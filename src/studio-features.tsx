@@ -1,6 +1,6 @@
 "use client";
-import { useEffect, useRef, useState, useCallback, type FormEvent, type ReactNode } from "react";
-import { ArrowLeft, CheckCircle2, CalendarDays, Plus, Download, Upload, Pencil, Trash2, ExternalLink, Link2, RefreshCw } from "lucide-react";
+import { useState, type FormEvent, type ReactNode } from "react";
+import { ArrowLeft, CalendarDays, Plus, Download, Upload, Pencil, Trash2 } from "lucide-react";
 import { eventRange } from "./studio-calendar";
 import { sumMoney, toISO } from "./studio-finance";
 import type { Project, Client, FinanceEntry, CalendarEvent, LibraryAsset, View, Status } from "./dashboard-client";
@@ -18,9 +18,17 @@ export const projectTemplates: Record<string, string[]> = {
 };
 function Empty({children}: {children: ReactNode}) { return <p className="studio-empty">{children}</p>; }
 function Back({onClick}: {onClick: () => void}) { return <button className="secondary-button" onClick={onClick}><ArrowLeft size={16}/> Voltar</button>; }
-export function WorkspaceTools({workspace, status, onNotify, onRetry, onUseServer}: {workspace: object; status: string; onRetry: () => void; onUseServer: () => void; onNotify: (s: string) => void}) {
-  function download() { const url = URL.createObjectURL(new Blob([JSON.stringify(workspace, null, 2)], {type:"application/json"})); const a = document.createElement("a"); a.href=url; a.download=`Roteiva-backup-${today()}.json`; a.click(); URL.revokeObjectURL(url); onNotify("Cópia exportada"); }
-  return <div className="workspace-tools"><span role="status">{status}</span>{status.includes("Conflito") && <button className="secondary-button" onClick={onUseServer}>Usar versão do servidor</button>}{(status.includes("Falha") || status.includes("indisponível")) && <button className="secondary-button" onClick={onRetry}>Tentar salvar</button>}<button className="secondary-button" title="Exporta os cadastros e lançamentos. Os arquivos enviados permanecem no armazenamento da Roteiva." onClick={download}><Download size={15}/> Exportar cópia</button></div>;
+export function WorkspaceTools({workspace, status, onNotify}: {workspace: object; status: string; onNotify: (s: string) => void}) {
+  function download() {
+    const url = URL.createObjectURL(new Blob([JSON.stringify(workspace, null, 2)], {type: "application/json"}));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Roteiva-backup-${today()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    onNotify("Cópia exportada");
+  }
+  return <div className="workspace-tools"><span role="status">{status}</span><button className="secondary-button" title="Exporta os cadastros e lançamentos locais; vídeos não são armazenados nesta demonstração." onClick={download}><Download size={15}/> Exportar cópia</button></div>;
 }
 export function TodayStudio({projects, clients, entries, events, activities, onView}: {projects: Project[]; clients:Client[]; entries: FinanceEntry[]; events: CalendarEvent[]; activities: {text: string; when: string}[]; onView: (v: View) => void}) {
   const active = projects.filter(p=>p.status!=="Aprovado").length;
@@ -72,33 +80,13 @@ export function ProjectDetail({project, clients, entries, assets, events, onSave
   <section className="panel studio-section"><div className="studio-toolbar"><h2>Agenda do projeto</h2><button className="secondary-button" onClick={()=>onEvent(project)}><CalendarDays size={15}/> Agendar</button></div>{events.filter(e=>e.projectId===project.id).map(e=><div className="studio-row" key={e.id}><b>{e.title}</b><span>{e.date.split("-").reverse().join("/")} · {eventRange(e)}</span></div>)}{!events.some(e=>e.projectId===project.id)&&<Empty>Nenhum compromisso vinculado.</Empty>}</section></div>;
 }
 
-type Feedback = {id:string;name:string;text:string;time:number;when:string;decision?:string};
-type Share = {token:string;asset_id:number;title:string;feedback:string;decision:string};
-function VersionCompare({assets}: {assets:LibraryAsset[]}) {
-  const videos=assets.filter(a=>a.kind==="Vídeo"&&a.url);
-  const [open,setOpen]=useState(false);
-  const [first,setFirst]=useState(String(videos[0]?.id || ""));
-  const [second,setSecond]=useState(String(videos[1]?.id || ""));
-  if(videos.length<2)return null;
-  return <section className="panel studio-section"><div className="studio-toolbar"><div><span className="eyebrow">REVISÃO VISUAL</span><h2>Compare dois cortes</h2></div><button className="secondary-button" onClick={()=>setOpen(v=>!v)}>{open?"Fechar comparação":"Comparar versões"}</button></div>{open&&<div className="studio-columns">{[{value:first,change:setFirst},{value:second,change:setSecond}].map((item,i)=><div className="compare-version" key={i}><label>Corte {i+1}<select value={item.value} onChange={e=>item.change(e.target.value)}>{videos.map(a=><option value={a.id} key={a.id}>{a.name} · V{a.version||1}</option>)}</select></label><video key={item.value} playsInline controls preload="metadata" src={videos.find(a=>String(a.id)===item.value)?.url}/></div>)}</div>}</section>;
+export function StudioReviews() {
+  return <div className="studio-detail"><section className="panel studio-section">
+    <span className="eyebrow">APROVAÇÕES · DEMONSTRAÇÃO</span>
+    <h2>Revisão de vídeos ainda não disponível</h2>
+    <p>Os arquivos serão armazenados no Google Drive de cada profissional. Envio, convites, comentários e aprovações serão habilitados quando a integração segura estiver pronta.</p>
+  </section></div>;
 }
-export function StudioReviews({assets,onNotify,onDecision,demoMode=false}: {demoMode?:boolean;assets:LibraryAsset[];onNotify:(s:string)=>void;onDecision:(a:LibraryAsset,decision:string)=>void}) {
-  const [shares,setShares]=useState<Share[]>([]); const [busy,setBusy]=useState(false);
-  const refresh = useCallback(async () => { if(demoMode) return; try {const r=await fetch("/api/share"); const d=await r.json() as {error?:string;shares:Share[]}; if(!r.ok)throw new Error(d.error);setShares(d.shares);}catch(e){onNotify(e instanceof Error?e.message:"Falha ao buscar aprovações");} }, [onNotify,demoMode]);
-  useEffect(()=>{queueMicrotask(() => {void refresh();});},[refresh]);
-  async function share(asset:LibraryAsset) {setBusy(true);try{const r=await fetch("/api/share",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({assetId:asset.id})});const d=await r.json() as {error?:string};if(!r.ok)throw new Error(d.error); await refresh();onDecision(asset,"pending");onNotify("Link de revisão criado. Use Copiar link para enviar ao cliente.");}catch(e){onNotify(e instanceof Error?e.message:"Não foi possível compartilhar");}setBusy(false);}
-  async function revoke(token:string) {if(!window.confirm("Desativar este link? O cliente não poderá mais acessar este material por ele."))return;try{const r=await fetch(`/api/share?token=${encodeURIComponent(token)}`,{method:"DELETE"});if(!r.ok)throw new Error("Não foi possível desativar o link");await refresh();onNotify("Link desativado");}catch(e){onNotify(e instanceof Error?e.message:"Falha ao desativar link");}}
-  if (demoMode) return <div className="studio-detail"><section className="panel studio-section"><span className="eyebrow">APROVAÇÕES · DEMONSTRAÇÃO</span><h2>Links de revisão requerem backend</h2><p>A área de aprovação de vídeos depende de armazenamento R2, banco D1 e APIs. No GitHub Pages, este recurso fica desativado para não simular o envio de arquivos ou o feedback de clientes.</p></section></div>;
-  return <div className="studio-detail"><section className="panel studio-section"><div className="studio-toolbar"><div><span className="eyebrow">APROVAÇÃO POR VERSÃO</span><h2>Materiais para revisão</h2></div><button className="secondary-button" onClick={refresh}><RefreshCw size={15}/> Atualizar retornos</button></div><p>Cada link dá acesso somente ao arquivo compartilhado. Quem receber o link poderá assistir, comentar e registrar uma decisão.</p>{assets.filter(a=>a.url&&a.kind==="Vídeo").map(a=><div className="studio-row" key={a.id}><div><b>{a.name}</b><small>{a.project}</small></div><button className="secondary-button" disabled={busy} onClick={()=>share(a)}><Link2 size={15}/> Criar link de revisão</button></div>)}{!assets.some(a=>a.url&&a.kind==="Vídeo")&&<Empty>Envie um vídeo na biblioteca ou na central do projeto para começar.</Empty>}</section><VersionCompare assets={assets}/>{shares.map(s=><section className="panel studio-section" key={s.token}><div className="studio-toolbar"><div><span className="eyebrow">{s.decision==="approved"?"APROVADO":s.decision==="changes"?"AJUSTES SOLICITADOS":"AGUARDANDO REVISÃO"}</span><h2>{s.title}</h2></div><a href={`/review?token=${s.token}`} target="_blank" rel="noreferrer" className="secondary-button"><ExternalLink size={15}/> Abrir portal</a><button className="secondary-button" onClick={async()=>{try{await navigator.clipboard.writeText(`${location.origin}/review?token=${s.token}`);onNotify("Link copiado");}catch{onNotify("Abra o portal e copie o endereço do navegador");}}}>Copiar link</button><button className="secondary-button" onClick={()=>revoke(s.token)}>Desativar link</button>{s.decision!=="pending"&&assets.find(a=>a.id===s.asset_id)?.projectId&&<button className="primary-button" onClick={()=>onDecision(assets.find(a=>a.id===s.asset_id)!,s.decision)}>Atualizar etapa do projeto</button>}</div>{(JSON.parse(s.feedback) as Feedback[]).map(f=><div className="feedback-item" key={f.id}><b>{f.name} <small>{new Date(f.when).toLocaleString("pt-BR")} · {Math.floor(f.time/60)}:{String(Math.floor(f.time%60)).padStart(2,"0")}</small></b><p>{f.text}</p></div>)}</section>)}</div>;
-}
-export function ReviewPortal() {
-  const [token,setToken]=useState("");const [data,setData]=useState<{title:string;feedback:Feedback[];decision:string;mimeType:string}|null>(null);const [error,setError]=useState("");const [name,setName]=useState("");const [text,setText]=useState("");const [time,setTime]=useState(0);const [busy,setBusy]=useState(false);const video=useRef<HTMLVideoElement>(null);
-  async function load(t:string) {const r=await fetch(`/api/portal?token=${encodeURIComponent(t)}`);const d=await r.json() as {error?:string;title:string;feedback:Feedback[];decision:string;mimeType:string};if(!r.ok)throw new Error(d.error);setData(d);}
-  useEffect(()=>{const t=new URLSearchParams(location.search).get("token")||"";queueMicrotask(()=>{setToken(t);void load(t).catch(e=>setError(e.message));});},[]);
-  async function submit(decision?:string) {setBusy(true);setError("");try{const r=await fetch("/api/portal",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token,name,text,time,decision})});const d=await r.json() as {error?:string};if(!r.ok)throw new Error(d.error);setText("");await load(token);}catch(e){setError(e instanceof Error?e.message:"Falha ao registrar retorno");}setBusy(false);}
-  return <main className="portal-page"><header><img src="/roteiva-logo-white.png" alt="Roteiva"/><span>ESPAÇO DE APROVAÇÃO</span></header>{error&&<p role="alert" className="studio-alert">{error}</p>}{!data?<p>Carregando material…</p>:<><h1>{data.title}</h1><p>{data.decision==="approved"?"Esta versão foi aprovada.":data.decision==="changes"?"Ajustes solicitados nesta versão.":"Assista ao material e registre seu retorno."}</p><div className="portal-layout"><section><video ref={video} playsInline controls preload="metadata" src={`/api/portal?token=${encodeURIComponent(token)}&media=1`} onTimeUpdate={e=>setTime(e.currentTarget.currentTime)}/><p>Comentários ficam vinculados ao tempo atual do vídeo.</p></section><aside className="studio-section panel"><label>Seu nome<input value={name} maxLength={100} onChange={e=>setName(e.target.value)} placeholder="Como podemos identificar seu retorno?"/></label><label>Comentário em {Math.floor(time/60)}:{String(Math.floor(time%60)).padStart(2,"0")}<textarea value={text} maxLength={3000} onChange={e=>setText(e.target.value)} placeholder="O que precisa ser ajustado?"/></label><button className="primary-button" disabled={busy||!name.trim()||!text.trim()} onClick={()=>submit()}>Enviar comentário</button><div className="portal-decisions"><button className="secondary-button" disabled={busy||!name.trim()} onClick={()=>submit("changes")}>Solicitar ajustes</button><button className="primary-button" disabled={busy||!name.trim()} onClick={()=>submit("approved")}><CheckCircle2 size={15}/> Aprovar versão</button></div>{data.feedback.map(f=><article className="feedback-item" key={f.id}><button className="timecode" onClick={()=>{if(video.current)video.current.currentTime=f.time;}}>{Math.floor(f.time/60)}:{String(Math.floor(f.time%60)).padStart(2,"0")}</button><b>{f.name}</b><p>{f.text}</p><small>{new Date(f.when).toLocaleString("pt-BR")}</small></article>)}</aside></div></>}</main>;
-}
-
 export function FinancePanel({entries,clients,onAdd,onEdit,onDelete}: {entries:FinanceEntry[];clients:Client[];onAdd:()=>void;onEdit:(e:FinanceEntry)=>void;onDelete:(e:FinanceEntry)=>void}) {
   const now=new Date();const [year,setYear]=useState(now.getFullYear());const [month,setMonth]=useState(now.getMonth());const [client,setClient]=useState("");const [status,setStatus]=useState("");
   const labels=["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];

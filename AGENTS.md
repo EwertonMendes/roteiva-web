@@ -38,12 +38,15 @@ Não recrie READMEs concorrentes, documentos de teste avulsos ou planos paralelo
 
 ## Atenção ao estado atual
 
-- O frontend **Next.js/Vinext é parte da estrutura aprovada e deve ser preservado**. A versão Pages em `pages/` usa os mesmos componentes em modo demonstração com `localStorage`.
-- Na PR #4 foram removidas APIs de negócio D1/R2/Drizzle e conectores antigos; o `build/sites-worker.ts` continua **somente como renderizador Vinext**. **Não remover Next/Vinext, seus scripts, layouts ou componentes sem solicitação explícita.**
-- Firebase + Worker API/D1 (tokens) + Drive individual é **objetivo futuro** e ainda não implementado. A remoção do backend legado não autoriza refatorar o frontend nem alterar a experiência.
+- O frontend foi **explicitamente migrado na PR #5 para React + Vite + TypeScript** a fim de atender ao Firebase Hosting estático. A entrada é `index.html` e o código da UI está em `src/`. **Não recriar Next.js/Vinext, SSR nem backend por conveniência**.
+- Existe **um único frontend**. `pnpm build` gera `dist/` para Firebase; `pnpm build:pages` gera `dist-pages/` para GitHub Pages. Ambos precisam continuar funcionando e a interface visual precisa ser preservada.
+- Apenas **Firebase Hosting está configurado**, sem deploy enquanto não houver projeto/segredos; Firebase Auth/Firestore, Worker API/D1 para OAuth e Google Drive individual ainda são **objetivo futuro**, não recursos implementados. Mudanças de tecnologia não autorizam redesenho da experiência.
 - O BRBET antigo é referência conceitual, não uma dependência e não deve ser copiado cegamente; verificar direitos de reutilização antes de aproveitar código.
 - O escopo `drive.file` é o padrão desejado; **não pedir acesso irrestrito ao Drive** por conveniência.
 - Com uploads grandes, dados passam diretamente do navegador ao Drive quando a prova de conceito confirmar segurança e CORS; **não passar vídeo pelo Worker**.
 - Refresh tokens só no backend criptografados; acesso entre workspaces sempre verificado no servidor/regras.
+
+- A chave de demonstração `roteiva-pages-demo-workspace-v1` é um contrato de compatibilidade local; não alterá-la sem migração de dados. LocalStorage não é compartilhado entre domínios diferentes.
+- Firebase deploy exige `FIREBASE_PROJECT_ID` e `FIREBASE_SERVICE_ACCOUNT`, nunca no código. Deploy de produção só manual até nova decisão.
 
 **Definição de pronto:** código revisado + testes aplicáveis + critérios de aceite + segurança relevante + documentação sincronizada. A documentação é parte da entrega, não um trabalho posterior.

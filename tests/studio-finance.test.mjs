@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {parseMoney, splitInstallments, sumMoney, toISO} from '../app/studio-finance.ts';
+import {parseMoney, splitInstallments, sumMoney, toISO} from '../src/studio-finance.ts';
 assert.equal(parseMoney('1.234,56'),1234.56);
 assert.equal(parseMoney('1234.56'),1234.56);
 assert.ok(Number.isNaN(parseMoney('inválido')));
@@ -14,9 +14,3 @@ assert.throws(()=>splitInstallments(.01,2,new Date()));
 assert.throws(()=>splitInstallments(5,0,new Date()));
 assert.equal(toISO('31/12/2026'),'2026-12-31');
 console.log('Financeiro: centavos, parcelas, fevereiro, ano bissexto e virada de ano OK');
-const {fingerprint,draftRecovery}=await import('../app/studio-sync.ts');
-assert.equal(fingerprint({b:2,a:1}),fingerprint({a:1,b:2}));
-assert.equal(draftRecovery({projects:[],clients:[]},2,{revision:1,workspace:{clients:[],projects:[]}}),'server');
-assert.equal(draftRecovery({projects:[]},2,{revision:2,workspace:{projects:[{id:1}]}}),'draft');
-assert.equal(draftRecovery({projects:[{id:2}]},3,{revision:2,workspace:{projects:[{id:1}]}}),'conflict');
-console.log('Sincronização: reordenação, resposta após recarregar, rascunho e conflito real OK');

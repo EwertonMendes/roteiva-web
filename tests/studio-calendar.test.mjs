@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {validTimeRange, overlaps, eventRange, eventDuration} from '../app/studio-calendar.ts';
+import {validTimeRange, overlaps, eventRange, eventDuration} from '../src/studio-calendar.ts';
 const work={id:1,date:'2026-10-23',time:'09:00',endTime:'11:30'};
 assert.equal(validTimeRange('09:00','11:30'),true);
 for(const range of [['09:00','09:00'],['11:00','09:00'],['25:00','26:00'],['09:00','']])assert.equal(validTimeRange(...range),false);

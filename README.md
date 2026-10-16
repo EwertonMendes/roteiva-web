@@ -1,77 +1,83 @@
 # Roteiva
 
-**Gestão de produções audiovisuais para freelancers e pequenos estúdios.**
+**Gestão de produção audiovisual para freelancers e pequenos estúdios.**
 
-O Roteiva pretende reunir clientes, projetos, entregas, agenda, financeiro, arquivos e aprovações em um único ambiente. A proposta é simplificar o trabalho de videomakers, editores, produtoras e profissionais independentes, mantendo os vídeos no **Google Drive do próprio usuário**.
+O Roteiva reúne, inicialmente em **modo demonstração**, clientes, projetos, tarefas, agenda e financeiro. A biblioteca de vídeos no Drive do usuário e o fluxo de revisões serão implementados nas próximas etapas do MVP.
 
-> **Estado em 16/10/2026:** protótipo com interface navegável e uma demonstração pública **local ao navegador**. A arquitetura SaaS descrita abaixo é o **plano do MVP**, não uma infraestrutura já implantada. **Não use dados privados ou arquivos reais na demonstração pública.**
-
-## Experimente a interface
+> **Estado em 16/10/2026:** frontend **React 19 + Vite 8 + TypeScript**, pronto para gerar um site estático para **Firebase Hosting**. Sem Next.js, Vinext, servidor próprio, banco, login ou upload remoto. A interface atual e os dados locais de demonstração foram preservados; **não utilize dados sensíveis ou de clientes reais**.
 
 **[Abrir demonstração no GitHub Pages](https://ewertonmendes.github.io/roteiva-web/)**
 
-A demonstração usa React/Vite e `localStorage`: permite explorar cadastros e telas, mas **não possui autenticação real, sincronização entre usuários/dispositivos, banco remoto, upload nem aprovação pública funcional**. Consulte [Desenvolvimento e ambientes](docs/DEVELOPMENT.md).
+## Começar
 
-## Escopo do produto
-
-- Painel com prazos, atividades e pendências.
-- Clientes recorrentes e avulsos; projetos, tarefas, modelos e entregas.
-- Agenda de gravações, reuniões, entregas e revisões.
-- Financeiro por cliente/projeto, receitas, despesas e parcelas.
-- Biblioteca de mídias com versões e vínculo aos projetos.
-- Revisão e aprovação de entregas por clientes convidados.
-- Conta individual e, no futuro, colaboração e assinaturas.
-
-**Status:** os componentes visuais/fluxos de protótipo existem em diferentes graus; os fluxos SaaS seguros e persistentes ainda serão implementados e validados. Veja o [roadmap vivo](docs/MVP-ROADMAP.md) para não confundir interface com produto pronto.
-
-## Arquitetura de destino (planejada)
-
-| Responsabilidade | Escolha para o MVP |
-|---|---|
-| Frontend | React + Vite + TypeScript, responsivo |
-| Hospedagem web | Firebase Hosting |
-| Identidade | Firebase Authentication, login Google |
-| Dados de negócio | Cloud Firestore com regras por workspace |
-| API e OAuth | Cloudflare Workers (TypeScript) |
-| Segredos e credenciais OAuth | Workers Secrets |
-| Refresh tokens criptografados | Cloudflare D1 |
-| Arquivos grandes | Google Drive conectado individualmente por usuário |
-| Integração contínua | GitHub Actions, com DEV/testes antes de produção |
-
-**Sem servidor próprio ligado 24h e sem armazenar os vídeos do cliente em um bucket central do Roteiva.** A meta inicial é caber nas franquias gratuitas; cotas, disponibilidade e necessidades comerciais devem ser verificadas antes do lançamento. A [arquitetura detalhada](docs/ARCHITECTURE.md) diferencia decisões, hipóteses e provas de conceito pendentes.
-
-## Situação técnica atual
-
-O repositório permanece em **Next.js 16 + Vinext + React 19**, preservando a estrutura, telas e estilos originais. A entrada adicional **React/Vite para GitHub Pages** continua funcionando. As rotas antigas `app/api/**`, Drizzle/D1, R2, autenticação do host e conectores antigos foram removidos; ambos os modos executam uma **demonstração com `localStorage`**, sem backend de negócio nem banco remoto. O adaptador Vinext/Cloudflare continua necessário para renderizar o frontend Next, mas não possui bindings D1/R2.
-
-A implementação de Firebase e Google Drive será feita **posteriormente e do zero**. Não confundir a demonstração atual com o SaaS final. A estrutura de frontend Next/Vinext foi mantida por decisão explícita.
-
-## Documentação
-
-| Documento | Para que serve |
-|---|---|
-| [Arquitetura](docs/ARCHITECTURE.md) | Frontend, backend, bancos, Drive, OAuth, segurança, modelos, fluxos e decisões em aberto |
-| [Roadmap do MVP](docs/MVP-ROADMAP.md) | Estado verificável, sequência de entregas, critérios de aceite e pendências |
-| [Desenvolvimento](docs/DEVELOPMENT.md) | Instalação, comandos, testes, deploy da demonstração e ambientes futuros |
-| [Design](docs/DESIGN.md) | Identidade visual, responsividade e acessibilidade |
-| [Instruções para IAs](AGENTS.md) | Regras para contribuir e **atualizar a documentação junto de cada implementação** |
-
-## Desenvolvimento rápido (estado atual)
-
-Requer **Node.js 22.13+** e **PNPM 11.25.0** (versão utilizada no CI).
+Requisitos: Node.js 22.13+ e PNPM 11.25.0.
 
 ```bash
 pnpm install --frozen-lockfile
-pnpm run test:calendar
-pnpm run test:finance
-pnpm run build:pages
+pnpm dev
 ```
 
-Para executar o frontend **Next/Vinext**, use `pnpm dev` (ambiente de desenvolvimento). Para a demonstração estática use `pnpm run build:pages`. O projeto utiliza **PNPM 11.25.0**, com um único `pnpm-lock.yaml`; não há migrations, R2 ou API de banco para iniciar.
+Validação e build:
 
-## Contribuição
+```bash
+pnpm test
+pnpm typecheck
+pnpm build
+pnpm preview
+```
 
-Use branches e pull requests. Toda mudança que implemente, remova ou altere uma funcionalidade precisa revisar o [roadmap](docs/MVP-ROADMAP.md), atualizar a [arquitetura](docs/ARCHITECTURE.md) quando necessário e registrar a validação no PR. Leia [AGENTS.md](AGENTS.md).
+O build de produção gera a pasta **`dist/`**, pronta para Firebase Hosting na raiz do domínio. A demonstração existente no GitHub Pages usa os **mesmos componentes** e é compilada com `pnpm build:pages` para `dist-pages/` sob `/roteiva-web/`.
 
----
-**Projeto em evolução — documentação atualizada em 16/10/2026.**
+## Estrutura atual
+
+```text
+index.html                   Entrada única React
+src/                         Componentes, estilos e regras locais
+public/                      Logos, favicon, fontes Ubuntu e licença
+assets/brand/                Fonte original da marca (fora do deploy)
+tests/                       Testes da agenda e do financeiro
+scripts/verify-static-build.mjs  Validação de artefatos Firebase/Pages
+vite.config.ts               Configuração única de build frontend
+firebase.json                Configuração Firebase Hosting (somente Hosting)
+.github/workflows/           CI e deploy do Pages; deploy Firebase manual
+docs/                        Arquitetura futura e roadmap
+```
+
+O aplicativo salva os dados somente no `localStorage` com a chave `roteiva-pages-demo-workspace-v1` (preservada para não perder dados anteriores no mesmo navegador e origem). **Domínios diferentes têm localStorage separado**: os dados existentes no Pages **não aparecerão automaticamente** em um domínio Firebase.
+
+Recursos ainda **não disponíveis**: autenticação Firebase, Firestore, backend Worker, upload do Drive, revisão compartilhada e sincronização em nuvem. A tela de revisão explica essa limitação.
+
+## Firebase Hosting
+
+O `firebase.json` já aponta para `dist/`, tem fallback de SPA para `/index.html` e cache longo somente para assets com nomes versionados. **Falta apenas vincular um projeto Firebase e autenticar o deploy**.
+
+```bash
+pnpm build
+pnpm dlx firebase-tools login
+pnpm dlx firebase-tools deploy --only hosting --project SEU_PROJECT_ID
+```
+
+O `SEU_PROJECT_ID` é o ID real do projeto Firebase escolhido, não um identificador de exemplo a manter. Também há o workflow manual **Deploy Firebase Hosting**, que requer a variável `FIREBASE_PROJECT_ID` e o segredo `FIREBASE_SERVICE_ACCOUNT` no GitHub. **Nada é publicado automaticamente no Firebase antes dessas configurações.** Consulte [guia de desenvolvimento e deploy](docs/DEVELOPMENT.md).
+
+## Próxima arquitetura (planejada)
+
+| Camada | Tecnologia futura |
+|---|---|
+| Site | Firebase Hosting — configuração estática já preparada |
+| Login | Firebase Authentication com Google |
+| Dados de negócio | Cloud Firestore + Security Rules |
+| API privilegiada e OAuth | Cloudflare Workers |
+| Tokens OAuth protegidos | Workers Secrets e Cloudflare D1 |
+| Vídeos e mídias | Google Drive individual de cada profissional |
+
+As integrações futuras **não fazem parte do build atual**. Consulte [arquitetura](docs/ARCHITECTURE.md) e [roadmap](docs/MVP-ROADMAP.md).
+
+## Documentação
+
+- [Arquitetura e decisões técnicas](docs/ARCHITECTURE.md)
+- [Roadmap vivo do MVP](docs/MVP-ROADMAP.md)
+- [Desenvolvimento, testes e deploy Firebase](docs/DEVELOPMENT.md)
+- [Design e responsividade](docs/DESIGN.md)
+- [Regras permanentes para IAs e contribuidores](AGENTS.md)
+
+Contribuições devem passar por PR, com testes e documentação atualizados na mesma alteração.

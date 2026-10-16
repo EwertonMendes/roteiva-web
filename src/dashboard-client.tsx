@@ -11,9 +11,8 @@ import {
 } from "lucide-react";
 import { ProjectDetail, ClientDetail, TodayStudio, StudioReviews, WorkspaceTools, FinancePanel, projectTemplates } from "./studio-features";
 import { validTimeRange, overlaps, eventRange, eventDuration } from "./studio-calendar";
-import { fingerprint, draftRecovery } from "./studio-sync";
 import { toISO as toISOAdded, parseMoney, splitInstallments } from "./studio-finance";
-import { FormEvent, useEffect, useMemo, useState, useRef, useCallback } from "react";
+import { FormEvent, useEffect, useMemo, useState, useCallback } from "react";
 
 export type View = "overview" | "projects" | "clients" | "reviews" | "finance" | "calendar" | "library";
 export type Status = "Em produção" | "Em aprovação" | "Ajustes" | "Aprovado";
@@ -53,7 +52,7 @@ function BrandAvatar({ initials, color, large = false }: { initials: string; col
   return <span className={`brand-avatar ${color} ${large ? "large" : ""}`}>{initials}</span>;
 }
 
-export default function DashboardClient({ firstName, email, demoMode = false }: { firstName: string; email: string; demoMode?: boolean }) {
+export default function DashboardClient({ firstName, email }: { firstName: string; email: string }) {
   const [view, setView] = useState<View>("overview");
   const [projects, setProjects] = useState(initialProjects);
   const [clientList, setClientList] = useState(initialClients);
@@ -87,14 +86,7 @@ export default function DashboardClient({ firstName, email, demoMode = false }: 
   const [saveStatus, setSaveStatus] = useState("Carregando dados…");
   const [libraryProject, setLibraryProject] = useState("");
   const [uploading, setUploading] = useState(false);
-  const storageKey = demoMode ? "roteiva-pages-demo-workspace-v1" : `roteiva-workspace-v2:${email}`;
-  const pendingKey = `roteiva-pending-v2:${email}`;
-  const revision = useRef(0);
-  const lastSaved = useRef("");
-  const remoteSnapshot = useRef<{workspace: Partial<typeof workspace>; revision: number} | null>(null);
-  const serverReady = useRef(false);
-  const [saveAttempt, setSaveAttempt] = useState(0);
-  const saveQueue = useRef(Promise.resolve());
+  const storageKey = "roteiva-pages-demo-workspace-v1";
   const [activities, setActivities] = useState<{text: string; when: string}[]>([]);
   const workspace = { projects, clients: clientList, financeEntries, monthlyRevenue, calendarEvents, libraryAssets: libraryAssets.map((asset) => ({ ...asset, preview: undefined })), comments, reviewState, activities };
   function logActivity(text: string) { setActivities(current => [{text, when: new Date().toISOString()}, ...current].slice(0, 150)); }
@@ -103,15 +95,6 @@ export default function DashboardClient({ firstName, email, demoMode = false }: 
     setCalendarEvents(data.calendarEvents || []);
     setLibraryAssets(data.libraryAssets || []); setComments(data.comments || []); setReviewState(data.reviewState || "pending"); setActivities(data.activities || []);
   }, []);
-  async function retrySave() {
-    if (demoMode) return;
-    try {
-      const response = await fetch("/api/workspace"); const data = await response.json() as {revision:number};
-      if (!response.ok) throw new Error("Servidor indisponível");
-      if (data.revision !== revision.current) { setSaveStatus("Conflito entre janelas · exporte sua cópia antes de recarregar"); return; }
-      serverReady.current = true; setSaveAttempt(n => n + 1);
-    } catch { setSaveStatus("Servidor indisponível · tente novamente"); }
-  }
   function openEvent(entry: CalendarEvent | null = null, date = "") {
     setEditingEvent(entry); setEventDate(date); setEventError("");
     setEventDraft({date:entry?.date || date || new Date().toLocaleDateString("en-CA"),time:entry?.time || "09:00",endTime:entry?.endTime || ""});
@@ -136,10 +119,6 @@ export default function DashboardClient({ firstName, email, demoMode = false }: 
     setClientList(current => current.map(c => c.id === client.id ? client : c));
     logActivity(`Entregas atualizadas: ${client.name}`);
   }
-  function applyReview(asset: LibraryAsset, decision: string) {
-    const project = projects.find(p => p.id === asset.projectId);
-    if (project) updateProject({...project,status:decision === "approved" ? "Aprovado" : decision === "changes" ? "Ajustes" : "Em aprovação"});
-  }
   function addLinkedRevenue(project: Project) { openFinanceModal(); setSelectedProject(project.id); }
 
 
@@ -149,110 +128,36 @@ export default function DashboardClient({ firstName, email, demoMode = false }: 
   }), [projects, query, statusFilter]);
 
   useEffect(() => {
-    let live = true;
-    async function load() {
-      const saved = localStorage.getItem("roteiva-theme");
-      const preferred = saved === "dark" || saved === "light" ? saved : window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-      setTheme(preferred); document.documentElement.setAttribute("data-theme", preferred);
-      if (demoMode) {
-        try {
-          const local = localStorage.getItem(storageKey);
-          if (local) restoreWorkspace(JSON.parse(local));
-          setSaveStatus("Demonstração · dados somente neste navegador");
-        } catch { setSaveStatus("Demonstração · armazenamento local indisponível"); }
-        if (live) setDataReady(true);
-        return;
-      }
-      try {
-        const response = await fetch("/api/workspace");
-        if (!response.ok) throw new Error("Servidor indisponível");
-        const data = await response.json() as { workspace: Partial<typeof workspace> | null; revision: number };
-        if (!live) return;
-        revision.current = data.revision; serverReady.current = true;
-        lastSaved.current = data.workspace ? fingerprint(data.workspace) : "";
-        const local = localStorage.getItem(storageKey) || ((!localStorage.getItem("roteiva-legacy-owner") || localStorage.getItem("roteiva-legacy-owner") === email) ? localStorage.getItem("roteiva-workspace-v1") : null);
-        const draftText = localStorage.getItem(pendingKey);
-        const draft = draftText ? JSON.parse(draftText) : null;
-        const recovery = draftRecovery(data.workspace, data.revision, draft);
-        if (recovery === "server") {
-          if (data.workspace) restoreWorkspace(data.workspace);
-          else if (local) restoreWorkspace(JSON.parse(local));
-          if (draftText) localStorage.removeItem(pendingKey);
-          setSaveStatus("Salvo no servidor");
-        } else {
-          restoreWorkspace(draft.workspace);
-          if (recovery === "conflict") {
-            serverReady.current = false;
-            remoteSnapshot.current = {workspace: data.workspace || {}, revision: data.revision};
-            setSaveStatus("Conflito entre janelas · sua cópia está preservada");
-          } else setSaveStatus("Salvando sua cópia pendente…");
-        }
-        if (!localStorage.getItem("roteiva-legacy-owner")) localStorage.setItem("roteiva-legacy-owner", email);
-      } catch {
-        if (!live) return;
-        const local = localStorage.getItem(storageKey) || ((!localStorage.getItem("roteiva-legacy-owner") || localStorage.getItem("roteiva-legacy-owner") === email) ? localStorage.getItem("roteiva-workspace-v1") : null);
-        if (local) { try { restoreWorkspace(JSON.parse(local)); } catch {} }
-        setSaveStatus("Cópia local · servidor indisponível");
-      }
-      if (live) setDataReady(true);
+    const saved = localStorage.getItem("roteiva-theme");
+    const preferred = saved === "dark" || saved === "light"
+      ? saved
+      : window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    setTheme(preferred);
+    document.documentElement.setAttribute("data-theme", preferred);
+    try {
+      const local = localStorage.getItem(storageKey);
+      if (local) restoreWorkspace(JSON.parse(local));
+      setSaveStatus("Demonstração · dados somente neste navegador");
+    } catch {
+      setSaveStatus("Demonstração · armazenamento local indisponível");
     }
-    void load();
-    return () => { live = false; };
-  }, [restoreWorkspace, storageKey, pendingKey, email, demoMode]);
+    setDataReady(true);
+  }, [restoreWorkspace]);
 
   useEffect(() => {
     if (!dataReady) return;
-    const payload = { projects, clients: clientList, financeEntries, monthlyRevenue, calendarEvents, libraryAssets: libraryAssets.map((asset) => ({ ...asset, preview: undefined })), comments, reviewState, activities };
-    const key = fingerprint(payload);
+    const payload = {
+      projects, clients: clientList, financeEntries, monthlyRevenue, calendarEvents,
+      libraryAssets: libraryAssets.map(asset => ({...asset, preview: undefined})),
+      comments, reviewState, activities,
+    };
     try {
       localStorage.setItem(storageKey, JSON.stringify(payload));
-      if (demoMode) { setSaveStatus("Demonstração · salvo neste navegador"); return; }
-      if (key === lastSaved.current) return;
-      if (serverReady.current) localStorage.setItem(pendingKey, JSON.stringify({workspace: payload, revision: revision.current}));
-    } catch { queueMicrotask(() => setSaveStatus("Falha na cópia local · exporte seus dados")); }
-    const timer = window.setTimeout(() => {
-      if (!serverReady.current) return;
-      setSaveStatus("Salvando…");
-      saveQueue.current = saveQueue.current.then(async () => {
-        if (!serverReady.current || key === lastSaved.current) return;
-        try {
-          const response = await fetch("/api/workspace", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workspace: payload, revision: revision.current }) });
-          const data = await response.json() as { error?: string; revision: number };
-          if (!response.ok) {
-            if (response.status === 409) {
-              const latestResponse = await fetch("/api/workspace");
-              if (!latestResponse.ok) throw new Error("Não foi possível conferir os dados no servidor");
-              const latest = await latestResponse.json() as {workspace: Partial<typeof payload>; revision:number};
-              if (fingerprint(latest.workspace) === key) revision.current = latest.revision;
-              else {
-                remoteSnapshot.current = latest; serverReady.current = false;
-                throw new Error("Conflito entre janelas · sua cópia está preservada");
-              }
-            } else throw new Error(data.error || "Falha ao salvar");
-          } else revision.current = data.revision;
-          lastSaved.current = key;
-          const draft = localStorage.getItem(pendingKey);
-          if (!draft || fingerprint(JSON.parse(draft).workspace) === key) {
-            localStorage.removeItem(pendingKey); setSaveStatus("Salvo no servidor");
-          } else {
-            const newer = JSON.parse(draft); newer.revision = revision.current;
-            localStorage.setItem(pendingKey, JSON.stringify(newer));
-          }
-        } catch (error) { setSaveStatus(error instanceof Error ? error.message : "Falha ao salvar · cópia local disponível"); }
-      });
-    }, 450);
-    return () => window.clearTimeout(timer);
-  }, [projects, clientList, financeEntries, monthlyRevenue, calendarEvents, libraryAssets, comments, reviewState, activities, dataReady, saveAttempt, storageKey, pendingKey, demoMode]);
-
-  function useServerCopy() {
-    const remote = remoteSnapshot.current;
-    if (!remote) return;
-    localStorage.setItem(`${storageKey}:conflict-backup`, JSON.stringify(workspace));
-    lastSaved.current = fingerprint(remote.workspace); revision.current = remote.revision;
-    serverReady.current = true; remoteSnapshot.current = null;
-    localStorage.removeItem(pendingKey); restoreWorkspace(remote.workspace);
-    setSaveStatus("Salvo no servidor · cópia anterior guardada neste navegador");
-  }
+      setSaveStatus("Demonstração · salvo neste navegador");
+    } catch {
+      setSaveStatus("Falha ao salvar · exporte seus dados");
+    }
+  }, [projects, clientList, financeEntries, monthlyRevenue, calendarEvents, libraryAssets, comments, reviewState, activities, dataReady]);
 
   useEffect(() => {
     if (!dataReady) return;
@@ -386,22 +291,8 @@ export default function DashboardClient({ firstName, email, demoMode = false }: 
     notify("Compromisso adicionado ao calendário");
   }
 
-  async function uploadAssets(files: FileList | null, projectId?: number) {
-    if (demoMode) { notify("Envio de arquivos requer um servidor. Disponível na hospedagem completa."); return; }
-    if (!files?.length || uploading) return;
-    setUploading(true);
-    for (const file of Array.from(files)) {
-      try {
-        if (!file.size || file.size > 250 * 1024 * 1024) throw new Error("Selecione um arquivo de até 250 MB");
-        const response = await fetch("/api/media", { method: "POST", body: file, headers: {"Content-Type":file.type || "application/octet-stream", "X-File-Name":encodeURIComponent(file.name), "X-File-Size":String(file.size)} });
-        const data = await response.json() as {error?: string; key: string; url: string; mimeType: string}; if (!response.ok) throw new Error(data.error);
-        const kind: AssetKind = file.type.startsWith("video/") ? "Vídeo" : file.type.startsWith("image/") ? "Imagem" : file.type.startsWith("audio/") ? "Áudio" : "Documento";
-        const asset: LibraryAsset = { id: Date.now(), name: file.name, kind, projectId, project: projects.find(p => p.id === projectId)?.name || "Sem projeto", size: `${(file.size / 1024 / 1024).toFixed(2).replace(".", ",")} MB`, addedAt: new Date().toLocaleDateString("pt-BR"), color: "violet", fileKey: data.key, url: data.url, mimeType: data.mimeType, version: Math.max(0, ...libraryAssets.filter(a => a.name === file.name && a.projectId === projectId).map(a => a.version || 1)) + 1 };
-        setLibraryAssets(current => [{...asset, version: Math.max(0, ...current.filter(a => a.name === asset.name && a.projectId === asset.projectId).map(a => a.version || 1)) + 1}, ...current]); logActivity(`Arquivo enviado: ${file.name}`);
-        notify(`Arquivo salvo: ${file.name}`);
-      } catch (error) { notify(error instanceof Error ? error.message : "Não foi possível enviar o arquivo"); }
-    }
-    setUploading(false);
+  function uploadAssets(_files: FileList | null, _projectId?: number) {
+    notify("Envio de arquivos ficará disponível após a integração com Google Drive.");
   }
 
   function changeView(next: View) {
@@ -462,22 +353,22 @@ export default function DashboardClient({ firstName, email, demoMode = false }: 
         </header>
 
         <section className="page">
-          {demoMode && <div className="pages-demo-notice" role="note"><b>Modo demonstração</b><span>Projetos, clientes, agenda e financeiro ficam salvos apenas neste navegador. Sem login, sincronização, uploads ou links públicos de aprovação.</span></div>}
+          <div className="pages-demo-notice" role="note"><b>Modo demonstração</b><span>Projetos, clientes, agenda e financeiro ficam salvos apenas neste navegador. Sem login, sincronização, uploads ou links públicos de aprovação.</span></div>
           <div className="page-heading">
             <div><span className="eyebrow">ROTEIVA / {view === "overview" ? "PAINEL" : pageTitles[view][0].toUpperCase()}</span><h1>{pageTitles[view][0]}</h1><p>{pageTitles[view][1]}</p></div>
             <div className="heading-actions">
-              <WorkspaceTools workspace={workspace} status={saveStatus} onRetry={retrySave} onUseServer={useServerCopy} onNotify={notify} />
+              <WorkspaceTools workspace={workspace} status={saveStatus} onNotify={notify} />
               {view === "clients" ? <button className="primary-button" onClick={() => { setEditingClient(null); setClientModalOpen(true); }}><UserRoundPlus size={17} /> Novo cliente</button>
                 : view === "finance" ? <button className="primary-button" onClick={() => openFinanceModal()}><Plus size={17} /> Nova receita</button>
                 : view === "calendar" ? <button className="primary-button" onClick={() => openEvent()}><Plus size={17} /> Novo compromisso</button>
-                : view === "library" ? <><select aria-label="Projeto dos arquivos" value={libraryProject} onChange={e => setLibraryProject(e.target.value)}><option value="">Sem projeto</option>{projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select><label className="primary-button upload-button"><Upload size={17} /> {uploading ? "Enviando…" : "Adicionar arquivos"}<input type="file" disabled={uploading || demoMode} multiple onChange={(event) => { uploadAssets(event.target.files, Number(libraryProject) || undefined); event.target.value = ""; }} /></label></>
+                : view === "library" ? <><select aria-label="Projeto dos arquivos" value={libraryProject} onChange={e => setLibraryProject(e.target.value)}><option value="">Sem projeto</option>{projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select><label className="primary-button upload-button"><Upload size={17} /> {uploading ? "Enviando…" : "Adicionar arquivos"}<input type="file" disabled multiple onChange={(event) => { uploadAssets(event.target.files, Number(libraryProject) || undefined); event.target.value = ""; }} /></label></>
                 : <button className="primary-button" onClick={() => setModalOpen(true)}><Plus size={17} /> Criar projeto</button>}
             </div>
           </div>
           {view === "overview" && <><TodayStudio clients={clientList} projects={projects} entries={financeEntries} events={calendarEvents} activities={activities} onView={changeView} /><Overview projects={projects} setView={changeView} /></>}
           {view === "projects" && (selectedProject && projects.some(p => p.id === selectedProject) ? <ProjectDetail project={projects.find(p => p.id === selectedProject)!} clients={clientList} entries={financeEntries} assets={libraryAssets} events={calendarEvents} onSave={updateProject} onBack={() => setSelectedProject(null)} onRevenue={addLinkedRevenue} onUpload={uploadAssets} onEvent={(p) => { openEvent(null, p.dueDate); }} uploading={uploading} /> : <ProjectsView projects={filtered.map(p => ({...p, files: libraryAssets.filter(a => a.projectId === p.id).length}))} statusFilter={statusFilter} setStatusFilter={setStatusFilter} onOpen={(id)=>{setSelectedProject(id);window.scrollTo({top:0,behavior:"auto"});}} />)}
           {view === "clients" && (selectedClient && clientList.some(c => c.id === selectedClient) ? <ClientDetail client={clientList.find(c => c.id === selectedClient)!} projects={projects} entries={financeEntries} onBack={() => setSelectedClient(null)} onEdit={(client) => { setEditingClient(client); setClientModalOpen(true); }} onSave={saveClientPackage} onProject={(id) => { setSelectedProject(id); setView("projects"); }} /> : <ClientsView clients={clientList.filter(c => `${c.name} ${c.email} ${c.phone}`.toLowerCase().includes(query.toLowerCase())).map(c => ({...c, projects: projects.filter(p => p.clientId === c.id).length, active: projects.filter(p => p.clientId === c.id && p.status !== "Aprovado").length}))} onOpen={(id)=>{setSelectedClient(id);window.scrollTo({top:0,behavior:"auto"});}} onAdd={() => { setEditingClient(null); setClientModalOpen(true); }} />)}
-          {view === "reviews" && <StudioReviews assets={libraryAssets} onNotify={notify} onDecision={applyReview} demoMode={demoMode} />}
+          {view === "reviews" && <StudioReviews />}
           {view === "finance" && <FinancePanel entries={financeEntries} clients={clientList} onAdd={() => openFinanceModal()} onEdit={(entry) => openFinanceModal(entry)} onDelete={setDeletingFinanceEntry} />}
           {view === "calendar" && <CalendarView events={calendarEvents} onAdd={(date) => openEvent(null, date)} onEdit={(entry) => openEvent(entry)} onDelete={(entry) => { if (window.confirm(`Excluir o compromisso “${entry.title}”?`)) { setCalendarEvents(current => current.filter(e => e.id !== entry.id)); logActivity(`Compromisso excluído: ${entry.title}`); } }} />}
           {view === "library" && <LibraryView assets={libraryAssets} query={query} onUpload={(files) => uploadAssets(files, Number(libraryProject) || undefined)} />}
