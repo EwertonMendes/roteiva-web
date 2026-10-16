@@ -35,10 +35,10 @@
 | Componente | Situação | Evidência/limitação |
 |---|---|---|
 | Interface, páginas e estados locais | **IMPLEMENTADO para demo local** | `src/dashboard-client.tsx` e `src/studio-features.tsx`, sem backend; UI preservada |
-| Demonstração GitHub Pages | **IMPLEMENTADO — publicação a validar após PR #5** | Mesmo frontend `src/`, build `dist-pages/`, `localStorage` |
+| Demonstração GitHub Pages | **VALIDADO — publicado após PR #6** | Mesmo frontend `src/`, build `dist-pages/`, `localStorage` |
 | Testes de calendário/financeiro | **IMPLEMENTADO** | `tests/studio-calendar.test.mjs`, `tests/studio-finance.test.mjs`; executados no CI do Pages |
 | API antiga e D1/R2 | **REMOVIDO do código ativo** | PR #4; frontend Next/Vinext preservado; backend futuro será novo |
-| Firebase Hosting | **VALIDADO na auditoria prévia** | DEV ativo, release 043ce6 anterior à PR #6, Spark |
+| Firebase Hosting | **VALIDADO na auditoria prévia** | DEV Spark atualizado após CI master 38981508561 e deploy 38981719389 |
 | Firebase Auth e Firestore | **IMPLEMENTADO na PR #6; QA em andamento** | Console DEV configurado, regras e persistência por UID; evidências abaixo |
 | Worker API separado e D1 de tokens | **PLANEJADO** | Não existe Worker OAuth/refresh do MVP |
 | Drive individual por usuário | **PLANEJADO** | Integração BRBET inspecionada externamente; não transferida |
@@ -170,7 +170,7 @@
 | 16/10/2026 | [PR #2](https://github.com/EwertonMendes/roteiva-web/pull/2) | Organização documental | Estrutura/arquitetura propostas registradas | Somente Markdown; **não** altera funcionalidades |
 | 16/10/2026 | [PR #3](https://github.com/EwertonMendes/roteiva-web/pull/3) | Higienização | Scaffold removido; PNPM padronizado | Pipeline Pages passou |
 | 16/10/2026 | [PR #4](https://github.com/EwertonMendes/roteiva-web/pull/4) | Limpeza backend | APIs antigas, D1/R2/Drizzle retirados; Next/Vinext preservados naquela etapa | Testes e deploy Pages aprovados |
-| 16/10/2026 | [PR #6](https://github.com/EwertonMendes/roteiva-web/pull/6) | Firebase DEV Solo | IMPLEMENTADO; automação VALIDADA | [CI 38980915291](https://github.com/EwertonMendes/roteiva-web/actions/runs/38980915291); 12 regras/repositório + 8 browser; provisionamento Spark aprovado; publicação e OAuth real pendentes |
+| 16/10/2026 | [PR #6](https://github.com/EwertonMendes/roteiva-web/pull/6) | Firebase DEV Solo | IMPLEMENTADO; automação VALIDADA | [CI 38980915291](https://github.com/EwertonMendes/roteiva-web/actions/runs/38980915291); 12 regras/repositório + 8 browser; CI master e deploy concluídos; OAuth real em andamento |
 | 16/10/2026 | [PR #5](https://github.com/EwertonMendes/roteiva-web/pull/5) | Migração React/Vite | Next/Vinext removidos a pedido, Vite único, Firebase Hosting configurado | Validar CI com TypeScript, testes e dois builds; Firebase deploy aguarda projeto/segredos |
 
 ### Protocolo para IAs
@@ -181,11 +181,11 @@
 4. Se mudar tecnologia/fluxo, sincronizar `ARCHITECTURE.md`, `DEVELOPMENT.md` e `README.md`.
 5. Nunca transformar projeções de uso/custo ou ideias discutidas em garantias ou funcionalidades entregues.
 
-**Próxima entrega:** concluir QA e publicação Firebase DEV da PR #6. Depois, PoC Drive da Fase 0, sem antecipar Worker/D1 nesta entrega.
+**Próxima entrega:** concluir QA Google real do DEV publicado na PR #6. Depois, PoC Drive da Fase 0, sem antecipar Worker/D1 nesta entrega.
 
 ## Entrega Firebase DEV — PR #6
 
-**Estado: IMPLEMENTADO; validação automatizada concluída, publicação e QA real pendentes.** [PR #6](https://github.com/EwertonMendes/roteiva-web/pull/6). Auditoria e decisões em [desenvolvimento](DEVELOPMENT.md). Esta seção é a evidência específica da fundação Solo; itens Worker/Drive/PROD das fases anteriores continuam planejados.
+**Estado: PUBLICADO no DEV; validação automatizada concluída, QA Google real em andamento.** [PR #6](https://github.com/EwertonMendes/roteiva-web/pull/6). Auditoria e decisões em [desenvolvimento](DEVELOPMENT.md). Esta seção é a evidência específica da fundação Solo; itens Worker/Drive/PROD das fases anteriores continuam planejados.
 
 - [x] Auditoria da master 4fbd5fd registrada antes das alterações.
 - [x] Aprovação explícita da região permanente São Paulo, Standard e Spark; banco provisionado em Production Mode.
@@ -194,13 +194,13 @@
 - [x] Persistência por documento, centavos, tarefas e entregas independentes, preferência de tema, gravação pontual e revisão para conflitos.
 - [x] Demo com chave original e build explícito; sem importação de dados antigos.
 - [x] [CI verde no commit 3eb037a](https://github.com/EwertonMendes/roteiva-web/actions/runs/38980915291): instalação congelada, testes domínio/TS, ambos builds, 12 testes regras/repositório A/B e 8 Chromium desktop/mobile. Alterações posteriores devem repetir CI antes do merge.
-- [ ] Publicar regras/índices e Hosting após validação e permissões necessárias.
+- [x] Regras/índices/Hosting publicados em roteiva-web-dev: [deploy 38981719389, tentativa 2](https://github.com/EwertonMendes/roteiva-web/actions/runs/38981719389), após [CI master](https://github.com/EwertonMendes/roteiva-web/actions/runs/38981508561).
 - [ ] QA Google real: entrar/sair, refresh, CRUD persistente, nome/e-mail/foto, segunda conta e acesso indevido.
 - [ ] QA visual real desktop/mobile, claro/escuro, SPA /review e Pages.
-- [ ] Finalizar PR, merge e release DEV com evidência.
+- [x] PR #6 mergeada em [4ce6847](https://github.com/EwertonMendes/roteiva-web/commit/4ce6847eeca52adaf0fbe894d51a6bf670d911e8); release DEV e Pages concluídos.
 
 **Testes adicionados:** `tests/firestore.rules.test.mjs` (CRUD, anônimo, A/B, UID/role/owner, timestamp, validação em updates, excesso de dados, datas/valores/referências, órfãos, atomicidade e conflito), `tests/auth-errors.test.mjs` e `tests/browser/workspace.spec.ts` (sessão e CRUD via Auth Emulator, offline, cancelamento e demo).
 
 **Riscos/limites:** emuladores não substituem OAuth real; Safari/iOS/navegadores embutidos não estão validados; sem listener entre abas (recarregar explicitamente); sem fila offline; o recarregamento de recuperação descarta rascunhos não confirmados. Histórico activities não é auditoria inviolável. Não há promessa de custo ilimitado ou segurança exaustiva. Perfil e exclusão completa de conta continuam sem UI para evitar limpeza parcial.
 
-**IAM autorizado e aplicado:** Firebase Rules Admin e Cloud Datastore Index Admin adicionados à conta de deploy existente somente no DEV. Sem Blaze ou novas chaves.
+**IAM autorizado e aplicado:** Firebase Rules Admin, Cloud Datastore Index Admin e Service Usage Viewer adicionados à conta de deploy existente somente no DEV. Sem Blaze ou novas chaves.

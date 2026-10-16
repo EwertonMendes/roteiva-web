@@ -73,7 +73,7 @@ Configuração de repositório reaproveitada:
 - Secret `FIREBASE_SERVICE_ACCOUNT`, somente em etapa de autenticação após validação.
 - Conta existente `roteiva-github-deploy-dev@roteiva-web-dev.iam.gserviceaccount.com`.
 
-Papéis existentes auditados: Firebase Hosting Admin e API Keys Viewer. Com autorização explícita do proprietário em 16/10/2026, adicionados Firebase Rules Admin (`roles/firebaserules.admin`) e Cloud Datastore Index Admin (`roles/datastore.indexAdmin`) somente no projeto DEV. Estes não dão acesso de leitura/escrita aos documentos, mas permitem alterar a segurança e os índices. Não conceder Editor/Owner/Firestore User por conveniência. WIF é uma melhoria futura: elimina chave persistente, mas exige pool, provider e binding IAM restrito ao repo/master; não criar outro mecanismo de credenciais sem auditoria e autorização.
+Papéis existentes auditados: Firebase Hosting Admin e API Keys Viewer. Com autorização explícita do proprietário em 16/10/2026, adicionados Firebase Rules Admin (`roles/firebaserules.admin`) e Cloud Datastore Index Admin (`roles/datastore.indexAdmin`) somente no projeto DEV. Após o primeiro deploy retornar 403 na consulta do estado da API Firestore, o proprietário também autorizou `roles/serviceusage.serviceUsageViewer`: leitura de serviços/cotas/métricas, sem habilitar APIs ou cobrança. Estes papéis não dão acesso de leitura/escrita aos documentos, mas permitem alterar a segurança e os índices. Não conceder Editor/Owner/Firestore User por conveniência. WIF é uma melhoria futura: elimina chave persistente, mas exige pool, provider e binding IAM restrito ao repo/master; não criar outro mecanismo de credenciais sem auditoria e autorização.
 
 O comando explícito é:
 ```bash
@@ -124,3 +124,9 @@ Em 16/10/2026 o proprietário aprovou explicitamente Standard, São Paulo e Spar
 ### Evidência automatizada da PR #6
 
 [Run 38980915291](https://github.com/EwertonMendes/roteiva-web/actions/runs/38980915291), commit 3eb037a: instalação congelada, testes de calendário/financeiro/autenticação, TypeScript, build Firebase e Pages, 12 testes Firestore/repositório e 8 testes Chromium passaram. Browser cobre OAuth simulado pelo Auth Emulator, cancelamento, CRUD, centavos, agenda após reload, sessão/tema, duas contas, offline e demo, em desktop e Pixel 7 emulado. Relatório HTML e capturas no artefato firebase-qa (retenção de 7 dias). A publicação e o OAuth real devem ser conferidos depois do merge; não são comprovados por este run.
+
+### Publicação DEV e IAM final
+
+PR #6 mergeada em 4ce6847. [CI master](https://github.com/EwertonMendes/roteiva-web/actions/runs/38981508561) passou, publicou Pages e acionou [deploy DEV](https://github.com/EwertonMendes/roteiva-web/actions/runs/38981719389), concluído na tentativa 2 em 16/10/2026 às 20:33 de Brasília: regras compiladas/publicadas, índices aplicados e 15 arquivos do Hosting publicados exclusivamente em roteiva-web-dev. O primeiro deploy retornou 403 ao consultar serviceusage.services.get. O proprietário aprovou Service Usage Viewer; após concessão, o mesmo commit foi republicado com sucesso. Nenhuma API nova ou cobrança foi habilitada por esse ajuste.
+
+Chrome confirmou a tela de login do DEV, ausência de workspace anônimo, recuperação do cancelamento do popup e demonstração Pages sem login. A rota direta /review entrega a SPA e exige autenticação. O endpoint reservado /__/auth/handler responde. A validação OAuth Google real está em andamento: seleção pelo controle automatizado ficou em carregamento; na primeira intervenção humana houve retorno ao Firebase, porém o app recebeu cancelamento. Nenhuma sessão real ou criação de usuário foi confirmada nesse ponto; não confundir esse registro com o sucesso dos emuladores.

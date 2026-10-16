@@ -1,6 +1,6 @@
 # Arquitetura do Roteiva — MVP SaaS
 
-**Atualizado em 16/10/2026. Fundação Firebase DEV IMPLEMENTADA na PR #6; testes automatizados validados; QA real após publicação pendente. Worker/Drive e demais fases continuam PLANEJADOS.**
+**Atualizado em 16/10/2026. Fundação Firebase DEV IMPLEMENTADA na PR #6; publicação DEV e testes automatizados validados; QA Google real em andamento. Worker/Drive e demais fases continuam PLANEJADOS.**
 
 Esta é a fonte de verdade sobre **como o sistema deverá funcionar**. O acompanhamento do que já foi entregue fica no [roadmap](MVP-ROADMAP.md); instruções operacionais em [desenvolvimento](DEVELOPMENT.md). Mudanças de arquitetura e decisões novas devem atualizar este arquivo **no mesmo PR**, conforme [AGENTS.md](../AGENTS.md).
 
@@ -203,7 +203,7 @@ Mudanças de uma decisão para **confirmada**, **validada** ou **descartada** pr
 
 A migração React/Vite foi preservada. Auditoria anterior às alterações em [DEVELOPMENT.md](DEVELOPMENT.md). Hosting já estava ativo com release 043ce6; textos antigos que diziam não publicado foram corrigidos.
 
-CI valida ambos builds, regras e browser nos emuladores. Deploy DEV após CI verde da master, checkout do SHA validado e projeto fixo. Dispatch manual executa testes novamente. Secret preexistente protegido no Actions. Papéis de regras/índices autorizados pelo proprietário e concedidos somente no DEV; WIF é evolução futura, sem pools/credenciais extras neste escopo.
+CI valida ambos builds, regras e browser nos emuladores. Deploy DEV após CI verde da master, checkout do SHA validado e projeto fixo. Dispatch manual executa testes novamente. Secret preexistente protegido no Actions. Papéis de regras/índices e Service Usage Viewer autorizados pelo proprietário e concedidos somente no DEV; WIF é evolução futura, sem pools/credenciais extras neste escopo.
 
 Limitações: sem atualização em tempo real entre abas; conflitos por documento e reload explícito; sem fila offline privada. OAuth Google real, segunda conta e Safari/iOS dependem evidência registrada no roadmap. Os componentes Worker/Drive acima continuam PLANEJADOS.
 
