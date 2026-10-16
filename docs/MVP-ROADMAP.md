@@ -170,7 +170,7 @@
 | 16/10/2026 | [PR #2](https://github.com/EwertonMendes/roteiva-web/pull/2) | Organização documental | Estrutura/arquitetura propostas registradas | Somente Markdown; **não** altera funcionalidades |
 | 16/10/2026 | [PR #3](https://github.com/EwertonMendes/roteiva-web/pull/3) | Higienização | Scaffold removido; PNPM padronizado | Pipeline Pages passou |
 | 16/10/2026 | [PR #4](https://github.com/EwertonMendes/roteiva-web/pull/4) | Limpeza backend | APIs antigas, D1/R2/Drizzle retirados; Next/Vinext preservados naquela etapa | Testes e deploy Pages aprovados |
-| 16/10/2026 | [PR #6](https://github.com/EwertonMendes/roteiva-web/pull/6) | Firebase DEV Solo | IMPLEMENTADO; automação VALIDADA | [CI 38980915291](https://github.com/EwertonMendes/roteiva-web/actions/runs/38980915291); 12 regras/repositório + 8 browser; CI master e deploy concluídos; OAuth real em andamento |
+| 16/10/2026 | [PR #6](https://github.com/EwertonMendes/roteiva-web/pull/6) | Firebase DEV Solo | IMPLEMENTADO; automação VALIDADA | [CI 38980915291](https://github.com/EwertonMendes/roteiva-web/actions/runs/38980915291); 12 regras/repositório + 8 browser; CI master e deploy concluídos; OAuth real em uma conta confirmado; segunda conta em andamento |
 | 16/10/2026 | [PR #5](https://github.com/EwertonMendes/roteiva-web/pull/5) | Migração React/Vite | Next/Vinext removidos a pedido, Vite único, Firebase Hosting configurado | Validar CI com TypeScript, testes e dois builds; Firebase deploy aguarda projeto/segredos |
 
 ### Protocolo para IAs
@@ -195,7 +195,8 @@
 - [x] Demo com chave original e build explícito; sem importação de dados antigos.
 - [x] [CI verde no commit 3eb037a](https://github.com/EwertonMendes/roteiva-web/actions/runs/38980915291): instalação congelada, testes domínio/TS, ambos builds, 12 testes regras/repositório A/B e 8 Chromium desktop/mobile. Alterações posteriores devem repetir CI antes do merge.
 - [x] Regras/índices/Hosting publicados em roteiva-web-dev: [deploy 38981719389, tentativa 2](https://github.com/EwertonMendes/roteiva-web/actions/runs/38981719389), após [CI master](https://github.com/EwertonMendes/roteiva-web/actions/runs/38981508561).
-- [ ] QA Google real: entrar/sair, refresh, CRUD persistente, nome/e-mail/foto, segunda conta e acesso indevido.
+- [x] Google real em uma conta: perfil/foto, workspace inicialmente vazio, cliente/projeto/tarefa/agenda/financeiro e tema restaurados após reload.
+- [ ] Concluir logout/relogin e segunda conta Google real; distinguir dos ataques A/B via SDK já testados nos emuladores.
 - [ ] QA visual real desktop/mobile, claro/escuro, SPA /review e Pages.
 - [x] PR #6 mergeada em [4ce6847](https://github.com/EwertonMendes/roteiva-web/commit/4ce6847eeca52adaf0fbe894d51a6bf670d911e8); release DEV e Pages concluídos.
 

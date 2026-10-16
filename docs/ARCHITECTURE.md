@@ -1,6 +1,6 @@
 # Arquitetura do Roteiva — MVP SaaS
 
-**Atualizado em 16/10/2026. Fundação Firebase DEV IMPLEMENTADA na PR #6; publicação DEV e testes automatizados validados; QA Google real em andamento. Worker/Drive e demais fases continuam PLANEJADOS.**
+**Atualizado em 16/10/2026. Fundação Firebase DEV IMPLEMENTADA na PR #6; publicação DEV e testes automatizados validados; Google real e persistência conferidos em uma conta; segunda conta e dispositivos ainda em andamento. Worker/Drive e demais fases continuam PLANEJADOS.**
 
 Esta é a fonte de verdade sobre **como o sistema deverá funcionar**. O acompanhamento do que já foi entregue fica no [roadmap](MVP-ROADMAP.md); instruções operacionais em [desenvolvimento](DEVELOPMENT.md). Mudanças de arquitetura e decisões novas devem atualizar este arquivo **no mesmo PR**, conforme [AGENTS.md](../AGENTS.md).
 
