@@ -30,9 +30,9 @@ export function decodeWorkspace(records: Records): WorkspaceData {
     const collection = path.split("/")[0];
     if (collection === "clients") {
       const {monthlyFeeCents, ...rest} = d;
-      workspace.clients.push({...rest,monthlyFee:Number(monthlyFeeCents)/100,projects:0,active:0,deliveries:[]} as Client);
+      workspace.clients.push({...rest,monthlyFee:Number(monthlyFeeCents)/100,projects:0,active:0,deliveries:[]} as unknown as Client);
     }
-    if (collection === "projects") workspace.projects.push({...d,due:d.dueDate ? new Date(d.dueDate+"T12:00:00").toLocaleDateString("pt-BR",{day:"2-digit",month:"short"}) : "Sem prazo",tasks:[],progress:0,files:0} as Project);
+    if (collection === "projects") workspace.projects.push({...d,due:d.dueDate ? new Date(d.dueDate+"T12:00:00").toLocaleDateString("pt-BR",{day:"2-digit",month:"short"}) : "Sem prazo",tasks:[],progress:0,files:0} as unknown as Project);
     if (collection === "events") workspace.calendarEvents.push(d as unknown as WorkspaceData["calendarEvents"][number]);
     if (collection === "financeEntries") {
       const {amountCents, ...rest} = d;

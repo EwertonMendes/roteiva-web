@@ -15,7 +15,7 @@ import { toISO as toISOAdded, parseMoney, splitInstallments } from "./studio-fin
 import { FormEvent, useEffect, useMemo, useState, useCallback } from "react";
 
 import { isDemo } from "./lib/firebase";
-import { newId, type WorkspaceData, type Activity, type View, type Project, type Client, type ClientType, type FinanceEntry, type CalendarEvent, type LibraryAsset, type Status } from "./domain/workspace";
+import { newId, type WorkspaceData, type Activity, type View, type Project, type Client, type ClientType, type AssetKind, type FinanceEntry, type CalendarEvent, type LibraryAsset, type Status } from "./domain/workspace";
 export type { View, Project, Client, FinanceEntry, CalendarEvent, LibraryAsset, Status } from "./domain/workspace";
 
 const initialProjects: Project[] = [];
@@ -90,7 +90,7 @@ export default function DashboardClient({ firstName, email, photoURL, initialWor
   const [activities, setActivities] = useState<Activity[]>([]);
   const workspace = { projects, clients: clientList, financeEntries, monthlyRevenue, calendarEvents, libraryAssets: libraryAssets.map((asset) => ({ ...asset, preview: undefined })), comments, reviewState, activities };
   function logActivity(text: string) { setActivities(current => [{id:crypto.randomUUID(),text, when: new Date().toISOString()}, ...current].slice(0, 150)); }
-  const restoreWorkspace = useCallback((data: Partial<typeof workspace>) => {
+  const restoreWorkspace = useCallback((data: Partial<WorkspaceData>) => {
     setProjects(data.projects || []); setClientList(data.clients || []); setFinanceEntries(data.financeEntries || []);
     setCalendarEvents(data.calendarEvents || []);
     setLibraryAssets(data.libraryAssets || []); setComments(data.comments || []); setReviewState(data.reviewState || "pending"); setActivities(data.activities || []);
