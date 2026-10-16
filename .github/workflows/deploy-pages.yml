@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [master]
   workflow_dispatch:
+    inputs:
+      prepare_firebase_dependencies:
+        description: 'One-time dependency lockfile preparation on the Firebase feature branch'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -15,7 +20,31 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  prepare:
+    if: github.event_name == 'workflow_dispatch' && inputs.prepare_firebase_dependencies && github.ref == 'refs/heads/codex/firebase-dev-auth-firestore'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: pnpm add firebase@latest
+      - run: pnpm add -D firebase-tools@latest @firebase/rules-unit-testing@latest @playwright/test@latest
+      - name: Commit dependency manifests only
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add package.json pnpm-lock.yaml
+          git commit -m 'build: lock Firebase SDK, emulators and browser test dependencies'
+          git push origin HEAD:codex/firebase-dev-auth-firestore
+
   build:
+    if: github.event_name != 'workflow_dispatch' || !inputs.prepare_firebase_dependencies
     name: Validate static frontend
     runs-on: ubuntu-latest
     steps:
@@ -50,7 +79,7 @@ jobs:
 
   deploy:
     name: Publish Pages
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && !inputs.prepare_firebase_dependencies
     needs: build
     runs-on: ubuntu-latest
     permissions:
