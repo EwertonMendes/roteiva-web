@@ -38,8 +38,8 @@
 | Demonstração GitHub Pages | **IMPLEMENTADO — publicação a validar após PR #5** | Mesmo frontend `src/`, build `dist-pages/`, `localStorage` |
 | Testes de calendário/financeiro | **IMPLEMENTADO** | `tests/studio-calendar.test.mjs`, `tests/studio-finance.test.mjs`; executados no CI do Pages |
 | API antiga e D1/R2 | **REMOVIDO do código ativo** | PR #4; frontend Next/Vinext preservado; backend futuro será novo |
-| Firebase Hosting | **CONFIGURADO, sem deploy** | `firebase.json`, build `dist/`, workflow manual; falta projeto/credenciais |
-| Firebase Auth e Firestore | **PLANEJADO** | Nenhuma conta, regras ou banco implementados |
+| Firebase Hosting | **VALIDADO na auditoria prévia** | DEV ativo, release 043ce6 anterior à PR #6, Spark |
+| Firebase Auth e Firestore | **IMPLEMENTADO na PR #6; QA em andamento** | Console DEV configurado, regras e persistência por UID; evidências abaixo |
 | Worker API separado e D1 de tokens | **PLANEJADO** | Não existe Worker OAuth/refresh do MVP |
 | Drive individual por usuário | **PLANEJADO** | Integração BRBET inspecionada externamente; não transferida |
 | Revisão segura por cliente | **PLANEJADO** | Fluxo legado incompatível com arquitetura-alvo |
@@ -65,12 +65,12 @@
 
 ## Fase 1 — Fundação SaaS e ambientes
 
-**Prioridade P0.** Dependente do aprendizado básico da Fase 0.
+**Prioridade P0.** Por solicitação explícita na PR #6, Auth/Firestore Solo são independentes da PoC Drive da Fase 0. Worker/OAuth continuam planejados.
 
 - [x] Unificar React/Vite/TS na SPA em `src/`, mantendo visual, estado local e build Pages; preparar build Firebase em `dist/` (PR #5).
 - [x] Padronizar lockfile/instalação com PNPM, removendo o npm lock e instaladores órfãos (higienização PR #3); **a auditoria de dependências em si continua pendente**.
-- [ ] Criar projetos Firebase **DEV** e **PROD** separados: Hosting, Authentication e Firestore.
-- [ ] Implementar login Google via Firebase Auth, logout, reidratação da sessão, proteção de rotas e erros.
+- [x] Reutilizar exclusivamente Firebase **DEV** roteiva-web-dev: Hosting ativo, Auth Google habilitado, Firestore Standard criado em São Paulo após aprovação. **PROD não autorizado e não criado**.
+- [x] Implementar login Google, logout, sessão, proteção e erros na PR #6; **IMPLEMENTADO**, QA real ainda pendente.
 - [ ] Criar cliente HTTP para Worker, com Firebase ID Token e tratamento de expiração/401; sem compartilhar UID arbitrário.
 - [ ] Criar API Worker DEV/PROD separada, secrets/bindings por ambiente e CORS controlado.
 - [ ] Configurar CI para typecheck, lint, testes, build e previews DEV; manter deploy PROD controlado.
@@ -83,9 +83,9 @@
 
 **Prioridade P0.** Dependente da Fase 1.
 
-- [ ] Definir tipos de domínio, IDs estáveis, datas ISO, moeda em centavos e índices necessários.
-- [ ] Estruturar `users` e `workspaces` com ownerUid imutável e regras deny-by-default.
-- [ ] Extrair repositórios Firestore para clientes, projetos, tarefas, entregas, agenda e finanças; **não** salvar workspace como documento JSON único.
+- [x] Contratos, IDs aleatórios seguros, datas civis ISO e moeda persistida em centavos (PR #6); sem índices compostos exigidos.
+- [x] Decisão Solo: users/{uid} e subcoleções privadas, ownerUid imutável, deny-by-default (PR #6). Workspaces compartilhados são futuros.
+- [x] Repositório por documento para clientes, projetos, tarefas, entregas, agenda, finanças, atividades e preferências (PR #6).
 - [ ] Implementar cadastro/edição/exclusão por registro, paginação e estados vazios/erros.
 - [ ] Definir estratégia de concorrência, descarte/recuperação offline e migração de dados prototipados; nunca sobrescrever silenciosamente.
 - [ ] Criar testes Firebase Emulator de Security Rules, com ataque cruzado A/B e mutações de owner/plano/papel negadas.
@@ -179,4 +179,26 @@
 4. Se mudar tecnologia/fluxo, sincronizar `ARCHITECTURE.md`, `DEVELOPMENT.md` e `README.md`.
 5. Nunca transformar projeções de uso/custo ou ideias discutidas em garantias ou funcionalidades entregues.
 
-**Próxima entrega recomendada:** Fase 0, PoC segura de Firebase ID Token + OAuth Drive + Worker + D1 + upload resumable.
+**Próxima entrega:** concluir QA e publicação Firebase DEV da PR #6. Depois, PoC Drive da Fase 0, sem antecipar Worker/D1 nesta entrega.
+
+## Entrega Firebase DEV — PR #6
+
+**Estado: IMPLEMENTADO, validação integral em andamento.** [PR #6](https://github.com/EwertonMendes/roteiva-web/pull/6). Auditoria e decisões em [desenvolvimento](DEVELOPMENT.md). Esta seção é a evidência específica da fundação Solo; itens Worker/Drive/PROD das fases anteriores continuam planejados.
+
+- [x] Auditoria da master 4fbd5fd registrada antes das alterações.
+- [x] Aprovação explícita da região permanente São Paulo, Standard e Spark; banco provisionado em Production Mode.
+- [x] Aplicativo Web DEV registrado e somente Google habilitado; domínios Firebase e localhost confirmados.
+- [x] Implementação Firebase modular, perfil privado, sessão, loading/proteção e erros.
+- [x] Persistência por documento, centavos, tarefas e entregas independentes, preferência de tema, gravação pontual e revisão para conflitos.
+- [x] Demo com chave original e build explícito; sem importação de dados antigos.
+- [ ] CI final verde: instalação congelada, testes domínio/TS, ambos builds, regras e integração A/B, Chromium desktop/mobile.
+- [ ] Publicar regras/índices e Hosting após validação e permissões necessárias.
+- [ ] QA Google real: entrar/sair, refresh, CRUD persistente, nome/e-mail/foto, segunda conta e acesso indevido.
+- [ ] QA visual real desktop/mobile, claro/escuro, SPA /review e Pages.
+- [ ] Finalizar PR, merge e release DEV com evidência.
+
+**Testes adicionados:** `tests/firestore.rules.test.mjs` (CRUD, anônimo, A/B, UID/role/owner, timestamp, validação em updates, excesso de dados, datas/valores/referências, órfãos, atomicidade e conflito), `tests/auth-errors.test.mjs` e `tests/browser/workspace.spec.ts` (sessão e CRUD via Auth Emulator, offline, cancelamento e demo).
+
+**Riscos/limites:** emuladores não substituem OAuth real; Safari/iOS/navegadores embutidos não estão validados; sem listener entre abas (recarregar explicitamente); sem fila offline; o recarregamento de recuperação descarta rascunhos não confirmados. Histórico activities não é auditoria inviolável. Não há promessa de custo ilimitado ou segurança exaustiva. Perfil e exclusão completa de conta continuam sem UI para evitar limpeza parcial.
+
+**BLOQUEADO até autorização:** papéis de implantação de regras/índices na conta de serviço existente. Não há necessidade de habilitar Blaze ou entregar credenciais pelo chat.

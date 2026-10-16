@@ -13,8 +13,11 @@ export function dataErrorMessage(error: unknown): string {
 }
 export class FirestoreWorkspace {
   private stored = new Map<string, Stored>();
-  constructor(private db: Firestore, private uid: string) {
+  private db: Firestore;
+  private uid: string;
+  constructor(db: Firestore, uid: string) {
     if (!uid || uid.includes("/")) throw new Error("UID inválido.");
+    this.db=db; this.uid=uid;
   }
   private ref(path: string) { return doc(this.db, "users/" + this.uid + "/" + path); }
   async initializeProfile(profile: {displayName:string;email:string;photoURL:string}) {

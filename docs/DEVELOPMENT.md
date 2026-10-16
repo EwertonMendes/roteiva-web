@@ -1,81 +1,89 @@
-# Desenvolvimento e deploy — React/Vite + Firebase Hosting
+# Desenvolvimento e deploy — Roteiva
 
-**Estado em 16/10/2026:** frontend estático **React 19 + Vite 8 + TypeScript**. Não existe backend, banco, autenticação real ou integração Drive ativa. [README](../README.md) · [Arquitetura](ARCHITECTURE.md) · [Roadmap](MVP-ROADMAP.md).
+[README](../README.md) · [Arquitetura](ARCHITECTURE.md) · [Roadmap](MVP-ROADMAP.md).
 
-## Requisitos
-
-- Node.js **22.13+** e PNPM **11.25.0**.
-- Apenas `pnpm-lock.yaml` como lockfile. Instalar com `pnpm install --frozen-lockfile`.
-- As fontes Ubuntu e licença estão em `public/fonts/ubuntu`; mantenha-as nos builds.
+React 19/Vite 8/TypeScript, sem SSR, Next/Vinext, Functions, Worker ou D1 ativo. Node 22.13+, PNPM 11.25.0 e Java 21 para emuladores. Somente `pnpm-lock.yaml`; instalação congelada obrigatória.
 
 ## Comandos
 
-| Comando | Finalidade |
+| Comando | Resultado |
 |---|---|
-| `pnpm dev` | Servidor local Vite na raiz (normalmente http://localhost:5173) |
-| `pnpm test` | Testes da agenda e do financeiro |
-| `pnpm typecheck` | TypeScript sem emitir arquivos |
-| `pnpm build` | Build **Firebase Hosting** com base `/` → `dist/` |
-| `pnpm preview` | Preview do build Firebase |
-| `pnpm build:pages` | Mesmo app com base `/roteiva-web/` → `dist-pages/` |
-| `node scripts/verify-static-build.mjs dist /` | Conferir artefatos Firebase + fallback SPA |
-| `node scripts/verify-static-build.mjs dist-pages /roteiva-web/` | Conferir artefatos Pages |
+| `pnpm install --frozen-lockfile` | Dependências travadas |
+| `pnpm dev` | Demo Vite sem login |
+| `pnpm dev --mode firebase` | DEV Firebase (config pública em .env.firebase / overrides .env.local) |
+| `pnpm test` | Agenda, dinheiro e mensagens de falha do login |
+| `pnpm typecheck` | TypeScript sem emissão |
+| `pnpm build` | Firebase explícito → dist/ |
+| `pnpm build:pages` | Demo explícita → dist-pages/ sob /roteiva-web/ |
+| `pnpm build:emulator` | Firebase fictício → dist-emulator/ |
+| `pnpm exec playwright install chromium` | Navegador de teste |
+| `pnpm test:firebase` | Auth/Firestore Emulator + regras, repositório e navegador |
+| `node scripts/verify-static-build.mjs dist /` | SPA e assets Firebase |
+| `node scripts/verify-static-build.mjs dist-pages /roteiva-web/` | Artefatos Pages |
 
-Não existem Next/Vinext, SSR, rotas de API, Workers, D1/R2 nem migrations. A única entrada é `index.html` e os componentes ficam em `src/`. Não adicionar serviços de servidor até iniciar a fase correspondente do MVP.
+As dependências desta PR foram instaladas e o lockfile gerado em GitHub Actions. Nenhuma CLI ou clone foi instalado no computador do proprietário. O job temporário que preparou o lockfile foi retirado; não é parte do CI final.
 
-## Firebase Hosting — preparado, mas ainda não vinculado
+## Variáveis públicas Vite
 
-O arquivo `firebase.json` está limitado a **Hosting**, com:
+`.env.example` é um modelo vazio. `.env.firebase` contém somente a configuração **pública** do app DEV registrado; `.env.demo` desativa Firebase; `.env.emulator` usa dados fictícios e `demo-roteiva`. `.env.local` é ignorado pelo Git.
 
-- `public: "dist"` — somente o resultado compilado é publicado.
-- `rewrites: [{source: "**", destination: "/index.html"}]` — rotas da SPA funcionam quando abertas diretamente.
-- Cache `immutable` para `/assets/**` (Vite gera nomes com hash); `index.html` sem cache forte.
-- Sem Cloud Functions, Firestore Rules, Storage nem rotas privilegiadas.
+| Variável | Necessidade |
+|---|---|
+| VITE_APP_MODE | `demo` ou `firebase`, obrigatório |
+| VITE_FIREBASE_API_KEY | Chave pública do SDK, obrigatória no Firebase |
+| VITE_FIREBASE_AUTH_DOMAIN | Domínio Firebase Auth, obrigatório |
+| VITE_FIREBASE_PROJECT_ID | Somente `roteiva-web-dev`; testes exigem `demo-roteiva` |
+| VITE_FIREBASE_APP_ID | App Web registrado, obrigatório |
+| VITE_FIREBASE_MESSAGING_SENDER_ID | Número do projeto, obrigatório |
+| VITE_FIREBASE_STORAGE_BUCKET | Opcional; nenhum bucket é utilizado/provisionado |
+| VITE_USE_EMULATORS | Apenas testes explícitos; endpoints 127.0.0.1:9099/8080 |
 
-Para o primeiro deploy, crie ou escolha um projeto no [Firebase Console](https://console.firebase.google.com/), ative **Hosting** (plano Spark enquanto couber nas franquias), faça login na CLI e execute:
+Nunca colocar service account JSON, private keys, refresh tokens ou segredos administrativos em `VITE_*`. O app mostra erro de configuração quando variáveis obrigatórias faltam. A demo não inicializa SDK/consulta/grava Firebase.
 
+## Autenticação e dados
+
+Google é o único provedor habilitado. Sessão em persistência local gerenciada pelo Firebase Auth; estado observado por `onAuthStateChanged`; telas privadas somente após a verificação. Popup acionado diretamente pelo clique, após inicializar persistência. Bloqueio, cancelamento, rede e expiração têm mensagens próprias.
+
+Domínios autorizados: `roteiva-web-dev.web.app`, `roteiva-web-dev.firebaseapp.com`, `localhost` (desenvolvimento). O Pages não é domínio de login. Não há escopos Drive. Redirecionamento OAuth automático não foi adicionado: exige validação específica de armazenamento entre origens e mobile. Safari/iOS e navegadores embutidos devem ter QA real antes de divulgação ampla.
+
+Dados privados somente em memória da aplicação e Firestore; nenhuma migração da demo ou cache Firestore persistente em disco. Carregamento paginado em blocos de 200, uma vez por abertura/recarregamento explícito; sem listeners globais. Atualizações concorrentes de um mesmo documento são rejeitadas pela revisão, com recuperação explícita. Atualizações independentes não regravam coleções inteiras. Uma transação limita alterações simultâneas a 400 documentos; pacotes de entregas permitem até 100 itens.
+
+Exportação JSON/CSV preservada. O JSON reflete os dados carregados e não inclui mídia. Ao perder rede/permissão ou ocorrer conflito, o painel oferece recarregar a nuvem, descartando alterações não confirmadas. Uma navegação enquanto grava dispara aviso de saída.
+
+## Regras e testes
+
+`firestore.rules` nega tudo por padrão e permite somente o dono de `users/{uid}`. Valida campos permitidos/obrigatórios, tamanhos, tipos, enumerações, referências dentro da mesma conta, centavos, datas civis reais, intervalos, revisão sequencial e timestamps de servidor. Perfil não pode ser excluído pelo cliente para não deixar filhos sem ciclo de limpeza.
+
+`firestore.indexes.json` tem listas vazias: consultas usam ordenação pelo ID de documento dentro do UID, sem índices compostos necessários. Não criar índices especulativos.
+
+O teste de regras cobre leitura/listagem, criação, atualização/exclusão cruzadas A/B, anônimo, UID forjado, mudança de owner, campos administrativos, timestamps, remoção de campos, strings excessivas, tipos/valores inválidos, órfãos e referências. O repositório testa CRUD, centavos, reabertura, preferência e conflito real. Chromium testa popup Google simulado, cancelamento, CRUD, reidratação, duas contas, offline, temas e demo em desktop/mobile.
+
+**Limite da evidência:** emuladores não comprovam OAuth do Google em produção, duas contas Google reais, Safari/iOS ou cotas reais. Ver status/evidências no roadmap. Artefatos de QA são mantidos por sete dias no Actions. Não marcar testes planejados como executados.
+
+## Deploy GitHub Actions
+
+`deploy-pages.yml` valida PR/push/dispatch: instalação congelada, domínio, TypeScript, builds Firebase/Pages, emuladores e navegador. Somente master fora de PR publica Pages.
+
+`deploy-firebase.yml` aguarda sucesso do workflow CI após push na master, faz checkout **do SHA validado**, confere o ID DEV e publica regras, índices e Hosting. Dispatch manual somente na master executa os testes completos novamente antes de publicar. Environment final: `firebase-development`; o antigo nome `firebase-production` não identificava um projeto PROD e não é usado no workflow novo.
+
+Configuração de repositório reaproveitada:
+- Variable `FIREBASE_PROJECT_ID=roteiva-web-dev`, validada por igualdade.
+- Secret `FIREBASE_SERVICE_ACCOUNT`, somente em etapa de autenticação após validação.
+- Conta existente `roteiva-github-deploy-dev@roteiva-web-dev.iam.gserviceaccount.com`.
+
+Papéis existentes auditados: Firebase Hosting Admin e API Keys Viewer. **PENDENTE DE AUTORIZAÇÃO:** publicação automática de regras/índices exige Firebase Rules Admin e Cloud Datastore Index Admin; estes não dão acesso de leitura/escrita aos documentos, mas permitem alterar a segurança e os índices. Não conceder Editor/Owner/Firestore User por conveniência. WIF é uma melhoria futura: elimina chave persistente, mas exige pool, provider e binding IAM restrito ao repo/master; não criar outro mecanismo de credenciais sem auditoria e autorização.
+
+O comando explícito é:
 ```bash
-pnpm install --frozen-lockfile
-pnpm test
-pnpm typecheck
-pnpm build
-node scripts/verify-static-build.mjs dist /
-pnpm dlx firebase-tools login
-pnpm dlx firebase-tools deploy --only hosting --project SEU_PROJECT_ID
+pnpm exec firebase deploy --only firestore:rules,firestore:indexes,hosting --project roteiva-web-dev --non-interactive
 ```
 
-**Não executar `firebase init hosting` sem revisar o diff:** pode sobrescrever o `firebase.json` pré-configurado. `.firebaserc` não é exigido porque o comando informa `--project`; nunca versionar segredos ou ID de projeto fictício. O Hosting disponibiliza `https://SEU_PROJECT_ID.web.app/` quando provisionado.
+O Hosting serve dist/, fallback SPA /index.html e cache longo somente para assets versionados. Nenhum comando tem projeto PROD ou cria projeto/banco. Auth foi configurado no Console e não é sobrescrito no deploy.
 
-## GitHub Actions
+## QA real restante
 
-`deploy-pages.yml` roda em todo PR/push na `master`: instalação PNPM, testes, typecheck, build `dist/` e `dist-pages/`, verificações de arquivos. Somente push/dispatch publica o GitHub Pages.
+Entrar/sair/reabrir com Google no DEV, repetir com segunda conta autorizada, conferir foto/nome/e-mail, permissão cruzada real, tema claro/escuro e desktop/mobile; testar atualização direta de /review. Emuladores e verificações de build não substituem isso.
 
-`deploy-firebase.yml` é **manual**, por `workflow_dispatch`, com environment `firebase-production`. Ele requer no GitHub:
-
-1. **Variable:** `FIREBASE_PROJECT_ID`, com o ID exato do projeto.
-2. **Secret:** `FIREBASE_SERVICE_ACCOUNT`, JSON da conta de serviço autorizada para Firebase Hosting, configurado pela pessoa responsável pelo projeto.
-
-O workflow **falha explicitamente** se variável/segredo não estiverem presentes, para evitar publicação em um projeto errado. Produção não é publicada automaticamente ao fazer merge. Para operação a longo prazo, preferir federação de identidade e permissões mínimas, se o mecanismo de deploy escolhido suportar.
-
-## Estado da demonstração
-
-- Navegação, clientes, projetos, tarefas, calendário, receitas/despesas, temas e exportação JSON funcionam **somente localmente**.
-- Dados ficam em `localStorage["roteiva-pages-demo-workspace-v1"]`.
-- **Dados não migram entre domínios:** Pages e Firebase têm origens distintas, então a mudança de URL começa com um armazenamento vazio.
-- Uploads, login e aprovação remota continuam desativados. `/review` exibe uma página explicativa (SPA fallback no Firebase).
-- Dados fictícios para testes; não inserir dados reais ou sigilosos.
-
-## Checklist de QA
-
-1. Acessar `/` e `/review` (inclusive atualização direta em `/review` no Hosting).
-2. Conferir logo, favicon, fontes locais, CSS, intro, tema claro/escuro e responsividade.
-3. Criar/editar/excluir clientes, projetos, tarefas, eventos, finanças; conferir CSV e JSON.
-4. Recarregar e verificar persistência de dados no mesmo domínio/navegador.
-5. Confirmar que não há chamadas `/api/**`, upload falso ou tela de erro de backend.
-6. Testar mobile, teclado, movimento reduzido e modais.
-7. Conferir tamanhos dos bundles e conteúdo do diretório publicado.
-
-A verificação do CI **não substitui testes visuais**. Atualize o [roadmap](MVP-ROADMAP.md) e a arquitetura no mesmo PR, conforme [AGENTS.md](../AGENTS.md).
 
 ## Auditoria Firebase DEV — antes das alterações (16/10/2026)
 
@@ -98,3 +106,7 @@ Inspeção da master `4fbd5fdf86c793c386ff42f6b6e5d696ebf51fb5` e Console autent
 **BLOQUEADO:** criação do banco até aprovação explícita da região permanente. Proposta: Standard, `(default)`, `southamerica-east1` (São Paulo), Production Mode, Spark. Sem Blaze, backups pagos, Functions, Storage, PROD ou importação de demo.
 
 Implementação e validação Auth/Firestore permanecem **PLANEJADAS** nesta auditoria. Credencial privada existente não foi lida nem copiada. WIF depende de auditoria IAM e não será alterado por conveniência.
+
+### Resultado do provisionamento aprovado
+
+Em 16/10/2026 o proprietário aprovou explicitamente Standard, São Paulo e Spark. Criado `(default)`, `southamerica-east1`, nativo, Production Mode inicialmente deny-all; sem backups pagos. Authentication inicializado e somente Google habilitado com nome público Roteiva DEV e e-mail de suporte do proprietário. Domínios confirmados como os dois Firebase e localhost; nada extra adicionado. App Web Roteiva Web DEV registrado, appId `1:533435008961:web:c197c1076bc0e7b151d140`; SDK público em .env.firebase. Não criado bucket Storage.
