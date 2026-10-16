@@ -41,7 +41,9 @@ for (const [name,data] of Object.entries(fixtures)) {
     const path=pathFor("alice",name),ref=doc(alice,path);
     await assertSucceeds(setDoc(ref,{...data,...meta("alice")}));
     await assertSucceeds(getDoc(ref));
-    await assertSucceeds(getDocs(collection(alice,"users","alice",name)));
+    // preferences/ui is intentionally a singleton get; listing settings is denied.
+    if (name==="preferences") await assertFails(getDocs(collection(alice,"users","alice",name)));
+    else await assertSucceeds(getDocs(collection(alice,"users","alice",name)));
     for (const db of [bob,anon]) {
       await assertFails(getDoc(doc(db,path)));
       await assertFails(getDocs(collection(db,"users","alice",name)));
