@@ -4,6 +4,8 @@ async function login(page:Page,email:string,existing=false) {
   const popupPromise=page.waitForEvent("popup");
   await page.getByRole("button",{name:"Entrar com Google",exact:true}).click();
   const popup=await popupPromise;
+  // The emulator HTML renders before its final script (and click handlers) loads.
+  await popup.waitForLoadState("load");
   if(existing) await popup.getByText(email,{exact:true}).click();
   else {
     await popup.getByRole("button",{name:"Add new account",exact:true}).click();
@@ -41,10 +43,11 @@ test("Google emulator session, CRUD, restoration, themes and separate users",asy
   await page.getByLabel("Nome do cliente",{exact:true}).fill("Estúdio Aurora");
   await page.getByLabel("Contato principal",{exact:true}).fill("Ana");
   await page.getByRole("button",{name:"Salvar cliente"}).click();await settled(page);
-  await page.getByRole("button",{name:"Novo projeto",exact:true}).click();
+  await navigate(page,"Projetos");
+  await page.locator(".heading-actions").getByRole("button",{name:"Criar projeto",exact:true}).click();
   await page.getByLabel("Nome do projeto",{exact:true}).fill("Filme Aurora");
   await page.locator("form.project-modal select[name=clientId]").selectOption({label:"Estúdio Aurora"});
-  await page.getByRole("button",{name:"Criar projeto",exact:true}).click();await settled(page);
+  await page.locator("form.project-modal").getByRole("button",{name:"Criar projeto",exact:true}).click();await settled(page);
   await page.getByLabel("Nova tarefa",{exact:true}).fill("Montar primeiro corte");
   await page.locator(".inline-form button").click();await settled(page);
   await expect(page.getByText("Montar primeiro corte",{exact:true})).toBeVisible();
@@ -63,6 +66,10 @@ test("Google emulator session, CRUD, restoration, themes and separate users",asy
   await page.getByRole("button",{name:"Ativar modo escuro",exact:true}).click();await settled(page);
   await page.reload();await expect(page.locator(".app-shell")).toBeVisible();await settled(page);
   await expect(page.locator("html")).toHaveAttribute("data-theme","dark");
+  await navigate(page,"Financeiro");
+  await expect(page.locator(".finance-table")).toContainText("100,01");
+  await navigate(page,"Calendário");
+  await expect(page.getByText("Gravação Aurora",{exact:true})).toBeVisible();
   await navigate(page,"Projetos");
   await expect(page.getByText("Filme Aurora",{exact:true})).toBeVisible();
   await page.getByRole("button",{name:"Abrir projeto Filme Aurora",exact:true}).click();
