@@ -14,15 +14,9 @@ import { validTimeRange, overlaps, eventRange, eventDuration } from "./studio-ca
 import { toISO as toISOAdded, parseMoney, splitInstallments } from "./studio-finance";
 import { FormEvent, useEffect, useMemo, useState, useCallback } from "react";
 
-export type View = "overview" | "projects" | "clients" | "reviews" | "finance" | "calendar" | "library";
-export type Status = "Em produção" | "Em aprovação" | "Ajustes" | "Aprovado";
-export type Project = { clientId?: number; dueDate?: string; description?: string; tasks?: { id: number; title: string; done: boolean }[]; template?: string;  id: number; name: string; client: string; status: Status; due: string; progress: number; files: number; color: string; initials: string };
-type ClientType = "Recorrente" | "Avulso";
-export type Client = { deliveries?: { id:number; title:string; month:string; done:boolean }[];  packageTitle?: string; monthlyDeliverables?: number; monthlyFee?: number;  id: number; name: string; contact: string; email?: string; phone?: string; projects: number; active: number; color: string; initials: string; type: ClientType; since: string };
-export type FinanceEntry = { projectId?: number; kind?: "income" | "expense";  id: number; project: string; client: string; clientId?: number; amount: number; date: string; status: "Recebido" | "A receber" };
-export type CalendarEvent = { endTime?: string; autoDeadline?: boolean; projectId?: number;  id: number; title: string; date: string; time: string; type: "Produção" | "Entrega" | "Reunião" | "Aprovação"; client: string };
-type AssetKind = "Vídeo" | "Imagem" | "Áudio" | "Documento";
-export type LibraryAsset = { fileKey?: string; url?: string; mimeType?: string; projectId?: number; version?: number;  id: number; name: string; kind: AssetKind; size: string; addedAt: string; project: string; color: string; preview?: string };
+import { isDemo } from "./lib/firebase";
+import { newId, type WorkspaceData, type Activity, type View, type Project, type Client, type ClientType, type FinanceEntry, type CalendarEvent, type LibraryAsset, type Status } from "./domain/workspace";
+export type { View, Project, Client, FinanceEntry, CalendarEvent, LibraryAsset, Status } from "./domain/workspace";
 
 const initialProjects: Project[] = [];
 const initialClients: Client[] = [];
@@ -52,7 +46,13 @@ function BrandAvatar({ initials, color, large = false }: { initials: string; col
   return <span className={`brand-avatar ${color} ${large ? "large" : ""}`}>{initials}</span>;
 }
 
-export default function DashboardClient({ firstName, email }: { firstName: string; email: string }) {
+type DashboardProps = {
+  firstName: string; email: string; photoURL?: string;
+  initialWorkspace?: WorkspaceData; initialTheme?: "light"|"dark";
+  onWorkspaceChange?: (workspace:WorkspaceData)=>void; onThemeChange?:(theme:"light"|"dark")=>void;
+  cloudStatus?:string; saving?:boolean; onLogout?:()=>void;
+};
+export default function DashboardClient({ firstName, email, photoURL, initialWorkspace, initialTheme, onWorkspaceChange, onThemeChange, cloudStatus, saving, onLogout }: DashboardProps) {
   const [view, setView] = useState<View>("overview");
   const [projects, setProjects] = useState(initialProjects);
   const [clientList, setClientList] = useState(initialClients);
@@ -87,9 +87,9 @@ export default function DashboardClient({ firstName, email }: { firstName: strin
   const [libraryProject, setLibraryProject] = useState("");
   const [uploading, setUploading] = useState(false);
   const storageKey = "roteiva-pages-demo-workspace-v1";
-  const [activities, setActivities] = useState<{text: string; when: string}[]>([]);
+  const [activities, setActivities] = useState<Activity[]>([]);
   const workspace = { projects, clients: clientList, financeEntries, monthlyRevenue, calendarEvents, libraryAssets: libraryAssets.map((asset) => ({ ...asset, preview: undefined })), comments, reviewState, activities };
-  function logActivity(text: string) { setActivities(current => [{text, when: new Date().toISOString()}, ...current].slice(0, 150)); }
+  function logActivity(text: string) { setActivities(current => [{id:crypto.randomUUID(),text, when: new Date().toISOString()}, ...current].slice(0, 150)); }
   const restoreWorkspace = useCallback((data: Partial<typeof workspace>) => {
     setProjects(data.projects || []); setClientList(data.clients || []); setFinanceEntries(data.financeEntries || []);
     setCalendarEvents(data.calendarEvents || []);
@@ -110,7 +110,7 @@ export default function DashboardClient({ firstName, email }: { firstName: strin
         const isDeadline = (e: CalendarEvent) => e.projectId === updated.id && e.type === "Entrega" && (e.autoDeadline || e.title === `Entrega — ${old?.name}`);
         const existing = current.find(isDeadline);
         const rest = current.filter(e => !isDeadline(e));
-        return updated.dueDate ? [...rest, {id:existing?.id || Date.now(), autoDeadline:true, projectId:updated.id, title:`Entrega — ${updated.name}`, date:updated.dueDate, time:existing?.time || "18:00", type:"Entrega", client:updated.client}] : rest;
+        return updated.dueDate ? [...rest, {id:existing?.id || newId(), autoDeadline:true, projectId:updated.id, title:`Entrega — ${updated.name}`, date:updated.dueDate, time:existing?.time || "18:00", type:"Entrega", client:updated.client}] : rest;
       });
     }
     logActivity(`Projeto atualizado: ${updated.name}`); notify("Projeto salvo");
@@ -128,36 +128,34 @@ export default function DashboardClient({ firstName, email }: { firstName: strin
   }), [projects, query, statusFilter]);
 
   useEffect(() => {
-    const saved = localStorage.getItem("roteiva-theme");
-    const preferred = saved === "dark" || saved === "light"
-      ? saved
-      : window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-    setTheme(preferred);
-    document.documentElement.setAttribute("data-theme", preferred);
-    try {
-      const local = localStorage.getItem(storageKey);
-      if (local) restoreWorkspace(JSON.parse(local));
-      setSaveStatus("Demonstração · dados somente neste navegador");
-    } catch {
-      setSaveStatus("Demonstração · armazenamento local indisponível");
+    if (!isDemo) {
+      if (initialWorkspace) restoreWorkspace(initialWorkspace);
+      const preferred=initialTheme || "light";
+      setTheme(preferred);
+      document.documentElement.setAttribute("data-theme",preferred);
+      setDataReady(true);
+      return;
     }
+    try {
+      const saved=localStorage.getItem("roteiva-theme");
+      const preferred=saved==="dark"||saved==="light" ? saved : window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark":"light";
+      setTheme(preferred); document.documentElement.setAttribute("data-theme",preferred);
+      const local=localStorage.getItem(storageKey);
+      if(local)restoreWorkspace(JSON.parse(local));
+      setSaveStatus("Demonstração · dados somente neste navegador");
+    } catch { setSaveStatus("Demonstração · armazenamento local indisponível"); }
     setDataReady(true);
-  }, [restoreWorkspace]);
+  },[restoreWorkspace,initialWorkspace,initialTheme]);
 
   useEffect(() => {
     if (!dataReady) return;
-    const payload = {
-      projects, clients: clientList, financeEntries, monthlyRevenue, calendarEvents,
-      libraryAssets: libraryAssets.map(asset => ({...asset, preview: undefined})),
-      comments, reviewState, activities,
-    };
+    const payload={projects,clients:clientList,financeEntries,calendarEvents,libraryAssets:libraryAssets.map(asset=>({...asset,preview:undefined})),comments,reviewState,activities};
+    if (!isDemo) { onWorkspaceChange?.(payload); return; }
     try {
-      localStorage.setItem(storageKey, JSON.stringify(payload));
+      localStorage.setItem(storageKey,JSON.stringify({...payload,monthlyRevenue}));
       setSaveStatus("Demonstração · salvo neste navegador");
-    } catch {
-      setSaveStatus("Falha ao salvar · exporte seus dados");
-    }
-  }, [projects, clientList, financeEntries, monthlyRevenue, calendarEvents, libraryAssets, comments, reviewState, activities, dataReady]);
+    } catch {setSaveStatus("Falha ao salvar · exporte seus dados");}
+  },[projects,clientList,financeEntries,monthlyRevenue,calendarEvents,libraryAssets,comments,reviewState,activities,dataReady,onWorkspaceChange]);
 
   useEffect(() => {
     if (!dataReady) return;
@@ -168,13 +166,14 @@ export default function DashboardClient({ firstName, email }: { firstName: strin
   function toggleTheme() {
     const next = theme === "light" ? "dark" : "light";
     setTheme(next);
-    localStorage.setItem("roteiva-theme", next);
+    if (isDemo) { try { localStorage.setItem("roteiva-theme", next); } catch { /* Theme still works in memory. */ } }
+    else onThemeChange?.(next);
     document.documentElement.setAttribute("data-theme", next);
     notify(next === "dark" ? "Modo escuro ativado" : "Modo claro ativado");
   }
 
   const notify = useCallback((message: string) => {
-    setToast(message);
+    setToast(isDemo ? message : "Alteração preparada · confira a confirmação na nuvem");
     window.setTimeout(() => setToast(""), 2600);
   }, []);
 
@@ -188,10 +187,10 @@ export default function DashboardClient({ firstName, email }: { firstName: strin
     const due = dueValue ? new Date(`${dueValue}T12:00:00`).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }).replace(".", "") : "Sem prazo";
     const template = String(form.get("template") || "Livre");
     const description = String(form.get("description") || "");
-    const tasks = (projectTemplates[template] || []).map((title, i) => ({ id: Date.now() + i, title, done: false }));
-    const projectId = Date.now();
+    const tasks = (projectTemplates[template] || []).map((title, i) => ({ id: newId() + i, title, done: false }));
+    const projectId = newId();
     setProjects((current) => [{ id: projectId, name, client, clientId, dueDate: dueValue, description, tasks, template, status: "Em produção", due, progress: 0, files: 0, color: "blue", initials: client.slice(0, 2).toUpperCase() }, ...current]);
-    if (dueValue) setCalendarEvents((current) => [{ id: Date.now() + 1, projectId, autoDeadline:true, title: `Entrega — ${name}`, date: dueValue, time: "18:00", type: "Entrega", client }, ...current]);
+    if (dueValue) setCalendarEvents((current) => [{ id: newId() + 1, projectId, autoDeadline:true, title: `Entrega — ${name}`, date: dueValue, time: "18:00", type: "Entrega", client }, ...current]);
     setModalOpen(false);
     setView("projects"); setSelectedProject(projectId);
     logActivity(`Projeto criado: ${name}`);
@@ -210,7 +209,7 @@ export default function DashboardClient({ firstName, email }: { firstName: strin
     const monthlyDeliverables = Math.max(0, Number(form.get("monthlyDeliverables")) || 0);
     const monthlyFee = Math.max(0, parseMoney(String(form.get("monthlyFee") || "0")) || 0);
     const packageTitle = String(form.get("packageTitle") || "").trim();
-    const updated: Client = { deliveries: editingClient?.deliveries || [], id: editingClient?.id || Date.now(), name, contact, email, phone, projects: editingClient?.projects || 0, active: 0, color: type === "Recorrente" ? "violet" : "blue", initials: name.slice(0, 2).toUpperCase(), type, since: editingClient?.since || since, monthlyDeliverables, monthlyFee, packageTitle };
+    const updated: Client = { deliveries: editingClient?.deliveries || [], id: editingClient?.id || newId(), name, contact, email, phone, projects: editingClient?.projects || 0, active: 0, color: type === "Recorrente" ? "violet" : "blue", initials: name.slice(0, 2).toUpperCase(), type, since: editingClient?.since || since, monthlyDeliverables, monthlyFee, packageTitle };
     setClientList(current => editingClient ? current.map(c => c.id === updated.id ? updated : c) : [updated, ...current]);
     if (editingClient) {
       setProjects(current => current.map(p => p.clientId === updated.id ? {...p, client: name} : p));
@@ -236,13 +235,13 @@ export default function DashboardClient({ firstName, email }: { firstName: strin
     if (!Number.isFinite(entryDate.getTime()) || !Number.isFinite(amount) || amount <= 0) return notify("Informe um valor válido");
     const projectId = Number(form.get("projectId")) || undefined;
     const kind = form.get("kind") === "expense" ? "expense" : "income";
-    const updatedEntry: FinanceEntry = { projectId, kind, id: editingFinanceEntry?.id || Date.now(), project, client, clientId, amount, date: entryDate.toLocaleDateString("pt-BR"), status };
+    const updatedEntry: FinanceEntry = { projectId, kind, id: editingFinanceEntry?.id || newId(), project, client, clientId, amount, date: entryDate.toLocaleDateString("pt-BR"), status };
     if (editingFinanceEntry) {
       setFinanceEntries((current) => current.map((entry) => entry.id === editingFinanceEntry.id ? updatedEntry : entry));
     } else {
       const count = Math.max(1, Math.min(24, Number(form.get("installments")) || 1));
       if (Math.round(amount * 100) < count) return notify("Valor insuficiente para dividir em parcelas");
-      const parts: FinanceEntry[] = splitInstallments(amount, count, entryDate).map((part,i) => ({...updatedEntry, id: Date.now() * 1000 + i, project: count > 1 ? `${project} · ${i+1}/${count}` : project, ...part, status: i === 0 ? status : "A receber"}));
+      const parts: FinanceEntry[] = splitInstallments(amount, count, entryDate).map((part,i) => ({...updatedEntry, id: newId(), project: count > 1 ? `${project} · ${i+1}/${count}` : project, ...part, status: i === 0 ? status : "A receber"}));
       setFinanceEntries((current) => [...parts, ...current]);
     }
     logActivity(`${kind === "expense" ? "Despesa" : "Receita"} ${editingFinanceEntry ? "atualizada" : "registrada"}: ${project}`);
@@ -280,7 +279,7 @@ export default function DashboardClient({ firstName, email }: { firstName: strin
     const type = String(form.get("type") || "Produção") as CalendarEvent["type"];
     const client = String(form.get("client") || "Interno").trim();
     if (!date) return notify("Escolha a data do compromisso");
-    const entry: CalendarEvent = { autoDeadline:editingEvent?.autoDeadline && type === "Entrega", id: editingEvent?.id || Date.now(), title, date, time, endTime, type, client, projectId: Number(form.get("projectId")) || undefined };
+    const entry: CalendarEvent = { autoDeadline:editingEvent?.autoDeadline && type === "Entrega", id: editingEvent?.id || newId(), title, date, time, endTime, type, client, projectId: Number(form.get("projectId")) || undefined };
     setCalendarEvents(current => (editingEvent ? current.map(e => e.id === entry.id ? entry : e) : [...current, entry]).sort((a,b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`)));
     if (entry.autoDeadline && entry.projectId) {
       setProjects(current => current.map(p => p.id === entry.projectId ? {...p,dueDate:date,due:new Date(`${date}T12:00:00`).toLocaleDateString("pt-BR",{day:"2-digit",month:"short"})} : p));
@@ -315,7 +314,7 @@ export default function DashboardClient({ firstName, email }: { firstName: strin
   if (!dataReady) return <main className="studio-loading" role="status">Carregando seu estúdio…</main>;
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" inert={saving || undefined}>
       <aside className={`sidebar ${mobileOpen ? "mobile-open" : ""}`}>
         <div className="brand-lockup">
           <img src={theme === "light" ? "roteiva-logo-black.png" : "roteiva-logo-white.png"} alt="Roteiva" />
@@ -336,10 +335,10 @@ export default function DashboardClient({ firstName, email }: { firstName: strin
         <div className="storage-card">
           <div><span><Sparkles size={15} /> Roteiva Studio</span><b>{libraryAssets.length} arquivos</b></div>
           <p>Seu espaço de produção</p>
-          <small className="sync-status" role="status">{saveStatus}</small>
+          <small className="sync-status" role="status">{isDemo ? saveStatus : cloudStatus}</small>
         </div>
         <div className="sidebar-profile">
-          <span>{firstName.slice(0, 2).toUpperCase()}</span><div><b>{firstName}</b><small>{email}</small></div><MoreHorizontal size={18} />
+          {photoURL ? <img className="profile-photo" src={photoURL} alt="Foto do usuário" referrerPolicy="no-referrer" /> : <span>{firstName.slice(0, 2).toUpperCase()}</span>}<div><b>{firstName}</b><small>{email}</small></div>{onLogout ? <button className="icon-button" onClick={onLogout} aria-label="Sair da conta" title="Sair da conta">↪</button> : <MoreHorizontal size={18} />}
         </div>
       </aside>
       {mobileOpen && <button className="mobile-scrim" aria-label="Fechar menu" onClick={() => setMobileOpen(false)} />}
@@ -353,11 +352,11 @@ export default function DashboardClient({ firstName, email }: { firstName: strin
         </header>
 
         <section className="page">
-          <div className="pages-demo-notice" role="note"><b>Modo demonstração</b><span>Projetos, clientes, agenda e financeiro ficam salvos apenas neste navegador. Sem login, sincronização, uploads ou links públicos de aprovação.</span></div>
+          {isDemo ? <div className="pages-demo-notice" role="note"><b>Modo demonstração</b><span>Projetos, clientes, agenda e financeiro ficam salvos apenas neste navegador. Sem login, sincronização, uploads ou links públicos de aprovação.</span></div> : <div className="cloud-banner" role="status"><b>Roteiva DEV</b><span>{cloudStatus}</span></div>}
           <div className="page-heading">
             <div><span className="eyebrow">ROTEIVA / {view === "overview" ? "PAINEL" : pageTitles[view][0].toUpperCase()}</span><h1>{pageTitles[view][0]}</h1><p>{pageTitles[view][1]}</p></div>
             <div className="heading-actions">
-              <WorkspaceTools workspace={workspace} status={saveStatus} onNotify={notify} />
+              <WorkspaceTools workspace={workspace} status={isDemo ? saveStatus : cloudStatus || ""} onNotify={notify} />
               {view === "clients" ? <button className="primary-button" onClick={() => { setEditingClient(null); setClientModalOpen(true); }}><UserRoundPlus size={17} /> Novo cliente</button>
                 : view === "finance" ? <button className="primary-button" onClick={() => openFinanceModal()}><Plus size={17} /> Nova receita</button>
                 : view === "calendar" ? <button className="primary-button" onClick={() => openEvent()}><Plus size={17} /> Novo compromisso</button>

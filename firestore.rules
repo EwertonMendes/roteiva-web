@@ -1,0 +1,185 @@
+rules_version = '2';
+// Data model: users/{uid}: private profile, immutable ownerUid/schemaVersion/createdAt.
+// All child documents have ownerUid=path UID, schemaVersion=1, incrementing revision,
+// server timestamps createdAt/updatedAt. No user roles, entitlements, shared access or arrays.
+// clients: contact/package + integer monthlyFeeCents; projects: briefing/status/date;
+// tasks/deliveries: independent bool checklist documents scoped to a project/client;
+// events: YYYY-MM-DD civil date + local HH:mm; financeEntries: integer amountCents;
+// activities: private UI history (not a trusted audit log); preferences/ui: theme.
+// Explicit field whitelists, types and size limits are enforced on create AND update.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function owner(uid) { return request.auth!=null && request.auth.uid==uid; }
+    function member(uid) { return owner(uid) && exists(/databases/$(database)/documents/users/$(uid)); }
+    function text(v,min,max) { return v is string && v.size()>=min && v.size()<=max; }
+    function clock(v) { return text(v,5,5) && v.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$'); }
+    function civilDate(v) {
+      let parts=v.split('-');
+      let y=int(parts[0]);
+      let m=int(parts[1]);
+      let d=int(parts[2]);
+      let leap=y%400==0 || (y%4==0 && y%100!=0);
+      let days=m==2 ? (leap ? 29:28) : (m in [4,6,9,11] ? 30:31);
+      return text(v,10,10) && v.matches('^(19|20|21)[0-9]{2}-(0[1-9]|1[0-2])-[0-9]{2}$') && d>=1 && d<=days;
+    }
+    function linked(uid,name,id) {
+      return getAfter(/databases/$(database)/documents/users/$(uid)/$(name)/$(string(id))).data.ownerUid==uid;
+    }
+    function metadata(d,uid) {
+      return d.ownerUid==uid && d.schemaVersion==1 && d.revision is int && d.revision>=1 &&
+        d.createdAt is timestamp && d.updatedAt==request.time;
+    }
+    function creating(d) { return d.createdAt==request.time && d.revision==1; }
+    function updating(d) {
+      return d.createdAt==resource.data.createdAt && d.ownerUid==resource.data.ownerUid &&
+        d.schemaVersion==resource.data.schemaVersion && d.revision==resource.data.revision+1;
+    }
+    function valid_clients(d,uid,id) {
+      return d.keys().hasAll(["ownerUid","schemaVersion","revision","createdAt","updatedAt","id","name","contact","email","phone","color","initials","type","since","packageTitle","monthlyDeliverables","monthlyFeeCents"]) && d.keys().hasOnly(["ownerUid","schemaVersion","revision","createdAt","updatedAt","id","name","contact","email","phone","color","initials","type","since","packageTitle","monthlyDeliverables","monthlyFeeCents"]) &&
+        metadata(d,uid) &&
+        d.id is int && d.id>0 && d.id<=9007199254740991 && string(d.id)==id &&
+        text(d.name,1,200) &&
+        text(d.contact,0,500) &&
+        text(d.email,0,254) && (d.email=='' || d.email.matches('^[^ @]+@[^ @]+[.][^ @]+$')) &&
+        text(d.phone,0,500) &&
+        text(d.color,0,80) &&
+        text(d.initials,0,80) &&
+        d.type in ["Recorrente","Avulso"] &&
+        text(d.since,0,80) &&
+        text(d.packageTitle,0,500) &&
+        d.monthlyDeliverables is int && d.monthlyDeliverables>=0 && d.monthlyDeliverables<=100 &&
+        d.monthlyFeeCents is int && d.monthlyFeeCents>=0 && d.monthlyFeeCents<=100000000000;
+    }
+    function valid_projects(d,uid,id) {
+      return d.keys().hasAll(["ownerUid","schemaVersion","revision","createdAt","updatedAt","id","name","clientId","client","status","dueDate","description","template","color","initials"]) && d.keys().hasOnly(["ownerUid","schemaVersion","revision","createdAt","updatedAt","id","name","clientId","client","status","dueDate","description","template","color","initials"]) &&
+        metadata(d,uid) &&
+        d.id is int && d.id>0 && d.id<=9007199254740991 && string(d.id)==id &&
+        text(d.name,1,200) &&
+        d.clientId is int && (d.clientId==0 || (d.clientId>0 && linked(uid,'clients',d.clientId))) &&
+        text(d.client,0,500) &&
+        d.status in ["Em produção","Em aprovação","Ajustes","Aprovado"] &&
+        (d.dueDate=='' || civilDate(d.dueDate)) &&
+        text(d.description,0,10000) &&
+        text(d.template,0,80) &&
+        text(d.color,0,80) &&
+        text(d.initials,0,80);
+    }
+    function valid_tasks(d,uid,id) {
+      return d.keys().hasAll(["ownerUid","schemaVersion","revision","createdAt","updatedAt","id","projectId","title","done"]) && d.keys().hasOnly(["ownerUid","schemaVersion","revision","createdAt","updatedAt","id","projectId","title","done"]) &&
+        metadata(d,uid) &&
+        d.id is int && d.id>0 && d.id<=9007199254740991 && string(d.id)==id &&
+        d.projectId is int && d.projectId>0 && linked(uid,'projects',d.projectId) &&
+        text(d.title,1,200) &&
+        d.done is bool;
+    }
+    function valid_deliveries(d,uid,id) {
+      return d.keys().hasAll(["ownerUid","schemaVersion","revision","createdAt","updatedAt","id","clientId","title","month","done"]) && d.keys().hasOnly(["ownerUid","schemaVersion","revision","createdAt","updatedAt","id","clientId","title","month","done"]) &&
+        metadata(d,uid) &&
+        d.id is int && d.id>0 && d.id<=9007199254740991 && string(d.id)==id &&
+        d.clientId is int && d.clientId>0 && linked(uid,'clients',d.clientId) &&
+        text(d.title,1,200) &&
+        text(d.month,7,7) && d.month.matches('^(19|20|21)[0-9]{2}-(0[1-9]|1[0-2])$') &&
+        d.done is bool;
+    }
+    function valid_events(d,uid,id) {
+      return d.keys().hasAll(["ownerUid","schemaVersion","revision","createdAt","updatedAt","id","projectId","title","date","time","endTime","autoDeadline","type","client"]) && d.keys().hasOnly(["ownerUid","schemaVersion","revision","createdAt","updatedAt","id","projectId","title","date","time","endTime","autoDeadline","type","client"]) &&
+        metadata(d,uid) &&
+        d.id is int && d.id>0 && d.id<=9007199254740991 && string(d.id)==id &&
+        d.projectId is int && (d.projectId==0 || (d.projectId>0 && linked(uid,'projects',d.projectId))) &&
+        text(d.title,1,200) &&
+        civilDate(d.date) &&
+        clock(d.time) &&
+        (d.endTime=='' || (clock(d.endTime) && d.endTime>d.time)) &&
+        d.autoDeadline is bool &&
+        d.type in ["Produção","Entrega","Reunião","Aprovação"] &&
+        text(d.client,0,500);
+    }
+    function valid_financeEntries(d,uid,id) {
+      return d.keys().hasAll(["ownerUid","schemaVersion","revision","createdAt","updatedAt","id","projectId","clientId","project","client","kind","amountCents","date","status"]) && d.keys().hasOnly(["ownerUid","schemaVersion","revision","createdAt","updatedAt","id","projectId","clientId","project","client","kind","amountCents","date","status"]) &&
+        metadata(d,uid) &&
+        d.id is int && d.id>0 && d.id<=9007199254740991 && string(d.id)==id &&
+        d.projectId is int && (d.projectId==0 || (d.projectId>0 && linked(uid,'projects',d.projectId))) &&
+        d.clientId is int && (d.clientId==0 || (d.clientId>0 && linked(uid,'clients',d.clientId))) &&
+        text(d.project,1,200) &&
+        text(d.client,0,500) &&
+        d.kind in ["income","expense"] &&
+        d.amountCents is int && d.amountCents>=1 && d.amountCents<=100000000000 &&
+        civilDate(d.date) &&
+        d.status in ["Recebido","A receber"];
+    }
+    function valid_activities(d,uid,id) {
+      return d.keys().hasAll(["ownerUid","schemaVersion","revision","createdAt","updatedAt","id","text","when"]) && d.keys().hasOnly(["ownerUid","schemaVersion","revision","createdAt","updatedAt","id","text","when"]) &&
+        metadata(d,uid) &&
+        d.id is string && d.id.size()>0 && d.id.size()<=64 && d.id==id &&
+        text(d.text,0,500) &&
+        text(d.when,24,24) && d.when.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[.][0-9]{3}Z$');
+    }
+    function valid_preferences(d,uid,id) {
+      return d.keys().hasAll(["ownerUid","schemaVersion","revision","createdAt","updatedAt","theme"]) && d.keys().hasOnly(["ownerUid","schemaVersion","revision","createdAt","updatedAt","theme"]) &&
+        metadata(d,uid) &&
+        d.theme in ["light","dark"];
+    }
+    function valid_profile(d,uid,id) {
+      return d.keys().hasAll(["ownerUid","schemaVersion","revision","createdAt","updatedAt","displayName","email","photoURL"]) && d.keys().hasOnly(["ownerUid","schemaVersion","revision","createdAt","updatedAt","displayName","email","photoURL"]) &&
+        metadata(d,uid) &&
+        text(d.displayName,0,500) &&
+        text(d.email,0,254) && (d.email=='' || d.email.matches('^[^ @]+@[^ @]+[.][^ @]+$')) &&
+        text(d.photoURL,0,2048) && (d.photoURL=='' || d.photoURL.matches('^https://.*$'));
+    }
+    match /users/{uid} {
+      allow read: if owner(uid);
+      allow create: if owner(uid) && valid_profile(request.resource.data,uid,uid) && creating(request.resource.data);
+      allow update: if owner(uid) && valid_profile(request.resource.data,uid,uid) && updating(request.resource.data);
+      allow delete: if false; // Account deletion requires a future explicit cleanup process.
+      match /clients/{id} {
+        allow read: if member(uid);
+        allow create: if member(uid) && valid_clients(request.resource.data,uid,id) && creating(request.resource.data);
+        allow update: if member(uid) && valid_clients(request.resource.data,uid,id) && updating(request.resource.data);
+        allow delete: if member(uid);
+      }
+      match /projects/{id} {
+        allow read: if member(uid);
+        allow create: if member(uid) && valid_projects(request.resource.data,uid,id) && creating(request.resource.data);
+        allow update: if member(uid) && valid_projects(request.resource.data,uid,id) && updating(request.resource.data);
+        allow delete: if member(uid);
+      }
+      match /tasks/{id} {
+        allow read: if member(uid);
+        allow create: if member(uid) && valid_tasks(request.resource.data,uid,id) && creating(request.resource.data);
+        allow update: if member(uid) && valid_tasks(request.resource.data,uid,id) && updating(request.resource.data);
+        allow delete: if member(uid);
+      }
+      match /deliveries/{id} {
+        allow read: if member(uid);
+        allow create: if member(uid) && valid_deliveries(request.resource.data,uid,id) && creating(request.resource.data);
+        allow update: if member(uid) && valid_deliveries(request.resource.data,uid,id) && updating(request.resource.data);
+        allow delete: if member(uid);
+      }
+      match /events/{id} {
+        allow read: if member(uid);
+        allow create: if member(uid) && valid_events(request.resource.data,uid,id) && creating(request.resource.data);
+        allow update: if member(uid) && valid_events(request.resource.data,uid,id) && updating(request.resource.data);
+        allow delete: if member(uid);
+      }
+      match /financeEntries/{id} {
+        allow read: if member(uid);
+        allow create: if member(uid) && valid_financeEntries(request.resource.data,uid,id) && creating(request.resource.data);
+        allow update: if member(uid) && valid_financeEntries(request.resource.data,uid,id) && updating(request.resource.data);
+        allow delete: if member(uid);
+      }
+      match /activities/{id} {
+        allow read: if member(uid);
+        allow create: if member(uid) && valid_activities(request.resource.data,uid,id) && creating(request.resource.data);
+        allow update: if member(uid) && valid_activities(request.resource.data,uid,id) && updating(request.resource.data);
+        allow delete: if member(uid);
+      }
+      match /preferences/{id} {
+        allow read: if member(uid) && id=='ui';
+        allow create: if member(uid) && id=='ui' && valid_preferences(request.resource.data,uid,id) && creating(request.resource.data);
+        allow update: if member(uid) && id=='ui' && valid_preferences(request.resource.data,uid,id) && updating(request.resource.data);
+        allow delete: if member(uid) && id=='ui';
+      }
+    }
+    match /{document=**} { allow read,write: if false; }
+  }
+}

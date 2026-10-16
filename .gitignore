@@ -21,3 +21,15 @@
 # Firebase CLI cache (do not commit credentials)
 .firebase/
 firebase-debug.log
+
+# Only public build configurations and blank template are versioned.
+!.env.example
+!.env.firebase
+!.env.demo
+!.env.development
+!.env.emulator
+.firebase/
+*-debug.log
+playwright-report/
+test-results/
+dist-emulator/
