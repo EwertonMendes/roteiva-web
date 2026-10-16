@@ -20,9 +20,11 @@
 - [x] Retirar UI genérica gerada e sem referência, exemplos D1 do template, ícones padrão, logos experimentais e arquivos auxiliares associados.
 - [x] Guardar o arquivo-fonte vetorial da marca fora de `public/`; manter fontes, logotipo em uso, favicon e licenças necessárias.
 - [x] Adotar PNPM como instalador único e eliminar o `package-lock.json` conflitante; preservar `pnpm-lock.yaml`.
-- [x] Manter `app/api/**`, Drizzle/D1/R2, Vinext e scripts de preview ainda referenciados até a migração segura.
+- [x] Preservar frontend **Next.js/Vinext** e componentes existentes; na PR #4, remover apenas APIs/banco/storage/autenticação legados e manter o runtime necessário ao frontend.
 - [ ] Auditar e reduzir **dependências NPM não utilizadas**, atualizando `pnpm-lock.yaml` com ferramenta instalada e validando todos os builds, na fase de migração.
-- [ ] Eliminar componentes e backend legados **somente após** substituição funcional com testes e dados protegidos.
+- [x] Remover `app/api/**`, Drizzle/D1, R2, auth de host e conectores de backend antigos, sem alterar componentes/estilos do frontend (PR #4).
+- [x] Manter Next.js e Vinext, inclusive a compilação e o modo demo na rota principal (PR #4).
+- [ ] Implementar autenticação e persistência novas apenas nas fases planejadas do MVP.
 
 **Critério de aceite desta limpeza:** a PR contém exclusivamente remoção de arquivos sem uso confirmado e ajustes mínimos de configuração/documentação; testes de calendário/financeiro e build da demo passam no CI; caminho público e assets atuais permanecem. A compilação do backend legado não é coberta pelo CI Pages e deverá ser verificada antes da migração.
 
@@ -35,7 +37,7 @@
 | Interface, páginas e estados locais | **PARCIAL** | `app/dashboard-client.tsx` e `app/studio-features.tsx`; fluxos prototipados |
 | Demonstração GitHub Pages | **VALIDADO para build/deploy; navegação funcional a verificar em dispositivos reais** | Workflow `.github/workflows/deploy-pages.yml`, URL no README; somente `localStorage`, sem backend |
 | Testes de calendário/financeiro | **IMPLEMENTADO** | `tests/studio-calendar.test.mjs`, `tests/studio-finance.test.mjs`; executados no CI do Pages |
-| API antiga e D1/R2 | **IMPLEMENTADO no legado, não validado para produção SaaS** | `app/api/**`, `db/schema.ts`; autenticação do host original |
+| API antiga e D1/R2 | **REMOVIDO do código ativo** | PR #4; frontend Next/Vinext preservado; backend futuro será novo |
 | Firebase Hosting/Auth/Firestore | **PLANEJADO** | Não configurados no repo |
 | Worker API separado e D1 de tokens | **PLANEJADO** | Não existe Worker OAuth/refresh do MVP |
 | Drive individual por usuário | **PLANEJADO** | Integração BRBET inspecionada externamente; não transferida |
@@ -164,7 +166,8 @@
 |---|---|---|---|---|
 | 16/10/2026 | [PR #1](https://github.com/EwertonMendes/roteiva-web/pull/1) | Demonstração Pages | Build/deploy validados; backend não implementado | CI build/testes calendário+finanças; demo localStorage |
 | 16/10/2026 | [PR #2](https://github.com/EwertonMendes/roteiva-web/pull/2) | Organização documental | Estrutura/arquitetura propostas registradas | Somente Markdown; **não** altera funcionalidades |
-| 16/10/2026 | [PR #3](https://github.com/EwertonMendes/roteiva-web/pull/3) | Higienização | Removido scaffold sem uso; PNPM padronizado | Validar CI Pages; backend Vinext preservado para a migração |
+| 16/10/2026 | [PR #3](https://github.com/EwertonMendes/roteiva-web/pull/3) | Higienização | Scaffold removido; PNPM padronizado | Pipeline Pages passou |
+| 16/10/2026 | [PR #4](https://github.com/EwertonMendes/roteiva-web/pull/4) | Limpeza backend | APIs antigas, D1/R2/Drizzle e connectors retirados; **Next/Vinext e telas mantidos** | Validar build Vinext + Pages e testes; demonstração sem banco remoto |
 
 ### Protocolo para IAs
 

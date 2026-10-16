@@ -42,9 +42,9 @@ A demonstração usa React/Vite e `localStorage`: permite explorar cadastros e t
 
 ## Situação técnica atual
 
-O repositório **ainda não usa** a arquitetura acima. A implementação original é **Next.js/Vinext + React**, com rotas `app/api/**`, autenticação vinculada ao ambiente original, **Cloudflare D1/R2** e armazenamento de workspace como um objeto grande. O GitHub Pages compila somente uma entrada estática separada. Nada disso deve ser anunciado como um SaaS em produção.
+O repositório permanece em **Next.js 16 + Vinext + React 19**, preservando a estrutura, telas e estilos originais. A entrada adicional **React/Vite para GitHub Pages** continua funcionando. As rotas antigas `app/api/**`, Drizzle/D1, R2, autenticação do host e conectores antigos foram removidos; ambos os modos executam uma **demonstração com `localStorage`**, sem backend de negócio nem banco remoto. O adaptador Vinext/Cloudflare continua necessário para renderizar o frontend Next, mas não possui bindings D1/R2.
 
-A migração será **incremental**; preservar o comportamento existente durante a substituição dos serviços é obrigatório. Não remover código legado sem identificar sua substituição e testar os fluxos.
+A implementação de Firebase e Google Drive será feita **posteriormente e do zero**. Não confundir a demonstração atual com o SaaS final. A estrutura de frontend Next/Vinext foi mantida por decisão explícita.
 
 ## Documentação
 
@@ -67,7 +67,7 @@ pnpm run test:finance
 pnpm run build:pages
 ```
 
-O código legado tem comandos próprios para um preview local com Vinext/D1/R2. Consulte [Desenvolvimento](docs/DEVELOPMENT.md) antes de executá-los. O projeto utiliza **PNPM 11.25.0** com apenas o lockfile `pnpm-lock.yaml`. Os instaladores e componentes genéricos do template original foram removidos; o código Vinext/D1/R2 ainda necessário ao legado permanece até sua migração.
+Para executar o frontend **Next/Vinext**, use `pnpm dev` (ambiente de desenvolvimento). Para a demonstração estática use `pnpm run build:pages`. O projeto utiliza **PNPM 11.25.0**, com um único `pnpm-lock.yaml`; não há migrations, R2 ou API de banco para iniciar.
 
 ## Contribuição
 
