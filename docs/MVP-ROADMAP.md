@@ -147,7 +147,7 @@
 | Data | PR / commit | Etapa | Status novo | Evidência e pendências |
 |---|---|---|---|---|
 | 16/10/2026 | [PR #1](https://github.com/EwertonMendes/roteiva-web/pull/1) | Demonstração Pages | Build/deploy validados; backend não implementado | CI build/testes calendário+finanças; demo localStorage |
-| 16/10/2026 | PR de documentação (link após criação) | Organização documental | Estrutura/arquitetura propostas registradas | Somente Markdown; **não** altera funcionalidades |
+| 16/10/2026 | [PR #2](https://github.com/EwertonMendes/roteiva-web/pull/2) | Organização documental | Estrutura/arquitetura propostas registradas | Somente Markdown; **não** altera funcionalidades |
 
 ### Protocolo para IAs
 
