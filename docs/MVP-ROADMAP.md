@@ -12,6 +12,22 @@
 
 **Regra:** uma página ou botão não significa funcionalidade operacional. Nunca marcar uma etapa concluída por uma proposta ou por uma build que apenas compila. Ao mudar status, acrescentar PR/commit, testes e observações de regressão.
 
+## Fase preliminar — Higienização do repositório
+
+**Objetivo:** remover arquivos demonstravelmente não utilizados **sem refatorar o funcionamento** nem apagar o backend legado.
+
+- [x] Auditar árvore do repositório e imports das principais entradas da demo/app.
+- [x] Retirar UI genérica gerada e sem referência, exemplos D1 do template, ícones padrão, logos experimentais e arquivos auxiliares associados.
+- [x] Guardar o arquivo-fonte vetorial da marca fora de `public/`; manter fontes, logotipo em uso, favicon e licenças necessárias.
+- [x] Adotar PNPM como instalador único e eliminar o `package-lock.json` conflitante; preservar `pnpm-lock.yaml`.
+- [x] Manter `app/api/**`, Drizzle/D1/R2, Vinext e scripts de preview ainda referenciados até a migração segura.
+- [ ] Auditar e reduzir **dependências NPM não utilizadas**, atualizando `pnpm-lock.yaml` com ferramenta instalada e validando todos os builds, na fase de migração.
+- [ ] Eliminar componentes e backend legados **somente após** substituição funcional com testes e dados protegidos.
+
+**Critério de aceite desta limpeza:** a PR contém exclusivamente remoção de arquivos sem uso confirmado e ajustes mínimos de configuração/documentação; testes de calendário/financeiro e build da demo passam no CI; caminho público e assets atuais permanecem. A compilação do backend legado não é coberta pelo CI Pages e deverá ser verificada antes da migração.
+
+**Evidência:** [PR #3](https://github.com/EwertonMendes/roteiva-web/pull/3) (arquivos removidos, diff e validação automatizada).
+
 ## Panorama de hoje
 
 | Componente | Situação | Evidência/limitação |
@@ -49,7 +65,7 @@
 **Prioridade P0.** Dependente do aprendizado básico da Fase 0.
 
 - [ ] Unificar a implementação da aplicação React/Vite/TS para produção, preservando visual e comportamento; manter Pages como demo isolada.
-- [ ] Padronizar gerenciador de dependências e corrigir/remover lockfile antigo após conferir scripts e pipeline.
+- [x] Padronizar lockfile/instalação com PNPM, removendo o npm lock e instaladores órfãos (higienização PR #3); **a auditoria de dependências em si continua pendente**.
 - [ ] Criar projetos Firebase **DEV** e **PROD** separados: Hosting, Authentication e Firestore.
 - [ ] Implementar login Google via Firebase Auth, logout, reidratação da sessão, proteção de rotas e erros.
 - [ ] Criar cliente HTTP para Worker, com Firebase ID Token e tratamento de expiração/401; sem compartilhar UID arbitrário.
@@ -148,6 +164,7 @@
 |---|---|---|---|---|
 | 16/10/2026 | [PR #1](https://github.com/EwertonMendes/roteiva-web/pull/1) | Demonstração Pages | Build/deploy validados; backend não implementado | CI build/testes calendário+finanças; demo localStorage |
 | 16/10/2026 | [PR #2](https://github.com/EwertonMendes/roteiva-web/pull/2) | Organização documental | Estrutura/arquitetura propostas registradas | Somente Markdown; **não** altera funcionalidades |
+| 16/10/2026 | [PR #3](https://github.com/EwertonMendes/roteiva-web/pull/3) | Higienização | Removido scaffold sem uso; PNPM padronizado | Validar CI Pages; backend Vinext preservado para a migração |
 
 ### Protocolo para IAs
 

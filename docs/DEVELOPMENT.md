@@ -6,7 +6,7 @@
 
 - Node.js **22.13 ou superior**.
 - Usar **PNPM 11.25.0** como no GitHub Actions; `pnpm-lock.yaml` é o lockfile utilizado no build da demonstração.
-- Há um `package-lock.json` legado que **não está sincronizado**. Evitar `npm ci` até a etapa de padronização de dependências; não apagar o arquivo sem avaliar os scripts do host original.
+- O lockfile único é **`pnpm-lock.yaml`**. `package-lock.json` e os instaladores especiais do template foram removidos nesta higienização. O script `install:ci` é um alias para `pnpm install --frozen-lockfile`; não usar `npm ci`.
 
 ## Demonstração estática — disponível
 
@@ -49,6 +49,7 @@ pnpm run db:generate
 - `build` gera o artefato legado, **não** a demonstração Pages.
 - `start` faz preview local do Worker já compilado usando Wrangler e estado em `.wrangler/state`.
 - `db:generate` gera migrations Drizzle destinadas ao D1 legado. Não reaproveitar essas migrations automaticamente no Firestore.
+- Componentes gerados e não utilizados do template (`components/ui`, exemplos D1 e assets de amostra) foram retirados. Os scripts necessários ao preview Vinext/Worker **ainda estão presentes**: não apagá-los sem migração e testes.
 - `tests/studio-api.test.mjs` valida endpoints antigos contra servidor local isolado; **não está** na pipeline de GitHub Pages. Exige ambiente apropriado.
 - Os arquivos binários do legado e sua base local ficam sob estado Wrangler, não são compartilhados com o GitHub Pages.
 - O login local simulado de ChatGPT pode funcionar no ambiente portátil legado. **Não** é login de produção e será substituído por Firebase Authentication.

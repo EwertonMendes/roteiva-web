@@ -67,7 +67,7 @@ pnpm run test:finance
 pnpm run build:pages
 ```
 
-O código legado tem comandos próprios para um preview local com Vinext/D1/R2. Consulte [Desenvolvimento](docs/DEVELOPMENT.md) antes de executá-los. O `package-lock.json` legado **não está sincronizado** com o conjunto atual de dependências; para a demonstração, use o `pnpm-lock.yaml` como referência do CI.
+O código legado tem comandos próprios para um preview local com Vinext/D1/R2. Consulte [Desenvolvimento](docs/DEVELOPMENT.md) antes de executá-los. O projeto utiliza **PNPM 11.25.0** com apenas o lockfile `pnpm-lock.yaml`. Os instaladores e componentes genéricos do template original foram removidos; o código Vinext/D1/R2 ainda necessário ao legado permanece até sua migração.
 
 ## Contribuição
 
