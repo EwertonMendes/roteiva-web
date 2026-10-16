@@ -34,6 +34,8 @@ jobs:
         run: |
           pnpm run test:calendar
           pnpm run test:finance
+      - name: Build Next.js / Vinext frontend
+        run: pnpm run build
       - name: Build GitHub Pages demo
         run: pnpm run build:pages
       - name: Verify static entrypoint

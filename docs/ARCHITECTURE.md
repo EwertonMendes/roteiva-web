@@ -16,17 +16,17 @@ Não confundir **R$ 0 enquanto dentro da franquia** com infraestrutura ilimitada
 
 | Área | Código atual (out/2026) | MVP-alvo (a implementar) |
 |---|---|---|
-| UI | React 19 + Next 16/Vinext; tela principal em `app/dashboard-client.tsx`; demo Vite em `pages/` | Aplicação única React + Vite + TypeScript, preservando experiência e componentes reutilizáveis |
+| UI | Next.js 16/Vinext + React 19 **preservados**, UI em `app/`; demo estática Vite em `pages/` | Aproveitar a UI existente; decidir futuramente hospedagem final sem excluir Next/Vinext sem autorização |
 | Hospedagem | GitHub Pages para **demo localStorage** | Firebase Hosting para aplicação autenticada; Pages pode continuar como demo |
-| Login | Cabeçalhos de identidade do host legado (mock local no dev) | Firebase Authentication com provedor Google |
-| Dados | D1/Drizzle, `studio_workspaces` com JSON agregado, estado React e draft local | Cloud Firestore com entidades independentes e Security Rules |
-| API | `app/api/**` hospedado no Worker/Vinext legado | Cloudflare Worker TypeScript, API explícita com autenticação Firebase verificada |
+| Login | Sem login real; Next e Pages executam `demoMode` | Firebase Authentication com provedor Google |
+| Dados | Apenas estado React + `localStorage`; D1/Drizzle removidos do código ativo | Cloud Firestore com entidades independentes e Security Rules |
+| API | `app/api/**` removido; apenas adaptador de **renderização Vinext** permanece | Cloudflare Worker TypeScript, API explícita com autenticação Firebase verificada |
 | Conexão Drive | Ausente no repo atual; referência em código BRBET histórico externo | OAuth 2.0 próprio, consentimento mínimo e refresh tokens cifrados no D1 |
-| Mídias | Cloudflare R2 no legado, sem upload na demo | Drive da conta do profissional, sem armazenar arquivos binários no Firestore/D1/Worker |
-| Aprovação | D1/R2 e links por token no legado; inoperantes na demo | Convites privados, feedback estruturado e acesso ao vídeo de acordo com a ACL do Drive |
+| Mídias | Upload desativado; binding R2 removido | Drive da conta do profissional, sem armazenar arquivos binários no Firestore/D1/Worker |
+| Aprovação | Demonstração desabilitada; página de revisão Next mostra aviso | Convites privados, feedback estruturado e acesso ao vídeo de acordo com a ACL do Drive |
 | Cobrança | Não implementada | Plano inicial controlado pelo servidor; cobrança automatizada só depois |
 
-**Não é uma migração 1:1 das tabelas existentes.** O frontend atual usa tipos numéricos e estado em bloco, enquanto parte dos endpoints usa tabelas normalizadas. Consolidar o domínio antes de implantar Firestore.
+**Decisão de limpeza:** o modelo D1 antigo foi descartado e o MVP Firestore começará com dados novos. **Next.js e Vinext permanecem como frontend**, incluindo seu runtime de renderização. A persistência da demo ainda usa estado local agregado, que não será copiado diretamente para um documento único Firestore.
 
 ## 3. Desenho lógico
 
@@ -54,12 +54,12 @@ O Worker é uma camada de operações privilegiadas, não deve virar proxy de st
 
 ## 4. Frontend
 
-- **Destino:** React + Vite + TypeScript, hospedagem estática pelo Firebase Hosting; manter UI e design system existentes, componentes reutilizáveis, navegação e responsividade desktop/mobile.
+- **Atual:** React 19 com **Next.js/Vinext preservados** e entrada estática Vite para GitHub Pages. **Destino:** Firebase Hosting/Auth/Firestore e Worker/Drive previstos; a escolha de como hospedar Next/Vinext em produção deverá ser validada antes do deploy, sem substituir a camada frontend sem solicitação.
 - Separar UI, lógica de domínio e integrações em módulos: `features/*`, `services/firebase`, `services/drive`, `services/api`, `domain/*` (estrutura ilustrativa, não criada ainda).
 - Componentes consomem contratos tipados de repositórios/serviços, não chamam Firebase ou Drive diretamente em todos os pontos da UI.
 - Estados explícitos: loading, vazio, erro, sem permissão, offline e conflito; evitar alteração otimista sem rollback.
 - Respeitar tema claro/escuro, movimento reduzido, navegação por teclado e formulários acessíveis.
-- Em migração, preservar a demo isolada e evitar manter duas implementações concorrentes de regras de negócio.
+- Preservar os componentes compartilhados e a demo GitHub Pages, sem duplicar regras de negócio. Uma futura mudança de framework/frontend exige aprovação explícita.
 - Minimizar leituras Firestore: consultas paginadas/filtradas por workspace, listeners apenas onde úteis, evitar recarregar coleções completas a cada interação; gravar somente entidades alteradas.
 - Projetos podem guardar thumbnails/metadados leves; **não** criar base64 gigantes, mídia nem segredos no Firestore ou `localStorage`.
 
@@ -209,15 +209,14 @@ Workflow recomendado: feature branch → PR → CI → preview DEV → teste man
 
 Mudanças de uma decisão para **confirmada**, **validada** ou **descartada** precisam citar evidência no PR e atualizar também o [roadmap](MVP-ROADMAP.md).
 
-## 15. Notas de migração do legado
+## 15. Higienização do backend legado — sem alterar a estrutura do frontend
 
-- `app/dashboard-client.tsx` concentra UI/estado/efeitos; extrair serviços por domínio sem grande reescrita visual.
-- `app/api/workspace/route.ts` serializa JSON de workspace com revisão; não reproduzir como um único documento Firestore.
-- `db/schema.ts` possui entidades normalizadas próprias do D1 antigo; usá-las para mapear regras de domínio, não como schema definitivo.
-- `app/api/media/route.ts` faz upload R2 limitado a 250 MB. No MVP Drive, substituir por integração direta e segura.
-- `app/api/share/route.ts` / `app/api/portal/route.ts` implementam revisões do legado; exigem redesign de autorização para múltiplas contas.
-- `app/chatgpt-auth.ts` depende de identidade específica do host original; remover do fluxo de produção depois da migração ao Firebase Auth.
-- `pages/` e `vite.pages.config.ts` são apenas a demo estática; não confundir a compilação verde com validação de backend.
-- O ZIP BRBET foi apenas inspecionado como referência conceitual; **não foi adicionado ao repositório**.
+A [PR #4](https://github.com/EwertonMendes/roteiva-web/pull/4) remove rotas `app/api/**`, `db/`, migrations `drizzle/`, validação exclusiva de API, autenticação do host antigo e integrações de conectores não utilizadas. Não migra os dados do legado; o Firestore será modelado do zero na fase correspondente.
 
-A arquitetura só deve ser alterada mediante mudança explicitamente descrita e revisada, não por preferência ad hoc de um agente.
+**Front preservado:** Next.js, Vinext, React, `app/dashboard-client.tsx`, `app/studio-features.tsx`, estilos, `app/layout.tsx`, experiência visual, `pages/`, build Pages e os scripts/adaptadores indispensáveis à renderização do Next. Não confundir `build/sites-worker.ts` (adaptador Vinext) com API de negócio.
+
+**Demonstração:** `app/page.tsx` e `pages/main.tsx` ativam `demoMode`. Persistência somente no navegador; a chave `roteiva-pages-demo-workspace-v1` foi preservada para a demo Pages. A tela `/review` mostra uma explicação até a API segura existir.
+
+**Infra Cloudflare existente:** limitada ao runtime de renderização do frontend Vinext, **sem D1/R2/CONNECTORS**. Não chamar isso de backend operacional do Roteiva. Firebase, backend OAuth/Workers, D1 de tokens e Google Drive continuarão `PLANEJADO`, e não existem ainda no repositório.
+
+A arquitetura deve ser atualizada a cada implementação de infraestrutura. O código removido é recuperável pelo histórico Git anterior à PR #4, mas não deve ser restaurado sem uma necessidade concreta.

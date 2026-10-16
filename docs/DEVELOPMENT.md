@@ -1,94 +1,67 @@
 # Desenvolvimento, testes e ambientes
 
-> **Atualizado em 16/10/2026.** Este documento descreve primeiro o que é executável **hoje** e separa os ambientes de destino ainda planejados. Consulte [Arquitetura](ARCHITECTURE.md) e [Roadmap](MVP-ROADMAP.md).
+> Atualizado em 16/10/2026. Este repositório **preserva Next.js/Vinext e seu frontend original**. As APIs de negócio e os bancos legados foram removidos por decisão explícita. [Arquitetura](ARCHITECTURE.md) · [Roadmap](MVP-ROADMAP.md).
 
-## Requisitos e gerenciador de pacotes
+## Instalação
 
-- Node.js **22.13 ou superior**.
-- Usar **PNPM 11.25.0** como no GitHub Actions; `pnpm-lock.yaml` é o lockfile utilizado no build da demonstração.
-- O lockfile único é **`pnpm-lock.yaml`**. `package-lock.json` e os instaladores especiais do template foram removidos nesta higienização. O script `install:ci` é um alias para `pnpm install --frozen-lockfile`; não usar `npm ci`.
-
-## Demonstração estática — disponível
+Node.js **22.13+**, PNPM **11.25.0** e `pnpm-lock.yaml` (lockfile único).
 
 ```bash
 pnpm install --frozen-lockfile
+```
+
+## Dois modos do mesmo frontend
+
+**Next.js 16 + Vinext + React (original, preservado):**
+
+```bash
+pnpm dev
+pnpm run build
+pnpm start
+```
+
+- `app/page.tsx` mostra `app/dashboard-client.tsx` com `demoMode`, sem login antigo.
+- `app/layout.tsx`, `app/site-experience.tsx`, estilos e componentes foram mantidos.
+- `vite.config.ts`, `next.config.ts`, `build/sites-worker.ts` e os scripts de runtime permanecem para **renderização do frontend Next/Vinext**.
+- O adaptador Vinext utiliza runtime Cloudflare, mas **sem D1, R2, conectores ou rotas de API de negócio**. Isso é infraestrutura de renderização do Next, não backend próprio do SaaS.
+- `app/review/page.tsx` informa que o portal real ainda não está disponível.
+
+**Demonstração estática para GitHub Pages (preservada):**
+
+```bash
 pnpm run test:calendar
 pnpm run test:finance
 pnpm run build:pages
 pnpm exec vite preview --config vite.pages.config.ts --outDir dist-pages
 ```
 
-A entrada de demonstração está em `pages/index.html` + `pages/main.tsx`; o build usa `vite.pages.config.ts` e publica `dist-pages/` com a base `/roteiva-web/`.
+- Entrada `pages/index.html` + `pages/main.tsx`; build `dist-pages/` com base `/roteiva-web/`.
+- A demo pública está em **https://ewertonmendes.github.io/roteiva-web/**.
+- Ambas as entradas usam os **mesmos componentes React**; a versão Pages não tem backend e mantém a chave de dados `roteiva-pages-demo-workspace-v1`.
+- A persistência é local ao navegador; sem login, sincronização entre dispositivos, upload, API, R2 ou revisão por links. Não inserir dados sensíveis ou reais.
 
-URL pública: **https://ewertonmendes.github.io/roteiva-web/**
+## Comandos existentes
 
-O workflow `.github/workflows/deploy-pages.yml`:
-- em PR para `master`: instala com PNPM fixo, executa testes de calendário/financeiro e compila a demo; **não publica PR**;
-- em push para `master` ou disparo manual: faz o mesmo e publica o artifact em GitHub Pages;
-- depende das configurações de GitHub Pages no repositório, não publica um backend.
+| Script | Finalidade |
+|---|---|
+| `dev` | Desenvolver frontend Next/Vinext |
+| `build` | Compilar frontend Next/Vinext |
+| `start` | Visualizar build local do frontend Vinext |
+| `build:pages` | Compilar demonstração estática para Pages |
+| `test:calendar` | Testar lógica da agenda |
+| `test:finance` | Testar cálculos financeiros e sincronização local |
+| `lint` | ESLint do frontend |
 
-**Limites da demo:** dados apenas no `localStorage` do navegador, sem contas reais, sem Firestore, sem Drive, sem upload, sem links públicos de revisão. O armazenamento local não é sincronizado e não deve conter dados de clientes reais. Para zerar a demonstração, limpe os dados do site no navegador. O backup JSON da interface inclui cadastros, não arquivos binários.
+Não existem mais `predev`, `db:generate`, `db:local` ou migrations. Não há necessidade de preparar banco ao iniciar `pnpm dev`.
 
-## Aplicação original Vinext/Cloudflare — legado de desenvolvimento
+## Validação e publicação
 
-Entradas: `app/page.tsx`, `app/dashboard-client.tsx`, `app/studio-features.tsx` e rotas `app/api/**`.
+O workflow `.github/workflows/deploy-pages.yml` instala com PNPM congelado, executa testes de calendário/financeiro e compila a demo Pages. A partir desta limpeza, também deve **compilar Next/Vinext no CI** para evitar regressões nessa camada. Em PR apenas valida; o push na `master` publica o Pages.
 
-Comandos disponíveis no `package.json` (sujeitos às dependências locais e bindings do ambiente):
+Revisar manualmente desktop/mobile, ambos os temas, cadastros, agenda, financeiro, importação/exportação JSON e navegação. Conferir que telas de arquivos e revisão não tentem utilizar APIs removidas. Uma build verde não substitui teste visual.
 
-```bash
-pnpm run dev
-pnpm run build
-pnpm run start
-pnpm run test:calendar
-pnpm run test:finance
-pnpm run lint
-pnpm run db:generate
-```
+## Serviços futuros (não implementados)
 
-- `dev` executa o ambiente de desenvolvimento Vinext e o script `predev` prepara o banco local. Na configuração portátil, usualmente serve em `127.0.0.1:5173`.
-- `build` gera o artefato legado, **não** a demonstração Pages.
-- `start` faz preview local do Worker já compilado usando Wrangler e estado em `.wrangler/state`.
-- `db:generate` gera migrations Drizzle destinadas ao D1 legado. Não reaproveitar essas migrations automaticamente no Firestore.
-- Componentes gerados e não utilizados do template (`components/ui`, exemplos D1 e assets de amostra) foram retirados. Os scripts necessários ao preview Vinext/Worker **ainda estão presentes**: não apagá-los sem migração e testes.
-- `tests/studio-api.test.mjs` valida endpoints antigos contra servidor local isolado; **não está** na pipeline de GitHub Pages. Exige ambiente apropriado.
-- Os arquivos binários do legado e sua base local ficam sob estado Wrangler, não são compartilhados com o GitHub Pages.
-- O login local simulado de ChatGPT pode funcionar no ambiente portátil legado. **Não** é login de produção e será substituído por Firebase Authentication.
+Firebase Hosting/Auth/Firestore, Cloudflare Workers/D1 para credenciais OAuth e o Google Drive individual são **plano do MVP**, e serão criados do zero. Ver [arquitetura](ARCHITECTURE.md) e [roadmap](MVP-ROADMAP.md).
 
-Os guias antigos de teste que tratavam armazenamento só no navegador e, alternativamente, mídia real em R2 descreviam versões distintas. Este documento centraliza essas distinções.
-
-## Fluxos manuais de validação da interface
-
-1. Navegar entre Início, Clientes, Projetos, Agenda, Financeiro, Biblioteca e Aprovações no desktop e celular.
-2. Conferir temas claro/escuro e a experiência com movimento reduzido.
-3. Cadastrar clientes recorrentes/avulsos, projetos, tarefas e prazos; testar filtros, edição e exclusão.
-4. Validar agenda com horários de início/término e aviso de sobreposição.
-5. Validar receitas, despesas, parcelas, cálculos em centavos, filtro mensal e exportação.
-6. Recarregar a demo e conferir persistência **somente local**.
-7. Verificar que recursos de upload, autenticação, sincronização e revisões remotas **não são anunciados como funcionais na demo**.
-
-## Ambientes-alvo do MVP — ainda não provisionados
-
-| Ambiente | Proposta | Observações |
-|---|---|---|
-| DEV | Firebase Hosting + Auth + Firestore isolados; Worker/D1 DEV; OAuth Google DEV | Dados artificiais; origens e redirect URIs próprias |
-| PROD | Firebase Hosting + Auth + Firestore produção; Worker/D1 produção; OAuth Google produção | Separar credenciais, regras e segredos de DEV |
-| DEMO | GitHub Pages atual | Preservar como visualização isolada, sem dados reais |
-
-**Planejado, não ativo:** workflows separados para testes das regras do Firestore, testes de OAuth, build do frontend final, deploy DEV e deploy PROD controlado. Não documentar comandos de deploy Firebase/Workers como existentes antes de criar os projetos, configurações e pipelines.
-
-## Configuração e segredos — planejado
-
-- Configuração pública do Firebase Web (API key, auth domain, project ID etc.) no frontend; a API key web **não é um segredo** nem substitui Security Rules.
-- Worker Secrets: client secret OAuth, chave de criptografia com versão e outros segredos de servidor.
-- D1 binding associado ao Worker para tokens cifrados, revisões de integração e auditoria mínima.
-- URLs autorizadas CORS, OAuth redirect URIs e domínios permitidos por ambiente.
-- Nunca copiar valores reais para README, PR, exemplos de `.env` ou logs.
-- Aplicar migrations do D1 de DEV/PROD via processo controlado; testar restauração e rollback antes do lançamento.
-
-## Acompanhamento e custos
-
-Monitorar Workers (requisições/CPU/erros), D1 (linhas/armazenamento), Firestore (leituras/gravações), Hosting (transferência), Drive (erros/quota) e sucesso/falha de OAuth. A meta de **R$ 0** vale apenas dentro das franquias gratuitas e não constitui garantia de custo fixo.
-
-## Ao alterar implementação
-
-Atualizar obrigatoriamente `docs/MVP-ROADMAP.md`; atualizar arquitetura, README, desenvolvimento e design conforme impacto. Consulte [AGENTS.md](../AGENTS.md) e o checklist de PR.
+Toda IA deve atualizar a documentação **no mesmo PR** em que alterar código, conforme [AGENTS.md](../AGENTS.md).

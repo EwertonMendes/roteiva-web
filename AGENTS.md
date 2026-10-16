@@ -38,9 +38,9 @@ Não recrie READMEs concorrentes, documentos de teste avulsos ou planos paralelo
 
 ## Atenção ao estado atual
 
-- A versão Pages em `pages/` é uma **demo localStorage**; não possui backend remoto.
-- O app legado em `app/` usa Next.js/Vinext e integrações Cloudflare D1/R2 específicas do ambiente original.
-- A arquitetura Firebase + Workers + D1 (tokens) + Drive individual é **objetivo futuro**, ainda não implementado.
+- O frontend **Next.js/Vinext é parte da estrutura aprovada e deve ser preservado**. A versão Pages em `pages/` usa os mesmos componentes em modo demonstração com `localStorage`.
+- Na PR #4 foram removidas APIs de negócio D1/R2/Drizzle e conectores antigos; o `build/sites-worker.ts` continua **somente como renderizador Vinext**. **Não remover Next/Vinext, seus scripts, layouts ou componentes sem solicitação explícita.**
+- Firebase + Worker API/D1 (tokens) + Drive individual é **objetivo futuro** e ainda não implementado. A remoção do backend legado não autoriza refatorar o frontend nem alterar a experiência.
 - O BRBET antigo é referência conceitual, não uma dependência e não deve ser copiado cegamente; verificar direitos de reutilização antes de aproveitar código.
 - O escopo `drive.file` é o padrão desejado; **não pedir acesso irrestrito ao Drive** por conveniência.
 - Com uploads grandes, dados passam diretamente do navegador ao Drive quando a prova de conceito confirmar segurança e CORS; **não passar vídeo pelo Worker**.

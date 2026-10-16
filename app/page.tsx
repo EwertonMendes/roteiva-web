@@ -1,10 +1,7 @@
 import DashboardClient from "./dashboard-client";
-import { requireChatGPTUser } from "./chatgpt-auth";
 
-export const dynamic = "force-dynamic";
-
-export default async function Home() {
-  const user = await requireChatGPTUser("/");
-  const firstName = user.displayName.split(/[\s@]/)[0] || "Mateus";
-  return <DashboardClient firstName={firstName} email={user.email} />;
+// A aplicação Next/Vinext continua disponível como frontend de demonstração.
+// Autenticação Firebase e persistência remota serão implementadas no MVP.
+export default function Home() {
+  return <DashboardClient firstName="Visitante" email="demo@roteiva.local" demoMode />;
 }
