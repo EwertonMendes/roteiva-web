@@ -73,7 +73,7 @@ Configuração de repositório reaproveitada:
 - Secret `FIREBASE_SERVICE_ACCOUNT`, somente em etapa de autenticação após validação.
 - Conta existente `roteiva-github-deploy-dev@roteiva-web-dev.iam.gserviceaccount.com`.
 
-Papéis existentes auditados: Firebase Hosting Admin e API Keys Viewer. **PENDENTE DE AUTORIZAÇÃO:** publicação automática de regras/índices exige Firebase Rules Admin e Cloud Datastore Index Admin; estes não dão acesso de leitura/escrita aos documentos, mas permitem alterar a segurança e os índices. Não conceder Editor/Owner/Firestore User por conveniência. WIF é uma melhoria futura: elimina chave persistente, mas exige pool, provider e binding IAM restrito ao repo/master; não criar outro mecanismo de credenciais sem auditoria e autorização.
+Papéis existentes auditados: Firebase Hosting Admin e API Keys Viewer. Com autorização explícita do proprietário em 16/10/2026, adicionados Firebase Rules Admin (`roles/firebaserules.admin`) e Cloud Datastore Index Admin (`roles/datastore.indexAdmin`) somente no projeto DEV. Estes não dão acesso de leitura/escrita aos documentos, mas permitem alterar a segurança e os índices. Não conceder Editor/Owner/Firestore User por conveniência. WIF é uma melhoria futura: elimina chave persistente, mas exige pool, provider e binding IAM restrito ao repo/master; não criar outro mecanismo de credenciais sem auditoria e autorização.
 
 O comando explícito é:
 ```bash

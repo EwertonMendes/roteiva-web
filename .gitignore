@@ -33,3 +33,6 @@ firebase-debug.log
 playwright-report/
 test-results/
 dist-emulator/
+
+# Temporary credentials produced by google-github-actions/auth.
+gha-creds-*.json

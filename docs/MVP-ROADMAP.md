@@ -201,4 +201,4 @@
 
 **Riscos/limites:** emuladores não substituem OAuth real; Safari/iOS/navegadores embutidos não estão validados; sem listener entre abas (recarregar explicitamente); sem fila offline; o recarregamento de recuperação descarta rascunhos não confirmados. Histórico activities não é auditoria inviolável. Não há promessa de custo ilimitado ou segurança exaustiva. Perfil e exclusão completa de conta continuam sem UI para evitar limpeza parcial.
 
-**BLOQUEADO até autorização:** papéis de implantação de regras/índices na conta de serviço existente. Não há necessidade de habilitar Blaze ou entregar credenciais pelo chat.
+**IAM autorizado e aplicado:** Firebase Rules Admin e Cloud Datastore Index Admin adicionados à conta de deploy existente somente no DEV. Sem Blaze ou novas chaves.

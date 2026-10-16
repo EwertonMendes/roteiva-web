@@ -51,6 +51,15 @@ jobs:
           pnpm exec playwright install --with-deps chromium
           pnpm run build:emulator
           pnpm run test:firebase
+      - name: Report browser failure context
+        if: failure()
+        run: |
+          node --input-type=module <<'NODE'
+          import {readdir,readFile} from 'node:fs/promises';
+          for (const entry of await readdir('test-results',{recursive:true}).catch(()=>[])) {
+            if (entry.endsWith('error-context.md')) console.log(entry+'\n'+await readFile('test-results/'+entry,'utf8'));
+          }
+          NODE
       - name: Upload QA evidence
         if: always()
         uses: actions/upload-artifact@v4
