@@ -53,7 +53,7 @@ function BrandAvatar({ initials, color, large = false }: { initials: string; col
   return <span className={`brand-avatar ${color} ${large ? "large" : ""}`}>{initials}</span>;
 }
 
-export default function DashboardClient({ firstName, email }: { firstName: string; email: string }) {
+export default function DashboardClient({ firstName, email, demoMode = false }: { firstName: string; email: string; demoMode?: boolean }) {
   const [view, setView] = useState<View>("overview");
   const [projects, setProjects] = useState(initialProjects);
   const [clientList, setClientList] = useState(initialClients);
@@ -87,7 +87,7 @@ export default function DashboardClient({ firstName, email }: { firstName: strin
   const [saveStatus, setSaveStatus] = useState("Carregando dados…");
   const [libraryProject, setLibraryProject] = useState("");
   const [uploading, setUploading] = useState(false);
-  const storageKey = `roteiva-workspace-v2:${email}`;
+  const storageKey = demoMode ? "roteiva-pages-demo-workspace-v1" : `roteiva-workspace-v2:${email}`;
   const pendingKey = `roteiva-pending-v2:${email}`;
   const revision = useRef(0);
   const lastSaved = useRef("");
@@ -104,6 +104,7 @@ export default function DashboardClient({ firstName, email }: { firstName: strin
     setLibraryAssets(data.libraryAssets || []); setComments(data.comments || []); setReviewState(data.reviewState || "pending"); setActivities(data.activities || []);
   }, []);
   async function retrySave() {
+    if (demoMode) return;
     try {
       const response = await fetch("/api/workspace"); const data = await response.json() as {revision:number};
       if (!response.ok) throw new Error("Servidor indisponível");
@@ -153,6 +154,15 @@ export default function DashboardClient({ firstName, email }: { firstName: strin
       const saved = localStorage.getItem("roteiva-theme");
       const preferred = saved === "dark" || saved === "light" ? saved : window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
       setTheme(preferred); document.documentElement.setAttribute("data-theme", preferred);
+      if (demoMode) {
+        try {
+          const local = localStorage.getItem(storageKey);
+          if (local) restoreWorkspace(JSON.parse(local));
+          setSaveStatus("Demonstração · dados somente neste navegador");
+        } catch { setSaveStatus("Demonstração · armazenamento local indisponível"); }
+        if (live) setDataReady(true);
+        return;
+      }
       try {
         const response = await fetch("/api/workspace");
         if (!response.ok) throw new Error("Servidor indisponível");
@@ -188,7 +198,7 @@ export default function DashboardClient({ firstName, email }: { firstName: strin
     }
     void load();
     return () => { live = false; };
-  }, [restoreWorkspace, storageKey, pendingKey, email]);
+  }, [restoreWorkspace, storageKey, pendingKey, email, demoMode]);
 
   useEffect(() => {
     if (!dataReady) return;
@@ -196,6 +206,7 @@ export default function DashboardClient({ firstName, email }: { firstName: strin
     const key = fingerprint(payload);
     try {
       localStorage.setItem(storageKey, JSON.stringify(payload));
+      if (demoMode) { setSaveStatus("Demonstração · salvo neste navegador"); return; }
       if (key === lastSaved.current) return;
       if (serverReady.current) localStorage.setItem(pendingKey, JSON.stringify({workspace: payload, revision: revision.current}));
     } catch { queueMicrotask(() => setSaveStatus("Falha na cópia local · exporte seus dados")); }
@@ -231,7 +242,7 @@ export default function DashboardClient({ firstName, email }: { firstName: strin
       });
     }, 450);
     return () => window.clearTimeout(timer);
-  }, [projects, clientList, financeEntries, monthlyRevenue, calendarEvents, libraryAssets, comments, reviewState, activities, dataReady, saveAttempt, storageKey, pendingKey]);
+  }, [projects, clientList, financeEntries, monthlyRevenue, calendarEvents, libraryAssets, comments, reviewState, activities, dataReady, saveAttempt, storageKey, pendingKey, demoMode]);
 
   function useServerCopy() {
     const remote = remoteSnapshot.current;
@@ -376,6 +387,7 @@ export default function DashboardClient({ firstName, email }: { firstName: strin
   }
 
   async function uploadAssets(files: FileList | null, projectId?: number) {
+    if (demoMode) { notify("Envio de arquivos requer um servidor. Disponível na hospedagem completa."); return; }
     if (!files?.length || uploading) return;
     setUploading(true);
     for (const file of Array.from(files)) {
@@ -415,7 +427,7 @@ export default function DashboardClient({ firstName, email }: { firstName: strin
     <div className="app-shell">
       <aside className={`sidebar ${mobileOpen ? "mobile-open" : ""}`}>
         <div className="brand-lockup">
-          <img src={theme === "light" ? "/roteiva-logo-black.png" : "/roteiva-logo-white.png"} alt="Roteiva" />
+          <img src={theme === "light" ? "roteiva-logo-black.png" : "roteiva-logo-white.png"} alt="Roteiva" />
           <button className="mobile-close" onClick={() => setMobileOpen(false)} aria-label="Fechar menu"><X size={18} /></button>
         </div>
         <nav>
@@ -450,6 +462,7 @@ export default function DashboardClient({ firstName, email }: { firstName: strin
         </header>
 
         <section className="page">
+          {demoMode && <div className="pages-demo-notice" role="note"><b>Modo demonstração</b><span>Projetos, clientes, agenda e financeiro ficam salvos apenas neste navegador. Sem login, sincronização, uploads ou links públicos de aprovação.</span></div>}
           <div className="page-heading">
             <div><span className="eyebrow">ROTEIVA / {view === "overview" ? "PAINEL" : pageTitles[view][0].toUpperCase()}</span><h1>{pageTitles[view][0]}</h1><p>{pageTitles[view][1]}</p></div>
             <div className="heading-actions">
@@ -457,14 +470,14 @@ export default function DashboardClient({ firstName, email }: { firstName: strin
               {view === "clients" ? <button className="primary-button" onClick={() => { setEditingClient(null); setClientModalOpen(true); }}><UserRoundPlus size={17} /> Novo cliente</button>
                 : view === "finance" ? <button className="primary-button" onClick={() => openFinanceModal()}><Plus size={17} /> Nova receita</button>
                 : view === "calendar" ? <button className="primary-button" onClick={() => openEvent()}><Plus size={17} /> Novo compromisso</button>
-                : view === "library" ? <><select aria-label="Projeto dos arquivos" value={libraryProject} onChange={e => setLibraryProject(e.target.value)}><option value="">Sem projeto</option>{projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select><label className="primary-button upload-button"><Upload size={17} /> {uploading ? "Enviando…" : "Adicionar arquivos"}<input type="file" disabled={uploading} multiple onChange={(event) => { uploadAssets(event.target.files, Number(libraryProject) || undefined); event.target.value = ""; }} /></label></>
+                : view === "library" ? <><select aria-label="Projeto dos arquivos" value={libraryProject} onChange={e => setLibraryProject(e.target.value)}><option value="">Sem projeto</option>{projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select><label className="primary-button upload-button"><Upload size={17} /> {uploading ? "Enviando…" : "Adicionar arquivos"}<input type="file" disabled={uploading || demoMode} multiple onChange={(event) => { uploadAssets(event.target.files, Number(libraryProject) || undefined); event.target.value = ""; }} /></label></>
                 : <button className="primary-button" onClick={() => setModalOpen(true)}><Plus size={17} /> Criar projeto</button>}
             </div>
           </div>
           {view === "overview" && <><TodayStudio clients={clientList} projects={projects} entries={financeEntries} events={calendarEvents} activities={activities} onView={changeView} /><Overview projects={projects} setView={changeView} /></>}
           {view === "projects" && (selectedProject && projects.some(p => p.id === selectedProject) ? <ProjectDetail project={projects.find(p => p.id === selectedProject)!} clients={clientList} entries={financeEntries} assets={libraryAssets} events={calendarEvents} onSave={updateProject} onBack={() => setSelectedProject(null)} onRevenue={addLinkedRevenue} onUpload={uploadAssets} onEvent={(p) => { openEvent(null, p.dueDate); }} uploading={uploading} /> : <ProjectsView projects={filtered.map(p => ({...p, files: libraryAssets.filter(a => a.projectId === p.id).length}))} statusFilter={statusFilter} setStatusFilter={setStatusFilter} onOpen={(id)=>{setSelectedProject(id);window.scrollTo({top:0,behavior:"auto"});}} />)}
           {view === "clients" && (selectedClient && clientList.some(c => c.id === selectedClient) ? <ClientDetail client={clientList.find(c => c.id === selectedClient)!} projects={projects} entries={financeEntries} onBack={() => setSelectedClient(null)} onEdit={(client) => { setEditingClient(client); setClientModalOpen(true); }} onSave={saveClientPackage} onProject={(id) => { setSelectedProject(id); setView("projects"); }} /> : <ClientsView clients={clientList.filter(c => `${c.name} ${c.email} ${c.phone}`.toLowerCase().includes(query.toLowerCase())).map(c => ({...c, projects: projects.filter(p => p.clientId === c.id).length, active: projects.filter(p => p.clientId === c.id && p.status !== "Aprovado").length}))} onOpen={(id)=>{setSelectedClient(id);window.scrollTo({top:0,behavior:"auto"});}} onAdd={() => { setEditingClient(null); setClientModalOpen(true); }} />)}
-          {view === "reviews" && <StudioReviews assets={libraryAssets} onNotify={notify} onDecision={applyReview} />}
+          {view === "reviews" && <StudioReviews assets={libraryAssets} onNotify={notify} onDecision={applyReview} demoMode={demoMode} />}
           {view === "finance" && <FinancePanel entries={financeEntries} clients={clientList} onAdd={() => openFinanceModal()} onEdit={(entry) => openFinanceModal(entry)} onDelete={setDeletingFinanceEntry} />}
           {view === "calendar" && <CalendarView events={calendarEvents} onAdd={(date) => openEvent(null, date)} onEdit={(entry) => openEvent(entry)} onDelete={(entry) => { if (window.confirm(`Excluir o compromisso “${entry.title}”?`)) { setCalendarEvents(current => current.filter(e => e.id !== entry.id)); logActivity(`Compromisso excluído: ${entry.title}`); } }} />}
           {view === "library" && <LibraryView assets={libraryAssets} query={query} onUpload={(files) => uploadAssets(files, Number(libraryProject) || undefined)} />}

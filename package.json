@@ -15,7 +15,8 @@
     "predev": "node scripts/prepare-studio.mjs",
     "test:finance": "node --experimental-strip-types tests/studio-finance.test.mjs",
     "db:local": "node scripts/prepare-studio.mjs",
-    "test:calendar": "node --experimental-strip-types tests/studio-calendar.test.mjs"
+    "test:calendar": "node --experimental-strip-types tests/studio-calendar.test.mjs",
+    "build:pages": "vite build --config vite.pages.config.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
