@@ -113,7 +113,7 @@ export default function DashboardClient({ firstName, email, photoURL, initialWor
         return updated.dueDate ? [...rest, {id:existing?.id || newId(), autoDeadline:true, projectId:updated.id, title:`Entrega — ${updated.name}`, date:updated.dueDate, time:existing?.time || "18:00", type:"Entrega", client:updated.client}] : rest;
       });
     }
-    logActivity(`Projeto atualizado: ${updated.name}`); notify("Projeto salvo");
+    logActivity(`Projeto atualizado: ${updated.name}`); notifyChange("Projeto salvo");
   }
   function saveClientPackage(client: Client) {
     setClientList(current => current.map(c => c.id === client.id ? client : c));
@@ -173,9 +173,11 @@ export default function DashboardClient({ firstName, email, photoURL, initialWor
   }
 
   const notify = useCallback((message: string) => {
-    setToast(isDemo ? message : "Alteração preparada · confira a confirmação na nuvem");
+    setToast(message);
     window.setTimeout(() => setToast(""), 2600);
   }, []);
+
+  function notifyChange(message: string) { notify(isDemo ? message : "Alteração preparada · confira a confirmação na nuvem"); }
 
   function addProject(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -194,7 +196,7 @@ export default function DashboardClient({ firstName, email, photoURL, initialWor
     setModalOpen(false);
     setView("projects"); setSelectedProject(projectId);
     logActivity(`Projeto criado: ${name}`);
-    notify("Projeto criado com sucesso");
+    notifyChange("Projeto criado com sucesso");
   }
 
   function addClient(event: FormEvent<HTMLFormElement>) {
@@ -217,7 +219,7 @@ export default function DashboardClient({ firstName, email, photoURL, initialWor
     }
     setClientModalOpen(false); setEditingClient(null);
     logActivity(`Cliente ${editingClient ? "atualizado" : "cadastrado"}: ${name}`);
-    notify("Cliente salvo com sucesso");
+    notifyChange("Cliente salvo com sucesso");
   }
 
   function addFinanceEntry(event: FormEvent<HTMLFormElement>) {
@@ -247,7 +249,7 @@ export default function DashboardClient({ firstName, email, photoURL, initialWor
     logActivity(`${kind === "expense" ? "Despesa" : "Receita"} ${editingFinanceEntry ? "atualizada" : "registrada"}: ${project}`);
     setFinanceModalOpen(false);
     setEditingFinanceEntry(null);
-    notify(editingFinanceEntry ? "Lançamento atualizado com sucesso" : kind === "expense" ? "Custo registrado no financeiro" : linkedClient ? `Receita vinculada a ${linkedClient.name}` : "Receita adicionada sem cliente vinculado");
+    notifyChange(editingFinanceEntry ? "Lançamento atualizado com sucesso" : kind === "expense" ? "Custo registrado no financeiro" : linkedClient ? `Receita vinculada a ${linkedClient.name}` : "Receita adicionada sem cliente vinculado");
   }
 
   function openFinanceModal(entry: FinanceEntry | null = null) {
@@ -265,7 +267,7 @@ export default function DashboardClient({ firstName, email, photoURL, initialWor
     setFinanceEntries((current) => current.filter((entry) => entry.id !== deletingFinanceEntry.id));
     logActivity(`Lançamento excluído: ${deletingFinanceEntry.project}`);
     setDeletingFinanceEntry(null);
-    notify("Receita excluída e indicadores atualizados");
+    notifyChange("Receita excluída e indicadores atualizados");
   }
 
   function addCalendarEvent(event: FormEvent<HTMLFormElement>) {
@@ -287,7 +289,7 @@ export default function DashboardClient({ firstName, email, photoURL, initialWor
     logActivity(`Compromisso salvo: ${title}`); setEditingEvent(null);
     setEventModalOpen(false);
     setView("calendar");
-    notify("Compromisso adicionado ao calendário");
+    notifyChange("Compromisso adicionado ao calendário");
   }
 
   function uploadAssets(_files: FileList | null, _projectId?: number) {

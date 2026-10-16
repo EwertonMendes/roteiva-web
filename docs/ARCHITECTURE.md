@@ -1,6 +1,6 @@
 # Arquitetura do Roteiva — MVP SaaS
 
-**Atualizado em 16/10/2026. Fundação Firebase DEV IMPLEMENTADA na PR #6; validação em andamento. Worker/Drive e demais fases continuam PLANEJADOS.**
+**Atualizado em 16/10/2026. Fundação Firebase DEV IMPLEMENTADA na PR #6; testes automatizados validados; QA real após publicação pendente. Worker/Drive e demais fases continuam PLANEJADOS.**
 
 Esta é a fonte de verdade sobre **como o sistema deverá funcionar**. O acompanhamento do que já foi entregue fica no [roadmap](MVP-ROADMAP.md); instruções operacionais em [desenvolvimento](DEVELOPMENT.md). Mudanças de arquitetura e decisões novas devem atualizar este arquivo **no mesmo PR**, conforme [AGENTS.md](../AGENTS.md).
 
@@ -186,7 +186,7 @@ Workflow recomendado: feature branch → PR → CI → preview DEV → teste man
 
 | Tema | Estado | Caminho |
 |---|---|---|
-| Frontend React/Vite, Firebase Hosting/Auth/Firestore | **IMPLEMENTADO na PR #6; QA em andamento** | Fundação UID Solo; evidências no roadmap |
+| Frontend React/Vite, Firebase Hosting/Auth/Firestore | **IMPLEMENTADO na PR #6; automação validada, QA real pendente** | Fundação UID Solo; evidências no roadmap |
 | Worker + D1 para OAuth/tokens | **Direção definida, pendente de PoC** | Testar WebCrypto/JWT, OAuth e limites Free |
 | Drive próprio com `drive.file` | **Direção definida, pendente de PoC** | OAuth offline + Picker + pasta gerenciada |
 | Técnica de upload sem proxy | **EM ABERTO** | Testar sessão resumable, token curto, CORS e browsers |

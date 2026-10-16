@@ -120,3 +120,7 @@ Implementação e validação Auth/Firestore permanecem **PLANEJADAS** nesta aud
 ### Resultado do provisionamento aprovado
 
 Em 16/10/2026 o proprietário aprovou explicitamente Standard, São Paulo e Spark. Criado `(default)`, `southamerica-east1`, nativo, Production Mode inicialmente deny-all; sem backups pagos. Authentication inicializado e somente Google habilitado com nome público Roteiva DEV e e-mail de suporte do proprietário. Domínios confirmados como os dois Firebase e localhost; nada extra adicionado. App Web Roteiva Web DEV registrado, appId `1:533435008961:web:c197c1076bc0e7b151d140`; SDK público em .env.firebase. Não criado bucket Storage.
+
+### Evidência automatizada da PR #6
+
+[Run 38980915291](https://github.com/EwertonMendes/roteiva-web/actions/runs/38980915291), commit 3eb037a: instalação congelada, testes de calendário/financeiro/autenticação, TypeScript, build Firebase e Pages, 12 testes Firestore/repositório e 8 testes Chromium passaram. Browser cobre OAuth simulado pelo Auth Emulator, cancelamento, CRUD, centavos, agenda após reload, sessão/tema, duas contas, offline e demo, em desktop e Pixel 7 emulado. Relatório HTML e capturas no artefato firebase-qa (retenção de 7 dias). A publicação e o OAuth real devem ser conferidos depois do merge; não são comprovados por este run.

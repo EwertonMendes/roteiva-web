@@ -73,7 +73,8 @@
 - [x] Implementar login Google, logout, sessão, proteção e erros na PR #6; **IMPLEMENTADO**, QA real ainda pendente.
 - [ ] Criar cliente HTTP para Worker, com Firebase ID Token e tratamento de expiração/401; sem compartilhar UID arbitrário.
 - [ ] Criar API Worker DEV/PROD separada, secrets/bindings por ambiente e CORS controlado.
-- [ ] Configurar CI para typecheck, lint, testes, build e previews DEV; manter deploy PROD controlado.
+- [x] CI com typecheck, testes, ambos builds e emuladores; deploy DEV automático após master verde (PR #6).
+- [ ] Acrescentar lint e previews; PROD continua separado e não provisionado.
 - [ ] Configurar observabilidade de erros/cotas e documentação de configuração/deploy.
 - [ ] Testar mobile, desktop, tema e navegação acessível.
 
@@ -169,6 +170,7 @@
 | 16/10/2026 | [PR #2](https://github.com/EwertonMendes/roteiva-web/pull/2) | Organização documental | Estrutura/arquitetura propostas registradas | Somente Markdown; **não** altera funcionalidades |
 | 16/10/2026 | [PR #3](https://github.com/EwertonMendes/roteiva-web/pull/3) | Higienização | Scaffold removido; PNPM padronizado | Pipeline Pages passou |
 | 16/10/2026 | [PR #4](https://github.com/EwertonMendes/roteiva-web/pull/4) | Limpeza backend | APIs antigas, D1/R2/Drizzle retirados; Next/Vinext preservados naquela etapa | Testes e deploy Pages aprovados |
+| 16/10/2026 | [PR #6](https://github.com/EwertonMendes/roteiva-web/pull/6) | Firebase DEV Solo | IMPLEMENTADO; automação VALIDADA | [CI 38980915291](https://github.com/EwertonMendes/roteiva-web/actions/runs/38980915291); 12 regras/repositório + 8 browser; provisionamento Spark aprovado; publicação e OAuth real pendentes |
 | 16/10/2026 | [PR #5](https://github.com/EwertonMendes/roteiva-web/pull/5) | Migração React/Vite | Next/Vinext removidos a pedido, Vite único, Firebase Hosting configurado | Validar CI com TypeScript, testes e dois builds; Firebase deploy aguarda projeto/segredos |
 
 ### Protocolo para IAs
@@ -183,7 +185,7 @@
 
 ## Entrega Firebase DEV — PR #6
 
-**Estado: IMPLEMENTADO, validação integral em andamento.** [PR #6](https://github.com/EwertonMendes/roteiva-web/pull/6). Auditoria e decisões em [desenvolvimento](DEVELOPMENT.md). Esta seção é a evidência específica da fundação Solo; itens Worker/Drive/PROD das fases anteriores continuam planejados.
+**Estado: IMPLEMENTADO; validação automatizada concluída, publicação e QA real pendentes.** [PR #6](https://github.com/EwertonMendes/roteiva-web/pull/6). Auditoria e decisões em [desenvolvimento](DEVELOPMENT.md). Esta seção é a evidência específica da fundação Solo; itens Worker/Drive/PROD das fases anteriores continuam planejados.
 
 - [x] Auditoria da master 4fbd5fd registrada antes das alterações.
 - [x] Aprovação explícita da região permanente São Paulo, Standard e Spark; banco provisionado em Production Mode.
@@ -191,7 +193,7 @@
 - [x] Implementação Firebase modular, perfil privado, sessão, loading/proteção e erros.
 - [x] Persistência por documento, centavos, tarefas e entregas independentes, preferência de tema, gravação pontual e revisão para conflitos.
 - [x] Demo com chave original e build explícito; sem importação de dados antigos.
-- [ ] CI final verde: instalação congelada, testes domínio/TS, ambos builds, regras e integração A/B, Chromium desktop/mobile.
+- [x] [CI verde no commit 3eb037a](https://github.com/EwertonMendes/roteiva-web/actions/runs/38980915291): instalação congelada, testes domínio/TS, ambos builds, 12 testes regras/repositório A/B e 8 Chromium desktop/mobile. Alterações posteriores devem repetir CI antes do merge.
 - [ ] Publicar regras/índices e Hosting após validação e permissões necessárias.
 - [ ] QA Google real: entrar/sair, refresh, CRUD persistente, nome/e-mail/foto, segunda conta e acesso indevido.
 - [ ] QA visual real desktop/mobile, claro/escuro, SPA /review e Pages.

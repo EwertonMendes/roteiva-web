@@ -54,6 +54,10 @@ test("Google emulator session, CRUD, restoration, themes and separate users",asy
   await expect(page.getByText("Montar primeiro corte",{exact:true})).toBeVisible();
   await navigate(page,"Financeiro");
   await page.getByRole("button",{name:"Nova receita",exact:true}).click();
+  await page.getByLabel("Valor do trabalho").fill("0");
+  await page.locator("form.finance-modal").getByRole("button",{name:"Adicionar lançamento"}).click();
+  await expect(page.locator(".toast")).toContainText("Informe um valor válido");
+  await expect(page.locator("form.finance-modal")).toBeVisible();
   await page.getByLabel("Valor do trabalho").fill("100,01");
   await page.getByLabel("Previsão de recebimento",{exact:true}).fill(new Date().toISOString().slice(0,10));
   await page.locator("form.finance-modal").getByRole("button",{name:"Adicionar lançamento"}).click();await settled(page);

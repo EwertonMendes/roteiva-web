@@ -4,7 +4,7 @@
 
 Frontend único **React 19 + Vite 8 + TypeScript**. [DEV](https://roteiva-web-dev.web.app/) · [Demonstração sem login](https://ewertonmendes.github.io/roteiva-web/).
 
-A [PR #6](https://github.com/EwertonMendes/roteiva-web/pull/6) implementa a fundação Firebase DEV: login Google, logout, restauração de sessão e clientes, projetos, tarefas, entregas recorrentes, agenda, financeiro e tema persistidos por usuário. **IMPLEMENTADO; validação final em andamento.** O estado detalhado e as evidências estão no [roadmap](docs/MVP-ROADMAP.md).
+A [PR #6](https://github.com/EwertonMendes/roteiva-web/pull/6) implementa a fundação Firebase DEV: login Google, logout, restauração de sessão e clientes, projetos, tarefas, entregas recorrentes, agenda, financeiro e tema persistidos por usuário. **IMPLEMENTADO; testes automatizados validados. QA Google real após publicação ainda pendente.** O estado detalhado e as evidências estão no [roadmap](docs/MVP-ROADMAP.md).
 
 | Ambiente | Build | Persistência |
 |---|---|---|
