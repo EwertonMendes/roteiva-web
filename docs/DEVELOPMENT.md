@@ -76,3 +76,25 @@ O workflow **falha explicitamente** se variável/segredo não estiverem presente
 7. Conferir tamanhos dos bundles e conteúdo do diretório publicado.
 
 A verificação do CI **não substitui testes visuais**. Atualize o [roadmap](MVP-ROADMAP.md) e a arquitetura no mesmo PR, conforme [AGENTS.md](../AGENTS.md).
+
+## Auditoria Firebase DEV — antes das alterações (16/10/2026)
+
+Inspeção da master `4fbd5fdf86c793c386ff42f6b6e5d696ebf51fb5` e Console autenticado:
+
+| Recurso | Estado observado |
+|---|---|
+| Projeto | Exclusivamente `roteiva-web-dev`, número 533435008961, plano Spark |
+| Hosting | Ativo; release `043ce6`, 16/10/2026 19:27 (Brasília), conta `roteiva-github-deploy-dev@roteiva-web-dev.iam.gserviceaccount.com` |
+| Domínios Hosting | `roteiva-web-dev.web.app` e `roteiva-web-dev.firebaseapp.com` |
+| Aplicativo Web | Nenhum aplicativo registrado |
+| Authentication | Não inicializado; Console apresenta “Vamos começar”; Google ainda não habilitado |
+| Domínios Auth | Ainda não verificados, dependem da inicialização |
+| Firestore | Nenhum banco criado; região/modo ainda não definidos |
+| Frontend | React 19/Vite 8/TS; sem SDK Firebase; localStorage com chave preservada |
+| Deploy Firebase | Workflow manual, environment denominado firebase-production, usa variável FIREBASE_PROJECT_ID e segredo FIREBASE_SERVICE_ACCOUNT; apenas Hosting |
+| Pages | Workflow PR/push master; testes de calendário/finanças, typecheck e ambos builds; publicação somente fora de PR |
+| Divergências | README/arquitetura/roadmap/desenvolvimento ainda dizem Hosting sem deploy; nome do environment é ambíguo para DEV |
+
+**BLOQUEADO:** criação do banco até aprovação explícita da região permanente. Proposta: Standard, `(default)`, `southamerica-east1` (São Paulo), Production Mode, Spark. Sem Blaze, backups pagos, Functions, Storage, PROD ou importação de demo.
+
+Implementação e validação Auth/Firestore permanecem **PLANEJADAS** nesta auditoria. Credencial privada existente não foi lida nem copiada. WIF depende de auditoria IAM e não será alterado por conveniência.
