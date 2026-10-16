@@ -24,7 +24,7 @@
 - [x] Reduzir dependências/lockfile à stack React/Vite/TS/Tailwind; validar instalação congelada, testes, typecheck e builds Firebase/Pages na PR #5.
 - [x] Remover `app/api/**`, Drizzle/D1, R2, auth de host e conectores de backend antigos, sem alterar componentes/estilos do frontend (PR #4).
 - [x] Preservar a demo original na PR #4 e migrar explicitamente para frontend único Vite na PR #5, sem SSR e sem duas aplicações concorrentes.
-- [ ] Implementar autenticação e persistência novas apenas nas fases planejadas do MVP.
+- [x] Implementar autenticação e persistência novas no escopo Solo DEV da PR #6, sem reutilizar backend antigo.
 
 **Aceite da migração frontend da PR #5:** pipeline com `pnpm install --frozen-lockfile`, testes de calendário/financeiro, `tsc --noEmit`, build base `/` com saída `dist/`, build base `/roteiva-web/` com saída `dist-pages/`; Firebase SPA rewrite e assets essenciais verificados. Avaliação visual em desktop/mobile após publicação continua necessária.
 
@@ -38,8 +38,8 @@
 | Demonstração GitHub Pages | **IMPLEMENTADO — publicação a validar após PR #5** | Mesmo frontend `src/`, build `dist-pages/`, `localStorage` |
 | Testes de calendário/financeiro | **IMPLEMENTADO** | `tests/studio-calendar.test.mjs`, `tests/studio-finance.test.mjs`; executados no CI do Pages |
 | API antiga e D1/R2 | **REMOVIDO do código ativo** | PR #4; frontend Next/Vinext preservado; backend futuro será novo |
-| Firebase Hosting | **CONFIGURADO, sem deploy** | `firebase.json`, build `dist/`, workflow manual; falta projeto/credenciais |
-| Firebase Auth e Firestore | **PLANEJADO** | Nenhuma conta, regras ou banco implementados |
+| Firebase Hosting | **VALIDADO na auditoria prévia** | DEV ativo, release 043ce6 anterior à PR #6, Spark |
+| Firebase Auth e Firestore | **IMPLEMENTADO na PR #6; QA em andamento** | Console DEV configurado, regras e persistência por UID; evidências abaixo |
 | Worker API separado e D1 de tokens | **PLANEJADO** | Não existe Worker OAuth/refresh do MVP |
 | Drive individual por usuário | **PLANEJADO** | Integração BRBET inspecionada externamente; não transferida |
 | Revisão segura por cliente | **PLANEJADO** | Fluxo legado incompatível com arquitetura-alvo |
@@ -65,34 +65,35 @@
 
 ## Fase 1 — Fundação SaaS e ambientes
 
-**Prioridade P0.** Dependente do aprendizado básico da Fase 0.
+**Prioridade P0.** Por solicitação explícita na PR #6, Auth/Firestore Solo são independentes da PoC Drive da Fase 0. Worker/OAuth continuam planejados.
 
 - [x] Unificar React/Vite/TS na SPA em `src/`, mantendo visual, estado local e build Pages; preparar build Firebase em `dist/` (PR #5).
 - [x] Padronizar lockfile/instalação com PNPM, removendo o npm lock e instaladores órfãos (higienização PR #3); **a auditoria de dependências em si continua pendente**.
-- [ ] Criar projetos Firebase **DEV** e **PROD** separados: Hosting, Authentication e Firestore.
-- [ ] Implementar login Google via Firebase Auth, logout, reidratação da sessão, proteção de rotas e erros.
+- [x] Reutilizar exclusivamente Firebase **DEV** roteiva-web-dev: Hosting ativo, Auth Google habilitado, Firestore Standard criado em São Paulo após aprovação. **PROD não autorizado e não criado**.
+- [x] Implementar login Google, logout, sessão, proteção e erros na PR #6; **IMPLEMENTADO**, QA real ainda pendente.
 - [ ] Criar cliente HTTP para Worker, com Firebase ID Token e tratamento de expiração/401; sem compartilhar UID arbitrário.
 - [ ] Criar API Worker DEV/PROD separada, secrets/bindings por ambiente e CORS controlado.
-- [ ] Configurar CI para typecheck, lint, testes, build e previews DEV; manter deploy PROD controlado.
+- [x] CI com typecheck, testes, ambos builds e emuladores; deploy DEV automático após master verde (PR #6).
+- [ ] Acrescentar lint e previews; PROD continua separado e não provisionado.
 - [ ] Configurar observabilidade de erros/cotas e documentação de configuração/deploy.
 - [ ] Testar mobile, desktop, tema e navegação acessível.
 
-**Aceite:** dois usuários entram em contas distintas, reiniciam sessão, veem telas protegidas; backend verifica identidade; artefatos de DEV/PROD isolados; CI verde. **Estado:** PLANEJADO.
+**Aceite:** dois usuários entram em contas distintas, reiniciam sessão, veem telas protegidas; regras verificam identidade; Worker/PROD continuam futuros; CI verde. **Estado:** PARCIAL — fundação Solo implementada, QA e demais subetapas discriminados abaixo.
 
 ## Fase 2 — Dados persistentes e isolamento
 
 **Prioridade P0.** Dependente da Fase 1.
 
-- [ ] Definir tipos de domínio, IDs estáveis, datas ISO, moeda em centavos e índices necessários.
-- [ ] Estruturar `users` e `workspaces` com ownerUid imutável e regras deny-by-default.
-- [ ] Extrair repositórios Firestore para clientes, projetos, tarefas, entregas, agenda e finanças; **não** salvar workspace como documento JSON único.
-- [ ] Implementar cadastro/edição/exclusão por registro, paginação e estados vazios/erros.
-- [ ] Definir estratégia de concorrência, descarte/recuperação offline e migração de dados prototipados; nunca sobrescrever silenciosamente.
-- [ ] Criar testes Firebase Emulator de Security Rules, com ataque cruzado A/B e mutações de owner/plano/papel negadas.
+- [x] Contratos, IDs aleatórios seguros, datas civis ISO e moeda persistida em centavos (PR #6); sem índices compostos exigidos.
+- [x] Decisão Solo: users/{uid} e subcoleções privadas, ownerUid imutável, deny-by-default (PR #6). Workspaces compartilhados são futuros.
+- [x] Repositório por documento para clientes, projetos, tarefas, entregas, agenda, finanças, atividades e preferências (PR #6).
+- [x] Persistência por registro, leitura paginada e estados vazios/erros na PR #6; exclusões somente onde a UI já oferece a operação.
+- [x] Revisão por documento detecta conflito; recuperação explícita descarta rascunho. Sem fila offline/importação da demo (PR #6).
+- [x] Regras e integração nos emuladores: 12 cenários passaram, incluindo CRUD A/B, UID/owner/role, timestamps, schema, valores, referências e conflito (PR #6).
 - [ ] Implementar exportação e procedimento de exclusão de conta/dados pessoais (mídia continua no Drive, por padrão).
 - [ ] Medir leituras/gravações para limitar custos.
 
-**Aceite:** cadastros persistem entre dispositivos da mesma conta, alterações refletem corretamente, usuário B não lê/escreve dados de A, e Firestore não é vulnerável a edição de plano. **Estado:** PLANEJADO.
+**Aceite:** cadastros persistem entre dispositivos da mesma conta, alterações refletem corretamente, usuário B não lê/escreve dados de A, e campos de plano/papel são negados. **Estado:** PARCIAL — integração e testes automatizados implementados; QA real e medição de uso ainda pendentes.
 
 ## Fase 3 — Gestão operacional de ponta a ponta
 
@@ -105,7 +106,7 @@
 - [ ] Painel: indicadores com consultas eficientes e cálculo consistente; funcionamento mobile.
 - [ ] Testes de cálculos, datas, permissões, edição concorrente e navegação.
 
-**Aceite:** freelancer conclui ciclo cliente→projeto→tarefa→agenda→financeiro, fecha e reabre sessão sem perda de dados. **Estado:** PARCIAL na UI, PLANEJADO para produção.
+**Aceite:** freelancer conclui ciclo cliente→projeto→tarefa→agenda→financeiro, fecha e reabre sessão sem perda de dados. **Estado:** PARCIAL — UI existente integrada à fundação DEV; produção e piloto completo ainda pendentes.
 
 ## Fase 4 — Biblioteca Drive de verdade
 
@@ -169,6 +170,7 @@
 | 16/10/2026 | [PR #2](https://github.com/EwertonMendes/roteiva-web/pull/2) | Organização documental | Estrutura/arquitetura propostas registradas | Somente Markdown; **não** altera funcionalidades |
 | 16/10/2026 | [PR #3](https://github.com/EwertonMendes/roteiva-web/pull/3) | Higienização | Scaffold removido; PNPM padronizado | Pipeline Pages passou |
 | 16/10/2026 | [PR #4](https://github.com/EwertonMendes/roteiva-web/pull/4) | Limpeza backend | APIs antigas, D1/R2/Drizzle retirados; Next/Vinext preservados naquela etapa | Testes e deploy Pages aprovados |
+| 16/10/2026 | [PR #6](https://github.com/EwertonMendes/roteiva-web/pull/6) | Firebase DEV Solo | IMPLEMENTADO; automação VALIDADA | [CI 38980915291](https://github.com/EwertonMendes/roteiva-web/actions/runs/38980915291); 12 regras/repositório + 8 browser; provisionamento Spark aprovado; publicação e OAuth real pendentes |
 | 16/10/2026 | [PR #5](https://github.com/EwertonMendes/roteiva-web/pull/5) | Migração React/Vite | Next/Vinext removidos a pedido, Vite único, Firebase Hosting configurado | Validar CI com TypeScript, testes e dois builds; Firebase deploy aguarda projeto/segredos |
 
 ### Protocolo para IAs
@@ -179,4 +181,26 @@
 4. Se mudar tecnologia/fluxo, sincronizar `ARCHITECTURE.md`, `DEVELOPMENT.md` e `README.md`.
 5. Nunca transformar projeções de uso/custo ou ideias discutidas em garantias ou funcionalidades entregues.
 
-**Próxima entrega recomendada:** Fase 0, PoC segura de Firebase ID Token + OAuth Drive + Worker + D1 + upload resumable.
+**Próxima entrega:** concluir QA e publicação Firebase DEV da PR #6. Depois, PoC Drive da Fase 0, sem antecipar Worker/D1 nesta entrega.
+
+## Entrega Firebase DEV — PR #6
+
+**Estado: IMPLEMENTADO; validação automatizada concluída, publicação e QA real pendentes.** [PR #6](https://github.com/EwertonMendes/roteiva-web/pull/6). Auditoria e decisões em [desenvolvimento](DEVELOPMENT.md). Esta seção é a evidência específica da fundação Solo; itens Worker/Drive/PROD das fases anteriores continuam planejados.
+
+- [x] Auditoria da master 4fbd5fd registrada antes das alterações.
+- [x] Aprovação explícita da região permanente São Paulo, Standard e Spark; banco provisionado em Production Mode.
+- [x] Aplicativo Web DEV registrado e somente Google habilitado; domínios Firebase e localhost confirmados.
+- [x] Implementação Firebase modular, perfil privado, sessão, loading/proteção e erros.
+- [x] Persistência por documento, centavos, tarefas e entregas independentes, preferência de tema, gravação pontual e revisão para conflitos.
+- [x] Demo com chave original e build explícito; sem importação de dados antigos.
+- [x] [CI verde no commit 3eb037a](https://github.com/EwertonMendes/roteiva-web/actions/runs/38980915291): instalação congelada, testes domínio/TS, ambos builds, 12 testes regras/repositório A/B e 8 Chromium desktop/mobile. Alterações posteriores devem repetir CI antes do merge.
+- [ ] Publicar regras/índices e Hosting após validação e permissões necessárias.
+- [ ] QA Google real: entrar/sair, refresh, CRUD persistente, nome/e-mail/foto, segunda conta e acesso indevido.
+- [ ] QA visual real desktop/mobile, claro/escuro, SPA /review e Pages.
+- [ ] Finalizar PR, merge e release DEV com evidência.
+
+**Testes adicionados:** `tests/firestore.rules.test.mjs` (CRUD, anônimo, A/B, UID/role/owner, timestamp, validação em updates, excesso de dados, datas/valores/referências, órfãos, atomicidade e conflito), `tests/auth-errors.test.mjs` e `tests/browser/workspace.spec.ts` (sessão e CRUD via Auth Emulator, offline, cancelamento e demo).
+
+**Riscos/limites:** emuladores não substituem OAuth real; Safari/iOS/navegadores embutidos não estão validados; sem listener entre abas (recarregar explicitamente); sem fila offline; o recarregamento de recuperação descarta rascunhos não confirmados. Histórico activities não é auditoria inviolável. Não há promessa de custo ilimitado ou segurança exaustiva. Perfil e exclusão completa de conta continuam sem UI para evitar limpeza parcial.
+
+**IAM autorizado e aplicado:** Firebase Rules Admin e Cloud Datastore Index Admin adicionados à conta de deploy existente somente no DEV. Sem Blaze ou novas chaves.

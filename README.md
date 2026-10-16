@@ -2,82 +2,57 @@
 
 **Gestão de produção audiovisual para freelancers e pequenos estúdios.**
 
-O Roteiva reúne, inicialmente em **modo demonstração**, clientes, projetos, tarefas, agenda e financeiro. A biblioteca de vídeos no Drive do usuário e o fluxo de revisões serão implementados nas próximas etapas do MVP.
+Frontend único **React 19 + Vite 8 + TypeScript**. [DEV](https://roteiva-web-dev.web.app/) · [Demonstração sem login](https://ewertonmendes.github.io/roteiva-web/).
 
-> **Estado em 16/10/2026:** frontend **React 19 + Vite 8 + TypeScript**, pronto para gerar um site estático para **Firebase Hosting**. Sem Next.js, Vinext, servidor próprio, banco, login ou upload remoto. A interface atual e os dados locais de demonstração foram preservados; **não utilize dados sensíveis ou de clientes reais**.
+A [PR #6](https://github.com/EwertonMendes/roteiva-web/pull/6) implementa a fundação Firebase DEV: login Google, logout, restauração de sessão e clientes, projetos, tarefas, entregas recorrentes, agenda, financeiro e tema persistidos por usuário. **IMPLEMENTADO; testes automatizados validados. QA Google real após publicação ainda pendente.** O estado detalhado e as evidências estão no [roadmap](docs/MVP-ROADMAP.md).
 
-**[Abrir demonstração no GitHub Pages](https://ewertonmendes.github.io/roteiva-web/)**
+| Ambiente | Build | Persistência |
+|---|---|---|
+| Firebase DEV — `roteiva-web-dev` | `pnpm build` → `dist/` | Firebase Auth Google + Firestore Standard, São Paulo |
+| GitHub Pages — demonstração | `pnpm build:pages` → `dist-pages/` | Sem login; localStorage `roteiva-pages-demo-workspace-v1` |
+| Emuladores | `pnpm build:emulator` | Projeto fictício `demo-roteiva`, nunca DEV real |
 
-## Começar
+O modo é uma configuração explícita `VITE_APP_MODE`; não depende do domínio. Um novo usuário Firebase começa vazio. **Nenhum dado antigo da demonstração é importado automaticamente.** Domínios têm localStorage separado.
 
-Requisitos: Node.js 22.13+ e PNPM 11.25.0.
+## Desenvolvimento e testes
+
+Node.js 22.13+, PNPM 11.25.0; Java 21 para emuladores.
 
 ```bash
 pnpm install --frozen-lockfile
 pnpm dev
-```
-
-Validação e build:
-
-```bash
 pnpm test
 pnpm typecheck
 pnpm build
-pnpm preview
+pnpm build:pages
+pnpm build:emulator
+pnpm exec playwright install chromium
+pnpm test:firebase
 ```
 
-O build de produção gera a pasta **`dist/`**, pronta para Firebase Hosting na raiz do domínio. A demonstração existente no GitHub Pages usa os **mesmos componentes** e é compilada com `pnpm build:pages` para `dist-pages/` sob `/roteiva-web/`.
+`pnpm dev` inicia a demo. Para testar o DEV real, copie `.env.example` para `.env.local`, preencha a configuração pública e execute `pnpm dev --mode firebase`. Consulte [desenvolvimento](docs/DEVELOPMENT.md) para variáveis, segurança e deploy. Não inserir credenciais administrativas em variáveis `VITE_*`.
 
-## Estrutura atual
+## Organização e segurança
 
-```text
-index.html                   Entrada única React
-src/                         Componentes, estilos e regras locais
-public/                      Logos, favicon, fontes Ubuntu e licença
-assets/brand/                Fonte original da marca (fora do deploy)
-tests/                       Testes da agenda e do financeiro
-scripts/verify-static-build.mjs  Validação de artefatos Firebase/Pages
-vite.config.ts               Configuração única de build frontend
-firebase.json                Configuração Firebase Hosting (somente Hosting)
-.github/workflows/           CI e deploy do Pages; deploy Firebase manual
-docs/                        Arquitetura futura e roadmap
-```
+- `src/features/auth/`: sessão, login e proteção da SPA.
+- `src/features/workspace/`: carregamento, confirmação de gravação e recuperação de erros.
+- `src/data/`: conversão tipada da UI e persistência por documento com detecção de conflito.
+- `src/domain/workspace.ts`: contratos das telas, preservados.
+- `users/{uid}`: perfil privado; subcoleções independentes para cada entidade.
+- `firestore.rules`: isolamento pelo UID autenticado, validação de campos/tipos/limites, propriedade e timestamps imutáveis.
+- `tests/`: regras nos emuladores com usuários A/B e testes Chromium desktop/mobile.
+- `.github/workflows/`: CI/Pages e publicação DEV após CI verde na master.
 
-O aplicativo salva os dados somente no `localStorage` com a chave `roteiva-pages-demo-workspace-v1` (preservada para não perder dados anteriores no mesmo navegador e origem). **Domínios diferentes têm localStorage separado**: os dados existentes no Pages **não aparecerão automaticamente** em um domínio Firebase.
+O Firestore usa centavos inteiros e datas civis ISO, sem converter dias da agenda em horários UTC. Apenas documentos alterados são gravados. Erros de rede, permissão e conflito exigem recuperação explícita da versão da nuvem; não há fila de gravação privada em localStorage.
 
-Recursos ainda **não disponíveis**: autenticação Firebase, Firestore, backend Worker, upload do Drive, revisão compartilhada e sincronização em nuvem. A tela de revisão explica essa limitação.
-
-## Firebase Hosting
-
-O `firebase.json` já aponta para `dist/`, tem fallback de SPA para `/index.html` e cache longo somente para assets com nomes versionados. **Falta apenas vincular um projeto Firebase e autenticar o deploy**.
-
-```bash
-pnpm build
-pnpm dlx firebase-tools login
-pnpm dlx firebase-tools deploy --only hosting --project SEU_PROJECT_ID
-```
-
-O `SEU_PROJECT_ID` é o ID real do projeto Firebase escolhido, não um identificador de exemplo a manter. Também há o workflow manual **Deploy Firebase Hosting**, que requer a variável `FIREBASE_PROJECT_ID` e o segredo `FIREBASE_SERVICE_ACCOUNT` no GitHub. **Nada é publicado automaticamente no Firebase antes dessas configurações.** Consulte [guia de desenvolvimento e deploy](docs/DEVELOPMENT.md).
-
-## Próxima arquitetura (planejada)
-
-| Camada | Tecnologia futura |
-|---|---|
-| Site | Firebase Hosting — configuração estática já preparada |
-| Login | Firebase Authentication com Google |
-| Dados de negócio | Cloud Firestore + Security Rules |
-| API privilegiada e OAuth | Cloudflare Workers |
-| Tokens OAuth protegidos | Workers Secrets e Cloudflare D1 |
-| Vídeos e mídias | Google Drive individual de cada profissional |
-
-As integrações futuras **não fazem parte do build atual**. Consulte [arquitetura](docs/ARCHITECTURE.md) e [roadmap](docs/MVP-ROADMAP.md).
+**PLANEJADO:** Google Drive, upload de mídia, revisão remota, Worker/D1 de OAuth, equipes, cobrança e PROD. A tela de revisão continua explicativa. A autenticação Google não concede acesso ao Drive.
 
 ## Documentação
 
-- [Arquitetura e decisões técnicas](docs/ARCHITECTURE.md)
-- [Roadmap vivo do MVP](docs/MVP-ROADMAP.md)
-- [Desenvolvimento, testes e deploy Firebase](docs/DEVELOPMENT.md)
+- [Arquitetura e decisões](docs/ARCHITECTURE.md)
+- [Roadmap, critérios de aceite e evidências](docs/MVP-ROADMAP.md)
+- [Desenvolvimento e deploy](docs/DEVELOPMENT.md)
 - [Design e responsividade](docs/DESIGN.md)
-- [Regras permanentes para IAs e contribuidores](AGENTS.md)
+- [Instruções permanentes](AGENTS.md)
 
-Contribuições devem passar por PR, com testes e documentação atualizados na mesma alteração.
+O projeto permanece no **Spark**. Franquias têm limites; nenhuma habilitação de Blaze ou serviço pago faz parte desta entrega.

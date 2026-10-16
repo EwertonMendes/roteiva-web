@@ -28,6 +28,10 @@ jobs:
         with:
           node-version: '22'
           cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Validate domain logic and TypeScript
@@ -42,8 +46,31 @@ jobs:
         run: |
           pnpm run build:pages
           node scripts/verify-static-build.mjs dist-pages /roteiva-web/
+      - name: Validate Firebase isolation and browser flows
+        run: |
+          pnpm exec playwright install --with-deps chromium
+          pnpm run build:emulator
+          pnpm run test:firebase
+      - name: Report browser failure context
+        if: failure()
+        run: |
+          node --input-type=module <<'NODE'
+          import {readdir,readFile} from 'node:fs/promises';
+          for (const entry of await readdir('test-results',{recursive:true}).catch(()=>[])) {
+            if (entry.endsWith('error-context.md')) console.log(entry+'\n'+await readFile('test-results/'+entry,'utf8'));
+          }
+          NODE
+      - name: Upload QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firebase-qa
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
       - name: Upload Pages artifact
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
         uses: actions/upload-pages-artifact@v3
         with:
           path: dist-pages

@@ -40,13 +40,15 @@ Não recrie READMEs concorrentes, documentos de teste avulsos ou planos paralelo
 
 - O frontend foi **explicitamente migrado na PR #5 para React + Vite + TypeScript** a fim de atender ao Firebase Hosting estático. A entrada é `index.html` e o código da UI está em `src/`. **Não recriar Next.js/Vinext, SSR nem backend por conveniência**.
 - Existe **um único frontend**. `pnpm build` gera `dist/` para Firebase; `pnpm build:pages` gera `dist-pages/` para GitHub Pages. Ambos precisam continuar funcionando e a interface visual precisa ser preservada.
-- Apenas **Firebase Hosting está configurado**, sem deploy enquanto não houver projeto/segredos; Firebase Auth/Firestore, Worker API/D1 para OAuth e Google Drive individual ainda são **objetivo futuro**, não recursos implementados. Mudanças de tecnologia não autorizam redesenho da experiência.
+- A fundação Firebase DEV da PR #6 usa somente roteiva-web-dev (Spark, Standard/nativo em São Paulo), Auth Google e subcoleções privadas users/{uid}. Conferir validação no roadmap. Worker/Drive/PROD continuam planejados. Mudanças de integração não autorizam redesenho.
 - O BRBET antigo é referência conceitual, não uma dependência e não deve ser copiado cegamente; verificar direitos de reutilização antes de aproveitar código.
 - O escopo `drive.file` é o padrão desejado; **não pedir acesso irrestrito ao Drive** por conveniência.
 - Com uploads grandes, dados passam diretamente do navegador ao Drive quando a prova de conceito confirmar segurança e CORS; **não passar vídeo pelo Worker**.
 - Refresh tokens só no backend criptografados; acesso entre workspaces sempre verificado no servidor/regras.
 
 - A chave de demonstração `roteiva-pages-demo-workspace-v1` é um contrato de compatibilidade local; não alterá-la sem migração de dados. LocalStorage não é compartilhado entre domínios diferentes.
-- Firebase deploy exige `FIREBASE_PROJECT_ID` e `FIREBASE_SERVICE_ACCOUNT`, nunca no código. Deploy de produção só manual até nova decisão.
+- Deploy DEV exige FIREBASE_PROJECT_ID=roteiva-web-dev e FIREBASE_SERVICE_ACCOUNT protegido no Actions. Config SDK VITE_FIREBASE_* é pública; credencial administrativa nunca é frontend. DEV automático somente após CI verde da master; PROD não existe neste escopo.
+- Preservar modos explícitos demo/firebase e projeto fictício demo-roteiva nos emuladores. Não detectar modo por domínio, importar demo automaticamente ou habilitar cache privado offline sem decisão explícita.
+- Alterações Firestore exigem testes A/B nos emuladores, validação create/update, revisão/timestamps e apenas gravações por documento. Nenhuma permissão/plano se baseia em campos livremente enviados pela UI.
 
 **Definição de pronto:** código revisado + testes aplicáveis + critérios de aceite + segurança relevante + documentação sincronizada. A documentação é parte da entrega, não um trabalho posterior.
