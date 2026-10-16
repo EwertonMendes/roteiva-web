@@ -1,0 +1,17 @@
+.pages-demo-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 13px 16px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--violet);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.6;
+  margin-bottom: 24px;
+}
+.pages-demo-notice b { white-space: nowrap; }
+.pages-demo-notice span { color: var(--muted); }
