@@ -2,9 +2,10 @@ import { readFile } from "node:fs/promises";
 import { before, after, beforeEach, test } from "node:test";
 import assert from "node:assert/strict";
 import { initializeTestEnvironment, assertFails, assertSucceeds } from "@firebase/rules-unit-testing";
-import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, deleteField, serverTimestamp, Timestamp, writeBatch } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, deleteField, serverTimestamp, Timestamp, writeBatch, setLogLevel } from "firebase/firestore";
 import { FirestoreWorkspace } from "../src/data/firestore-workspace.ts";
 import { emptyWorkspace } from "../src/domain/workspace.ts";
+setLogLevel('silent');
 let env;
 const profile={displayName:"Alice",email:"alice@example.com",photoURL:""};
 const meta=(uid,revision=1)=>({ownerUid:uid,schemaVersion:1,revision,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});
@@ -39,6 +40,11 @@ for (const [name,data] of Object.entries(fixtures)) {
   test(name+": own CRUD, anonymous denial and A/B separation",async()=>{
     const alice=dbFor("alice"),bob=dbFor("bob"),anon=dbFor();
     const path=pathFor("alice",name),ref=doc(alice,path);
+    await assertFails(setDoc(ref,{...data,...meta("bob")}));
+    for (const field of Object.keys(data)) {
+      const incomplete={...data,...meta("alice")}; delete incomplete[field];
+      await assertFails(setDoc(ref,incomplete));
+    }
     await assertSucceeds(setDoc(ref,{...data,...meta("alice")}));
     await assertSucceeds(getDoc(ref));
     // preferences/ui is intentionally a singleton get; listing settings is denied.
@@ -60,6 +66,8 @@ for (const [name,data] of Object.entries(fixtures)) {
     await assertFails(updateDoc(ref,{revision:4,updatedAt:serverTimestamp()}));
     for (const field of Object.keys(data)) {
       await assertFails(updateDoc(ref,{[field]:deleteField(),revision:2,updatedAt:serverTimestamp()}));
+      const wrongType=typeof data[field]==="string" ? 42 : "invalid";
+      await assertFails(updateDoc(ref,{[field]:wrongType,revision:2,updatedAt:serverTimestamp()}));
       if(typeof data[field]==="string") await assertFails(updateDoc(ref,{[field]:"x".repeat(12000),revision:2,updatedAt:serverTimestamp()}));
     }
     await assertSucceeds(updateDoc(ref,{revision:2,updatedAt:serverTimestamp()}));

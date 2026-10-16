@@ -48,6 +48,7 @@ export function FirebaseWorkspace() {
   const saveTheme=useCallback((theme:"light"|"dark")=>enqueue(()=>repository.saveTheme(theme)),[repository,enqueue]);
   if (!user) return null;
   return <>
+    {saving && <div className="cloud-operation" role="status">Salvando na nuvem…</div>}
     {authError && <p className="cloud-banner" role="alert">{authError}</p>}
     {error && <section className="cloud-recovery" role="alert">
       <h2>Precisamos recuperar a conexão com seus dados</h2><p>{error}</p>

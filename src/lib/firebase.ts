@@ -3,10 +3,10 @@ import { connectAuthEmulator, getAuth } from "firebase/auth";
 import { connectFirestoreEmulator, getFirestore } from "firebase/firestore";
 
 export const appMode = import.meta.env.VITE_APP_MODE;
-if (appMode !== "demo" && appMode !== "firebase") throw new Error("Defina VITE_APP_MODE como demo ou firebase.");
 export const isDemo = appMode === "demo";
 export const useEmulators = import.meta.env.VITE_USE_EMULATORS === "true";
 export function firebaseServices() {
+  if (appMode !== "demo" && appMode !== "firebase") throw new Error("Defina VITE_APP_MODE como demo ou firebase.");
   if (isDemo) throw new Error("Firebase não está disponível no modo demonstração.");
   const config = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY,

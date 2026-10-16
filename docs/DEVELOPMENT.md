@@ -58,6 +58,8 @@ Exportação JSON/CSV preservada. O JSON reflete os dados carregados e não incl
 
 O teste de regras cobre leitura/listagem, criação, atualização/exclusão cruzadas A/B, anônimo, UID forjado, mudança de owner, campos administrativos, timestamps, remoção de campos, strings excessivas, tipos/valores inválidos, órfãos e referências. O repositório testa CRUD, centavos, reabertura, preferência e conflito real. Chromium testa popup Google simulado, cancelamento, CRUD, reidratação, duas contas, offline, temas e demo em desktop/mobile.
 
+O runner Node usa `--test-force-exit` após todos os testes e hooks de cleanup: conexões internas do SDK mantêm handles abertos após o relatório final. Falhas dos testes continuam retornando código não zero; o flag não ignora testes nem assertions.
+
 **Limite da evidência:** emuladores não comprovam OAuth do Google em produção, duas contas Google reais, Safari/iOS ou cotas reais. Ver status/evidências no roadmap. Artefatos de QA são mantidos por sete dias no Actions. Não marcar testes planejados como executados.
 
 ## Deploy GitHub Actions
