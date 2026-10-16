@@ -161,7 +161,7 @@ Proposta comercial ainda exploratória: gratuito limitado, Solo e Studio. Não d
 
 ## 12. Cotas, observabilidade e plano gratuito
 
-Franquias de referência (sujeitas a atualização): Workers Free **100.000 requests/dia, 10 ms CPU/request**; Firestore Standard grátis **50.000 reads e 20.000 writes/dia, 1 GiB**; D1 Free possui limites próprios de queries/armazenamento. A franquia do Hosting e as cotas do Google Drive também precisam ser monitoradas por projeto e usuário. **2–10 usuários é cenário estimado, não garantia de custo fixo.**
+O DEV mantém Spark. Firestore Standard tem franquias de 50.000 leituras, 20.000 escritas e 20.000 exclusões por dia, 1 GiB armazenado e 10 GiB de saída/mês. Hosting estático oferece 10 GB de conteúdo e 10 GB de transferência/mês. Limites e comportamento no teto estão em [DEVELOPMENT.md](DEVELOPMENT.md). Worker, D1 e Drive não foram provisionados; suas cotas deverão ser avaliadas na PoC futura. **2–10 usuários é cenário estimado, não garantia de custo fixo.**
 
 Criar dashboards de erro/consumo, alertas operacionais quando disponíveis sem custo, limites defensivos por usuário, proteção a abuso/rate limiting e revisões periódicas. Se ficar perto das franquias, reduzir leituras e avaliar upgrade baseado em receita. No Worker, habilitar **fail closed** para rotas de segurança.
 
@@ -203,7 +203,7 @@ Mudanças de uma decisão para **confirmada**, **validada** ou **descartada** pr
 
 A migração React/Vite foi preservada. Auditoria anterior às alterações em [DEVELOPMENT.md](DEVELOPMENT.md). Hosting já estava ativo com release 043ce6; textos antigos que diziam não publicado foram corrigidos.
 
-CI valida ambos builds, regras e browser nos emuladores. Deploy DEV após CI verde da master, checkout do SHA validado e projeto fixo. Dispatch manual executa testes novamente. Secret preexistente protegido no Actions. Papéis adicionais de regras/índices dependem autorização; WIF é evolução futura, sem pools/credenciais extras neste escopo.
+CI valida ambos builds, regras e browser nos emuladores. Deploy DEV após CI verde da master, checkout do SHA validado e projeto fixo. Dispatch manual executa testes novamente. Secret preexistente protegido no Actions. Papéis de regras/índices autorizados pelo proprietário e concedidos somente no DEV; WIF é evolução futura, sem pools/credenciais extras neste escopo.
 
 Limitações: sem atualização em tempo real entre abas; conflitos por documento e reload explícito; sem fila offline privada. OAuth Google real, segunda conta e Safari/iOS dependem evidência registrada no roadmap. Os componentes Worker/Drive acima continuam PLANEJADOS.
 

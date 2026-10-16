@@ -24,7 +24,7 @@
 - [x] Reduzir dependências/lockfile à stack React/Vite/TS/Tailwind; validar instalação congelada, testes, typecheck e builds Firebase/Pages na PR #5.
 - [x] Remover `app/api/**`, Drizzle/D1, R2, auth de host e conectores de backend antigos, sem alterar componentes/estilos do frontend (PR #4).
 - [x] Preservar a demo original na PR #4 e migrar explicitamente para frontend único Vite na PR #5, sem SSR e sem duas aplicações concorrentes.
-- [ ] Implementar autenticação e persistência novas apenas nas fases planejadas do MVP.
+- [x] Implementar autenticação e persistência novas no escopo Solo DEV da PR #6, sem reutilizar backend antigo.
 
 **Aceite da migração frontend da PR #5:** pipeline com `pnpm install --frozen-lockfile`, testes de calendário/financeiro, `tsc --noEmit`, build base `/` com saída `dist/`, build base `/roteiva-web/` com saída `dist-pages/`; Firebase SPA rewrite e assets essenciais verificados. Avaliação visual em desktop/mobile após publicação continua necessária.
 
@@ -77,7 +77,7 @@
 - [ ] Configurar observabilidade de erros/cotas e documentação de configuração/deploy.
 - [ ] Testar mobile, desktop, tema e navegação acessível.
 
-**Aceite:** dois usuários entram em contas distintas, reiniciam sessão, veem telas protegidas; backend verifica identidade; artefatos de DEV/PROD isolados; CI verde. **Estado:** PLANEJADO.
+**Aceite:** dois usuários entram em contas distintas, reiniciam sessão, veem telas protegidas; regras verificam identidade; Worker/PROD continuam futuros; CI verde. **Estado:** PARCIAL — fundação Solo implementada, QA e demais subetapas discriminados abaixo.
 
 ## Fase 2 — Dados persistentes e isolamento
 
@@ -86,13 +86,13 @@
 - [x] Contratos, IDs aleatórios seguros, datas civis ISO e moeda persistida em centavos (PR #6); sem índices compostos exigidos.
 - [x] Decisão Solo: users/{uid} e subcoleções privadas, ownerUid imutável, deny-by-default (PR #6). Workspaces compartilhados são futuros.
 - [x] Repositório por documento para clientes, projetos, tarefas, entregas, agenda, finanças, atividades e preferências (PR #6).
-- [ ] Implementar cadastro/edição/exclusão por registro, paginação e estados vazios/erros.
-- [ ] Definir estratégia de concorrência, descarte/recuperação offline e migração de dados prototipados; nunca sobrescrever silenciosamente.
-- [ ] Criar testes Firebase Emulator de Security Rules, com ataque cruzado A/B e mutações de owner/plano/papel negadas.
+- [x] Persistência por registro, leitura paginada e estados vazios/erros na PR #6; exclusões somente onde a UI já oferece a operação.
+- [x] Revisão por documento detecta conflito; recuperação explícita descarta rascunho. Sem fila offline/importação da demo (PR #6).
+- [x] Regras e integração nos emuladores: 12 cenários passaram, incluindo CRUD A/B, UID/owner/role, timestamps, schema, valores, referências e conflito (PR #6).
 - [ ] Implementar exportação e procedimento de exclusão de conta/dados pessoais (mídia continua no Drive, por padrão).
 - [ ] Medir leituras/gravações para limitar custos.
 
-**Aceite:** cadastros persistem entre dispositivos da mesma conta, alterações refletem corretamente, usuário B não lê/escreve dados de A, e Firestore não é vulnerável a edição de plano. **Estado:** PLANEJADO.
+**Aceite:** cadastros persistem entre dispositivos da mesma conta, alterações refletem corretamente, usuário B não lê/escreve dados de A, e campos de plano/papel são negados. **Estado:** PARCIAL — integração e testes automatizados implementados; QA real e medição de uso ainda pendentes.
 
 ## Fase 3 — Gestão operacional de ponta a ponta
 
@@ -105,7 +105,7 @@
 - [ ] Painel: indicadores com consultas eficientes e cálculo consistente; funcionamento mobile.
 - [ ] Testes de cálculos, datas, permissões, edição concorrente e navegação.
 
-**Aceite:** freelancer conclui ciclo cliente→projeto→tarefa→agenda→financeiro, fecha e reabre sessão sem perda de dados. **Estado:** PARCIAL na UI, PLANEJADO para produção.
+**Aceite:** freelancer conclui ciclo cliente→projeto→tarefa→agenda→financeiro, fecha e reabre sessão sem perda de dados. **Estado:** PARCIAL — UI existente integrada à fundação DEV; produção e piloto completo ainda pendentes.
 
 ## Fase 4 — Biblioteca Drive de verdade
 

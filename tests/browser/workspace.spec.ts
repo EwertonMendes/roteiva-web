@@ -49,7 +49,8 @@ test("Google emulator session, CRUD, restoration, themes and separate users",asy
   await page.locator("form.project-modal select[name=clientId]").selectOption({label:"Estúdio Aurora"});
   await page.locator("form.project-modal").getByRole("button",{name:"Criar projeto",exact:true}).click();await settled(page);
   await page.getByLabel("Nova tarefa",{exact:true}).fill("Montar primeiro corte");
-  await page.locator(".inline-form button").click();await settled(page);
+  await expect(page.getByLabel("Nova tarefa",{exact:true})).toHaveValue("Montar primeiro corte");
+  await page.getByRole("button",{name:"Adicionar tarefa",exact:true}).click();await settled(page);
   await expect(page.getByText("Montar primeiro corte",{exact:true})).toBeVisible();
   await navigate(page,"Financeiro");
   await page.getByRole("button",{name:"Nova receita",exact:true}).click();
@@ -69,7 +70,7 @@ test("Google emulator session, CRUD, restoration, themes and separate users",asy
   await navigate(page,"Financeiro");
   await expect(page.locator(".finance-table")).toContainText("100,01");
   await navigate(page,"Calendário");
-  await expect(page.getByText("Gravação Aurora",{exact:true})).toBeVisible();
+  await expect(page.locator(".day-agenda").getByText("Gravação Aurora",{exact:true})).toBeVisible();
   await navigate(page,"Projetos");
   await expect(page.getByText("Filme Aurora",{exact:true})).toBeVisible();
   await page.getByRole("button",{name:"Abrir projeto Filme Aurora",exact:true}).click();

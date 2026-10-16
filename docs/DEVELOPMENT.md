@@ -82,6 +82,14 @@ pnpm exec firebase deploy --only firestore:rules,firestore:indexes,hosting --pro
 
 O Hosting serve dist/, fallback SPA /index.html e cache longo somente para assets versionados. Nenhum comando tem projeto PROD ou cria projeto/banco. Auth foi configurado no Console e não é sobrescrito no deploy.
 
+## Franquias e consumo
+
+Projeto mantido no Spark, sem vincular cobrança. Firestore Standard: um banco gratuito por projeto, 1 GiB, 50.000 leituras/dia, 20.000 escritas/dia, 20.000 exclusões/dia e 10 GiB de saída/mês; a renovação diária segue aproximadamente meia-noite do Pacífico. Referência: [cotas oficiais](https://firebase.google.com/docs/firestore/quotas). TTL, backup, PITR, restore e clone não foram habilitados.
+
+Cada abertura lê as sete coleções do usuário, perfil e preferência; regras podem acrescentar leituras de documentos dependentes. Transações fazem leituras antes das escritas e podem repetir em conflito. Paginação evita respostas grandes, mas não limita o total por conta. Sem listeners globais, polling, sincronização de abas ou mídia no Firestore. O histórico da UI fica limitado aos últimos 150 itens. Usar os painéis de uso do Console antes de ampliar o piloto; Spark pode recusar operações ao atingir limites.
+
+Login Google não usa SMS nem Identity Platform avançado. Hosting entrega apenas SPA estática e assets, sem Functions/App Hosting; franquias de 10 GB de conteúdo e 10 GB de transferência/mês. Ao atingir o teto, Spark pode impedir deploy ou suspender o site até renovação; conferir [uso e limites do Hosting](https://firebase.google.com/docs/hosting/usage-quotas-pricing). GitHub Actions executa testes contra emuladores fictícios, sem consumir documentos do DEV. Franquias não são promessa de capacidade ilimitada.
+
 ## QA real restante
 
 Entrar/sair/reabrir com Google no DEV, repetir com segunda conta autorizada, conferir foto/nome/e-mail, permissão cruzada real, tema claro/escuro e desktop/mobile; testar atualização direta de /review. Emuladores e verificações de build não substituem isso.
