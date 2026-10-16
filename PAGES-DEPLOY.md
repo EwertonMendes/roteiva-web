@@ -6,7 +6,7 @@ URL: https://ewertonmendes.github.io/roteiva-web/
 
 O workflow `.github/workflows/deploy-pages.yml` roda automaticamente ao enviar código à `master` e pode ser acionado manualmente. Pull requests validam os testes de calendário/financeiro e compilam a demonstração sem fazer deploy.
 
-- Node.js 22, `npm ci`, testes, `npm run build:pages`;
+- Node.js 22, PNPM 11.25.0, `pnpm install --frozen-lockfile`, testes, `pnpm run build:pages`;
 - Vite produz HTML/CSS/JS estáticos em `dist-pages`, servidos pelo GitHub Pages;
 - a interface reaproveita o DashboardClient e estilos do projeto original;
 - projetos, clientes, agenda e financeiro funcionam no navegador e os dados são salvos **apenas no localStorage daquele navegador**, sob chave separada da aplicação original;
@@ -23,8 +23,8 @@ A versão original permanece intacta para uma implantação full-stack futura. P
 ## Build local
 
 ```bash
-npm ci
-npm run build:pages
+pnpm install --frozen-lockfile
+pnpm run build:pages
 ```
 
 O HTML gerado espera ser hospedado em `/roteiva-web/`, que é a base do projeto no GitHub Pages. Para verificar localmente, use `npx vite preview --config vite.pages.config.ts --outDir dist-pages`.
