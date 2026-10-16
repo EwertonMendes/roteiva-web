@@ -1,4 +1,4 @@
-name: Deploy demo to GitHub Pages
+name: Build and deploy Roteiva demo
 
 on:
   push:
@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   build:
-    name: Build static demo
+    name: Validate static frontend
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -30,19 +30,18 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Verify calendar and finance logic
+      - name: Validate domain logic and TypeScript
         run: |
-          pnpm run test:calendar
-          pnpm run test:finance
-      - name: Build Next.js / Vinext frontend
-        run: pnpm run build
+          pnpm run test
+          pnpm run typecheck
+      - name: Build Firebase Hosting output
+        run: |
+          pnpm run build
+          node scripts/verify-static-build.mjs dist /
       - name: Build GitHub Pages demo
-        run: pnpm run build:pages
-      - name: Verify static entrypoint
         run: |
-          test -s dist-pages/index.html
-          test -f dist-pages/.nojekyll
-          test -n "$(find dist-pages/assets -name '*.js' -print -quit)"
+          pnpm run build:pages
+          node scripts/verify-static-build.mjs dist-pages /roteiva-web/
       - name: Upload Pages artifact
         if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v3

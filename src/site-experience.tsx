@@ -102,7 +102,7 @@ export function SiteExperience() {
   return <>
     {intro !== "done" && <div className={`brand-intro brand-intro-${intro}`} aria-hidden="true">
       <div className="brand-intro-corner"><span>ROTEIVA</span><span>SEU ESPAÇO DE PRODUÇÃO</span></div>
-      <div className="brand-intro-center"><div className="brand-intro-wordmark"><img src="roteiva-logo-white.png" alt=""/></div><div className="brand-intro-track"><span ref={bar}/></div></div>
+      <div className="brand-intro-center"><div className="brand-intro-wordmark"><img src={`${import.meta.env.BASE_URL}roteiva-logo-white.png`} alt=""/></div><div className="brand-intro-track"><span ref={bar}/></div></div>
       <div className="brand-intro-footer"><span>DA IDEIA À ENTREGA.</span><span>EM SINTONIA.</span></div>
     </div>}
     <div ref={ring} className="studio-cursor-ring" aria-hidden="true"><i/></div>

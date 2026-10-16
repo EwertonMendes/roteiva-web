@@ -20,13 +20,13 @@
 - [x] Retirar UI genérica gerada e sem referência, exemplos D1 do template, ícones padrão, logos experimentais e arquivos auxiliares associados.
 - [x] Guardar o arquivo-fonte vetorial da marca fora de `public/`; manter fontes, logotipo em uso, favicon e licenças necessárias.
 - [x] Adotar PNPM como instalador único e eliminar o `package-lock.json` conflitante; preservar `pnpm-lock.yaml`.
-- [x] Preservar frontend **Next.js/Vinext** e componentes existentes; na PR #4, remover apenas APIs/banco/storage/autenticação legados e manter o runtime necessário ao frontend.
-- [ ] Auditar e reduzir **dependências NPM não utilizadas**, atualizando `pnpm-lock.yaml` com ferramenta instalada e validando todos os builds, na fase de migração.
+- [x] Preservar frontend Next.js/Vinext durante a limpeza do backend na PR #4; **decisão posterior na PR #5: migrar para React/Vite estático** para Firebase Hosting, mantendo a UI.
+- [x] Reduzir dependências/lockfile à stack React/Vite/TS/Tailwind; validar instalação congelada, testes, typecheck e builds Firebase/Pages na PR #5.
 - [x] Remover `app/api/**`, Drizzle/D1, R2, auth de host e conectores de backend antigos, sem alterar componentes/estilos do frontend (PR #4).
-- [x] Manter Next.js e Vinext, inclusive a compilação e o modo demo na rota principal (PR #4).
+- [x] Preservar a demo original na PR #4 e migrar explicitamente para frontend único Vite na PR #5, sem SSR e sem duas aplicações concorrentes.
 - [ ] Implementar autenticação e persistência novas apenas nas fases planejadas do MVP.
 
-**Critério de aceite desta limpeza:** a PR contém exclusivamente remoção de arquivos sem uso confirmado e ajustes mínimos de configuração/documentação; testes de calendário/financeiro e build da demo passam no CI; caminho público e assets atuais permanecem. A compilação do backend legado não é coberta pelo CI Pages e deverá ser verificada antes da migração.
+**Aceite da migração frontend da PR #5:** pipeline com `pnpm install --frozen-lockfile`, testes de calendário/financeiro, `tsc --noEmit`, build base `/` com saída `dist/`, build base `/roteiva-web/` com saída `dist-pages/`; Firebase SPA rewrite e assets essenciais verificados. Avaliação visual em desktop/mobile após publicação continua necessária.
 
 **Evidência:** [PR #3](https://github.com/EwertonMendes/roteiva-web/pull/3) (arquivos removidos, diff e validação automatizada).
 
@@ -34,11 +34,12 @@
 
 | Componente | Situação | Evidência/limitação |
 |---|---|---|
-| Interface, páginas e estados locais | **PARCIAL** | `app/dashboard-client.tsx` e `app/studio-features.tsx`; fluxos prototipados |
-| Demonstração GitHub Pages | **VALIDADO para build/deploy; navegação funcional a verificar em dispositivos reais** | Workflow `.github/workflows/deploy-pages.yml`, URL no README; somente `localStorage`, sem backend |
+| Interface, páginas e estados locais | **IMPLEMENTADO para demo local** | `src/dashboard-client.tsx` e `src/studio-features.tsx`, sem backend; UI preservada |
+| Demonstração GitHub Pages | **IMPLEMENTADO — publicação a validar após PR #5** | Mesmo frontend `src/`, build `dist-pages/`, `localStorage` |
 | Testes de calendário/financeiro | **IMPLEMENTADO** | `tests/studio-calendar.test.mjs`, `tests/studio-finance.test.mjs`; executados no CI do Pages |
 | API antiga e D1/R2 | **REMOVIDO do código ativo** | PR #4; frontend Next/Vinext preservado; backend futuro será novo |
-| Firebase Hosting/Auth/Firestore | **PLANEJADO** | Não configurados no repo |
+| Firebase Hosting | **CONFIGURADO, sem deploy** | `firebase.json`, build `dist/`, workflow manual; falta projeto/credenciais |
+| Firebase Auth e Firestore | **PLANEJADO** | Nenhuma conta, regras ou banco implementados |
 | Worker API separado e D1 de tokens | **PLANEJADO** | Não existe Worker OAuth/refresh do MVP |
 | Drive individual por usuário | **PLANEJADO** | Integração BRBET inspecionada externamente; não transferida |
 | Revisão segura por cliente | **PLANEJADO** | Fluxo legado incompatível com arquitetura-alvo |
@@ -66,7 +67,7 @@
 
 **Prioridade P0.** Dependente do aprendizado básico da Fase 0.
 
-- [ ] Unificar a implementação da aplicação React/Vite/TS para produção, preservando visual e comportamento; manter Pages como demo isolada.
+- [x] Unificar React/Vite/TS na SPA em `src/`, mantendo visual, estado local e build Pages; preparar build Firebase em `dist/` (PR #5).
 - [x] Padronizar lockfile/instalação com PNPM, removendo o npm lock e instaladores órfãos (higienização PR #3); **a auditoria de dependências em si continua pendente**.
 - [ ] Criar projetos Firebase **DEV** e **PROD** separados: Hosting, Authentication e Firestore.
 - [ ] Implementar login Google via Firebase Auth, logout, reidratação da sessão, proteção de rotas e erros.
@@ -167,7 +168,8 @@
 | 16/10/2026 | [PR #1](https://github.com/EwertonMendes/roteiva-web/pull/1) | Demonstração Pages | Build/deploy validados; backend não implementado | CI build/testes calendário+finanças; demo localStorage |
 | 16/10/2026 | [PR #2](https://github.com/EwertonMendes/roteiva-web/pull/2) | Organização documental | Estrutura/arquitetura propostas registradas | Somente Markdown; **não** altera funcionalidades |
 | 16/10/2026 | [PR #3](https://github.com/EwertonMendes/roteiva-web/pull/3) | Higienização | Scaffold removido; PNPM padronizado | Pipeline Pages passou |
-| 16/10/2026 | [PR #4](https://github.com/EwertonMendes/roteiva-web/pull/4) | Limpeza backend | APIs antigas, D1/R2/Drizzle e connectors retirados; **Next/Vinext e telas mantidos** | Validar build Vinext + Pages e testes; demonstração sem banco remoto |
+| 16/10/2026 | [PR #4](https://github.com/EwertonMendes/roteiva-web/pull/4) | Limpeza backend | APIs antigas, D1/R2/Drizzle retirados; Next/Vinext preservados naquela etapa | Testes e deploy Pages aprovados |
+| 16/10/2026 | [PR #5](https://github.com/EwertonMendes/roteiva-web/pull/5) | Migração React/Vite | Next/Vinext removidos a pedido, Vite único, Firebase Hosting configurado | Validar CI com TypeScript, testes e dois builds; Firebase deploy aguarda projeto/segredos |
 
 ### Protocolo para IAs
 
