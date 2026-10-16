@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import {validTimeRange, overlaps, eventRange, eventDuration} from '../app/studio-calendar.ts';
+const work={id:1,date:'2026-10-23',time:'09:00',endTime:'11:30'};
+assert.equal(validTimeRange('09:00','11:30'),true);
+for(const range of [['09:00','09:00'],['11:00','09:00'],['25:00','26:00'],['09:00','']])assert.equal(validTimeRange(...range),false);
+assert.equal(overlaps(work,{...work,id:2,time:'11:00',endTime:'12:30'}),true);
+assert.equal(overlaps(work,{...work,id:2,time:'11:30',endTime:'12:30'}),false);
+assert.equal(overlaps(work,{...work,id:2,time:'08:00',endTime:'12:30'}),true);
+assert.equal(overlaps(work,{...work,id:2,date:'2026-10-24'}),false);
+assert.equal(overlaps(work,work),false);
+assert.equal(overlaps(work,{...work,id:2,endTime:undefined}),false);
+assert.equal(eventRange(work),'09:00 – 11:30');
+assert.equal(eventDuration(work),'2h 30min');
+assert.equal(eventDuration({...work,endTime:'10:00'}),'1h');
+assert.equal(eventRange({...work,endTime:undefined}),'09:00 · sem término');
+console.log('Agenda: início/término, duração, sobreposições, horários consecutivos e registros antigos OK');
