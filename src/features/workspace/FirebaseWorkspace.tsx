@@ -87,6 +87,9 @@ export function FirebaseWorkspace() {
     const request=++scopeRequest.current;
     setLoadingBusiness(true);
     try {
+      // Navigation never reads an older snapshot while its own mutation is pending.
+      await queue.current;
+      if(failed.current)throw new Error("Conflito: há uma alteração não confirmada.");
       const workspace=await repository.load(domains);
       if (request===scopeRequest.current) {
         setInitial(current=>current?{...current,workspace}:current);
@@ -105,6 +108,8 @@ export function FirebaseWorkspace() {
     const request=++scopeRequest.current;
     setLoadingBusiness(true);
     try{
+      await queue.current;
+      if(failed.current)throw new Error("Conflito: há uma alteração não confirmada.");
       // The project editor needs the complete client selector even on a paged list.
       await repository.load(["clients","activities"]);
       const result=await repository.projectPage({status,reset,size:24});
