@@ -44,7 +44,7 @@ export async function handle(request: Request, env: Env): Promise<Response> {
       const uid = await identity(request,env);
       if (!(await env.API_RATE_LIMIT.limit({key:'dev:uid:'+uid})).success) throw new ApiError(429,'rate_limited');
       response = await start(env,uid);
-    } else if (/^\/integrations\/drive\/[^/]+\/folders(?:\/[^/]+\/items)?$/ && request.method==='GET') {
+    } else if (/^\/integrations\/drive\/[^/]+\/folders(?:\/[^/]+\/items)?$/.test(url.pathname) && request.method==='GET') {
       enabled(env);
       const uid=await identity(request,env);
       if (!(await env.API_RATE_LIMIT.limit({key:'dev:uid:'+uid})).success) throw new ApiError(429,'rate_limited');
