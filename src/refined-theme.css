@@ -39,7 +39,7 @@ a { text-underline-offset: 3px; }
 :root .sidebar nav > button:hover { color: var(--ink); background: var(--subtle); border-color: transparent; }
 :root .sidebar nav > button.active { background: var(--subtle); color: var(--ink); border-color: var(--line); box-shadow: none; font-weight: 500; }
 :root .sidebar nav > button em { background: var(--subtle); color: var(--muted); font-weight: 400; }
-:root .nav-label { color: var(--muted); font-weight: 500; font-size: 9px; }
+:root .nav-label { color: var(--muted); font-weight: 500; font-size: var(--type-caption); }
 :root .storage-card { color: var(--ink); background: var(--subtle); border: 1px solid var(--line); box-shadow: none; border-radius: 16px; }
 :root .storage-card svg { color: var(--muted); }
 :root .storage-card p,.storage-card b,.sync-status { color: var(--muted); }
@@ -57,7 +57,7 @@ a { text-underline-offset: 3px; }
 :root .secondary-button { font-weight: 400; }
 :root .secondary-button:hover,:root .icon-button:hover { background: var(--subtle); transform: translateY(-1px); box-shadow: none; }
 .page-heading h1 { font-weight: 700; letter-spacing: -.045em; }
-.page-heading p { color: var(--muted); font-weight: 300; font-size: 14px; }
+.page-heading p { color: var(--muted); font-weight: 300; font-size: var(--type-label); }
 .eyebrow,.page-heading > div > span,.panel-head > div > span { color: var(--muted); font-weight: 500; }
 :root .panel,:root .metric-grid article,:root .finance-metrics article:not(.featured),:root .library-summary article,:root .project-card,:root .asset-card,:root .comments-panel {
   background: var(--card); border: 1px solid var(--line); box-shadow: var(--glass-shadow); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
@@ -89,10 +89,10 @@ a { text-underline-offset: 3px; }
 .flow-overview-head h2 { font-size: 25px; font-weight: 500; letter-spacing: -.03em; }
 .flow-numbers { margin-top: 32px; margin-bottom: 30px; }
 .flow-numbers strong { font-weight: 500; font-size: 36px; letter-spacing: -.03em; }
-.flow-numbers button > span { font-size: 13px; font-weight: 400; }
-.flow-numbers small { font-weight: 300; font-size: 12px; }
-.flow-progress-title,.flow-next p { font-size: 12px; }
-.flow-legend > span { font-size: 11px; }
+.flow-numbers button > span { font-size: var(--type-support); font-weight: 400; }
+.flow-numbers small { font-weight: 300; font-size: var(--type-support); }
+.flow-progress-title,.flow-next p { font-size: var(--type-support); }
+.flow-legend > span { font-size: var(--type-support); }
 .flow-overview .studio-activity summary { font-weight: 400; }
 :root .finance-metrics article.featured { background: linear-gradient(125deg,#222,#3d3d3d); color: #fff; border: 1px solid rgba(255,255,255,.06); box-shadow: 0 8px 24px rgba(0,0,0,.08); }
 :root[data-theme="dark"] .finance-metrics article.featured { background: linear-gradient(125deg,#e8e8e8,#fff); color: #151515; box-shadow: 0 8px 24px rgba(0,0,0,.07); }
@@ -163,8 +163,8 @@ a { text-underline-offset: 3px; }
 }
 @media(max-width:560px) {
   :root .project-modal { border-radius: 24px 24px 0 0; }
-  .flow-numbers small { font-size: 11px; }
-  .flow-numbers button > span { font-size: 12px; }
+  .flow-numbers small { font-size: var(--type-support); }
+  .flow-numbers button > span { font-size: var(--type-support); }
 }
 :root .payment-status.paid,:root .payment-status.pending,:root .client-type.recurring,:root .client-type.one-off { color: var(--ink); background: var(--subtle); border-color: var(--line); }
 :root .metric-icon.violet,:root .metric-icon.lime,:root .metric-icon.amber,:root .metric-icon.blue { color: var(--ink); background: var(--subtle); }
@@ -176,26 +176,26 @@ a { text-underline-offset: 3px; }
 :root .portal-page .primary-button:hover { background: #eee; color: #151515; }
 :root .portal-page .secondary-button:hover { background: #303030; color: #eee; }
 @media(min-width:821px) {
- .sidebar nav > button { font-size: 13px; }
- .global-search input { font-size: 12px; }
- .primary-button,.secondary-button { font-size: 12px; }
- .panel-head h2 { font-size: 18px; }
- .panel-head > div > span { font-size: 9px; }
- .finance-metrics article > small { font-size: 10px; }
- .finance-metrics article > p { font-size: 12px; }
- .finance-table-head { font-size: 10px; }
- .finance-table article { font-size: 12px; }
- .finance-table article strong,.finance-table article b { font-size: 13px; }
- .payment-status { font-size: 10px; }
- .revenue-sources span,.revenue-sources b { font-size: 12px; }
- .client-summary span { font-size: 10px; }
- .client-summary small,.client-toolbar small { font-size: 12px; }
- .client-list button { font-size: 12px; }
- .client-contact-meta b,.client-contact-meta small { font-size: 11px; }
- .project-modal label,.project-modal .form-grid > label { font-size: 12px; }
- .project-modal input,.project-modal select,.project-modal textarea { font-size: 14px; }
+ .sidebar nav > button { font-size: var(--type-support); }
+ .global-search input { font-size: var(--type-support); }
+ .primary-button,.secondary-button { font-size: var(--type-support); }
+ .panel-head h2 { font-size: var(--type-card); }
+ .panel-head > div > span { font-size: var(--type-caption); }
+ .finance-metrics article > small { font-size: var(--type-support); }
+ .finance-metrics article > p { font-size: var(--type-support); }
+ .finance-table-head { font-size: var(--type-support); }
+ .finance-table article { font-size: var(--type-support); }
+ .finance-table article strong,.finance-table article b { font-size: var(--type-support); }
+ .payment-status { font-size: var(--type-support); }
+ .revenue-sources span,.revenue-sources b { font-size: var(--type-support); }
+ .client-summary span { font-size: var(--type-support); }
+ .client-summary small,.client-toolbar small { font-size: var(--type-support); }
+ .client-list button { font-size: var(--type-support); }
+ .client-contact-meta b,.client-contact-meta small { font-size: var(--type-support); }
+ .project-modal label,.project-modal .form-grid > label { font-size: var(--type-support); }
+ .project-modal input,.project-modal select,.project-modal textarea { font-size: var(--type-label); }
  .modal-head h2 { font-size: 26px; }
- .modal-head p { font-size: 13px; line-height: 1.6; }
+ .modal-head p { font-size: var(--type-support); line-height: 1.6; }
 }
 
 /* Keep the existing dark review portal readable in both app themes. */

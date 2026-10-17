@@ -259,7 +259,7 @@ export function DriveConnectionPanel({
     {!ready ? <p role="status">Carregando integração…</p> : <>
       {connected.length ? <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",margin:"10px 0 16px"}}>
         <ShieldCheck size={17}/><strong>{connected.map(c=>c.google_email).join(", ")}</strong>
-        <span style={{fontSize:12,opacity:.8}}>{authorized.length?"Drive conectado":"Permissões de pastas pendentes"}</span>
+        <span style={{fontSize:"var(--type-support)",opacity:.8}}>{authorized.length?"Drive conectado":"Permissões de pastas pendentes"}</span>
         <button className="secondary-button" disabled={busy} onClick={()=>{setConfirmId(connected[0].id===confirmId?"":connected[0].id);}}><Unplug size={14}/> Desconectar</button>
         {confirmId && <><button className="secondary-button" onClick={()=>setConfirmId("")}>Cancelar</button>
           <button className="secondary-button" disabled={busy} onClick={()=>void disconnect(confirmId)}>Confirmar desconexão</button></>}
@@ -290,7 +290,7 @@ export function DriveConnectionPanel({
           <FolderOpen size={19}/>
           <div style={{flex:1,minWidth:160}}>
             <strong>{link.folderName}</strong>
-            <div style={{fontSize:12,opacity:.7}}>{projects.find(p=>p.id===link.projectId)?.name||"Projeto indisponível"}</div>
+            <div style={{fontSize:"var(--type-support)",opacity:.7}}>{projects.find(p=>p.id===link.projectId)?.name||"Projeto indisponível"}</div>
           </div>
           <button className="secondary-button" disabled={fileBusy||busy} onClick={()=>void openFiles(link)}>Ver arquivos</button>
           <button className="secondary-button" disabled={busy} onClick={()=>void removeFolder(link)} aria-label={"Desvincular "+link.folderName}><X size={15}/></button>
@@ -314,7 +314,7 @@ export function DriveConnectionPanel({
           {files.map(file=>{const Icon=kindIcon(file.mimeType);return <div key={file.id} style={{display:"flex",gap:10,alignItems:"center",padding:"10px 0",borderBottom:"1px solid var(--border,#ffffff19)",flexWrap:"wrap"}}>
             <Icon size={19}/><div style={{flex:1,minWidth:160}}>
               <strong style={{fontSize:13}}>{file.name}</strong>
-              <div style={{fontSize:11,opacity:.65}}>{file.mimeType===FOLDER?"Subpasta":sizeText(file.size)} {file.modifiedTime?" · "+new Date(file.modifiedTime).toLocaleDateString("pt-BR"):""}</div>
+              <div style={{fontSize:"var(--type-support)",opacity:.65}}>{file.mimeType===FOLDER?"Subpasta":sizeText(file.size)} {file.modifiedTime?" · "+new Date(file.modifiedTime).toLocaleDateString("pt-BR"):""}</div>
             </div>
             {file.mimeType!==FOLDER && !file.mimeType.startsWith("application/vnd.google-apps.") &&
               <button className="secondary-button" onClick={()=>setPreview(file)}>Prévia</button>}
@@ -336,7 +336,7 @@ export function DriveConnectionPanel({
           <button className="secondary-button" onClick={()=>setPicker(false)} aria-label="Fechar seletor"><X size={18}/></button>
         </div>
         <label style={{display:"grid",gap:7,margin:"14px 0"}}>
-          <span style={{fontSize:12,opacity:.8}}>Projeto para vincular as pastas</span>
+          <span style={{fontSize:"var(--type-support)",opacity:.8}}>Projeto para vincular as pastas</span>
           <select aria-label="Projeto para vincular pastas" value={selectedProjectId??""} onChange={event=>onSelectProject(event.target.value)}
             style={{width:"100%",padding:"10px",borderRadius:8}}>
             <option value="">Selecione um projeto</option>
@@ -373,7 +373,7 @@ export function DriveConnectionPanel({
           {!folderBusy&&!folderList.length&&<p>Nenhuma pasta encontrada nesta localização.</p>}
         </div>
         {folderPage&&<button className="secondary-button" disabled={folderBusy} onClick={()=>void browse(trail[trail.length-1].id,trail,folderPage,true)}>Carregar mais</button>}
-        <p style={{fontSize:12,marginTop:12,opacity:.75}}>Você pode vincular quantas pastas precisar. Os arquivos continuam no Google Drive.</p>
+        <p style={{fontSize:"var(--type-support)",marginTop:12,opacity:.75}}>Você pode vincular quantas pastas precisar. Os arquivos continuam no Google Drive.</p>
         </>}
         {error && <p role="alert" className="auth-error">{error}</p>}
       </div>
@@ -384,7 +384,7 @@ export function DriveConnectionPanel({
           <strong>{preview.name}</strong><button className="secondary-button" onClick={()=>setPreview(null)}><X size={17}/> Fechar</button>
         </div>
         <iframe title={"Prévia de "+preview.name} referrerPolicy="no-referrer" allow="fullscreen" src={"https://drive.google.com/file/d/"+encodeURIComponent(preview.id)+"/preview"} style={{width:"100%",height:"min(65vh,650px)",border:0,borderRadius:8}}/>
-        <p style={{marginTop:8,fontSize:12}}>Caso não abra, acesse o arquivo diretamente no <a href={preview.webViewLink||"https://drive.google.com/file/d/"+encodeURIComponent(preview.id)+"/view"} target="_blank" rel="noreferrer">Google Drive</a>.</p>
+        <p style={{marginTop:8,fontSize:"var(--type-support)"}}>Caso não abra, acesse o arquivo diretamente no <a href={preview.webViewLink||"https://drive.google.com/file/d/"+encodeURIComponent(preview.id)+"/view"} target="_blank" rel="noreferrer">Google Drive</a>.</p>
       </div>
     </div>}
   </section>;

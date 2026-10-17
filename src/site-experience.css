@@ -1,6 +1,6 @@
 .brand-intro { position: fixed; inset: 0; z-index: 900; overflow: hidden; background: #111; color: #f4f4f4; font-family: Ubuntu,sans-serif; transition: transform .65s cubic-bezier(.76,0,.24,1); will-change: transform; }
 .brand-intro-exit { transform: translateY(-103%); pointer-events: none; }
-.brand-intro-corner,.brand-intro-footer { position: absolute; left: clamp(24px,5vw,72px); right: clamp(24px,5vw,72px); display: flex; justify-content: space-between; gap: 20px; font-size: 10px; font-weight: 400; letter-spacing: .14em; }
+.brand-intro-corner,.brand-intro-footer { position: absolute; left: clamp(24px,5vw,72px); right: clamp(24px,5vw,72px); display: flex; justify-content: space-between; gap: 20px; font-size: var(--type-support); font-weight: 400; letter-spacing: .14em; }
 .brand-intro-corner { top: clamp(28px,5vh,54px); color: #777; }
 .brand-intro-corner > span:first-child { color: #bbb; font-weight: 500; }
 .brand-intro-footer { bottom: clamp(28px,5vh,54px); color: #777; }
@@ -21,7 +21,7 @@
  .studio-cursor-ring.is-visible,.studio-cursor-dot.is-visible { opacity: 1; }
 }
 @media(max-width:560px) {
- .brand-intro-corner,.brand-intro-footer { font-size: 8px; letter-spacing: .08em; }
+ .brand-intro-corner,.brand-intro-footer { font-size: var(--type-caption); letter-spacing: .08em; }
  .brand-intro-corner > span:last-child { max-width: 115px; text-align: right; line-height: 1.6; }
 }
 @media(prefers-reduced-motion:reduce) {

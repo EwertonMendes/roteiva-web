@@ -25,7 +25,7 @@ html[data-typography-lab="true"] .app-shell :not(svg):not(svg *) {
 }
 .font-lab-icon { color: var(--muted); flex: 0 0 auto; }
 .font-lab-label { display: grid; min-width: 0; gap: 2px; }
-.font-lab-caption { font-size: 10px; font-weight: 600; color: var(--muted); line-height: 1.1; }
+.font-lab-caption { font-size: var(--type-caption); font-weight: 600; color: var(--muted); line-height: 1.1; }
 .font-lab select {
   display: block;
   appearance: auto;
@@ -43,7 +43,7 @@ html[data-typography-lab="true"] .app-shell :not(svg):not(svg *) {
   color-scheme: light;
 }
 :root[data-theme="dark"] .font-lab select { color-scheme: dark; }
-.font-lab-status { position: absolute; left: 0; top: calc(100% + 5px); z-index: 2; white-space: nowrap; font-size: 11px; font-weight: 600; pointer-events: none; }
+.font-lab-status { position: absolute; left: 0; top: calc(100% + 5px); z-index: 2; white-space: nowrap; font-size: var(--type-caption); font-weight: 600; pointer-events: none; }
 .font-lab-status-loading { color: var(--muted); }
 .font-lab-status-error { color: #b85142; }
 :root[data-theme="dark"] .font-lab-status-error { color: #ffb1a6; }
@@ -87,11 +87,11 @@ html[data-typography-lab="true"] .app-shell :not(svg):not(svg *) {
 }
 @media (max-width: 820px) {
   .topbar .font-lab { padding: 4px 6px; gap: 4px; max-width: 164px; }
-  .topbar .font-lab select { width: clamp(87px, 28vw, 136px); min-height: 34px; font-size: 13px; }
+  .topbar .font-lab select { width: clamp(87px, 28vw, 136px); min-height: 34px; font-size: var(--type-support); }
   .topbar .font-lab-icon { width: 15px; }
 }
 @media (max-width: 390px) {
   .topbar .font-lab { gap: 2px; padding: 4px; }
   .topbar .font-lab-icon { display: none; }
-  .topbar .font-lab select { width: 112px; font-size: 12px; }
+  .topbar .font-lab select { width: 112px; font-size: var(--type-support); }
 }
