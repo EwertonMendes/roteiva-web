@@ -401,6 +401,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     window.scrollTo({top:0,behavior:"auto"});
   }
 
+  function startProject(){if(!isDemo&&view!=="projects")changeView("projects");setModalOpen(true);}
   function changeView(next:View) {
     navigateRoute({view:next});
     if(next==="projects"&&query.trim())onSearchProjects?.();
@@ -489,7 +490,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
               setQuery(value);
               if(value.trim() && view==="projects")onSearchProjects?.();
             }} placeholder="Buscar projetos, clientes ou arquivos" /><kbd><Command size={11} /> K</kbd></label>
-          <div className="top-actions"><button className="icon-button" title="Ver atividades" aria-label="Ver atividades" onClick={() => { changeView("overview"); notify(activities[0]?.text || "Nenhuma atividade ainda"); }}><Bell size={18} /></button><button className="icon-button theme-toggle" onClick={toggleTheme} aria-label={theme === "light" ? "Ativar modo escuro" : "Ativar modo claro"} title={theme === "light" ? "Modo escuro" : "Modo claro"}>{theme === "light" ? <Moon size={18} /> : <Sun size={18} />}</button><button className="primary-button" onClick={() => setModalOpen(true)}><Plus size={17} /> Novo projeto</button></div>
+          <div className="top-actions"><button className="icon-button" title="Ver atividades" aria-label="Ver atividades" onClick={() => { changeView("overview"); notify(activities[0]?.text || "Nenhuma atividade ainda"); }}><Bell size={18} /></button><button className="icon-button theme-toggle" onClick={toggleTheme} aria-label={theme === "light" ? "Ativar modo escuro" : "Ativar modo claro"} title={theme === "light" ? "Modo escuro" : "Modo claro"}>{theme === "light" ? <Moon size={18} /> : <Sun size={18} />}</button><button className="primary-button" onClick={startProject}><Plus size={17} /> Novo projeto</button></div>
         </header>
 
         <section className="page">
@@ -502,7 +503,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
                 : view === "finance" ? <button className="primary-button" onClick={() => openFinanceModal()}><Plus size={17} /> Nova receita</button>
                 : view === "calendar" ? <button className="primary-button" onClick={() => openEvent()}><Plus size={17} /> Novo compromisso</button>
                 : view === "library" ? <><select aria-label="Projeto dos arquivos" value={libraryProject} onChange={e => setLibraryProject(e.target.value)}><option value="">Sem projeto</option>{projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select><label className="primary-button upload-button"><Upload size={17} /> {uploading ? "Enviando…" : "Adicionar arquivos"}<input type="file" disabled multiple onChange={(event) => { uploadAssets(event.target.files, Number(libraryProject) || undefined); event.target.value = ""; }} /></label></>
-                : <button className="primary-button" onClick={() => setModalOpen(true)}><Plus size={17} /> Criar projeto</button>}
+                : <button className="primary-button" onClick={startProject}><Plus size={17} /> Criar projeto</button>}
             </div>
           </div>
           {view === "settings" && <SettingsPage profile={profile} email={email} photoURL={photoURL} theme={theme} toggleTheme={toggleTheme} workspace={workspace} onLoadWorkspace={onLoadWorkspace} cloudStatus={isDemo ? saveStatus : cloudStatus || ""} onNotify={notify} onSaveProfile={onSaveProfile} />}

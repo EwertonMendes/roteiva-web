@@ -15,7 +15,7 @@ test("each route loads all domains required by its current UI and mutations",()=
   assert.ok(!overview.includes("clients"));
   assert.ok(!overview.includes("projects"));
   assert.ok(!overview.includes("deliveries"));
-  assert.ok(!list.includes("clients"));
+  assert.ok(list.includes("clients"));
   assert.ok(!list.includes("financeEntries"));
   assert.ok(detail.includes("financeEntries"));
   assert.ok(detail.includes("financeEntries")&&detail.includes("events"));
