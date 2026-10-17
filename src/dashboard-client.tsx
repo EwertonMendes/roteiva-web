@@ -108,7 +108,13 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     onCommands(commands);
   }
   const workspace = { projects, clients: clientList, financeEntries, monthlyRevenue, calendarEvents, libraryAssets: libraryAssets.map((asset) => ({ ...asset, preview: undefined })), comments, reviewState, activities };
-  function logActivity(text: string) { setActivities(current => [{id:crypto.randomUUID(),text, when: new Date().toISOString()}, ...current].slice(0, 150)); }
+  function logActivity(text: string) {
+    const activity:Activity={id:crypto.randomUUID(),text,when:new Date().toISOString()};
+    setActivities(current=>[activity,...current].slice(0,150));
+    const commands:WorkspaceCommand[]=[{kind:"appendActivity",activity}];
+    if(activities.length>=150 && activities[149].id)commands.push({kind:"deleteActivity",id:activities[149].id!});
+    commitCommands(commands);
+  }
   const restoreWorkspace = useCallback((data: Partial<WorkspaceData>) => {
     const next={
       projects:data.projects || [],clients:data.clients || [],financeEntries:data.financeEntries || [],
@@ -132,20 +138,44 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     const old = projects.find(p => p.id === updated.id);
     setProjects(current => current.map(p => p.id === updated.id ? updated : p));
     if (old?.name !== updated.name) setLibraryAssets(current => current.map(a => a.projectId === updated.id ? {...a, project:updated.name} : a));
-    if (old?.dueDate !== updated.dueDate || old?.name !== updated.name) {
-      setCalendarEvents(current => {
-        const isDeadline = (e: CalendarEvent) => e.projectId === updated.id && e.type === "Entrega" && (e.autoDeadline || e.title === `Entrega — ${old?.name}`);
-        const existing = current.find(isDeadline);
-        const rest = current.filter(e => !isDeadline(e));
-        return updated.dueDate ? [...rest, {id:existing?.id || newId(), autoDeadline:true, projectId:updated.id, title:`Entrega — ${updated.name}`, date:updated.dueDate, time:existing?.time || "18:00", type:"Entrega", client:updated.client}] : rest;
-      });
+    const commands:WorkspaceCommand[]=[{kind:"saveProject",project:updated}];
+    const previousTasks=new Map((old?.tasks||[]).map(t=>[t.id,t]));
+    for(const task of updated.tasks||[]){
+      const was=previousTasks.get(task.id);
+      if(!was || was.title!==task.title || was.done!==task.done)
+        commands.push({kind:"saveTask",projectId:updated.id,task});
+      previousTasks.delete(task.id);
     }
-    commitCommands([{kind:"saveProject",project:updated}]);
+    for(const id of previousTasks.keys())commands.push({kind:"deleteTask",id});
+    if (old?.dueDate !== updated.dueDate || old?.name !== updated.name) {
+      const isDeadline=(e:CalendarEvent)=>e.projectId===updated.id && e.type==="Entrega" &&
+        (e.autoDeadline || e.title===`Entrega — ${old?.name}`);
+      const existing=calendarEvents.find(isDeadline);
+      const deadline:CalendarEvent|undefined=updated.dueDate ? {
+        id:existing?.id || newId(),autoDeadline:true,projectId:updated.id,
+        title:`Entrega — ${updated.name}`,date:updated.dueDate,time:existing?.time || "18:00",
+        type:"Entrega",client:updated.client,
+      } : undefined;
+      setCalendarEvents(current=>[...current.filter(e=>!isDeadline(e)),...(deadline?[deadline]:[])]);
+      if(deadline)commands.push({kind:"saveEvent",event:deadline});
+      else if(existing)commands.push({kind:"deleteEvent",id:existing.id});
+    }
+    commitCommands(commands);
     logActivity(`Projeto atualizado: ${updated.name}`); notifyChange("Projeto salvo");
   }
   function saveClientPackage(client: Client) {
     setClientList(current => current.map(c => c.id === client.id ? client : c));
-    commitCommands([{kind:"saveClient",client}]);
+    const previous=clientList.find(c=>c.id===client.id);
+    const old=new Map((previous?.deliveries||[]).map(d=>[d.id,d]));
+    const commands:WorkspaceCommand[]=[{kind:"saveClient",client}];
+    for(const delivery of client.deliveries||[]){
+      const was=old.get(delivery.id);
+      if(!was||was.title!==delivery.title||was.month!==delivery.month||was.done!==delivery.done)
+        commands.push({kind:"saveDelivery",clientId:client.id,delivery});
+      old.delete(delivery.id);
+    }
+    for(const id of old.keys())commands.push({kind:"deleteDelivery",id});
+    commitCommands(commands);
     logActivity(`Entregas atualizadas: ${client.name}`);
   }
   function addLinkedRevenue(project: Project) { openFinanceModal(); setSelectedProject(project.id); }
@@ -235,11 +265,18 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     const description = String(form.get("description") || "");
     const tasks = (projectTemplates[template] || []).map((title, i) => ({ id: newId() + i, title, done: false }));
     const projectId = newId();
-    setProjects((current) => [{ id: projectId, name, client, clientId, dueDate: dueValue, description, tasks, template, status: "Em produção", due, progress: 0, files: 0, color: "blue", initials: client.slice(0, 2).toUpperCase() }, ...current]);
-    if (dueValue) setCalendarEvents((current) => [{ id: newId() + 1, projectId, autoDeadline:true, title: `Entrega — ${name}`, date: dueValue, time: "18:00", type: "Entrega", client }, ...current]);
-    commitCommands([{kind:"saveProject",project:{id:projectId,name,client,clientId,dueDate:dueValue,
+    const created:Project={id:projectId,name,client,clientId,dueDate:dueValue,
       description,tasks,template,status:"Em produção",due,progress:0,files:0,
-      color:"blue",initials:client.slice(0,2).toUpperCase()}}]);
+      color:"blue",initials:client.slice(0,2).toUpperCase()};
+    const deadline:CalendarEvent|undefined=dueValue ? {
+      id:newId(),projectId,autoDeadline:true,title:`Entrega — ${name}`,date:dueValue,
+      time:"18:00",type:"Entrega",client,
+    } : undefined;
+    setProjects(current=>[created,...current]);
+    if(deadline)setCalendarEvents(current=>[deadline,...current]);
+    commitCommands([{kind:"saveProject",project:created},
+      ...tasks.map(task=>({kind:"saveTask" as const,projectId,task})),
+      ...(deadline?[{kind:"saveEvent" as const,event:deadline}]:[])]);
     setModalOpen(false);
     openProject(projectId);
     logActivity(`Projeto criado: ${name}`);
@@ -264,7 +301,16 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
       setProjects(current => current.map(p => p.clientId === updated.id ? {...p, client: name} : p));
       setFinanceEntries(current => current.map(e => e.clientId === updated.id ? {...e, client: name} : e));
     }
-    commitCommands([{kind:"saveClient",client:updated}]);
+    const commands:WorkspaceCommand[]=[{kind:"saveClient",client:updated}];
+    if(editingClient && editingClient.name!==name){
+      commands.push(...projects.filter(p=>p.clientId===updated.id).map(project=>({
+        kind:"saveProject" as const,project:{...project,client:name},
+      })));
+      commands.push(...financeEntries.filter(e=>e.clientId===updated.id).map(entry=>({
+        kind:"saveFinance" as const,entry:{...entry,client:name},
+      })));
+    }
+    commitCommands(commands);
     setClientModalOpen(false); setEditingClient(null);
     logActivity(`Cliente ${editingClient ? "atualizado" : "cadastrado"}: ${name}`);
     notifyChange("Cliente salvo com sucesso");
@@ -336,7 +382,13 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     commitCommands([{kind:"saveEvent",event:entry}]);
     setCalendarEvents(current => (editingEvent ? current.map(e => e.id === entry.id ? entry : e) : [...current, entry]).sort((a,b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`)));
     if (entry.autoDeadline && entry.projectId) {
-      setProjects(current => current.map(p => p.id === entry.projectId ? {...p,dueDate:date,due:new Date(`${date}T12:00:00`).toLocaleDateString("pt-BR",{day:"2-digit",month:"short"})} : p));
+      const linked=projects.find(p=>p.id===entry.projectId);
+      if(linked){
+        const modified:Project={...linked,dueDate:date,
+          due:new Date(`${date}T12:00:00`).toLocaleDateString("pt-BR",{day:"2-digit",month:"short"})};
+        setProjects(current=>current.map(p=>p.id===modified.id?modified:p));
+        commitCommands([{kind:"saveProject",project:modified}]);
+      }
     }
     logActivity(`Compromisso salvo: ${title}`); setEditingEvent(null);
     setEventModalOpen(false);
