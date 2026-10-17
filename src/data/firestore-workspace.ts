@@ -213,7 +213,10 @@ export class FirestoreWorkspace {
   }
   private async readProjectPage(options:{status?:string;reset?:boolean;size?:number}):
     Promise<{workspace:WorkspaceData;total:number;hasMore:boolean}> {
-    if(this.loadedDomains.has("projects") && this.loadedDomains.has("tasks")){
+    if(this.loadedDomains.has("projects")){
+      // Never replace a previously complete project collection with a page.
+      // Load missing tasks once so every project's progress is correct.
+      if(!this.loadedDomains.has("tasks")) await this.loadDomains(["tasks"]);
       const workspace=this.decoded();
       return {workspace,total:workspace.projects.length,hasMore:false};
     }
