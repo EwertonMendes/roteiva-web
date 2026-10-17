@@ -204,6 +204,15 @@ export class FirestoreWorkspace {
    */
   async projectPage(options:{status?:string;reset?:boolean;size?:number}={}):
     Promise<{workspace:WorkspaceData;total:number;hasMore:boolean}> {
+    const previous=this.loadQueue;
+    let release!:()=>void;
+    this.loadQueue=new Promise<void>(resolve=>{release=resolve;});
+    await previous;
+    try{return await this.readProjectPage(options);}
+    finally{release();}
+  }
+  private async readProjectPage(options:{status?:string;reset?:boolean;size?:number}):
+    Promise<{workspace:WorkspaceData;total:number;hasMore:boolean}> {
     if(this.loadedDomains.has("projects") && this.loadedDomains.has("tasks")){
       const workspace=this.decoded();
       return {workspace,total:workspace.projects.length,hasMore:false};
