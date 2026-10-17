@@ -2,6 +2,7 @@ import { ApiError, type Env } from './types.ts';
 import { identity } from './auth.ts';
 import { callback, start, launch, enabled } from './oauth.ts';
 import { metadata, disconnect, about } from './drive.ts';
+import { listFolders, listFolderItems } from './folders.ts';
 const headers = {
   'Cache-Control':'no-store', 'Referrer-Policy':'no-referrer',
   'X-Content-Type-Options':'nosniff', 'Content-Security-Policy':"default-src 'none'; frame-ancestors 'none'",
@@ -42,7 +43,17 @@ export async function handle(request: Request, env: Env): Promise<Response> {
       if (origin !== env.FRONTEND_ORIGIN) throw new ApiError(403,'origin_required');
       const uid = await identity(request,env);
       if (!(await env.API_RATE_LIMIT.limit({key:'dev:uid:'+uid})).success) throw new ApiError(429,'rate_limited');
-      response = await start(env,uid);
+      const mode=url.searchParams.get('mode');
+      if (mode!==null && mode!=='folders') throw new ApiError(400,'invalid_oauth_mode');
+      response = await start(env,uid,mode==='folders'?'folders':'files');
+    } else if (/^\\/integrations\\/drive\\/[^/]+\\/folders(?:\\/[^/]+\\/items)?$/.test(url.pathname) && request.method==='GET') {
+      enabled(env);
+      const uid=await identity(request,env);
+      if (!(await env.API_RATE_LIMIT.limit({key:'dev:uid:'+uid})).success) throw new ApiError(429,'rate_limited');
+      const parts=url.pathname.split('/');
+      response=parts.length===5
+        ? await listFolders(env,uid,parts[3],url.searchParams.get('parentId')||'root',url.searchParams.get('pageToken'))
+        : await listFolderItems(env,uid,parts[3],parts[5],url.searchParams.get('pageToken'));
     } else if (/^\/integrations\/drive\/[^/]+\/(metadata|disconnect|about)$/.test(url.pathname)) {
       enabled(env);
       const uid = await identity(request,env);
