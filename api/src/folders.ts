@@ -16,7 +16,7 @@ function validateId(id: string, allowRoot = false) {
 }
 function validatePage(page: string | null): string {
   if (!page) return '';
-  if (page.length > 2048 || !/^[A-Za-z0-9._=+\/-]+$/.test(page)) throw new ApiError(400, 'invalid_page_token');
+  if (page.length > 2048 || /[\x00-\x20\x7F]/.test(page)) throw new ApiError(400, 'invalid_page_token');
   return page;
 }
 function safeItem(value: DriveItem): DriveItem {
