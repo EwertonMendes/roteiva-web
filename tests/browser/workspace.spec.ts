@@ -125,7 +125,8 @@ test("First login does not silently create a workspace",async({page},info)=>{
   await popup.locator("#display-name-input").fill("Novo profissional");
   await popup.locator("#sign-in").click();
   await expect(page.getByRole("heading",{name:"Ainda não encontramos seu espaço."})).toBeVisible();
-  await expect(page.getByText("Nenhuma conta foi criada no Roteiva.")).toBeVisible();
+  await expect(page.locator(".auth-invitation")).toHaveText("Se quiser começar, vamos cadastrar seu perfil e preparar um espaço privado.");
+  await expect(page.getByText("Nenhuma conta foi criada no Roteiva.")).toHaveCount(0);
   await expect(page.locator(".app-shell")).toHaveCount(0);
   await page.reload();
   await expect(page.getByRole("heading",{name:"Ainda não encontramos seu espaço."})).toBeVisible();
