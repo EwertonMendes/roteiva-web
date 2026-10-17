@@ -3,6 +3,7 @@ import { collections, decodeWorkspace, encodeWorkspace, equalData, type Data, ty
 import type { WorkspaceData, Status } from "../domain/workspace";
 import { advanceSync, bootstrapSync, emptyNumbers, parseSync, persistentCacheSelected, readManifest, readSync, recordCounts, saveManifest, syncRef, type Domain, type SyncStamp } from "./firestore-sync.ts";
 import { FirestoreQueryGate } from "./firestore-query-gate.ts";
+import { missingQueryIndex } from "./firestore-recovery.ts";
 import { encodeCommand,type WorkspaceCommand } from "./firestore-commands.ts";
 import { trackAggregation, trackMutation, trackPage, trackRevision, usageSnapshot } from "./firestore-usage.ts";
 
@@ -210,6 +211,11 @@ export class FirestoreWorkspace {
    * ISO civil-date field; old finance history and unrelated agenda months
    * cannot consume reads on the current screen. Never marks a domain complete.
    */
+  private async fallbackDateWindow(name:"events"|"financeEntries"):Promise<WorkspaceData> {
+    // An index can still be building after a Hosting deploy. A complete,
+    // non-indexed read is an accurate fallback and never implies deletion.
+    return this.loadDomains([name]);
+  }
   private async dateWindow(name:"events"|"financeEntries",start:string,end:string):
     Promise<WorkspaceData> {
     const previous=this.loadQueue;
@@ -222,9 +228,11 @@ export class FirestoreWorkspace {
       const key=name+":"+start+":"+end;
       if(this.rangeRevisions.get(key)===before.domains[name] && this.stamp?.domains[name]===before.domains[name])
         return this.decoded();
+      const results=new Map<string,Stored>();
+      const newPeek=new Set<string>();
+      try {
       const base=collection(this.db,"users",this.uid,name);
       let cursor:QueryDocumentSnapshot<DocumentData>|undefined;
-      const results=new Map<string,Stored>();
       while(true){
         const q=query(base,where("date",">=",start),where("date","<",end),
           orderBy("date"),orderBy(documentId()),...(cursor?[startAfter(cursor)]:[]),limit(200));
@@ -237,7 +245,6 @@ export class FirestoreWorkspace {
         if(snapshot.size<200)break;
         cursor=snapshot.docs[snapshot.docs.length-1];
       }
-      const newPeek=new Set<string>();
       if(name==="events"){
         const future=query(base,where("date",">=",end),orderBy("date"),orderBy(documentId()),limit(4));
         const extra=await getDocsFromServer(future);
@@ -248,6 +255,11 @@ export class FirestoreWorkspace {
           results.set(path,{data:data as Data,revision});newPeek.add(path);
         }
       }
+      } catch(error) {
+        if(!missingQueryIndex(error))throw error;
+        return this.fallbackDateWindow(name);
+      }
+      // The query succeeded, but the next revision check is mandatory.
       trackRevision(this.uid);
       const after=await readSync(this.db,this.uid);
       if(!after||before.domains[name]!==after.domains[name])
@@ -383,7 +395,15 @@ export class FirestoreWorkspace {
     const base=collection(this.db,"users",this.uid,"clients");
     const q=query(base,orderBy("createdAt","desc"),orderBy(documentId(),"desc"),
       ...(this.clientCursor?[startAfter(this.clientCursor)]:[]),limit(size+1));
-    const page=await getDocsFromServer(q);
+    let page;
+    try{page=await getDocsFromServer(q);}
+    catch(error){
+      if(!missingQueryIndex(error))throw error;
+      const workspace=await this.loadDomains(["clients"]);
+      return {workspace,total:workspace.clients.length,
+        recurring:workspace.clients.filter(client=>client.type==="Recorrente").length,
+        hasMore:false};
+    }
     trackPage(this.uid,"server",page.size);
     const docs=page.docs.slice(0,size);
     const groups=new Map<string,Stored>();
@@ -393,7 +413,15 @@ export class FirestoreWorkspace {
     }
     let recurring=this.recurringCount?.count;
     if(this.recurringCount?.revision!==before.domains.clients){
-      const result=await getCountFromServer(query(base,where("type","==","Recorrente")));
+      let result;
+      try{result=await getCountFromServer(query(base,where("type","==","Recorrente")));}
+      catch(error){
+        if(!missingQueryIndex(error))throw error;
+        const workspace=await this.loadDomains(["clients"]);
+        return {workspace,total:workspace.clients.length,
+          recurring:workspace.clients.filter(client=>client.type==="Recorrente").length,
+          hasMore:false};
+      }
       trackAggregation(this.uid);
       recurring=result.data().count;
       this.recurringCount={revision:before.domains.clients,count:recurring};
@@ -452,7 +480,13 @@ export class FirestoreWorkspace {
     const conditions=status?[where("status","==",status)]:[];
     const entries=query(base,...conditions,orderBy("createdAt","desc"),
       orderBy(documentId(),"desc"),...(previous?[startAfter(previous)]:[]),limit(size+1));
-    const list=await getDocsFromServer(entries);
+    let list;
+    try{list=await getDocsFromServer(entries);}
+    catch(error){
+      if(!missingQueryIndex(error))throw error;
+      const workspace=await this.loadDomains(["projects","tasks"]);
+      return {workspace,total:workspace.projects.length,hasMore:false};
+    }
     trackPage(this.uid,"server",list.size);
     const docs=list.docs.slice(0,size);
     const projects=new Map<string,Stored>();
@@ -464,7 +498,13 @@ export class FirestoreWorkspace {
     const ids=docs.map(item=>Number(item.id)).filter(Number.isSafeInteger);
     if(ids.length){
       const taskQuery=query(collection(this.db,"users",this.uid,"tasks"),where("projectId","in",ids));
-      const taskDocs=await getDocsFromServer(taskQuery);
+      let taskDocs;
+      try{taskDocs=await getDocsFromServer(taskQuery);}
+      catch(error){
+        if(!missingQueryIndex(error))throw error;
+        const workspace=await this.loadDomains(["projects","tasks"]);
+        return {workspace,total:workspace.projects.length,hasMore:false};
+      }
       trackPage(this.uid,"server",taskDocs.size);
       for(const record of taskDocs.docs){
         const {ownerUid:_o,schemaVersion:_s,revision,createdAt:_c,updatedAt:_u,...data}=record.data();
@@ -476,7 +516,13 @@ export class FirestoreWorkspace {
       const storedCount=this.filteredProjectCounts.get(status);
       if(storedCount?.revision===before.domains.projects)total=storedCount.count;
       else {
-        const aggregate=await getCountFromServer(query(base,where("status","==",status)));
+        let aggregate;
+        try{aggregate=await getCountFromServer(query(base,where("status","==",status)));}
+        catch(error){
+          if(!missingQueryIndex(error))throw error;
+          const workspace=await this.loadDomains(["projects","tasks"]);
+          return {workspace,total:workspace.projects.length,hasMore:false};
+        }
         trackAggregation(this.uid);
         total=aggregate.data().count;
         this.filteredProjectCounts.set(status,{revision:before.domains.projects,count:total});
@@ -523,6 +569,7 @@ export class FirestoreWorkspace {
     // Reuse a verified complete small page. Empty accounts should not spend
     // four aggregation queries to discover that every project bucket is zero.
     const pageComplete=!!projects && this.stamp?.counts.projects===projects.length;
+    try {
     const [clients,receivable,...counts]=await Promise.all([
       getCountFromServer(collection(this.db,"users",this.uid,"clients")),
       getAggregateFromServer(query(collection(this.db,"users",this.uid,"financeEntries"),
@@ -540,6 +587,21 @@ export class FirestoreWorkspace {
       receivableAmount:(receivable.data().amountCents ?? 0)/100,
       projectCount:Object.values(projectStatuses).reduce((sum,value)=>sum+value,0),
       projectStatuses};
+    }catch(error) {
+      if(!missingQueryIndex(error))throw error;
+      // Recover accurately while deployment indexes finish building. Only
+      // activated on a failed aggregate; normal users keep cheap server sums.
+      const data=await this.load(["clients","projects","financeEntries"]);
+      const projectStatuses=Object.fromEntries(statuses.map(status=>[
+        status,data.projects.filter(p=>p.status===status).length,
+      ])) as Record<Status,number>;
+      return {
+        clientCount:data.clients.length,
+        receivableAmount:data.financeEntries.filter(e=>e.kind!=="expense"&&e.status==="A receber")
+          .reduce((sum,e)=>sum+Math.round(e.amount*100),0)/100,
+        projectCount:data.projects.length,projectStatuses,
+      };
+    }
   }
   diagnostics() { return usageSnapshot(this.uid); }
   totalCount(domain:Domain):number|undefined{return this.stamp?.counts[domain];}
