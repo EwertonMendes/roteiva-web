@@ -3,6 +3,7 @@ import { collections, decodeWorkspace, encodeWorkspace, equalData, type Data, ty
 import type { WorkspaceData } from "../domain/workspace";
 import { advanceSync, bootstrapSync, emptyNumbers, parseSync, persistentCacheSelected, readManifest, readSync, recordCounts, saveManifest, syncRef, type Domain, type SyncStamp } from "./firestore-sync.ts";
 import { FirestoreQueryGate } from "./firestore-query-gate.ts";
+import { encodeCommand,type WorkspaceCommand } from "./firestore-commands.ts";
 import { trackAggregation, trackMutation, trackPage, trackRevision, usageSnapshot } from "./firestore-usage.ts";
 
 export type ProfessionalType = "freelancer" | "studio" | "producer" | "other";
@@ -229,6 +230,68 @@ export class FirestoreWorkspace {
       const before=await tx.get(ref);
       tx.set(ref,{theme,ownerUid:this.uid,schemaVersion:1,revision:(before.data()?.revision || 0)+1,createdAt:before.data()?.createdAt || serverTimestamp(),updatedAt:serverTimestamp()});
     });
+  }
+  /**
+   * Explicit document mutations. Unloaded pages are never treated as deletions.
+   * The stored revision guards edits on known records; updates to records not
+   * yet loaded are rejected until the caller fetches them.
+   */
+  async applyCommands(commands:readonly WorkspaceCommand[]):Promise<boolean>{
+    const distinct=new Map(commands.map(command=>{
+      const record=encodeCommand(command);
+      return [record.key,record] as const;
+    }));
+    const changes=[...distinct.values()].filter(({key,data})=>!equalData(this.stored.get(key)?.data,data));
+    if(!changes.length)return false;
+    if(changes.length>350)throw new Error("Muitas alterações simultâneas.");
+    await this.ensureSync();
+    const expected=new Map(changes.map(c=>[c.key,this.stored.get(c.key)]));
+    const result=await runTransaction(this.db,async tx=>{
+      const sync=syncRef(this.db,this.uid),stamp=await tx.get(sync);
+      const parsed=stamp.exists()?parseSync(stamp.data()):null;
+      if(!parsed)throw new Error("Conflito: revisão do espaço indisponível.");
+      const snaps=await Promise.all(changes.map(c=>tx.get(this.ref(c.key))));
+      changes.forEach((change,index)=>{
+        if((snaps[index].data()?.revision||0)!==(expected.get(change.key)?.revision||0)){
+          throw new Error("Conflito: registro modificado em outro dispositivo. Recarregue antes de salvar.");
+        }
+      });
+      const counts={...parsed.counts};
+      const nextCounts={...counts};
+      const touched=new Set<Domain>();
+      changes.forEach((change,index)=>{
+        const snap=snaps[index],before=snap.data(),path=this.ref(change.key);
+        touched.add(change.collection);
+        if(!change.data){
+          tx.delete(path);
+          if(snap.exists())nextCounts[change.collection]--;
+        }else{
+          tx.set(path,{...change.data,ownerUid:this.uid,schemaVersion:1,
+            revision:(before?.revision||0)+1,
+            createdAt:before?.createdAt||serverTimestamp(),updatedAt:serverTimestamp()});
+          if(!snap.exists())nextCounts[change.collection]++;
+        }
+      });
+      const committed=advanceSync(tx,sync,stamp,counts,nextCounts,touched);
+      return {old:parsed,committed,touched};
+    });
+    for(const change of changes){
+      if(change.data)this.stored.set(change.key,{
+        data:change.data,revision:(expected.get(change.key)?.revision||0)+1,
+      });
+      else this.stored.delete(change.key);
+    }
+    const known={...(this.stamp?.domains ?? result.committed.domains)};
+    for(const name of result.touched) {
+      if(!this.stamp || this.stamp.domains[name]===result.old.domains[name])
+        known[name]=result.committed.domains[name];
+    }
+    this.stamp={...result.committed,domains:known};
+    const safeManifest={...known};
+    for(const name of collections)if(!this.loadedDomains.has(name))safeManifest[name]=-1;
+    saveManifest(this.uid,safeManifest);
+    trackMutation(this.uid,changes.length);
+    return true;
   }
   async save(workspace: WorkspaceData, dirtyDomains?: readonly Domain[]): Promise<boolean> {
     if (dirtyDomains && !dirtyDomains.length) return false;
