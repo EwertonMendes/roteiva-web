@@ -276,10 +276,10 @@
 - [x] **IMPLEMENTADO (aguarda validação CI/QA):** documento privado `users/{uid}/sync/state` com revisões e contagens por coleção; regras estritas para schema/propriedade; atualização transacional das revisões nas gravações do workspace.
 - [x] **IMPLEMENTADO (aguarda validação CI/QA):** cache só reutilizado quando existe manifesto por UID/schema, revisão igual à remota e contagem completa; fallback para leitura do servidor, detecção de concorrência durante o bootstrap e revalidação ao retomar a aba.
 - [x] **IMPLEMENTADO (aguarda validação CI/QA):** deduplicação de carregamento concorrente e testes unitários e de segurança para a sincronização.
-- [x] **IMPLEMENTADO (aguarda validação CI/QA):** carregamento inicial por rota dos domínios necessários (Biblioteca inclui projetos; listas de clientes/projetos incluem dependências dos detalhes), recuperação incremental em navegação e exportação integral sob demanda, com exclusão impossível de registros que ainda não foram carregados.
-- [ ] **PLANEJADO:** implementar páginas visíveis com cursor, índices para filtros e métricas agregadas; por enquanto uma coleção requerida é lida até o fim em blocos de 200.
-- [x] **IMPLEMENTADO (aguarda validação CI/QA):** persistência codifica e compara somente domínios React realmente alterados; exclusões e revisões continuam transacionais, não afetando outras coleções.
-- [ ] **PLANEJADO:** migrar o efeito de persistência de domínios para comandos de negócio explícitos por ação, com resultados tipados, sem perder a confirmação antes de sair.
+- [x] **IMPLEMENTADO (aguarda CI/QA do novo HEAD):** carregamento inicial por rota, Visão Geral com projetos recentes limitados e agregações, lista de Projetos com cursor e busca textual completa sob demanda, exportação integral e isolamento entre domínios completos/parciais.
+- [x] **IMPLEMENTADO (aguarda CI/QA do novo HEAD):** listagem de Projetos com botão Carregar mais, cursor estável do Firestore, status filtrado na origem, índice composto e tarefas associadas; o Dashboard usa contagens agregadas e soma de valores a receber, com caminho econômico para até quatro projetos.
+- [ ] **PLANEJADO:** estender paginação e agregações para Clientes, histórico Financeiro e calendário, sem perder totais, vínculos, filtros nem exportação completa.
+- [x] **IMPLEMENTADO (aguarda CI/QA do novo HEAD):** UI Firebase não persiste efeitos de renderização; ações chamam comandos tipados por documento para projetos, tarefas, entregas, clientes, finanças, agenda e atividade, com controle de revisão e contadores transacionais. Demo preserva o localStorage original. O salvamento de workspace integral continua somente para compatibilidade e testes.
 - [ ] **PLANEJADO:** métricas DEV de reads/writes por sessão e comparação de custos faturáveis antes/depois.
 - [ ] **VALIDAÇÃO PENDENTE:** CI da PR, QA duas contas reais, F5 com cache consentido, exclusões, concorrência, IndexedDB em mobile e impacto real nas quotas.
 
