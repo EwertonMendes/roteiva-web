@@ -183,6 +183,18 @@
 
 **Próxima entrega:** concluir QA Google real do DEV publicado na PR #6. Depois, PoC Drive da Fase 0, sem antecipar Worker/D1 nesta entrega.
 
+### PR #7 — Ajuste da revisão e evidência DEV
+
+- [x] Em `/review`, mostrar **ROTEIVA DEV · REVISÃO EM BREVE** no ambiente Firebase, sem identificar equivocadamente o login como demonstração; melhorar contraste do cartão escuro.
+- [x] Cobertura de navegação autenticada para `/review` e retorno ao painel em desktop/mobile com Firebase Auth Emulator.
+- [x] Validar [CI da PR #7 (38984055813)](https://github.com/EwertonMendes/roteiva-web/actions/runs/38984055813): 12 testes de regras/repositório, oito Playwright desktop/mobile, builds Firebase/Pages, TypeScript e testes de domínio passaram.
+- [x] Corrigir **somente a automação mobile**, que tentava preencher o campo de tarefa fora da área visível: rolagem, foco e digitação pelo teclado. A implementação da UI foi preservada. As tentativas anteriores [38983025601](https://github.com/EwertonMendes/roteiva-web/actions/runs/38983025601) e [38983735658](https://github.com/EwertonMendes/roteiva-web/actions/runs/38983735658) falharam nesse passo; não ocultar esse histórico.
+- [ ] Publicação na `master` e confirmação do deploy DEV da PR #7.
+- [ ] QA real após publicação: logout/relogin, segunda conta Google, contraste de `/review` autenticado, Safari/iOS e celular físico.
+
+**Limite:** Playwright mobile emulado e contas Auth Emulator não substituem validação com Google real nem dispositivo físico. Não apagar os registros `[QA]` existentes no Firestore sem autorização.
+
+
 ## Entrega Firebase DEV — PR #6
 
 **Estado: PUBLICADO no DEV; validação automatizada concluída, QA Google real em andamento.** [PR #6](https://github.com/EwertonMendes/roteiva-web/pull/6). Auditoria e decisões em [desenvolvimento](DEVELOPMENT.md). Esta seção é a evidência específica da fundação Solo; itens Worker/Drive/PROD das fases anteriores continuam planejados.
