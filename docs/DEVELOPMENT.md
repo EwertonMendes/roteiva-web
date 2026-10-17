@@ -2,7 +2,7 @@
 
 [README](../README.md) · [Arquitetura](ARCHITECTURE.md) · [Roadmap](MVP-ROADMAP.md).
 
-React 19/Vite 8/TypeScript, sem SSR, Next/Vinext, Functions, Worker ou D1 ativo. Node 22.13+, PNPM 11.25.0 e Java 21 para emuladores. Somente `pnpm-lock.yaml`; instalação congelada obrigatória.
+React 19/Vite 8/TypeScript, sem SSR, Next/Vinext ou Functions. API Worker/D1 DEV independente em api/ (PR #15). Node 22.13+, PNPM 11.25.0 e Java 21 para emuladores. Somente `pnpm-lock.yaml`; instalação congelada obrigatória.
 
 ## Comandos
 
@@ -177,3 +177,85 @@ Como o GitHub Pages é estático e não oferece fallback correto para subrotas, 
 O carregamento inicial e as leituras por rota executam retentativas limitadas somente para erros transitórios do Firestore (rede indisponível, prazo excedido, aborto ou erro interno), seguidas por reconexão automática em segundo plano. Consultas otimizadas que falham por índice pendente ou argumento não suportado podem usar, de forma excepcional, a leitura completa da coleção sob as mesmas regras por UID e revisões, preservando totais e integridade. O fallback não é um retorno de zeros e não desativa regras de segurança. O usuário não recebe prompt para repetir leituras. Falhas determinísticas repetidas param de reiniciar indefinidamente; autenticação/permissão e cota permanecem erros explícitos.
 
 **Atenção:** gravações sem confirmação não são repetidas automaticamente. A tela de recuperação manual só pode ser usada nesse cenário para evitar duplicação ou descarte silencioso de alterações locais. Testes de regressão: `firestore-recovery.test.mjs`, fluxo Playwright offline/reconexão desktop/mobile e `firestore.rules.test.mjs`. A causa exata de erros de rede em dispositivos físicos só é determinável por código de erro/diagnóstico de sessão; não registrar conteúdo privado de documentos.
+
+## API Google Drive / Cloudflare DEV — PR #15
+
+O código e o lockfile da API ficam em `api/`. O frontend mantém PNPM e seu lockfile existente. A API usa npm com dependências exatas e package-lock próprio, evitando alterar o pipeline Firebase/Pages. Tudo pode rodar no Actions, sem instalação no computador do usuário.
+
+### Recursos e consoles
+
+| Recurso | Identificador / console |
+|---|---|
+| Conta Cloudflare existente | [b3855f9c192541a01a45b2dae7b6a7f8](https://dash.cloudflare.com/b3855f9c192541a01a45b2dae7b6a7f8/workers-and-pages) |
+| Worker novo DEV | [roteiva-api-dev](https://dash.cloudflare.com/b3855f9c192541a01a45b2dae7b6a7f8/workers/services/view/roteiva-api-dev/production) |
+| HTTPS estável | https://roteiva-api-dev.ewertonmendes9.workers.dev |
+| D1 novo DEV | [roteiva-drive-dev — 302adc88-76b2-4827-bb16-99662fa0408b](https://dash.cloudflare.com/b3855f9c192541a01a45b2dae7b6a7f8/workers/d1/databases/302adc88-76b2-4827-bb16-99662fa0408b/metrics) |
+| Projeto Google novo | [roteiva-drive-dev — 479738001561](https://console.cloud.google.com/home/dashboard?project=roteiva-drive-dev) |
+| APIs ativadas | [Drive](https://console.cloud.google.com/apis/api/drive.googleapis.com/metrics?project=roteiva-drive-dev), [Picker](https://console.cloud.google.com/apis/api/picker.googleapis.com/overview?project=roteiva-drive-dev) |
+| Consentimento separado | [Google Auth Platform](https://console.cloud.google.com/auth/audience?project=roteiva-drive-dev), Externo / Testing, proprietário como usuário de teste |
+| Cliente web novo | [Clientes OAuth](https://console.cloud.google.com/auth/clients?project=roteiva-drive-dev), Roteiva Drive DEV Backend |
+| GitHub environment novo | [cloudflare-development](https://github.com/EwertonMendes/roteiva-web/settings/environments/24586792750/edit) |
+| Firebase reutilizado | roteiva-web-dev, identidade e negócio; não usado como projeto OAuth Drive |
+| PROD | Não criado |
+
+Origem JavaScript autorizada: `https://roteiva-web-dev.web.app`. Callback exato: `https://roteiva-api-dev.ewertonmendes9.workers.dev/oauth/drive/callback`. O Pages permanece demo sem login nem acesso ao Worker. Não adicionar localhost, wildcard, domínio Bem Feito ou callback do Firebase ao cliente de Drive por conveniência.
+
+### Configuração e secrets
+
+`wrangler.jsonc` mantém base sem publicação e somente `env.dev` com binding DB e IDs reais. Os guards de runtime recusam ambiente/projeto/origem/callback divergentes. Não existe comando deploy PROD. `OAUTH_ENABLED=false` até PoC autenticada e revisão das limitações de cookies; mudar conscientemente na configuração versionada após QA.
+
+| Nome | Destino / finalidade |
+|---|---|
+| GOOGLE_CLIENT_ID | Wrangler vars; identificador público do cliente web dedicado |
+| GOOGLE_CLIENT_SECRET | Worker Secret DEV; troca/renovação OAuth |
+| TOKEN_KEYS | Worker Secret DEV; JSON de versões para chaves AES-256 base64url; valores nunca documentados |
+| TOKEN_KEY_VERSION | Wrangler vars; versão usada em novas cifragens, inicialmente v1 |
+| FIREBASE_PROJECT_ID | Wrangler vars; roteiva-web-dev |
+| FRONTEND_ORIGIN / OAUTH_REDIRECT_URI | Wrangler vars; allowlist e retorno exato |
+| ENVIRONMENT / OAUTH_ENABLED | Wrangler vars; dev e gate de integração |
+| CLOUDFLARE_API_TOKEN | GitHub environment secret cloudflare-development |
+| CLOUDFLARE_ACCOUNT_ID / CLOUDFLARE_D1_DATABASE_ID | GitHub environment variables; IDs conferidos antes de migrations/deploy |
+
+Secrets inseridos diretamente pelos formulários oficiais. Chave AES gerada com CSPRNG, 32 bytes. Não ficam em GitHub, VITE_*, artefatos, logs, URLs ou .env versionado. O token Cloudflare `roteiva-dev-github-deploy` foi autorizado com **Workers Scripts:Edit + D1:Edit somente na conta acima**, expira em **15/01/2027**. A interface só limita essas permissões por conta: pode alterar outros Workers/D1 nessa conta, não apenas Roteiva. Não inclui billing, DNS, zona, perfil, tokens, R2 ou acesso global. Se futuramente forem exigidas permissões adicionais, auditar erro antes de conceder. A conta não possuía Workers/D1 antes desta tarefa.
+
+Rotação AES: gerar nova chave por destino seguro, adicionar versão mantendo as antigas no secret, mudar TOKEN_KEY_VERSION, recriptografar registros por procedimento auditado com revisão e AAD, verificar todas as versões remanescentes; só depois remover chave antiga. **Não há job automático de recriptografia nesta fundação**. Perder a chave obriga reconectar as contas. Rotação OAuth/CI: criar substituta nos mecanismos oficiais, atualizar destino seguro, validar, revogar a anterior; não usar código/Actions para imprimir material secreto. Backup/recuperação e retenção precisam ser definidos antes do piloto.
+
+### Comandos válidos na pasta api
+
+```bash
+npm ci --ignore-scripts
+npm audit --audit-level=high
+npm run typecheck
+npm test
+npm run migrate:local
+npm run build
+npm run migrate:dev
+npm run deploy:dev
+```
+
+Os quatro últimos que usam Wrangler dependem do runtime oficial instalado pelo runner; migrations remotas e deploy exigem token no environment. `build` é dry-run, não publicação. Migrations remotas são versionadas pelo D1; nunca editar arquivo já aplicado, criar próximo número. Usar mudanças aditivas compatíveis com versão anterior do Worker; não automatizar DROP/rollback destrutivo. DB guarda somente conexão, ciphertext e transação temporária; nenhum cliente/projeto/mídia.
+
+`api-dev.yml` valida PRs/push: instalação congelada, audit, typecheck, testes, migração local e dry-run. Publicação normal só master fora de PR, após validate; serializa migrations/deploy, confere conta/banco e testa HTTPS e rejeição de identidade inválida. Checkout/artifact do mesmo run; token somente nas etapas privilegiadas. Firebase/Pages permanecem workflows originais. O bootstrap inicial usa dispatch explícito do proprietário, branch exata e SHA esperado, com validação repetida; remover autorização temporária após a primeira publicação. Não fazer merge automático.
+
+### Contratos mínimos
+
+| Rota | Comportamento |
+|---|---|
+| GET /health | SELECT mínimo no ledger de migrations, status/environment sem IDs ou dados privados; 503 se dependência falha |
+| GET /integrations/drive | Bearer Firebase, apenas resumo das conexões do próprio UID |
+| POST /oauth/drive/start | Bearer Firebase + Origin exata, retorna authorizationUrl e cookie HttpOnly; credentials:include necessário |
+| GET /oauth/drive/callback | State/cookie/TTL/PKCE/nonce; 303 para biblioteca com resultado categórico |
+| GET /integrations/drive/:connectionId/metadata?fileId=... | Só metadado de arquivo autorizado, sem bytes/mídia; refresh no servidor |
+| POST /integrations/drive/:connectionId/disconnect | Origem exata e proprietário; revogação Google explícita, sem apagar arquivos |
+
+Rotas OAuth/metadados/desconexão bloqueadas enquanto OAUTH_ENABLED=false. Callback não retorna tokens; respostas privadas no-store, no-referrer e sem conteúdo executável. Não registrar exceções, requests, URLs, cookies ou respostas OAuth. Invocation logs desabilitados para impedir retenção de code/state no callback; logs categóricos com requestId, amostragem 10%, sem traces nem exportação para terceiros.
+
+### Franquias e pendências de operação
+
+Console Cloudflare confirmou Free: 100.000 requests/dia, D1 10 bancos/5 GB de conta, 5 milhões de linhas lidas/dia e 100 mil escritas/dia; banco Free até 500 MB. Limites duros podem interromper API, sem upgrade automático. CPU limitada pelo próprio plano Free (10 ms); a API Cloudflare recusou configurar cpu_ms explicitamente no Free, portanto esse campo foi removido sem upgrade; medir JWT/WebCrypto no Free com tráfego real. Rate limiter 60/minuto por chave de agregado/UID por local Cloudflare; não garante orçamento global em ataques distribuídos. Ver [Workers limits](https://developers.cloudflare.com/workers/platform/limits/) e [D1 pricing](https://developers.cloudflare.com/d1/platform/pricing/). Nenhum plano pago, billing ou recurso PROD foi habilitado.
+
+Google Testing com drive.file normalmente emite refresh tokens que expiram em sete dias; não prometer validade permanente. In production elimina essa limitação específica, mas tokens continuam sujeitos a revogação, inatividade, limites e políticas de conta. Não publicar para contornar testes: revisar domínio, marca, homepage, privacidade/termos públicos, escopos mínimos, suporte, exclusão/retenção e verificação aplicável. drive.file é não confidencial na classificação Google; escopos restritos ampliam obrigações e podem exigir avaliação de segurança. Ver [expiração OAuth](https://developers.google.com/identity/protocols/oauth2#expiration) e [escopos Drive](https://developers.google.com/workspace/drive/api/guides/api-specific-auth).
+
+Picker requer futuramente chave de API **pública restrita a HTTP referrer DEV e somente Picker API**, appId do projeto e token curto adequado. A API está habilitada, mas a UI Picker e essa chave não foram criadas nesta fundação. Seleção de pasta não concede acesso recursivo aos arquivos existentes. Originais permanecem no Drive; biblioteca/associação de múltiplas pastas serão outra etapa.
+
+**QA obrigatório antes de habilitar a integração:** login real A/B, consentimento/revogação/renovação reais, arquivo autorizado pelo Picker, concorrência e cookies entre sites. Mocks de Google e JWTs sintéticos não contam como essas evidências. API REST não valida revogação Firebase imediatamente; documentar janela de expiração antes de piloto. Sem chave em VITE_*, sem refresh token devolvido ao cliente.

@@ -40,7 +40,7 @@
 | API antiga e D1/R2 | **REMOVIDO do código ativo** | PR #4; frontend Next/Vinext preservado; backend futuro será novo |
 | Firebase Hosting | **VALIDADO na auditoria prévia** | DEV Spark atualizado após CI master 38981508561 e deploy 38981719389 |
 | Firebase Auth e Firestore | **IMPLEMENTADO na PR #6; QA em andamento** | Console DEV configurado, regras e persistência por UID; evidências abaixo |
-| Worker API separado e D1 de tokens | **PLANEJADO** | Não existe Worker OAuth/refresh do MVP |
+| Worker API separado e D1 de tokens | **PARCIAL — PR #15** | Fundação e recursos DEV; PoC real e biblioteca pendentes |
 | Drive individual por usuário | **PLANEJADO** | Integração BRBET inspecionada externamente; não transferida |
 | Revisão segura por cliente | **PLANEJADO** | Fluxo legado incompatível com arquitetura-alvo |
 | Planos/entitlements | **PLANEJADO** | Não há verificação server-side de assinatura |
@@ -230,7 +230,7 @@
 4. Se mudar tecnologia/fluxo, sincronizar `ARCHITECTURE.md`, `DEVELOPMENT.md` e `README.md`.
 5. Nunca transformar projeções de uso/custo ou ideias discutidas em garantias ou funcionalidades entregues.
 
-**Próxima entrega:** concluir QA Google real do DEV publicado na PR #6. Depois, PoC Drive da Fase 0, sem antecipar Worker/D1 nesta entrega.
+**Próxima entrega:** concluir QA Google real Firebase e PoC Drive da Fase 0; fundação Worker/D1 DEV preparada separadamente na PR #15.
 
 ### PR #7 — Ajuste da revisão e evidência DEV
 
@@ -288,3 +288,21 @@
 **Decisão de segurança:** não persistir dados em disco sem consentimento explícito do usuário; o SDK do Firebase não oferece limpeza criptográfica segura de cache do navegador. Dados privados em dispositivo compartilhado exigem cache desativado. Nenhum recurso novo foi provisionado e a demonstração permanece local.
 
 - [x] **PR #14 — recuperação de leituras (aguarda CI/deploy):** erros de consulta transitórios são retomados automaticamente; falhas por índices ainda não disponíveis têm fallback completo e verificado; a tela de recarregamento manual deixa de ser usada para leituras. Gravações incertas preservam o aviso explícito, sem repetição cega.
+
+## Fundação Google Drive + Cloudflare DEV — PR #15 (17/10/2026)
+
+**Estado geral: PARCIAL.** Infraestrutura e contratos mínimos não representam a biblioteca concluída.
+
+- [x] **VALIDADO:** auditoria da master b4e86d7, AGENTS/README/arquitetura/roadmap/desenvolvimento, workflows e regras; nenhum Worker/D1 existente na conta.
+- [x] **IMPLEMENTADO:** pacote API isolado; identidade Firebase RS256/JWKS, CORS de origem exata, erros sem conteúdo privado, AES-GCM com versão/AAD, migração e repositório por UID.
+- [x] **IMPLEMENTADO:** start/callback com state de uso único, PKCE, nonce OIDC e cookie; renovação, invalid_grant, revogação e consulta mínima de metadados. OAuth desabilitado por padrão.
+- [x] **VALIDADO em infraestrutura remota:** criação do Worker roteiva-api-dev, endereço workers.dev e D1 roteiva-drive-dev com binding DB. Publicação inicial do scaffold não prova os endpoints da API.
+- [x] **VALIDADO no Console:** projeto Google roteiva-drive-dev, Drive API e Picker API ativados; identidade Roteiva Drive DEV e cliente web com callback real; tela externa Testing. Aceites Picker/política de dados e criação das credenciais autorizados pelo proprietário nesta conversa.
+- [x] **VALIDADO:** Client Secret e chave AES armazenados como Worker Secrets; token Cloudflare salvo no environment GitHub cloudflare-development, sem expor valores em código/chat.
+- [x] **VALIDADO no CI 39055131858:** auditoria sem vulnerabilidades conhecidas após atualização das ferramentas, seis testes iniciais, typecheck, migração D1 local e build dry-run. Isso **não** prova OAuth real ou banco remoto.
+- [ ] Concluir CI do HEAD, publicação da API, migração remota e smoke tests HTTPS; registrar evidências antes da entrega.
+- [ ] **PLANEJADO:** PoC com consentimento Google real, renovação real, metadado de arquivo selecionado e duas contas reais; UI/biblioteca/uploads continuam fora deste PR.
+- [ ] **PLANEJADO:** domínio próprio ou fluxo de lançamento compatível com bloqueio de cookies entre sites; QA Safari/mobile, recuperação/rotação de chaves e retenção/reconciliação.
+- [ ] **PLANEJADO:** políticas públicas, domínio verificado, escopos/branding finais e análise de publicação OAuth. Não publicar app nem ampliar escopos automaticamente.
+
+**Testes simulados:** Google token endpoint usa mocks; identidade Firebase usa JWTs RS256 assinados em teste e JWKS local; AES-GCM usa criptografia real com dados sintéticos; schema usa SQLite real e Wrangler/D1 local. Nenhum teste simulado comprova consentimento Google, renovação real, Picker, arquivos reais ou isolamento de duas contas reais. A suíte verifica assinatura/issuer/audience/expiry, AAD, ciphertext adulterado, consulta por owner, replay SQL, CORS e invalid_grant.

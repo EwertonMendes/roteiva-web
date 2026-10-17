@@ -14,6 +14,8 @@ on:
         description: Exact reviewed commit to publish
         type: string
         required: false
+env:
+  WRANGLER_SEND_METRICS: 'false'
 permissions:
   contents: read
 concurrency:

@@ -34,9 +34,6 @@
           "invocation_logs": false
         }
       },
-      "limits": {
-        "cpu_ms": 10
-      },
       "ratelimits": [
         {
           "name": "API_RATE_LIMIT",
