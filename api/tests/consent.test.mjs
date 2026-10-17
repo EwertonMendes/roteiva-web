@@ -4,7 +4,7 @@ import {persistDriveConsent} from '../src/consent.ts';
 import {base64url, decrypt, context} from '../src/crypto.ts';
 import {DRIVE_SCOPE} from '../src/google.ts';
 
-function makeEnv(existing = null) {
+function makeEnv(existing = null, tokenKeys = null) {
   const writes=[];
   const DB={prepare(sql) {
     if(sql.startsWith('SELECT encrypted_refresh_token')) return {
@@ -17,7 +17,7 @@ function makeEnv(existing = null) {
   }};
   const env={
     DB, ENVIRONMENT:'dev', TOKEN_KEY_VERSION:'v1',
-    TOKEN_KEYS:JSON.stringify({v1:base64url(crypto.getRandomValues(new Uint8Array(32)))}),
+    TOKEN_KEYS:tokenKeys || JSON.stringify({v1:base64url(crypto.getRandomValues(new Uint8Array(32)))}),
   };
   return {env,writes};
 }
@@ -82,9 +82,10 @@ test('re-authorization without new refresh token preserves existing encrypted cr
   const {env:source}=makeEnv();
   const {encrypt}=await import('../src/crypto.ts');
   const previous=await encrypt(source,'original-refresh',context(source,'user-A','google-A'));
-  const {env,writes}=makeEnv({status:'connected',encrypted_refresh_token:previous});
+  const {env,writes}=makeEnv({status:'connected',encrypted_refresh_token:previous},source.TOKEN_KEYS);
   await persistDriveConsent(env,'user-A',grant({refresh_token:undefined,scope:DRIVE_SCOPE}),identity,driveOK());
   assert.equal(writes[0][4],previous);
+  assert.equal(await decrypt(env,writes[0][4],context(env,'user-A','google-A')),'original-refresh');
   assert.equal(writes[0][1],'user-A');
   assert.equal(writes[0][2],'google-A');
   await assert.rejects(
