@@ -361,3 +361,43 @@ test("client and project cursors reject pages mixed across remote revisions",asy
   await second.applyCommands([{kind:"saveClient",client:{...other.clients.find(c=>c.id===1),contact:"Mudou remotamente"}}]);
   await assert.rejects(()=>first.clientPage({size:1}),/Conflito/);
 });
+
+
+test("finance annual windows avoid reading older history and preserve cross-year records",async()=>{
+  const db=dbFor("alice");
+  for(const [id,date] of [[101,"2024-06-17"],[102,"2025-10-17"],[103,"2026-02-02"],[104,"2026-10-17"]]){
+    await assertSucceeds(setDoc(doc(db,"users/alice/financeEntries/"+id),
+      {...fixtures.financeEntries,id,date,amountCents:id*100,...meta("alice")}));
+  }
+  const repo=new FirestoreWorkspace(db,"alice");
+  const thisYear=await repo.financeYear(2026);
+  assert.deepEqual(thisYear.financeEntries.map(x=>x.id).sort(),[103,104]);
+  assert.equal(repo.hasLoaded(["financeEntries"]),false);
+  const afterFirst=repo.diagnostics();
+  assert.equal(afterFirst.serverDocumentsReturned,2);
+  const cached=await repo.financeYear(2026);
+  assert.equal(cached.financeEntries.length,2);
+  assert.equal(repo.diagnostics().serverDocumentsReturned,2);
+  const previous=await repo.financeYear(2025);
+  assert.deepEqual(previous.financeEntries.map(x=>x.id).sort(),[102,103,104]);
+  assert.equal(repo.diagnostics().serverDocumentsReturned,3);
+  const full=await repo.load(["financeEntries"]);
+  assert.equal(full.financeEntries.length,4);
+});
+
+test("calendar windows include adjacent grid months, exclude distant history",async()=>{
+  const db=dbFor("alice");
+  for(const [id,date] of [[201,"2026-08-31"],[202,"2026-09-15"],[203,"2026-10-01"],[204,"2026-11-30"],[205,"2026-12-01"]]){
+    await assertSucceeds(setDoc(doc(db,"users/alice/events/"+id),
+      {...fixtures.events,id,date,...meta("alice")}));
+  }
+  const repo=new FirestoreWorkspace(db,"alice");
+  const first=await repo.calendarWindow(2026,9);
+  assert.deepEqual(first.calendarEvents.map(e=>e.id).sort(),[202,203,204]);
+  assert.equal(repo.hasLoaded(["events"]),false);
+  const again=await repo.calendarWindow(2026,9);
+  assert.equal(again.calendarEvents.length,3);
+  const shifted=await repo.calendarWindow(2026,10);
+  assert.deepEqual(shifted.calendarEvents.map(e=>e.id).sort(),[202,203,204,205]);
+  await assert.rejects(()=>repo.calendarWindow(2026,12),/inválido/);
+});
