@@ -37,23 +37,26 @@ export function WorkspaceTools({workspace, status, onNotify,loadWorkspace}: {wor
   }
   return <div className="workspace-tools"><span role="status">{status}</span><button className="secondary-button" title="Exporta os cadastros e lançamentos carregados; arquivos de mídia não estão incluídos." onClick={()=>void download()} disabled={downloading}><Download size={15}/> {downloading?"Preparando cópia…":"Exportar cópia"}</button></div>;
 }
-export function TodayStudio({projects, clients, entries, events, activities, onView, overviewMetrics}: {projects: Project[]; clients:Client[]; entries: FinanceEntry[]; events: CalendarEvent[]; activities: {text: string; when: string}[]; onView: (v: View) => void; overviewMetrics?:{clientCount:number;receivableAmount:number}}) {
-  const active = projects.filter(p=>p.status!=="Aprovado").length;
-  const approved = projects.filter(p=>p.status==="Aprovado").length;
-  const pending = projects.filter(p=>p.status==="Em aprovação"||p.status==="Ajustes").length;
+export function TodayStudio({projects, clients, entries, events, activities, onView, overviewMetrics}: {projects: Project[]; clients:Client[]; entries: FinanceEntry[]; events: CalendarEvent[]; activities: {text: string; when: string}[]; onView: (v: View) => void; overviewMetrics?:{clientCount:number;receivableAmount:number;projectCount:number;projectStatuses:Record<Status,number>}}) {
+  const active = overviewMetrics ? overviewMetrics.projectCount-overviewMetrics.projectStatuses.Aprovado :
+    projects.filter(p=>p.status!=="Aprovado").length;
+  const approved = overviewMetrics?.projectStatuses.Aprovado ?? projects.filter(p=>p.status==="Aprovado").length;
+  const pending = overviewMetrics ? overviewMetrics.projectStatuses["Em aprovação"]+overviewMetrics.projectStatuses.Ajustes :
+    projects.filter(p=>p.status==="Em aprovação"||p.status==="Ajustes").length;
+  const projectCount=overviewMetrics?.projectCount ?? projects.length;
   const receivable = entries.filter(e=>e.kind!=="expense"&&e.status==="A receber");
-  const phases = [{label:"Produção",status:"Em produção",color:"var(--chart-primary)"},{label:"Aprovação",status:"Em aprovação",color:"#929292"},{label:"Ajustes",status:"Ajustes",color:"#b6b6b6"},{label:"Concluídos",status:"Aprovado",color:"#d4d4d4"}].map(p=>({...p,count:projects.filter(item=>item.status===p.status).length}));
+  const phases = [{label:"Produção",status:"Em produção",color:"var(--chart-primary)"},{label:"Aprovação",status:"Em aprovação",color:"#929292"},{label:"Ajustes",status:"Ajustes",color:"#b6b6b6"},{label:"Concluídos",status:"Aprovado",color:"#d4d4d4"}].map(p=>({...p,count:overviewMetrics?.projectStatuses[p.status as Status] ?? projects.filter(item=>item.status===p.status).length}));
   const clock=new Date().toTimeString().slice(0,5);
   const next = [...events].filter(e=>e.date>today() || (e.date===today() && (e.endTime || e.time)>=clock)).sort((a,b)=>`${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`))[0];
   return <section className="panel flow-overview" aria-label="Panorama geral do estúdio">
-    <header className="flow-overview-head"><div><span className="eyebrow">PANORAMA GERAL</span><h2>O ritmo do seu estúdio</h2></div><span className="flow-total">{projects.length} {projects.length===1?"projeto":"projetos"} no total</span></header>
+    <header className="flow-overview-head"><div><span className="eyebrow">PANORAMA GERAL</span><h2>O ritmo do seu estúdio</h2></div><span className="flow-total">{projectCount} {projectCount===1?"projeto":"projetos"} no total</span></header>
     <div className="flow-numbers">
       <button onClick={()=>onView("projects")}><span>Projetos ativos</span><strong>{active}</strong><small>Em produção e revisão</small></button>
       <button onClick={()=>onView("reviews")}><span>Em revisão</span><strong>{pending}</strong><small>Aprovações e ajustes</small></button>
       <button onClick={()=>onView("clients")}><span>Clientes</span><strong>{overviewMetrics?.clientCount ?? clients.length}</strong><small>Na sua carteira</small></button>
       <button onClick={()=>onView("finance")}><span>A receber</span><strong className="flow-money">{money(overviewMetrics?.receivableAmount ?? sum(receivable))}</strong><small>Todos os lançamentos pendentes</small></button>
     </div>
-    <div className="flow-progress"><div className="flow-progress-title"><span>Fluxo de produção</span><b>{projects.length ? `${approved} de ${projects.length} concluídos` : "Nenhum projeto ainda"}</b></div><div className={`flow-track ${projects.length?"":"is-empty"}`} role="img" aria-label={phases.map(p=>`${p.label}: ${p.count}`).join(", ")}>{phases.filter(p=>p.count>0).map(p=><i key={p.status} style={{width:`${p.count/Math.max(1,projects.length)*100}%`,background:p.color}}/>)}</div><div className="flow-legend">{phases.map(p=><span key={p.status}><i style={{background:p.color}}/>{p.label}<b>{p.count}</b></span>)}</div></div>
+    <div className="flow-progress"><div className="flow-progress-title"><span>Fluxo de produção</span><b>{projectCount ? `${approved} de ${projectCount} concluídos` : "Nenhum projeto ainda"}</b></div><div className={`flow-track ${projectCount?"":"is-empty"}`} role="img" aria-label={phases.map(p=>`${p.label}: ${p.count}`).join(", ")}>{phases.filter(p=>p.count>0).map(p=><i key={p.status} style={{width:`${p.count/Math.max(1,projectCount)*100}%`,background:p.color}}/>)}</div><div className="flow-legend">{phases.map(p=><span key={p.status}><i style={{background:p.color}}/>{p.label}<b>{p.count}</b></span>)}</div></div>
     <footer className="flow-next"><CalendarDays size={17}/><div><span>Próximo compromisso</span><p>{next ? <><b>{next.title}</b> · {next.date.split("-").reverse().join("/")} · {eventRange(next)}</> : "Sua agenda está livre. Adicione a próxima produção."}</p></div><button className="secondary-button" onClick={()=>onView("calendar")}>Ver agenda</button></footer>
     <details className="studio-activity"><summary>Atividade recente <span>{activities.length}</span></summary>{activities.length ? activities.slice(0,5).map((a,i)=><p key={i}><time>{new Date(a.when).toLocaleString("pt-BR")}</time>{a.text}</p>):<Empty>As próximas movimentações aparecerão aqui.</Empty>}</details>
   </section>;

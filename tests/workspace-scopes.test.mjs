@@ -11,11 +11,13 @@ test("each route loads all domains required by its current UI and mutations",()=
   const clientDetail=domainsForRoute({view:"clients",clientId:11});
   assert.deepEqual(settings,[]);
   assert.ok(!overview.includes("financeEntries"));
-  assert.ok(overview.includes("tasks"));
+  assert.ok(!overview.includes("tasks"));
   assert.ok(!overview.includes("clients"));
+  assert.ok(!overview.includes("projects"));
   assert.ok(!overview.includes("deliveries"));
-  assert.ok(list.includes("clients"));
-  assert.ok(list.includes("financeEntries"));
+  assert.ok(!list.includes("clients"));
+  assert.ok(!list.includes("financeEntries"));
+  assert.ok(detail.includes("financeEntries"));
   assert.ok(detail.includes("financeEntries")&&detail.includes("events"));
   assert.ok(clients.includes("financeEntries"));
   assert.ok(clientDetail.includes("deliveries"));

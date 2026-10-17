@@ -254,7 +254,10 @@ test("overview aggregates client count and receivables without fetching finance 
     {...fixtures.financeEntries,...meta("alice")}));
   const repository=new FirestoreWorkspace(db,"alice");
   const metrics=await repository.overviewMetrics();
-  assert.deepEqual(metrics,{clientCount:1,receivableAmount:100.01});
+  assert.equal(metrics.clientCount,1);
+  assert.equal(metrics.receivableAmount,100.01);
+  assert.equal(metrics.projectCount,1);
+  assert.equal(metrics.projectStatuses["Em produção"],1);
   const expense={...fixtures.financeEntries,id:11,kind:"expense",amountCents:1500};
   await assertSucceeds(setDoc(doc(db,"users/alice/financeEntries/11"),
     {...expense,...meta("alice")}));

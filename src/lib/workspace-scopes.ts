@@ -11,12 +11,14 @@ export function domainsForRoute(route:WorkspaceRoute):readonly Domain[] {
     case "library":
       return ["projects"];
     case "overview":
-      return ["projects","tasks","events","activities"];
+      return ["events","activities"];
     // Lists and details intentionally use the same closure of business domains.
     // This prevents a newly created record from being replaced by an older
     // server snapshot during immediate navigation to its detail route.
     case "projects":
-      return ["clients","projects","tasks","events","financeEntries","activities"];
+      return route.projectId
+        ? ["clients","projects","tasks","events","financeEntries","activities"]
+        : ["activities"];
     case "clients":
       return ["clients","projects","financeEntries","deliveries","activities"];
     case "finance":

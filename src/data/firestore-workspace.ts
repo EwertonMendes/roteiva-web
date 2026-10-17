@@ -1,6 +1,6 @@
 import { collection, doc, documentId, getAggregateFromServer, sum, where, getDocFromServer, getDocsFromCache, getDocsFromServer, getCountFromServer, limit, orderBy, query, runTransaction, serverTimestamp, startAfter, type DocumentData, type Firestore, type QueryDocumentSnapshot } from "firebase/firestore";
 import { collections, decodeWorkspace, encodeWorkspace, equalData, type Data, type Records } from "./workspace-codec.ts";
-import type { WorkspaceData } from "../domain/workspace";
+import type { WorkspaceData, Status } from "../domain/workspace";
 import { advanceSync, bootstrapSync, emptyNumbers, parseSync, persistentCacheSelected, readManifest, readSync, recordCounts, saveManifest, syncRef, type Domain, type SyncStamp } from "./firestore-sync.ts";
 import { FirestoreQueryGate } from "./firestore-query-gate.ts";
 import { encodeCommand,type WorkspaceCommand } from "./firestore-commands.ts";
@@ -277,16 +277,22 @@ export class FirestoreWorkspace {
    * to render the overview. The composite index is declared with the rules.
    * A failed aggregation aborts the overview instead of reporting fake zeros.
    */
-  async overviewMetrics(): Promise<{clientCount:number;receivableAmount:number}> {
-    const [clients,receivable]=await Promise.all([
+  async overviewMetrics(): Promise<{clientCount:number;receivableAmount:number;projectCount:number;projectStatuses:Record<Status,number>}> {
+    const statuses:Status[]=["Em produção","Em aprovação","Ajustes","Aprovado"];
+    const [clients,receivable,...statusCounts]=await Promise.all([
       getCountFromServer(collection(this.db,"users",this.uid,"clients")),
       getAggregateFromServer(query(collection(this.db,"users",this.uid,"financeEntries"),
         where("kind","==","income"),where("status","==","A receber")),
         {amountCents:sum("amountCents")}),
+      ...statuses.map(status=>getCountFromServer(query(
+        collection(this.db,"users",this.uid,"projects"),where("status","==",status)))),
     ]);
-    trackAggregation(this.uid);trackAggregation(this.uid);
+    for(let i=0;i<2+statuses.length;i++)trackAggregation(this.uid);
+    const projectStatuses=Object.fromEntries(statuses.map((name,i)=>[name,statusCounts[i].data().count])) as Record<Status,number>;
     return {clientCount:clients.data().count,
-      receivableAmount:(receivable.data().amountCents ?? 0)/100};
+      receivableAmount:(receivable.data().amountCents ?? 0)/100,
+      projectCount:Object.values(projectStatuses).reduce((sum,value)=>sum+value,0),
+      projectStatuses};
   }
   diagnostics() { return usageSnapshot(this.uid); }
   async saveTheme(theme:"light"|"dark") {
