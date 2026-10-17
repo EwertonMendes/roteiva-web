@@ -21,7 +21,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: npm install --ignore-scripts
+      - name: Resolve current official packages for initial lock bootstrap
+        run: |
+          npm install --ignore-scripts --save-exact jose@latest
+          npm install --ignore-scripts --save-dev --save-exact wrangler@latest @cloudflare/workers-types@latest typescript@5.9.3
+          node --input-type=module -e "import fs from 'node:fs'; console.log('PACKAGE_JSON_START'+fs.readFileSync('package.json','utf8')+'PACKAGE_JSON_END'); console.log('LOCK_JSON_START'+JSON.stringify(JSON.parse(fs.readFileSync('package-lock.json','utf8')))+'LOCK_JSON_END')"
+      - run: npm audit --audit-level=high
       - run: npm run typecheck
       - run: npm test
       - run: npm run migrate:local
