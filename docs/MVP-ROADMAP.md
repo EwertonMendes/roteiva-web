@@ -330,3 +330,14 @@ Se houver falha em teste de segurança/cookie, desabilitar imediatamente OAuth v
 - [x] **IMPLEMENTADO — aguarda CI:** validação separada de identidade, permissão Drive e refresh offline; `scope` omitido usa prova real `Drive about.get` em vez de presumir falha. Se o refresh não vier em novo vínculo, não salvar conexão sem renovação; vínculo existente somente reutiliza credencial cifrada da mesma conta.
 - [x] **IMPLEMENTADO — aguarda CI:** retorno do callback à Biblioteca com códigos estáticos de recuperação, sem página JSON/segredos.
 - [ ] **VALIDAÇÃO REAL PENDENTE:** repetir consentimento com a conta testadora no Chrome, confirmar `?drive=connected`, testar `Drive about.get` e reconectar após nova sessão. Tests mocks/CI e health não demonstram isso.
+
+## Biblioteca Drive com pastas por projeto — implementação em DEV (17/10/2026)
+
+- [x] **IMPLEMENTADO (aguarda CI):** uma única autorização inicial para `drive.file` e `drive.readonly`, mantendo refresh tokens no Worker/D1; contas legadas estreitas precisam apenas de consentimento de atualização via botão Vincular pastas.
+- [x] **IMPLEMENTADO (aguarda CI):** pós-OAuth restaura projeto selecionado e abre automaticamente navegador de pastas; múltiplos vínculos por projeto e paginação.
+- [x] **IMPLEMENTADO (aguarda CI):** navegação de pastas e subpastas, leitura de metadados de mídia pelo Worker, preview Google com fallback e Firestore Rules restringindo vínculos ao UID/projetos próprios.
+- [ ] **QA real pendente:** consentimento Google ampliado, duas contas e 403/404, arquivos reais, Safari/mobile e limitação das prévias embutidas.
+- [ ] **PLANEJADO:** upload direto Drive, comentários/labels/versões, compartilhamento seguro ao cliente e fluxo de revisão assíncrona.
+- [ ] **REQUISITO para público:** escopo restrito `drive.readonly` exige cumprir política e revisão de segurança Google antes de habilitar para usuários externos.
+
+Não confundir biblioteca navegável MVP com aprovação/produção audiovisual completa.
