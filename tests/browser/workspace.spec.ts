@@ -1,4 +1,5 @@
 import {test,expect,type Page} from "@playwright/test";
+import {readFile} from "node:fs/promises";
 const cloud="http://127.0.0.1:4173";
 async function googlePopup(page:Page,email:string,existing=false) {
   const popupPromise=page.waitForEvent("popup");
@@ -311,4 +312,23 @@ test("persistent cache is opt-in, survives refresh, and is cleared on logout",as
   await page.getByRole("button",{name:"Desativar cache"}).click();
   await expect(page.getByRole("button",{name:"Ativar cache"})).toBeVisible();
   await expect.poll(()=>page.evaluate(()=>localStorage.getItem("roteiva-private-cache"))).toBe("disabled");
+});
+
+test("settings deep link defers business loading but exports complete records on demand",async({page},info)=>{
+  await page.goto(cloud);
+  await login(page,"settings-lazy-"+info.project.name+"@example.com");
+  await navigate(page,"Clientes");
+  await page.getByRole("button",{name:"Novo cliente",exact:true}).click();
+  await page.getByLabel("Nome do cliente",{exact:true}).fill("Registro preservado na exportação");
+  await page.getByLabel("Contato principal",{exact:true}).fill("Teste de carga");
+  await page.getByRole("button",{name:"Salvar cliente"}).click();await settled(page);
+  await page.goto(cloud+"/configuracoes");
+  await expect(page.getByRole("heading",{name:"Perfil profissional"})).toBeVisible();
+  const promise=page.waitForEvent("download");
+  await page.getByRole("button",{name:"Exportar cópia"}).last().click();
+  const download=await promise;
+  const contents=await readFile(await download.path(),"utf8");
+  expect(contents).toContain("Registro preservado na exportação");
+  await navigate(page,"Clientes");
+  await expect(page.getByText("Registro preservado na exportação",{exact:true}).first()).toBeVisible();
 });

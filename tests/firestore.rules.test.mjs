@@ -205,3 +205,24 @@ test("sync stamps are private, versioned and cannot be deleted", async () => {
   await assertSucceeds(updateDoc(ref,{domains:{...domains,clients:1},revision:2,updatedAt:serverTimestamp()}));
   await assertFails(deleteDoc(ref));
 });
+
+test("domain-scoped writes preserve untouched collections and their revisions",async()=>{
+  const db=dbFor("charlie"), repository=new FirestoreWorkspace(db,"charlie");
+  await repository.registerProfile({...profile,studioName:"Studio scoped",professionalType:"freelancer",acknowledgedDataUse:true});
+  const workspace=emptyWorkspace();
+  workspace.clients=[{...client,id:101,name:"Cliente preservado",monthlyFee:0,projects:0,active:0,deliveries:[]}];
+  workspace.financeEntries=[{...fixtures.financeEntries,id:102,projectId:0,clientId:101,amount:25,date:"16/10/2026"}];
+  await repository.save(workspace);
+  await repository.load();
+  const state=emptyWorkspace();
+  state.financeEntries=[{...workspace.financeEntries[0],amount:30}];
+  assert.equal(await repository.save(state,["financeEntries"]),true);
+  assert.equal((await getDoc(doc(db,"users/charlie/clients/101"))).data().name,"Cliente preservado");
+  assert.equal((await getDoc(doc(db,"users/charlie/financeEntries/102"))).data().amountCents,3000);
+  const stamp=(await getDoc(doc(db,"users/charlie/sync/state"))).data();
+  assert.equal(stamp.counts.clients,1);
+  assert.equal(stamp.counts.financeEntries,1);
+  assert.equal(stamp.domains.clients,1);
+  assert.equal(stamp.domains.financeEntries,2);
+  assert.equal(await repository.save(state,["financeEntries"]),false);
+});
