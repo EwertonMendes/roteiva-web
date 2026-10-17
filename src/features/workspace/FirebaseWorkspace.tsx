@@ -7,6 +7,7 @@ import { routeFromLocation, type WorkspaceRoute } from "../../lib/workspace-rout
 import { domainsForRoute } from "../../lib/workspace-scopes";
 import type { Domain } from "../../data/firestore-sync";
 import { collections } from "../../data/workspace-codec";
+import type { WorkspaceCommand } from "../../data/firestore-commands";
 import { useAuth } from "../auth/AuthProvider";
 import { useRegistrationProfile } from "../auth/RegistrationGate";
 
@@ -116,6 +117,8 @@ export function FirebaseWorkspace() {
   },[]);
   const save=useCallback((workspace:WorkspaceData,dirtyDomains:readonly Domain[])=>enqueue(()=>repository.save(workspace,dirtyDomains)),[repository,enqueue]);
   const saveTheme=useCallback((theme:"light"|"dark")=>enqueue(()=>repository.saveTheme(theme)),[repository,enqueue]);
+  const executeCommands=useCallback((commands:readonly WorkspaceCommand[])=>
+    enqueue(()=>repository.applyCommands(commands)),[repository,enqueue]);
   if (!user) return null;
   return <>
     {saving && <div className="cloud-operation" role="status">Salvando na nuvem…</div>}
@@ -136,7 +139,7 @@ export function FirebaseWorkspace() {
     {loadingBusiness && !error && <main className="studio-loading" role="status">Carregando os dados do seu espaço…</main>}
     {initial && !loadingBusiness && (overviewMetrics || routeFromLocation(window.location,{base:import.meta.env.BASE_URL,useHash:false}).view!=="overview") && <div inert={!!error || remoteChanges} aria-busy={saving}>
       <DashboardClient key={user.uid+"-"+version} firstName={profileContext?.profile.displayName || user.displayName || "Profissional"} profile={profileContext?.profile || null} onSaveProfile={profileContext?.saveProfile} email={user.email || ""} photoURL={user.photoURL || undefined}
-        initialWorkspace={initial.workspace} initialTheme={initial.theme} onWorkspaceChange={businessLoaded ? save : undefined} onLoadWorkspace={repository.hasLoaded(collections) ? undefined : ensureFullWorkspace} onRouteChange={onRouteChange} onThemeChange={saveTheme}
+        initialWorkspace={initial.workspace} initialTheme={initial.theme} onWorkspaceChange={businessLoaded ? save : undefined} onCommands={businessLoaded ? executeCommands : undefined} onLoadWorkspace={repository.hasLoaded(collections) ? undefined : ensureFullWorkspace} onRouteChange={onRouteChange} onThemeChange={saveTheme}
         overviewMetrics={{
           clientCount:repository.hasLoaded(["clients"]) ? initial.workspace.clients.length : (overviewMetrics?.clientCount ?? initial.workspace.clients.length),
           receivableAmount:repository.hasLoaded(["financeEntries"]) ? initial.workspace.financeEntries

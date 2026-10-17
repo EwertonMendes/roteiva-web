@@ -12,6 +12,15 @@ export type WorkspaceCommand =
   | {kind:"deleteEvent";id:number};
 
 export type DocumentChange={key:string;collection:CollectionName;data?:Data};
+export function commandDomain(command:WorkspaceCommand):CollectionName{
+  switch(command.kind){
+    case "saveClient": return "clients";
+    case "saveProject": return "projects";
+    case "saveFinance":case "deleteFinance": return "financeEntries";
+    case "saveEvent":case "deleteEvent": return "events";
+    case "appendActivity": return "activities";
+  }
+}
 
 const noRecords:WorkspaceData={
   projects:[],clients:[],financeEntries:[],calendarEvents:[],activities:[],

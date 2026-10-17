@@ -19,6 +19,7 @@ import { hrefForWorkspaceRoute, routeFromLocation, type WorkspaceRoute } from ".
 import { SettingsPage } from "./features/settings/SettingsPage";
 import type { RoteivaProfile, ProfileChanges } from "./data/firestore-workspace";
 import type { Domain } from "./data/firestore-sync";
+import {commandDomain,type WorkspaceCommand} from "./data/firestore-commands";
 import { newId, type WorkspaceData, type Activity, type View, type Project, type Client, type ClientType, type AssetKind, type FinanceEntry, type CalendarEvent, type LibraryAsset, type Status } from "./domain/workspace";
 export type { View, Project, Client, FinanceEntry, CalendarEvent, LibraryAsset, Status } from "./domain/workspace";
 
@@ -56,9 +57,10 @@ type DashboardProps = {
   initialWorkspace?: WorkspaceData; initialTheme?: "light"|"dark";
   onWorkspaceChange?: (workspace:WorkspaceData, dirtyDomains:readonly Domain[])=>void; onThemeChange?:(theme:"light"|"dark")=>void;
   onLoadWorkspace?:()=>Promise<WorkspaceData>; onRouteChange?:(route:WorkspaceRoute)=>void;
+  onCommands?:(commands:readonly WorkspaceCommand[])=>void;
   overviewMetrics?:{clientCount:number;receivableAmount:number}; cloudStatus?:string; saving?:boolean; onLogout?:()=>void;
 };
-export default function DashboardClient({ firstName, email, photoURL, profile, onSaveProfile, initialWorkspace, initialTheme, onWorkspaceChange, onThemeChange, onLoadWorkspace, onRouteChange, overviewMetrics, cloudStatus, saving, onLogout }: DashboardProps) {
+export default function DashboardClient({ firstName, email, photoURL, profile, onSaveProfile, initialWorkspace, initialTheme, onWorkspaceChange, onThemeChange, onLoadWorkspace, onRouteChange, onCommands, overviewMetrics, cloudStatus, saving, onLogout }: DashboardProps) {
   const routeEnvironment={base:import.meta.env.BASE_URL,useHash:isDemo};
   const initialRoute=()=>routeFromLocation(window.location,routeEnvironment);
   const [initialBrowserRoute]=useState<WorkspaceRoute>(initialRoute);
@@ -99,6 +101,12 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
   const storageKey = "roteiva-pages-demo-workspace-v1";
   const [activities, setActivities] = useState<Activity[]>([]);
   const lastPersistedState=useRef({projects,clients:clientList,financeEntries,calendarEvents,activities});
+  const commandDomains=useRef(new Set<Domain>());
+  function commitCommands(commands:WorkspaceCommand[]){
+    if (!onCommands || isDemo) return;
+    for(const command of commands)commandDomains.current.add(commandDomain(command));
+    onCommands(commands);
+  }
   const workspace = { projects, clients: clientList, financeEntries, monthlyRevenue, calendarEvents, libraryAssets: libraryAssets.map((asset) => ({ ...asset, preview: undefined })), comments, reviewState, activities };
   function logActivity(text: string) { setActivities(current => [{id:crypto.randomUUID(),text, when: new Date().toISOString()}, ...current].slice(0, 150)); }
   const restoreWorkspace = useCallback((data: Partial<WorkspaceData>) => {
@@ -132,10 +140,12 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
         return updated.dueDate ? [...rest, {id:existing?.id || newId(), autoDeadline:true, projectId:updated.id, title:`Entrega — ${updated.name}`, date:updated.dueDate, time:existing?.time || "18:00", type:"Entrega", client:updated.client}] : rest;
       });
     }
+    commitCommands([{kind:"saveProject",project:updated}]);
     logActivity(`Projeto atualizado: ${updated.name}`); notifyChange("Projeto salvo");
   }
   function saveClientPackage(client: Client) {
     setClientList(current => current.map(c => c.id === client.id ? client : c));
+    commitCommands([{kind:"saveClient",client}]);
     logActivity(`Entregas atualizadas: ${client.name}`);
   }
   function addLinkedRevenue(project: Project) { openFinanceModal(); setSelectedProject(project.id); }
@@ -179,8 +189,10 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     if (previous.calendarEvents!==calendarEvents) dirtyDomains.push("events");
     if (previous.activities!==activities) dirtyDomains.push("activities");
     lastPersistedState.current={projects,clients:clientList,financeEntries,calendarEvents,activities};
+    const snapshotDomains=dirtyDomains.filter(name=>!commandDomains.current.has(name));
+    commandDomains.current.clear();
     if (!isDemo) {
-      if (dirtyDomains.length) onWorkspaceChange?.(payload,dirtyDomains);
+      if (snapshotDomains.length) onWorkspaceChange?.(payload,snapshotDomains);
       return;
     }
     try {
@@ -225,6 +237,9 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     const projectId = newId();
     setProjects((current) => [{ id: projectId, name, client, clientId, dueDate: dueValue, description, tasks, template, status: "Em produção", due, progress: 0, files: 0, color: "blue", initials: client.slice(0, 2).toUpperCase() }, ...current]);
     if (dueValue) setCalendarEvents((current) => [{ id: newId() + 1, projectId, autoDeadline:true, title: `Entrega — ${name}`, date: dueValue, time: "18:00", type: "Entrega", client }, ...current]);
+    commitCommands([{kind:"saveProject",project:{id:projectId,name,client,clientId,dueDate:dueValue,
+      description,tasks,template,status:"Em produção",due,progress:0,files:0,
+      color:"blue",initials:client.slice(0,2).toUpperCase()}}]);
     setModalOpen(false);
     openProject(projectId);
     logActivity(`Projeto criado: ${name}`);
@@ -249,6 +264,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
       setProjects(current => current.map(p => p.clientId === updated.id ? {...p, client: name} : p));
       setFinanceEntries(current => current.map(e => e.clientId === updated.id ? {...e, client: name} : e));
     }
+    commitCommands([{kind:"saveClient",client:updated}]);
     setClientModalOpen(false); setEditingClient(null);
     logActivity(`Cliente ${editingClient ? "atualizado" : "cadastrado"}: ${name}`);
     notifyChange("Cliente salvo com sucesso");
@@ -272,11 +288,13 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     const updatedEntry: FinanceEntry = { projectId, kind, id: editingFinanceEntry?.id || newId(), project, client, clientId, amount, date: entryDate.toLocaleDateString("pt-BR"), status };
     if (editingFinanceEntry) {
       setFinanceEntries((current) => current.map((entry) => entry.id === editingFinanceEntry.id ? updatedEntry : entry));
+      commitCommands([{kind:"saveFinance",entry:updatedEntry}]);
     } else {
       const count = Math.max(1, Math.min(24, Number(form.get("installments")) || 1));
       if (Math.round(amount * 100) < count) return notify("Valor insuficiente para dividir em parcelas");
       const parts: FinanceEntry[] = splitInstallments(amount, count, entryDate).map((part,i) => ({...updatedEntry, id: newId(), project: count > 1 ? `${project} · ${i+1}/${count}` : project, ...part, status: i === 0 ? status : "A receber"}));
       setFinanceEntries((current) => [...parts, ...current]);
+      commitCommands(parts.map(entry=>({kind:"saveFinance",entry})));
     }
     logActivity(`${kind === "expense" ? "Despesa" : "Receita"} ${editingFinanceEntry ? "atualizada" : "registrada"}: ${project}`);
     setFinanceModalOpen(false);
@@ -296,6 +314,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
 
   function deleteFinanceEntry() {
     if (!deletingFinanceEntry) return;
+    commitCommands([{kind:"deleteFinance",id:deletingFinanceEntry.id}]);
     setFinanceEntries((current) => current.filter((entry) => entry.id !== deletingFinanceEntry.id));
     logActivity(`Lançamento excluído: ${deletingFinanceEntry.project}`);
     setDeletingFinanceEntry(null);
@@ -314,6 +333,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     const client = String(form.get("client") || "Interno").trim();
     if (!date) return notify("Escolha a data do compromisso");
     const entry: CalendarEvent = { autoDeadline:editingEvent?.autoDeadline && type === "Entrega", id: editingEvent?.id || newId(), title, date, time, endTime, type, client, projectId: Number(form.get("projectId")) || undefined };
+    commitCommands([{kind:"saveEvent",event:entry}]);
     setCalendarEvents(current => (editingEvent ? current.map(e => e.id === entry.id ? entry : e) : [...current, entry]).sort((a,b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`)));
     if (entry.autoDeadline && entry.projectId) {
       setProjects(current => current.map(p => p.id === entry.projectId ? {...p,dueDate:date,due:new Date(`${date}T12:00:00`).toLocaleDateString("pt-BR",{day:"2-digit",month:"short"})} : p));
@@ -448,7 +468,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
           {view === "clients" && (selectedClient && clientList.some(c => c.id === selectedClient) ? <ClientDetail client={clientList.find(c => c.id === selectedClient)!} projects={projects} entries={financeEntries} onBack={() => changeView("clients")} onEdit={(client) => { setEditingClient(client); setClientModalOpen(true); }} onSave={saveClientPackage} onProject={openProject} /> : <ClientsView clients={clientList.filter(c => `${c.name} ${c.email} ${c.phone}`.toLowerCase().includes(query.toLowerCase())).map(c => ({...c, projects: projects.filter(p => p.clientId === c.id).length, active: projects.filter(p => p.clientId === c.id && p.status !== "Aprovado").length}))} onOpen={openClient} onAdd={() => { setEditingClient(null); setClientModalOpen(true); }} />)}
           {view === "reviews" && <StudioReviews />}
           {view === "finance" && <FinancePanel entries={financeEntries} clients={clientList} onAdd={() => openFinanceModal()} onEdit={(entry) => openFinanceModal(entry)} onDelete={setDeletingFinanceEntry} />}
-          {view === "calendar" && <CalendarView events={calendarEvents} onAdd={(date) => openEvent(null, date)} onEdit={(entry) => openEvent(entry)} onDelete={(entry) => { if (window.confirm(`Excluir o compromisso “${entry.title}”?`)) { setCalendarEvents(current => current.filter(e => e.id !== entry.id)); logActivity(`Compromisso excluído: ${entry.title}`); } }} />}
+          {view === "calendar" && <CalendarView events={calendarEvents} onAdd={(date) => openEvent(null, date)} onEdit={(entry) => openEvent(entry)} onDelete={(entry) => { if (window.confirm(`Excluir o compromisso “${entry.title}”?`)) { commitCommands([{kind:"deleteEvent",id:entry.id}]); setCalendarEvents(current => current.filter(e => e.id !== entry.id)); logActivity(`Compromisso excluído: ${entry.title}`); } }} />}
           {view === "library" && <LibraryView assets={libraryAssets} query={query} onUpload={(files) => uploadAssets(files, Number(libraryProject) || undefined)} />}
         </section>
       </main>
