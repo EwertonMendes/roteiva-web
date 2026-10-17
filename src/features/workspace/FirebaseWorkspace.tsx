@@ -26,6 +26,7 @@ export function FirebaseWorkspace() {
   const [financeBars,setFinanceBars]=useState<{key:string;bars:number[]}>();
   const [calendarPeriod,setCalendarPeriod]=useState<string>();
   const [error,setError]=useState("");
+  const [failedWrite,setFailedWrite]=useState(false);
   const [saving,setSaving]=useState(false);
   const [status,setStatus]=useState("Dados na nuvem");
   const [version,setVersion]=useState(0);
@@ -43,7 +44,7 @@ export function FirebaseWorkspace() {
     let retryTimer:ReturnType<typeof setTimeout>|undefined;
     failed.current=false;
     setRemoteChanges(false);setSyncWarning("");
-    setError(""); setInitial(undefined);setBusinessLoaded(false);setOverviewMetrics(undefined);setProjectPage(undefined);setClientPage(undefined);setFinancePeriod(undefined);setFinanceBars(undefined);setCalendarPeriod(undefined);
+    setError("");setFailedWrite(false); setInitial(undefined);setBusinessLoaded(false);setOverviewMetrics(undefined);setProjectPage(undefined);setClientPage(undefined);setFinancePeriod(undefined);setFinanceBars(undefined);setCalendarPeriod(undefined);
     (async()=>{
       await retryFirestoreRead(async()=>{
       const route=routeFromLocation(window.location,{base:import.meta.env.BASE_URL,useHash:false});
@@ -304,7 +305,7 @@ export function FirebaseWorkspace() {
       await operation();
       setStatus("Salvo na nuvem");
     }).catch(reason=>{
-      failed.current=true;setError(dataErrorMessage(reason));setStatus("Alterações não confirmadas");
+      failed.current=true;setFailedWrite(true);setError(dataErrorMessage(reason));setStatus("Alterações não confirmadas");
     }).finally(()=>{pending.current--;if(!pending.current)setSaving(false);});
   },[]);
   const saveTheme=useCallback((theme:"light"|"dark")=>enqueue(()=>repository.saveTheme(theme)),[repository,enqueue]);
@@ -332,7 +333,10 @@ export function FirebaseWorkspace() {
     {syncWarning && !error && <p className="cloud-banner" role="status">{syncWarning}</p>}
     {error && <section className="cloud-recovery" role="alert">
       <h2>Não foi possível confirmar o acesso à nuvem</h2><p>{error}</p>
-      <p>Se sua sessão ou as permissões de acesso expiraram, entre novamente. Seus dados já confirmados no Firebase não foram alterados por esta tentativa.</p>
+      {failedWrite
+        ? <><p>Essa gravação não foi confirmada. Para evitar duplicações, ela não será repetida automaticamente. Ao recuperar os dados confirmados, alterações locais não salvas serão descartadas.</p>
+            <button className="primary-button" disabled={saving} onClick={()=>setVersion(v=>v+1)}>Recarregar dados da nuvem</button></>
+        : <p>Se sua sessão ou as permissões de acesso expiraram, entre novamente. Os dados confirmados no Firebase permanecem preservados.</p>}
       <button className="secondary-button" disabled={saving||busy} onClick={()=>void logout()}>Sair da conta</button>
     </section>}
     {!initial && !error && <main className="studio-loading" role="status">Sincronizando seu espaço…</main>}
