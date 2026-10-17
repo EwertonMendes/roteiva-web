@@ -9,7 +9,7 @@
   border-radius: 12px;
   background: var(--card);
   color: var(--ink);
-  font-size: 12px;
+  font-size: var(--type-support);
   line-height: 1.6;
   margin-bottom: 24px;
 }
