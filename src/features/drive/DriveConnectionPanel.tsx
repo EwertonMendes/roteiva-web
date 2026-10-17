@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { CheckCircle2, ChevronRight, Cloud, ExternalLink, File, FileAudio, FileImage, FileText, FileVideo, Folder, FolderOpen, Link2, RefreshCw, ShieldCheck, Unplug, X } from "lucide-react";
 import { useAuth } from "../auth/AuthProvider";
-import { linkDriveFolder, readDriveLinks, unlinkDriveFolder, type DriveFolderLink } from "./drive-folder-links";
+import { linkDriveFolder, readDriveLinks, unlinkDriveFolder, type DriveFolderLink } from "../../data/drive-folder-links";
 import type { Project } from "../../domain/workspace";
 
 const API = "https://roteiva-api-dev.ewertonmendes9.workers.dev";
