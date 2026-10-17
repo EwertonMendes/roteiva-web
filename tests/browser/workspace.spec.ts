@@ -332,3 +332,16 @@ test("settings deep link defers business loading but exports complete records on
   await navigate(page,"Clientes");
   await expect(page.getByText("Registro preservado na exportação",{exact:true}).first()).toBeVisible();
 });
+
+test("temporary read disconnection recovers without asking for manual reload",async({page,context},info)=>{
+  await page.goto(cloud);
+  await login(page,"read-recovery-"+info.project.name+"@example.com");
+  await context.setOffline(true);
+  await navigate(page,"Clientes");
+  // A read failure must never turn into the old manual recovery screen.
+  await expect(page.locator(".cloud-recovery")).toHaveCount(0);
+  await context.setOffline(false);
+  await expect(page.locator(".app-shell")).toBeVisible({timeout:45000});
+  await settled(page);
+  await expect(page.getByRole("heading",{name:"Clientes",exact:true})).toBeVisible();
+});
