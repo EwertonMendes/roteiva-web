@@ -46,7 +46,7 @@ test('project folder picker lists actual folders through a private user-scoped b
   const response=await listFolders(env,'alice',connectionId,'root',null,fetcher);
   assert.equal(response.status,200);
   assert.deepEqual((await response.json()).folders,[{id:folderId,name:'Campanha',mimeType:folderMime,
-    size:undefined,modifiedTime:undefined,thumbnailLink:undefined,webViewLink:undefined,parents:['root']}]);
+    parents:['root']}]);
   const nested=await listFolders(env,'alice',connectionId,folderId,'page-token',fetcher);
   assert.equal(nested.status,200);
   assert.ok(urls.some(url=>url.includes('pageToken=page-token')));
