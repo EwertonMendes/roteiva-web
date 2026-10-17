@@ -154,3 +154,13 @@ O modo Firebase verifica a existência de `users/{uid}` via `getDocFromServer` a
 **Teste de regressão indispensável:** os usuários de antes da PR #9 devem entrar sem onboarding e manter cadastros e preferências; a demo Pages nunca deve carregar Firebase; criar identidade Auth não pode criar automaticamente o documento de perfil. Um UID sem perfil não acessa coleções protegidas. Não afirmar conclusão de aceite legal: política e termos finais para o produto público continuam pendentes. Validação automatizada em emuladores é distinta do teste com Google real.
 
 Para teste visual, conferir fluxos `Entrar`, `Criar conta`, conta ausente, voltar/sair sem registro, checkbox obrigatório, contraste dos temas, teclado, mobile/desktop, restauração de sessão e `/review` protegido. O fluxo do registro só é publicado no DEV após a pipeline de testes.
+
+## Configurações do perfil e estúdio — PR #11
+
+Em `Configurações`, o usuário autenticado pode editar seu nome, estúdio/marca e tipo de atuação, ou mudar o tema (persistido em `preferences/ui`). Os campos `email` e `photoURL` são provenientes da conta Google e permanecem somente leitura. O topo e a lateral mostram o nome do estúdio gravado em `users/{uid}`.
+
+A função `saveProfile(changes, expectedRevision)` valida os campos, lê o documento em transação, compara a revisão e atualiza apenas os campos editáveis; em conflito, exibe orientação para atualizar a página. `RegistrationGate` carrega a versão do servidor e atualiza o contexto somente **após** confirmação de gravação, não aplica alterações otimistas. Contas antigas mantêm `registrationCompletedAt` e `dataAcknowledgedAt` ausentes; ao personalizar o estúdio, registram apenas nome, tipo de atuação e revisão.
+
+As regras Firestore proíbem alterações de UID, e-mail/foto, timestamps de cadastro e campos administrativos. O QA deve incluir conta antiga, conta nova, tentativa cruzada de edição, atualização concorrente, nome no cabeçalho, recarga da página, tema e preservação de projetos. O GitHub Pages continua sem gravação no Firebase.
+
+A opção de exportação JSON reutiliza o componente existente e **não garante backup de registros que não foram carregados**; não inclui mídia, segredos nem autenticação. Exclusão de conta e tratamento LGPD/termos são **pendências** do beta, não recursos falsamente anunciados.

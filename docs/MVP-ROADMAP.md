@@ -61,6 +61,22 @@
 
 **Escopo:** separação entre identidade Google e cadastro de negócio. Não confundir checkbox DEV com aceite jurídico definitivo.
 
+## Configurações da conta e do estúdio — PR #11
+
+**Estado: VALIDADO no CI da PR #11, publicação DEV pendente do merge.**
+
+- [x] Criar uma tela de configurações alinhada à identidade visual do Roteiva, responsiva e com temas claro/escuro.
+- [x] Permitir editar nome profissional, nome do estúdio e tipo de atuação, com Firestore revisionado e validação.
+- [x] Exibir nome cadastrado do estúdio em vez de `Roteiva Studio`, com fallback para perfis sem marca.
+- [x] Preservar conta antiga, dados existentes e timestamps do cadastro, e-mail/foto Google somente leitura.
+- [x] Reutilizar tema salvo e exportação JSON dos dados carregados, com limitações explícitas.
+- [x] Estender Security Rules para edição restrita ao UID e preservar registro e identidade.
+- [x] [CI da PR #11 — execução 38992248908](https://github.com/EwertonMendes/roteiva-web/actions/runs/38992248908): instalação congelada, testes de domínio, TypeScript, builds Firebase/Pages, testes de segurança e persistência com Firebase Emulator, Playwright Chromium desktop/mobile aprovados.
+- [ ] Merge, deploy DEV e conferência com conta Google real.
+- [ ] Futuro: eliminação segura de conta, exportação integral e políticas legais antes do beta público.
+
+**Não implementa Drive, cobrança, edição de conta Google ou exclusão irreversível.**
+
 ## Fase 0 — Prova técnica mais arriscada: Google Drive + Worker
 
 **Prioridade P0.** Fazer **antes** de migrar a biblioteca completa, para validar que é possível usar Drive com segurança e arquivos grandes sem proxy.

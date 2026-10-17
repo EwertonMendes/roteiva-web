@@ -97,6 +97,42 @@ test("profile PII, creation, ownership, schema and orphan denial",async()=>{
   await assertFails(setDoc(doc(charlie,"users/charlie/private/secret"),{role:"admin"}));
   await assertSucceeds(updateDoc(doc(alice,path),{displayName:"Novo nome",revision:2,updatedAt:serverTimestamp()}));
 });
+test("studio profile changes: legacy compatibility, privacy and concurrent saves",async()=>{
+  const alice=dbFor("alice"),bob=dbFor("bob"),charlie=dbFor("charlie");
+  const legacy=new FirestoreWorkspace(alice,"alice");
+  const old=await legacy.loadProfile();
+  assert.equal(old.legacy,true);
+  assert.equal(old.studioName,"");
+  assert.equal(old.revision,1);
+  const updated=await legacy.saveProfile({displayName:"Alice Editora",studioName:"Estúdio dos Crias",professionalType:"studio"},old.revision);
+  assert.equal(updated.revision,2);
+  assert.equal(updated.legacy,true);
+  const legacyRaw=(await getDoc(doc(alice,"users/alice"))).data();
+  assert.equal(legacyRaw.studioName,"Estúdio dos Crias");
+  assert.equal(legacyRaw.professionalType,"studio");
+  assert.equal("registrationCompletedAt" in legacyRaw,false);
+  assert.equal("dataAcknowledgedAt" in legacyRaw,false);
+  assert.equal(legacyRaw.email,profile.email);
+  await assertFails(updateDoc(doc(bob,"users/alice"),{displayName:"Invadido",revision:3,updatedAt:serverTimestamp()}));
+  await assertFails(updateDoc(doc(alice,"users/alice"),{email:"fake@example.com",revision:3,updatedAt:serverTimestamp()}));
+  await assertFails(updateDoc(doc(alice,"users/alice"),{studioName:"x".repeat(121),revision:3,updatedAt:serverTimestamp()}));
+  await assertFails(updateDoc(doc(alice,"users/alice"),{professionalType:"admin",revision:3,updatedAt:serverTimestamp()}));
+  await assert.rejects(()=>legacy.saveProfile({displayName:"Rascunho",studioName:"Outro",professionalType:"producer"},1),/Conflito/);
+  await assert.rejects(()=>legacy.saveProfile({displayName:"A",studioName:"Outro",professionalType:"producer"},2),/Confira/);
+  await assertFails(updateDoc(doc(alice,"users/alice"),{registrationCompletedAt:serverTimestamp(),dataAcknowledgedAt:serverTimestamp(),revision:3,updatedAt:serverTimestamp()}));
+
+  const modern=new FirestoreWorkspace(charlie,"charlie");
+  await modern.registerProfile({...profile,studioName:"Studio A",professionalType:"freelancer",acknowledgedDataUse:true});
+  const current=await modern.loadProfile();
+  assert.equal(current.legacy,false);
+  const next=await modern.saveProfile({displayName:"Alice Studio",studioName:"Studio B",professionalType:"producer"},current.revision);
+  assert.equal(next.studioName,"Studio B");
+  const modernRaw=(await getDoc(doc(charlie,"users/charlie"))).data();
+  assert.equal(modernRaw.registrationCompletedAt.toMillis()>0,true);
+  assert.equal(modernRaw.dataAcknowledgedAt.toMillis()>0,true);
+  await assertFails(updateDoc(doc(charlie,"users/charlie"),{photoURL:"https://example.com/avatar.png",revision:3,updatedAt:serverTimestamp()}));
+  assert.equal((await modern.loadProfile()).revision,2);
+});
 test("invalid money, civil dates, time ranges and references are rejected",async()=>{
   const db=dbFor("alice");
   for(const amountCents of [-1,0,1.5,100000000001,"100"]) await assertFails(setDoc(doc(db,pathFor("alice","financeEntries")),{...fixtures.financeEntries,amountCents,...meta("alice")}));

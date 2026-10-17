@@ -7,7 +7,7 @@ import {
   ArrowUpRight, Building2, Moon, UserRound,
   MoreHorizontal, Pencil, Plus, ReceiptText, Search, Sparkles, Sun, Trash2,
   UserRoundPlus, Users, WalletCards, X, Upload, Image as ImageIcon,
-  FileVideo, FileAudio, FileText, HardDrive, ChevronLeft, type LucideIcon,
+  FileVideo, FileAudio, FileText, HardDrive, ChevronLeft, Settings2, type LucideIcon,
 } from "lucide-react";
 import { ProjectDetail, ClientDetail, TodayStudio, StudioReviews, WorkspaceTools, FinancePanel, projectTemplates } from "./studio-features";
 import { validTimeRange, overlaps, eventRange, eventDuration } from "./studio-calendar";
@@ -15,6 +15,8 @@ import { toISO as toISOAdded, parseMoney, splitInstallments } from "./studio-fin
 import { FormEvent, useEffect, useMemo, useState, useCallback } from "react";
 
 import { isDemo } from "./lib/firebase";
+import { SettingsPage } from "./features/settings/SettingsPage";
+import type { RoteivaProfile, ProfileChanges } from "./data/firestore-workspace";
 import { newId, type WorkspaceData, type Activity, type View, type Project, type Client, type ClientType, type AssetKind, type FinanceEntry, type CalendarEvent, type LibraryAsset, type Status } from "./domain/workspace";
 export type { View, Project, Client, FinanceEntry, CalendarEvent, LibraryAsset, Status } from "./domain/workspace";
 
@@ -47,13 +49,15 @@ function BrandAvatar({ initials, color, large = false }: { initials: string; col
 }
 
 type DashboardProps = {
-  firstName: string; email: string; photoURL?: string;
+  firstName: string; email: string; photoURL?: string; profile?:RoteivaProfile|null;
+  onSaveProfile?:(changes:ProfileChanges)=>Promise<void>;
   initialWorkspace?: WorkspaceData; initialTheme?: "light"|"dark";
   onWorkspaceChange?: (workspace:WorkspaceData)=>void; onThemeChange?:(theme:"light"|"dark")=>void;
   cloudStatus?:string; saving?:boolean; onLogout?:()=>void;
 };
-export default function DashboardClient({ firstName, email, photoURL, initialWorkspace, initialTheme, onWorkspaceChange, onThemeChange, cloudStatus, saving, onLogout }: DashboardProps) {
+export default function DashboardClient({ firstName, email, photoURL, profile, onSaveProfile, initialWorkspace, initialTheme, onWorkspaceChange, onThemeChange, cloudStatus, saving, onLogout }: DashboardProps) {
   const [view, setView] = useState<View>("overview");
+  const workspaceName=profile?.studioName.trim() || "Roteiva Studio";
   const [projects, setProjects] = useState(initialProjects);
   const [clientList, setClientList] = useState(initialClients);
   const [financeEntries, setFinanceEntries] = useState(initialFinanceEntries);
@@ -311,6 +315,7 @@ export default function DashboardClient({ firstName, email, photoURL, initialWor
     finance: ["Gestão financeira", "Faturamento, recebimentos e visão mensal do seu estúdio."],
     calendar: ["Calendário", "Prazos, gravações, reuniões e entregas em uma única agenda."],
     library: ["Biblioteca", "Centralize arquivos, versões e materiais de todos os projetos."],
+    settings: ["Configurações", "Sua identidade profissional, estúdio e preferências."],
   };
 
   if (!dataReady) return <main className="studio-loading" role="status">Carregando seu estúdio…</main>;
@@ -333,9 +338,10 @@ export default function DashboardClient({ firstName, email, photoURL, initialWor
           <small className="nav-label second">FERRAMENTAS</small>
           <button className={view === "calendar" ? "active" : ""} onClick={() => changeView("calendar")}><AnimatedNavIcon icon={CalendarDays} hoverIcon={CalendarCheck2} kind="calendar" /><span>Calendário</span><em>{calendarEvents.length}</em></button>
           <button className={view === "library" ? "active" : ""} onClick={() => changeView("library")}><AnimatedNavIcon icon={Grid2X2} hoverIcon={LibraryBig} kind="library" /><span>Biblioteca</span><em>{libraryAssets.length}</em></button>
+          <button className={view === "settings" ? "active" : ""} onClick={() => changeView("settings")}><AnimatedNavIcon icon={Settings2} hoverIcon={UserRound} kind="settings" /><span>Configurações</span></button>
         </nav>
         <div className="storage-card">
-          <div><span><Sparkles size={15} /> Roteiva Studio</span><b>{libraryAssets.length} arquivos</b></div>
+          <div><span><Sparkles size={15} /> {workspaceName}</span><b>{libraryAssets.length} arquivos</b></div>
           <p>Seu espaço de produção</p>
           <small className="sync-status" role="status">{isDemo ? saveStatus : cloudStatus}</small>
         </div>
@@ -348,7 +354,7 @@ export default function DashboardClient({ firstName, email, photoURL, initialWor
       <main className="main">
         <header className="topbar">
           <button className="menu-button" onClick={() => setMobileOpen(true)} aria-label="Abrir menu" aria-expanded={mobileOpen}><Menu size={20} /></button>
-          <div className="workspace-switch"><span className="sync-dot">R</span><b>Roteiva Studio</b><ChevronDown size={14} /></div>
+          <button type="button" className="workspace-switch" onClick={()=>changeView("settings")} title="Abrir configurações do estúdio" aria-label="Abrir configurações do estúdio"><span className="sync-dot">R</span><b title={workspaceName}>{workspaceName}</b><ChevronDown size={14} /></button>
           <label className="global-search"><Search size={17} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar projetos, clientes ou arquivos" /><kbd><Command size={11} /> K</kbd></label>
           <div className="top-actions"><button className="icon-button" title="Ver atividades" aria-label="Ver atividades" onClick={() => { changeView("overview"); notify(activities[0]?.text || "Nenhuma atividade ainda"); }}><Bell size={18} /></button><button className="icon-button theme-toggle" onClick={toggleTheme} aria-label={theme === "light" ? "Ativar modo escuro" : "Ativar modo claro"} title={theme === "light" ? "Modo escuro" : "Modo claro"}>{theme === "light" ? <Moon size={18} /> : <Sun size={18} />}</button><button className="primary-button" onClick={() => setModalOpen(true)}><Plus size={17} /> Novo projeto</button></div>
         </header>
@@ -358,14 +364,15 @@ export default function DashboardClient({ firstName, email, photoURL, initialWor
           <div className="page-heading">
             <div><span className="eyebrow">ROTEIVA / {view === "overview" ? "PAINEL" : pageTitles[view][0].toUpperCase()}</span><h1>{pageTitles[view][0]}</h1><p>{pageTitles[view][1]}</p></div>
             <div className="heading-actions">
-              <WorkspaceTools workspace={workspace} status={isDemo ? saveStatus : cloudStatus || ""} onNotify={notify} />
-              {view === "clients" ? <button className="primary-button" onClick={() => { setEditingClient(null); setClientModalOpen(true); }}><UserRoundPlus size={17} /> Novo cliente</button>
+              {view !== "settings" && <WorkspaceTools workspace={workspace} status={isDemo ? saveStatus : cloudStatus || ""} onNotify={notify} />}
+              {view === "settings" ? null : view === "clients" ? <button className="primary-button" onClick={() => { setEditingClient(null); setClientModalOpen(true); }}><UserRoundPlus size={17} /> Novo cliente</button>
                 : view === "finance" ? <button className="primary-button" onClick={() => openFinanceModal()}><Plus size={17} /> Nova receita</button>
                 : view === "calendar" ? <button className="primary-button" onClick={() => openEvent()}><Plus size={17} /> Novo compromisso</button>
                 : view === "library" ? <><select aria-label="Projeto dos arquivos" value={libraryProject} onChange={e => setLibraryProject(e.target.value)}><option value="">Sem projeto</option>{projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select><label className="primary-button upload-button"><Upload size={17} /> {uploading ? "Enviando…" : "Adicionar arquivos"}<input type="file" disabled multiple onChange={(event) => { uploadAssets(event.target.files, Number(libraryProject) || undefined); event.target.value = ""; }} /></label></>
                 : <button className="primary-button" onClick={() => setModalOpen(true)}><Plus size={17} /> Criar projeto</button>}
             </div>
           </div>
+          {view === "settings" && <SettingsPage profile={profile} email={email} photoURL={photoURL} theme={theme} toggleTheme={toggleTheme} workspace={workspace} cloudStatus={isDemo ? saveStatus : cloudStatus || ""} onNotify={notify} onSaveProfile={onSaveProfile} />}
           {view === "overview" && <><TodayStudio clients={clientList} projects={projects} entries={financeEntries} events={calendarEvents} activities={activities} onView={changeView} /><Overview projects={projects} setView={changeView} /></>}
           {view === "projects" && (selectedProject && projects.some(p => p.id === selectedProject) ? <ProjectDetail project={projects.find(p => p.id === selectedProject)!} clients={clientList} entries={financeEntries} assets={libraryAssets} events={calendarEvents} onSave={updateProject} onBack={() => setSelectedProject(null)} onRevenue={addLinkedRevenue} onUpload={uploadAssets} onEvent={(p) => { openEvent(null, p.dueDate); }} uploading={uploading} /> : <ProjectsView projects={filtered.map(p => ({...p, files: libraryAssets.filter(a => a.projectId === p.id).length}))} statusFilter={statusFilter} setStatusFilter={setStatusFilter} onOpen={(id)=>{setSelectedProject(id);window.scrollTo({top:0,behavior:"auto"});}} />)}
           {view === "clients" && (selectedClient && clientList.some(c => c.id === selectedClient) ? <ClientDetail client={clientList.find(c => c.id === selectedClient)!} projects={projects} entries={financeEntries} onBack={() => setSelectedClient(null)} onEdit={(client) => { setEditingClient(client); setClientModalOpen(true); }} onSave={saveClientPackage} onProject={(id) => { setSelectedProject(id); setView("projects"); }} /> : <ClientsView clients={clientList.filter(c => `${c.name} ${c.email} ${c.phone}`.toLowerCase().includes(query.toLowerCase())).map(c => ({...c, projects: projects.filter(p => p.clientId === c.id).length, active: projects.filter(p => p.clientId === c.id && p.status !== "Aprovado").length}))} onOpen={(id)=>{setSelectedClient(id);window.scrollTo({top:0,behavior:"auto"});}} onAdd={() => { setEditingClient(null); setClientModalOpen(true); }} />)}

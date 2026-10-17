@@ -130,7 +130,13 @@ service cloud.firestore {
         d.dataAcknowledgedAt is timestamp;
     }
     function legacyProfile(d) {
-      return !d.keys().hasAny(["studioName","professionalType","registrationCompletedAt","dataAcknowledgedAt"]);
+      // Accounts created before explicit onboarding keep their original registration state.
+      // A legacy account may opt to configure studio/occupation without fake consent timestamps.
+      return !d.keys().hasAny(["registrationCompletedAt","dataAcknowledgedAt"]) &&
+        ((!d.keys().hasAny(["studioName","professionalType"])) ||
+         (d.keys().hasAll(["studioName","professionalType"]) &&
+          text(d.studioName,0,120) &&
+          d.professionalType in ["freelancer","studio","producer","other"]));
     }
     function valid_profile(d,uid,id) {
       return d.keys().hasAll(["ownerUid","schemaVersion","revision","createdAt","updatedAt","displayName","email","photoURL"]) &&
@@ -156,7 +162,10 @@ service cloud.firestore {
         request.resource.data.dataAcknowledgedAt==request.time &&
         creating(request.resource.data);
       allow update: if owner(uid) && valid_profile(request.resource.data,uid,uid) &&
-        immutableRegistration(request.resource.data) && updating(request.resource.data);
+        immutableRegistration(request.resource.data) &&
+        request.resource.data.email==resource.data.email &&
+        request.resource.data.photoURL==resource.data.photoURL &&
+        updating(request.resource.data);
       allow delete: if false; // Account deletion requires a future explicit cleanup process.
       match /clients/{id} {
         allow read: if member(uid);
