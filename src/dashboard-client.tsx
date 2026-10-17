@@ -426,7 +426,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
           <div className="page-heading">
             <div><span className="eyebrow">ROTEIVA / {view === "overview" ? "PAINEL" : pageTitles[view][0].toUpperCase()}</span><h1>{pageTitles[view][0]}</h1><p>{pageTitles[view][1]}</p></div>
             <div className="heading-actions">
-              {view !== "settings" && <WorkspaceTools workspace={workspace} status={isDemo ? saveStatus : cloudStatus || ""} onNotify={notify} />}
+              {view !== "settings" && <WorkspaceTools workspace={workspace} loadWorkspace={onLoadWorkspace} status={isDemo ? saveStatus : cloudStatus || ""} onNotify={notify} />}
               {view === "settings" ? null : view === "clients" ? <button className="primary-button" onClick={() => { setEditingClient(null); setClientModalOpen(true); }}><UserRoundPlus size={17} /> Novo cliente</button>
                 : view === "finance" ? <button className="primary-button" onClick={() => openFinanceModal()}><Plus size={17} /> Nova receita</button>
                 : view === "calendar" ? <button className="primary-button" onClick={() => openEvent()}><Plus size={17} /> Novo compromisso</button>

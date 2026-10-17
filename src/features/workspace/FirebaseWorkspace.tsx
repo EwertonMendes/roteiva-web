@@ -4,6 +4,7 @@ import { firebaseServices } from "../../lib/firebase";
 import { FirestoreWorkspace, dataErrorMessage } from "../../data/firestore-workspace";
 import { emptyWorkspace, type WorkspaceData } from "../../domain/workspace";
 import { routeFromLocation, type WorkspaceRoute } from "../../lib/workspace-routing";
+import { domainsForRoute } from "../../lib/workspace-scopes";
 import type { Domain } from "../../data/firestore-sync";
 import { useAuth } from "../auth/AuthProvider";
 import { useRegistrationProfile } from "../auth/RegistrationGate";
@@ -22,6 +23,7 @@ export function FirebaseWorkspace() {
   const [remoteChanges,setRemoteChanges]=useState(false);
   const [syncWarning,setSyncWarning]=useState("");
   const lastCheck=useRef(0);
+  const scopeRequest=useRef(0);
   const queue=useRef(Promise.resolve());
   const pending=useRef(0);
   const failed=useRef(false);
@@ -31,12 +33,13 @@ export function FirebaseWorkspace() {
     setRemoteChanges(false);setSyncWarning("");
     setError(""); setInitial(undefined);setBusinessLoaded(false);
     (async()=>{
-      const inSettings=routeFromLocation(window.location,{base:import.meta.env.BASE_URL,useHash:false}).view==="settings";
+      const route=routeFromLocation(window.location,{base:import.meta.env.BASE_URL,useHash:false});
+      const domains=domainsForRoute(route);
       const [workspace,theme]=await Promise.all([
-        inSettings ? Promise.resolve(emptyWorkspace()) : repository.load(),repository.loadTheme(),
+        domains.length ? repository.load(domains) : Promise.resolve(emptyWorkspace()),repository.loadTheme(),
       ]);
       if (active) {
-        setBusinessLoaded(!inSettings);
+        setBusinessLoaded(domains.length>0);
         setInitial({workspace,theme:theme || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark":"light")});
       }
     })().catch(reason=>{if(active){failed.current=true;setError(dataErrorMessage(reason));}});
@@ -62,22 +65,30 @@ export function FirebaseWorkspace() {
     return () => {active=false;window.removeEventListener("focus",check);
       document.removeEventListener("visibilitychange",check);};
   },[repository,initial,version]);
-  const ensureBusinessData=useCallback(async ():Promise<WorkspaceData>=>{
-    if (businessLoaded && initial) return initial.workspace;
+  const ensureDomains=useCallback(async(domains:readonly Domain[]):Promise<WorkspaceData>=>{
+    if (repository.hasLoaded(domains) && initial) return initial.workspace;
+    const request=++scopeRequest.current;
     setLoadingBusiness(true);
     try {
-      const workspace=await repository.load();
-      setInitial(current=>current?{...current,workspace}:current);
-      setBusinessLoaded(true);
+      const workspace=await repository.load(domains);
+      if (request===scopeRequest.current) {
+        setInitial(current=>current?{...current,workspace}:current);
+        setBusinessLoaded(repository.hasLoaded(domains));
+      }
       return workspace;
     } catch(reason) {
-      setError(dataErrorMessage(reason));
+      if (request===scopeRequest.current) setError(dataErrorMessage(reason));
       throw reason;
-    } finally {setLoadingBusiness(false);}
-  },[repository,businessLoaded,initial]);
+    } finally {
+      if (request===scopeRequest.current) setLoadingBusiness(false);
+    }
+  },[repository,initial]);
+  const ensureFullWorkspace=useCallback(()=>ensureDomains(["clients","projects","tasks","deliveries","events","financeEntries","activities"]),[ensureDomains]);
   const onRouteChange=useCallback((route:WorkspaceRoute)=>{
-    if (route.view!=="settings" && !businessLoaded) void ensureBusinessData().catch(()=>undefined);
-  },[businessLoaded,ensureBusinessData]);
+    const required=domainsForRoute(route);
+    if (!required.length || repository.hasLoaded(required)) return;
+    void ensureDomains(required).catch(()=>undefined);
+  },[repository,ensureDomains]);
   useEffect(()=>{
     if (!saving) return;
     const warn=(event:BeforeUnloadEvent)=>{event.preventDefault();event.returnValue="";};
@@ -117,7 +128,7 @@ export function FirebaseWorkspace() {
     {loadingBusiness && !error && <main className="studio-loading" role="status">Carregando os dados do seu espaço…</main>}
     {initial && !loadingBusiness && <div inert={!!error || remoteChanges} aria-busy={saving}>
       <DashboardClient key={user.uid+"-"+version} firstName={profileContext?.profile.displayName || user.displayName || "Profissional"} profile={profileContext?.profile || null} onSaveProfile={profileContext?.saveProfile} email={user.email || ""} photoURL={user.photoURL || undefined}
-        initialWorkspace={initial.workspace} initialTheme={initial.theme} onWorkspaceChange={businessLoaded ? save : undefined} onLoadWorkspace={businessLoaded ? undefined : ensureBusinessData} onRouteChange={onRouteChange} onThemeChange={saveTheme}
+        initialWorkspace={initial.workspace} initialTheme={initial.theme} onWorkspaceChange={businessLoaded ? save : undefined} onLoadWorkspace={ensureFullWorkspace} onRouteChange={onRouteChange} onThemeChange={saveTheme}
         cloudStatus={status} saving={saving} onLogout={()=>void logout()} />
     </div>}
   </>;
