@@ -97,7 +97,7 @@
 
 **Prioridade P0.** Fazer **antes** de migrar a biblioteca completa, para validar que é possível usar Drive com segurança e arquivos grandes sem proxy.
 
-- [ ] PoC Worker TypeScript publicado em ambiente DEV no plano gratuito.
+- [x] **VALIDADO — PR #15:** Worker TypeScript publicado em DEV/Free; [run 39055895154](https://github.com/EwertonMendes/roteiva-web/actions/runs/39055895154), health HTTPS real. PoC Drive autenticada segue pendente.
 - [ ] PoC de verificação segura de Firebase ID Token no Worker; rejeitar tokens inválidos, expirados e de outro projeto.
 - [ ] OAuth 2.0 Google no Worker com `drive.file`, `state`, offline access e callback seguro; testar expiração, reconexão, revogação, troca de conta.
 - [ ] D1 DEV com refresh token cifrado via WebCrypto/AES-GCM e chave em Workers Secrets; isolamento e não exposição.
@@ -113,20 +113,20 @@
 
 ## Fase 1 — Fundação SaaS e ambientes
 
-**Prioridade P0.** Por solicitação explícita na PR #6, Auth/Firestore Solo são independentes da PoC Drive da Fase 0. Worker/OAuth continuam planejados.
+**Prioridade P0.** Por solicitação explícita na PR #6, Auth/Firestore Solo são independentes da PoC Drive da Fase 0. Fundação Worker/D1 DEV adicionada na PR #15; OAuth real e biblioteca continuam pendentes.
 
 - [x] Unificar React/Vite/TS na SPA em `src/`, mantendo visual, estado local e build Pages; preparar build Firebase em `dist/` (PR #5).
 - [x] Padronizar lockfile/instalação com PNPM, removendo o npm lock e instaladores órfãos (higienização PR #3); **a auditoria de dependências em si continua pendente**.
 - [x] Reutilizar exclusivamente Firebase **DEV** roteiva-web-dev: Hosting ativo, Auth Google habilitado, Firestore Standard criado em São Paulo após aprovação. **PROD não autorizado e não criado**.
 - [x] Implementar login Google, logout, sessão, proteção e erros na PR #6; **IMPLEMENTADO**, QA real ainda pendente.
 - [ ] Criar cliente HTTP para Worker, com Firebase ID Token e tratamento de expiração/401; sem compartilhar UID arbitrário.
-- [ ] Criar API Worker DEV/PROD separada, secrets/bindings por ambiente e CORS controlado.
+- [ ] **PARCIAL — PR #15:** Worker DEV, secrets/bindings e CORS implementados/publicados; PROD separado, não autorizado nem provisionado.
 - [x] CI com typecheck, testes, ambos builds e emuladores; deploy DEV automático após master verde (PR #6).
 - [ ] Acrescentar lint e previews; PROD continua separado e não provisionado.
 - [ ] Configurar observabilidade de erros/cotas e documentação de configuração/deploy.
 - [ ] Testar mobile, desktop, tema e navegação acessível.
 
-**Aceite:** dois usuários entram em contas distintas, reiniciam sessão, veem telas protegidas; regras verificam identidade; Worker/PROD continuam futuros; CI verde. **Estado:** PARCIAL — fundação Solo implementada, QA e demais subetapas discriminados abaixo.
+**Aceite:** dois usuários entram em contas distintas, reiniciam sessão, veem telas protegidas; regras verificam identidade; Worker DEV tem fundação na PR #15; PROD continua futuro; CI verde. **Estado:** PARCIAL — fundação Solo implementada, QA e demais subetapas discriminados abaixo.
 
 ## Fase 2 — Dados persistentes e isolamento
 

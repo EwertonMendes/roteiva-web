@@ -2,7 +2,7 @@
 
 [README](../README.md) · [Arquitetura](ARCHITECTURE.md) · [Roadmap](MVP-ROADMAP.md).
 
-React 19/Vite 8/TypeScript, sem SSR, Next/Vinext ou Functions. API Worker/D1 DEV independente em api/ (PR #15). Node 22.13+, PNPM 11.25.0 e Java 21 para emuladores. Somente `pnpm-lock.yaml`; instalação congelada obrigatória.
+React 19/Vite 8/TypeScript, sem SSR, Next/Vinext ou Functions. API Worker/D1 DEV independente em api/ (PR #15). Node 22.13+, PNPM 11.25.0 e Java 21 para emuladores. Frontend com `pnpm-lock.yaml`; API independente com `api/package-lock.json`. Instalação congelada obrigatória em ambos.
 
 ## Comandos
 
@@ -265,3 +265,5 @@ Picker requer futuramente chave de API **pública restrita a HTTP referrer DEV e
 [Run DEV 39055895154](https://github.com/EwertonMendes/roteiva-web/actions/runs/39055895154) publicou o commit `0d8d7bc99cf615603bddd6e0d78a246a5ff07d45`: npm ci/audit, TypeScript, oito testes, migration local, dry-run, aplicação idempotente da migração remota, deploy e smoke HTTPS concluídos. Health real retornou 200 com status ok/environment dev; token inválido retornou 401. Conferido também no Chrome. A primeira tentativa [39055742987](https://github.com/EwertonMendes/roteiva-web/actions/runs/39055742987) já havia aplicado 0001_oauth.sql, mas a publicação foi recusada porque cpu_ms configurável não é suportado no Free; remoção do campo resolveu sem upgrade. Logs não contêm secrets, e a tela do Worker confirmou os dois secrets cifrados preservados após deploy. Projeto Google confirmado sem conta de faturamento vinculada.
 
 OAuth real, renovação real, arquivo real selecionado e segunda conta Google **não executados**. O grant Drive nunca foi concedido nem há refresh token real armazenado. Infraestrutura funcional não equivale a biblioteca ou PoC Google validada.
+
+Validação HTTPS independente após deploy: health 200, conexões sem identidade 401, callback desabilitado 503, rota inexistente 404, Origin não autorizado 403 sem CORS e OPTIONS da origem DEV 204 com allowlist exata. Firebase DEV e Pages retornaram HTTP 200 com HTML Roteiva. Essas leituras HTTP não validam login/CRUD real dos frontends.
