@@ -103,19 +103,9 @@ export function DriveConnectionPanel({
     async function init(){
       setReady(false);setError("");
       try{
-        const accounts=await refresh();
+        await refresh();
         if(!active)return;
-        const pending=sessionStorage.getItem(INTENT);
-        if(callback==="connected" && pending){
-          sessionStorage.removeItem(INTENT);
-          if(projects.some(p=>String(p.id)===pending) &&
-            accounts.some(c=>c.status==="connected"&&c.scopes.split(/\s+/).includes(READ))){
-            onSelectProject(pending);
-            setPicker(true);
-          }
-        }else if(callback && callback!=="connected"){
-          sessionStorage.removeItem(INTENT);
-        }
+        if (callback && callback!=="connected") sessionStorage.removeItem(INTENT);
       }catch(e){if(active)setError(e instanceof Error?e.message:"Falha ao carregar o Drive.");}
       finally{if(active)setReady(true);}
     }
@@ -125,6 +115,17 @@ export function DriveConnectionPanel({
     // must not reset the folder chooser or refresh the same data repeatedly.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   },[user?.uid]);
+
+  useEffect(()=>{
+    if(!ready || callback!=="connected")return;
+    const pending=sessionStorage.getItem(INTENT);
+    if(!pending)return;
+    if(projects.some(project=>String(project.id)===pending) && authorized.length){
+      sessionStorage.removeItem(INTENT);
+      onSelectProject(pending);
+      setPicker(true);
+    }
+  },[ready,callback,projects,authorized.length,onSelectProject]);
 
   async function connect(projectId?:number){
     setError("");setResult("");setBusy(true);
@@ -162,13 +163,14 @@ export function DriveConnectionPanel({
     if(!connection){await connect(selectedProjectId);return;}
     setPicker(true);setFolderList([]);
     setTrail([{id:"root",name:"Meu Drive"}]);setRootMode("root");
+    void browse("root",[{id:"root",name:"Meu Drive"}],null,false,"root");
   }
 
   useEffect(()=>{
-    if(picker && connection && folderList.length===0 && !folderBusy && trail.length===1){
-      void browse(trail[0].id,trail);
+    if(picker && connection){
+      void browse("root",[{id:"root",name:"Meu Drive"}],null,false,"root");
     }
-    // Root is loaded when the picker opens, not on every state update.
+    // Initial load occurs when the dialog becomes visible.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   },[picker,connection?.id]);
 
@@ -237,7 +239,7 @@ export function DriveConnectionPanel({
         <button className="secondary-button" disabled={busy} onClick={()=>{setConfirmId(connected[0].id===confirmId?"":connected[0].id);}}><Unplug size={14}/> Desconectar</button>
         {confirmId && <><button className="secondary-button" onClick={()=>setConfirmId("")}>Cancelar</button>
           <button className="secondary-button" disabled={busy} onClick={()=>void disconnect(confirmId)}>Confirmar desconexão</button></>}
-      </div> : <p>Conecte sua conta uma vez e escolha as pastas para trabalhar dentro de cada projeto.</p>}
+      </div> : <p>Conecte sua conta uma vez e escolha pastas para trabalhar nos projetos. O Google solicitará leitura do seu Drive; o Roteiva organiza somente as pastas que você vincular.</p>}
       {!connected.length ?
         <button className="primary-button" disabled={busy} onClick={()=>void connect(selectedProjectId)}>
           <Cloud size={16}/> {busy?"Conectando…":"Conectar Google Drive"}
