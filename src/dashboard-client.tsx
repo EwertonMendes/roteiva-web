@@ -348,7 +348,9 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
 
   useEffect(()=>{
     const onNavigation=()=>{
-      applyRoute(routeFromLocation(window.location,routeEnvironment));
+      const next=routeFromLocation(window.location,routeEnvironment);
+      applyRoute(next);
+      onRouteChange?.(next);
       window.scrollTo({top:0,behavior:"auto"});
     };
     window.addEventListener("popstate",onNavigation);
@@ -357,7 +359,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
       window.removeEventListener("popstate",onNavigation);
       if(routeEnvironment.useHash)window.removeEventListener("hashchange",onNavigation);
     };
-  },[]);
+  },[onRouteChange]);
 
   // Direct links must not display another user's records or leave a broken detail URL.
   useEffect(()=>{

@@ -117,7 +117,7 @@ export function FirebaseWorkspace() {
     {loadingBusiness && !error && <main className="studio-loading" role="status">Carregando os dados do seu espaço…</main>}
     {initial && !loadingBusiness && <div inert={!!error || remoteChanges} aria-busy={saving}>
       <DashboardClient key={user.uid+"-"+version} firstName={profileContext?.profile.displayName || user.displayName || "Profissional"} profile={profileContext?.profile || null} onSaveProfile={profileContext?.saveProfile} email={user.email || ""} photoURL={user.photoURL || undefined}
-        initialWorkspace={initial.workspace} initialTheme={initial.theme} onWorkspaceChange={businessLoaded ? save : undefined} onLoadWorkspace={ensureBusinessData} onRouteChange={onRouteChange} onThemeChange={saveTheme}
+        initialWorkspace={initial.workspace} initialTheme={initial.theme} onWorkspaceChange={businessLoaded ? save : undefined} onLoadWorkspace={businessLoaded ? undefined : ensureBusinessData} onRouteChange={onRouteChange} onThemeChange={saveTheme}
         cloudStatus={status} saving={saving} onLogout={()=>void logout()} />
     </div>}
   </>;
