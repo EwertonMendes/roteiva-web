@@ -6,6 +6,7 @@ import { emptyWorkspace, type WorkspaceData } from "../../domain/workspace";
 import { routeFromLocation, type WorkspaceRoute } from "../../lib/workspace-routing";
 import { domainsForRoute } from "../../lib/workspace-scopes";
 import type { Domain } from "../../data/firestore-sync";
+import { collections } from "../../data/workspace-codec";
 import { useAuth } from "../auth/AuthProvider";
 import { useRegistrationProfile } from "../auth/RegistrationGate";
 
@@ -128,7 +129,7 @@ export function FirebaseWorkspace() {
     {loadingBusiness && !error && <main className="studio-loading" role="status">Carregando os dados do seu espaço…</main>}
     {initial && !loadingBusiness && <div inert={!!error || remoteChanges} aria-busy={saving}>
       <DashboardClient key={user.uid+"-"+version} firstName={profileContext?.profile.displayName || user.displayName || "Profissional"} profile={profileContext?.profile || null} onSaveProfile={profileContext?.saveProfile} email={user.email || ""} photoURL={user.photoURL || undefined}
-        initialWorkspace={initial.workspace} initialTheme={initial.theme} onWorkspaceChange={businessLoaded ? save : undefined} onLoadWorkspace={ensureFullWorkspace} onRouteChange={onRouteChange} onThemeChange={saveTheme}
+        initialWorkspace={initial.workspace} initialTheme={initial.theme} onWorkspaceChange={businessLoaded ? save : undefined} onLoadWorkspace={repository.hasLoaded(collections) ? undefined : ensureFullWorkspace} onRouteChange={onRouteChange} onThemeChange={saveTheme}
         cloudStatus={status} saving={saving} onLogout={()=>void logout()} />
     </div>}
   </>;
