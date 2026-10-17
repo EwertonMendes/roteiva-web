@@ -5,16 +5,22 @@ import {readFileSync} from 'node:fs';
 test('real SQLite schema enforces account uniqueness and atomic state consumption',()=>{
  const db=new DatabaseSync(':memory:');
  db.exec(readFileSync(new URL('../migrations/0001_oauth.sql',import.meta.url),'utf8'));
+ db.exec(readFileSync(new URL('../migrations/0002_oauth_launch.sql',import.meta.url),'utf8'));
  const insert=db.prepare("INSERT INTO drive_connections(id,owner_uid,google_account_id,google_email,encrypted_refresh_token,status,scopes,created_at,updated_at) VALUES(?,?,?,?,?,'connected','drive.file',1,1)");
  insert.run('a','A','g','test@example.com','ciphertext');
  assert.throws(()=>insert.run('b','A','g','test@example.com','ciphertext'));
  insert.run('b','B','g','test@example.com','ciphertext');
  assert.equal(db.prepare('SELECT count(*) AS n FROM drive_connections WHERE owner_uid=?').get('B').n,1);
- db.prepare('INSERT INTO oauth_transactions VALUES(?,?,?,?,?,?,?)').run('state','A','browser','encrypted','nonce',100,1);
+ db.prepare('INSERT INTO oauth_transactions (state_hash,owner_uid,browser_hash,encrypted_verifier,nonce,expires_at,created_at) VALUES(?,?,?,?,?,?,?)').run('state','A','browser','encrypted','nonce',100,1);
  const consume=db.prepare('DELETE FROM oauth_transactions WHERE state_hash=? AND browser_hash=? AND expires_at>? RETURNING owner_uid');
  assert.equal(consume.get('state','wrong',50),undefined);
  assert.equal(consume.get('state','browser',101),undefined);
  assert.equal(consume.get('state','browser',50).owner_uid,'A');
  assert.equal(consume.get('state','browser',50),undefined);
+ db.prepare('INSERT INTO oauth_transactions (state_hash,owner_uid,browser_hash,encrypted_verifier,nonce,expires_at,created_at,launch_hash,encrypted_state) VALUES(?,?,?,?,?,?,?,?,?)')
+  .run('state2','A','','sealed-verifier','nonce',100,1,'ticket-hash','sealed-state');
+ const launch=db.prepare('UPDATE oauth_transactions SET browser_hash=?,launch_hash=NULL,launched_at=? WHERE launch_hash=? AND launched_at IS NULL AND expires_at>? RETURNING state_hash');
+ assert.equal(launch.get('browser-hash',2,'ticket-hash',50).state_hash,'state2');
+ assert.equal(launch.get('other',3,'ticket-hash',50),undefined);
  db.close();
 });
