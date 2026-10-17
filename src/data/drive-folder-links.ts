@@ -1,4 +1,4 @@
-import { collection, deleteDoc, doc, getDocsFromServer, serverTimestamp, setDoc } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDocs, serverTimestamp, setDoc } from 'firebase/firestore';
 import {firebaseServices} from '../lib/firebase';
 
 export type DriveFolderLink = {
