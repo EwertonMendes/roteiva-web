@@ -57,9 +57,11 @@ type DashboardProps = {
   onThemeChange?:(theme:"light"|"dark")=>void;
   onLoadWorkspace?:()=>Promise<WorkspaceData>; onRouteChange?:(route:WorkspaceRoute)=>void;
   onCommands?:(commands:readonly WorkspaceCommand[])=>void;
-  overviewMetrics?:{clientCount:number;receivableAmount:number}; cloudStatus?:string; saving?:boolean; onLogout?:()=>void;
+  overviewMetrics?:{clientCount?:number;receivableAmount?:number;projectCount?:number;projectStatuses?:Record<Status,number>}; projectPage?:{total:number;hasMore:boolean;status:string};
+  onMoreProjects?:()=>void;onProjectStatus?:(status:Status|"Todos")=>void;
+  onSearchProjects?:()=>void; cloudStatus?:string; saving?:boolean; onLogout?:()=>void;
 };
-export default function DashboardClient({ firstName, email, photoURL, profile, onSaveProfile, initialWorkspace, initialTheme, onThemeChange, onLoadWorkspace, onRouteChange, onCommands, overviewMetrics, cloudStatus, saving, onLogout }: DashboardProps) {
+export default function DashboardClient({ firstName, email, photoURL, profile, onSaveProfile, initialWorkspace, initialTheme, onThemeChange, onLoadWorkspace, onRouteChange, onCommands, overviewMetrics, projectPage, onMoreProjects, onProjectStatus, onSearchProjects, cloudStatus, saving, onLogout }: DashboardProps) {
   const routeEnvironment={base:import.meta.env.BASE_URL,useHash:isDemo};
   const initialRoute=()=>routeFromLocation(window.location,routeEnvironment);
   const [initialBrowserRoute]=useState<WorkspaceRoute>(initialRoute);
@@ -399,7 +401,10 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     window.scrollTo({top:0,behavior:"auto"});
   }
 
-  function changeView(next:View) { navigateRoute({view:next}); }
+  function changeView(next:View) {
+    navigateRoute({view:next});
+    if(next==="projects"&&query.trim())onSearchProjects?.();
+  }
   function openProject(id:number) { navigateRoute({view:"projects",projectId:id}); }
   function openClient(id:number) { navigateRoute({view:"clients",clientId:id}); }
   function signOut() {
@@ -454,7 +459,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
         <nav>
           <small className="nav-label">ESPAÇO DE TRABALHO</small>
           {nav.map((item) => {
-            const count = item.id === "projects" ? projects.length : item.id === "reviews" ? projects.filter((project) => project.status === "Em aprovação").length : undefined;
+            const count = item.id === "projects" ? (overviewMetrics?.projectCount ?? projectPage?.total ?? projects.length) : item.id === "reviews" ? (overviewMetrics?.projectStatuses?.["Em aprovação"] ?? projects.filter((project) => project.status === "Em aprovação").length) : undefined;
             return <button key={item.id} className={view === item.id ? "active" : ""} onClick={() => changeView(item.id)}>
               <AnimatedNavIcon icon={item.icon} hoverIcon={item.hoverIcon} kind={item.id} /><span>{item.label}</span>{count !== undefined && <em>{count}</em>}
             </button>;
@@ -479,7 +484,11 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
         <header className="topbar">
           <button className="menu-button" onClick={() => setMobileOpen(true)} aria-label="Abrir menu" aria-expanded={mobileOpen}><Menu size={20} /></button>
           <button type="button" className="workspace-switch" onClick={()=>changeView("settings")} title="Abrir configurações do estúdio" aria-label="Abrir configurações do estúdio"><span className="sync-dot">R</span><b title={workspaceName}>{workspaceName}</b><ChevronDown size={14} /></button>
-          <label className="global-search"><Search size={17} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar projetos, clientes ou arquivos" /><kbd><Command size={11} /> K</kbd></label>
+          <label className="global-search"><Search size={17} /><input value={query} onChange={(e) => {
+              const value=e.target.value;
+              setQuery(value);
+              if(value.trim() && view==="projects")onSearchProjects?.();
+            }} placeholder="Buscar projetos, clientes ou arquivos" /><kbd><Command size={11} /> K</kbd></label>
           <div className="top-actions"><button className="icon-button" title="Ver atividades" aria-label="Ver atividades" onClick={() => { changeView("overview"); notify(activities[0]?.text || "Nenhuma atividade ainda"); }}><Bell size={18} /></button><button className="icon-button theme-toggle" onClick={toggleTheme} aria-label={theme === "light" ? "Ativar modo escuro" : "Ativar modo claro"} title={theme === "light" ? "Modo escuro" : "Modo claro"}>{theme === "light" ? <Moon size={18} /> : <Sun size={18} />}</button><button className="primary-button" onClick={() => setModalOpen(true)}><Plus size={17} /> Novo projeto</button></div>
         </header>
 
@@ -498,7 +507,13 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
           </div>
           {view === "settings" && <SettingsPage profile={profile} email={email} photoURL={photoURL} theme={theme} toggleTheme={toggleTheme} workspace={workspace} onLoadWorkspace={onLoadWorkspace} cloudStatus={isDemo ? saveStatus : cloudStatus || ""} onNotify={notify} onSaveProfile={onSaveProfile} />}
           {view === "overview" && <><TodayStudio clients={clientList} projects={projects} entries={financeEntries} events={calendarEvents} activities={activities} onView={changeView} overviewMetrics={overviewMetrics} /><Overview projects={projects} setView={changeView} onOpenProject={openProject} /></>}
-          {view === "projects" && (selectedProject && projects.some(p => p.id === selectedProject) ? <ProjectDetail project={projects.find(p => p.id === selectedProject)!} clients={clientList} entries={financeEntries} assets={libraryAssets} events={calendarEvents} onSave={updateProject} onBack={() => changeView("projects")} onRevenue={addLinkedRevenue} onUpload={uploadAssets} onEvent={(p) => { openEvent(null, p.dueDate); }} uploading={uploading} /> : <ProjectsView projects={filtered.map(p => ({...p, files: libraryAssets.filter(a => a.projectId === p.id).length}))} statusFilter={statusFilter} setStatusFilter={setStatusFilter} onOpen={openProject} />)}
+          {view === "projects" && (selectedProject && projects.some(p => p.id === selectedProject) ? <ProjectDetail project={projects.find(p => p.id === selectedProject)!} clients={clientList} entries={financeEntries} assets={libraryAssets} events={calendarEvents} onSave={updateProject} onBack={() => changeView("projects")} onRevenue={addLinkedRevenue} onUpload={uploadAssets} onEvent={(p) => { openEvent(null, p.dueDate); }} uploading={uploading} /> : <ProjectsView projects={filtered.map(p => ({...p, files: libraryAssets.filter(a => a.projectId === p.id).length}))}
+                  statusFilter={statusFilter} setStatusFilter={(status)=>{
+                    setStatusFilter(status);
+                    onProjectStatus?.(status);
+                  }} onOpen={openProject}
+                  total={projectPage && !query.trim()?projectPage.total:undefined}
+                  hasMore={!!projectPage?.hasMore&&!query.trim()} onMore={onMoreProjects} />)}
           {view === "clients" && (selectedClient && clientList.some(c => c.id === selectedClient) ? <ClientDetail client={clientList.find(c => c.id === selectedClient)!} projects={projects} entries={financeEntries} onBack={() => changeView("clients")} onEdit={(client) => { setEditingClient(client); setClientModalOpen(true); }} onSave={saveClientPackage} onProject={openProject} /> : <ClientsView clients={clientList.filter(c => `${c.name} ${c.email} ${c.phone}`.toLowerCase().includes(query.toLowerCase())).map(c => ({...c, projects: projects.filter(p => p.clientId === c.id).length, active: projects.filter(p => p.clientId === c.id && p.status !== "Aprovado").length}))} onOpen={openClient} onAdd={() => { setEditingClient(null); setClientModalOpen(true); }} />)}
           {view === "reviews" && <StudioReviews />}
           {view === "finance" && <FinancePanel entries={financeEntries} clients={clientList} onAdd={() => openFinanceModal()} onEdit={(entry) => openFinanceModal(entry)} onDelete={setDeletingFinanceEntry} />}
@@ -599,15 +614,19 @@ function ProjectRow({ project, onOpen }: { project: Project; onOpen: () => void 
   </button>;
 }
 
-function ProjectsView({ projects, statusFilter, setStatusFilter, onOpen }: { onOpen: (id: number) => void; projects: Project[]; statusFilter: Status | "Todos"; setStatusFilter: (status: Status | "Todos") => void }) {
+function ProjectsView({ projects, statusFilter, setStatusFilter, onOpen, total, hasMore, onMore }: {
+  onOpen:(id:number)=>void;projects:Project[];statusFilter:Status|"Todos";
+  setStatusFilter:(status:Status|"Todos")=>void;total?:number;hasMore?:boolean;onMore?:()=>void;
+}) {
   const filters: (Status | "Todos")[] = ["Todos", "Em produção", "Em aprovação", "Ajustes", "Aprovado"];
   return <div className="panel full-panel">
-    <div className="filter-bar"><div className="filter-pills">{filters.map((filter) => <button key={filter} className={statusFilter === filter ? "active" : ""} onClick={() => setStatusFilter(filter)}>{filter}</button>)}</div><span className="field-hint">{projects.length} projetos encontrados</span></div>
+    <div className="filter-bar"><div className="filter-pills">{filters.map((filter) => <button key={filter} className={statusFilter === filter ? "active" : ""} onClick={() => setStatusFilter(filter)}>{filter}</button>)}</div><span className="field-hint">{total!==undefined&&total>projects.length?`${projects.length} de ${total}`:`${projects.length}`} projetos encontrados</span></div>
     <div className="project-cards">{projects.map((project) => <article className="project-card" key={project.id} onClick={() => onOpen(project.id)}>
       <div className={`project-cover ${project.color}`}><span className="cover-grid" /><BrandAvatar initials={project.initials} color={project.color} large /><button aria-label={`Abrir projeto ${project.name}`} onClick={(e) => { e.stopPropagation(); onOpen(project.id); }}><ChevronRight size={17} /></button><em><Film size={14} /> {project.files} arquivos</em></div>
       <div className="project-card-copy"><StatusBadge status={project.status} /><h3>{project.name}</h3><p>{project.client}</p><div className="card-progress"><span><i style={{ width: `${project.progress}%` }} /></span><b>{project.progress}%</b></div><footer><span><CalendarDays size={14} /> {project.due}</span><span>{project.template || "Produção"}</span></footer></div>
     </article>)}</div>
     {!projects.length && <div className="empty-state"><FolderOpen size={28} /><h3>Nenhum projeto cadastrado</h3><p>Use o botão “Criar projeto” para iniciar sua primeira produção.</p></div>}
+    {hasMore&&<div className="modal-actions"><button className="secondary-button" type="button" onClick={onMore}>Carregar mais projetos <ChevronDown size={16}/></button></div>}
   </div>;
 }
 

@@ -37,15 +37,15 @@ export function WorkspaceTools({workspace, status, onNotify,loadWorkspace}: {wor
   }
   return <div className="workspace-tools"><span role="status">{status}</span><button className="secondary-button" title="Exporta os cadastros e lançamentos carregados; arquivos de mídia não estão incluídos." onClick={()=>void download()} disabled={downloading}><Download size={15}/> {downloading?"Preparando cópia…":"Exportar cópia"}</button></div>;
 }
-export function TodayStudio({projects, clients, entries, events, activities, onView, overviewMetrics}: {projects: Project[]; clients:Client[]; entries: FinanceEntry[]; events: CalendarEvent[]; activities: {text: string; when: string}[]; onView: (v: View) => void; overviewMetrics?:{clientCount:number;receivableAmount:number;projectCount:number;projectStatuses:Record<Status,number>}}) {
-  const active = overviewMetrics ? overviewMetrics.projectCount-overviewMetrics.projectStatuses.Aprovado :
+export function TodayStudio({projects, clients, entries, events, activities, onView, overviewMetrics}: {projects: Project[]; clients:Client[]; entries: FinanceEntry[]; events: CalendarEvent[]; activities: {text: string; when: string}[]; onView: (v: View) => void; overviewMetrics?:{clientCount?:number;receivableAmount?:number;projectCount?:number;projectStatuses?:Record<Status,number>}}) {
+  const active = overviewMetrics?.projectStatuses && overviewMetrics.projectCount!==undefined ? overviewMetrics.projectCount-overviewMetrics.projectStatuses.Aprovado :
     projects.filter(p=>p.status!=="Aprovado").length;
   const approved = overviewMetrics?.projectStatuses.Aprovado ?? projects.filter(p=>p.status==="Aprovado").length;
-  const pending = overviewMetrics ? overviewMetrics.projectStatuses["Em aprovação"]+overviewMetrics.projectStatuses.Ajustes :
+  const pending = overviewMetrics?.projectStatuses ? overviewMetrics.projectStatuses["Em aprovação"]+overviewMetrics.projectStatuses.Ajustes :
     projects.filter(p=>p.status==="Em aprovação"||p.status==="Ajustes").length;
   const projectCount=overviewMetrics?.projectCount ?? projects.length;
   const receivable = entries.filter(e=>e.kind!=="expense"&&e.status==="A receber");
-  const phases = [{label:"Produção",status:"Em produção",color:"var(--chart-primary)"},{label:"Aprovação",status:"Em aprovação",color:"#929292"},{label:"Ajustes",status:"Ajustes",color:"#b6b6b6"},{label:"Concluídos",status:"Aprovado",color:"#d4d4d4"}].map(p=>({...p,count:overviewMetrics?.projectStatuses[p.status as Status] ?? projects.filter(item=>item.status===p.status).length}));
+  const phases = [{label:"Produção",status:"Em produção",color:"var(--chart-primary)"},{label:"Aprovação",status:"Em aprovação",color:"#929292"},{label:"Ajustes",status:"Ajustes",color:"#b6b6b6"},{label:"Concluídos",status:"Aprovado",color:"#d4d4d4"}].map(p=>({...p,count:overviewMetrics?.projectStatuses?.[p.status as Status] ?? projects.filter(item=>item.status===p.status).length}));
   const clock=new Date().toTimeString().slice(0,5);
   const next = [...events].filter(e=>e.date>today() || (e.date===today() && (e.endTime || e.time)>=clock)).sort((a,b)=>`${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`))[0];
   return <section className="panel flow-overview" aria-label="Panorama geral do estúdio">
