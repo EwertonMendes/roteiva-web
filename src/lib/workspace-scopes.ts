@@ -11,7 +11,7 @@ export function domainsForRoute(route:WorkspaceRoute):readonly Domain[] {
     case "library":
       return ["projects"];
     case "overview":
-      return ["clients","projects","tasks","events","financeEntries","activities"];
+      return ["projects","tasks","events","activities"];
     // Lists and details intentionally use the same closure of business domains.
     // This prevents a newly created record from being replaced by an older
     // server snapshot during immediate navigation to its detail route.

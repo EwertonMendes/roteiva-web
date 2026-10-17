@@ -56,9 +56,9 @@ type DashboardProps = {
   initialWorkspace?: WorkspaceData; initialTheme?: "light"|"dark";
   onWorkspaceChange?: (workspace:WorkspaceData, dirtyDomains:readonly Domain[])=>void; onThemeChange?:(theme:"light"|"dark")=>void;
   onLoadWorkspace?:()=>Promise<WorkspaceData>; onRouteChange?:(route:WorkspaceRoute)=>void;
-  cloudStatus?:string; saving?:boolean; onLogout?:()=>void;
+  overviewMetrics?:{clientCount:number;receivableAmount:number}; cloudStatus?:string; saving?:boolean; onLogout?:()=>void;
 };
-export default function DashboardClient({ firstName, email, photoURL, profile, onSaveProfile, initialWorkspace, initialTheme, onWorkspaceChange, onThemeChange, onLoadWorkspace, onRouteChange, cloudStatus, saving, onLogout }: DashboardProps) {
+export default function DashboardClient({ firstName, email, photoURL, profile, onSaveProfile, initialWorkspace, initialTheme, onWorkspaceChange, onThemeChange, onLoadWorkspace, onRouteChange, overviewMetrics, cloudStatus, saving, onLogout }: DashboardProps) {
   const routeEnvironment={base:import.meta.env.BASE_URL,useHash:isDemo};
   const initialRoute=()=>routeFromLocation(window.location,routeEnvironment);
   const [initialBrowserRoute]=useState<WorkspaceRoute>(initialRoute);
@@ -435,7 +435,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
             </div>
           </div>
           {view === "settings" && <SettingsPage profile={profile} email={email} photoURL={photoURL} theme={theme} toggleTheme={toggleTheme} workspace={workspace} onLoadWorkspace={onLoadWorkspace} cloudStatus={isDemo ? saveStatus : cloudStatus || ""} onNotify={notify} onSaveProfile={onSaveProfile} />}
-          {view === "overview" && <><TodayStudio clients={clientList} projects={projects} entries={financeEntries} events={calendarEvents} activities={activities} onView={changeView} /><Overview projects={projects} setView={changeView} onOpenProject={openProject} /></>}
+          {view === "overview" && <><TodayStudio clients={clientList} projects={projects} entries={financeEntries} events={calendarEvents} activities={activities} onView={changeView} overviewMetrics={overviewMetrics} /><Overview projects={projects} setView={changeView} onOpenProject={openProject} /></>}
           {view === "projects" && (selectedProject && projects.some(p => p.id === selectedProject) ? <ProjectDetail project={projects.find(p => p.id === selectedProject)!} clients={clientList} entries={financeEntries} assets={libraryAssets} events={calendarEvents} onSave={updateProject} onBack={() => changeView("projects")} onRevenue={addLinkedRevenue} onUpload={uploadAssets} onEvent={(p) => { openEvent(null, p.dueDate); }} uploading={uploading} /> : <ProjectsView projects={filtered.map(p => ({...p, files: libraryAssets.filter(a => a.projectId === p.id).length}))} statusFilter={statusFilter} setStatusFilter={setStatusFilter} onOpen={openProject} />)}
           {view === "clients" && (selectedClient && clientList.some(c => c.id === selectedClient) ? <ClientDetail client={clientList.find(c => c.id === selectedClient)!} projects={projects} entries={financeEntries} onBack={() => changeView("clients")} onEdit={(client) => { setEditingClient(client); setClientModalOpen(true); }} onSave={saveClientPackage} onProject={openProject} /> : <ClientsView clients={clientList.filter(c => `${c.name} ${c.email} ${c.phone}`.toLowerCase().includes(query.toLowerCase())).map(c => ({...c, projects: projects.filter(p => p.clientId === c.id).length, active: projects.filter(p => p.clientId === c.id && p.status !== "Aprovado").length}))} onOpen={openClient} onAdd={() => { setEditingClient(null); setClientModalOpen(true); }} />)}
           {view === "reviews" && <StudioReviews />}

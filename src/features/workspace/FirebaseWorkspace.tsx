@@ -17,6 +17,7 @@ export function FirebaseWorkspace() {
   const [initial,setInitial]=useState<{workspace:WorkspaceData;theme:"light"|"dark"}>();
   const [businessLoaded,setBusinessLoaded]=useState(false);
   const [loadingBusiness,setLoadingBusiness]=useState(false);
+  const [overviewMetrics,setOverviewMetrics]=useState<{clientCount:number;receivableAmount:number}>();
   const [error,setError]=useState("");
   const [saving,setSaving]=useState(false);
   const [status,setStatus]=useState("Dados na nuvem");
@@ -32,15 +33,18 @@ export function FirebaseWorkspace() {
     let active=true;
     failed.current=false;
     setRemoteChanges(false);setSyncWarning("");
-    setError(""); setInitial(undefined);setBusinessLoaded(false);
+    setError(""); setInitial(undefined);setBusinessLoaded(false);setOverviewMetrics(undefined);
     (async()=>{
       const route=routeFromLocation(window.location,{base:import.meta.env.BASE_URL,useHash:false});
       const domains=domainsForRoute(route);
-      const [workspace,theme]=await Promise.all([
-        domains.length ? repository.load(domains) : Promise.resolve(emptyWorkspace()),repository.loadTheme(),
+      const [workspace,theme,stats]=await Promise.all([
+        domains.length ? repository.load(domains) : Promise.resolve(emptyWorkspace()),
+        repository.loadTheme(),
+        route.view==="overview" ? repository.overviewMetrics() : Promise.resolve(undefined),
       ]);
       if (active) {
         setBusinessLoaded(domains.length>0);
+        if (stats) setOverviewMetrics(stats);
         setInitial({workspace,theme:theme || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark":"light")});
       }
     })().catch(reason=>{if(active){failed.current=true;setError(dataErrorMessage(reason));}});
@@ -86,10 +90,13 @@ export function FirebaseWorkspace() {
   },[repository,initial]);
   const ensureFullWorkspace=useCallback(()=>ensureDomains(["clients","projects","tasks","deliveries","events","financeEntries","activities"]),[ensureDomains]);
   const onRouteChange=useCallback((route:WorkspaceRoute)=>{
+    if (route.view==="overview" && !overviewMetrics) {
+      void repository.overviewMetrics().then(setOverviewMetrics).catch(reason=>setError(dataErrorMessage(reason)));
+    }
     const required=domainsForRoute(route);
     if (!required.length || repository.hasLoaded(required)) return;
     void ensureDomains(required).catch(()=>undefined);
-  },[repository,ensureDomains]);
+  },[repository,ensureDomains,overviewMetrics]);
   useEffect(()=>{
     if (!saving) return;
     const warn=(event:BeforeUnloadEvent)=>{event.preventDefault();event.returnValue="";};
@@ -127,10 +134,15 @@ export function FirebaseWorkspace() {
     </section>}
     {!initial && !error && <main className="studio-loading" role="status">Carregando seu espaço na nuvem…</main>}
     {loadingBusiness && !error && <main className="studio-loading" role="status">Carregando os dados do seu espaço…</main>}
-    {initial && !loadingBusiness && <div inert={!!error || remoteChanges} aria-busy={saving}>
+    {initial && !loadingBusiness && (overviewMetrics || routeFromLocation(window.location,{base:import.meta.env.BASE_URL,useHash:false}).view!=="overview") && <div inert={!!error || remoteChanges} aria-busy={saving}>
       <DashboardClient key={user.uid+"-"+version} firstName={profileContext?.profile.displayName || user.displayName || "Profissional"} profile={profileContext?.profile || null} onSaveProfile={profileContext?.saveProfile} email={user.email || ""} photoURL={user.photoURL || undefined}
         initialWorkspace={initial.workspace} initialTheme={initial.theme} onWorkspaceChange={businessLoaded ? save : undefined} onLoadWorkspace={repository.hasLoaded(collections) ? undefined : ensureFullWorkspace} onRouteChange={onRouteChange} onThemeChange={saveTheme}
-        cloudStatus={status} saving={saving} onLogout={()=>void logout()} />
+        overviewMetrics={{
+          clientCount:repository.hasLoaded(["clients"]) ? initial.workspace.clients.length : (overviewMetrics?.clientCount ?? initial.workspace.clients.length),
+          receivableAmount:repository.hasLoaded(["financeEntries"]) ? initial.workspace.financeEntries
+            .filter(e=>e.kind!=="expense"&&e.status==="A receber").reduce((n,e)=>n+Math.round(e.amount*100),0)/100
+            : (overviewMetrics?.receivableAmount ?? 0),
+        }} cloudStatus={status} saving={saving} onLogout={()=>void logout()} />
     </div>}
   </>;
 }

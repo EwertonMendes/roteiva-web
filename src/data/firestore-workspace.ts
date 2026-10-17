@@ -1,4 +1,4 @@
-import { collection, doc, documentId, getDocFromServer, getDocsFromCache, getDocsFromServer, getCountFromServer, limit, orderBy, query, runTransaction, serverTimestamp, startAfter, type DocumentData, type Firestore, type QueryDocumentSnapshot } from "firebase/firestore";
+import { collection, doc, documentId, getAggregateFromServer, sum, where, getDocFromServer, getDocsFromCache, getDocsFromServer, getCountFromServer, limit, orderBy, query, runTransaction, serverTimestamp, startAfter, type DocumentData, type Firestore, type QueryDocumentSnapshot } from "firebase/firestore";
 import { collections, decodeWorkspace, encodeWorkspace, equalData, type Data, type Records } from "./workspace-codec.ts";
 import type { WorkspaceData } from "../domain/workspace";
 import { advanceSync, bootstrapSync, emptyNumbers, parseSync, persistentCacheSelected, readManifest, readSync, recordCounts, saveManifest, syncRef, type Domain, type SyncStamp } from "./firestore-sync.ts";
@@ -205,6 +205,22 @@ export class FirestoreWorkspace {
   async loadTheme(): Promise<"light"|"dark"|undefined> {
     const snap=await getDocFromServer(this.ref("preferences/ui"));
     return snap.exists() ? snap.data().theme as "light"|"dark" : undefined;
+  }
+  /**
+   * Server aggregations avoid downloading every finance entry or client
+   * to render the overview. The composite index is declared with the rules.
+   * A failed aggregation aborts the overview instead of reporting fake zeros.
+   */
+  async overviewMetrics(): Promise<{clientCount:number;receivableAmount:number}> {
+    const [clients,receivable]=await Promise.all([
+      getCountFromServer(collection(this.db,"users",this.uid,"clients")),
+      getAggregateFromServer(query(collection(this.db,"users",this.uid,"financeEntries"),
+        where("kind","==","income"),where("status","==","A receber")),
+        {amountCents:sum("amountCents")}),
+    ]);
+    trackAggregation(this.uid);trackAggregation(this.uid);
+    return {clientCount:clients.data().count,
+      receivableAmount:(receivable.data().amountCents ?? 0)/100};
   }
   diagnostics() { return usageSnapshot(this.uid); }
   async saveTheme(theme:"light"|"dark") {
