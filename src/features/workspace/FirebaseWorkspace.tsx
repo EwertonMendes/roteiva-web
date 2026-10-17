@@ -116,6 +116,13 @@ export function FirebaseWorkspace() {
         reason:typeof summary==="string"?summary.slice(0,180):"unknown",
       });
       const attempt=automaticAttempts.current++;
+      // Do not loop forever on a deterministic client/schema problem.
+      // Temporary network failures continue reconnecting in the background.
+      if(!transientFirestoreRead(reason) && attempt>=2){
+        failed.current=true;
+        setError("A sincronização não pôde ser concluída automaticamente. O acesso aos seus dados foi interrompido para evitar informações incorretas.");
+        return;
+      }
       const delay=Math.min(30000,2000*2**Math.min(attempt,4));
       retryTimer=setTimeout(()=>{if(active)setVersion(value=>value+1);},delay);
     });
