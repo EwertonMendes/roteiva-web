@@ -235,7 +235,7 @@ npm run deploy:dev
 
 Os quatro últimos que usam Wrangler dependem do runtime oficial instalado pelo runner; migrations remotas e deploy exigem token no environment. `build` é dry-run, não publicação. Migrations remotas são versionadas pelo D1; nunca editar arquivo já aplicado, criar próximo número. Usar mudanças aditivas compatíveis com versão anterior do Worker; não automatizar DROP/rollback destrutivo. DB guarda somente conexão, ciphertext e transação temporária; nenhum cliente/projeto/mídia.
 
-`api-dev.yml` valida PRs/push: instalação congelada, audit, typecheck, testes, migração local e dry-run. Publicação normal só master fora de PR, após validate; serializa migrations/deploy, confere conta/banco e testa HTTPS e rejeição de identidade inválida. Checkout/artifact do mesmo run; token somente nas etapas privilegiadas. Firebase/Pages permanecem workflows originais. O bootstrap inicial usa dispatch explícito do proprietário, branch exata e SHA esperado, com validação repetida; remover autorização temporária após a primeira publicação. Não fazer merge automático.
+`api-dev.yml` valida PRs, dispatch e conclusão bem-sucedida do CI frontend após push master: instalação congelada, audit, typecheck, testes, migração local e dry-run. Publicação normal só após CI frontend verde de push master (workflow_run) ou dispatch manual na master com validação própria; checkout do SHA validado, após validate; serializa migrations/deploy, confere conta/banco e testa HTTPS e rejeição de identidade inválida. Checkout/artifact do mesmo run; token somente nas etapas privilegiadas. Firebase/Pages permanecem workflows originais. O bootstrap inicial foi executado por dispatch explícito do proprietário, branch exata e SHA esperado, com validação repetida. A exceção foi removida do workflow e o environment passou a aceitar somente master após a publicação; versões históricas da branch também não recebem mais esse secret. Não fazer merge automático.
 
 ### Contratos mínimos
 
@@ -248,7 +248,7 @@ Os quatro últimos que usam Wrangler dependem do runtime oficial instalado pelo 
 | GET /integrations/drive/:connectionId/metadata?fileId=... | Só metadado de arquivo autorizado, sem bytes/mídia; refresh no servidor |
 | POST /integrations/drive/:connectionId/disconnect | Origem exata e proprietário; revogação Google explícita, sem apagar arquivos |
 
-Rotas OAuth/metadados/desconexão bloqueadas enquanto OAUTH_ENABLED=false. Callback não retorna tokens; respostas privadas no-store, no-referrer e sem conteúdo executável. Não registrar exceções, requests, URLs, cookies ou respostas OAuth. Invocation logs desabilitados para impedir retenção de code/state no callback; logs categóricos com requestId, amostragem 10%, sem traces nem exportação para terceiros.
+Rotas OAuth/metadados/desconexão bloqueadas enquanto OAUTH_ENABLED=false. Não há tela Conectar Drive publicada: a próxima fase deve preparar o cliente autenticado/PoC, resolver cookies entre sites e solicitar o consentimento real do proprietário no navegador. Callback não retorna tokens; respostas privadas no-store, no-referrer e sem conteúdo executável. Não registrar exceções, requests, URLs, cookies ou respostas OAuth. Invocation logs desabilitados para impedir retenção de code/state no callback; logs categóricos com requestId, amostragem 10%, sem traces nem exportação para terceiros.
 
 ### Franquias e pendências de operação
 
@@ -259,3 +259,9 @@ Google Testing com drive.file normalmente emite refresh tokens que expiram em se
 Picker requer futuramente chave de API **pública restrita a HTTP referrer DEV e somente Picker API**, appId do projeto e token curto adequado. A API está habilitada, mas a UI Picker e essa chave não foram criadas nesta fundação. Seleção de pasta não concede acesso recursivo aos arquivos existentes. Originais permanecem no Drive; biblioteca/associação de múltiplas pastas serão outra etapa.
 
 **QA obrigatório antes de habilitar a integração:** login real A/B, consentimento/revogação/renovação reais, arquivo autorizado pelo Picker, concorrência e cookies entre sites. Mocks de Google e JWTs sintéticos não contam como essas evidências. API REST não valida revogação Firebase imediatamente; documentar janela de expiração antes de piloto. Sem chave em VITE_*, sem refresh token devolvido ao cliente.
+
+### Evidência de publicação em 17/10/2026
+
+[Run DEV 39055895154](https://github.com/EwertonMendes/roteiva-web/actions/runs/39055895154) publicou o commit `0d8d7bc99cf615603bddd6e0d78a246a5ff07d45`: npm ci/audit, TypeScript, oito testes, migration local, dry-run, aplicação idempotente da migração remota, deploy e smoke HTTPS concluídos. Health real retornou 200 com status ok/environment dev; token inválido retornou 401. Conferido também no Chrome. A primeira tentativa [39055742987](https://github.com/EwertonMendes/roteiva-web/actions/runs/39055742987) já havia aplicado 0001_oauth.sql, mas a publicação foi recusada porque cpu_ms configurável não é suportado no Free; remoção do campo resolveu sem upgrade. Logs não contêm secrets, e a tela do Worker confirmou os dois secrets cifrados preservados após deploy. Projeto Google confirmado sem conta de faturamento vinculada.
+
+OAuth real, renovação real, arquivo real selecionado e segunda conta Google **não executados**. O grant Drive nunca foi concedido nem há refresh token real armazenado. Infraestrutura funcional não equivale a biblioteca ou PoC Google validada.

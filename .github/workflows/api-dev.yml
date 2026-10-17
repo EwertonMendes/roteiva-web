@@ -2,18 +2,11 @@ name: Roteiva API DEV
 on:
   pull_request:
     branches: [master]
-  push:
+  workflow_run:
+    workflows: ["Build and deploy Roteiva demo"]
+    types: [completed]
     branches: [master]
   workflow_dispatch:
-    inputs:
-      dev_bootstrap:
-        description: Initial DEV publication from audited PR branch
-        type: boolean
-        default: false
-      expected_sha:
-        description: Exact reviewed commit to publish
-        type: string
-        required: false
 env:
   WRANGLER_SEND_METRICS: 'false'
 permissions:
@@ -23,12 +16,20 @@ concurrency:
   cancel-in-progress: false
 jobs:
   validate:
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_branch == 'master' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: api
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -45,10 +46,10 @@ jobs:
           retention-days: 7
   deploy:
     if: >-
-      (github.ref == 'refs/heads/master' && github.event_name != 'pull_request') ||
-      (github.event_name == 'workflow_dispatch' && inputs.dev_bootstrap &&
-       github.ref == 'refs/heads/codex/drive-infrastructure-dev' && inputs.expected_sha == github.sha &&
-       github.actor == 'EwertonMendes')
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master') ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'master' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
     needs: validate
     runs-on: ubuntu-latest
     environment: cloudflare-development
@@ -57,6 +58,8 @@ jobs:
         working-directory: api
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
