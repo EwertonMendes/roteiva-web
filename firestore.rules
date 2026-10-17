@@ -114,6 +114,292 @@ service cloud.firestore {
         text(d.text,0,500) &&
         text(d.when,24,24) && d.when.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[.][0-9]{3}Z$');
     }
+    function valid_driveFolders(d,uid,id) {
+      return d.keys().hasAll(["ownerUid","schemaVersion","projectId","connectionId","folderId","folderName","createdAt"]) &&
+        d.keys().hasOnly(["ownerUid","schemaVersion","projectId","connectionId","folderId","folderName","createdAt"]) &&
+        d.ownerUid==uid && d.schemaVersion==1 &&
+        d.projectId is int && d.projectId>0 &&
+        exists(/databases/$(database)/documents/users/$(uid)/projects/$(string(d.projectId))) &&
+        text(d.connectionId,36,36) && d.connectionId.matches('^[a-zA-Z0-9-]{36}
+      return d.keys().hasAll(["ownerUid","schemaVersion","revision","createdAt","updatedAt","theme"]) && d.keys().hasOnly(["ownerUid","schemaVersion","revision","createdAt","updatedAt","theme"]) &&
+        metadata(d,uid) &&
+        d.theme in ["light","dark"];
+    }
+
+    function valid_sync(d,uid,id) {
+      return id=='state' &&
+        d.keys().hasAll(["ownerUid","schemaVersion","revision","createdAt","updatedAt","domains","counts"]) &&
+        d.keys().hasOnly(["ownerUid","schemaVersion","revision","createdAt","updatedAt","domains","counts"]) &&
+        metadata(d,uid) && d.revision is int && d.revision>=1 &&
+        d.domains is map && d.counts is map &&
+        d.domains.keys().hasAll(["clients","projects","tasks","deliveries","events","financeEntries","activities"]) &&
+        d.domains.keys().hasOnly(["clients","projects","tasks","deliveries","events","financeEntries","activities"]) &&
+        d.counts.keys().hasAll(["clients","projects","tasks","deliveries","events","financeEntries","activities"]) &&
+        d.counts.keys().hasOnly(["clients","projects","tasks","deliveries","events","financeEntries","activities"]) &&
+        valid_sync_counts(d.domains) && valid_sync_counts(d.counts);
+    }
+    function valid_sync_counts(d) {
+      return d.clients is int && d.clients>=0 && d.clients<1000000 &&
+        d.projects is int && d.projects>=0 && d.projects<1000000 &&
+        d.tasks is int && d.tasks>=0 && d.tasks<1000000 &&
+        d.deliveries is int && d.deliveries>=0 && d.deliveries<1000000 &&
+        d.events is int && d.events>=0 && d.events<1000000 &&
+        d.financeEntries is int && d.financeEntries>=0 && d.financeEntries<1000000 &&
+        d.activities is int && d.activities>=0 && d.activities<1000000;
+    }
+    function hasRegistration(d) {
+      return d.keys().hasAll(["studioName","professionalType","registrationCompletedAt","dataAcknowledgedAt"]);
+    }
+    function modernProfile(d) {
+      return hasRegistration(d) && text(d.displayName,2,120) &&
+        text(d.studioName,0,120) &&
+        d.professionalType in ["freelancer","studio","producer","other"] &&
+        d.registrationCompletedAt is timestamp &&
+        d.dataAcknowledgedAt is timestamp;
+    }
+    function legacyProfile(d) {
+      // Accounts created before explicit onboarding keep their original registration state.
+      // A legacy account may opt to configure studio/occupation without fake consent timestamps.
+      return !d.keys().hasAny(["registrationCompletedAt","dataAcknowledgedAt"]) &&
+        ((!d.keys().hasAny(["studioName","professionalType"])) ||
+         (d.keys().hasAll(["studioName","professionalType"]) &&
+          text(d.studioName,0,120) &&
+          d.professionalType in ["freelancer","studio","producer","other"]));
+    }
+    function valid_profile(d,uid,id) {
+      return d.keys().hasAll(["ownerUid","schemaVersion","revision","createdAt","updatedAt","displayName","email","photoURL"]) &&
+        d.keys().hasOnly(["ownerUid","schemaVersion","revision","createdAt","updatedAt","displayName","email","photoURL","studioName","professionalType","registrationCompletedAt","dataAcknowledgedAt"]) &&
+        metadata(d,uid) &&
+        text(d.displayName,0,500) &&
+        text(d.email,0,254) && (d.email=='' || d.email.matches('^[^ @]+@[^ @]+[.][^ @]+$')) &&
+        text(d.photoURL,0,2048) && (d.photoURL=='' || d.photoURL.matches('^https://.*$')) &&
+        (modernProfile(d) || legacyProfile(d));
+    }
+    function immutableRegistration(d) {
+      return (legacyProfile(resource.data) && legacyProfile(d)) ||
+        (modernProfile(resource.data) && modernProfile(d) &&
+         d.registrationCompletedAt==resource.data.registrationCompletedAt &&
+         d.dataAcknowledgedAt==resource.data.dataAcknowledgedAt);
+    }
+    match /users/{uid} {
+      allow read: if owner(uid);
+      // New users must complete the registration form. Legacy users keep their original profile.
+      allow create: if owner(uid) && valid_profile(request.resource.data,uid,uid) &&
+        modernProfile(request.resource.data) &&
+        request.resource.data.registrationCompletedAt==request.time &&
+        request.resource.data.dataAcknowledgedAt==request.time &&
+        creating(request.resource.data);
+      allow update: if owner(uid) && valid_profile(request.resource.data,uid,uid) &&
+        immutableRegistration(request.resource.data) &&
+        request.resource.data.email==resource.data.email &&
+        request.resource.data.photoURL==resource.data.photoURL &&
+        updating(request.resource.data);
+      allow delete: if false; // Account deletion requires a future explicit cleanup process.
+      match /clients/{id} {
+        allow read: if member(uid);
+        allow create: if member(uid) && valid_clients(request.resource.data,uid,id) && creating(request.resource.data);
+        allow update: if member(uid) && valid_clients(request.resource.data,uid,id) && updating(request.resource.data);
+        allow delete: if member(uid);
+      }
+      match /projects/{id} {
+        allow read: if member(uid);
+        allow create: if member(uid) && valid_projects(request.resource.data,uid,id) && creating(request.resource.data);
+        allow update: if member(uid) && valid_projects(request.resource.data,uid,id) && updating(request.resource.data);
+        allow delete: if member(uid);
+      }
+      match /tasks/{id} {
+        allow read: if member(uid);
+        allow create: if member(uid) && valid_tasks(request.resource.data,uid,id) && creating(request.resource.data);
+        allow update: if member(uid) && valid_tasks(request.resource.data,uid,id) && updating(request.resource.data);
+        allow delete: if member(uid);
+      }
+      match /deliveries/{id} {
+        allow read: if member(uid);
+        allow create: if member(uid) && valid_deliveries(request.resource.data,uid,id) && creating(request.resource.data);
+        allow update: if member(uid) && valid_deliveries(request.resource.data,uid,id) && updating(request.resource.data);
+        allow delete: if member(uid);
+      }
+      match /events/{id} {
+        allow read: if member(uid);
+        allow create: if member(uid) && valid_events(request.resource.data,uid,id) && creating(request.resource.data);
+        allow update: if member(uid) && valid_events(request.resource.data,uid,id) && updating(request.resource.data);
+        allow delete: if member(uid);
+      }
+      match /financeEntries/{id} {
+        allow read: if member(uid);
+        allow create: if member(uid) && valid_financeEntries(request.resource.data,uid,id) && creating(request.resource.data);
+        allow update: if member(uid) && valid_financeEntries(request.resource.data,uid,id) && updating(request.resource.data);
+        allow delete: if member(uid);
+      }
+      match /activities/{id} {
+        allow read: if member(uid);
+        allow create: if member(uid) && valid_activities(request.resource.data,uid,id) && creating(request.resource.data);
+        allow update: if member(uid) && valid_activities(request.resource.data,uid,id) && updating(request.resource.data);
+        allow delete: if member(uid);
+      }
+      // Private per-UID revision counters; no shared hot document across accounts.
+      match /sync/{id} {
+        allow read: if member(uid) && id=='state';
+        allow create: if member(uid) && valid_sync(request.resource.data,uid,id) && creating(request.resource.data);
+        allow update: if member(uid) && valid_sync(request.resource.data,uid,id) && updating(request.resource.data);
+        allow delete: if false;
+      }
+      // Explicit folder-to-project links; file bodies and OAuth credentials never enter Firestore.
+      match /driveFolders/{id} {
+        allow read: if member(uid);
+        allow create: if member(uid) && valid_driveFolders(request.resource.data,uid,id);
+        allow update: if false;
+        allow delete: if member(uid);
+      }
+      match /preferences/{id} {
+        allow read: if member(uid) && id=='ui';
+        allow create: if member(uid) && id=='ui' && valid_preferences(request.resource.data,uid,id) && creating(request.resource.data);
+        allow update: if member(uid) && id=='ui' && valid_preferences(request.resource.data,uid,id) && updating(request.resource.data);
+        allow delete: if member(uid) && id=='ui';
+      }
+    }
+    match /{document=**} { allow read,write: if false; }
+  }
+}
+) &&
+        text(d.folderId,10,200) && d.folderId.matches('^[a-zA-Z0-9_-]+
+      return d.keys().hasAll(["ownerUid","schemaVersion","revision","createdAt","updatedAt","theme"]) && d.keys().hasOnly(["ownerUid","schemaVersion","revision","createdAt","updatedAt","theme"]) &&
+        metadata(d,uid) &&
+        d.theme in ["light","dark"];
+    }
+
+    function valid_sync(d,uid,id) {
+      return id=='state' &&
+        d.keys().hasAll(["ownerUid","schemaVersion","revision","createdAt","updatedAt","domains","counts"]) &&
+        d.keys().hasOnly(["ownerUid","schemaVersion","revision","createdAt","updatedAt","domains","counts"]) &&
+        metadata(d,uid) && d.revision is int && d.revision>=1 &&
+        d.domains is map && d.counts is map &&
+        d.domains.keys().hasAll(["clients","projects","tasks","deliveries","events","financeEntries","activities"]) &&
+        d.domains.keys().hasOnly(["clients","projects","tasks","deliveries","events","financeEntries","activities"]) &&
+        d.counts.keys().hasAll(["clients","projects","tasks","deliveries","events","financeEntries","activities"]) &&
+        d.counts.keys().hasOnly(["clients","projects","tasks","deliveries","events","financeEntries","activities"]) &&
+        valid_sync_counts(d.domains) && valid_sync_counts(d.counts);
+    }
+    function valid_sync_counts(d) {
+      return d.clients is int && d.clients>=0 && d.clients<1000000 &&
+        d.projects is int && d.projects>=0 && d.projects<1000000 &&
+        d.tasks is int && d.tasks>=0 && d.tasks<1000000 &&
+        d.deliveries is int && d.deliveries>=0 && d.deliveries<1000000 &&
+        d.events is int && d.events>=0 && d.events<1000000 &&
+        d.financeEntries is int && d.financeEntries>=0 && d.financeEntries<1000000 &&
+        d.activities is int && d.activities>=0 && d.activities<1000000;
+    }
+    function hasRegistration(d) {
+      return d.keys().hasAll(["studioName","professionalType","registrationCompletedAt","dataAcknowledgedAt"]);
+    }
+    function modernProfile(d) {
+      return hasRegistration(d) && text(d.displayName,2,120) &&
+        text(d.studioName,0,120) &&
+        d.professionalType in ["freelancer","studio","producer","other"] &&
+        d.registrationCompletedAt is timestamp &&
+        d.dataAcknowledgedAt is timestamp;
+    }
+    function legacyProfile(d) {
+      // Accounts created before explicit onboarding keep their original registration state.
+      // A legacy account may opt to configure studio/occupation without fake consent timestamps.
+      return !d.keys().hasAny(["registrationCompletedAt","dataAcknowledgedAt"]) &&
+        ((!d.keys().hasAny(["studioName","professionalType"])) ||
+         (d.keys().hasAll(["studioName","professionalType"]) &&
+          text(d.studioName,0,120) &&
+          d.professionalType in ["freelancer","studio","producer","other"]));
+    }
+    function valid_profile(d,uid,id) {
+      return d.keys().hasAll(["ownerUid","schemaVersion","revision","createdAt","updatedAt","displayName","email","photoURL"]) &&
+        d.keys().hasOnly(["ownerUid","schemaVersion","revision","createdAt","updatedAt","displayName","email","photoURL","studioName","professionalType","registrationCompletedAt","dataAcknowledgedAt"]) &&
+        metadata(d,uid) &&
+        text(d.displayName,0,500) &&
+        text(d.email,0,254) && (d.email=='' || d.email.matches('^[^ @]+@[^ @]+[.][^ @]+$')) &&
+        text(d.photoURL,0,2048) && (d.photoURL=='' || d.photoURL.matches('^https://.*$')) &&
+        (modernProfile(d) || legacyProfile(d));
+    }
+    function immutableRegistration(d) {
+      return (legacyProfile(resource.data) && legacyProfile(d)) ||
+        (modernProfile(resource.data) && modernProfile(d) &&
+         d.registrationCompletedAt==resource.data.registrationCompletedAt &&
+         d.dataAcknowledgedAt==resource.data.dataAcknowledgedAt);
+    }
+    match /users/{uid} {
+      allow read: if owner(uid);
+      // New users must complete the registration form. Legacy users keep their original profile.
+      allow create: if owner(uid) && valid_profile(request.resource.data,uid,uid) &&
+        modernProfile(request.resource.data) &&
+        request.resource.data.registrationCompletedAt==request.time &&
+        request.resource.data.dataAcknowledgedAt==request.time &&
+        creating(request.resource.data);
+      allow update: if owner(uid) && valid_profile(request.resource.data,uid,uid) &&
+        immutableRegistration(request.resource.data) &&
+        request.resource.data.email==resource.data.email &&
+        request.resource.data.photoURL==resource.data.photoURL &&
+        updating(request.resource.data);
+      allow delete: if false; // Account deletion requires a future explicit cleanup process.
+      match /clients/{id} {
+        allow read: if member(uid);
+        allow create: if member(uid) && valid_clients(request.resource.data,uid,id) && creating(request.resource.data);
+        allow update: if member(uid) && valid_clients(request.resource.data,uid,id) && updating(request.resource.data);
+        allow delete: if member(uid);
+      }
+      match /projects/{id} {
+        allow read: if member(uid);
+        allow create: if member(uid) && valid_projects(request.resource.data,uid,id) && creating(request.resource.data);
+        allow update: if member(uid) && valid_projects(request.resource.data,uid,id) && updating(request.resource.data);
+        allow delete: if member(uid);
+      }
+      match /tasks/{id} {
+        allow read: if member(uid);
+        allow create: if member(uid) && valid_tasks(request.resource.data,uid,id) && creating(request.resource.data);
+        allow update: if member(uid) && valid_tasks(request.resource.data,uid,id) && updating(request.resource.data);
+        allow delete: if member(uid);
+      }
+      match /deliveries/{id} {
+        allow read: if member(uid);
+        allow create: if member(uid) && valid_deliveries(request.resource.data,uid,id) && creating(request.resource.data);
+        allow update: if member(uid) && valid_deliveries(request.resource.data,uid,id) && updating(request.resource.data);
+        allow delete: if member(uid);
+      }
+      match /events/{id} {
+        allow read: if member(uid);
+        allow create: if member(uid) && valid_events(request.resource.data,uid,id) && creating(request.resource.data);
+        allow update: if member(uid) && valid_events(request.resource.data,uid,id) && updating(request.resource.data);
+        allow delete: if member(uid);
+      }
+      match /financeEntries/{id} {
+        allow read: if member(uid);
+        allow create: if member(uid) && valid_financeEntries(request.resource.data,uid,id) && creating(request.resource.data);
+        allow update: if member(uid) && valid_financeEntries(request.resource.data,uid,id) && updating(request.resource.data);
+        allow delete: if member(uid);
+      }
+      match /activities/{id} {
+        allow read: if member(uid);
+        allow create: if member(uid) && valid_activities(request.resource.data,uid,id) && creating(request.resource.data);
+        allow update: if member(uid) && valid_activities(request.resource.data,uid,id) && updating(request.resource.data);
+        allow delete: if member(uid);
+      }
+      // Private per-UID revision counters; no shared hot document across accounts.
+      match /sync/{id} {
+        allow read: if member(uid) && id=='state';
+        allow create: if member(uid) && valid_sync(request.resource.data,uid,id) && creating(request.resource.data);
+        allow update: if member(uid) && valid_sync(request.resource.data,uid,id) && updating(request.resource.data);
+        allow delete: if false;
+      }
+      match /preferences/{id} {
+        allow read: if member(uid) && id=='ui';
+        allow create: if member(uid) && id=='ui' && valid_preferences(request.resource.data,uid,id) && creating(request.resource.data);
+        allow update: if member(uid) && id=='ui' && valid_preferences(request.resource.data,uid,id) && updating(request.resource.data);
+        allow delete: if member(uid) && id=='ui';
+      }
+    }
+    match /{document=**} { allow read,write: if false; }
+  }
+}
+) &&
+        text(d.folderName,1,250) && d.createdAt==request.time &&
+        id==string(d.projectId)+'_'+d.connectionId+'_'+d.folderId;
+    }
     function valid_preferences(d,uid,id) {
       return d.keys().hasAll(["ownerUid","schemaVersion","revision","createdAt","updatedAt","theme"]) && d.keys().hasOnly(["ownerUid","schemaVersion","revision","createdAt","updatedAt","theme"]) &&
         metadata(d,uid) &&
