@@ -15,6 +15,11 @@ export async function purgePrivateCache(): Promise<void> {
   const {app,db} = firebaseServices();
   await terminate(db);
   await clearIndexedDbPersistence(db);
+  try {
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith("roteiva-cache-v2:")) localStorage.removeItem(key);
+    }
+  } catch { /* Storage inaccessible: no reusable manifest can be read. */ }
   await deleteApp(app);
 }
 export const useEmulators = import.meta.env.VITE_USE_EMULATORS === "true";

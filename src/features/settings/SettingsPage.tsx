@@ -16,11 +16,11 @@ type SettingsProps={
   profile?: RoteivaProfile | null;
   email:string; photoURL?:string;
   theme:"light"|"dark"; toggleTheme:()=>void;
-  workspace:object; cloudStatus:string; onNotify:(message:string)=>void;
+  workspace:object; onLoadWorkspace?:()=>Promise<object>; cloudStatus:string; onNotify:(message:string)=>void;
   onSaveProfile?:(changes:ProfileChanges)=>Promise<void>;
 };
 
-export function SettingsPage({profile,email,photoURL,theme,toggleTheme,workspace,cloudStatus,onNotify,onSaveProfile}:SettingsProps){
+export function SettingsPage({profile,email,photoURL,theme,toggleTheme,workspace,onLoadWorkspace,cloudStatus,onNotify,onSaveProfile}:SettingsProps){
   const [name,setName]=useState(profile?.displayName||"");
   const [studio,setStudio]=useState(profile?.studioName||"");
   const [occupation,setOccupation]=useState<ProfessionalType>(profile?.professionalType||"freelancer");
@@ -139,7 +139,7 @@ export function SettingsPage({profile,email,photoURL,theme,toggleTheme,workspace
       </div>
       <div className="settings-privacy-row">
         <div><strong><Download size={16}/> Exportar dados do espaço</strong><p>Baixe uma cópia JSON dos registros carregados. A exportação não inclui arquivos de mídia, credenciais nem dados de autenticação.</p></div>
-        <WorkspaceTools workspace={workspace} status={cloudStatus} onNotify={onNotify}/>
+        <WorkspaceTools workspace={workspace} loadWorkspace={onLoadWorkspace} status={cloudStatus} onNotify={onNotify}/>
       </div>
       <p className="settings-note"><Info size={15}/> Exclusão de conta e dados ainda não está disponível. Esse procedimento precisa ser implementado com segurança antes da abertura pública.</p>
     </section>

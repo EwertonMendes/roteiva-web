@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import DashboardClient from "../../dashboard-client";
 import { firebaseServices } from "../../lib/firebase";
 import { FirestoreWorkspace, dataErrorMessage } from "../../data/firestore-workspace";
-import type { WorkspaceData } from "../../domain/workspace";
+import { emptyWorkspace, type WorkspaceData } from "../../domain/workspace";
+import { routeFromLocation, type WorkspaceRoute } from "../../lib/workspace-routing";
 import type { Domain } from "../../data/firestore-sync";
 import { useAuth } from "../auth/AuthProvider";
 import { useRegistrationProfile } from "../auth/RegistrationGate";
@@ -12,6 +13,8 @@ export function FirebaseWorkspace() {
   const profileContext=useRegistrationProfile();
   const repository=useMemo(()=>new FirestoreWorkspace(firebaseServices().db,user!.uid),[user!.uid]);
   const [initial,setInitial]=useState<{workspace:WorkspaceData;theme:"light"|"dark"}>();
+  const [businessLoaded,setBusinessLoaded]=useState(false);
+  const [loadingBusiness,setLoadingBusiness]=useState(false);
   const [error,setError]=useState("");
   const [saving,setSaving]=useState(false);
   const [status,setStatus]=useState("Dados na nuvem");
@@ -26,10 +29,16 @@ export function FirebaseWorkspace() {
     let active=true;
     failed.current=false;
     setRemoteChanges(false);setSyncWarning("");
-    setError(""); setInitial(undefined);
+    setError(""); setInitial(undefined);setBusinessLoaded(false);
     (async()=>{
-      const [workspace,theme]=await Promise.all([repository.load(),repository.loadTheme()]);
-      if (active) setInitial({workspace,theme:theme || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark":"light")});
+      const inSettings=routeFromLocation(window.location,{base:import.meta.env.BASE_URL,useHash:false}).view==="settings";
+      const [workspace,theme]=await Promise.all([
+        inSettings ? Promise.resolve(emptyWorkspace()) : repository.load(),repository.loadTheme(),
+      ]);
+      if (active) {
+        setBusinessLoaded(!inSettings);
+        setInitial({workspace,theme:theme || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark":"light")});
+      }
     })().catch(reason=>{if(active){failed.current=true;setError(dataErrorMessage(reason));}});
     return ()=>{active=false;};
   },[repository,user,version]);
@@ -53,6 +62,22 @@ export function FirebaseWorkspace() {
     return () => {active=false;window.removeEventListener("focus",check);
       document.removeEventListener("visibilitychange",check);};
   },[repository,initial,version]);
+  const ensureBusinessData=useCallback(async ():Promise<WorkspaceData>=>{
+    if (businessLoaded && initial) return initial.workspace;
+    setLoadingBusiness(true);
+    try {
+      const workspace=await repository.load();
+      setInitial(current=>current?{...current,workspace}:current);
+      setBusinessLoaded(true);
+      return workspace;
+    } catch(reason) {
+      setError(dataErrorMessage(reason));
+      throw reason;
+    } finally {setLoadingBusiness(false);}
+  },[repository,businessLoaded,initial]);
+  const onRouteChange=useCallback((route:WorkspaceRoute)=>{
+    if (route.view!=="settings" && !businessLoaded) void ensureBusinessData().catch(()=>undefined);
+  },[businessLoaded,ensureBusinessData]);
   useEffect(()=>{
     if (!saving) return;
     const warn=(event:BeforeUnloadEvent)=>{event.preventDefault();event.returnValue="";};
@@ -89,9 +114,10 @@ export function FirebaseWorkspace() {
       <button className="secondary-button" disabled={saving||busy} onClick={()=>void logout()}>Sair da conta</button>
     </section>}
     {!initial && !error && <main className="studio-loading" role="status">Carregando seu espaço na nuvem…</main>}
-    {initial && <div inert={!!error || remoteChanges} aria-busy={saving}>
+    {loadingBusiness && !error && <main className="studio-loading" role="status">Carregando os dados do seu espaço…</main>}
+    {initial && !loadingBusiness && <div inert={!!error || remoteChanges} aria-busy={saving}>
       <DashboardClient key={user.uid+"-"+version} firstName={profileContext?.profile.displayName || user.displayName || "Profissional"} profile={profileContext?.profile || null} onSaveProfile={profileContext?.saveProfile} email={user.email || ""} photoURL={user.photoURL || undefined}
-        initialWorkspace={initial.workspace} initialTheme={initial.theme} onWorkspaceChange={save} onThemeChange={saveTheme}
+        initialWorkspace={initial.workspace} initialTheme={initial.theme} onWorkspaceChange={businessLoaded ? save : undefined} onLoadWorkspace={ensureBusinessData} onRouteChange={onRouteChange} onThemeChange={saveTheme}
         cloudStatus={status} saving={saving} onLogout={()=>void logout()} />
     </div>}
   </>;
