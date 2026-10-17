@@ -145,6 +145,67 @@ test("Account and studio settings persist without changing existing projects",as
   await navigate(page,"Projetos");
   await expect(page.getByText("Projeto mantido",{exact:true})).toBeVisible();
 });
+test("Direct routes, refresh and browser Back/Forward preserve each user's screen",async({page},info)=>{
+  const email="routes-"+info.project.name+"@example.com";
+  await page.goto(cloud+"/clientes");
+  await login(page,email);
+  await expect(page).toHaveURL(cloud+"/clientes");
+  await expect(page.getByRole("heading",{name:"Clientes",exact:true})).toBeVisible();
+  await page.reload();await settled(page);
+  await expect(page).toHaveURL(cloud+"/clientes");
+
+  await navigate(page,"Projetos");
+  await expect(page).toHaveURL(cloud+"/projetos");
+  await page.locator(".heading-actions").getByRole("button",{name:"Criar projeto",exact:true}).click();
+  await page.getByLabel("Nome do projeto",{exact:true}).fill("Projeto com URL");
+  await page.locator("form.project-modal").getByRole("button",{name:"Criar projeto",exact:true}).click();
+  await settled(page);
+  await expect(page.locator(".cloud-banner")).toContainText("Salvo na nuvem");
+  await expect(page).toHaveURL(new RegExp("/projetos/[1-9][0-9]*$"));
+  const projectURL=page.url();
+  await expect(page.getByLabel("Nova tarefa",{exact:true})).toBeVisible();
+  await page.reload();await settled(page);
+  await expect(page).toHaveURL(projectURL);
+  await expect(page.getByLabel("Nova tarefa",{exact:true})).toBeVisible();
+
+  await page.goBack();await settled(page);
+  await expect(page).toHaveURL(cloud+"/projetos");
+  await expect(page.getByText("Projeto com URL",{exact:true})).toBeVisible();
+  await page.goForward();await settled(page);
+  await expect(page).toHaveURL(projectURL);
+  await expect(page.getByLabel("Nova tarefa",{exact:true})).toBeVisible();
+
+  await navigate(page,"Clientes");
+  await page.getByRole("button",{name:"Novo cliente",exact:true}).click();
+  await page.getByLabel("Nome do cliente",{exact:true}).fill("Cliente com URL");
+  await page.getByLabel("Contato principal",{exact:true}).fill("Contato de teste");
+  await page.getByRole("button",{name:"Salvar cliente"}).click();await settled(page);
+  await expect(page.locator(".cloud-banner")).toContainText("Salvo na nuvem");
+  await page.locator(".client-list button").filter({hasText:"Cliente com URL"}).click();
+  await expect(page).toHaveURL(new RegExp("/clientes/[1-9][0-9]*$"));
+  const clientURL=page.url();
+  await page.reload();await settled(page);
+  await expect(page).toHaveURL(clientURL);
+  await expect(page.getByText("Cliente com URL",{exact:true}).first()).toBeVisible();
+
+  await navigate(page,"Configurações");
+  await expect(page).toHaveURL(cloud+"/configuracoes");
+  await page.reload();await settled(page);
+  await expect(page.getByRole("heading",{name:"Perfil profissional"})).toBeVisible();
+  await page.goBack();await settled(page);
+  await expect(page).toHaveURL(clientURL);
+  await page.goForward();await settled(page);
+  await expect(page).toHaveURL(cloud+"/configuracoes");
+
+  // A private URL from account A must never be shown as account B's data.
+  await logout(page);
+  await expect(page).toHaveURL(cloud+"/");
+  await page.goto(projectURL);
+  const second="other-routes-"+info.project.name+"@example.com";
+  await login(page,second);
+  await expect(page).toHaveURL(cloud+"/projetos");
+  await expect(page.getByText("Projeto com URL",{exact:true})).toHaveCount(0);
+});
 test("First login does not silently create a workspace",async({page},info)=>{
   await page.goto(cloud);
   // Capture the actual login screen, not the Roteiva intro animation.
@@ -205,6 +266,14 @@ test("Pages stays anonymous and uses the unchanged localStorage key",async({page
   await expect(page.getByText("Modo demonstração",{exact:true})).toBeVisible();
   await expect(page.getByRole("button",{name:"Entrar com Google",exact:true})).toHaveCount(0);
   await navigate(page,"Clientes");
+  await expect(page).toHaveURL(new RegExp("/roteiva-web/#/clientes$"));
+  await page.reload();
+  await expect(page.getByRole("heading",{name:"Clientes",exact:true})).toBeVisible();
+  await expect(page).toHaveURL(new RegExp("/roteiva-web/#/clientes$"));
+  await page.goBack();
+  await expect(page).toHaveURL(new RegExp("/roteiva-web/(#/clientes)?$"));
+  await page.goto("http://127.0.0.1:4174/roteiva-web/#/clientes");
+  await expect(page.getByRole("heading",{name:"Clientes",exact:true})).toBeVisible();
   await page.getByRole("button",{name:"Novo cliente",exact:true}).click();
   await page.getByLabel("Nome do cliente",{exact:true}).fill("Cliente Demo");
   await page.getByLabel("Contato principal",{exact:true}).fill("Teste");

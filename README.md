@@ -58,6 +58,12 @@ O perfil é salvo no próprio `users/{uid}` do Firestore com revisão sequencial
 
 **Fora deste PR:** exclusão irreversível de conta, edição de foto/e-mail do Google, políticas legais, billing, Drive e trabalho em equipe. A demonstração Pages continua sem conta e mostra as configurações em modo leitura.
 
+## Navegação com URLs persistentes (PR #12)
+
+O Firebase DEV utiliza caminhos reais para as telas internas (`/projetos`, `/clientes`, `/financeiro`, `/calendario`, `/biblioteca`, `/aprovacoes`, `/configuracoes`) e para detalhes de projetos e clientes (`/projetos/:id`, `/clientes/:id`). A URL sobrevive ao F5, pode ser usada como link e respeita Voltar/Avançar. `/review` permanece uma página separada e protegida.
+
+A mesma aplicação na demonstração GitHub Pages usa rotas em `#/...` sob `/roteiva-web/`, sem alterar a chave de localStorage nem exigir um backend/fallback indisponível no Pages. Links de registros privados **não concedem acesso**: Firebase Auth e Security Rules continuam exigindo o proprietário.
+
 ## Documentação
 
 - [Arquitetura e decisões](docs/ARCHITECTURE.md)

@@ -12,9 +12,10 @@ import {
 import { ProjectDetail, ClientDetail, TodayStudio, StudioReviews, WorkspaceTools, FinancePanel, projectTemplates } from "./studio-features";
 import { validTimeRange, overlaps, eventRange, eventDuration } from "./studio-calendar";
 import { toISO as toISOAdded, parseMoney, splitInstallments } from "./studio-finance";
-import { FormEvent, useEffect, useMemo, useState, useCallback } from "react";
+import { FormEvent, useEffect, useLayoutEffect, useMemo, useState, useCallback } from "react";
 
 import { isDemo } from "./lib/firebase";
+import { hrefForWorkspaceRoute, routeFromLocation, type WorkspaceRoute } from "./lib/workspace-routing";
 import { SettingsPage } from "./features/settings/SettingsPage";
 import type { RoteivaProfile, ProfileChanges } from "./data/firestore-workspace";
 import { newId, type WorkspaceData, type Activity, type View, type Project, type Client, type ClientType, type AssetKind, type FinanceEntry, type CalendarEvent, type LibraryAsset, type Status } from "./domain/workspace";
@@ -56,7 +57,10 @@ type DashboardProps = {
   cloudStatus?:string; saving?:boolean; onLogout?:()=>void;
 };
 export default function DashboardClient({ firstName, email, photoURL, profile, onSaveProfile, initialWorkspace, initialTheme, onWorkspaceChange, onThemeChange, cloudStatus, saving, onLogout }: DashboardProps) {
-  const [view, setView] = useState<View>("overview");
+  const routeEnvironment={base:import.meta.env.BASE_URL,useHash:isDemo};
+  const initialRoute=()=>routeFromLocation(window.location,routeEnvironment);
+  const [initialBrowserRoute]=useState<WorkspaceRoute>(initialRoute);
+  const [view, setView] = useState<View>(initialBrowserRoute.view);
   const workspaceName=profile?.studioName.trim() || "Roteiva Studio";
   const [projects, setProjects] = useState(initialProjects);
   const [clientList, setClientList] = useState(initialClients);
@@ -80,8 +84,8 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
   
   const [comments, setComments] = useState<{ name: string; initials: string; time: string; text: string; when: string }[]>([]);
   const [dataReady, setDataReady] = useState(false);
-  const [selectedProject, setSelectedProject] = useState<number | null>(null);
-  const [selectedClient, setSelectedClient] = useState<number | null>(null);
+  const [selectedProject, setSelectedProject] = useState<number | null>(initialBrowserRoute.projectId || null);
+  const [selectedClient, setSelectedClient] = useState<number | null>(initialBrowserRoute.clientId || null);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [eventDate, setEventDate] = useState("");
@@ -151,7 +155,9 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     setDataReady(true);
   },[restoreWorkspace,initialWorkspace,initialTheme]);
 
-  useEffect(() => {
+  // Queue persistence before the new UI can be painted/reloaded, closing the
+  // gap between a mutation appearing on screen and the unload protection.
+  useLayoutEffect(() => {
     if (!dataReady) return;
     const payload={projects,clients:clientList,financeEntries,calendarEvents,libraryAssets:libraryAssets.map(asset=>({...asset,preview:undefined})),comments,reviewState,activities};
     if (!isDemo) { onWorkspaceChange?.(payload); return; }
@@ -198,7 +204,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     setProjects((current) => [{ id: projectId, name, client, clientId, dueDate: dueValue, description, tasks, template, status: "Em produção", due, progress: 0, files: 0, color: "blue", initials: client.slice(0, 2).toUpperCase() }, ...current]);
     if (dueValue) setCalendarEvents((current) => [{ id: newId() + 1, projectId, autoDeadline:true, title: `Entrega — ${name}`, date: dueValue, time: "18:00", type: "Entrega", client }, ...current]);
     setModalOpen(false);
-    setView("projects"); setSelectedProject(projectId);
+    openProject(projectId);
     logActivity(`Projeto criado: ${name}`);
     notifyChange("Projeto criado com sucesso");
   }
@@ -292,7 +298,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     }
     logActivity(`Compromisso salvo: ${title}`); setEditingEvent(null);
     setEventModalOpen(false);
-    setView("calendar");
+    changeView("calendar");
     notifyChange("Compromisso adicionado ao calendário");
   }
 
@@ -300,12 +306,51 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     notify("Envio de arquivos ficará disponível após a integração com Google Drive.");
   }
 
-  function changeView(next: View) {
-    setSelectedProject(null); setSelectedClient(null);
-    setView(next);
+  function applyRoute(next:WorkspaceRoute) {
+    setView(next.view);
+    setSelectedProject(next.view==="projects" ? next.projectId || null : null);
+    setSelectedClient(next.view==="clients" ? next.clientId || null : null);
     setMobileOpen(false);
+  }
+
+  function navigateRoute(next:WorkspaceRoute,{replace=false}:{replace?:boolean}={}) {
+    const target=hrefForWorkspaceRoute(next,routeEnvironment);
+    if(window.location.pathname+window.location.hash!==target) {
+      window.history[replace?"replaceState":"pushState"](null,"",target);
+    }
+    applyRoute(next);
     window.scrollTo({top:0,behavior:"auto"});
   }
+
+  function changeView(next:View) { navigateRoute({view:next}); }
+  function openProject(id:number) { navigateRoute({view:"projects",projectId:id}); }
+  function openClient(id:number) { navigateRoute({view:"clients",clientId:id}); }
+  function signOut() {
+    // Do not leave a previous account's private record URL in a shared browser.
+    window.history.replaceState(null,"",hrefForWorkspaceRoute({view:"overview"},routeEnvironment));
+    onLogout?.();
+  }
+
+  useEffect(()=>{
+    const onNavigation=()=>{
+      applyRoute(routeFromLocation(window.location,routeEnvironment));
+      window.scrollTo({top:0,behavior:"auto"});
+    };
+    window.addEventListener("popstate",onNavigation);
+    if(routeEnvironment.useHash)window.addEventListener("hashchange",onNavigation);
+    return ()=>{
+      window.removeEventListener("popstate",onNavigation);
+      if(routeEnvironment.useHash)window.removeEventListener("hashchange",onNavigation);
+    };
+  },[]);
+
+  // Direct links must not display another user's records or leave a broken detail URL.
+  useEffect(()=>{
+    if(!dataReady)return;
+    const route=routeFromLocation(window.location,routeEnvironment);
+    if(route.projectId && !projects.some(p=>p.id===route.projectId))navigateRoute({view:"projects"},{replace:true});
+    if(route.clientId && !clientList.some(c=>c.id===route.clientId))navigateRoute({view:"clients"},{replace:true});
+  },[dataReady,projects,clientList]);
 
   const pageTitles: Record<View, [string, string]> = {
     overview: [`Olá, ${firstName}.`, "Aqui está o ritmo da sua produção hoje."],
@@ -346,7 +391,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
           <small className="sync-status" role="status">{isDemo ? saveStatus : cloudStatus}</small>
         </div>
         <div className="sidebar-profile">
-          {photoURL ? <img className="profile-photo" src={photoURL} alt="Foto do usuário" referrerPolicy="no-referrer" /> : <span>{firstName.slice(0, 2).toUpperCase()}</span>}<div><b>{firstName}</b><small>{email}</small></div>{onLogout ? <button className="icon-button" onClick={onLogout} aria-label="Sair da conta" title="Sair da conta">↪</button> : <MoreHorizontal size={18} />}
+          {photoURL ? <img className="profile-photo" src={photoURL} alt="Foto do usuário" referrerPolicy="no-referrer" /> : <span>{firstName.slice(0, 2).toUpperCase()}</span>}<div><b>{firstName}</b><small>{email}</small></div>{onLogout ? <button className="icon-button" onClick={signOut} aria-label="Sair da conta" title="Sair da conta">↪</button> : <MoreHorizontal size={18} />}
         </div>
       </aside>
       {mobileOpen && <button className="mobile-scrim" aria-label="Fechar menu" onClick={() => setMobileOpen(false)} />}
@@ -373,9 +418,9 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
             </div>
           </div>
           {view === "settings" && <SettingsPage profile={profile} email={email} photoURL={photoURL} theme={theme} toggleTheme={toggleTheme} workspace={workspace} cloudStatus={isDemo ? saveStatus : cloudStatus || ""} onNotify={notify} onSaveProfile={onSaveProfile} />}
-          {view === "overview" && <><TodayStudio clients={clientList} projects={projects} entries={financeEntries} events={calendarEvents} activities={activities} onView={changeView} /><Overview projects={projects} setView={changeView} /></>}
-          {view === "projects" && (selectedProject && projects.some(p => p.id === selectedProject) ? <ProjectDetail project={projects.find(p => p.id === selectedProject)!} clients={clientList} entries={financeEntries} assets={libraryAssets} events={calendarEvents} onSave={updateProject} onBack={() => setSelectedProject(null)} onRevenue={addLinkedRevenue} onUpload={uploadAssets} onEvent={(p) => { openEvent(null, p.dueDate); }} uploading={uploading} /> : <ProjectsView projects={filtered.map(p => ({...p, files: libraryAssets.filter(a => a.projectId === p.id).length}))} statusFilter={statusFilter} setStatusFilter={setStatusFilter} onOpen={(id)=>{setSelectedProject(id);window.scrollTo({top:0,behavior:"auto"});}} />)}
-          {view === "clients" && (selectedClient && clientList.some(c => c.id === selectedClient) ? <ClientDetail client={clientList.find(c => c.id === selectedClient)!} projects={projects} entries={financeEntries} onBack={() => setSelectedClient(null)} onEdit={(client) => { setEditingClient(client); setClientModalOpen(true); }} onSave={saveClientPackage} onProject={(id) => { setSelectedProject(id); setView("projects"); }} /> : <ClientsView clients={clientList.filter(c => `${c.name} ${c.email} ${c.phone}`.toLowerCase().includes(query.toLowerCase())).map(c => ({...c, projects: projects.filter(p => p.clientId === c.id).length, active: projects.filter(p => p.clientId === c.id && p.status !== "Aprovado").length}))} onOpen={(id)=>{setSelectedClient(id);window.scrollTo({top:0,behavior:"auto"});}} onAdd={() => { setEditingClient(null); setClientModalOpen(true); }} />)}
+          {view === "overview" && <><TodayStudio clients={clientList} projects={projects} entries={financeEntries} events={calendarEvents} activities={activities} onView={changeView} /><Overview projects={projects} setView={changeView} onOpenProject={openProject} /></>}
+          {view === "projects" && (selectedProject && projects.some(p => p.id === selectedProject) ? <ProjectDetail project={projects.find(p => p.id === selectedProject)!} clients={clientList} entries={financeEntries} assets={libraryAssets} events={calendarEvents} onSave={updateProject} onBack={() => changeView("projects")} onRevenue={addLinkedRevenue} onUpload={uploadAssets} onEvent={(p) => { openEvent(null, p.dueDate); }} uploading={uploading} /> : <ProjectsView projects={filtered.map(p => ({...p, files: libraryAssets.filter(a => a.projectId === p.id).length}))} statusFilter={statusFilter} setStatusFilter={setStatusFilter} onOpen={openProject} />)}
+          {view === "clients" && (selectedClient && clientList.some(c => c.id === selectedClient) ? <ClientDetail client={clientList.find(c => c.id === selectedClient)!} projects={projects} entries={financeEntries} onBack={() => changeView("clients")} onEdit={(client) => { setEditingClient(client); setClientModalOpen(true); }} onSave={saveClientPackage} onProject={openProject} /> : <ClientsView clients={clientList.filter(c => `${c.name} ${c.email} ${c.phone}`.toLowerCase().includes(query.toLowerCase())).map(c => ({...c, projects: projects.filter(p => p.clientId === c.id).length, active: projects.filter(p => p.clientId === c.id && p.status !== "Aprovado").length}))} onOpen={openClient} onAdd={() => { setEditingClient(null); setClientModalOpen(true); }} />)}
           {view === "reviews" && <StudioReviews />}
           {view === "finance" && <FinancePanel entries={financeEntries} clients={clientList} onAdd={() => openFinanceModal()} onEdit={(entry) => openFinanceModal(entry)} onDelete={setDeletingFinanceEntry} />}
           {view === "calendar" && <CalendarView events={calendarEvents} onAdd={(date) => openEvent(null, date)} onEdit={(entry) => openEvent(entry)} onDelete={(entry) => { if (window.confirm(`Excluir o compromisso “${entry.title}”?`)) { setCalendarEvents(current => current.filter(e => e.id !== entry.id)); logActivity(`Compromisso excluído: ${entry.title}`); } }} />}
@@ -454,12 +499,12 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
   );
 }
 
-function Overview({ projects, setView }: { projects: Project[]; setView: (view: View) => void }) {
+function Overview({ projects, setView, onOpenProject }: { projects: Project[]; setView: (view: View) => void; onOpenProject:(id:number)=>void }) {
   return <>
     <div className="dashboard-grid">
       <div className="panel projects-panel">
         <div className="panel-head"><div><span>EM ANDAMENTO</span><h2>Projetos recentes</h2></div><button onClick={() => setView("projects")}>Ver todos <ChevronRight size={15} /></button></div>
-        <div className="project-list">{projects.slice(0, 4).map((project) => <ProjectRow project={project} key={project.id} onOpen={() => setView(project.status === "Em aprovação" ? "reviews" : "projects")} />)}{!projects.length && <div className="empty-state compact"><FolderOpen size={27} /><h3>Seu espaço está pronto</h3><p>Crie o primeiro projeto para começar a organizar sua produção.</p><button className="primary-button" onClick={() => setView("projects")}>Começar agora</button></div>}</div>
+        <div className="project-list">{projects.slice(0, 4).map((project) => <ProjectRow project={project} key={project.id} onOpen={() => onOpenProject(project.id)} />)}{!projects.length && <div className="empty-state compact"><FolderOpen size={27} /><h3>Seu espaço está pronto</h3><p>Crie o primeiro projeto para começar a organizar sua produção.</p><button className="primary-button" onClick={() => setView("projects")}>Começar agora</button></div>}</div>
       </div>
 
     </div>
