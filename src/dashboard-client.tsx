@@ -15,7 +15,7 @@ import { toISO as toISOAdded, parseMoney, splitInstallments } from "./studio-fin
 import { FormEvent, useEffect, useMemo, useState, useCallback } from "react";
 
 import { isDemo } from "./lib/firebase";
-import { hrefForWorkspaceRoute, routeFromLocation, sameWorkspaceRoute, type WorkspaceRoute } from "./lib/workspace-routing";
+import { hrefForWorkspaceRoute, routeFromLocation, type WorkspaceRoute } from "./lib/workspace-routing";
 import { SettingsPage } from "./features/settings/SettingsPage";
 import type { RoteivaProfile, ProfileChanges } from "./data/firestore-workspace";
 import { newId, type WorkspaceData, type Activity, type View, type Project, type Client, type ClientType, type AssetKind, type FinanceEntry, type CalendarEvent, type LibraryAsset, type Status } from "./domain/workspace";
@@ -312,9 +312,9 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
   }
 
   function navigateRoute(next:WorkspaceRoute,{replace=false}:{replace?:boolean}={}) {
-    const current=routeFromLocation(window.location,routeEnvironment);
-    if(!sameWorkspaceRoute(current,next)) {
-      window.history[replace?"replaceState":"pushState"](null,"",hrefForWorkspaceRoute(next,routeEnvironment));
+    const target=hrefForWorkspaceRoute(next,routeEnvironment);
+    if(window.location.pathname+window.location.hash!==target) {
+      window.history[replace?"replaceState":"pushState"](null,"",target);
     }
     applyRoute(next);
     window.scrollTo({top:0,behavior:"auto"});
