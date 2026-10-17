@@ -370,17 +370,18 @@ test("finance annual windows avoid reading older history and preserve cross-year
       {...fixtures.financeEntries,id,date,amountCents:id*100,...meta("alice")}));
   }
   const repo=new FirestoreWorkspace(db,"alice");
+  const baseline=repo.diagnostics().serverDocumentsReturned;
   const thisYear=await repo.financeYear(2026);
   assert.deepEqual(thisYear.financeEntries.map(x=>x.id).sort(),[103,104]);
   assert.equal(repo.hasLoaded(["financeEntries"]),false);
   const afterFirst=repo.diagnostics();
-  assert.equal(afterFirst.serverDocumentsReturned,2);
+  assert.equal(afterFirst.serverDocumentsReturned-baseline,2);
   const cached=await repo.financeYear(2026);
   assert.equal(cached.financeEntries.length,2);
-  assert.equal(repo.diagnostics().serverDocumentsReturned,2);
+  assert.equal(repo.diagnostics().serverDocumentsReturned-baseline,2);
   const previous=await repo.financeYear(2025);
   assert.deepEqual(previous.financeEntries.map(x=>x.id).sort(),[102,103,104]);
-  assert.equal(repo.diagnostics().serverDocumentsReturned,3);
+  assert.equal(repo.diagnostics().serverDocumentsReturned-baseline,3);
   const full=await repo.load(["financeEntries"]);
   assert.equal(full.financeEntries.length,4);
 });
