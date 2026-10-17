@@ -16,7 +16,7 @@ export function enabled(env: Env): void {
 // The authenticated cross-origin fetch only creates an expiring transaction.
 // It MUST NOT attempt to set a cookie: browser privacy protections can discard
 // cookies delivered by web.app -> workers.dev fetch requests.
-export async function start(env: Env, uid: string, mode: 'files'|'folders' = 'files'): Promise<Response> {
+export async function start(env: Env, uid: string): Promise<Response> {
   enabled(env);
   const now = Date.now();
   await env.DB.prepare('DELETE FROM oauth_transactions WHERE expires_at<=?').bind(now).run();
@@ -25,8 +25,8 @@ export async function start(env: Env, uid: string, mode: 'files'|'folders' = 'fi
   const sealedVerifier = await encrypt(env,verifier,context(env,uid,stateHash,'pkce'));
   const sealedState = await encrypt(env,state,context(env,uid,stateHash,'oauth_state'));
   const insert = await env.DB.prepare(
-    "INSERT INTO oauth_transactions (state_hash,owner_uid,browser_hash,encrypted_verifier,nonce,expires_at,created_at,launch_hash,encrypted_state,scope_mode) SELECT ?,?,'',?,?,?,?,?,?,? WHERE (SELECT count(*) FROM oauth_transactions WHERE owner_uid=? AND created_at>?)<5"
-  ).bind(stateHash,uid,sealedVerifier,nonce,now+600000,now,await hash(ticket),sealedState,mode,uid,now-600000).run();
+    "INSERT INTO oauth_transactions (state_hash,owner_uid,browser_hash,encrypted_verifier,nonce,expires_at,created_at,launch_hash,encrypted_state) SELECT ?,?,'',?,?,?,?,?,? WHERE (SELECT count(*) FROM oauth_transactions WHERE owner_uid=? AND created_at>?)<5"
+  ).bind(stateHash,uid,sealedVerifier,nonce,now+600000,now,await hash(ticket),sealedState,uid,now-600000).run();
   if (insert.meta.changes !== 1) throw new ApiError(429,'oauth_rate_limited');
   const launchUrl = new URL(LAUNCH_PATH, env.OAUTH_REDIRECT_URI);
   launchUrl.searchParams.set('ticket',ticket);
@@ -43,9 +43,9 @@ export async function launch(request: Request, env: Env): Promise<Response> {
   const browser = random();
   const now = Date.now();
   const tx = await env.DB.prepare(
-    'UPDATE oauth_transactions SET browser_hash=?,launch_hash=NULL,launched_at=? WHERE launch_hash=? AND launched_at IS NULL AND expires_at>? RETURNING owner_uid,state_hash,encrypted_state,encrypted_verifier,nonce,scope_mode'
+    'UPDATE oauth_transactions SET browser_hash=?,launch_hash=NULL,launched_at=? WHERE launch_hash=? AND launched_at IS NULL AND expires_at>? RETURNING owner_uid,state_hash,encrypted_state,encrypted_verifier,nonce'
   ).bind(await hash(browser),now,await hash(ticket),now).first<{
-    owner_uid:string;state_hash:string;encrypted_state:string;encrypted_verifier:string;nonce:string;scope_mode:string
+    owner_uid:string;state_hash:string;encrypted_state:string;encrypted_verifier:string;nonce:string
   }>();
   if (!tx || !tx.encrypted_state || !tx.encrypted_verifier) throw new ApiError(400,'expired_or_used_launch');
   const state = await decrypt(env,tx.encrypted_state,context(env,tx.owner_uid,tx.state_hash,'oauth_state'));
@@ -54,7 +54,7 @@ export async function launch(request: Request, env: Env): Promise<Response> {
   target.search = new URLSearchParams({
     client_id:env.GOOGLE_CLIENT_ID!, redirect_uri:env.OAUTH_REDIRECT_URI,
     response_type:'code', access_type:'offline', prompt:'consent select_account',
-    scope:'openid email ' + DRIVE_SCOPE + (tx.scope_mode === 'folders' ? ' ' + DRIVE_READ_SCOPE : ''), state, nonce:tx.nonce,
+    scope:'openid email ' + DRIVE_SCOPE + ' ' + DRIVE_READ_SCOPE, state, nonce:tx.nonce,
     code_challenge:await hash(verifier),code_challenge_method:'S256',
   }).toString();
   return new Response(null,{status:303,headers:{
@@ -88,7 +88,7 @@ export async function callback(request: Request, env: Env): Promise<Response> {
     if (payload.nonce !== tx.nonce || !payload.sub || payload.email_verified !== true || typeof payload.email !== 'string') {
       throw new ApiError(400,'invalid_google_identity');
     }
-    await persistDriveConsent(env, tx.owner_uid, tokens, {sub:payload.sub,email:payload.email}, fetch, tx.scope_mode === 'folders');
+    await persistDriveConsent(env, tx.owner_uid, tokens, {sub:payload.sub,email:payload.email}, fetch, true);
     return finish(env,'connected');
   } catch (error) {
     // All credentials remain backend-only. Distinct, static codes let the UI
