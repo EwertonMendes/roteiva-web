@@ -808,3 +808,9 @@ button:disabled { opacity: .5; cursor: wait; }
 .compare-version label { display: flex; flex-direction: column; gap: 8px; font-size: 12px; margin-bottom: 12px; }
 .compare-version select { border: 1px solid var(--line); border-radius: 10px; padding: 10px; background: var(--card); color: var(--ink); max-width: 100%; }
 .compare-version video { width: 100%; border-radius: 12px; background: #090b08; max-height: 480px; }
+
+/* The workspace badge opens the settings page without changing the topbar layout. */
+button.workspace-switch{background:transparent;border:0;color:inherit;padding:0;cursor:pointer;text-align:left;max-width:230px}
+button.workspace-switch b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:165px}
+button.workspace-switch:focus-visible{outline:2px solid var(--ink);outline-offset:5px;border-radius:7px}
+.storage-card span{min-width:0;overflow-wrap:anywhere}
