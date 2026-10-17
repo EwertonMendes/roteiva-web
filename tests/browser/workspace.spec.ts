@@ -160,6 +160,7 @@ test("Direct routes, refresh and browser Back/Forward preserve each user's scree
   await page.getByLabel("Nome do projeto",{exact:true}).fill("Projeto com URL");
   await page.locator("form.project-modal").getByRole("button",{name:"Criar projeto",exact:true}).click();
   await settled(page);
+  await expect(page.locator(".cloud-banner")).toContainText("Salvo na nuvem");
   await expect(page).toHaveURL(new RegExp("/projetos/[1-9][0-9]*$"));
   const projectURL=page.url();
   await expect(page.getByLabel("Nova tarefa",{exact:true})).toBeVisible();
@@ -179,6 +180,7 @@ test("Direct routes, refresh and browser Back/Forward preserve each user's scree
   await page.getByLabel("Nome do cliente",{exact:true}).fill("Cliente com URL");
   await page.getByLabel("Contato principal",{exact:true}).fill("Contato de teste");
   await page.getByRole("button",{name:"Salvar cliente"}).click();await settled(page);
+  await expect(page.locator(".cloud-banner")).toContainText("Salvo na nuvem");
   await page.locator(".client-list button").filter({hasText:"Cliente com URL"}).click();
   await expect(page).toHaveURL(new RegExp("/clientes/[1-9][0-9]*$"));
   const clientURL=page.url();
