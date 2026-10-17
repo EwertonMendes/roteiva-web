@@ -18,7 +18,8 @@ export function FirebaseWorkspace() {
   const [initial,setInitial]=useState<{workspace:WorkspaceData;theme:"light"|"dark"}>();
   const [businessLoaded,setBusinessLoaded]=useState(false);
   const [loadingBusiness,setLoadingBusiness]=useState(false);
-  const [overviewMetrics,setOverviewMetrics]=useState<{clientCount:number;receivableAmount:number}>();
+  const [overviewMetrics,setOverviewMetrics]=useState<Awaited<ReturnType<FirestoreWorkspace["overviewMetrics"]>>>();
+  const [projectPage,setProjectPage]=useState<{total:number;hasMore:boolean;status:string}>();
   const [error,setError]=useState("");
   const [saving,setSaving]=useState(false);
   const [status,setStatus]=useState("Dados na nuvem");
@@ -34,19 +35,29 @@ export function FirebaseWorkspace() {
     let active=true;
     failed.current=false;
     setRemoteChanges(false);setSyncWarning("");
-    setError(""); setInitial(undefined);setBusinessLoaded(false);setOverviewMetrics(undefined);
+    setError(""); setInitial(undefined);setBusinessLoaded(false);setOverviewMetrics(undefined);setProjectPage(undefined);
     (async()=>{
       const route=routeFromLocation(window.location,{base:import.meta.env.BASE_URL,useHash:false});
       const domains=domainsForRoute(route);
-      const [workspace,theme,stats]=await Promise.all([
-        domains.length ? repository.load(domains) : Promise.resolve(emptyWorkspace()),
+      const [workspaceState,theme,stats]=await Promise.all([
+        (async()=>{
+          if (domains.length) await repository.load(domains);
+          if(route.view==="overview" || (route.view==="projects" && !route.projectId)){
+            const size=route.view==="overview"?4:24;
+            const page=await repository.projectPage({reset:true,size});
+            return {workspace:page.workspace,page};
+          }
+          return {workspace:domains.length ? await repository.load(domains) : emptyWorkspace()};
+        })(),
         repository.loadTheme(),
         route.view==="overview" ? repository.overviewMetrics() : Promise.resolve(undefined),
       ]);
       if (active) {
         setBusinessLoaded(domains.length>0);
         if (stats) setOverviewMetrics(stats);
-        setInitial({workspace,theme:theme || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark":"light")});
+        if (workspaceState.page && route.view==="projects")
+          setProjectPage({total:workspaceState.page.total,hasMore:workspaceState.page.hasMore,status:"Todos"});
+        setInitial({workspace:workspaceState.workspace,theme:theme || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark":"light")});
       }
     })().catch(reason=>{if(active){failed.current=true;setError(dataErrorMessage(reason));}});
     return ()=>{active=false;};
@@ -90,14 +101,37 @@ export function FirebaseWorkspace() {
     }
   },[repository,initial]);
   const ensureFullWorkspace=useCallback(()=>ensureDomains(["clients","projects","tasks","deliveries","events","financeEntries","activities"]),[ensureDomains]);
+  const fetchProjectPage=useCallback(async(status:string,reset:boolean)=>{
+    const request=++scopeRequest.current;
+    setLoadingBusiness(true);
+    try{
+      const result=await repository.projectPage({status,reset,size:24});
+      if(request===scopeRequest.current){
+        setInitial(current=>current?{...current,workspace:result.workspace}:current);
+        setProjectPage({total:result.total,hasMore:result.hasMore,status});
+      }
+    }catch(reason){
+      if(request===scopeRequest.current)setError(dataErrorMessage(reason));
+    }finally{
+      if(request===scopeRequest.current)setLoadingBusiness(false);
+    }
+  },[repository]);
+  const searchAllProjects=useCallback(()=>{
+    void ensureDomains(["clients","projects","tasks","events","financeEntries","activities"]).catch(()=>undefined);
+  },[ensureDomains]);
+
   const onRouteChange=useCallback((route:WorkspaceRoute)=>{
     if (route.view==="overview" && !overviewMetrics) {
       void repository.overviewMetrics().then(setOverviewMetrics).catch(reason=>setError(dataErrorMessage(reason)));
     }
+    if(route.view==="projects" && !route.projectId && !repository.hasLoaded(["projects","tasks"])){
+      if(!projectPage || projectPage.status!=="Todos")void fetchProjectPage("Todos",true);
+      return;
+    }
     const required=domainsForRoute(route);
     if (!required.length || repository.hasLoaded(required)) return;
     void ensureDomains(required).catch(()=>undefined);
-  },[repository,ensureDomains,overviewMetrics]);
+  },[repository,ensureDomains,overviewMetrics,projectPage,fetchProjectPage]);
   useEffect(()=>{
     if (!saving) return;
     const warn=(event:BeforeUnloadEvent)=>{event.preventDefault();event.returnValue="";};
@@ -136,15 +170,19 @@ export function FirebaseWorkspace() {
     </section>}
     {!initial && !error && <main className="studio-loading" role="status">Carregando seu espaço na nuvem…</main>}
     {loadingBusiness && !error && <main className="studio-loading" role="status">Carregando os dados do seu espaço…</main>}
-    {initial && !loadingBusiness && (overviewMetrics || routeFromLocation(window.location,{base:import.meta.env.BASE_URL,useHash:false}).view!=="overview") && <div inert={!!error || remoteChanges} aria-busy={saving}>
+    {initial && (overviewMetrics || routeFromLocation(window.location,{base:import.meta.env.BASE_URL,useHash:false}).view!=="overview") && <div inert={!!error || remoteChanges || loadingBusiness} aria-busy={saving}>
       <DashboardClient key={user.uid+"-"+version} firstName={profileContext?.profile.displayName || user.displayName || "Profissional"} profile={profileContext?.profile || null} onSaveProfile={profileContext?.saveProfile} email={user.email || ""} photoURL={user.photoURL || undefined}
-        initialWorkspace={initial.workspace} initialTheme={initial.theme} onCommands={businessLoaded ? executeCommands : undefined} onLoadWorkspace={repository.hasLoaded(collections) ? undefined : ensureFullWorkspace} onRouteChange={onRouteChange} onThemeChange={saveTheme}
-        overviewMetrics={{
-          clientCount:repository.hasLoaded(["clients"]) ? initial.workspace.clients.length : (overviewMetrics?.clientCount ?? initial.workspace.clients.length),
-          receivableAmount:repository.hasLoaded(["financeEntries"]) ? initial.workspace.financeEntries
-            .filter(e=>e.kind!=="expense"&&e.status==="A receber").reduce((n,e)=>n+Math.round(e.amount*100),0)/100
-            : (overviewMetrics?.receivableAmount ?? 0),
-        }} cloudStatus={status} saving={saving} onLogout={()=>void logout()} />
+        initialWorkspace={initial.workspace} initialTheme={initial.theme} onCommands={businessLoaded ? executeCommands : undefined} onLoadWorkspace={repository.hasLoaded(collections) ? undefined : ensureFullWorkspace} onRouteChange={onRouteChange}
+        projectPage={repository.hasLoaded(["projects","tasks"])?undefined:projectPage}
+        onMoreProjects={()=>void fetchProjectPage(projectPage?.status||"Todos",false)}
+        onProjectStatus={(status)=>{if(!repository.hasLoaded(["projects","tasks"]))void fetchProjectPage(status,true);}}
+        onSearchProjects={searchAllProjects} onThemeChange={saveTheme}
+        overviewMetrics={overviewMetrics ? {
+          clientCount:repository.hasLoaded(["clients"])?undefined:overviewMetrics.clientCount,
+          receivableAmount:repository.hasLoaded(["financeEntries"])?undefined:overviewMetrics.receivableAmount,
+          projectCount:repository.hasLoaded(["projects"])?undefined:overviewMetrics.projectCount,
+          projectStatuses:repository.hasLoaded(["projects"])?undefined:overviewMetrics.projectStatuses,
+        } : undefined} cloudStatus={status} saving={saving} onLogout={()=>void logout()} />
     </div>}
   </>;
 }
