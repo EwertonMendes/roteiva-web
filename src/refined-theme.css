@@ -197,3 +197,7 @@ a { text-underline-offset: 3px; }
  .modal-head h2 { font-size: 26px; }
  .modal-head p { font-size: 13px; line-height: 1.6; }
 }
+
+/* Keep the existing dark review portal readable in both app themes. */
+.portal-page .review-unavailable { background:#1c1c1c; color:#f1f1f1; border:1px solid #383838; }
+.portal-page .review-unavailable p,.portal-page .review-unavailable .eyebrow { color:#bdbdbd; }

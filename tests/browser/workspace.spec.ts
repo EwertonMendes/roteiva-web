@@ -48,8 +48,13 @@ test("Google emulator session, CRUD, restoration, themes and separate users",asy
   await page.getByLabel("Nome do projeto",{exact:true}).fill("Filme Aurora");
   await page.locator("form.project-modal select[name=clientId]").selectOption({label:"Estúdio Aurora"});
   await page.locator("form.project-modal").getByRole("button",{name:"Criar projeto",exact:true}).click();await settled(page);
-  await page.getByLabel("Nova tarefa",{exact:true}).fill("Montar primeiro corte");
-  await expect(page.getByLabel("Nova tarefa",{exact:true})).toHaveValue("Montar primeiro corte");
+  const taskField=page.getByLabel("Nova tarefa",{exact:true});
+  // Mobile: ensure the checklist below the long project form is actually in view.
+  // A synthetic fill on an off-screen input can appear to complete without typing.
+  await taskField.scrollIntoViewIfNeeded();
+  await taskField.click();
+  await taskField.pressSequentially("Montar primeiro corte");
+  await expect(taskField).toHaveValue("Montar primeiro corte");
   await page.getByRole("button",{name:"Adicionar tarefa",exact:true}).click();await settled(page);
   await expect(page.getByText("Montar primeiro corte",{exact:true})).toBeVisible();
   await navigate(page,"Financeiro");
@@ -80,6 +85,12 @@ test("Google emulator session, CRUD, restoration, themes and separate users",asy
   await page.getByRole("button",{name:"Abrir projeto Filme Aurora",exact:true}).click();
   await expect(page.getByText("Montar primeiro corte",{exact:true})).toBeVisible();
   await page.screenshot({path:info.outputPath("workspace.png"),fullPage:true});
+  await page.goto(cloud+"/review");
+  await expect(page.getByText("ROTEIVA DEV · REVISÃO EM BREVE",{exact:true})).toBeVisible();
+  await expect(page.getByText("MODO DEMONSTRAÇÃO",{exact:true})).toHaveCount(0);
+  await page.screenshot({path:info.outputPath("review.png"),fullPage:true});
+  await page.getByRole("link",{name:"Voltar ao painel",exact:true}).click();
+  await expect(page.locator(".app-shell")).toBeVisible();await settled(page);
   await logout(page);
   await login(page,"bob-"+info.project.name+"@example.com");
   await expect(page.getByRole("heading",{name:"Seu espaço está pronto"})).toBeVisible();
