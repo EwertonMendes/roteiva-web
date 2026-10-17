@@ -19,6 +19,7 @@ import { hrefForWorkspaceRoute, routeFromLocation, type WorkspaceRoute } from ".
 import { SettingsPage } from "./features/settings/SettingsPage";
 import type { RoteivaProfile, ProfileChanges } from "./data/firestore-workspace";
 import type { WorkspaceCommand } from "./data/firestore-commands";
+import type { FirestoreUsage } from "./data/firestore-usage";
 import { newId, type WorkspaceData, type Activity, type View, type Project, type Client, type ClientType, type AssetKind, type FinanceEntry, type CalendarEvent, type LibraryAsset, type Status } from "./domain/workspace";
 export type { View, Project, Client, FinanceEntry, CalendarEvent, LibraryAsset, Status } from "./domain/workspace";
 
@@ -61,10 +62,10 @@ type DashboardProps = {
   onMoreProjects?:()=>void;onProjectStatus?:(status:Status|"Todos")=>void;
   onSearchProjects?:()=>void; clientPage?:{total:number;recurring:number;hasMore:boolean};
   onFinancePeriodChange?:(year:number,month:number,clientId?:number)=>void;
-  financeBars?:{key:string;bars:number[]};eventCount?:number;onCalendarMonthChange?:(year:number,month:number)=>void;
+  financeBars?:{key:string;bars:number[]};eventCount?:number;usage?:Readonly<FirestoreUsage>;onCalendarMonthChange?:(year:number,month:number)=>void;
   onMoreClients?:()=>void;onSearchClients?:()=>void;onClientCreated?:(client:Client)=>void;canValidateProjectLink?:boolean;canValidateClientLink?:boolean; cloudStatus?:string; saving?:boolean; onLogout?:()=>void;
 };
-export default function DashboardClient({ firstName, email, photoURL, profile, onSaveProfile, initialWorkspace, initialTheme, onThemeChange, onLoadWorkspace, onRouteChange, onCommands, overviewMetrics, projectPage, onMoreProjects, onProjectStatus, onSearchProjects, clientPage, onMoreClients, onSearchClients, onClientCreated, onFinancePeriodChange, financeBars, eventCount, onCalendarMonthChange, canValidateProjectLink, canValidateClientLink, cloudStatus, saving, onLogout }: DashboardProps) {
+export default function DashboardClient({ firstName, email, photoURL, profile, onSaveProfile, initialWorkspace, initialTheme, onThemeChange, onLoadWorkspace, onRouteChange, onCommands, overviewMetrics, projectPage, onMoreProjects, onProjectStatus, onSearchProjects, clientPage, onMoreClients, onSearchClients, onClientCreated, onFinancePeriodChange, financeBars, eventCount, usage, onCalendarMonthChange, canValidateProjectLink, canValidateClientLink, cloudStatus, saving, onLogout }: DashboardProps) {
   const routeEnvironment={base:import.meta.env.BASE_URL,useHash:isDemo};
   const initialRoute=()=>routeFromLocation(window.location,routeEnvironment);
   const [initialBrowserRoute]=useState<WorkspaceRoute>(initialRoute);
@@ -512,7 +513,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
                 : <button className="primary-button" onClick={startProject}><Plus size={17} /> Criar projeto</button>}
             </div>
           </div>
-          {view === "settings" && <SettingsPage profile={profile} email={email} photoURL={photoURL} theme={theme} toggleTheme={toggleTheme} workspace={workspace} onLoadWorkspace={onLoadWorkspace} cloudStatus={isDemo ? saveStatus : cloudStatus || ""} onNotify={notify} onSaveProfile={onSaveProfile} />}
+          {view === "settings" && <SettingsPage profile={profile} email={email} photoURL={photoURL} theme={theme} toggleTheme={toggleTheme} workspace={workspace} onLoadWorkspace={onLoadWorkspace} cloudStatus={isDemo ? saveStatus : cloudStatus || ""} onNotify={notify} onSaveProfile={onSaveProfile} usage={usage} />}
           {view === "overview" && <><TodayStudio clients={clientList} projects={projects} entries={financeEntries} events={calendarEvents} activities={activities} onView={changeView} overviewMetrics={overviewMetrics} /><Overview projects={projects} setView={changeView} onOpenProject={openProject} /></>}
           {view === "projects" && (selectedProject && projects.some(p => p.id === selectedProject) ? <ProjectDetail project={projects.find(p => p.id === selectedProject)!} clients={clientList} entries={financeEntries} assets={libraryAssets} events={calendarEvents} onSave={updateProject} onBack={() => changeView("projects")} onRevenue={addLinkedRevenue} onUpload={uploadAssets} onEvent={(p) => { openEvent(null, p.dueDate); }} uploading={uploading} /> : <ProjectsView projects={filtered.map(p => ({...p, files: libraryAssets.filter(a => a.projectId === p.id).length}))}
                   statusFilter={statusFilter} setStatusFilter={(status)=>{

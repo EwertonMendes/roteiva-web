@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { ArrowUpRight, Check, Cloud, Download, LockKeyhole, Moon, ShieldCheck, Sun, UserRound, Video, Info } from "lucide-react";
 import type { ProfileChanges, ProfessionalType, RoteivaProfile } from "../../data/firestore-workspace";
 import { dataErrorMessage } from "../../data/firestore-workspace";
+import type { FirestoreUsage } from "../../data/firestore-usage";
 import { WorkspaceTools } from "../../studio-features";
 import { CACHE_CONSENT_KEY, persistentCacheEnabled, purgePrivateCache } from "../../lib/firebase";
 
@@ -18,9 +19,10 @@ type SettingsProps={
   theme:"light"|"dark"; toggleTheme:()=>void;
   workspace:object; onLoadWorkspace?:()=>Promise<object>; cloudStatus:string; onNotify:(message:string)=>void;
   onSaveProfile?:(changes:ProfileChanges)=>Promise<void>;
+  usage?:Readonly<FirestoreUsage>;
 };
 
-export function SettingsPage({profile,email,photoURL,theme,toggleTheme,workspace,onLoadWorkspace,cloudStatus,onNotify,onSaveProfile}:SettingsProps){
+export function SettingsPage({profile,email,photoURL,theme,toggleTheme,workspace,onLoadWorkspace,cloudStatus,onNotify,onSaveProfile,usage}:SettingsProps){
   const [name,setName]=useState(profile?.displayName||"");
   const [studio,setStudio]=useState(profile?.studioName||"");
   const [occupation,setOccupation]=useState<ProfessionalType>(profile?.professionalType||"freelancer");
@@ -147,6 +149,14 @@ export function SettingsPage({profile,email,photoURL,theme,toggleTheme,workspace
         </div>
         <button type="button" className="secondary-button" disabled={cacheBusy || busy}
           onClick={()=>void changePrivateCache(!localCache)}>{cacheBusy?"Aplicando…":localCache?"Desativar cache":"Ativar cache"}</button>
+      </div>}
+      {usage&&<div className="settings-privacy-row" role="status">
+        <div><strong><Info size={16}/> Diagnóstico da sessão</strong>
+          <p>Consultas ao servidor: {usage.serverQueries}; documentos retornados: {usage.serverDocumentsReturned};
+          agregações: {usage.aggregationQueries}; conferências de revisão: {usage.revisionReads};
+          documentos alterados: {usage.mutationDocuments}; revisões gravadas: {usage.mutationRevisions}.
+          Estes números são locais e não representam as leituras faturáveis, índices, regras ou tentativas de transação.</p>
+        </div>
       </div>}
       {cacheError && <p role="alert" className="settings-feedback settings-feedback-error">{cacheError}</p>}
       <p className="settings-note"><Info size={15}/> Exclusão de conta e dados ainda não está disponível. Esse procedimento precisa ser implementado com segurança antes da abertura pública.</p>

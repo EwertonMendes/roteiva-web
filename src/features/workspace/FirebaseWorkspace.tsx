@@ -302,6 +302,7 @@ export function FirebaseWorkspace() {
         onSearchProjects={searchAllProjects}
         clientPage={repository.hasLoaded(["clients"])?undefined:clientPage}
         onMoreClients={()=>void fetchClientPage(false)}
+        usage={repository.diagnostics()}
         eventCount={repository.totalCount("events")}
         onSearchClients={searchAllClients}
         onFinancePeriodChange={(year,month,clientId)=>void loadFinancePeriod(year,month,clientId)}
