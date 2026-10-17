@@ -141,6 +141,14 @@ export function SettingsPage({profile,email,photoURL,theme,toggleTheme,workspace
         <div><strong><Download size={16}/> Exportar dados do espaço</strong><p>Baixe uma cópia JSON dos registros carregados. A exportação não inclui arquivos de mídia, credenciais nem dados de autenticação.</p></div>
         <WorkspaceTools workspace={workspace} loadWorkspace={onLoadWorkspace} status={cloudStatus} onNotify={onNotify}/>
       </div>
+      {onSaveProfile && <div className="settings-privacy-row">
+        <div><strong><LockKeyhole size={16}/> Cache neste dispositivo</strong>
+          <p>Opcional para reduzir consultas após reiniciar. Este navegador poderá armazenar clientes, projetos e dados financeiros. Ative somente em um dispositivo pessoal. Desativar apaga o cache e recarrega a página.</p>
+        </div>
+        <button type="button" className="secondary-button" disabled={cacheBusy || busy}
+          onClick={()=>void changePrivateCache(!localCache)}>{cacheBusy?"Aplicando…":localCache?"Desativar cache":"Ativar cache"}</button>
+      </div>}
+      {cacheError && <p role="alert" className="settings-feedback settings-feedback-error">{cacheError}</p>}
       <p className="settings-note"><Info size={15}/> Exclusão de conta e dados ainda não está disponível. Esse procedimento precisa ser implementado com segurança antes da abertura pública.</p>
     </section>
     <footer className="settings-footer"><Cloud size={14}/>{onSaveProfile?"ROTEIVA DEV · PERFIL PRIVADO":"ROTEIVA DEMO · SOMENTE NESTE NAVEGADOR"}</footer>
