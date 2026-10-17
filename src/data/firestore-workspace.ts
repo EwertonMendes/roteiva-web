@@ -53,6 +53,7 @@ export class FirestoreWorkspace {
   private loadQueue:Promise<void>=Promise.resolve();
   private readonly loadedDomains = new Set<Domain>();
   private readonly projectCursors=new Map<string,QueryDocumentSnapshot<DocumentData>|null>();
+  private readonly pagedDomains=new Set<Domain>();
   hasLoaded(domains:readonly Domain[]):boolean { return domains.every(name=>this.loadedDomains.has(name)); }
   constructor(db: Firestore, uid: string) {
     if (!uid || uid.includes("/")) throw new Error("UID inválido.");
@@ -268,6 +269,9 @@ export class FirestoreWorkspace {
       }
     }
     for(const [key,item] of [...projects,...tasks])this.stored.set(key,item);
+    this.pagedDomains.add("projects");this.pagedDomains.add("tasks");
+    this.stamp={...after,domains:{...(this.stamp?.domains||after.domains),
+      projects:after.domains.projects,tasks:after.domains.tasks}};
     const hasMore=list.docs.length>size;
     this.projectCursors.set(key,hasMore?docs[docs.length-1]:null);
     return {workspace:this.decoded(),total,hasMore};
@@ -277,7 +281,7 @@ export class FirestoreWorkspace {
     if (!this.stamp) return false;
     trackRevision(this.uid);
     const current=await readSync(this.db,this.uid);
-    return !current || [...this.loadedDomains].some(name=>this.stamp!.domains[name]!==current.domains[name]);
+    return !current || [...new Set([...this.loadedDomains,...this.pagedDomains])].some(name=>this.stamp!.domains[name]!==current.domains[name]);
   }
 
   async loadTheme(): Promise<"light"|"dark"|undefined> {
