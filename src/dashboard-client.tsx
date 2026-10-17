@@ -323,6 +323,11 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
   function changeView(next:View) { navigateRoute({view:next}); }
   function openProject(id:number) { navigateRoute({view:"projects",projectId:id}); }
   function openClient(id:number) { navigateRoute({view:"clients",clientId:id}); }
+  function signOut() {
+    // Do not leave a previous account's private record URL in a shared browser.
+    window.history.replaceState(null,"",hrefForWorkspaceRoute({view:"overview"},routeEnvironment));
+    onLogout?.();
+  }
 
   useEffect(()=>{
     const onNavigation=()=>{
@@ -384,7 +389,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
           <small className="sync-status" role="status">{isDemo ? saveStatus : cloudStatus}</small>
         </div>
         <div className="sidebar-profile">
-          {photoURL ? <img className="profile-photo" src={photoURL} alt="Foto do usuário" referrerPolicy="no-referrer" /> : <span>{firstName.slice(0, 2).toUpperCase()}</span>}<div><b>{firstName}</b><small>{email}</small></div>{onLogout ? <button className="icon-button" onClick={onLogout} aria-label="Sair da conta" title="Sair da conta">↪</button> : <MoreHorizontal size={18} />}
+          {photoURL ? <img className="profile-photo" src={photoURL} alt="Foto do usuário" referrerPolicy="no-referrer" /> : <span>{firstName.slice(0, 2).toUpperCase()}</span>}<div><b>{firstName}</b><small>{email}</small></div>{onLogout ? <button className="icon-button" onClick={signOut} aria-label="Sair da conta" title="Sair da conta">↪</button> : <MoreHorizontal size={18} />}
         </div>
       </aside>
       {mobileOpen && <button className="mobile-scrim" aria-label="Fechar menu" onClick={() => setMobileOpen(false)} />}
