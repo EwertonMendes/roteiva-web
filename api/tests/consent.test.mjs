@@ -118,3 +118,20 @@ test('Google Drive outage or malformed response fails closed without saving refr
   }
   assert.equal(writes.length,0);
 });
+
+test('one-step Drive onboarding requires both narrow file grant and broad read grant',async()=>{
+  const {env,writes}=makeEnv();
+  const scopes=DRIVE_SCOPE+' https://www.googleapis.com/auth/drive.readonly';
+  await persistDriveConsent(env,'user-A',grant({scope:scopes}),identity,driveOK(),true);
+  assert.equal(writes.length,1);
+  assert.equal(writes[0][5],scopes);
+});
+
+test('partial Drive authorization never claims existing-folder read access',async()=>{
+  const {env,writes}=makeEnv();
+  await assert.rejects(
+    ()=>persistDriveConsent(env,'user-A',grant({scope:DRIVE_SCOPE}),identity,driveOK(),true),
+    e=>e.code==='drive_read_permission_missing'
+  );
+  assert.equal(writes.length,0);
+});
