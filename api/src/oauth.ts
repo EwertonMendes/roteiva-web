@@ -2,7 +2,7 @@ import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { ApiError, type Env } from './types.ts';
 import { context, decrypt, encrypt, hash, random } from './crypto.ts';
 import { consumeState } from './repository.ts';
-import { DRIVE_SCOPE, tokenRequest } from './google.ts';
+import { DRIVE_SCOPE, DRIVE_READ_SCOPE, tokenRequest } from './google.ts';
 import { persistDriveConsent } from './consent.ts';
 
 const googleKeys = createRemoteJWKSet(new URL('https://www.googleapis.com/oauth2/v3/certs'));
@@ -16,7 +16,7 @@ export function enabled(env: Env): void {
 // The authenticated cross-origin fetch only creates an expiring transaction.
 // It MUST NOT attempt to set a cookie: browser privacy protections can discard
 // cookies delivered by web.app -> workers.dev fetch requests.
-export async function start(env: Env, uid: string): Promise<Response> {
+export async function start(env: Env, uid: string, mode: 'files'|'folders' = 'files'): Promise<Response> {
   enabled(env);
   const now = Date.now();
   await env.DB.prepare('DELETE FROM oauth_transactions WHERE expires_at<=?').bind(now).run();
@@ -25,8 +25,8 @@ export async function start(env: Env, uid: string): Promise<Response> {
   const sealedVerifier = await encrypt(env,verifier,context(env,uid,stateHash,'pkce'));
   const sealedState = await encrypt(env,state,context(env,uid,stateHash,'oauth_state'));
   const insert = await env.DB.prepare(
-    "INSERT INTO oauth_transactions (state_hash,owner_uid,browser_hash,encrypted_verifier,nonce,expires_at,created_at,launch_hash,encrypted_state) SELECT ?,?,'',?,?,?,?,?,? WHERE (SELECT count(*) FROM oauth_transactions WHERE owner_uid=? AND created_at>?)<5"
-  ).bind(stateHash,uid,sealedVerifier,nonce,now+600000,now,await hash(ticket),sealedState,uid,now-600000).run();
+    "INSERT INTO oauth_transactions (state_hash,owner_uid,browser_hash,encrypted_verifier,nonce,expires_at,created_at,launch_hash,encrypted_state,scope_mode) SELECT ?,?,'',?,?,?,?,?,?,? WHERE (SELECT count(*) FROM oauth_transactions WHERE owner_uid=? AND created_at>?)<5"
+  ).bind(stateHash,uid,sealedVerifier,nonce,now+600000,now,await hash(ticket),sealedState,mode,uid,now-600000).run();
   if (insert.meta.changes !== 1) throw new ApiError(429,'oauth_rate_limited');
   const launchUrl = new URL(LAUNCH_PATH, env.OAUTH_REDIRECT_URI);
   launchUrl.searchParams.set('ticket',ticket);
@@ -43,9 +43,9 @@ export async function launch(request: Request, env: Env): Promise<Response> {
   const browser = random();
   const now = Date.now();
   const tx = await env.DB.prepare(
-    'UPDATE oauth_transactions SET browser_hash=?,launch_hash=NULL,launched_at=? WHERE launch_hash=? AND launched_at IS NULL AND expires_at>? RETURNING owner_uid,state_hash,encrypted_state,encrypted_verifier,nonce'
+    'UPDATE oauth_transactions SET browser_hash=?,launch_hash=NULL,launched_at=? WHERE launch_hash=? AND launched_at IS NULL AND expires_at>? RETURNING owner_uid,state_hash,encrypted_state,encrypted_verifier,nonce,scope_mode'
   ).bind(await hash(browser),now,await hash(ticket),now).first<{
-    owner_uid:string;state_hash:string;encrypted_state:string;encrypted_verifier:string;nonce:string
+    owner_uid:string;state_hash:string;encrypted_state:string;encrypted_verifier:string;nonce:string;scope_mode:string
   }>();
   if (!tx || !tx.encrypted_state || !tx.encrypted_verifier) throw new ApiError(400,'expired_or_used_launch');
   const state = await decrypt(env,tx.encrypted_state,context(env,tx.owner_uid,tx.state_hash,'oauth_state'));
@@ -54,7 +54,7 @@ export async function launch(request: Request, env: Env): Promise<Response> {
   target.search = new URLSearchParams({
     client_id:env.GOOGLE_CLIENT_ID!, redirect_uri:env.OAUTH_REDIRECT_URI,
     response_type:'code', access_type:'offline', prompt:'consent select_account',
-    scope:'openid email ' + DRIVE_SCOPE, state, nonce:tx.nonce,
+    scope:'openid email ' + DRIVE_SCOPE + (tx.scope_mode === 'folders' ? ' ' + DRIVE_READ_SCOPE : ''), state, nonce:tx.nonce,
     code_challenge:await hash(verifier),code_challenge_method:'S256',
   }).toString();
   return new Response(null,{status:303,headers:{
@@ -88,7 +88,7 @@ export async function callback(request: Request, env: Env): Promise<Response> {
     if (payload.nonce !== tx.nonce || !payload.sub || payload.email_verified !== true || typeof payload.email !== 'string') {
       throw new ApiError(400,'invalid_google_identity');
     }
-    await persistDriveConsent(env, tx.owner_uid, tokens, {sub:payload.sub,email:payload.email});
+    await persistDriveConsent(env, tx.owner_uid, tokens, {sub:payload.sub,email:payload.email}, fetch, tx.scope_mode === 'folders');
     return finish(env,'connected');
   } catch (error) {
     // All credentials remain backend-only. Distinct, static codes let the UI
@@ -97,7 +97,7 @@ export async function callback(request: Request, env: Env): Promise<Response> {
       'offline_access_unavailable', 'drive_permission_missing',
       'drive_verification_unavailable', 'google_identity_missing',
       'invalid_google_identity', 'reconnect_required', 'connection_changed',
-      'google_unavailable',
+      'google_unavailable', 'drive_read_permission_missing',
     ]);
     const code = error instanceof ApiError && recoverable.has(error.code) ? error.code : 'connection_failed';
     return finish(env,code);
