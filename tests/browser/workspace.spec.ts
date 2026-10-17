@@ -110,6 +110,41 @@ test("Google emulator session, CRUD, restoration, themes and separate users",asy
   await navigate(page,"Clientes");await expect(page.getByText("Estúdio Aurora",{exact:true})).toBeVisible();
   expect(await page.evaluate(()=>localStorage.getItem("roteiva-pages-demo-workspace-v1"))).toBeNull();
 });
+test("Account and studio settings persist without changing existing projects",async({page},info)=>{
+  await page.goto(cloud);
+  const email="settings-"+info.project.name+"@example.com";
+  await login(page,email);
+  await expect(page.locator(".workspace-switch")).toContainText("Estúdio de QA");
+  await navigate(page,"Projetos");
+  await page.locator(".heading-actions").getByRole("button",{name:"Criar projeto",exact:true}).click();
+  await page.getByLabel("Nome do projeto",{exact:true}).fill("Projeto mantido");
+  await page.locator("form.project-modal").getByRole("button",{name:"Criar projeto",exact:true}).click();
+  await settled(page);
+  await navigate(page,"Configurações");
+  await expect(page.getByRole("heading",{name:"Perfil profissional"})).toBeVisible();
+  await expect(page.getByLabel("E-mail de acesso")).toHaveValue(email);
+  await page.getByLabel("Nome profissional",{exact:true}).fill("Direção Criativa");
+  await page.getByLabel("Nome do estúdio ou marca",{exact:true}).fill("Estúdio dos Crias");
+  await page.getByLabel("Tipo de atuação").selectOption("producer");
+  await page.getByRole("button",{name:"Salvar alterações"}).click();
+  await expect(page.getByRole("status").filter({hasText:"Perfil e estúdio salvos na nuvem."})).toBeVisible();
+  await expect(page.locator(".workspace-switch")).toContainText("Estúdio dos Crias");
+  await page.screenshot({path:info.outputPath("settings.png"),fullPage:true});
+  await page.getByRole("button",{name:"Escuro",exact:true}).click();
+  await settled(page);
+  await expect(page.locator("html")).toHaveAttribute("data-theme","dark");
+  await page.reload();
+  await expect(page.locator(".app-shell")).toBeVisible();await settled(page);
+  await navigate(page,"Configurações");
+  await expect(page.getByLabel("Nome profissional",{exact:true})).toHaveValue("Direção Criativa");
+  await expect(page.getByLabel("Nome do estúdio ou marca",{exact:true})).toHaveValue("Estúdio dos Crias");
+  await expect(page.getByLabel("Tipo de atuação")).toHaveValue("producer");
+  await expect(page.locator(".workspace-switch")).toContainText("Estúdio dos Crias");
+  await expect(page.locator("html")).toHaveAttribute("data-theme","dark");
+  await expect(page.getByLabel("E-mail de acesso")).toHaveAttribute("readonly","");
+  await navigate(page,"Projetos");
+  await expect(page.getByText("Projeto mantido",{exact:true})).toBeVisible();
+});
 test("First login does not silently create a workspace",async({page},info)=>{
   await page.goto(cloud);
   // Capture the actual login screen, not the Roteiva intro animation.
