@@ -39,6 +39,7 @@ export function FirebaseWorkspace() {
   const automaticAttempts=useRef(0);
   useEffect(()=>{
     let active=true;
+    let ready=false;
     let retryTimer:ReturnType<typeof setTimeout>|undefined;
     failed.current=false;
     setRemoteChanges(false);setSyncWarning("");
@@ -81,6 +82,7 @@ export function FirebaseWorkspace() {
       const stats=route.view==="overview" ?
         await repository.overviewMetrics(workspaceState.page?.workspace.projects) : undefined;
       if (active) {
+        ready=true;
         automaticAttempts.current=0;
         setBusinessLoaded(domains.length>0);
         if (stats) setOverviewMetrics(stats);
@@ -107,15 +109,19 @@ export function FirebaseWorkspace() {
         failed.current=true;setError(dataErrorMessage(reason));
         return;
       }
-      console.warn("[Roteiva] Leitura inicial aguardando recuperação:",code||"unexpected");
+      const summary=(reason as {message?:unknown}|null)?.message;
+      console.warn("[Roteiva] Aguardando nova tentativa de leitura",{
+        code:code||"unexpected",
+        reason:typeof summary==="string"?summary.slice(0,180):"unknown",
+      });
       const attempt=automaticAttempts.current++;
       const delay=Math.min(30000,2000*2**Math.min(attempt,4));
       retryTimer=setTimeout(()=>{if(active)setVersion(value=>value+1);},delay);
     });
-    const online=()=>{if(active && !initial){clearTimeout(retryTimer);setVersion(value=>value+1);}};
+    const online=()=>{if(active && !ready){clearTimeout(retryTimer);setVersion(value=>value+1);}};
     window.addEventListener("online",online);
     return ()=>{active=false;clearTimeout(retryTimer);window.removeEventListener("online",online);};
-  },[repository,user,version]);
+  },[repository,version]);
   // Revalidate only when returning to the app, not on every screen navigation.
   useEffect(() => {
     if (!initial) return;
