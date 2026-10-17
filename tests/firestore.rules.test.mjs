@@ -433,3 +433,39 @@ test("financial month reads only requested month, and annual bars respect year a
   assert.equal(other.financeEntries.some(e=>e.id===301),true);
   assert.equal((await repo.load(["financeEntries"])).financeEntries.length,5);
 });
+
+
+test("large finance histories use server annual aggregation and refresh only changed months",async()=>{
+  const db=dbFor("alice");
+  await env.withSecurityRulesDisabled(async ctx=>{
+    const admin=ctx.firestore();
+    for(let i=0;i<45;i++){
+      const date=i<40?"2025-08-12":"2026-10-12";
+      await setDoc(doc(admin,"users/alice/financeEntries/"+(700+i)),
+        {...fixtures.financeEntries,id:700+i,date,clientId:i%2?1:2,
+        kind:"income",amountCents:100,...meta("alice")});
+    }
+  });
+  const repo=new FirestoreWorkspace(db,"alice");
+  const initial=repo.diagnostics();
+  const page=await repo.financeMonth(2026,9);
+  assert.equal(page.financeEntries.length,5);
+  const bars=await repo.financeYearBars(2026);
+  assert.equal(bars[9],5);
+  assert.equal(bars.reduce((a,b)=>a+b,0),5);
+  const after=repo.diagnostics();
+  assert.equal(repo.hasLoaded(["financeEntries"]),false);
+  assert.equal(after.serverDocumentsReturned-initial.serverDocumentsReturned,5);
+  assert.equal(after.aggregationQueries-initial.aggregationQueries,12);
+  const commands=[{kind:"saveFinance",entry:{
+    id:999,project:"Novo",client:"Cliente",clientId:1,projectId:2,
+    kind:"income",amount:7.5,date:"17/10/2026",status:"Recebido"
+  }}];
+  assert.deepEqual(repo.affectedFinanceMonths(commands,2026),[9]);
+  await repo.applyCommands(commands);
+  const rechecked=await repo.financeYearBars(2026,undefined,[9]);
+  assert.equal(rechecked[9],12.5);
+  assert.equal(repo.diagnostics().aggregationQueries-after.aggregationQueries,1);
+  const forClient=await repo.financeYearBars(2026,1);
+  assert.equal(forClient[9],9.5);
+});
