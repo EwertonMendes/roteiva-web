@@ -35,7 +35,17 @@
       },
       "limits": {
         "cpu_ms": 10
-      }
+      },
+      "ratelimits": [
+        {
+          "name": "API_RATE_LIMIT",
+          "namespace_id": "479738001561",
+          "simple": {
+            "limit": 60,
+            "period": 60
+          }
+        }
+      ]
     }
   }
 }

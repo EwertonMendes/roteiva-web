@@ -1,6 +1,7 @@
 import { ApiError, type Env } from './types.ts';
 import { identity } from './auth.ts';
-import { callback, start } from './oauth.ts';
+import { callback, start, enabled } from './oauth.ts';
+import { metadata, disconnect } from './drive.ts';
 const headers = {
   'Cache-Control':'no-store', 'Referrer-Policy':'no-referrer',
   'X-Content-Type-Options':'nosniff', 'Content-Security-Policy':"default-src 'none'; frame-ancestors 'none'",
@@ -15,6 +16,7 @@ export async function handle(request: Request, env: Env): Promise<Response> {
         env.FRONTEND_ORIGIN !== 'https://roteiva-web-dev.web.app' ||
         env.OAUTH_REDIRECT_URI !== 'https://roteiva-api-dev.ewertonmendes9.workers.dev/oauth/drive/callback') throw new ApiError(503,'invalid_environment');
     if (origin && origin !== env.FRONTEND_ORIGIN) throw new ApiError(403,'origin_denied');
+    if (!(await env.API_RATE_LIMIT.limit({key:'dev:all'})).success) throw new ApiError(429,'rate_limited');
     if (request.method === 'OPTIONS') {
       if (!origin) throw new ApiError(403,'origin_required');
       response = new Response(null,{status:204,headers:{
@@ -28,12 +30,25 @@ export async function handle(request: Request, env: Env): Promise<Response> {
       response = await callback(request,env);
     } else if (url.pathname === '/integrations/drive' && request.method === 'GET') {
       const uid = await identity(request,env);
+      if (!(await env.API_RATE_LIMIT.limit({key:'dev:uid:'+uid})).success) throw new ApiError(429,'rate_limited');
       const rows = await env.DB.prepare('SELECT id,google_email,status,scopes,updated_at FROM drive_connections WHERE owner_uid=? ORDER BY created_at LIMIT 20').bind(uid).all();
       response = Response.json({connections:rows.results});
     } else if (url.pathname === '/oauth/drive/start' && request.method === 'POST') {
       if (origin !== env.FRONTEND_ORIGIN) throw new ApiError(403,'origin_required');
       const uid = await identity(request,env);
+      if (!(await env.API_RATE_LIMIT.limit({key:'dev:uid:'+uid})).success) throw new ApiError(429,'rate_limited');
       response = await start(env,uid);
+    } else if (/^\/integrations\/drive\/[^/]+\/(metadata|disconnect)$/.test(url.pathname)) {
+      enabled(env);
+      const uid = await identity(request,env);
+      if (!(await env.API_RATE_LIMIT.limit({key:'dev:uid:'+uid})).success) throw new ApiError(429,'rate_limited');
+      const parts = url.pathname.split('/');
+      if (parts[4] === 'metadata' && request.method === 'GET') {
+        response = await metadata(env,uid,parts[3],url.searchParams.get('fileId') || '');
+      } else if (parts[4] === 'disconnect' && request.method === 'POST') {
+        if (origin !== env.FRONTEND_ORIGIN) throw new ApiError(403,'origin_required');
+        response = await disconnect(env,uid,parts[3]);
+      } else throw new ApiError(405,'method_not_allowed');
     } else {
       throw new ApiError(404,'not_found');
     }

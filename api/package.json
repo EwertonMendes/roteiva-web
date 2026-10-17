@@ -15,11 +15,11 @@
     "deploy:dev": "wrangler deploy --env dev"
   },
   "dependencies": {
-    "jose": "6.1.0"
+    "jose": "6.2.12"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "4.20251011.0",
+    "@cloudflare/workers-types": "5.20261016.1",
     "typescript": "5.9.3",
-    "wrangler": "4.45.0"
+    "wrangler": "4.151.1"
   }
 }

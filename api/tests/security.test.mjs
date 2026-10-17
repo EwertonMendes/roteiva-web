@@ -7,6 +7,7 @@ import { handle } from '../src/index.ts';
 import { accessToken } from '../src/google.ts';
 import { connection, consumeState } from '../src/repository.ts';
 const env = {
+ API_RATE_LIMIT:{limit:async()=>({success:true})},
  ENVIRONMENT:'dev', FIREBASE_PROJECT_ID:'roteiva-web-dev',
  FRONTEND_ORIGIN:'https://roteiva-web-dev.web.app',
  OAUTH_REDIRECT_URI:'https://roteiva-api-dev.ewertonmendes9.workers.dev/oauth/drive/callback',
@@ -83,4 +84,26 @@ test('refresh stays backend-only; transient error preserves token; invalid_grant
  assert.equal(invalidated,false);
  await assert.rejects(()=>accessToken(configured,row,async()=>Response.json({error:'invalid_grant'},{status:400})),e=>e.code==='reconnect_required');
  assert.equal(invalidated,true);
+});
+
+test('rate limit rejects before touching D1',async()=>{
+ const response=await handle(new Request('https://api.example/health'),{...env,API_RATE_LIMIT:{limit:async()=>({success:false})}});
+ assert.equal(response.status,429);
+});
+test('OAuth starts scoped offline PKCE flow and callback rejects missing browser binding',async()=>{
+ const {start,callback}=await import('../src/oauth.ts');
+ let inserts=0;
+ const DB={prepare(sql){return {bind(...args){return {run:async()=>{if(sql.startsWith('INSERT')) inserts++; return {meta:{changes:1}}}}}}};
+ const configured={...env,DB,OAUTH_ENABLED:'true',GOOGLE_CLIENT_ID:'test',GOOGLE_CLIENT_SECRET:'synthetic'};
+ const response=await start(configured,'A');
+ const {authorizationUrl}=await response.json();
+ const target=new URL(authorizationUrl);
+ assert.equal(target.searchParams.get('access_type'),'offline');
+ assert.equal(target.searchParams.get('code_challenge_method'),'S256');
+ assert.equal(target.searchParams.get('scope'),'openid email https://www.googleapis.com/auth/drive.file');
+ assert.equal(target.searchParams.get('state').length,43);
+ assert.ok(response.headers.get('Set-Cookie').includes('HttpOnly; Secure; SameSite=None'));
+ assert.equal(inserts,1);
+ await assert.rejects(()=>callback(new Request(configured.OAUTH_REDIRECT_URI+'?state='+target.searchParams.get('state')),configured),e=>e.code==='invalid_oauth_state');
+ await assert.rejects(()=>start(env,'A'),e=>e.code==='oauth_not_configured');
 });
