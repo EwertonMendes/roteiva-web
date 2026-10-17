@@ -470,3 +470,31 @@ test("large finance histories use server annual aggregation and refresh only cha
   const forClient=await repo.financeYearBars(2026,1);
   assert.equal(forClient[9],9.5);
 });
+
+test("Drive folder links: user-owned projects only, no cross-account reads or edits",async()=>{
+  const alice=dbFor("alice"),bob=dbFor("bob"),anon=dbFor();
+  const connectionId="aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa";
+  const folderId="folder_1234567890";
+  const id="2_"+connectionId+"_"+folderId;
+  const linkPath="users/alice/driveFolders/"+id;
+  const data={ownerUid:"alice",schemaVersion:1,projectId:2,connectionId,
+    folderId,folderName:"Materiais de gravação",createdAt:serverTimestamp()};
+  const ref=doc(alice,linkPath);
+  await assertFails(setDoc(ref,{...data,ownerUid:"bob"}));
+  await assertFails(setDoc(ref,{...data,projectId:999}));
+  await assertFails(setDoc(ref,{...data,folderId:"other_folder_9999"}));
+  await assertFails(setDoc(ref,{...data,folderName:""}));
+  await assertFails(setDoc(ref,{...data,extra:"secret"}));
+  await assertSucceeds(setDoc(ref,data));
+  await assertSucceeds(getDoc(ref));
+  await assertSucceeds(getDocs(collection(alice,"users/alice/driveFolders")));
+  await assertFails(updateDoc(ref,{folderName:"Alterado"}));
+  await assertFails(setDoc(ref,data));
+  for(const unauthorized of [bob,anon]){
+    await assertFails(getDoc(doc(unauthorized,linkPath)));
+    await assertFails(getDocs(collection(unauthorized,"users/alice/driveFolders")));
+    await assertFails(setDoc(doc(unauthorized,linkPath),data));
+    await assertFails(deleteDoc(doc(unauthorized,linkPath)));
+  }
+  await assertSucceeds(deleteDoc(ref));
+});
