@@ -289,13 +289,13 @@ test("Pages stays anonymous and uses the unchanged localStorage key",async({page
 test("persistent cache is opt-in, survives refresh, and is cleared on logout",async({page},info)=>{
   await page.goto(cloud);
   await login(page,"cache-"+info.project.name+"@example.com");
-  await navigate(page,"Configurações");
+  await page.goto(cloud+"/configuracoes");
   await expect(page.getByRole("button",{name:"Ativar cache"})).toBeVisible();
   await page.getByRole("button",{name:"Ativar cache"}).click();
   await expect(page.locator(".app-shell")).toBeVisible();
   await expect(page.getByRole("button",{name:"Desativar cache"})).toBeVisible();
   await expect.poll(()=>page.evaluate(()=>localStorage.getItem("roteiva-private-cache"))).toBe("enabled");
-  await navigate(page,"Clientes");
+  await page.goto(cloud+"/clientes");
   await page.getByRole("button",{name:"Novo cliente",exact:true}).click();
   await page.getByLabel("Nome do cliente",{exact:true}).fill("Cliente cache seguro");
   await page.getByLabel("Contato principal",{exact:true}).fill("Contato cache");
@@ -306,9 +306,9 @@ test("persistent cache is opt-in, survives refresh, and is cleared on logout",as
   await expect.poll(()=>page.evaluate(()=>localStorage.getItem("roteiva-private-cache"))).toBe("enabled");
   // On shared browsers the opted-in setting remains, but account data is cleared.
   await login(page,"cache-other-"+info.project.name+"@example.com");
-  await navigate(page,"Clientes");
+  await page.goto(cloud+"/clientes");
   await expect(page.getByText("Cliente cache seguro",{exact:true})).toHaveCount(0);
-  await navigate(page,"Configurações");
+  await page.goto(cloud+"/configuracoes");
   await page.getByRole("button",{name:"Desativar cache"}).click();
   await expect(page.getByRole("button",{name:"Ativar cache"})).toBeVisible();
   await expect.poll(()=>page.evaluate(()=>localStorage.getItem("roteiva-private-cache"))).toBe("disabled");
