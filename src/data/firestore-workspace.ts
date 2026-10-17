@@ -58,6 +58,7 @@ export class FirestoreWorkspace {
   private clientCursor:QueryDocumentSnapshot<DocumentData>|null|undefined;
   private recurringCount:{revision:number;count:number}|undefined;
   private readonly rangeRevisions=new Map<string,number>();
+  private readonly financeBarCache=new Map<string,{revision:number;bars:number[]}>();
   hasLoaded(domains:readonly Domain[]):boolean { return domains.every(name=>this.loadedDomains.has(name)); }
   constructor(db: Firestore, uid: string) {
     if (!uid || uid.includes("/")) throw new Error("UID inválido.");
@@ -251,6 +252,50 @@ export class FirestoreWorkspace {
       this.rangeRevisions.set(key,after.domains[name]);
       return this.decoded();
     }finally{release();}
+  }
+  async financeMonth(year:number,month:number):Promise<WorkspaceData>{
+    if(!Number.isInteger(year)||year<2000||year>2100||
+      !Number.isInteger(month)||month<0||month>11)throw Error("Período financeiro inválido.");
+    const start=new Date(Date.UTC(year,month,1)).toISOString().slice(0,10);
+    const end=new Date(Date.UTC(year,month+1,1)).toISOString().slice(0,10);
+    return this.dateWindow("financeEntries",start,end);
+  }
+  async financeYearBars(year:number,clientId?:number):Promise<number[]>{
+    if(!Number.isInteger(year)||year<2000||year>2100)throw Error("Ano financeiro inválido.");
+    const stamp=await this.ensureSync();
+    const key=year+":"+(clientId||"all");
+    const cached=this.financeBarCache.get(key);
+    if(cached?.revision===stamp.domains.financeEntries)return [...cached.bars];
+    let bars:number[];
+    // For small accounts a single complete read is cheaper and immediately
+    // supports all filters, export and monthly charts without 12 aggregations.
+    if(stamp.counts.financeEntries<=40 && !this.loadedDomains.has("financeEntries"))
+      await this.load(["financeEntries"]);
+    if(this.loadedDomains.has("financeEntries")){
+      const records=this.decoded().financeEntries;
+      bars=Array.from({length:12},(_,i)=>records.filter(entry=>
+        entry.kind!=="expense" && (!clientId||entry.clientId===clientId) &&
+        entry.date.endsWith("/"+year) && Number(entry.date.slice(3,5))===i+1)
+        .reduce((n,entry)=>n+Math.round(entry.amount*100),0)/100);
+    }else{
+      const base=collection(this.db,"users",this.uid,"financeEntries");
+      const values=await Promise.all(Array.from({length:12},async(_,i)=>{
+        const start=new Date(Date.UTC(year,i,1)).toISOString().slice(0,10);
+        const end=new Date(Date.UTC(year,i+1,1)).toISOString().slice(0,10);
+        const filtered=query(base,...(clientId?[where("clientId","==",clientId)]:[]),
+          where("kind","==","income"),where("date",">=",start),where("date","<",end));
+        const result=await getAggregateFromServer(filtered,{amountCents:sum("amountCents")});
+        trackAggregation(this.uid);
+        return Number(result.data().amountCents??0)/100;
+      }));
+      bars=values;
+    }
+    trackRevision(this.uid);
+    const after=await readSync(this.db,this.uid);
+    if(!after||after.domains.financeEntries!==stamp.domains.financeEntries)
+      throw Error("Conflito: o financeiro mudou durante a consulta. Recarregue.");
+    this.financeBarCache.set(key,{revision:after.domains.financeEntries,bars});
+    return [...bars];
   }
   async financeYear(year:number):Promise<WorkspaceData>{
     if(!Number.isInteger(year)||year<2000||year>2100)throw Error("Ano financeiro inválido.");

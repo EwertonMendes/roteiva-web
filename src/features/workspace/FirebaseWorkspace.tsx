@@ -21,7 +21,8 @@ export function FirebaseWorkspace() {
   const [overviewMetrics,setOverviewMetrics]=useState<Awaited<ReturnType<FirestoreWorkspace["overviewMetrics"]>>>();
   const [projectPage,setProjectPage]=useState<{total:number;hasMore:boolean;status:string}>();
   const [clientPage,setClientPage]=useState<{total:number;recurring:number;hasMore:boolean}>();
-  const [financeYear,setFinanceYear]=useState<number>();
+  const [financePeriod,setFinancePeriod]=useState<string>();
+  const [financeBars,setFinanceBars]=useState<{key:string;bars:number[]}>();
   const [calendarPeriod,setCalendarPeriod]=useState<string>();
   const [error,setError]=useState("");
   const [saving,setSaving]=useState(false);
@@ -38,7 +39,7 @@ export function FirebaseWorkspace() {
     let active=true;
     failed.current=false;
     setRemoteChanges(false);setSyncWarning("");
-    setError(""); setInitial(undefined);setBusinessLoaded(false);setOverviewMetrics(undefined);setProjectPage(undefined);setClientPage(undefined);setFinanceYear(undefined);setCalendarPeriod(undefined);
+    setError(""); setInitial(undefined);setBusinessLoaded(false);setOverviewMetrics(undefined);setProjectPage(undefined);setClientPage(undefined);setFinancePeriod(undefined);setFinanceBars(undefined);setCalendarPeriod(undefined);
     (async()=>{
       const route=routeFromLocation(window.location,{base:import.meta.env.BASE_URL,useHash:false});
       const domains=domainsForRoute(route);
@@ -55,8 +56,10 @@ export function FirebaseWorkspace() {
             return {workspace:clients.workspace,clients};
           }
           if(route.view==="finance"){
-            const year=new Date().getFullYear();
-            return {workspace:await repository.financeYear(year),year};
+            const now=new Date(),year=now.getFullYear(),month=now.getMonth();
+            const workspace=await repository.financeMonth(year,month);
+            const bars=await repository.financeYearBars(year);
+            return {workspace,finance:{year,month,bars}};
           }
           if(route.view==="calendar"){
             const date=new Date(),year=date.getFullYear(),month=date.getMonth();
@@ -75,7 +78,11 @@ export function FirebaseWorkspace() {
           setProjectPage({total:workspaceState.page.total,hasMore:workspaceState.page.hasMore,status:"Todos"});
         if (workspaceState.clients)
           setClientPage({total:workspaceState.clients.total,recurring:workspaceState.clients.recurring,hasMore:workspaceState.clients.hasMore});
-        if("year" in workspaceState && workspaceState.year)setFinanceYear(workspaceState.year);
+        if("finance" in workspaceState && workspaceState.finance){
+          const {year,month,bars}=workspaceState.finance;
+          const key=year+"-"+month+"-";
+          setFinancePeriod(key);setFinanceBars({key:year+"-",bars});
+        }
         if("calendar" in workspaceState && workspaceState.calendar)setCalendarPeriod(workspaceState.calendar);
         setInitial({workspace:workspaceState.workspace,theme:theme || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark":"light")});
       }
@@ -170,22 +177,25 @@ export function FirebaseWorkspace() {
     void ensureDomains(["clients","projects","tasks","events","financeEntries","activities"]).catch(()=>undefined);
   },[ensureDomains]);
 
-  const loadFinancePeriod=useCallback(async(year:number)=>{
-    if(financeYear===year && !repository.hasLoaded(["financeEntries"]))return;
+  const loadFinancePeriod=useCallback(async(year:number,month:number,clientId?:number)=>{
+    const key=year+"-"+month+"-"+(clientId||"");
+    if(financePeriod===key && financeBars?.key===year+"-"+(clientId||""))return;
     const request=++scopeRequest.current;
     setLoadingBusiness(true);
     try {
       await queue.current;
       if(failed.current)throw Error("Conflito: há uma gravação não confirmada.");
       await repository.load(["clients","projects","activities"]);
-      const workspace=await repository.financeYear(year);
+      const workspace=await repository.financeMonth(year,month);
+      const bars=await repository.financeYearBars(year,clientId);
       if(request===scopeRequest.current){
         setInitial(current=>current?{...current,workspace}:current);
-        setBusinessLoaded(true);setFinanceYear(year);
+        setBusinessLoaded(true);setFinancePeriod(key);
+        setFinanceBars({key:year+"-"+(clientId||""),bars});
       }
     }catch(reason){if(request===scopeRequest.current)setError(dataErrorMessage(reason));}
     finally{if(request===scopeRequest.current)setLoadingBusiness(false);}
-  },[repository,financeYear]);
+  },[repository,financePeriod,financeBars]);
   const loadCalendarPeriod=useCallback(async(year:number,month:number)=>{
     const period=year+"-"+month;
     if(calendarPeriod===period)return;
@@ -215,8 +225,8 @@ export function FirebaseWorkspace() {
       if(!clientPage)void fetchClientPage(true);
       return;
     }
-    if(route.view==="finance" && !financeYear){
-      void loadFinancePeriod(new Date().getFullYear());
+    if(route.view==="finance" && !financePeriod){
+      const d=new Date();void loadFinancePeriod(d.getFullYear(),d.getMonth());
       return;
     }
     if(route.view==="calendar" && !calendarPeriod){
@@ -226,7 +236,7 @@ export function FirebaseWorkspace() {
     const required=domainsForRoute(route);
     if (!required.length || repository.hasLoaded(required)) return;
     void ensureDomains(required).catch(()=>undefined);
-  },[repository,ensureDomains,overviewMetrics,projectPage,fetchProjectPage,clientPage,fetchClientPage,financeYear,calendarPeriod,loadFinancePeriod,loadCalendarPeriod]);
+  },[repository,ensureDomains,overviewMetrics,projectPage,fetchProjectPage,clientPage,fetchClientPage,financePeriod,calendarPeriod,loadFinancePeriod,loadCalendarPeriod]);
   useEffect(()=>{
     if (!saving) return;
     const warn=(event:BeforeUnloadEvent)=>{event.preventDefault();event.returnValue="";};
@@ -277,7 +287,8 @@ export function FirebaseWorkspace() {
         clientPage={repository.hasLoaded(["clients"])?undefined:clientPage}
         onMoreClients={()=>void fetchClientPage(false)}
         onSearchClients={searchAllClients}
-        onFinanceYearChange={(year)=>void loadFinancePeriod(year)}
+        onFinancePeriodChange={(year,month,clientId)=>void loadFinancePeriod(year,month,clientId)}
+        financeBars={financeBars}
         onCalendarMonthChange={(year,month)=>void loadCalendarPeriod(year,month)}
         onClientCreated={(client)=>setClientPage(current=>current?{
           ...current,total:current.total+1,recurring:current.recurring+(client.type==="Recorrente"?1:0),
