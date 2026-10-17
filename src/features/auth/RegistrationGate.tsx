@@ -1,13 +1,17 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { ArrowRight } from "lucide-react";
-import { FirestoreWorkspace, dataErrorMessage } from "../../data/firestore-workspace";
+import { FirestoreWorkspace, dataErrorMessage, type RoteivaProfile, type ProfileChanges } from "../../data/firestore-workspace";
 import { firebaseServices } from "../../lib/firebase";
 import { useAuth } from "./AuthProvider";
 import { AuthLayout } from "./AuthLayout";
 import { RegistrationPage, type RegistrationValues } from "./RegistrationPage";
 
 type Status = "checking" | "registered" | "missing" | "error";
-const RegistrationProfileContext=createContext<{displayName:string}|null>(null);
+type ProfileContext = {
+  profile:RoteivaProfile;
+  saveProfile:(changes:ProfileChanges)=>Promise<void>;
+};
+const RegistrationProfileContext=createContext<ProfileContext|null>(null);
 export function useRegistrationProfile(){return useContext(RegistrationProfileContext);}
 
 export function RegistrationGate({children}: {children: ReactNode}) {
@@ -17,7 +21,7 @@ export function RegistrationGate({children}: {children: ReactNode}) {
   const [showForm,setShowForm]=useState(intent==="register");
   const [attempt,setAttempt]=useState(0);
   const [error,setError]=useState("");
-  const [profile,setProfile]=useState<{displayName:string}|null>(null);
+  const [profile,setProfile]=useState<RoteivaProfile|null>(null);
   const [creating,setCreating]=useState(false);
 
   useEffect(()=>{
@@ -38,7 +42,9 @@ export function RegistrationGate({children}: {children: ReactNode}) {
         ...values,email:user.email||"",photoURL:user.photoURL||"",
         acknowledgedDataUse:true,
       });
-      setProfile({displayName:values.displayName});
+      const saved=await repository.loadProfile();
+      if (!saved) throw new Error("Conflito: o perfil não foi encontrado depois do cadastro.");
+      setProfile(saved);
       setStatus("registered");
     } catch (reason) {
       setError(dataErrorMessage(reason));
@@ -47,9 +53,15 @@ export function RegistrationGate({children}: {children: ReactNode}) {
     }
   }
 
+  async function saveProfile(changes:ProfileChanges) {
+    if(!profile) throw new Error("Conflito: perfil não carregado.");
+    const updated=await repository.saveProfile(changes,profile.revision);
+    setProfile(updated);
+  }
+
   if(!user)return null;
   if(status==="checking")return <main className="studio-loading" role="status">Verificando seu cadastro…</main>;
-  if(status==="registered")return <RegistrationProfileContext.Provider value={profile}>{children}</RegistrationProfileContext.Provider>;
+  if(status==="registered" && profile)return <RegistrationProfileContext.Provider value={{profile,saveProfile}}>{children}</RegistrationProfileContext.Provider>;
   if(status==="error")return <AuthLayout section="CONEXÃO" title="Não foi possível consultar seu cadastro." description="Não vamos criar uma nova conta enquanto não for possível confirmar o estado do seu espaço.">
     <p className="auth-error" role="alert">{error}</p>
     <div className="auth-row-actions"><button className="auth-primary" onClick={()=>setAttempt(n=>n+1)}>Tentar novamente <ArrowRight size={16}/></button><button className="auth-link" onClick={()=>void logout()} disabled={busy}>Trocar conta</button></div>
