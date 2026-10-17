@@ -40,10 +40,11 @@ Não recrie READMEs concorrentes, documentos de teste avulsos ou planos paralelo
 
 - O frontend foi **explicitamente migrado na PR #5 para React + Vite + TypeScript** a fim de atender ao Firebase Hosting estático. A entrada é `index.html` e o código da UI está em `src/`. **Não recriar Next.js/Vinext, SSR nem backend por conveniência**.
 - Existe **um único frontend**. `pnpm build` gera `dist/` para Firebase; `pnpm build:pages` gera `dist-pages/` para GitHub Pages. Ambos precisam continuar funcionando e a interface visual precisa ser preservada.
-- A fundação Firebase DEV da PR #6 usa somente roteiva-web-dev (Spark, Standard/nativo em São Paulo), Auth Google e subcoleções privadas users/{uid}. Conferir validação no roadmap. Worker/Drive/PROD continuam planejados. Mudanças de integração não autorizam redesenho.
+- A fundação Firebase DEV da PR #6 usa somente roteiva-web-dev (Spark, Standard/nativo em São Paulo), Auth Google e subcoleções privadas users/{uid}. Conferir validação no roadmap. A PR #15 adiciona a fundação Worker/D1 DEV em api/; OAuth real, biblioteca Drive e PROD continuam pendentes. Mudanças de integração não autorizam redesenho.
 - O BRBET antigo é referência conceitual, não uma dependência e não deve ser copiado cegamente; verificar direitos de reutilização antes de aproveitar código.
 - O escopo `drive.file` é o padrão desejado; **não pedir acesso irrestrito ao Drive** por conveniência.
 - Com uploads grandes, dados passam diretamente do navegador ao Drive quando a prova de conceito confirmar segurança e CORS; **não passar vídeo pelo Worker**.
+- API em api/ usa npm ci/package-lock próprios; frontend preserva PNPM/lockfile. OAuth permanece desabilitado até PoC real e QA de cookies entre web.app/workers.dev. Não reutilizar o bootstrap temporário da PR #15: environment cloudflare-development aceita somente master, pipeline normal aguarda CI frontend verde. Nenhuma infraestrutura PROD autorizada.
 - Refresh tokens só no backend criptografados; acesso entre workspaces sempre verificado no servidor/regras.
 
 - A chave de demonstração `roteiva-pages-demo-workspace-v1` é um contrato de compatibilidade local; não alterá-la sem migração de dados. LocalStorage não é compartilhado entre domínios diferentes.

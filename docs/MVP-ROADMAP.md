@@ -40,7 +40,7 @@
 | API antiga e D1/R2 | **REMOVIDO do código ativo** | PR #4; frontend Next/Vinext preservado; backend futuro será novo |
 | Firebase Hosting | **VALIDADO na auditoria prévia** | DEV Spark atualizado após CI master 38981508561 e deploy 38981719389 |
 | Firebase Auth e Firestore | **IMPLEMENTADO na PR #6; QA em andamento** | Console DEV configurado, regras e persistência por UID; evidências abaixo |
-| Worker API separado e D1 de tokens | **PLANEJADO** | Não existe Worker OAuth/refresh do MVP |
+| Worker API separado e D1 de tokens | **PARCIAL — PR #15** | Fundação e recursos DEV; PoC real e biblioteca pendentes |
 | Drive individual por usuário | **PLANEJADO** | Integração BRBET inspecionada externamente; não transferida |
 | Revisão segura por cliente | **PLANEJADO** | Fluxo legado incompatível com arquitetura-alvo |
 | Planos/entitlements | **PLANEJADO** | Não há verificação server-side de assinatura |
@@ -97,7 +97,7 @@
 
 **Prioridade P0.** Fazer **antes** de migrar a biblioteca completa, para validar que é possível usar Drive com segurança e arquivos grandes sem proxy.
 
-- [ ] PoC Worker TypeScript publicado em ambiente DEV no plano gratuito.
+- [x] **VALIDADO — PR #15:** Worker TypeScript publicado em DEV/Free; [run 39055895154](https://github.com/EwertonMendes/roteiva-web/actions/runs/39055895154), health HTTPS real. PoC Drive autenticada segue pendente.
 - [ ] PoC de verificação segura de Firebase ID Token no Worker; rejeitar tokens inválidos, expirados e de outro projeto.
 - [ ] OAuth 2.0 Google no Worker com `drive.file`, `state`, offline access e callback seguro; testar expiração, reconexão, revogação, troca de conta.
 - [ ] D1 DEV com refresh token cifrado via WebCrypto/AES-GCM e chave em Workers Secrets; isolamento e não exposição.
@@ -113,20 +113,20 @@
 
 ## Fase 1 — Fundação SaaS e ambientes
 
-**Prioridade P0.** Por solicitação explícita na PR #6, Auth/Firestore Solo são independentes da PoC Drive da Fase 0. Worker/OAuth continuam planejados.
+**Prioridade P0.** Por solicitação explícita na PR #6, Auth/Firestore Solo são independentes da PoC Drive da Fase 0. Fundação Worker/D1 DEV adicionada na PR #15; OAuth real e biblioteca continuam pendentes.
 
 - [x] Unificar React/Vite/TS na SPA em `src/`, mantendo visual, estado local e build Pages; preparar build Firebase em `dist/` (PR #5).
 - [x] Padronizar lockfile/instalação com PNPM, removendo o npm lock e instaladores órfãos (higienização PR #3); **a auditoria de dependências em si continua pendente**.
 - [x] Reutilizar exclusivamente Firebase **DEV** roteiva-web-dev: Hosting ativo, Auth Google habilitado, Firestore Standard criado em São Paulo após aprovação. **PROD não autorizado e não criado**.
 - [x] Implementar login Google, logout, sessão, proteção e erros na PR #6; **IMPLEMENTADO**, QA real ainda pendente.
 - [ ] Criar cliente HTTP para Worker, com Firebase ID Token e tratamento de expiração/401; sem compartilhar UID arbitrário.
-- [ ] Criar API Worker DEV/PROD separada, secrets/bindings por ambiente e CORS controlado.
+- [ ] **PARCIAL — PR #15:** Worker DEV, secrets/bindings e CORS implementados/publicados; PROD separado, não autorizado nem provisionado.
 - [x] CI com typecheck, testes, ambos builds e emuladores; deploy DEV automático após master verde (PR #6).
 - [ ] Acrescentar lint e previews; PROD continua separado e não provisionado.
 - [ ] Configurar observabilidade de erros/cotas e documentação de configuração/deploy.
 - [ ] Testar mobile, desktop, tema e navegação acessível.
 
-**Aceite:** dois usuários entram em contas distintas, reiniciam sessão, veem telas protegidas; regras verificam identidade; Worker/PROD continuam futuros; CI verde. **Estado:** PARCIAL — fundação Solo implementada, QA e demais subetapas discriminados abaixo.
+**Aceite:** dois usuários entram em contas distintas, reiniciam sessão, veem telas protegidas; regras verificam identidade; Worker DEV tem fundação na PR #15; PROD continua futuro; CI verde. **Estado:** PARCIAL — fundação Solo implementada, QA e demais subetapas discriminados abaixo.
 
 ## Fase 2 — Dados persistentes e isolamento
 
@@ -230,7 +230,7 @@
 4. Se mudar tecnologia/fluxo, sincronizar `ARCHITECTURE.md`, `DEVELOPMENT.md` e `README.md`.
 5. Nunca transformar projeções de uso/custo ou ideias discutidas em garantias ou funcionalidades entregues.
 
-**Próxima entrega:** concluir QA Google real do DEV publicado na PR #6. Depois, PoC Drive da Fase 0, sem antecipar Worker/D1 nesta entrega.
+**Próxima entrega:** concluir QA Google real Firebase e PoC Drive da Fase 0; fundação Worker/D1 DEV preparada separadamente na PR #15.
 
 ### PR #7 — Ajuste da revisão e evidência DEV
 
@@ -288,3 +288,23 @@
 **Decisão de segurança:** não persistir dados em disco sem consentimento explícito do usuário; o SDK do Firebase não oferece limpeza criptográfica segura de cache do navegador. Dados privados em dispositivo compartilhado exigem cache desativado. Nenhum recurso novo foi provisionado e a demonstração permanece local.
 
 - [x] **PR #14 — recuperação de leituras (aguarda CI/deploy):** erros de consulta transitórios são retomados automaticamente; falhas por índices ainda não disponíveis têm fallback completo e verificado; a tela de recarregamento manual deixa de ser usada para leituras. Gravações incertas preservam o aviso explícito, sem repetição cega.
+
+## Fundação Google Drive + Cloudflare DEV — PR #15 (17/10/2026)
+
+**Estado geral: PARCIAL.** Infraestrutura e contratos mínimos não representam a biblioteca concluída.
+
+- [x] **VALIDADO:** auditoria da master b4e86d7, AGENTS/README/arquitetura/roadmap/desenvolvimento, workflows e regras; nenhum Worker/D1 existente na conta.
+- [x] **IMPLEMENTADO:** pacote API isolado; identidade Firebase RS256/JWKS, CORS de origem exata, erros sem conteúdo privado, AES-GCM com versão/AAD, migração e repositório por UID.
+- [x] **IMPLEMENTADO:** start/callback com state de uso único, PKCE, nonce OIDC e cookie; renovação, invalid_grant, revogação e consulta mínima de metadados. OAuth desabilitado por padrão.
+- [x] **VALIDADO em infraestrutura remota:** criação do Worker roteiva-api-dev, endereço workers.dev e D1 roteiva-drive-dev com binding DB. Publicação inicial do scaffold não prova os endpoints da API.
+- [x] **VALIDADO no Console:** projeto Google roteiva-drive-dev, Drive API e Picker API ativados; identidade Roteiva Drive DEV e cliente web com callback real; tela externa Testing, proprietário como usuário de teste, escopos openid/e-mail/drive.file salvos. Aceites Picker/política de dados e criação das credenciais autorizados pelo proprietário nesta conversa.
+- [x] **VALIDADO:** Client Secret e chave AES armazenados como Worker Secrets; token Cloudflare salvo no environment GitHub cloudflare-development, sem expor valores em código/chat.
+- [x] **VALIDADO no CI 39055131858:** auditoria sem vulnerabilidades conhecidas após atualização das ferramentas, seis testes iniciais, typecheck, migração D1 local e build dry-run. Isso **não** prova OAuth real ou banco remoto.
+- [x] **VALIDADO:** [publicação DEV 39055895154](https://github.com/EwertonMendes/roteiva-web/actions/runs/39055895154), commit 0d8d7bc: oito testes de API, npm ci/audit, typecheck, migrations local/remota, deploy e smoke HTTPS (health 200 + token inválido 401). Conferência health também no Chrome. A primeira tentativa aplicou a migration mas recusou cpu_ms no Free; corrigido sem upgrade. Último HEAD documental/workflow passa pelo CI separado.
+- [ ] **PLANEJADO:** PoC com consentimento Google real, renovação real, metadado de arquivo selecionado e duas contas reais; UI/biblioteca/uploads continuam fora deste PR.
+- [ ] **PLANEJADO:** domínio próprio ou fluxo de lançamento compatível com bloqueio de cookies entre sites; QA Safari/mobile, recuperação/rotação de chaves e retenção/reconciliação.
+- [ ] **PLANEJADO:** políticas públicas, domínio verificado, escopos/branding finais e análise de publicação OAuth. Não publicar app nem ampliar escopos automaticamente.
+
+**Testes simulados:** Google token endpoint usa mocks; identidade Firebase usa JWTs RS256 assinados em teste e JWKS local; AES-GCM usa criptografia real com dados sintéticos; schema usa SQLite real e Wrangler/D1 local. Nenhum teste simulado comprova consentimento Google, renovação real, Picker, arquivos reais ou isolamento de duas contas reais. A suíte verifica assinatura/issuer/audience/expiry, AAD, ciphertext adulterado, consulta por owner, replay SQL, CORS e invalid_grant.
+
+- **Segurança operacional:** encerrado o bootstrap; environment cloudflare-development restrito à master e workflow normal condicionado ao CI frontend. Publicação automática pós-merge ainda deve ser observada; não confundir bootstrap real com execução futura na master.

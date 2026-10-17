@@ -1,6 +1,6 @@
 # Arquitetura do Roteiva — MVP SaaS
 
-**Atualizado em 16/10/2026. Fundação Firebase DEV IMPLEMENTADA na PR #6; publicação DEV e testes automatizados validados; Google real e persistência conferidos em uma conta; segunda conta e dispositivos ainda em andamento. Worker/Drive e demais fases continuam PLANEJADOS.**
+**Atualizado em 16/10/2026. Fundação Firebase DEV IMPLEMENTADA na PR #6; publicação DEV e testes automatizados validados; Google real e persistência conferidos em uma conta; segunda conta e dispositivos ainda em andamento. Fundação Worker/D1 DEV na PR #15; biblioteca Drive e demais fases continuam PLANEJADAS.**
 
 Esta é a fonte de verdade sobre **como o sistema deverá funcionar**. O acompanhamento do que já foi entregue fica no [roadmap](MVP-ROADMAP.md); instruções operacionais em [desenvolvimento](DEVELOPMENT.md). Mudanças de arquitetura e decisões novas devem atualizar este arquivo **no mesmo PR**, conforme [AGENTS.md](../AGENTS.md).
 
@@ -21,7 +21,7 @@ Não confundir **R$ 0 enquanto dentro da franquia** com infraestrutura ilimitada
 | Login | Firebase Auth Google, sessão, logout e proteção | Login não concede Drive |
 | Dados | Firestore Standard nativo em São Paulo, escopo por UID | Workspaces compartilhados exigem nova modelagem/regras |
 | Segurança | Regras deny-by-default, contratos/revisões e testes A/B nos emuladores | Revisão adicional antes de piloto público |
-| API/Drive | Nenhum Worker, D1, OAuth Drive ou upload implementado | PoC nas fases futuras |
+| API/Drive | Fundação TypeScript e contratos na PR #15; recursos DEV separados, OAuth desabilitado até PoC | Biblioteca e upload continuam planejados |
 | Revisão | Página explicativa protegida no DEV | Convites e ACL de mídia futuros |
 | Cobrança | Spark, sem Blaze ou serviços pagos | Sem implementação de planos |
 
@@ -91,7 +91,7 @@ Carregamento por rota: `workspace-scopes.ts` define domínios completos necessá
 
 Sem índices compostos exigidos na fase atual: consultas ordenam por documentId. Índices por filtros e agregações dependem da migração futura para consultas por tela. Tarefas e entregas são documentos independentes. Exportação JSON/CSV preservada, sem mídia. Exclusões de lançamento/agenda são pontuais; exclusão de conta e limpeza completa continuam planejadas.
 
-## 7. Backend — Cloudflare Workers (PLANEJADO)
+## 7. Backend — Cloudflare Workers (fundação DEV, PR #15)
 
 Worker TypeScript com rotas mínimas de **operação privilegiada**, não CRUD indiscriminado do que as Firestore Rules podem proteger:
 
@@ -106,11 +106,11 @@ Worker TypeScript com rotas mínimas de **operação privilegiada**, não CRUD i
 | `POST /drive/share` | Conceder/revogar permissão no Drive sob ACL explícita |
 | `POST /entitlements/*` | Alterações de plano apenas por processo administrativo seguro (futuro) |
 
-As rotas são **contratos planejados** e ainda não existem. Incluir verificação de propriedade dos arquivos antes de compartilhar, rate limit, validação de entrada, CORS por allowlist DEV/PROD, logs estruturados sem segredos, tratamento de retries e idempotência. OAuth callback precisa de proteção contra CSRF, replay e vinculação ao usuário que iniciou o fluxo. A depender do fluxo, usar cookie seguro HttpOnly/SameSite e armazenamento temporário de state com expiração; **nunca confiar no UID vindo do retorno OAuth sem verificar o state**.
+Na PR #15, `/health`, `/oauth/drive/start`, `/oauth/drive/callback`, `/integrations/drive` e `/integrations/drive/:connectionId/{metadata,disconnect}` têm implementação de fundação; publicação e evidências constam no roadmap. Upload/share/entitlements permanecem **PLANEJADOS**. Incluir verificação de propriedade dos arquivos antes de compartilhar, rate limit, validação de entrada, CORS por allowlist DEV/PROD, logs estruturados sem segredos, tratamento de retries e idempotência. OAuth callback precisa de proteção contra CSRF, replay e vinculação ao usuário que iniciou o fluxo. A depender do fluxo, usar cookie seguro HttpOnly/SameSite e armazenamento temporário de state com expiração; **nunca confiar no UID vindo do retorno OAuth sem verificar o state**.
 
 **Secrets do Worker:** OAuth client secret, chaves AES-GCM com versionamento, demais credenciais. Config pública do Firebase não é segredo, mas regras continuam obrigatórias. Sem service account JSON em código ou repo. CI/CD: segredo por ambiente, deploy DEV separado de PROD.
 
-## 8. D1 e proteção de tokens (PLANEJADO)
+## 8. D1 e proteção de tokens (fundação DEV, PR #15)
 
 D1 é o banco SQL serverless vinculado ao Worker e serve **somente à infraestrutura privada**, principalmente OAuth; não é armazenamento de mídia.
 
@@ -161,7 +161,7 @@ Proposta comercial ainda exploratória: gratuito limitado, Solo e Studio. Não d
 
 ## 12. Cotas, observabilidade e plano gratuito
 
-O DEV mantém Spark. Firestore Standard tem franquias de 50.000 leituras, 20.000 escritas e 20.000 exclusões por dia, 1 GiB armazenado e 10 GiB de saída/mês. Hosting estático oferece 10 GB de conteúdo e 10 GB de transferência/mês. Limites e comportamento no teto estão em [DEVELOPMENT.md](DEVELOPMENT.md). Worker, D1 e Drive não foram provisionados; suas cotas deverão ser avaliadas na PoC futura. **2–10 usuários é cenário estimado, não garantia de custo fixo.**
+O DEV mantém Spark. Firestore Standard tem franquias de 50.000 leituras, 20.000 escritas e 20.000 exclusões por dia, 1 GiB armazenado e 10 GiB de saída/mês. Hosting estático oferece 10 GB de conteúdo e 10 GB de transferência/mês. Limites e comportamento no teto estão em [DEVELOPMENT.md](DEVELOPMENT.md). Recursos DEV e limites da fundação Worker/D1 estão registrados em DEVELOPMENT.md; a PoC funcional Drive ainda precisa ser concluída. **2–10 usuários é cenário estimado, não garantia de custo fixo.**
 
 Criar dashboards de erro/consumo, alertas operacionais quando disponíveis sem custo, limites defensivos por usuário, proteção a abuso/rate limiting e revisões periódicas. Se ficar perto das franquias, reduzir leituras e avaliar upgrade baseado em receita. No Worker, habilitar **fail closed** para rotas de segurança.
 
@@ -205,7 +205,7 @@ A migração React/Vite foi preservada. Auditoria anterior às alterações em [
 
 CI valida ambos builds, regras e browser nos emuladores. Deploy DEV após CI verde da master, checkout do SHA validado e projeto fixo. Dispatch manual executa testes novamente. Secret preexistente protegido no Actions. Papéis de regras/índices e Service Usage Viewer autorizados pelo proprietário e concedidos somente no DEV; WIF é evolução futura, sem pools/credenciais extras neste escopo.
 
-Limitações: sem atualização em tempo real entre abas; conflitos por documento e reload explícito; sem fila offline privada. OAuth Google real, segunda conta e Safari/iOS dependem evidência registrada no roadmap. Os componentes Worker/Drive acima continuam PLANEJADOS.
+Limitações: sem atualização em tempo real entre abas; conflitos por documento e reload explícito; sem fila offline privada. OAuth Google real, segunda conta e Safari/iOS dependem evidência registrada no roadmap. A fundação Worker/D1 está na PR #15; a biblioteca Drive continua PLANEJADA.
 
 
 ## 16. Primeiro acesso e registro consciente (PR #9)
@@ -241,3 +241,21 @@ A UI única React/Vite não usa SSR nem Next. `src/lib/workspace-routing.ts` man
 **Proteção de dados:** URL não representa autorização; documentos são lidos exclusivamente do `users/{uid}` do Firebase Auth e as regras já negam usuários diferentes. No logout explícito, a URL de detalhe é substituída pelo caminho inicial para não deixar um identificador privado na barra de endereço. Recuperação de sessão restaura o mesmo caminho enquanto houver acesso. Link para ID inválido/desconhecido não deve expor conteúdo de outras contas nem inventar um projeto.
 
 **QA exigido:** cada seção, F5 e abertura direta, Voltar/Avançar, detalhes existentes/inexistentes, login com link direto, conta A/B, `/review`, Pages com `#/...`, desktop e mobile. Sem migração de dados, novos serviços ou dependências de roteamento.
+
+## Fundação de integração DEV — PR #15 (17/10/2026)
+
+**Decisão tomada:** API independente em `api/`, com npm/lockfile próprios; frontend PNPM, UI, regras Firestore e deploys existentes preservados. Firebase continua identificando usuários em `roteiva-web-dev`. O OAuth Drive usa o novo projeto **roteiva-drive-dev** (479738001561): a tela OAuth do Firebase existente estava Em produção; uma tela separada em Testing evita alterar o login atual. Não existe PROD nesta entrega.
+
+Cloudflare: Worker `roteiva-api-dev`, D1 `roteiva-drive-dev`, binding `DB`, migration `0001_oauth.sql`. Domínio: https://roteiva-api-dev.ewertonmendes9.workers.dev. A palavra Production no dashboard Cloudflare identifica a versão ativa **desse Worker DEV**, não um ambiente Roteiva PROD.
+
+`jose` valida assinatura RS256 por JWKS oficial Firebase, issuer, audience, sub, iat, exp e auth_time. Não aceita UID enviado pelo cliente nem tokens de emulador. **Limite:** não consulta revogação/disable em Admin API a cada pedido; um ID token previamente emitido pode permanecer válido até expirar. Dados de negócio e autorização de projetos permanecem no Firestore; contratos presentes são exclusivamente do próprio UID, sem workspace compartilhado.
+
+OAuth é Authorization Code confidencial, offline, escopo `openid email drive.file`, PKCE S256, nonce OIDC, state aleatório de 256 bits armazenado como hash com TTL de dez minutos, consumo atômico DELETE RETURNING e cookie de vinculação ao navegador (`__Host-`, HttpOnly, Secure, SameSite=None). Callback não confia em UID/conta vindos da URL. Verifier também cifrado; identidade Google obtida de ID token validado contra issuer/audience/nonce e e-mail verificado. Não agrega escopos amplos. Estado consumido não pode ser reutilizado mesmo se a troca de código falhar. Cinco inícios por UID por dez minutos; rate limiter de plataforma adicional por UID e agregado, local ao ponto Cloudflare, **não** uma quota global rígida.
+
+**Hipótese em validação:** navegador deverá chamar start com credentials:include; bloqueio de cookies entre `web.app` e `workers.dev` pode impedir o callback. A rota falha fechada se faltar cookie. Antes da UI, validar Chrome/Safari/mobile e, se necessário, migrar para domínio próprio com frontend/API no mesmo site ou fluxo de lançamento em primeiro nível. Não remover a vinculação para contornar cookies. Até PoC real, `OAUTH_ENABLED=false`.
+
+AES-256-GCM usa IV aleatório de 96 bits, chave no Secret `TOKEN_KEYS` e envelope com versão, IV e ciphertext/tag; AAD inclui app, ambiente, UID, conta e finalidade. Só ciphertext entra no D1; access token fica em memória durante uma operação. Renovação não faz retry cego: invalid_grant apaga o ciphertext e marca reconexão; erros transitórios preservam credencial; refresh token novo é cifrado e gravado por comparação de revisão. Revogação bloqueia refresh antes da chamada Google; falhas mantêm revocation_pending para nova tentativa explícita, arquivos permanecem no Drive. **Pendente antes de piloto:** reconciliação de refresh/desconexão concorrentes em teste real, limpeza periódica de estados sem tráfego, retenção máxima de revogação pendente e recuperação operacional de chaves.
+
+Conexões têm constraint `UNIQUE(owner_uid,google_account_id)`; mesmo Google pode ser autorizado separadamente por dois UIDs, sem compartilhar credenciais. Metadados e desconexão exigem identidade e consulta por UID+connectionId. Não há ACL compartilhada, listagem recursiva, upload, player ou biblioteca.
+
+**Limite de drive.file:** selecionar uma pasta não autoriza automaticamente todos os arquivos preexistentes, subpastas ou descendentes. Múltiplas pastas exigem referências por ID e seleção/autorização dos arquivos necessários com Picker. A futura modelagem pasta/projeto é Firestore; não adicionar um único folder_id à conexão como se representasse toda a biblioteca. Qualquer mudança para drive.readonly/drive exige decisão explícita sobre escopos restritos, verificação e eventual avaliação de segurança.
