@@ -1,4 +1,4 @@
-import { collection, deleteDoc, doc, getDocsFromServer, serverTimestamp, setDoc } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDocs, serverTimestamp, setDoc } from 'firebase/firestore';
 import {firebaseServices} from '../lib/firebase';
 
 export type DriveFolderLink = {
@@ -9,7 +9,7 @@ export const driveFolderLinkId=(projectId:number,connectionId:string,folderId:st
   projectId+'_'+connectionId+'_'+folderId;
 
 export async function readDriveLinks(uid:string):Promise<DriveFolderLink[]>{
-  const snap=await getDocsFromServer(collection(firebaseServices().db,'users',uid,collectionName));
+  const snap=await getDocs(collection(firebaseServices().db,'users',uid,collectionName));
   return snap.docs.map(entry=>{
     const data=entry.data();
     return {
