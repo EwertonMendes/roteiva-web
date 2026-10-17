@@ -145,7 +145,9 @@ export function FirebaseWorkspace() {
           else setRemoteChanges(true);
         }
       } catch {
-        if (active) setSyncWarning("Não foi possível conferir atualizações externas. Verifique sua conexão.");
+        // Revision checks are advisory. Keep the confirmed workspace visible
+        // and check again on the next focus instead of alarming the user.
+        if(active) lastCheck.current=0;
       }
     };
     window.addEventListener("focus", check);
