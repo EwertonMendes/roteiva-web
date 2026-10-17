@@ -8,7 +8,7 @@ import { useRegistrationProfile } from "../auth/RegistrationGate";
 
 export function FirebaseWorkspace() {
   const {user,logout,busy,error:authError}=useAuth();
-  const registrationProfile=useRegistrationProfile();
+  const profileContext=useRegistrationProfile();
   const repository=useMemo(()=>new FirestoreWorkspace(firebaseServices().db,user!.uid),[user!.uid]);
   const [initial,setInitial]=useState<{workspace:WorkspaceData;theme:"light"|"dark"}>();
   const [error,setError]=useState("");
@@ -59,7 +59,7 @@ export function FirebaseWorkspace() {
     </section>}
     {!initial && !error && <main className="studio-loading" role="status">Carregando seu espaço na nuvem…</main>}
     {initial && <div inert={!!error} aria-busy={saving}>
-      <DashboardClient key={user.uid+"-"+version} firstName={registrationProfile?.displayName || user.displayName || "Profissional"} email={user.email || ""} photoURL={user.photoURL || undefined}
+      <DashboardClient key={user.uid+"-"+version} firstName={profileContext?.profile.displayName || user.displayName || "Profissional"} profile={profileContext?.profile || null} onSaveProfile={profileContext?.saveProfile} email={user.email || ""} photoURL={user.photoURL || undefined}
         initialWorkspace={initial.workspace} initialTheme={initial.theme} onWorkspaceChange={save} onThemeChange={saveTheme}
         cloudStatus={status} saving={saving} onLogout={()=>void logout()} />
     </div>}
