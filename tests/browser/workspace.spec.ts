@@ -1,10 +1,9 @@
 import {test,expect,type Page} from "@playwright/test";
 const cloud="http://127.0.0.1:4173";
-async function login(page:Page,email:string,existing=false) {
+async function googlePopup(page:Page,email:string,existing=false) {
   const popupPromise=page.waitForEvent("popup");
-  await page.getByRole("button",{name:"Entrar com Google",exact:true}).click();
+  await page.getByRole("button",{name:existing?"Entrar com Google":"Cadastrar com Google",exact:true}).click();
   const popup=await popupPromise;
-  // The emulator HTML renders before its final script (and click handlers) loads.
   await popup.waitForLoadState("load");
   if(existing) await popup.getByText(email,{exact:true}).click();
   else {
@@ -12,6 +11,18 @@ async function login(page:Page,email:string,existing=false) {
     await popup.locator("#email-input").fill(email);
     await popup.locator("#display-name-input").fill("Profissional de teste");
     await popup.locator("#sign-in").click();
+  }
+}
+async function login(page:Page,email:string,existing=false) {
+  if(!existing) await page.getByRole("button",{name:"Criar conta",exact:true}).click();
+  await googlePopup(page,email,existing);
+  if(!existing) {
+    await expect(page.getByRole("heading",{name:"Vamos deixar tudo com a sua cara."})).toBeVisible();
+    await expect(page.locator(".app-shell")).toHaveCount(0);
+    await page.getByLabel("Como podemos chamar você?").fill("Profissional de teste");
+    await page.getByLabel("Nome do estúdio ou marca").fill("Estúdio de QA");
+    await page.getByLabel("Entendo que meu perfil e os dados de trabalho").check();
+    await page.getByRole("button",{name:"Criar meu espaço de trabalho"}).click();
   }
   await expect(page.locator(".app-shell")).toBeVisible();
   await settled(page);
@@ -99,6 +110,29 @@ test("Google emulator session, CRUD, restoration, themes and separate users",asy
   await navigate(page,"Clientes");await expect(page.getByText("Estúdio Aurora",{exact:true})).toBeVisible();
   expect(await page.evaluate(()=>localStorage.getItem("roteiva-pages-demo-workspace-v1"))).toBeNull();
 });
+test("First login does not silently create a workspace",async({page},info)=>{
+  await page.goto(cloud);
+  const email="unregistered-"+info.project.name+"@example.com";
+  const popupPromise=page.waitForEvent("popup");
+  await page.getByRole("button",{name:"Entrar com Google",exact:true}).click();
+  const popup=await popupPromise;
+  await popup.waitForLoadState("load");
+  await popup.getByRole("button",{name:"Add new account",exact:true}).click();
+  await popup.locator("#email-input").fill(email);
+  await popup.locator("#display-name-input").fill("Novo profissional");
+  await popup.locator("#sign-in").click();
+  await expect(page.getByRole("heading",{name:"Ainda não encontramos seu espaço."})).toBeVisible();
+  await expect(page.getByText("Nenhuma conta foi criada no Roteiva.")).toBeVisible();
+  await expect(page.locator(".app-shell")).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByRole("heading",{name:"Ainda não encontramos seu espaço."})).toBeVisible();
+  await page.getByRole("button",{name:"Criar meu espaço",exact:true}).click();
+  await expect(page.getByRole("heading",{name:"Vamos deixar tudo com a sua cara."})).toBeVisible();
+  await expect(page.getByRole("button",{name:"Criar meu espaço de trabalho"})).toBeDisabled();
+  await page.getByRole("button",{name:"Sair sem criar conta"}).click();
+  await expect(page.getByRole("button",{name:"Entrar com Google",exact:true})).toBeVisible();
+});
+
 test("popup cancellation is recoverable",async({page})=>{
   await page.goto(cloud);
   const popupPromise=page.waitForEvent("popup");

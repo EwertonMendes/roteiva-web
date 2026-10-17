@@ -20,13 +20,37 @@ export class FirestoreWorkspace {
     this.db=db; this.uid=uid;
   }
   private ref(path: string) { return doc(this.db, "users/" + this.uid + "/" + path); }
-  async initializeProfile(profile: {displayName:string;email:string;photoURL:string}) {
-    const ref = doc(this.db,"users",this.uid);
-    await runTransaction(this.db,async tx=>{
+  // Reading the profile does not create an account or a business workspace.
+  async loadProfile(): Promise<{displayName:string}|null> {
+    const snap = await getDocFromServer(doc(this.db, "users", this.uid));
+    return snap.exists() ? {displayName: snap.data().displayName as string} : null;
+  }
+  async profileExists(): Promise<boolean> {
+    return (await this.loadProfile()) !== null;
+  }
+  async registerProfile(profile: {
+    displayName: string; email: string; photoURL: string;
+    studioName: string; professionalType: "freelancer" | "studio" | "producer" | "other";
+    acknowledgedDataUse: boolean;
+  }): Promise<void> {
+    const displayName = profile.displayName.trim();
+    const studioName = profile.studioName.trim();
+    if (displayName.length < 2 || displayName.length > 120 ||
+        studioName.length > 120 ||
+        !["freelancer","studio","producer","other"].includes(profile.professionalType) ||
+        !profile.acknowledgedDataUse) throw new Error("Confira o cadastro e confirme o uso dos dados antes de continuar.");
+    const ref = doc(this.db, "users", this.uid);
+    await runTransaction(this.db, async tx => {
       const current = await tx.get(ref);
-      const before = current.data();
-      if (before && Object.entries(profile).every(([key,value])=>before[key]===value)) return;
-      tx.set(ref,{...profile,ownerUid:this.uid,schemaVersion:1,createdAt:before?.createdAt || serverTimestamp(),updatedAt:serverTimestamp(),revision:(before?.revision || 0)+1});
+      if (current.exists()) return; // Safe when two tabs submit at once. Never overwrite legacy users.
+      tx.set(ref, {
+        displayName, email: profile.email, photoURL: profile.photoURL,
+        studioName, professionalType: profile.professionalType,
+        registrationCompletedAt: serverTimestamp(),
+        dataAcknowledgedAt: serverTimestamp(),
+        ownerUid: this.uid, schemaVersion: 1, revision: 1,
+        createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+      });
     });
   }
   async load(): Promise<WorkspaceData> {

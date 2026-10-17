@@ -45,6 +45,22 @@
 | Revisão segura por cliente | **PLANEJADO** | Fluxo legado incompatível com arquitetura-alvo |
 | Planos/entitlements | **PLANEJADO** | Não há verificação server-side de assinatura |
 
+## Evolução de onboarding — cadastro separado (PR #9)
+
+**Status inicial: IMPLEMENTADO, aguardando validação do CI e publicação DEV.**
+
+- [x] Diferenciar **Entrar** e **Criar conta** mantendo Google como único login.
+- [x] Não criar perfis Firestore em login ou restauração de sessão; apenas depois da confirmação do formulário.
+- [x] Consultar perfil existente sem escrita, preservar usuários antigos e dados das PRs #6–8.
+- [x] Criar formulário responsivo com nome, estúdio opcional, tipo de trabalho e ciência do uso de dados no ambiente DEV, sem inventar Termos/Política formais.
+- [x] Regras: exigir dados completos em novos perfis, timestamps imutáveis, manter compatibilidade para contas existentes e negar acesso entre UIDs.
+- [x] Preservar a demonstração sem Firebase e a chave `localStorage`.
+- [ ] Validar em CI: testes de regras/perfil legado, registro explícito, login/cadastro e navegador desktop/mobile.
+- [ ] Publicar após CI verde e verificar fluxo real no DEV sem afetar registros existentes.
+- [ ] Antes de abrir cadastro público: providenciar e revisar Termos de Uso, Política de Privacidade, canal de suporte e processo de exclusão de conta/dados.
+
+**Escopo:** separação entre identidade Google e cadastro de negócio. Não confundir checkbox DEV com aceite jurídico definitivo.
+
 ## Fase 0 — Prova técnica mais arriscada: Google Drive + Worker
 
 **Prioridade P0.** Fazer **antes** de migrar a biblioteca completa, para validar que é possível usar Drive com segurança e arquivos grandes sem proxy.

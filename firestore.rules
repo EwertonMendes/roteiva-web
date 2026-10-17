@@ -1,5 +1,5 @@
 rules_version = '2';
-// Data model: users/{uid}: private profile, immutable ownerUid/schemaVersion/createdAt.
+// Data model: users/{uid}: private profile with explicit first-time registration.
 // All child documents have ownerUid=path UID, schemaVersion=1, incrementing revision,
 // server timestamps createdAt/updatedAt. No user roles, entitlements, shared access or arrays.
 // clients: contact/package + integer monthlyFeeCents; projects: briefing/status/date;
@@ -119,17 +119,44 @@ service cloud.firestore {
         metadata(d,uid) &&
         d.theme in ["light","dark"];
     }
+    function hasRegistration(d) {
+      return d.keys().hasAll(["studioName","professionalType","registrationCompletedAt","dataAcknowledgedAt"]);
+    }
+    function modernProfile(d) {
+      return hasRegistration(d) && text(d.displayName,2,120) &&
+        text(d.studioName,0,120) &&
+        d.professionalType in ["freelancer","studio","producer","other"] &&
+        d.registrationCompletedAt is timestamp &&
+        d.dataAcknowledgedAt is timestamp;
+    }
+    function legacyProfile(d) {
+      return !d.keys().hasAny(["studioName","professionalType","registrationCompletedAt","dataAcknowledgedAt"]);
+    }
     function valid_profile(d,uid,id) {
-      return d.keys().hasAll(["ownerUid","schemaVersion","revision","createdAt","updatedAt","displayName","email","photoURL"]) && d.keys().hasOnly(["ownerUid","schemaVersion","revision","createdAt","updatedAt","displayName","email","photoURL"]) &&
+      return d.keys().hasAll(["ownerUid","schemaVersion","revision","createdAt","updatedAt","displayName","email","photoURL"]) &&
+        d.keys().hasOnly(["ownerUid","schemaVersion","revision","createdAt","updatedAt","displayName","email","photoURL","studioName","professionalType","registrationCompletedAt","dataAcknowledgedAt"]) &&
         metadata(d,uid) &&
         text(d.displayName,0,500) &&
         text(d.email,0,254) && (d.email=='' || d.email.matches('^[^ @]+@[^ @]+[.][^ @]+$')) &&
-        text(d.photoURL,0,2048) && (d.photoURL=='' || d.photoURL.matches('^https://.*$'));
+        text(d.photoURL,0,2048) && (d.photoURL=='' || d.photoURL.matches('^https://.*$')) &&
+        (modernProfile(d) || legacyProfile(d));
+    }
+    function immutableRegistration(d) {
+      return (legacyProfile(resource.data) && legacyProfile(d)) ||
+        (modernProfile(resource.data) && modernProfile(d) &&
+         d.registrationCompletedAt==resource.data.registrationCompletedAt &&
+         d.dataAcknowledgedAt==resource.data.dataAcknowledgedAt);
     }
     match /users/{uid} {
       allow read: if owner(uid);
-      allow create: if owner(uid) && valid_profile(request.resource.data,uid,uid) && creating(request.resource.data);
-      allow update: if owner(uid) && valid_profile(request.resource.data,uid,uid) && updating(request.resource.data);
+      // New users must complete the registration form. Legacy users keep their original profile.
+      allow create: if owner(uid) && valid_profile(request.resource.data,uid,uid) &&
+        modernProfile(request.resource.data) &&
+        request.resource.data.registrationCompletedAt==request.time &&
+        request.resource.data.dataAcknowledgedAt==request.time &&
+        creating(request.resource.data);
+      allow update: if owner(uid) && valid_profile(request.resource.data,uid,uid) &&
+        immutableRegistration(request.resource.data) && updating(request.resource.data);
       allow delete: if false; // Account deletion requires a future explicit cleanup process.
       match /clients/{id} {
         allow read: if member(uid);

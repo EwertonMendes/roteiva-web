@@ -146,3 +146,11 @@ A PR #7 foi incorporada à master pelo [commit c11532e](https://github.com/Ewert
 A rota `/review` autenticada foi **validada em navegador automatizado contra emuladores**, com rótulo DEV e retorno ao painel. A inspeção visual autenticada diretamente no site publicado **ainda não foi comprovada**. Não declarar concluídos logout/relogin com conta Google real, isolamento com segunda conta Google real, Safari/iOS ou aparelho móvel físico.
 
 Esses testes devem ser executados sem apagar os registros `[QA]` já existentes e sem conceder acesso entre contas.
+
+## Cadastro separado — PR #9
+
+O modo Firebase verifica a existência de `users/{uid}` via `getDocFromServer` após o login Google, sem criar perfil silenciosamente. `src/features/auth/RegistrationGate.tsx` separa as contas existentes do primeiro acesso e trata falha de rede sem considerar a conta inexistente. `RegistrationPage.tsx` cadastra nome profissional, estúdio opcional e perfil de atuação e exige reconhecimento explícito do armazenamento de dados DEV. Uma transação Firestore cria o documento somente após o envio; várias abas não sobrescrevem os dados existentes. Timestamps de registro são imutáveis e as regras mantém compatibilidade com documentos legados.
+
+**Teste de regressão indispensável:** os usuários de antes da PR #9 devem entrar sem onboarding e manter cadastros e preferências; a demo Pages nunca deve carregar Firebase; criar identidade Auth não pode criar automaticamente o documento de perfil. Um UID sem perfil não acessa coleções protegidas. Não afirmar conclusão de aceite legal: política e termos finais para o produto público continuam pendentes. Validação automatizada em emuladores é distinta do teste com Google real.
+
+Para teste visual, conferir fluxos `Entrar`, `Criar conta`, conta ausente, voltar/sair sem registro, checkbox obrigatório, contraste dos temas, teclado, mobile/desktop, restauração de sessão e `/review` protegido. O fluxo do registro só é publicado no DEV após a pipeline de testes.

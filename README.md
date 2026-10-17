@@ -14,6 +14,8 @@ A [PR #6](https://github.com/EwertonMendes/roteiva-web/pull/6) implementa a fund
 
 O modo é uma configuração explícita `VITE_APP_MODE`; não depende do domínio. Um novo usuário Firebase começa vazio. **Nenhum dado antigo da demonstração é importado automaticamente.** Domínios têm localStorage separado.
 
+**Cadastro separado (PR #9):** o login Google autentica a identidade, mas **não cria mais automaticamente o perfil no Firestore**. Quem já possui `users/{uid}` entra diretamente, mantendo todos os dados. Quem escolhe **Criar conta** passa pelo cadastro curto com nome profissional, estúdio opcional, tipo de atuação e confirmação de entendimento do uso de dados DEV; só então é gravado o perfil e liberado o dashboard. Entrar com Google sem cadastro mostra uma opção explícita de criar espaço ou sair. O GitHub Pages continua sem login.
+
 ## Desenvolvimento e testes
 
 Node.js 22.13+, PNPM 11.25.0; Java 21 para emuladores.
