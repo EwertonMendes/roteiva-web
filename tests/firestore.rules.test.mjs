@@ -247,3 +247,19 @@ test("legacy account migrates counts and reads only requested workspace domains"
   assert.equal(stamp.domains.clients,1);
   assert.equal(stamp.domains.projects,0);
 });
+
+test("overview aggregates client count and receivables without fetching finance documents",async()=>{
+  const db=dbFor("alice");
+  await assertSucceeds(setDoc(doc(db,"users/alice/financeEntries/10"),
+    {...fixtures.financeEntries,...meta("alice")}));
+  const repository=new FirestoreWorkspace(db,"alice");
+  const metrics=await repository.overviewMetrics();
+  assert.deepEqual(metrics,{clientCount:1,receivableAmount:100.01});
+  const expense={...fixtures.financeEntries,id:11,kind:"expense",amountCents:1500};
+  await assertSucceeds(setDoc(doc(db,"users/alice/financeEntries/11"),
+    {...expense,...meta("alice")}));
+  const fresh=await repository.overviewMetrics();
+  assert.equal(fresh.receivableAmount,100.01);
+  assert.equal(repository.hasLoaded(["clients"]),false);
+  assert.equal(repository.hasLoaded(["financeEntries"]),false);
+});
