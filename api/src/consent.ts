@@ -1,6 +1,6 @@
 import { ApiError, type Env } from './types.ts';
 import { context, encrypt } from './crypto.ts';
-import { DRIVE_SCOPE, type Tokens } from './google.ts';
+import { DRIVE_SCOPE, DRIVE_READ_SCOPE, type Tokens } from './google.ts';
 
 export interface GoogleAccount {
   sub: string;
@@ -18,10 +18,15 @@ export async function persistDriveConsent(
   tokens: Tokens,
   account: GoogleAccount,
   fetcher: typeof fetch = fetch,
+  folders = false,
 ): Promise<void> {
   if (typeof tokens.scope === 'string' && tokens.scope.trim() &&
       !tokens.scope.split(/\s+/).includes(DRIVE_SCOPE)) {
     throw new ApiError(409, 'drive_permission_missing');
+  }
+
+  if (folders && (!tokens.scope || !tokens.scope.split(/\s+/).includes(DRIVE_READ_SCOPE))) {
+    throw new ApiError(409, 'drive_read_permission_missing');
   }
 
   const endpoint = new URL('https://www.googleapis.com/drive/v3/about');
@@ -49,13 +54,14 @@ export async function persistDriveConsent(
   // Re-authorization may return no new refresh_token. Preserve an existing
   // connection's encrypted token only for the *same owner and Google account*.
   const old = await env.DB.prepare(
-    'SELECT encrypted_refresh_token,status FROM drive_connections WHERE owner_uid=? AND google_account_id=?'
+    'SELECT encrypted_refresh_token,status,scopes FROM drive_connections WHERE owner_uid=? AND google_account_id=?'
   ).bind(ownerUid, account.sub).first<{
     encrypted_refresh_token: string | null;
     status: string;
+    scopes: string;
   }>();
   const previous = old?.status === 'connected' ? old.encrypted_refresh_token : null;
-  if (!tokens.refresh_token && !previous) throw new ApiError(409, 'offline_access_unavailable');
+  if (!tokens.refresh_token && (!previous || (folders && !old?.scopes?.split(' ').includes(DRIVE_READ_SCOPE)))) throw new ApiError(409, 'offline_access_unavailable');
 
   const encrypted = tokens.refresh_token
     ? await encrypt(env, tokens.refresh_token, context(env, ownerUid, account.sub))
@@ -67,7 +73,7 @@ export async function persistDriveConsent(
     "WHERE drive_connections.status!='revocation_pending'"
   ).bind(
     crypto.randomUUID(), ownerUid, account.sub, account.email, encrypted,
-    DRIVE_SCOPE, now, now,
+    folders ? DRIVE_SCOPE+' '+DRIVE_READ_SCOPE : (old?.scopes?.includes(DRIVE_READ_SCOPE) ? DRIVE_SCOPE+' '+DRIVE_READ_SCOPE : DRIVE_SCOPE), now, now,
   ).run();
   if (result.meta.changes !== 1) throw new ApiError(409, 'connection_changed');
 }

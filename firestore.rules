@@ -114,6 +114,17 @@ service cloud.firestore {
         text(d.text,0,500) &&
         text(d.when,24,24) && d.when.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[.][0-9]{3}Z$');
     }
+    function valid_driveFolders(d,uid,id) {
+      return d.keys().hasAll(["ownerUid","schemaVersion","projectId","connectionId","folderId","folderName","createdAt"]) &&
+        d.keys().hasOnly(["ownerUid","schemaVersion","projectId","connectionId","folderId","folderName","createdAt"]) &&
+        d.ownerUid==uid && d.schemaVersion==1 &&
+        d.projectId is int && d.projectId>0 &&
+        exists(/databases/$(database)/documents/users/$(uid)/projects/$(string(d.projectId))) &&
+        text(d.connectionId,36,36) && d.connectionId.matches('^[a-zA-Z0-9-]{36}$') &&
+        text(d.folderId,10,200) && d.folderId.matches('^[a-zA-Z0-9_-]+$') &&
+        text(d.folderName,1,250) && d.createdAt==request.time &&
+        id==string(d.projectId)+'_'+d.connectionId+'_'+d.folderId;
+    }
     function valid_preferences(d,uid,id) {
       return d.keys().hasAll(["ownerUid","schemaVersion","revision","createdAt","updatedAt","theme"]) && d.keys().hasOnly(["ownerUid","schemaVersion","revision","createdAt","updatedAt","theme"]) &&
         metadata(d,uid) &&
@@ -237,6 +248,13 @@ service cloud.firestore {
         allow create: if member(uid) && valid_sync(request.resource.data,uid,id) && creating(request.resource.data);
         allow update: if member(uid) && valid_sync(request.resource.data,uid,id) && updating(request.resource.data);
         allow delete: if false;
+      }
+      // Folder links carry identifiers only: never OAuth tokens or file bodies.
+      match /driveFolders/{id} {
+        allow read: if member(uid);
+        allow create: if member(uid) && valid_driveFolders(request.resource.data,uid,id);
+        allow update: if false;
+        allow delete: if member(uid);
       }
       match /preferences/{id} {
         allow read: if member(uid) && id=='ui';

@@ -273,3 +273,14 @@ Validação HTTPS independente após deploy: health 200, conexões sem identidad
 ### Recuperação do retorno Google — `offline_consent_required`
 
 O primeiro teste manual do OAuth no Chrome chegou ao callback e apresentou `offline_consent_required` com JSON no navegador. O código anterior agregava três causas diferentes (refresh ausente, ID token ausente, `scope` não informado/sem `drive.file`). A correção separa erros categóricos, valida o escopo informado, faz consulta autenticada `Drive about.get` antes de gravar credenciais e permite reutilizar o refresh token cifrado **somente** da mesma conta já conectada. Primeiro acesso sem refresh token retorna `offline_access_unavailable` e requer novo consentimento/recuperação da autorização no Google. O callback usa redirect `303` para a Biblioteca, sem expor credenciais. Testes de integração usam respostas Google simuladas; o próximo teste precisa confirmar a autorização real. O OAuth segue Google Testing.
+
+### Teste do fluxo único Google Drive/pastas
+
+1. Acesse `https://roteiva-web-dev.web.app/biblioteca` autenticado e selecione um projeto no seletor superior.
+2. Se não conectado, clique **Conectar Google Drive**. O Google apresenta de uma só vez permissão de arquivos específicos e leitura de arquivos existentes; aceite somente em conta Google de teste. Se conectado com permissão antiga `drive.file`, clique **Vincular pastas**, que inicia a atualização de permissão no mesmo fluxo.
+3. Depois do retorno `?drive=connected`, a UI restaura o projeto selecionado e abre automaticamente o seletor. Navegue por Meu Drive/Todas as pastas, subpastas, clique **Vincular** em várias pastas e feche o seletor.
+4. Clique **Ver arquivos** em uma pasta vinculada. Confirme listagem paginada, subpastas, prévia Google e o link de fallback **Drive**; arquivos e pastas originais continuam na conta Google.
+5. Desvincule uma pasta e valide que arquivos originais não foram apagados. Teste refresh, reload, duas contas diferentes, regras Firestore e bloqueio de permissão no Cloudflare.
+6. Verifique a integração completa com consentimento real e QA Chrome/Safari/mobile. Mocks e CI sozinhos não atestam a concessão de escopo restrito. Antes de abrir ao público, concluir a verificação exigida pelo Google para `drive.readonly`.
+
+O deploy Firebase DEV precisa publicar `firestore.rules` e Worker DEV. Nenhuma credencial Google pessoal é armazenada em `sessionStorage`, URL ou Firestore.

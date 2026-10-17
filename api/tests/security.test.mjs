@@ -117,7 +117,7 @@ test('OAuth first-party launch uses one-time ticket, PKCE and Lax callback cooki
  assert.equal(target.origin,'https://accounts.google.com');
  assert.equal(target.searchParams.get('access_type'),'offline');
  assert.equal(target.searchParams.get('code_challenge_method'),'S256');
- assert.equal(target.searchParams.get('scope'),'openid email https://www.googleapis.com/auth/drive.file');
+ assert.equal(target.searchParams.get('scope'),'openid email https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly');
  assert.equal(target.searchParams.get('state').length,43);
  assert.equal(await hashTest(target.searchParams.get('state')),inserted[0]);
  await assert.rejects(()=>launch(new Request(launchUrl),configured),e=>e.code==='expired_or_used_launch');

@@ -2,6 +2,7 @@ import { ApiError, type Connection, type Env } from './types.ts';
 import { context, decrypt, encrypt } from './crypto.ts';
 import { invalidate } from './repository.ts';
 export const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+export const DRIVE_READ_SCOPE = 'https://www.googleapis.com/auth/drive.readonly';
 export interface Tokens { access_token: string; refresh_token?: string; id_token?: string; scope?: string; token_type:string; expires_in:number; }
 export async function tokenRequest(env: Env, fields: Record<string,string>, fetcher: typeof fetch = fetch): Promise<Tokens> {
   if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) throw new ApiError(503,'oauth_not_configured');

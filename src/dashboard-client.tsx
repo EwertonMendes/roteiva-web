@@ -14,7 +14,7 @@ import { validTimeRange, overlaps, eventRange, eventDuration } from "./studio-ca
 import { toISO as toISOAdded, parseMoney, splitInstallments } from "./studio-finance";
 import { FormEvent, useEffect, useLayoutEffect, useMemo, useState, useCallback } from "react";
 
-import { isDemo } from "./lib/firebase";
+import { isDemo, useEmulators } from "./lib/firebase";
 import { hrefForWorkspaceRoute, routeFromLocation, type WorkspaceRoute } from "./lib/workspace-routing";
 import { SettingsPage } from "./features/settings/SettingsPage";
 import { DriveConnectionPanel } from "./features/drive/DriveConnectionPanel";
@@ -510,7 +510,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
               {view === "settings" ? null : view === "clients" ? <button className="primary-button" onClick={() => { setEditingClient(null); setClientModalOpen(true); }}><UserRoundPlus size={17} /> Novo cliente</button>
                 : view === "finance" ? <button className="primary-button" onClick={() => openFinanceModal()}><Plus size={17} /> Nova receita</button>
                 : view === "calendar" ? <button className="primary-button" onClick={() => openEvent()}><Plus size={17} /> Novo compromisso</button>
-                : view === "library" ? <><select aria-label="Projeto dos arquivos" value={libraryProject} onChange={e => setLibraryProject(e.target.value)}><option value="">Sem projeto</option>{projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select><label className="primary-button upload-button"><Upload size={17} /> {uploading ? "Enviando…" : "Adicionar arquivos"}<input type="file" disabled multiple onChange={(event) => { uploadAssets(event.target.files, Number(libraryProject) || undefined); event.target.value = ""; }} /></label></>
+                : view === "library" ? <><select aria-label="Projeto dos arquivos" value={libraryProject} onChange={e => setLibraryProject(e.target.value)}><option value="">Sem projeto</option>{projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>{isDemo && <label className="primary-button upload-button"><Upload size={17} /> {uploading ? "Enviando…" : "Adicionar arquivos"}<input type="file" disabled multiple onChange={(event) => { uploadAssets(event.target.files, Number(libraryProject) || undefined); event.target.value = ""; }} /></label>}</>
                 : <button className="primary-button" onClick={startProject}><Plus size={17} /> Criar projeto</button>}
             </div>
           </div>
@@ -532,7 +532,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
           {view === "reviews" && <StudioReviews />}
           {view === "finance" && <FinancePanel entries={financeEntries} clients={clientList} onPeriodChange={onFinancePeriodChange} serverBars={financeBars} onAdd={() => openFinanceModal()} onEdit={(entry) => openFinanceModal(entry)} onDelete={setDeletingFinanceEntry} />}
           {view === "calendar" && <CalendarView events={calendarEvents} onMonthChange={onCalendarMonthChange} onAdd={(date) => openEvent(null, date)} onEdit={(entry) => openEvent(entry)} onDelete={(entry) => { if (window.confirm(`Excluir o compromisso “${entry.title}”?`)) { commitCommands([{kind:"deleteEvent",id:entry.id}]); setCalendarEvents(current => current.filter(e => e.id !== entry.id)); logActivity(`Compromisso excluído: ${entry.title}`); } }} />}
-          {view === "library" && <LibraryView assets={libraryAssets} query={query} onUpload={(files) => uploadAssets(files, Number(libraryProject) || undefined)} />}
+          {view === "library" && <LibraryView assets={libraryAssets} query={query} onUpload={(files) => uploadAssets(files, Number(libraryProject) || undefined)} projects={projects} selectedProjectId={Number(libraryProject)||undefined} onSelectProject={setLibraryProject} />}
         </section>
       </main>
 
@@ -713,7 +713,7 @@ function assetIcon(kind: AssetKind) {
   return kind === "Vídeo" ? FileVideo : kind === "Imagem" ? ImageIcon : kind === "Áudio" ? FileAudio : FileText;
 }
 
-function LibraryView({ assets, query, onUpload }: { assets: LibraryAsset[]; query: string; onUpload: (files: FileList | null) => void }) {
+function LibraryView({ assets, query, onUpload, projects, selectedProjectId, onSelectProject }: { assets: LibraryAsset[]; query: string; onUpload: (files: FileList | null) => void; projects: readonly Project[]; selectedProjectId?:number; onSelectProject:(id:string)=>void }) {
   const [kind, setKind] = useState<AssetKind | "Todos">("Todos");
   const [layout, setLayout] = useState<"grid" | "list">("grid");
   const [sort, setSort] = useState("recent");
@@ -722,7 +722,8 @@ function LibraryView({ assets, query, onUpload }: { assets: LibraryAsset[]; quer
   const kinds: (AssetKind | "Todos")[] = ["Todos", "Vídeo", "Imagem", "Áudio", "Documento"];
 
   return <div className="library-layout">
-    {!isDemo && <DriveConnectionPanel />}
+    {!isDemo && !useEmulators && <DriveConnectionPanel projects={projects} selectedProjectId={selectedProjectId} onSelectProject={onSelectProject} />}
+    {(isDemo || assets.length>0) && <>
     <div className="library-summary"><article><span><HardDrive size={18} /></span><div><small>ARQUIVOS</small><b>{assets.length}</b></div></article><article><span><Film size={18} /></span><div><small>ARMAZENAMENTO</small><b>{totalMb >= 1024 ? `${(totalMb / 1024).toFixed(1)} GB` : `${Math.round(totalMb)} MB`}</b></div></article><article><span><CalendarDays size={18} /></span><div><small>ADICIONADOS ESTE MÊS</small><b>{assets.filter(a => toISOAdded(a.addedAt).slice(0,7) === new Date().toLocaleDateString("en-CA").slice(0,7)).length}</b></div></article></div>
     <section className="panel library-panel">
       <div className="library-toolbar"><div className="filter-pills">{kinds.map((item) => <button key={item} className={kind === item ? "active" : ""} onClick={() => setKind(item)}>{item}</button>)}</div><div><select aria-label="Ordenar arquivos" value={sort} onChange={e => setSort(e.target.value)}><option value="recent">Mais recentes</option><option value="name">Nome A–Z</option></select><button className={`view-button ${layout === "grid" ? "active" : ""}`} onClick={() => setLayout("grid")}><Grid2X2 size={16} /></button><button className={`view-button ${layout === "list" ? "active" : ""}`} onClick={() => setLayout("list")}><ListFilter size={16} /></button></div></div>
@@ -730,6 +731,7 @@ function LibraryView({ assets, query, onUpload }: { assets: LibraryAsset[]; quer
       {!filteredAssets.length && <div className="library-empty"><FolderOpen size={34} /><h3>Nenhum arquivo encontrado</h3><p>Altere o filtro ou adicione novos materiais à biblioteca.</p></div>}
       <label className="library-drop"><Upload size={22} /><b>Clique para enviar arquivos</b><span>Vídeo, áudio, imagens, PDFs e documentos</span><input type="file" multiple onChange={(event) => { onUpload(event.target.files); event.target.value = ""; }} /></label>
     </section>
+    </>}
   </div>;
 }
 

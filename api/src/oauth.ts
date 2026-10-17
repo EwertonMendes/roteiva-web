@@ -2,7 +2,7 @@ import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { ApiError, type Env } from './types.ts';
 import { context, decrypt, encrypt, hash, random } from './crypto.ts';
 import { consumeState } from './repository.ts';
-import { DRIVE_SCOPE, tokenRequest } from './google.ts';
+import { DRIVE_SCOPE, DRIVE_READ_SCOPE, tokenRequest } from './google.ts';
 import { persistDriveConsent } from './consent.ts';
 
 const googleKeys = createRemoteJWKSet(new URL('https://www.googleapis.com/oauth2/v3/certs'));
@@ -54,7 +54,7 @@ export async function launch(request: Request, env: Env): Promise<Response> {
   target.search = new URLSearchParams({
     client_id:env.GOOGLE_CLIENT_ID!, redirect_uri:env.OAUTH_REDIRECT_URI,
     response_type:'code', access_type:'offline', prompt:'consent select_account',
-    scope:'openid email ' + DRIVE_SCOPE, state, nonce:tx.nonce,
+    scope:'openid email ' + DRIVE_SCOPE + ' ' + DRIVE_READ_SCOPE, state, nonce:tx.nonce,
     code_challenge:await hash(verifier),code_challenge_method:'S256',
   }).toString();
   return new Response(null,{status:303,headers:{
@@ -88,7 +88,7 @@ export async function callback(request: Request, env: Env): Promise<Response> {
     if (payload.nonce !== tx.nonce || !payload.sub || payload.email_verified !== true || typeof payload.email !== 'string') {
       throw new ApiError(400,'invalid_google_identity');
     }
-    await persistDriveConsent(env, tx.owner_uid, tokens, {sub:payload.sub,email:payload.email});
+    await persistDriveConsent(env, tx.owner_uid, tokens, {sub:payload.sub,email:payload.email}, fetch, true);
     return finish(env,'connected');
   } catch (error) {
     // All credentials remain backend-only. Distinct, static codes let the UI
@@ -97,7 +97,7 @@ export async function callback(request: Request, env: Env): Promise<Response> {
       'offline_access_unavailable', 'drive_permission_missing',
       'drive_verification_unavailable', 'google_identity_missing',
       'invalid_google_identity', 'reconnect_required', 'connection_changed',
-      'google_unavailable',
+      'google_unavailable', 'drive_read_permission_missing',
     ]);
     const code = error instanceof ApiError && recoverable.has(error.code) ? error.code : 'connection_failed';
     return finish(env,code);
