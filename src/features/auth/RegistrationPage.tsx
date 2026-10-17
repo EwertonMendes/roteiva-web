@@ -22,7 +22,7 @@ export function RegistrationPage({user,submitting,error,onSubmit,onExit}:{
   const [acknowledged,setAcknowledged]=useState(false);
   const valid=displayName.trim().length>=2&&displayName.trim().length<=120&&studioName.trim().length<=120&&acknowledged;
   function submit(e:FormEvent<HTMLFormElement>){e.preventDefault();if(valid&&!submitting)void onSubmit({displayName:displayName.trim(),studioName:studioName.trim(),professionalType});}
-  return <AuthLayout section="02 — SEU ESPAÇO" title="Vamos deixar tudo com a sua cara." description="Só o essencial para começar. Você poderá completar as informações do seu negócio mais tarde.">
+  return <AuthLayout section="02 — SEU ESPAÇO" title="Vamos deixar tudo com a sua cara." description="Só o essencial para preparar um espaço que combina com o seu trabalho.">
     <div className="auth-account-note">
       {user.photoURL?<img src={user.photoURL} alt="" referrerPolicy="no-referrer"/>:<span className="auth-avatar-fallback"><UserRound size={20}/></span>}
       <div><strong>{user.email||"Conta Google"}</strong><span>Identidade confirmada pelo Google</span></div>
