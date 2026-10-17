@@ -1,4 +1,4 @@
-export type View = "overview" | "projects" | "clients" | "reviews" | "finance" | "calendar" | "library";
+export type View = "overview" | "projects" | "clients" | "reviews" | "finance" | "calendar" | "library" | "settings";
 export type Status = "Em produção" | "Em aprovação" | "Ajustes" | "Aprovado";
 export type Project = { clientId?: number; dueDate?: string; description?: string; tasks?: { id: number; title: string; done: boolean }[]; template?: string;  id: number; name: string; client: string; status: Status; due: string; progress: number; files: number; color: string; initials: string };
 export type ClientType = "Recorrente" | "Avulso";
