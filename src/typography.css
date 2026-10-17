@@ -37,6 +37,8 @@ input,select,textarea { font-size: var(--type-body); line-height: var(--type-lea
 input::placeholder,textarea::placeholder { opacity: 1; }
 button { line-height: var(--type-leading-ui); }
 button, [role="button"] { touch-action: manipulation; }
+/* Timecodes and keyboard hints are UI text, not source code. Preserve digit alignment. */
+.app-shell kbd, .app-shell .timecode { font-family: inherit; font-variant-numeric: tabular-nums; }
 
 /* Actual UI hierarchy — overrides old per-screen values without !important. */
 .app-shell .page-heading h1 { font-size: clamp(1.75rem,2vw + 1rem,2.25rem); line-height: var(--type-leading-tight); letter-spacing: -.035em; }
@@ -117,7 +119,7 @@ button, [role="button"] { touch-action: manipulation; }
 .app-shell .chart-y-axis { line-height: var(--type-leading-meta); }
 .app-shell .calendar-week { font-size: var(--type-caption); letter-spacing: 0; }
 .app-shell .calendar-grid > button small { font-size: var(--type-caption); }
-.app-shell .calendar-grid .event-chip:not([aria-hidden="true"]) { font-size: var(--type-caption); line-height: var(--type-leading-ui); }
+.app-shell .calendar-grid .event-chip { font-size: var(--type-caption); line-height: var(--type-leading-ui); }
 .app-shell .calendar-grid > button { overflow: hidden; }
 .app-shell .library-summary small,
 .app-shell .settings-field small,
