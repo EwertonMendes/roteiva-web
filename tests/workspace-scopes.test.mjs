@@ -18,6 +18,6 @@ test("each route loads all domains required by its current UI and mutations",()=
   assert.ok(detail.includes("financeEntries")&&detail.includes("events"));
   assert.ok(clients.includes("financeEntries"));
   assert.ok(clientDetail.includes("deliveries"));
-  assert.deepEqual(domainsForRoute({view:"library"}),[]);
+  assert.deepEqual(domainsForRoute({view:"library"}),["projects"]);
   assert.ok(domainsForRoute({view:"calendar"}).includes("events"));
 });

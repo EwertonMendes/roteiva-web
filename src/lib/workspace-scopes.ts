@@ -7,8 +7,9 @@ import type { WorkspaceRoute } from "./workspace-routing.ts";
 export function domainsForRoute(route:WorkspaceRoute):readonly Domain[] {
   switch(route.view) {
     case "settings":
-    case "library":
       return [];
+    case "library":
+      return ["projects"];
     case "overview":
       return ["clients","projects","tasks","events","financeEntries","activities"];
     case "projects":

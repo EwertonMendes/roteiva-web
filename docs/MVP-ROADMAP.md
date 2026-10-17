@@ -276,7 +276,7 @@
 - [x] **IMPLEMENTADO (aguarda validação CI/QA):** documento privado `users/{uid}/sync/state` com revisões e contagens por coleção; regras estritas para schema/propriedade; atualização transacional das revisões nas gravações do workspace.
 - [x] **IMPLEMENTADO (aguarda validação CI/QA):** cache só reutilizado quando existe manifesto por UID/schema, revisão igual à remota e contagem completa; fallback para leitura do servidor, detecção de concorrência durante o bootstrap e revalidação ao retomar a aba.
 - [x] **IMPLEMENTADO (aguarda validação CI/QA):** deduplicação de carregamento concorrente e testes unitários e de segurança para a sincronização.
-- [x] **IMPLEMENTADO (aguarda validação CI/QA):** carregamento inicial por rota dos domínios necessários, recuperação incremental em navegação e exportação integral sob demanda, com exclusão impossível de registros que ainda não foram carregados.
+- [x] **IMPLEMENTADO (aguarda validação CI/QA):** carregamento inicial por rota dos domínios necessários (Biblioteca inclui projetos para o seletor), recuperação incremental em navegação e exportação integral sob demanda, com exclusão impossível de registros que ainda não foram carregados.
 - [ ] **PLANEJADO:** implementar páginas visíveis com cursor, índices para filtros e métricas agregadas; por enquanto uma coleção requerida é lida até o fim em blocos de 200.
 - [x] **IMPLEMENTADO (aguarda validação CI/QA):** persistência codifica e compara somente domínios React realmente alterados; exclusões e revisões continuam transacionais, não afetando outras coleções.
 - [ ] **PLANEJADO:** migrar o efeito de persistência de domínios para comandos de negócio explícitos por ação, com resultados tipados, sem perder a confirmação antes de sair.
