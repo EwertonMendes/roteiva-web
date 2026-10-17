@@ -119,6 +119,28 @@ service cloud.firestore {
         metadata(d,uid) &&
         d.theme in ["light","dark"];
     }
+
+    function valid_sync(d,uid,id) {
+      return id=='state' &&
+        d.keys().hasAll(["ownerUid","schemaVersion","revision","createdAt","updatedAt","domains","counts"]) &&
+        d.keys().hasOnly(["ownerUid","schemaVersion","revision","createdAt","updatedAt","domains","counts"]) &&
+        metadata(d,uid) && d.revision is int && d.revision>=1 &&
+        d.domains is map && d.counts is map &&
+        d.domains.keys().hasAll(["clients","projects","tasks","deliveries","events","financeEntries","activities"]) &&
+        d.domains.keys().hasOnly(["clients","projects","tasks","deliveries","events","financeEntries","activities"]) &&
+        d.counts.keys().hasAll(["clients","projects","tasks","deliveries","events","financeEntries","activities"]) &&
+        d.counts.keys().hasOnly(["clients","projects","tasks","deliveries","events","financeEntries","activities"]) &&
+        valid_sync_counts(d.domains) && valid_sync_counts(d.counts);
+    }
+    function valid_sync_counts(d) {
+      return d.clients is int && d.clients>=0 && d.clients<1000000 &&
+        d.projects is int && d.projects>=0 && d.projects<1000000 &&
+        d.tasks is int && d.tasks>=0 && d.tasks<1000000 &&
+        d.deliveries is int && d.deliveries>=0 && d.deliveries<1000000 &&
+        d.events is int && d.events>=0 && d.events<1000000 &&
+        d.financeEntries is int && d.financeEntries>=0 && d.financeEntries<1000000 &&
+        d.activities is int && d.activities>=0 && d.activities<1000000;
+    }
     function hasRegistration(d) {
       return d.keys().hasAll(["studioName","professionalType","registrationCompletedAt","dataAcknowledgedAt"]);
     }
@@ -208,6 +230,13 @@ service cloud.firestore {
         allow create: if member(uid) && valid_activities(request.resource.data,uid,id) && creating(request.resource.data);
         allow update: if member(uid) && valid_activities(request.resource.data,uid,id) && updating(request.resource.data);
         allow delete: if member(uid);
+      }
+      // Private per-UID revision counters; no shared hot document across accounts.
+      match /sync/{id} {
+        allow read: if member(uid) && id=='state';
+        allow create: if member(uid) && valid_sync(request.resource.data,uid,id) && creating(request.resource.data);
+        allow update: if member(uid) && valid_sync(request.resource.data,uid,id) && updating(request.resource.data);
+        allow delete: if false;
       }
       match /preferences/{id} {
         allow read: if member(uid) && id=='ui';

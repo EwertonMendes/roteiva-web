@@ -266,3 +266,23 @@
 **Riscos/limites:** emuladores não substituem OAuth real; Safari/iOS/navegadores embutidos não estão validados; sem listener entre abas (recarregar explicitamente); sem fila offline; o recarregamento de recuperação descarta rascunhos não confirmados. Histórico activities não é auditoria inviolável. Não há promessa de custo ilimitado ou segurança exaustiva. Perfil e exclusão completa de conta continuam sem UI para evitar limpeza parcial.
 
 **IAM autorizado e aplicado:** Firebase Rules Admin, Cloud Datastore Index Admin e Service Usage Viewer adicionados à conta de deploy existente somente no DEV. Sem Blaze ou novas chaves.
+
+
+## Otimização de consultas e cache Firestore — 16/10/2026
+
+**Objetivo:** reduzir consultas redundantes sem perder isolamento por UID, integridade de vínculos, concorrência ou compatibilidade da demonstração.
+
+- [x] **IMPLEMENTADO (aguarda validação CI/QA):** cache persistente oficial multiaba somente por consentimento explícito nas Configurações; memória por padrão; tentativa de limpeza ao desabilitar e no logout.
+- [x] **IMPLEMENTADO (aguarda validação CI/QA):** documento privado `users/{uid}/sync/state` com revisões e contagens por coleção; regras estritas para schema/propriedade; atualização transacional das revisões nas gravações do workspace.
+- [x] **IMPLEMENTADO (aguarda validação CI/QA):** cache só reutilizado quando existe manifesto por UID/schema, revisão igual à remota e contagem completa; fallback para leitura do servidor, detecção de concorrência durante o bootstrap e revalidação ao retomar a aba.
+- [x] **IMPLEMENTADO (aguarda validação CI/QA):** deduplicação de carregamento concorrente e testes unitários e de segurança para a sincronização.
+- [x] **IMPLEMENTADO (aguarda CI/QA do novo HEAD):** carregamento inicial por rota, Visão Geral com projetos recentes limitados e agregações, listas de Projetos e Clientes com cursor e busca textual completa sob demanda, exportação integral e isolamento entre domínios completos/parciais.
+- [x] **IMPLEMENTADO (aguarda CI/QA do novo HEAD):** Projetos e Clientes usam Carregar mais e cursores estáveis; Projetos filtra status na origem e associa tarefas, Clientes mantém contagem total/recorrentes agregada e vínculo com projetos, e o Dashboard usa agregações de valores a receber e etapas, com caminho econômico para até quatro projetos.
+- [x] **IMPLEMENTADO (aguarda validação CI/QA):** Financeiro por mês selecionado e gráfico anual por agregações (reuso de leitura completa em contas pequenas e atualização dos meses afetados). Agenda por três meses exibidos e quatro próximos compromissos, com contagens gerais via documento de sincronização. Preserva totais do mês, vínculos, filtros, CSV e exportação JSON completa.
+- [ ] **MELHORIA FUTURA DEPENDENTE DE ESCALA:** cursor de até 24 lançamentos **dentro** de meses com centenas de movimentos, exigindo agregações materializadas verificáveis para preservar donut, parcelas, filtros e CSV exatos. A otimização atual é por mês, não por página de lançamento.
+- [x] **IMPLEMENTADO (aguarda CI/QA do novo HEAD):** UI Firebase não persiste efeitos de renderização; ações chamam comandos tipados por documento para projetos, tarefas, entregas, clientes, finanças, agenda e atividade, com controle de revisão e contadores transacionais. Demo preserva o localStorage original. O salvamento de workspace integral continua somente para compatibilidade e testes.
+- [x] **IMPLEMENTADO (diagnóstico, não faturamento):** métricas locais de leituras/escritas na sessão, mostradas em Configurações, com cenários de comparação e agregações nos testes do emulador.
+- [ ] **PENDENTE DE DADOS DO CONSOLE:** comparar leituras/escritas efetivamente faturáveis no Firebase DEV antes/depois, incluindo Rules, índices e retries. O SDK/emulador não consegue recuperar essa medição sozinho.
+- [ ] **VALIDAÇÃO PENDENTE:** CI da PR, QA duas contas reais, F5 com cache consentido, exclusões, concorrência, IndexedDB em mobile e impacto real nas quotas.
+
+**Decisão de segurança:** não persistir dados em disco sem consentimento explícito do usuário; o SDK do Firebase não oferece limpeza criptográfica segura de cache do navegador. Dados privados em dispositivo compartilhado exigem cache desativado. Nenhum recurso novo foi provisionado e a demonstração permanece local.

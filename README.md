@@ -45,7 +45,7 @@ pnpm test:firebase
 - `tests/`: regras nos emuladores com usuários A/B e testes Chromium desktop/mobile.
 - `.github/workflows/`: CI/Pages e publicação DEV após CI verde na master.
 
-O Firestore usa centavos inteiros e datas civis ISO, sem converter dias da agenda em horários UTC. Apenas documentos alterados são gravados. Erros de rede, permissão e conflito exigem recuperação explícita da versão da nuvem; não há fila de gravação privada em localStorage.
+O Firestore usa centavos inteiros e datas civis ISO, sem converter dias da agenda em horários UTC. Apenas documentos alterados são gravados. Erros de rede, permissão e conflito exigem recuperação explícita da versão da nuvem; não há fila de gravação privada em localStorage. O cache persistente é opt-in em Configurações e contém registros privados neste dispositivo; por padrão usa memória. A reabertura consulta a revisão privada por UID e só reutiliza coleções persistidas com contagem completa e versão correspondente. O sincronismo por domínio acrescenta uma escrita por transação de negócio e não usa documento global compartilhado.
 
 **PLANEJADO:** Google Drive, upload de mídia, revisão remota, Worker/D1 de OAuth, equipes, cobrança e PROD. A tela de revisão continua explicativa. A autenticação Google não concede acesso ao Drive.
 
@@ -73,3 +73,6 @@ A mesma aplicação na demonstração GitHub Pages usa rotas em `#/...` sob `/ro
 - [Instruções permanentes](AGENTS.md)
 
 O projeto permanece no **Spark**. Franquias têm limites; nenhuma habilitação de Blaze ou serviço pago faz parte desta entrega.
+
+
+**Economia de consultas (PR #13, em validação):** a Visão Geral usa contagens agregadas e até quatro projetos recentes com tarefas vinculadas, em vez do histórico inteiro de projetos e lançamentos. As listas de Projetos e Clientes possuem paginação real no Firestore (24 por vez) e Carregar mais; Projetos filtra status no servidor, e buscas textuais carregam o domínio completo para não omitir resultados. Ações de negócio gravam documentos específicos por comandos tipados, sem persistir o workspace inteiro por efeito React; a demonstração continua com localStorage. Configurações não baixa coleções de negócio e a exportação busca os dados completos. **Financeiro:** a abertura carrega somente o mês atual; o gráfico anual usa somas agregadas por mês (com leitura completa de até 40 lançamentos como caminho mais econômico), e mudar mês, ano ou cliente consulta a janela necessária. **Agenda:** carrega os três meses que cobrem a grade e até quatro compromissos futuros, sem baixar o histórico. O diagnóstico da sessão aparece em Configurações, mas não corresponde ao consumo faturável; a confirmação de economia requer métricas do Console Firebase DEV.

@@ -1,4 +1,5 @@
 import {test,expect,type Page} from "@playwright/test";
+import {readFile} from "node:fs/promises";
 const cloud="http://127.0.0.1:4173";
 async function googlePopup(page:Page,email:string,existing=false) {
   const popupPromise=page.waitForEvent("popup");
@@ -283,4 +284,51 @@ test("Pages stays anonymous and uses the unchanged localStorage key",async({page
   expect(await page.evaluate(()=>localStorage.getItem("roteiva-pages-demo-workspace-v1"))).toContain("Cliente Demo");
   expect(requests.filter(url=>/googleapis.com|127.0.0.1:8080|127.0.0.1:9099/.test(url))).toEqual([]);
   await page.screenshot({path:info.outputPath("demo.png"),fullPage:true});
+});
+
+test("persistent cache is opt-in, survives refresh, and is cleared on logout",async({page},info)=>{
+  await page.goto(cloud);
+  await login(page,"cache-"+info.project.name+"@example.com");
+  await page.goto(cloud+"/configuracoes");
+  await expect(page.getByRole("button",{name:"Ativar cache"})).toBeVisible();
+  await page.getByRole("button",{name:"Ativar cache"}).click();
+  await expect(page.locator(".app-shell")).toBeVisible();
+  await expect(page.getByRole("button",{name:"Desativar cache"})).toBeVisible();
+  await expect.poll(()=>page.evaluate(()=>localStorage.getItem("roteiva-private-cache"))).toBe("enabled");
+  await page.goto(cloud+"/clientes");
+  await page.getByRole("button",{name:"Novo cliente",exact:true}).click();
+  await page.getByLabel("Nome do cliente",{exact:true}).fill("Cliente cache seguro");
+  await page.getByLabel("Contato principal",{exact:true}).fill("Contato cache");
+  await page.getByRole("button",{name:"Salvar cliente"}).click();await settled(page);
+  await page.reload();await settled(page);
+  await expect(page.getByText("Cliente cache seguro",{exact:true}).first()).toBeVisible();
+  await logout(page);
+  await expect.poll(()=>page.evaluate(()=>localStorage.getItem("roteiva-private-cache"))).toBe("enabled");
+  // On shared browsers the opted-in setting remains, but account data is cleared.
+  await login(page,"cache-other-"+info.project.name+"@example.com");
+  await page.goto(cloud+"/clientes");
+  await expect(page.getByText("Cliente cache seguro",{exact:true})).toHaveCount(0);
+  await page.goto(cloud+"/configuracoes");
+  await page.getByRole("button",{name:"Desativar cache"}).click();
+  await expect(page.getByRole("button",{name:"Ativar cache"})).toBeVisible();
+  await expect.poll(()=>page.evaluate(()=>localStorage.getItem("roteiva-private-cache"))).toBe("disabled");
+});
+
+test("settings deep link defers business loading but exports complete records on demand",async({page},info)=>{
+  await page.goto(cloud);
+  await login(page,"settings-lazy-"+info.project.name+"@example.com");
+  await navigate(page,"Clientes");
+  await page.getByRole("button",{name:"Novo cliente",exact:true}).click();
+  await page.getByLabel("Nome do cliente",{exact:true}).fill("Registro preservado na exportação");
+  await page.getByLabel("Contato principal",{exact:true}).fill("Teste de carga");
+  await page.getByRole("button",{name:"Salvar cliente"}).click();await settled(page);
+  await page.goto(cloud+"/configuracoes");
+  await expect(page.getByRole("heading",{name:"Perfil profissional"})).toBeVisible();
+  const promise=page.waitForEvent("download");
+  await page.getByRole("button",{name:"Exportar cópia"}).last().click();
+  const download=await promise;
+  const contents=await readFile(await download.path(),"utf8");
+  expect(contents).toContain("Registro preservado na exportação");
+  await navigate(page,"Clientes");
+  await expect(page.getByText("Registro preservado na exportação",{exact:true}).first()).toBeVisible();
 });

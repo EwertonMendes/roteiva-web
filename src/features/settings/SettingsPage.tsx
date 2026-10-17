@@ -2,7 +2,9 @@ import { useEffect, useState, type FormEvent } from "react";
 import { ArrowUpRight, Check, Cloud, Download, LockKeyhole, Moon, ShieldCheck, Sun, UserRound, Video, Info } from "lucide-react";
 import type { ProfileChanges, ProfessionalType, RoteivaProfile } from "../../data/firestore-workspace";
 import { dataErrorMessage } from "../../data/firestore-workspace";
+import type { FirestoreUsage } from "../../data/firestore-usage";
 import { WorkspaceTools } from "../../studio-features";
+import { CACHE_CONSENT_KEY, persistentCacheEnabled, purgePrivateCache } from "../../lib/firebase";
 
 const occupations:{value:ProfessionalType;label:string}[]=[
   {value:"freelancer",label:"Videomaker / freelancer"},
@@ -15,15 +17,32 @@ type SettingsProps={
   profile?: RoteivaProfile | null;
   email:string; photoURL?:string;
   theme:"light"|"dark"; toggleTheme:()=>void;
-  workspace:object; cloudStatus:string; onNotify:(message:string)=>void;
+  workspace:object; onLoadWorkspace?:()=>Promise<object>; cloudStatus:string; onNotify:(message:string)=>void;
   onSaveProfile?:(changes:ProfileChanges)=>Promise<void>;
+  usage?:Readonly<FirestoreUsage>;
 };
 
-export function SettingsPage({profile,email,photoURL,theme,toggleTheme,workspace,cloudStatus,onNotify,onSaveProfile}:SettingsProps){
+export function SettingsPage({profile,email,photoURL,theme,toggleTheme,workspace,onLoadWorkspace,cloudStatus,onNotify,onSaveProfile,usage}:SettingsProps){
   const [name,setName]=useState(profile?.displayName||"");
   const [studio,setStudio]=useState(profile?.studioName||"");
   const [occupation,setOccupation]=useState<ProfessionalType>(profile?.professionalType||"freelancer");
   const [busy,setBusy]=useState(false);
+  const [localCache,setLocalCache]=useState(persistentCacheEnabled);
+  const [cacheBusy,setCacheBusy]=useState(false);
+  const [cacheError,setCacheError]=useState("");
+  async function changePrivateCache(enable:boolean) {
+    if (!onSaveProfile || cacheBusy) return;
+    setCacheBusy(true);setCacheError("");
+    try {
+      if (!enable) await purgePrivateCache();
+      localStorage.setItem(CACHE_CONSENT_KEY, enable ? "enabled" : "disabled");
+      setLocalCache(enable);
+      window.location.reload();
+    } catch {
+      setCacheError("Não foi possível limpar o cache privado. Feche outras abas do Roteiva e tente novamente.");
+      setCacheBusy(false);
+    }
+  }
   const [feedback,setFeedback]=useState<{kind:"success"|"error";message:string}|null>(null);
   useEffect(()=>{
     setName(profile?.displayName||"");setStudio(profile?.studioName||"");
@@ -122,8 +141,24 @@ export function SettingsPage({profile,email,photoURL,theme,toggleTheme,workspace
       </div>
       <div className="settings-privacy-row">
         <div><strong><Download size={16}/> Exportar dados do espaço</strong><p>Baixe uma cópia JSON dos registros carregados. A exportação não inclui arquivos de mídia, credenciais nem dados de autenticação.</p></div>
-        <WorkspaceTools workspace={workspace} status={cloudStatus} onNotify={onNotify}/>
+        <WorkspaceTools workspace={workspace} loadWorkspace={onLoadWorkspace} status={cloudStatus} onNotify={onNotify}/>
       </div>
+      {onSaveProfile && <div className="settings-privacy-row">
+        <div><strong><LockKeyhole size={16}/> Cache neste dispositivo</strong>
+          <p>Opcional para reduzir consultas após reiniciar. Este navegador poderá armazenar clientes, projetos e dados financeiros. Ative somente em um dispositivo pessoal. Desativar apaga o cache e recarrega a página.</p>
+        </div>
+        <button type="button" className="secondary-button" disabled={cacheBusy || busy}
+          onClick={()=>void changePrivateCache(!localCache)}>{cacheBusy?"Aplicando…":localCache?"Desativar cache":"Ativar cache"}</button>
+      </div>}
+      {usage&&<div className="settings-privacy-row" role="status">
+        <div><strong><Info size={16}/> Diagnóstico da sessão</strong>
+          <p>Consultas ao servidor: {usage.serverQueries}; documentos retornados: {usage.serverDocumentsReturned};
+          agregações: {usage.aggregationQueries}; conferências de revisão: {usage.revisionReads};
+          documentos alterados: {usage.mutationDocuments}; revisões gravadas: {usage.mutationRevisions}.
+          Estes números são locais e não representam as leituras faturáveis, índices, regras ou tentativas de transação.</p>
+        </div>
+      </div>}
+      {cacheError && <p role="alert" className="settings-feedback settings-feedback-error">{cacheError}</p>}
       <p className="settings-note"><Info size={15}/> Exclusão de conta e dados ainda não está disponível. Esse procedimento precisa ser implementado com segurança antes da abertura pública.</p>
     </section>
     <footer className="settings-footer"><Cloud size={14}/>{onSaveProfile?"ROTEIVA DEV · PERFIL PRIVADO":"ROTEIVA DEMO · SOMENTE NESTE NAVEGADOR"}</footer>

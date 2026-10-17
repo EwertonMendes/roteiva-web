@@ -18,6 +18,8 @@ import { isDemo } from "./lib/firebase";
 import { hrefForWorkspaceRoute, routeFromLocation, type WorkspaceRoute } from "./lib/workspace-routing";
 import { SettingsPage } from "./features/settings/SettingsPage";
 import type { RoteivaProfile, ProfileChanges } from "./data/firestore-workspace";
+import type { WorkspaceCommand } from "./data/firestore-commands";
+import type { FirestoreUsage } from "./data/firestore-usage";
 import { newId, type WorkspaceData, type Activity, type View, type Project, type Client, type ClientType, type AssetKind, type FinanceEntry, type CalendarEvent, type LibraryAsset, type Status } from "./domain/workspace";
 export type { View, Project, Client, FinanceEntry, CalendarEvent, LibraryAsset, Status } from "./domain/workspace";
 
@@ -53,10 +55,17 @@ type DashboardProps = {
   firstName: string; email: string; photoURL?: string; profile?:RoteivaProfile|null;
   onSaveProfile?:(changes:ProfileChanges)=>Promise<void>;
   initialWorkspace?: WorkspaceData; initialTheme?: "light"|"dark";
-  onWorkspaceChange?: (workspace:WorkspaceData)=>void; onThemeChange?:(theme:"light"|"dark")=>void;
-  cloudStatus?:string; saving?:boolean; onLogout?:()=>void;
+  onThemeChange?:(theme:"light"|"dark")=>void;
+  onLoadWorkspace?:()=>Promise<WorkspaceData>; onRouteChange?:(route:WorkspaceRoute)=>void;
+  onCommands?:(commands:readonly WorkspaceCommand[])=>void;
+  overviewMetrics?:{clientCount?:number;receivableAmount?:number;projectCount?:number;projectStatuses?:Record<Status,number>}; projectPage?:{total:number;hasMore:boolean;status:string};
+  onMoreProjects?:()=>void;onProjectStatus?:(status:Status|"Todos")=>void;
+  onSearchProjects?:()=>void; clientPage?:{total:number;recurring:number;hasMore:boolean};
+  onFinancePeriodChange?:(year:number,month:number,clientId?:number)=>void;
+  financeBars?:{key:string;bars:number[]};eventCount?:number;usage?:Readonly<FirestoreUsage>;onCalendarMonthChange?:(year:number,month:number)=>void;
+  onMoreClients?:()=>void;onSearchClients?:()=>void;onClientCreated?:(client:Client)=>void;canValidateProjectLink?:boolean;canValidateClientLink?:boolean; cloudStatus?:string; saving?:boolean; onLogout?:()=>void;
 };
-export default function DashboardClient({ firstName, email, photoURL, profile, onSaveProfile, initialWorkspace, initialTheme, onWorkspaceChange, onThemeChange, cloudStatus, saving, onLogout }: DashboardProps) {
+export default function DashboardClient({ firstName, email, photoURL, profile, onSaveProfile, initialWorkspace, initialTheme, onThemeChange, onLoadWorkspace, onRouteChange, onCommands, overviewMetrics, projectPage, onMoreProjects, onProjectStatus, onSearchProjects, clientPage, onMoreClients, onSearchClients, onClientCreated, onFinancePeriodChange, financeBars, eventCount, usage, onCalendarMonthChange, canValidateProjectLink, canValidateClientLink, cloudStatus, saving, onLogout }: DashboardProps) {
   const routeEnvironment={base:import.meta.env.BASE_URL,useHash:isDemo};
   const initialRoute=()=>routeFromLocation(window.location,routeEnvironment);
   const [initialBrowserRoute]=useState<WorkspaceRoute>(initialRoute);
@@ -96,12 +105,28 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
   const [uploading, setUploading] = useState(false);
   const storageKey = "roteiva-pages-demo-workspace-v1";
   const [activities, setActivities] = useState<Activity[]>([]);
+  function commitCommands(commands:WorkspaceCommand[]){
+    // The cloud is persisted only through explicit typed business commands.
+    // The demo retains its independent localStorage snapshot.
+    if (!isDemo && onCommands && commands.length)onCommands(commands);
+  }
   const workspace = { projects, clients: clientList, financeEntries, monthlyRevenue, calendarEvents, libraryAssets: libraryAssets.map((asset) => ({ ...asset, preview: undefined })), comments, reviewState, activities };
-  function logActivity(text: string) { setActivities(current => [{id:crypto.randomUUID(),text, when: new Date().toISOString()}, ...current].slice(0, 150)); }
+  function logActivity(text: string) {
+    const activity:Activity={id:crypto.randomUUID(),text,when:new Date().toISOString()};
+    setActivities(current=>[activity,...current].slice(0,150));
+    const commands:WorkspaceCommand[]=[{kind:"appendActivity",activity}];
+    if(activities.length>=150 && activities[149].id)commands.push({kind:"deleteActivity",id:activities[149].id!});
+    commitCommands(commands);
+  }
   const restoreWorkspace = useCallback((data: Partial<WorkspaceData>) => {
-    setProjects(data.projects || []); setClientList(data.clients || []); setFinanceEntries(data.financeEntries || []);
-    setCalendarEvents(data.calendarEvents || []);
-    setLibraryAssets(data.libraryAssets || []); setComments(data.comments || []); setReviewState(data.reviewState || "pending"); setActivities(data.activities || []);
+    const next={
+      projects:data.projects || [],clients:data.clients || [],financeEntries:data.financeEntries || [],
+      calendarEvents:data.calendarEvents || [],activities:data.activities || [],
+    };
+    setProjects(next.projects);setClientList(next.clients);setFinanceEntries(next.financeEntries);
+    setCalendarEvents(next.calendarEvents);
+    setLibraryAssets(data.libraryAssets || []);setComments(data.comments || []);
+    setReviewState(data.reviewState || "pending");setActivities(next.activities);
   }, []);
   function openEvent(entry: CalendarEvent | null = null, date = "") {
     setEditingEvent(entry); setEventDate(date); setEventError("");
@@ -113,18 +138,44 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     const old = projects.find(p => p.id === updated.id);
     setProjects(current => current.map(p => p.id === updated.id ? updated : p));
     if (old?.name !== updated.name) setLibraryAssets(current => current.map(a => a.projectId === updated.id ? {...a, project:updated.name} : a));
-    if (old?.dueDate !== updated.dueDate || old?.name !== updated.name) {
-      setCalendarEvents(current => {
-        const isDeadline = (e: CalendarEvent) => e.projectId === updated.id && e.type === "Entrega" && (e.autoDeadline || e.title === `Entrega — ${old?.name}`);
-        const existing = current.find(isDeadline);
-        const rest = current.filter(e => !isDeadline(e));
-        return updated.dueDate ? [...rest, {id:existing?.id || newId(), autoDeadline:true, projectId:updated.id, title:`Entrega — ${updated.name}`, date:updated.dueDate, time:existing?.time || "18:00", type:"Entrega", client:updated.client}] : rest;
-      });
+    const commands:WorkspaceCommand[]=[{kind:"saveProject",project:updated}];
+    const previousTasks=new Map((old?.tasks||[]).map(t=>[t.id,t]));
+    for(const task of updated.tasks||[]){
+      const was=previousTasks.get(task.id);
+      if(!was || was.title!==task.title || was.done!==task.done)
+        commands.push({kind:"saveTask",projectId:updated.id,task});
+      previousTasks.delete(task.id);
     }
+    for(const id of previousTasks.keys())commands.push({kind:"deleteTask",id});
+    if (old?.dueDate !== updated.dueDate || old?.name !== updated.name) {
+      const isDeadline=(e:CalendarEvent)=>e.projectId===updated.id && e.type==="Entrega" &&
+        (e.autoDeadline || e.title===`Entrega — ${old?.name}`);
+      const existing=calendarEvents.find(isDeadline);
+      const deadline:CalendarEvent|undefined=updated.dueDate ? {
+        id:existing?.id || newId(),autoDeadline:true,projectId:updated.id,
+        title:`Entrega — ${updated.name}`,date:updated.dueDate,time:existing?.time || "18:00",
+        type:"Entrega",client:updated.client,
+      } : undefined;
+      setCalendarEvents(current=>[...current.filter(e=>!isDeadline(e)),...(deadline?[deadline]:[])]);
+      if(deadline)commands.push({kind:"saveEvent",event:deadline});
+      else if(existing)commands.push({kind:"deleteEvent",id:existing.id});
+    }
+    commitCommands(commands);
     logActivity(`Projeto atualizado: ${updated.name}`); notifyChange("Projeto salvo");
   }
   function saveClientPackage(client: Client) {
     setClientList(current => current.map(c => c.id === client.id ? client : c));
+    const previous=clientList.find(c=>c.id===client.id);
+    const old=new Map((previous?.deliveries||[]).map(d=>[d.id,d]));
+    const commands:WorkspaceCommand[]=[{kind:"saveClient",client}];
+    for(const delivery of client.deliveries||[]){
+      const was=old.get(delivery.id);
+      if(!was||was.title!==delivery.title||was.month!==delivery.month||was.done!==delivery.done)
+        commands.push({kind:"saveDelivery",clientId:client.id,delivery});
+      old.delete(delivery.id);
+    }
+    for(const id of old.keys())commands.push({kind:"deleteDelivery",id});
+    commitCommands(commands);
     logActivity(`Entregas atualizadas: ${client.name}`);
   }
   function addLinkedRevenue(project: Project) { openFinanceModal(); setSelectedProject(project.id); }
@@ -155,17 +206,18 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     setDataReady(true);
   },[restoreWorkspace,initialWorkspace,initialTheme]);
 
-  // Queue persistence before the new UI can be painted/reloaded, closing the
-  // gap between a mutation appearing on screen and the unload protection.
+  // The Pages demo preserves its existing browser-only snapshot contract.
+  // Firebase never persists a render/effect: business mutations call commands.
   useLayoutEffect(() => {
-    if (!dataReady) return;
-    const payload={projects,clients:clientList,financeEntries,calendarEvents,libraryAssets:libraryAssets.map(asset=>({...asset,preview:undefined})),comments,reviewState,activities};
-    if (!isDemo) { onWorkspaceChange?.(payload); return; }
+    if (!dataReady || !isDemo) return;
+    const payload={projects,clients:clientList,financeEntries,calendarEvents,
+      libraryAssets:libraryAssets.map(asset=>({...asset,preview:undefined})),
+      comments,reviewState,activities};
     try {
       localStorage.setItem(storageKey,JSON.stringify({...payload,monthlyRevenue}));
       setSaveStatus("Demonstração · salvo neste navegador");
     } catch {setSaveStatus("Falha ao salvar · exporte seus dados");}
-  },[projects,clientList,financeEntries,monthlyRevenue,calendarEvents,libraryAssets,comments,reviewState,activities,dataReady,onWorkspaceChange]);
+  },[projects,clientList,financeEntries,monthlyRevenue,calendarEvents,libraryAssets,comments,reviewState,activities,dataReady]);
 
   useEffect(() => {
     if (!dataReady) return;
@@ -201,8 +253,18 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     const description = String(form.get("description") || "");
     const tasks = (projectTemplates[template] || []).map((title, i) => ({ id: newId() + i, title, done: false }));
     const projectId = newId();
-    setProjects((current) => [{ id: projectId, name, client, clientId, dueDate: dueValue, description, tasks, template, status: "Em produção", due, progress: 0, files: 0, color: "blue", initials: client.slice(0, 2).toUpperCase() }, ...current]);
-    if (dueValue) setCalendarEvents((current) => [{ id: newId() + 1, projectId, autoDeadline:true, title: `Entrega — ${name}`, date: dueValue, time: "18:00", type: "Entrega", client }, ...current]);
+    const created:Project={id:projectId,name,client,clientId,dueDate:dueValue,
+      description,tasks,template,status:"Em produção",due,progress:0,files:0,
+      color:"blue",initials:client.slice(0,2).toUpperCase()};
+    const deadline:CalendarEvent|undefined=dueValue ? {
+      id:newId(),projectId,autoDeadline:true,title:`Entrega — ${name}`,date:dueValue,
+      time:"18:00",type:"Entrega",client,
+    } : undefined;
+    setProjects(current=>[created,...current]);
+    if(deadline)setCalendarEvents(current=>[deadline,...current]);
+    commitCommands([{kind:"saveProject",project:created},
+      ...tasks.map(task=>({kind:"saveTask" as const,projectId,task})),
+      ...(deadline?[{kind:"saveEvent" as const,event:deadline}]:[])]);
     setModalOpen(false);
     openProject(projectId);
     logActivity(`Projeto criado: ${name}`);
@@ -227,6 +289,17 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
       setProjects(current => current.map(p => p.clientId === updated.id ? {...p, client: name} : p));
       setFinanceEntries(current => current.map(e => e.clientId === updated.id ? {...e, client: name} : e));
     }
+    const commands:WorkspaceCommand[]=[{kind:"saveClient",client:updated}];
+    if(editingClient && editingClient.name!==name){
+      commands.push(...projects.filter(p=>p.clientId===updated.id).map(project=>({
+        kind:"saveProject" as const,project:{...project,client:name},
+      })));
+      commands.push(...financeEntries.filter(e=>e.clientId===updated.id).map(entry=>({
+        kind:"saveFinance" as const,entry:{...entry,client:name},
+      })));
+    }
+    if(!editingClient)onClientCreated?.(updated);
+    commitCommands(commands);
     setClientModalOpen(false); setEditingClient(null);
     logActivity(`Cliente ${editingClient ? "atualizado" : "cadastrado"}: ${name}`);
     notifyChange("Cliente salvo com sucesso");
@@ -250,11 +323,13 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     const updatedEntry: FinanceEntry = { projectId, kind, id: editingFinanceEntry?.id || newId(), project, client, clientId, amount, date: entryDate.toLocaleDateString("pt-BR"), status };
     if (editingFinanceEntry) {
       setFinanceEntries((current) => current.map((entry) => entry.id === editingFinanceEntry.id ? updatedEntry : entry));
+      commitCommands([{kind:"saveFinance",entry:updatedEntry}]);
     } else {
       const count = Math.max(1, Math.min(24, Number(form.get("installments")) || 1));
       if (Math.round(amount * 100) < count) return notify("Valor insuficiente para dividir em parcelas");
       const parts: FinanceEntry[] = splitInstallments(amount, count, entryDate).map((part,i) => ({...updatedEntry, id: newId(), project: count > 1 ? `${project} · ${i+1}/${count}` : project, ...part, status: i === 0 ? status : "A receber"}));
       setFinanceEntries((current) => [...parts, ...current]);
+      commitCommands(parts.map(entry=>({kind:"saveFinance",entry})));
     }
     logActivity(`${kind === "expense" ? "Despesa" : "Receita"} ${editingFinanceEntry ? "atualizada" : "registrada"}: ${project}`);
     setFinanceModalOpen(false);
@@ -274,6 +349,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
 
   function deleteFinanceEntry() {
     if (!deletingFinanceEntry) return;
+    commitCommands([{kind:"deleteFinance",id:deletingFinanceEntry.id}]);
     setFinanceEntries((current) => current.filter((entry) => entry.id !== deletingFinanceEntry.id));
     logActivity(`Lançamento excluído: ${deletingFinanceEntry.project}`);
     setDeletingFinanceEntry(null);
@@ -292,9 +368,16 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     const client = String(form.get("client") || "Interno").trim();
     if (!date) return notify("Escolha a data do compromisso");
     const entry: CalendarEvent = { autoDeadline:editingEvent?.autoDeadline && type === "Entrega", id: editingEvent?.id || newId(), title, date, time, endTime, type, client, projectId: Number(form.get("projectId")) || undefined };
+    commitCommands([{kind:"saveEvent",event:entry}]);
     setCalendarEvents(current => (editingEvent ? current.map(e => e.id === entry.id ? entry : e) : [...current, entry]).sort((a,b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`)));
     if (entry.autoDeadline && entry.projectId) {
-      setProjects(current => current.map(p => p.id === entry.projectId ? {...p,dueDate:date,due:new Date(`${date}T12:00:00`).toLocaleDateString("pt-BR",{day:"2-digit",month:"short"})} : p));
+      const linked=projects.find(p=>p.id===entry.projectId);
+      if(linked){
+        const modified:Project={...linked,dueDate:date,
+          due:new Date(`${date}T12:00:00`).toLocaleDateString("pt-BR",{day:"2-digit",month:"short"})};
+        setProjects(current=>current.map(p=>p.id===modified.id?modified:p));
+        commitCommands([{kind:"saveProject",project:modified}]);
+      }
     }
     logActivity(`Compromisso salvo: ${title}`); setEditingEvent(null);
     setEventModalOpen(false);
@@ -319,10 +402,16 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
       window.history[replace?"replaceState":"pushState"](null,"",target);
     }
     applyRoute(next);
+    onRouteChange?.(next);
     window.scrollTo({top:0,behavior:"auto"});
   }
 
-  function changeView(next:View) { navigateRoute({view:next}); }
+  function startProject(){if(!isDemo&&view!=="projects")changeView("projects");setModalOpen(true);}
+  function changeView(next:View) {
+    navigateRoute({view:next});
+    if(next==="projects"&&query.trim())onSearchProjects?.();
+    if(next==="clients"&&query.trim())onSearchClients?.();
+  }
   function openProject(id:number) { navigateRoute({view:"projects",projectId:id}); }
   function openClient(id:number) { navigateRoute({view:"clients",clientId:id}); }
   function signOut() {
@@ -333,7 +422,9 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
 
   useEffect(()=>{
     const onNavigation=()=>{
-      applyRoute(routeFromLocation(window.location,routeEnvironment));
+      const next=routeFromLocation(window.location,routeEnvironment);
+      applyRoute(next);
+      onRouteChange?.(next);
       window.scrollTo({top:0,behavior:"auto"});
     };
     window.addEventListener("popstate",onNavigation);
@@ -342,15 +433,15 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
       window.removeEventListener("popstate",onNavigation);
       if(routeEnvironment.useHash)window.removeEventListener("hashchange",onNavigation);
     };
-  },[]);
+  },[onRouteChange]);
 
   // Direct links must not display another user's records or leave a broken detail URL.
   useEffect(()=>{
     if(!dataReady)return;
     const route=routeFromLocation(window.location,routeEnvironment);
-    if(route.projectId && !projects.some(p=>p.id===route.projectId))navigateRoute({view:"projects"},{replace:true});
-    if(route.clientId && !clientList.some(c=>c.id===route.clientId))navigateRoute({view:"clients"},{replace:true});
-  },[dataReady,projects,clientList]);
+    if(route.projectId && (isDemo||canValidateProjectLink) && !projects.some(p=>p.id===route.projectId))navigateRoute({view:"projects"},{replace:true});
+    if(route.clientId && (isDemo||canValidateClientLink) && !clientList.some(c=>c.id===route.clientId))navigateRoute({view:"clients"},{replace:true});
+  },[dataReady,projects,clientList,canValidateProjectLink,canValidateClientLink]);
 
   const pageTitles: Record<View, [string, string]> = {
     overview: [`Olá, ${firstName}.`, "Aqui está o ritmo da sua produção hoje."],
@@ -375,13 +466,13 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
         <nav>
           <small className="nav-label">ESPAÇO DE TRABALHO</small>
           {nav.map((item) => {
-            const count = item.id === "projects" ? projects.length : item.id === "reviews" ? projects.filter((project) => project.status === "Em aprovação").length : undefined;
+            const count = item.id === "projects" ? (overviewMetrics?.projectCount ?? projectPage?.total ?? projects.length) : item.id === "reviews" ? (overviewMetrics?.projectStatuses?.["Em aprovação"] ?? projects.filter((project) => project.status === "Em aprovação").length) : undefined;
             return <button key={item.id} className={view === item.id ? "active" : ""} onClick={() => changeView(item.id)}>
               <AnimatedNavIcon icon={item.icon} hoverIcon={item.hoverIcon} kind={item.id} /><span>{item.label}</span>{count !== undefined && <em>{count}</em>}
             </button>;
           })}
           <small className="nav-label second">FERRAMENTAS</small>
-          <button className={view === "calendar" ? "active" : ""} onClick={() => changeView("calendar")}><AnimatedNavIcon icon={CalendarDays} hoverIcon={CalendarCheck2} kind="calendar" /><span>Calendário</span><em>{calendarEvents.length}</em></button>
+          <button className={view === "calendar" ? "active" : ""} onClick={() => changeView("calendar")}><AnimatedNavIcon icon={CalendarDays} hoverIcon={CalendarCheck2} kind="calendar" /><span>Calendário</span><em>{eventCount ?? calendarEvents.length}</em></button>
           <button className={view === "library" ? "active" : ""} onClick={() => changeView("library")}><AnimatedNavIcon icon={Grid2X2} hoverIcon={LibraryBig} kind="library" /><span>Biblioteca</span><em>{libraryAssets.length}</em></button>
           <button className={view === "settings" ? "active" : ""} onClick={() => changeView("settings")}><AnimatedNavIcon icon={Settings2} hoverIcon={UserRound} kind="settings" /><span>Configurações</span></button>
         </nav>
@@ -400,8 +491,13 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
         <header className="topbar">
           <button className="menu-button" onClick={() => setMobileOpen(true)} aria-label="Abrir menu" aria-expanded={mobileOpen}><Menu size={20} /></button>
           <button type="button" className="workspace-switch" onClick={()=>changeView("settings")} title="Abrir configurações do estúdio" aria-label="Abrir configurações do estúdio"><span className="sync-dot">R</span><b title={workspaceName}>{workspaceName}</b><ChevronDown size={14} /></button>
-          <label className="global-search"><Search size={17} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar projetos, clientes ou arquivos" /><kbd><Command size={11} /> K</kbd></label>
-          <div className="top-actions"><button className="icon-button" title="Ver atividades" aria-label="Ver atividades" onClick={() => { changeView("overview"); notify(activities[0]?.text || "Nenhuma atividade ainda"); }}><Bell size={18} /></button><button className="icon-button theme-toggle" onClick={toggleTheme} aria-label={theme === "light" ? "Ativar modo escuro" : "Ativar modo claro"} title={theme === "light" ? "Modo escuro" : "Modo claro"}>{theme === "light" ? <Moon size={18} /> : <Sun size={18} />}</button><button className="primary-button" onClick={() => setModalOpen(true)}><Plus size={17} /> Novo projeto</button></div>
+          <label className="global-search"><Search size={17} /><input value={query} onChange={(e) => {
+              const value=e.target.value;
+              setQuery(value);
+              if(value.trim() && view==="projects")onSearchProjects?.();
+              if(value.trim() && view==="clients")onSearchClients?.();
+            }} placeholder="Buscar projetos, clientes ou arquivos" /><kbd><Command size={11} /> K</kbd></label>
+          <div className="top-actions"><button className="icon-button" title="Ver atividades" aria-label="Ver atividades" onClick={() => { changeView("overview"); notify(activities[0]?.text || "Nenhuma atividade ainda"); }}><Bell size={18} /></button><button className="icon-button theme-toggle" onClick={toggleTheme} aria-label={theme === "light" ? "Ativar modo escuro" : "Ativar modo claro"} title={theme === "light" ? "Modo escuro" : "Modo claro"}>{theme === "light" ? <Moon size={18} /> : <Sun size={18} />}</button><button className="primary-button" onClick={startProject}><Plus size={17} /> Novo projeto</button></div>
         </header>
 
         <section className="page">
@@ -409,21 +505,32 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
           <div className="page-heading">
             <div><span className="eyebrow">ROTEIVA / {view === "overview" ? "PAINEL" : pageTitles[view][0].toUpperCase()}</span><h1>{pageTitles[view][0]}</h1><p>{pageTitles[view][1]}</p></div>
             <div className="heading-actions">
-              {view !== "settings" && <WorkspaceTools workspace={workspace} status={isDemo ? saveStatus : cloudStatus || ""} onNotify={notify} />}
+              {view !== "settings" && <WorkspaceTools workspace={workspace} loadWorkspace={onLoadWorkspace} status={isDemo ? saveStatus : cloudStatus || ""} onNotify={notify} />}
               {view === "settings" ? null : view === "clients" ? <button className="primary-button" onClick={() => { setEditingClient(null); setClientModalOpen(true); }}><UserRoundPlus size={17} /> Novo cliente</button>
                 : view === "finance" ? <button className="primary-button" onClick={() => openFinanceModal()}><Plus size={17} /> Nova receita</button>
                 : view === "calendar" ? <button className="primary-button" onClick={() => openEvent()}><Plus size={17} /> Novo compromisso</button>
                 : view === "library" ? <><select aria-label="Projeto dos arquivos" value={libraryProject} onChange={e => setLibraryProject(e.target.value)}><option value="">Sem projeto</option>{projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select><label className="primary-button upload-button"><Upload size={17} /> {uploading ? "Enviando…" : "Adicionar arquivos"}<input type="file" disabled multiple onChange={(event) => { uploadAssets(event.target.files, Number(libraryProject) || undefined); event.target.value = ""; }} /></label></>
-                : <button className="primary-button" onClick={() => setModalOpen(true)}><Plus size={17} /> Criar projeto</button>}
+                : <button className="primary-button" onClick={startProject}><Plus size={17} /> Criar projeto</button>}
             </div>
           </div>
-          {view === "settings" && <SettingsPage profile={profile} email={email} photoURL={photoURL} theme={theme} toggleTheme={toggleTheme} workspace={workspace} cloudStatus={isDemo ? saveStatus : cloudStatus || ""} onNotify={notify} onSaveProfile={onSaveProfile} />}
-          {view === "overview" && <><TodayStudio clients={clientList} projects={projects} entries={financeEntries} events={calendarEvents} activities={activities} onView={changeView} /><Overview projects={projects} setView={changeView} onOpenProject={openProject} /></>}
-          {view === "projects" && (selectedProject && projects.some(p => p.id === selectedProject) ? <ProjectDetail project={projects.find(p => p.id === selectedProject)!} clients={clientList} entries={financeEntries} assets={libraryAssets} events={calendarEvents} onSave={updateProject} onBack={() => changeView("projects")} onRevenue={addLinkedRevenue} onUpload={uploadAssets} onEvent={(p) => { openEvent(null, p.dueDate); }} uploading={uploading} /> : <ProjectsView projects={filtered.map(p => ({...p, files: libraryAssets.filter(a => a.projectId === p.id).length}))} statusFilter={statusFilter} setStatusFilter={setStatusFilter} onOpen={openProject} />)}
-          {view === "clients" && (selectedClient && clientList.some(c => c.id === selectedClient) ? <ClientDetail client={clientList.find(c => c.id === selectedClient)!} projects={projects} entries={financeEntries} onBack={() => changeView("clients")} onEdit={(client) => { setEditingClient(client); setClientModalOpen(true); }} onSave={saveClientPackage} onProject={openProject} /> : <ClientsView clients={clientList.filter(c => `${c.name} ${c.email} ${c.phone}`.toLowerCase().includes(query.toLowerCase())).map(c => ({...c, projects: projects.filter(p => p.clientId === c.id).length, active: projects.filter(p => p.clientId === c.id && p.status !== "Aprovado").length}))} onOpen={openClient} onAdd={() => { setEditingClient(null); setClientModalOpen(true); }} />)}
+          {view === "settings" && <SettingsPage profile={profile} email={email} photoURL={photoURL} theme={theme} toggleTheme={toggleTheme} workspace={workspace} onLoadWorkspace={onLoadWorkspace} cloudStatus={isDemo ? saveStatus : cloudStatus || ""} onNotify={notify} onSaveProfile={onSaveProfile} usage={usage} />}
+          {view === "overview" && <><TodayStudio clients={clientList} projects={projects} entries={financeEntries} events={calendarEvents} activities={activities} onView={changeView} overviewMetrics={overviewMetrics} /><Overview projects={projects} setView={changeView} onOpenProject={openProject} /></>}
+          {view === "projects" && (selectedProject && projects.some(p => p.id === selectedProject) ? <ProjectDetail project={projects.find(p => p.id === selectedProject)!} clients={clientList} entries={financeEntries} assets={libraryAssets} events={calendarEvents} onSave={updateProject} onBack={() => changeView("projects")} onRevenue={addLinkedRevenue} onUpload={uploadAssets} onEvent={(p) => { openEvent(null, p.dueDate); }} uploading={uploading} /> : <ProjectsView projects={filtered.map(p => ({...p, files: libraryAssets.filter(a => a.projectId === p.id).length}))}
+                  statusFilter={statusFilter} setStatusFilter={(status)=>{
+                    setStatusFilter(status);
+                    onProjectStatus?.(status);
+                  }} onOpen={openProject}
+                  total={projectPage && !query.trim()?projectPage.total:undefined}
+                  hasMore={!!projectPage?.hasMore&&!query.trim()} onMore={onMoreProjects} />)}
+          {view === "clients" && (selectedClient && clientList.some(c => c.id === selectedClient) ? <ClientDetail client={clientList.find(c => c.id === selectedClient)!} projects={projects} entries={financeEntries} onBack={() => changeView("clients")} onEdit={(client) => { setEditingClient(client); setClientModalOpen(true); }} onSave={saveClientPackage} onProject={openProject} /> : <ClientsView clients={clientList.filter(c => `${c.name} ${c.email} ${c.phone}`.toLowerCase().includes(query.toLowerCase())).map(c => ({...c, projects: projects.filter(p => p.clientId === c.id).length, active: projects.filter(p => p.clientId === c.id && p.status !== "Aprovado").length}))}
+                  onOpen={openClient} onAdd={() => {setEditingClient(null);setClientModalOpen(true);}}
+                  totalCount={clientPage && !query.trim()?clientPage.total:undefined}
+                  recurringCount={clientPage && !query.trim()?clientPage.recurring:undefined}
+                  activeProjectsCount={clientPage && !query.trim()?projects.filter(p=>p.status!=="Aprovado" && !!p.clientId).length:undefined}
+                  hasMore={!!clientPage?.hasMore&&!query.trim()} onMore={onMoreClients} />)}
           {view === "reviews" && <StudioReviews />}
-          {view === "finance" && <FinancePanel entries={financeEntries} clients={clientList} onAdd={() => openFinanceModal()} onEdit={(entry) => openFinanceModal(entry)} onDelete={setDeletingFinanceEntry} />}
-          {view === "calendar" && <CalendarView events={calendarEvents} onAdd={(date) => openEvent(null, date)} onEdit={(entry) => openEvent(entry)} onDelete={(entry) => { if (window.confirm(`Excluir o compromisso “${entry.title}”?`)) { setCalendarEvents(current => current.filter(e => e.id !== entry.id)); logActivity(`Compromisso excluído: ${entry.title}`); } }} />}
+          {view === "finance" && <FinancePanel entries={financeEntries} clients={clientList} onPeriodChange={onFinancePeriodChange} serverBars={financeBars} onAdd={() => openFinanceModal()} onEdit={(entry) => openFinanceModal(entry)} onDelete={setDeletingFinanceEntry} />}
+          {view === "calendar" && <CalendarView events={calendarEvents} onMonthChange={onCalendarMonthChange} onAdd={(date) => openEvent(null, date)} onEdit={(entry) => openEvent(entry)} onDelete={(entry) => { if (window.confirm(`Excluir o compromisso “${entry.title}”?`)) { commitCommands([{kind:"deleteEvent",id:entry.id}]); setCalendarEvents(current => current.filter(e => e.id !== entry.id)); logActivity(`Compromisso excluído: ${entry.title}`); } }} />}
           {view === "library" && <LibraryView assets={libraryAssets} query={query} onUpload={(files) => uploadAssets(files, Number(libraryProject) || undefined)} />}
         </section>
       </main>
@@ -520,26 +627,35 @@ function ProjectRow({ project, onOpen }: { project: Project; onOpen: () => void 
   </button>;
 }
 
-function ProjectsView({ projects, statusFilter, setStatusFilter, onOpen }: { onOpen: (id: number) => void; projects: Project[]; statusFilter: Status | "Todos"; setStatusFilter: (status: Status | "Todos") => void }) {
+function ProjectsView({ projects, statusFilter, setStatusFilter, onOpen, total, hasMore, onMore }: {
+  onOpen:(id:number)=>void;projects:Project[];statusFilter:Status|"Todos";
+  setStatusFilter:(status:Status|"Todos")=>void;total?:number;hasMore?:boolean;onMore?:()=>void;
+}) {
   const filters: (Status | "Todos")[] = ["Todos", "Em produção", "Em aprovação", "Ajustes", "Aprovado"];
   return <div className="panel full-panel">
-    <div className="filter-bar"><div className="filter-pills">{filters.map((filter) => <button key={filter} className={statusFilter === filter ? "active" : ""} onClick={() => setStatusFilter(filter)}>{filter}</button>)}</div><span className="field-hint">{projects.length} projetos encontrados</span></div>
+    <div className="filter-bar"><div className="filter-pills">{filters.map((filter) => <button key={filter} className={statusFilter === filter ? "active" : ""} onClick={() => setStatusFilter(filter)}>{filter}</button>)}</div><span className="field-hint">{total!==undefined&&total>projects.length?`${projects.length} de ${total}`:`${projects.length}`} projetos encontrados</span></div>
     <div className="project-cards">{projects.map((project) => <article className="project-card" key={project.id} onClick={() => onOpen(project.id)}>
       <div className={`project-cover ${project.color}`}><span className="cover-grid" /><BrandAvatar initials={project.initials} color={project.color} large /><button aria-label={`Abrir projeto ${project.name}`} onClick={(e) => { e.stopPropagation(); onOpen(project.id); }}><ChevronRight size={17} /></button><em><Film size={14} /> {project.files} arquivos</em></div>
       <div className="project-card-copy"><StatusBadge status={project.status} /><h3>{project.name}</h3><p>{project.client}</p><div className="card-progress"><span><i style={{ width: `${project.progress}%` }} /></span><b>{project.progress}%</b></div><footer><span><CalendarDays size={14} /> {project.due}</span><span>{project.template || "Produção"}</span></footer></div>
     </article>)}</div>
     {!projects.length && <div className="empty-state"><FolderOpen size={28} /><h3>Nenhum projeto cadastrado</h3><p>Use o botão “Criar projeto” para iniciar sua primeira produção.</p></div>}
+    {hasMore&&<div className="modal-actions"><button className="secondary-button" type="button" onClick={onMore}>Carregar mais projetos <ChevronDown size={16}/></button></div>}
   </div>;
 }
 
-function ClientsView({ clients, onOpen, onAdd }: { clients: Client[]; onOpen: (id: number) => void; onAdd: () => void }) {
-  const recurring = clients.filter((client) => client.type === "Recorrente").length;
-  const activeProjects = clients.reduce((total, client) => total + client.active, 0);
+function ClientsView({ clients, onOpen, onAdd,totalCount,recurringCount,activeProjectsCount,hasMore,onMore }: {
+  clients:Client[];onOpen:(id:number)=>void;onAdd:()=>void;
+  totalCount?:number;recurringCount?:number;activeProjectsCount?:number;
+  hasMore?:boolean;onMore?:()=>void;
+}) {
+  const recurring = recurringCount ?? clients.filter(client=>client.type==="Recorrente").length;
+  const total = totalCount ?? clients.length;
+  const activeProjects = activeProjectsCount ?? clients.reduce((n,client)=>n+client.active,0);
   return <div className="panel full-panel client-panel">
-    <div className="client-summary"><div><span>CLIENTES CADASTRADOS</span><strong>{clients.length}</strong><small>{activeProjects} {activeProjects === 1 ? "projeto em produção" : "projetos em produção"}</small></div><div><span>CLIENTES RECORRENTES</span><strong>{recurring}</strong><small className="positive">{Math.round(recurring / Math.max(1, clients.length) * 100)}% da carteira</small></div><div><span>CLIENTES AVULSOS</span><strong>{clients.length - recurring}</strong><small>Trabalhos pontuais</small></div></div>
-    <div className="client-toolbar"><div><b>Carteira de clientes</b><small>Classifique cada relacionamento para entender melhor sua receita.</small></div><button className="secondary-button" onClick={onAdd}><UserRoundPlus size={15} /> Adicionar cliente</button></div>
+    <div className="client-summary"><div><span>CLIENTES CADASTRADOS</span><strong>{total}</strong><small>{activeProjects} {activeProjects === 1 ? "projeto em produção" : "projetos em produção"}</small></div><div><span>CLIENTES RECORRENTES</span><strong>{recurring}</strong><small className="positive">{Math.round(recurring / Math.max(1, total) * 100)}% da carteira</small></div><div><span>CLIENTES AVULSOS</span><strong>{total - recurring}</strong><small>Trabalhos pontuais</small></div></div>
+    <div className="client-toolbar"><div><b>Carteira de clientes</b><small>{total>clients.length?`${clients.length} de ${total} carregados · `:""}Classifique cada relacionamento para entender melhor sua receita.</small></div><button className="secondary-button" onClick={onAdd}><UserRoundPlus size={15} /> Adicionar cliente</button></div>
     <div className="client-list-head"><span>Cliente</span><span>Relacionamento</span><span>Contato</span><span>Projetos</span><span>Desde</span><span /></div>
-    <div className="client-list">{clients.map((client) => <button key={client.id} onClick={() => onOpen(client.id)}><div><BrandAvatar initials={client.initials} color={client.color} /><b>{client.name}</b></div><span><i className={`client-type ${client.type === "Recorrente" ? "recurring" : "one-off"}`}>{client.type === "Recorrente" ? <><Building2 size={12} /> Recorrente</> : <><ReceiptText size={12} /> Avulso</>}</i></span><span className="client-contact-meta"><b>{client.contact}</b><small>{client.phone || client.email || "Sem telefone ou e-mail"}</small>{client.phone && client.email && <small>{client.email}</small>}</span><span>{client.projects}</span><span>{client.since}</span><ChevronRight size={16} /></button>)}{!clients.length && <div className="empty-state"><Users size={30} /><h3>Nenhum cliente cadastrado</h3><p>Adicione o primeiro cliente e defina se o relacionamento é recorrente ou avulso.</p><button className="primary-button" onClick={onAdd}>Adicionar primeiro cliente</button></div>}</div>
+    <div className="client-list">{clients.map((client) => <button key={client.id} onClick={() => onOpen(client.id)}><div><BrandAvatar initials={client.initials} color={client.color} /><b>{client.name}</b></div><span><i className={`client-type ${client.type === "Recorrente" ? "recurring" : "one-off"}`}>{client.type === "Recorrente" ? <><Building2 size={12} /> Recorrente</> : <><ReceiptText size={12} /> Avulso</>}</i></span><span className="client-contact-meta"><b>{client.contact}</b><small>{client.phone || client.email || "Sem telefone ou e-mail"}</small>{client.phone && client.email && <small>{client.email}</small>}</span><span>{client.projects}</span><span>{client.since}</span><ChevronRight size={16} /></button>)}{!clients.length && <div className="empty-state"><Users size={30} /><h3>Nenhum cliente cadastrado</h3><p>Adicione o primeiro cliente e defina se o relacionamento é recorrente ou avulso.</p><button className="primary-button" onClick={onAdd}>Adicionar primeiro cliente</button></div>}</div>{hasMore&&<div className="modal-actions"><button type="button" className="secondary-button" onClick={onMore}>Carregar mais clientes <ChevronDown size={16}/></button></div>}
   </div>;
 }
 
@@ -555,13 +671,14 @@ function dateKey(year: number, month: number, day: number) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
-function CalendarView({ events, onAdd, onEdit, onDelete }: { events: CalendarEvent[]; onAdd: (date: string) => void; onEdit: (entry: CalendarEvent) => void; onDelete: (entry: CalendarEvent) => void }) {
+function CalendarView({ events, onAdd, onEdit, onDelete, onMonthChange }: { events: CalendarEvent[]; onAdd: (date: string) => void; onEdit: (entry: CalendarEvent) => void; onDelete: (entry: CalendarEvent) => void;onMonthChange?:(year:number,month:number)=>void }) {
   const now = new Date();
   const today = dateKey(now.getFullYear(), now.getMonth(), now.getDate());
   const [cursor, setCursor] = useState(new Date(now.getFullYear(), now.getMonth(), 1));
   const [selectedDate, setSelectedDate] = useState(today);
   const year = cursor.getFullYear();
   const month = cursor.getMonth();
+  useEffect(()=>onMonthChange?.(year,month),[year,month,onMonthChange]);
   const firstWeekday = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const previousDays = new Date(year, month, 0).getDate();

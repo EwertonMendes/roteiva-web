@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { browserLocalPersistence, GoogleAuthProvider, onAuthStateChanged, setPersistence, signInWithPopup, signOut, type User } from "firebase/auth";
-import { firebaseServices } from "../../lib/firebase";
+import { firebaseServices, persistentCacheEnabled, purgePrivateCache } from "../../lib/firebase";
 import { authErrorMessage } from "./errors";
 
 export type AuthIntent = "login" | "register";
@@ -42,8 +42,15 @@ export function AuthProvider({children}: {children: ReactNode}) {
   }
   async function logout() {
     setBusy(true); setError("");
-    try { await signOut(firebaseServices().auth); setUser(null); setIntent("login"); }
-    catch (reason) { setError(authErrorMessage(reason)); }
+    try {
+      await signOut(firebaseServices().auth);
+      setUser(null);setIntent("login");
+      if (persistentCacheEnabled()) {
+        await purgePrivateCache();
+        window.location.replace("/");
+      }
+    }
+    catch (reason) { setError("Sessão encerrada, mas não foi possível limpar o cache local. Feche outras abas do Roteiva e limpe os dados deste site antes de entrar com outra conta."); }
     finally { setBusy(false); }
   }
   return <AuthContext.Provider value={{user, loading, busy, error, intent, login, logout}}>{children}</AuthContext.Provider>;

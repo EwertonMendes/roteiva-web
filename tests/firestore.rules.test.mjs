@@ -188,3 +188,285 @@ test("repository: empty new account, CRUD, cents, refresh and conflict",async()=
   workspace.financeEntries=[]; await a.save(workspace);
   assert.equal((await getDoc(doc(db,"users/charlie/financeEntries/10"))).exists(),false);
 });
+
+test("sync stamps are private, versioned and cannot be deleted", async () => {
+  const alice=dbFor("alice"),bob=dbFor("bob"),anon=dbFor();
+  const path="users/alice/sync/state",ref=doc(alice,path);
+  const counts={clients:1,projects:1,tasks:0,deliveries:0,events:0,financeEntries:0,activities:0};
+  const domains={clients:0,projects:0,tasks:0,deliveries:0,events:0,financeEntries:0,activities:0};
+  await assertFails(getDoc(doc(bob,path)));
+  await assertFails(getDoc(doc(anon,path)));
+  await assertFails(setDoc(doc(bob,path),{...meta("alice"),domains,counts}));
+  await assertFails(setDoc(ref,{...meta("alice"),domains,counts:{...counts,clients:-1}}));
+  await assertSucceeds(setDoc(ref,{...meta("alice"),domains,counts}));
+  await assertSucceeds(getDoc(ref));
+  await assertFails(updateDoc(ref,{counts:{...counts,clients:"invalid"},revision:2,updatedAt:serverTimestamp()}));
+  await assertFails(updateDoc(ref,{ownerUid:"bob",revision:2,updatedAt:serverTimestamp()}));
+  await assertSucceeds(updateDoc(ref,{domains:{...domains,clients:1},revision:2,updatedAt:serverTimestamp()}));
+  await assertFails(deleteDoc(ref));
+});
+
+test("domain-scoped writes preserve untouched collections and their revisions",async()=>{
+  const db=dbFor("charlie"), repository=new FirestoreWorkspace(db,"charlie");
+  await repository.registerProfile({...profile,studioName:"Studio scoped",professionalType:"freelancer",acknowledgedDataUse:true});
+  const workspace=emptyWorkspace();
+  workspace.clients=[{...client,id:101,name:"Cliente preservado",monthlyFee:0,projects:0,active:0,deliveries:[]}];
+  workspace.financeEntries=[{...fixtures.financeEntries,id:102,projectId:0,clientId:101,amount:25,date:"16/10/2026"}];
+  await repository.save(workspace);
+  await repository.load();
+  const state=emptyWorkspace();
+  state.financeEntries=[{...workspace.financeEntries[0],amount:30}];
+  assert.equal(await repository.save(state,["financeEntries"]),true);
+  assert.equal((await getDoc(doc(db,"users/charlie/clients/101"))).data().name,"Cliente preservado");
+  assert.equal((await getDoc(doc(db,"users/charlie/financeEntries/102"))).data().amountCents,3000);
+  const stamp=(await getDoc(doc(db,"users/charlie/sync/state"))).data();
+  assert.equal(stamp.counts.clients,1);
+  assert.equal(stamp.counts.financeEntries,1);
+  assert.equal(stamp.domains.clients,1);
+  assert.equal(stamp.domains.financeEntries,2);
+  assert.equal(await repository.save(state,["financeEntries"]),false);
+});
+
+test("legacy account migrates counts and reads only requested workspace domains",async()=>{
+  const db=dbFor("alice");
+  const repository=new FirestoreWorkspace(db,"alice");
+  const clients=await repository.load(["clients"]);
+  assert.equal(repository.hasLoaded(["clients"]),true);
+  assert.equal(repository.hasLoaded(["projects"]),false);
+  assert.equal(clients.clients.length,1);
+  assert.equal(clients.projects.length,0);
+  const revised={...clients,clients:clients.clients.map(c=>({...c,contact:"Contato otimizado"}))};
+  await repository.save(revised,["clients"]);
+  assert.equal((await getDoc(doc(db,"users/alice/projects/2"))).exists(),true);
+  const both=await repository.load(["projects"]);
+  assert.equal(both.clients[0].contact,"Contato otimizado");
+  assert.equal(both.projects.length,1);
+  const stamp=(await getDoc(doc(db,"users/alice/sync/state"))).data();
+  assert.equal(stamp.counts.clients,1);
+  assert.equal(stamp.counts.projects,1);
+  assert.equal(stamp.domains.clients,1);
+  assert.equal(stamp.domains.projects,0);
+});
+
+test("overview aggregates client count and receivables without fetching finance documents",async()=>{
+  const db=dbFor("alice");
+  await assertSucceeds(setDoc(doc(db,"users/alice/financeEntries/10"),
+    {...fixtures.financeEntries,...meta("alice")}));
+  const repository=new FirestoreWorkspace(db,"alice");
+  const metrics=await repository.overviewMetrics();
+  assert.equal(metrics.clientCount,1);
+  assert.equal(metrics.receivableAmount,100.01);
+  assert.equal(metrics.projectCount,1);
+  assert.equal(metrics.projectStatuses["Em produção"],1);
+  const expense={...fixtures.financeEntries,id:11,kind:"expense",amountCents:1500};
+  await assertSucceeds(setDoc(doc(db,"users/alice/financeEntries/11"),
+    {...expense,...meta("alice")}));
+  const fresh=await repository.overviewMetrics();
+  assert.equal(fresh.receivableAmount,100.01);
+  assert.equal(repository.hasLoaded(["clients"]),false);
+  assert.equal(repository.hasLoaded(["financeEntries"]),false);
+});
+
+test("typed commands preserve counts, reject duplicates, and detect concurrent edits",async()=>{
+  const db=dbFor("alice");
+  const owner=new FirestoreWorkspace(db,"alice");
+  const rival=new FirestoreWorkspace(db,"alice");
+  const before=await owner.load(["clients","projects","financeEntries"]);
+  await rival.load(["clients","projects","financeEntries"]);
+  const entry={
+    id:103,clientId:1,projectId:2,project:"Projeto",client:"Cliente",
+    kind:"income",amount:83.25,date:"17/10/2026",status:"A receber",
+  };
+  assert.equal(await owner.applyCommands([{kind:"saveFinance",entry}]),true);
+  assert.equal(await owner.applyCommands([{kind:"saveFinance",entry}]),false);
+  assert.equal((await getDoc(doc(db,"users/alice/financeEntries/103"))).data().amountCents,8325);
+  let revision=(await getDoc(doc(db,"users/alice/sync/state"))).data();
+  assert.equal(revision.counts.financeEntries,1);
+  assert.equal(await owner.applyCommands([{kind:"saveFinance",entry:{...entry,amount:84}}]),true);
+  revision=(await getDoc(doc(db,"users/alice/sync/state"))).data();
+  assert.equal(revision.counts.financeEntries,1);
+  await assert.rejects(()=>rival.applyCommands([{kind:"saveFinance",entry:{...entry,amount:40}}]),/Conflito/);
+  assert.equal(await owner.applyCommands([{kind:"deleteFinance",id:103}]),true);
+  revision=(await getDoc(doc(db,"users/alice/sync/state"))).data();
+  assert.equal(revision.counts.financeEntries,0);
+  assert.equal((await getDoc(doc(db,"users/alice/clients/1"))).exists(),true);
+  assert.equal((await getDoc(doc(db,"users/alice/projects/2"))).exists(),true);
+  assert.equal(before.clients.length,1);
+});
+
+test("server cursor pages return distinct projects, status filters and joined tasks",async()=>{
+  const db=dbFor("alice");
+  for(const id of [11,12,13,14]){
+    await assertSucceeds(setDoc(doc(db,"users/alice/projects/"+id),
+      {...project,id,clientId:1,status:id===14?"Aprovado":"Em produção",...meta("alice")}));
+  }
+  await assertSucceeds(setDoc(doc(db,"users/alice/tasks/50"),
+    {...fixtures.tasks,id:50,projectId:12,...meta("alice")}));
+  const repo=new FirestoreWorkspace(db,"alice");
+  const first=await repo.projectPage({reset:true,size:2});
+  assert.equal(first.workspace.projects.length,2);
+  assert.equal(first.total,5);
+  assert.equal(first.hasMore,true);
+  assert.equal(repo.hasLoaded(["projects"]),false);
+  const second=await repo.projectPage({size:2});
+  assert.equal(second.workspace.projects.length,4);
+  assert.equal(new Set(second.workspace.projects.map(p=>p.id)).size,4);
+  const last=await repo.projectPage({size:2});
+  assert.equal(last.workspace.projects.length,5);
+  assert.equal(last.hasMore,false);
+  const filtered=await repo.projectPage({status:"Aprovado",reset:true,size:2});
+  assert.deepEqual(filtered.workspace.projects.map(p=>p.id),[14]);
+  assert.equal(filtered.total,1);
+  const complete=await repo.load(["projects","tasks"]);
+  assert.equal(complete.projects.length,5);
+  assert.equal(complete.projects.find(p=>p.id===12).tasks.length,1);
+});
+
+test("client directory uses bounded cursor, accurate recurring count, and never marks partial as complete",async()=>{
+  const db=dbFor("alice");
+  for(const id of [11,12,13]){
+    await assertSucceeds(setDoc(doc(db,"users/alice/clients/"+id),
+      {...client,id,name:"Cliente "+id,type:id===12||id===13?"Recorrente":"Avulso",...meta("alice")}));
+  }
+  const repo=new FirestoreWorkspace(db,"alice");
+  const first=await repo.clientPage({reset:true,size:2});
+  assert.equal(first.total,4);
+  assert.equal(first.recurring,2);
+  assert.equal(first.workspace.clients.length,2);
+  assert.equal(first.hasMore,true);
+  assert.equal(repo.hasLoaded(["clients"]),false);
+  const second=await repo.clientPage({size:2});
+  assert.equal(second.workspace.clients.length,4);
+  assert.equal(new Set(second.workspace.clients.map(c=>c.id)).size,4);
+  assert.equal(second.hasMore,false);
+  const complete=await repo.load(["clients","deliveries"]);
+  assert.equal(complete.clients.length,4);
+  assert.equal(repo.hasLoaded(["clients"]),true);
+});
+
+test("client and project cursors reject pages mixed across remote revisions",async()=>{
+  const db=dbFor("alice");
+  await assertSucceeds(setDoc(doc(db,"users/alice/projects/11"),
+    {...project,id:11,clientId:1,...meta("alice")}));
+  await assertSucceeds(setDoc(doc(db,"users/alice/clients/11"),
+    {...client,id:11,name:"Cliente onze",...meta("alice")}));
+  const first=new FirestoreWorkspace(db,"alice"),second=new FirestoreWorkspace(db,"alice");
+  const projectPage=await first.projectPage({reset:true,size:1});
+  assert.equal(projectPage.hasMore,true);
+  const other=await second.load(["projects","clients"]);
+  await second.applyCommands([{kind:"saveProject",project:{...other.projects.find(p=>p.id===2),name:"Atualizado em outra aba"}}]);
+  await assert.rejects(()=>first.projectPage({size:1}),/Conflito/);
+  const clientPage=await first.clientPage({reset:true,size:1});
+  assert.equal(clientPage.hasMore,true);
+  await second.applyCommands([{kind:"saveClient",client:{...other.clients.find(c=>c.id===1),contact:"Mudou remotamente"}}]);
+  await assert.rejects(()=>first.clientPage({size:1}),/Conflito/);
+});
+
+
+test("finance annual windows avoid reading older history and preserve cross-year records",async()=>{
+  const db=dbFor("alice");
+  for(const [id,date] of [[101,"2024-06-17"],[102,"2025-10-17"],[103,"2026-02-02"],[104,"2026-10-17"]]){
+    await assertSucceeds(setDoc(doc(db,"users/alice/financeEntries/"+id),
+      {...fixtures.financeEntries,id,date,amountCents:id*100,...meta("alice")}));
+  }
+  const repo=new FirestoreWorkspace(db,"alice");
+  const baseline=repo.diagnostics().serverDocumentsReturned;
+  const thisYear=await repo.financeYear(2026);
+  assert.deepEqual(thisYear.financeEntries.map(x=>x.id).sort(),[103,104]);
+  assert.equal(repo.hasLoaded(["financeEntries"]),false);
+  const afterFirst=repo.diagnostics();
+  assert.equal(afterFirst.serverDocumentsReturned-baseline,2);
+  const cached=await repo.financeYear(2026);
+  assert.equal(cached.financeEntries.length,2);
+  assert.equal(repo.diagnostics().serverDocumentsReturned-baseline,2);
+  const previous=await repo.financeYear(2025);
+  assert.deepEqual(previous.financeEntries.map(x=>x.id).sort(),[102,103,104]);
+  assert.equal(repo.diagnostics().serverDocumentsReturned-baseline,3);
+  const full=await repo.load(["financeEntries"]);
+  assert.equal(full.financeEntries.length,4);
+});
+
+test("calendar windows include adjacent grid months, exclude distant history",async()=>{
+  const db=dbFor("alice");
+  for(const [id,date] of [[201,"2026-08-31"],[202,"2026-09-15"],[203,"2026-10-01"],[204,"2026-11-30"],[205,"2026-12-01"]]){
+    await assertSucceeds(setDoc(doc(db,"users/alice/events/"+id),
+      {...fixtures.events,id,date,...meta("alice")}));
+  }
+  const repo=new FirestoreWorkspace(db,"alice");
+  const first=await repo.calendarWindow(2026,9);
+  assert.deepEqual(first.calendarEvents.map(e=>e.id).sort(),[202,203,204,205]);
+  assert.equal(repo.hasLoaded(["events"]),false);
+  const again=await repo.calendarWindow(2026,9);
+  assert.equal(again.calendarEvents.length,4);
+  const shifted=await repo.calendarWindow(2026,10);
+  assert.deepEqual(shifted.calendarEvents.map(e=>e.id).sort(),[202,203,204,205]);
+  await assert.rejects(()=>repo.calendarWindow(2026,12),/inválido/);
+});
+
+
+test("financial month reads only requested month, and annual bars respect year and client",async()=>{
+  const db=dbFor("alice");
+  for(const [id,date,clientId,kind,amountCents] of [
+    [301,"2025-10-11",1,"income",99900],
+    [302,"2026-01-11",1,"income",10001],
+    [303,"2026-10-12",1,"income",20050],
+    [304,"2026-10-15",0,"income",5000],
+    [305,"2026-10-17",1,"expense",700],
+  ]){
+    await assertSucceeds(setDoc(doc(db,"users/alice/financeEntries/"+id),
+      {...fixtures.financeEntries,id,date,clientId,kind,amountCents,...meta("alice")}));
+  }
+  const repo=new FirestoreWorkspace(db,"alice");
+  const baseline=repo.diagnostics().serverDocumentsReturned;
+  const month=await repo.financeMonth(2026,9);
+  assert.deepEqual(month.financeEntries.map(x=>x.id).sort(),[303,304,305]);
+  assert.equal(repo.diagnostics().serverDocumentsReturned-baseline,3);
+  assert.equal(repo.hasLoaded(["financeEntries"]),false);
+  const all=await repo.financeYearBars(2026);
+  assert.equal(all[0],100.01);
+  assert.equal(all[9],250.5);
+  assert.equal(all.reduce((a,b)=>a+b,0),350.51);
+  const filtered=await repo.financeYearBars(2026,1);
+  assert.equal(filtered[9],200.5);
+  assert.equal(filtered[0],100.01);
+  const other=await repo.financeMonth(2025,9);
+  assert.equal(other.financeEntries.some(e=>e.id===301),true);
+  assert.equal((await repo.load(["financeEntries"])).financeEntries.length,5);
+});
+
+
+test("large finance histories use server annual aggregation and refresh only changed months",async()=>{
+  const db=dbFor("alice");
+  await env.withSecurityRulesDisabled(async ctx=>{
+    const admin=ctx.firestore();
+    for(let i=0;i<45;i++){
+      const date=i<40?"2025-08-12":"2026-10-12";
+      await setDoc(doc(admin,"users/alice/financeEntries/"+(700+i)),
+        {...fixtures.financeEntries,id:700+i,date,clientId:i%2?1:2,
+        kind:"income",amountCents:100,...meta("alice")});
+    }
+  });
+  const repo=new FirestoreWorkspace(db,"alice");
+  const initial=repo.diagnostics();
+  const page=await repo.financeMonth(2026,9);
+  assert.equal(page.financeEntries.length,5);
+  const aggregationBaseline=repo.diagnostics().aggregationQueries;
+  const bars=await repo.financeYearBars(2026);
+  assert.equal(bars[9],5);
+  assert.equal(bars.reduce((a,b)=>a+b,0),5);
+  const after=repo.diagnostics();
+  assert.equal(repo.hasLoaded(["financeEntries"]),false);
+  assert.equal(after.serverDocumentsReturned-initial.serverDocumentsReturned,5);
+  assert.equal(after.aggregationQueries-aggregationBaseline,12);
+  const commands=[{kind:"saveFinance",entry:{
+    id:999,project:"Novo",client:"Cliente",clientId:1,projectId:2,
+    kind:"income",amount:7.5,date:"17/10/2026",status:"Recebido"
+  }}];
+  assert.deepEqual(repo.affectedFinanceMonths(commands,2026),[9]);
+  await repo.applyCommands(commands);
+  const rechecked=await repo.financeYearBars(2026,undefined,[9]);
+  assert.equal(rechecked[9],12.5);
+  assert.equal(repo.diagnostics().aggregationQueries-after.aggregationQueries,1);
+  const forClient=await repo.financeYearBars(2026,1);
+  assert.equal(forClient[9],9.5);
+});
