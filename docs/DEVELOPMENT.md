@@ -284,3 +284,17 @@ O primeiro teste manual do OAuth no Chrome chegou ao callback e apresentou `offl
 6. Verifique a integração completa com consentimento real e QA Chrome/Safari/mobile. Mocks e CI sozinhos não atestam a concessão de escopo restrito. Antes de abrir ao público, concluir a verificação exigida pelo Google para `drive.readonly`.
 
 O deploy Firebase DEV precisa publicar `firestore.rules` e Worker DEV. Nenhuma credencial Google pessoal é armazenada em `sessionStorage`, URL ou Firestore.
+
+## Laboratório temporário de tipografia — DEV (outubro/2026)
+
+A barra superior do ambiente DEV possui um seletor **Fonte (teste)**. Mantemos **Ubuntu (atual)** como referência, além de 10 famílias gratuitas carregadas remotamente via Google Fonts CSS2, somente quando selecionadas: Manrope, Plus Jakarta Sans, DM Sans, Instrument Sans, Geist, Sora, Space Grotesk, Outfit, Inter e Onest. Nenhuma nova fonte foi baixada ou adicionada ao repositório. Fontes remotas exigem rede e podem falhar sob bloqueios de privacidade; nesses casos a fonte anterior continua aplicada e o controle informa a falha.
+
+- Componente e flag para desativar: `src/features/typography/TypographyLab.tsx` (constante `TEMPORARY_FONT_LAB_ENABLED`).
+- Estilos temporários e contraste do menu nativo: `src/features/typography/font-lab.css`.
+- Montagem na topbar: `src/dashboard-client.tsx` (somente ambiente autenticado, não na demonstração Pages).
+- Importação isolada dos estilos: `src/main.tsx`.
+- A escolha é guardada apenas em `sessionStorage`, não no Firebase nem no armazenamento permanente do usuário; voltar para Ubuntu remove o override CSS. O experimento não altera as definições tipográficas oficiais do tema.
+- Remoção definitiva: retirar componente/imports na topbar e main, deletar os dois arquivos. Não há migrações ou dados de negócio.
+- Teste Playwright: `tests/browser/font-lab.spec.ts`, com mock do CSS remoto apenas no teste, verificando os 11 itens, troca imediata, persistência na sessão, reset e contraste dos options em claro/escuro.
+
+O seletor não altera ainda a escala de tamanhos do produto: decidir a família primeiro, depois refatorar a hierarquia tipográfica e legibilidade sem testes contaminados por mudanças simultâneas.
