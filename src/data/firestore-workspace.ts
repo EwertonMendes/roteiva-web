@@ -231,6 +231,9 @@ export class FirestoreWorkspace {
     }
     const size=Math.max(1,Math.min(30,options.size||24));
     const before=await this.ensureSync();
+    if(!options.reset && this.pagedDomains.has("clients") &&
+      this.stamp?.domains.clients!==before.domains.clients)
+      throw new Error("Conflito: a lista de clientes mudou. Recarregue antes de continuar.");
     const base=collection(this.db,"users",this.uid,"clients");
     const q=query(base,orderBy("createdAt","desc"),orderBy(documentId(),"desc"),
       ...(this.clientCursor?[startAfter(this.clientCursor)]:[]),limit(size+1));
@@ -296,6 +299,9 @@ export class FirestoreWorkspace {
       return {workspace:this.decoded(),total:this.stamp?.counts.projects||0,hasMore:false};
     }
     const before=await this.ensureSync();
+    if(!options.reset && this.pagedDomains.has("projects") &&
+      this.stamp?.domains.projects!==before.domains.projects)
+      throw new Error("Conflito: a lista de projetos mudou. Recarregue antes de continuar.");
     const base=collection(this.db,"users",this.uid,"projects");
     const conditions=status?[where("status","==",status)]:[];
     const entries=query(base,...conditions,orderBy("createdAt","desc"),
