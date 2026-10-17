@@ -8,6 +8,11 @@ export type WorkspaceCommand =
   | {kind:"saveFinance";entry:FinanceEntry}
   | {kind:"saveEvent";event:CalendarEvent}
   | {kind:"appendActivity";activity:Activity}
+  | {kind:"deleteActivity";id:string}
+  | {kind:"saveTask";projectId:number;task:NonNullable<Project["tasks"]>[number]}
+  | {kind:"deleteTask";id:number}
+  | {kind:"saveDelivery";clientId:number;delivery:NonNullable<Client["deliveries"]>[number]}
+  | {kind:"deleteDelivery";id:number}
   | {kind:"deleteFinance";id:number}
   | {kind:"deleteEvent";id:number};
 
@@ -18,7 +23,9 @@ export function commandDomain(command:WorkspaceCommand):CollectionName{
     case "saveProject": return "projects";
     case "saveFinance":case "deleteFinance": return "financeEntries";
     case "saveEvent":case "deleteEvent": return "events";
-    case "appendActivity": return "activities";
+    case "appendActivity":case "deleteActivity": return "activities";
+    case "saveTask":case "deleteTask": return "tasks";
+    case "saveDelivery":case "deleteDelivery": return "deliveries";
   }
 }
 
@@ -41,6 +48,21 @@ export function encodeCommand(command:WorkspaceCommand):DocumentChange {
     case "appendActivity":
       if (!command.activity.id) throw new Error("A atividade precisa de ID próprio.");
       return encoded({...noRecords,activities:[command.activity]},"activities");
+    case "saveTask":
+      return {key:"tasks/"+command.task.id,collection:"tasks",
+        data:{...command.task,projectId:command.projectId}};
+    case "deleteTask":
+      if (!Number.isSafeInteger(command.id)||command.id<1)throw Error("ID de tarefa inválido.");
+      return {key:"tasks/"+command.id,collection:"tasks"};
+    case "saveDelivery":
+      return {key:"deliveries/"+command.delivery.id,collection:"deliveries",
+        data:{...command.delivery,clientId:command.clientId}};
+    case "deleteDelivery":
+      if (!Number.isSafeInteger(command.id)||command.id<1)throw Error("ID de entrega inválido.");
+      return {key:"deliveries/"+command.id,collection:"deliveries"};
+    case "deleteActivity":
+      if(!command.id || command.id.includes("/"))throw Error("ID da atividade inválido.");
+      return {key:"activities/"+command.id,collection:"activities"};
     case "deleteFinance":
       if (!Number.isSafeInteger(command.id)||command.id<1)throw new Error("ID financeiro inválido.");
       return {key:"financeEntries/"+command.id,collection:"financeEntries"};
