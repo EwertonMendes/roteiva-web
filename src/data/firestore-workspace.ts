@@ -2,6 +2,35 @@ import { collection, doc, documentId, getDocFromServer, getDocsFromServer, limit
 import { collections, decodeWorkspace, encodeWorkspace, equalData, type Data, type Records } from "./workspace-codec.ts";
 import type { WorkspaceData } from "../domain/workspace";
 
+export type ProfessionalType = "freelancer" | "studio" | "producer" | "other";
+export type RoteivaProfile = {
+  displayName: string;
+  studioName: string;
+  professionalType: ProfessionalType;
+  revision: number;
+  legacy: boolean;
+};
+export type ProfileChanges = Pick<RoteivaProfile, "displayName" | "studioName" | "professionalType">;
+export function validateProfileChanges(profile: ProfileChanges): ProfileChanges {
+  const displayName=profile.displayName.trim();
+  const studioName=profile.studioName.trim();
+  if (displayName.length<2 || displayName.length>120 || studioName.length>120 ||
+      !["freelancer","studio","producer","other"].includes(profile.professionalType)) {
+    throw new Error("Confira o nome, o estúdio e a área de atuação.");
+  }
+  return {displayName,studioName,professionalType:profile.professionalType};
+}
+function readProfile(data:DocumentData): RoteivaProfile {
+  return {
+    displayName:typeof data.displayName==="string" ? data.displayName : "",
+    studioName:typeof data.studioName==="string" ? data.studioName : "",
+    professionalType:["freelancer","studio","producer","other"].includes(data.professionalType)
+      ? data.professionalType as ProfessionalType : "freelancer",
+    revision:data.revision as number,
+    legacy:!data.registrationCompletedAt,
+  };
+}
+
 type Stored = {data: Data; revision: number};
 export function dataErrorMessage(error: unknown): string {
   const code = (error as {code?:string})?.code || "";
@@ -21,9 +50,22 @@ export class FirestoreWorkspace {
   }
   private ref(path: string) { return doc(this.db, "users/" + this.uid + "/" + path); }
   // Reading the profile does not create an account or a business workspace.
-  async loadProfile(): Promise<{displayName:string}|null> {
+  async loadProfile(): Promise<RoteivaProfile|null> {
     const snap = await getDocFromServer(doc(this.db, "users", this.uid));
-    return snap.exists() ? {displayName: snap.data().displayName as string} : null;
+    return snap.exists() ? readProfile(snap.data()) : null;
+  }
+  async saveProfile(changes:ProfileChanges,expectedRevision:number): Promise<RoteivaProfile> {
+    const validated=validateProfileChanges(changes);
+    const ref=doc(this.db,"users",this.uid);
+    return runTransaction(this.db,async tx=>{
+      const snap=await tx.get(ref);
+      if (!snap.exists()) throw new Error("Conflito: o cadastro não foi encontrado. Recarregue a página.");
+      const before=snap.data();
+      if (before.revision!==expectedRevision) throw new Error("Conflito: seu perfil foi alterado em outro dispositivo. Atualize a página antes de salvar.");
+      // Never rewrite Google identity or onboarding acknowledgements.
+      tx.update(ref,{...validated,revision:expectedRevision+1,updatedAt:serverTimestamp()});
+      return {...validated,revision:expectedRevision+1,legacy:!before.registrationCompletedAt};
+    });
   }
   async profileExists(): Promise<boolean> {
     return (await this.loadProfile()) !== null;
