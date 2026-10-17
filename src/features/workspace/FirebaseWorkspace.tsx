@@ -10,6 +10,7 @@ import { collections } from "../../data/workspace-codec";
 import type { WorkspaceCommand } from "../../data/firestore-commands";
 import { useAuth } from "../auth/AuthProvider";
 import { useRegistrationProfile } from "../auth/RegistrationGate";
+import { retryFirestoreRead,transientFirestoreRead,firestoreCode } from "../../data/firestore-recovery";
 
 export function FirebaseWorkspace() {
   const {user,logout,busy,error:authError}=useAuth();
@@ -35,12 +36,15 @@ export function FirebaseWorkspace() {
   const queue=useRef(Promise.resolve());
   const pending=useRef(0);
   const failed=useRef(false);
+  const automaticAttempts=useRef(0);
   useEffect(()=>{
     let active=true;
+    let retryTimer:ReturnType<typeof setTimeout>|undefined;
     failed.current=false;
     setRemoteChanges(false);setSyncWarning("");
     setError(""); setInitial(undefined);setBusinessLoaded(false);setOverviewMetrics(undefined);setProjectPage(undefined);setClientPage(undefined);setFinancePeriod(undefined);setFinanceBars(undefined);setCalendarPeriod(undefined);
     (async()=>{
+      await retryFirestoreRead(async()=>{
       const route=routeFromLocation(window.location,{base:import.meta.env.BASE_URL,useHash:false});
       const domains=domainsForRoute(route);
       const [workspaceState,theme]=await Promise.all([
@@ -51,7 +55,7 @@ export function FirebaseWorkspace() {
             const page=await repository.projectPage({reset:true,size});
             if(route.view==="overview"){
               const d=new Date(),year=d.getFullYear(),month=d.getMonth();
-              const workspace=await repository.calendarWindow(year,month);
+              const workspace=await retryFirestoreRead(()=>repository.calendarWindow(year,month));
               return {workspace,page:{...page,workspace},calendar:`${year}-${month}`};
             }
             return {workspace:page.workspace,page};
@@ -77,6 +81,7 @@ export function FirebaseWorkspace() {
       const stats=route.view==="overview" ?
         await repository.overviewMetrics(workspaceState.page?.workspace.projects) : undefined;
       if (active) {
+        automaticAttempts.current=0;
         setBusinessLoaded(domains.length>0);
         if (stats) setOverviewMetrics(stats);
         if (workspaceState.page && route.view==="projects")
@@ -91,8 +96,25 @@ export function FirebaseWorkspace() {
         if("calendar" in workspaceState && workspaceState.calendar)setCalendarPeriod(workspaceState.calendar);
         setInitial({workspace:workspaceState.workspace,theme:theme || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark":"light")});
       }
-    })().catch(reason=>{if(active){failed.current=true;setError(dataErrorMessage(reason));}});
-    return ()=>{active=false;};
+      },{isCurrent:()=>active});
+    })().catch(reason=>{
+      if(!active)return;
+      // Do not turn a recoverable read error into an endless "reload" screen.
+      // Recreate the read pipeline automatically with capped backoff.
+      const code=firestoreCode(reason);
+      const blocked=["permission-denied","unauthenticated","resource-exhausted"].includes(code);
+      if(blocked){
+        failed.current=true;setError(dataErrorMessage(reason));
+        return;
+      }
+      console.warn("[Roteiva] Leitura inicial aguardando recuperação:",code||"unexpected");
+      const attempt=automaticAttempts.current++;
+      const delay=Math.min(30000,2000*2**Math.min(attempt,4));
+      retryTimer=setTimeout(()=>{if(active)setVersion(value=>value+1);},delay);
+    });
+    const online=()=>{if(active && !initial){clearTimeout(retryTimer);setVersion(value=>value+1);}};
+    window.addEventListener("online",online);
+    return ()=>{active=false;clearTimeout(retryTimer);window.removeEventListener("online",online);};
   },[repository,user,version]);
   // Revalidate only when returning to the app, not on every screen navigation.
   useEffect(() => {
@@ -104,7 +126,10 @@ export function FirebaseWorkspace() {
       lastCheck.current = Date.now();
       try {
         const changed = await repository.hasExternalChanges();
-        if (active && changed) setRemoteChanges(true);
+        if(active && changed){
+          if(!pending.current)setVersion(value=>value+1);
+          else setRemoteChanges(true);
+        }
       } catch {
         if (active) setSyncWarning("Não foi possível conferir atualizações externas. Verifique sua conexão.");
       }
@@ -122,14 +147,17 @@ export function FirebaseWorkspace() {
       // Navigation never reads an older snapshot while its own mutation is pending.
       await queue.current;
       if(failed.current)throw new Error("Conflito: há uma alteração não confirmada.");
-      const workspace=await repository.load(domains);
+      const workspace=await retryFirestoreRead(()=>repository.load(domains));
       if (request===scopeRequest.current) {
         setInitial(current=>current?{...current,workspace}:current);
         setBusinessLoaded(repository.hasLoaded(domains));
       }
       return workspace;
     } catch(reason) {
-      if (request===scopeRequest.current) setError(dataErrorMessage(reason));
+      if(request===scopeRequest.current){
+        if(transientFirestoreRead(reason) && !pending.current)setVersion(value=>value+1);
+        else setError(dataErrorMessage(reason));
+      }
       throw reason;
     } finally {
       if (request===scopeRequest.current) setLoadingBusiness(false);
@@ -144,14 +172,17 @@ export function FirebaseWorkspace() {
       if(failed.current)throw new Error("Conflito: há uma alteração não confirmada.");
       // The project editor needs the complete client selector even on a paged list.
       await repository.load(["clients","activities"]);
-      const result=await repository.projectPage({status,reset,size:24});
+      const result=await retryFirestoreRead(()=>repository.projectPage({status,reset,size:24}));
       if(request===scopeRequest.current){
         setInitial(current=>current?{...current,workspace:result.workspace}:current);
         setBusinessLoaded(true);
         setProjectPage({total:result.total,hasMore:result.hasMore,status});
       }
     }catch(reason){
-      if(request===scopeRequest.current)setError(dataErrorMessage(reason));
+      if(request===scopeRequest.current){
+        if(transientFirestoreRead(reason) && !pending.current)setVersion(value=>value+1);
+        else setError(dataErrorMessage(reason));
+      }
     }finally{
       if(request===scopeRequest.current)setLoadingBusiness(false);
     }
@@ -163,14 +194,17 @@ export function FirebaseWorkspace() {
       await queue.current;
       if(failed.current)throw new Error("Conflito: há uma alteração não confirmada.");
       await repository.load(["projects","activities"]);
-      const result=await repository.clientPage({reset,size:24});
+      const result=await retryFirestoreRead(()=>repository.clientPage({reset,size:24}));
       if(request===scopeRequest.current){
         setInitial(current=>current?{...current,workspace:result.workspace}:current);
         setBusinessLoaded(true);
         setClientPage({total:result.total,recurring:result.recurring,hasMore:result.hasMore});
       }
     }catch(reason){
-      if(request===scopeRequest.current)setError(dataErrorMessage(reason));
+      if(request===scopeRequest.current){
+        if(transientFirestoreRead(reason) && !pending.current)setVersion(value=>value+1);
+        else setError(dataErrorMessage(reason));
+      }
     }finally{
       if(request===scopeRequest.current)setLoadingBusiness(false);
     }
@@ -191,14 +225,17 @@ export function FirebaseWorkspace() {
       await queue.current;
       if(failed.current)throw Error("Conflito: há uma gravação não confirmada.");
       await repository.load(["clients","projects","activities"]);
-      const workspace=await repository.financeMonth(year,month);
-      const bars=await repository.financeYearBars(year,clientId);
+      const workspace=await retryFirestoreRead(()=>repository.financeMonth(year,month));
+      const bars=await retryFirestoreRead(()=>repository.financeYearBars(year,clientId));
       if(request===scopeRequest.current){
         setInitial(current=>current?{...current,workspace}:current);
         setBusinessLoaded(true);setFinancePeriod(key);
         setFinanceBars({key:year+"-"+(clientId||""),bars});
       }
-    }catch(reason){if(request===scopeRequest.current)setError(dataErrorMessage(reason));}
+    }catch(reason){if(request===scopeRequest.current){
+        if(transientFirestoreRead(reason) && !pending.current)setVersion(value=>value+1);
+        else setError(dataErrorMessage(reason));
+      }}
     finally{if(request===scopeRequest.current)setLoadingBusiness(false);}
   },[repository,financePeriod,financeBars]);
   const loadCalendarPeriod=useCallback(async(year:number,month:number)=>{
@@ -215,12 +252,16 @@ export function FirebaseWorkspace() {
         setInitial(current=>current?{...current,workspace}:current);
         setBusinessLoaded(true);setCalendarPeriod(period);
       }
-    }catch(reason){if(request===scopeRequest.current)setError(dataErrorMessage(reason));}
+    }catch(reason){if(request===scopeRequest.current){
+        if(transientFirestoreRead(reason) && !pending.current)setVersion(value=>value+1);
+        else setError(dataErrorMessage(reason));
+      }}
     finally{if(request===scopeRequest.current)setLoadingBusiness(false);}
   },[repository,calendarPeriod]);
   const onRouteChange=useCallback((route:WorkspaceRoute)=>{
     if(route.view==="overview"){
-      if(!overviewMetrics)void repository.overviewMetrics().then(setOverviewMetrics).catch(reason=>setError(dataErrorMessage(reason)));
+      if(!overviewMetrics)void retryFirestoreRead(()=>repository.overviewMetrics()).then(setOverviewMetrics)
+        .catch(reason=>{if(!transientFirestoreRead(reason))setError(dataErrorMessage(reason));});
       if(!calendarPeriod){const d=new Date();void loadCalendarPeriod(d.getFullYear(),d.getMonth());}
     }
     if(route.view==="projects" && !route.projectId && !repository.hasLoaded(["projects","tasks"])){
@@ -284,12 +325,11 @@ export function FirebaseWorkspace() {
     </section>}
     {syncWarning && !error && <p className="cloud-banner" role="status">{syncWarning}</p>}
     {error && <section className="cloud-recovery" role="alert">
-      <h2>Precisamos recuperar a conexão com seus dados</h2><p>{error}</p>
-      <p>A versão confirmada na nuvem será restaurada. Alterações não salvas nesta aba serão descartadas.</p>
-      <button className="primary-button" disabled={saving} onClick={()=>setVersion(v=>v+1)}>Recarregar dados da nuvem</button>
+      <h2>Não foi possível confirmar o acesso à nuvem</h2><p>{error}</p>
+      <p>Se sua sessão ou as permissões de acesso expiraram, entre novamente. Seus dados já confirmados no Firebase não foram alterados por esta tentativa.</p>
       <button className="secondary-button" disabled={saving||busy} onClick={()=>void logout()}>Sair da conta</button>
     </section>}
-    {!initial && !error && <main className="studio-loading" role="status">Carregando seu espaço na nuvem…</main>}
+    {!initial && !error && <main className="studio-loading" role="status">Sincronizando seu espaço…</main>}
     {loadingBusiness && !error && <main className="studio-loading" role="status">Carregando os dados do seu espaço…</main>}
     {initial && (overviewMetrics || routeFromLocation(window.location,{base:import.meta.env.BASE_URL,useHash:false}).view!=="overview") && <div inert={!!error || remoteChanges || loadingBusiness} aria-busy={saving}>
       <DashboardClient key={user.uid+"-"+version} firstName={profileContext?.profile.displayName || user.displayName || "Profissional"} profile={profileContext?.profile || null} onSaveProfile={profileContext?.saveProfile} email={user.email || ""} photoURL={user.photoURL || undefined}
