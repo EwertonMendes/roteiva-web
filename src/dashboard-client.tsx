@@ -12,14 +12,13 @@ import {
 import { ProjectDetail, ClientDetail, TodayStudio, StudioReviews, WorkspaceTools, FinancePanel, projectTemplates } from "./studio-features";
 import { validTimeRange, overlaps, eventRange, eventDuration } from "./studio-calendar";
 import { toISO as toISOAdded, parseMoney, splitInstallments } from "./studio-finance";
-import { FormEvent, useEffect, useLayoutEffect, useMemo, useState, useCallback, useRef } from "react";
+import { FormEvent, useEffect, useLayoutEffect, useMemo, useState, useCallback } from "react";
 
 import { isDemo } from "./lib/firebase";
 import { hrefForWorkspaceRoute, routeFromLocation, type WorkspaceRoute } from "./lib/workspace-routing";
 import { SettingsPage } from "./features/settings/SettingsPage";
 import type { RoteivaProfile, ProfileChanges } from "./data/firestore-workspace";
-import type { Domain } from "./data/firestore-sync";
-import {commandDomain,type WorkspaceCommand} from "./data/firestore-commands";
+import type { WorkspaceCommand } from "./data/firestore-commands";
 import { newId, type WorkspaceData, type Activity, type View, type Project, type Client, type ClientType, type AssetKind, type FinanceEntry, type CalendarEvent, type LibraryAsset, type Status } from "./domain/workspace";
 export type { View, Project, Client, FinanceEntry, CalendarEvent, LibraryAsset, Status } from "./domain/workspace";
 
@@ -55,12 +54,12 @@ type DashboardProps = {
   firstName: string; email: string; photoURL?: string; profile?:RoteivaProfile|null;
   onSaveProfile?:(changes:ProfileChanges)=>Promise<void>;
   initialWorkspace?: WorkspaceData; initialTheme?: "light"|"dark";
-  onWorkspaceChange?: (workspace:WorkspaceData, dirtyDomains:readonly Domain[])=>void; onThemeChange?:(theme:"light"|"dark")=>void;
+  onThemeChange?:(theme:"light"|"dark")=>void;
   onLoadWorkspace?:()=>Promise<WorkspaceData>; onRouteChange?:(route:WorkspaceRoute)=>void;
   onCommands?:(commands:readonly WorkspaceCommand[])=>void;
   overviewMetrics?:{clientCount:number;receivableAmount:number}; cloudStatus?:string; saving?:boolean; onLogout?:()=>void;
 };
-export default function DashboardClient({ firstName, email, photoURL, profile, onSaveProfile, initialWorkspace, initialTheme, onWorkspaceChange, onThemeChange, onLoadWorkspace, onRouteChange, onCommands, overviewMetrics, cloudStatus, saving, onLogout }: DashboardProps) {
+export default function DashboardClient({ firstName, email, photoURL, profile, onSaveProfile, initialWorkspace, initialTheme, onThemeChange, onLoadWorkspace, onRouteChange, onCommands, overviewMetrics, cloudStatus, saving, onLogout }: DashboardProps) {
   const routeEnvironment={base:import.meta.env.BASE_URL,useHash:isDemo};
   const initialRoute=()=>routeFromLocation(window.location,routeEnvironment);
   const [initialBrowserRoute]=useState<WorkspaceRoute>(initialRoute);
@@ -100,12 +99,10 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
   const [uploading, setUploading] = useState(false);
   const storageKey = "roteiva-pages-demo-workspace-v1";
   const [activities, setActivities] = useState<Activity[]>([]);
-  const lastPersistedState=useRef({projects,clients:clientList,financeEntries,calendarEvents,activities});
-  const commandDomains=useRef(new Set<Domain>());
   function commitCommands(commands:WorkspaceCommand[]){
-    if (!onCommands || isDemo) return;
-    for(const command of commands)commandDomains.current.add(commandDomain(command));
-    onCommands(commands);
+    // The cloud is persisted only through explicit typed business commands.
+    // The demo retains its independent localStorage snapshot.
+    if (!isDemo && onCommands && commands.length)onCommands(commands);
   }
   const workspace = { projects, clients: clientList, financeEntries, monthlyRevenue, calendarEvents, libraryAssets: libraryAssets.map((asset) => ({ ...asset, preview: undefined })), comments, reviewState, activities };
   function logActivity(text: string) {
@@ -120,9 +117,6 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
       projects:data.projects || [],clients:data.clients || [],financeEntries:data.financeEntries || [],
       calendarEvents:data.calendarEvents || [],activities:data.activities || [],
     };
-    // Hydration is not a user mutation. Without resetting the comparison anchor,
-    // loading one more domain could delete records that were not loaded before.
-    lastPersistedState.current=next;
     setProjects(next.projects);setClientList(next.clients);setFinanceEntries(next.financeEntries);
     setCalendarEvents(next.calendarEvents);
     setLibraryAssets(data.libraryAssets || []);setComments(data.comments || []);
@@ -206,30 +200,18 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     setDataReady(true);
   },[restoreWorkspace,initialWorkspace,initialTheme]);
 
-  // Queue persistence before the new UI can be painted/reloaded, closing the
-  // gap between a mutation appearing on screen and the unload protection.
+  // The Pages demo preserves its existing browser-only snapshot contract.
+  // Firebase never persists a render/effect: business mutations call commands.
   useLayoutEffect(() => {
-    if (!dataReady) return;
-    const payload={projects,clients:clientList,financeEntries,calendarEvents,libraryAssets:libraryAssets.map(asset=>({...asset,preview:undefined})),comments,reviewState,activities};
-    const previous=lastPersistedState.current;
-    const dirtyDomains:Domain[]=[];
-    if (previous.projects!==projects) dirtyDomains.push("projects","tasks");
-    if (previous.clients!==clientList) dirtyDomains.push("clients","deliveries");
-    if (previous.financeEntries!==financeEntries) dirtyDomains.push("financeEntries");
-    if (previous.calendarEvents!==calendarEvents) dirtyDomains.push("events");
-    if (previous.activities!==activities) dirtyDomains.push("activities");
-    lastPersistedState.current={projects,clients:clientList,financeEntries,calendarEvents,activities};
-    const snapshotDomains=dirtyDomains.filter(name=>!commandDomains.current.has(name));
-    commandDomains.current.clear();
-    if (!isDemo) {
-      if (snapshotDomains.length) onWorkspaceChange?.(payload,snapshotDomains);
-      return;
-    }
+    if (!dataReady || !isDemo) return;
+    const payload={projects,clients:clientList,financeEntries,calendarEvents,
+      libraryAssets:libraryAssets.map(asset=>({...asset,preview:undefined})),
+      comments,reviewState,activities};
     try {
       localStorage.setItem(storageKey,JSON.stringify({...payload,monthlyRevenue}));
       setSaveStatus("Demonstração · salvo neste navegador");
     } catch {setSaveStatus("Falha ao salvar · exporte seus dados");}
-  },[projects,clientList,financeEntries,monthlyRevenue,calendarEvents,libraryAssets,comments,reviewState,activities,dataReady,onWorkspaceChange]);
+  },[projects,clientList,financeEntries,monthlyRevenue,calendarEvents,libraryAssets,comments,reviewState,activities,dataReady]);
 
   useEffect(() => {
     if (!dataReady) return;
