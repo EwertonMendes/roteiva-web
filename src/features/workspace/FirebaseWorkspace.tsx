@@ -20,6 +20,7 @@ export function FirebaseWorkspace() {
   const [loadingBusiness,setLoadingBusiness]=useState(false);
   const [overviewMetrics,setOverviewMetrics]=useState<Awaited<ReturnType<FirestoreWorkspace["overviewMetrics"]>>>();
   const [projectPage,setProjectPage]=useState<{total:number;hasMore:boolean;status:string}>();
+  const [clientPage,setClientPage]=useState<{total:number;recurring:number;hasMore:boolean}>();
   const [error,setError]=useState("");
   const [saving,setSaving]=useState(false);
   const [status,setStatus]=useState("Dados na nuvem");
@@ -35,7 +36,7 @@ export function FirebaseWorkspace() {
     let active=true;
     failed.current=false;
     setRemoteChanges(false);setSyncWarning("");
-    setError(""); setInitial(undefined);setBusinessLoaded(false);setOverviewMetrics(undefined);setProjectPage(undefined);
+    setError(""); setInitial(undefined);setBusinessLoaded(false);setOverviewMetrics(undefined);setProjectPage(undefined);setClientPage(undefined);
     (async()=>{
       const route=routeFromLocation(window.location,{base:import.meta.env.BASE_URL,useHash:false});
       const domains=domainsForRoute(route);
@@ -46,6 +47,10 @@ export function FirebaseWorkspace() {
             const size=route.view==="overview"?4:24;
             const page=await repository.projectPage({reset:true,size});
             return {workspace:page.workspace,page};
+          }
+          if(route.view==="clients" && !route.clientId){
+            const clients=await repository.clientPage({reset:true,size:24});
+            return {workspace:clients.workspace,clients};
           }
           return {workspace:domains.length ? await repository.load(domains) : emptyWorkspace()};
         })(),
@@ -58,6 +63,8 @@ export function FirebaseWorkspace() {
         if (stats) setOverviewMetrics(stats);
         if (workspaceState.page && route.view==="projects")
           setProjectPage({total:workspaceState.page.total,hasMore:workspaceState.page.hasMore,status:"Todos"});
+        if (workspaceState.clients)
+          setClientPage({total:workspaceState.clients.total,recurring:workspaceState.clients.recurring,hasMore:workspaceState.clients.hasMore});
         setInitial({workspace:workspaceState.workspace,theme:theme || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark":"light")});
       }
     })().catch(reason=>{if(active){failed.current=true;setError(dataErrorMessage(reason));}});
@@ -124,6 +131,27 @@ export function FirebaseWorkspace() {
       if(request===scopeRequest.current)setLoadingBusiness(false);
     }
   },[repository]);
+  const fetchClientPage=useCallback(async(reset:boolean)=>{
+    const request=++scopeRequest.current;
+    setLoadingBusiness(true);
+    try{
+      await queue.current;
+      if(failed.current)throw new Error("Conflito: há uma alteração não confirmada.");
+      await repository.load(["projects","activities"]);
+      const result=await repository.clientPage({reset,size:24});
+      if(request===scopeRequest.current){
+        setInitial(current=>current?{...current,workspace:result.workspace}:current);
+        setClientPage({total:result.total,recurring:result.recurring,hasMore:result.hasMore});
+      }
+    }catch(reason){
+      if(request===scopeRequest.current)setError(dataErrorMessage(reason));
+    }finally{
+      if(request===scopeRequest.current)setLoadingBusiness(false);
+    }
+  },[repository]);
+  const searchAllClients=useCallback(()=>{
+    void ensureDomains(["clients","projects","financeEntries","deliveries","activities"]).catch(()=>undefined);
+  },[ensureDomains]);
   const searchAllProjects=useCallback(()=>{
     void ensureDomains(["clients","projects","tasks","events","financeEntries","activities"]).catch(()=>undefined);
   },[ensureDomains]);
@@ -136,10 +164,14 @@ export function FirebaseWorkspace() {
       if(!projectPage || projectPage.status!=="Todos")void fetchProjectPage("Todos",true);
       return;
     }
+    if(route.view==="clients" && !route.clientId && !repository.hasLoaded(["clients"])){
+      if(!clientPage)void fetchClientPage(true);
+      return;
+    }
     const required=domainsForRoute(route);
     if (!required.length || repository.hasLoaded(required)) return;
     void ensureDomains(required).catch(()=>undefined);
-  },[repository,ensureDomains,overviewMetrics,projectPage,fetchProjectPage]);
+  },[repository,ensureDomains,overviewMetrics,projectPage,fetchProjectPage,clientPage,fetchClientPage]);
   useEffect(()=>{
     if (!saving) return;
     const warn=(event:BeforeUnloadEvent)=>{event.preventDefault();event.returnValue="";};
@@ -186,7 +218,10 @@ export function FirebaseWorkspace() {
         projectPage={repository.hasLoaded(["projects","tasks"])?undefined:projectPage}
         onMoreProjects={()=>void fetchProjectPage(projectPage?.status||"Todos",false)}
         onProjectStatus={(status)=>{if(!repository.hasLoaded(["projects","tasks"]))void fetchProjectPage(status,true);}}
-        onSearchProjects={searchAllProjects} onThemeChange={saveTheme}
+        onSearchProjects={searchAllProjects}
+        clientPage={repository.hasLoaded(["clients"])?undefined:clientPage}
+        onMoreClients={()=>void fetchClientPage(false)}
+        onSearchClients={searchAllClients} onThemeChange={saveTheme}
         overviewMetrics={overviewMetrics ? {
           clientCount:repository.hasLoaded(["clients"])?undefined:overviewMetrics.clientCount,
           receivableAmount:repository.hasLoaded(["financeEntries"])?undefined:overviewMetrics.receivableAmount,

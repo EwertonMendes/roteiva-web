@@ -20,7 +20,9 @@ export function domainsForRoute(route:WorkspaceRoute):readonly Domain[] {
         ? ["clients","projects","tasks","events","financeEntries","activities"]
         : ["clients","activities"];
     case "clients":
-      return ["clients","projects","financeEntries","deliveries","activities"];
+      return route.clientId
+        ? ["clients","projects","financeEntries","deliveries","activities"]
+        : ["projects","activities"];
     case "finance":
       return ["financeEntries","clients","projects","activities"];
     case "calendar":
