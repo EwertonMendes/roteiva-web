@@ -84,3 +84,30 @@ test("settings forms stay at 16px or larger on mobile",async({page},info)=>{
     expect(await helper.evaluate(e=>parseFloat(getComputedStyle(e).fontSize))).toBeGreaterThanOrEqual(14);
   }
 });
+
+test("sidebar logo always loads from site root on nested Firebase routes and in both themes",async({page},info)=>{
+  await enterWorkspace(page,"logo-base-"+info.project.name+"@example.com");
+  const logo=page.locator(".brand-lockup img");
+  await expect(logo).toHaveAttribute("src",/^\/roteiva-logo-(black|white)\.png$/);
+  await expect.poll(()=>logo.evaluate((img:HTMLImageElement)=>img.complete && img.naturalWidth>0)).toBe(true);
+  await page.goto(app+"/projetos/123");
+  await expect(page.locator(".app-shell")).toBeVisible();
+  await expect(logo).toHaveAttribute("src",/^\/roteiva-logo-(black|white)\.png$/);
+  await expect.poll(()=>logo.evaluate((img:HTMLImageElement)=>img.complete && img.naturalWidth>0)).toBe(true);
+  await page.reload();
+  await expect(logo).toHaveAttribute("src",/^\/roteiva-logo-(black|white)\.png$/);
+  await expect.poll(()=>logo.evaluate((img:HTMLImageElement)=>img.complete && img.naturalWidth>0)).toBe(true);
+  if(info.project.name==="desktop"){
+    await page.getByRole("button",{name:"Ativar modo escuro"}).click();
+    await expect(logo).toHaveAttribute("src","/roteiva-logo-white.png");
+    await expect.poll(()=>logo.evaluate((img:HTMLImageElement)=>img.complete && img.naturalWidth>0)).toBe(true);
+  }
+});
+
+test("GitHub Pages demo resolves logo under /roteiva-web/ instead of the browser root",async({page})=>{
+  await page.goto("http://127.0.0.1:4174/roteiva-web/#/projetos");
+  const logo=page.locator(".brand-lockup img");
+  await expect(logo).toBeVisible();
+  await expect(logo).toHaveAttribute("src",/^\/roteiva-web\/roteiva-logo-(black|white)\.png$/);
+  await expect.poll(()=>logo.evaluate((img:HTMLImageElement)=>img.complete && img.naturalWidth>0)).toBe(true);
+});
