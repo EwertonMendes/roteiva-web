@@ -1,7 +1,7 @@
-import { collection, doc, documentId, getDocFromServer, getDocsFromCache, getDocsFromServer, limit, orderBy, query, runTransaction, serverTimestamp, startAfter, type DocumentData, type Firestore, type QueryDocumentSnapshot } from "firebase/firestore";
+import { collection, doc, documentId, getDocFromServer, getDocsFromCache, getDocsFromServer, getCountFromServer, limit, orderBy, query, runTransaction, serverTimestamp, startAfter, type DocumentData, type Firestore, type QueryDocumentSnapshot } from "firebase/firestore";
 import { collections, decodeWorkspace, encodeWorkspace, equalData, type Data, type Records } from "./workspace-codec.ts";
 import type { WorkspaceData } from "../domain/workspace";
-import { advanceSync, bootstrapSync, clearManifest, parseSync, persistentCacheSelected, readManifest, readSync, recordCounts, saveManifest, syncRef, type Domain, type SyncStamp } from "./firestore-sync.ts";
+import { advanceSync, bootstrapSync, emptyNumbers, parseSync, persistentCacheSelected, readManifest, readSync, recordCounts, saveManifest, syncRef, type Domain, type SyncStamp } from "./firestore-sync.ts";
 import { FirestoreQueryGate } from "./firestore-query-gate.ts";
 
 export type ProfessionalType = "freelancer" | "studio" | "producer" | "other";
@@ -48,6 +48,9 @@ export class FirestoreWorkspace {
   private uid: string;
   private stamp: SyncStamp | null = null;
   private readonly gate = new FirestoreQueryGate();
+  private loadQueue:Promise<void>=Promise.resolve();
+  private readonly loadedDomains = new Set<Domain>();
+  hasLoaded(domains:readonly Domain[]):boolean { return domains.every(name=>this.loadedDomains.has(name)); }
   constructor(db: Firestore, uid: string) {
     if (!uid || uid.includes("/")) throw new Error("UID inválido.");
     this.db=db; this.uid=uid;
@@ -86,9 +89,9 @@ export class FirestoreWorkspace {
         !["freelancer","studio","producer","other"].includes(profile.professionalType) ||
         !profile.acknowledgedDataUse) throw new Error("Confira o cadastro e confirme o uso dos dados antes de continuar.");
     const ref = doc(this.db, "users", this.uid);
-    await runTransaction(this.db, async tx => {
+    const created=await runTransaction(this.db, async tx => {
       const current = await tx.get(ref);
-      if (current.exists()) return; // Safe when two tabs submit at once. Never overwrite legacy users.
+      if (current.exists()) return false; // Never overwrite a legacy registration.
       tx.set(ref, {
         displayName, email: profile.email, photoURL: profile.photoURL,
         studioName, professionalType: profile.professionalType,
@@ -97,7 +100,9 @@ export class FirestoreWorkspace {
         ownerUid: this.uid, schemaVersion: 1, revision: 1,
         createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
       });
+      return true;
     });
+    if (created) await bootstrapSync(this.db,this.uid,emptyNumbers());
   }
   private async readCollection(name: Domain, source: "server" | "cache"): Promise<Map<string, Stored>> {
     const result = new Map<string, Stored>();
@@ -116,47 +121,79 @@ export class FirestoreWorkspace {
     return result;
   }
 
-  /** Reuse only COMPLETE persistent queries with an unchanged server revision.
-   * A missing IndexedDB page, missing manifest or incompatible counts always uses the server.
+  /** Serializes distinct route loads and deduplicates identical requests, so
+   * navigation cannot replace a newer, wider snapshot with an older one.
    */
-  async load(): Promise<WorkspaceData> {
-    return this.gate.run("workspace", async () => {
-      for (let attempt = 0; attempt < 3; attempt++) {
-        const before = await readSync(this.db, this.uid);
-        const manifest = readManifest(this.uid);
-        const groups = await Promise.all(collections.map(async name => {
-          const cacheValid = before && manifest?.domains[name] === before.domains[name] && persistentCacheSelected();
-          if (cacheValid) {
-            try {
-              const cached = await this.readCollection(name, "cache");
-              if (cached.size === before.counts[name]) return cached;
-            } catch { /* Cache missing or evicted. A fresh server query is mandatory. */ }
-          }
-          return this.readCollection(name, "server");
-        }));
-        const next = new Map<string, Stored>();
-        for (const group of groups) for (const [key,value] of group) next.set(key,value);
-        const after = before ? await readSync(this.db,this.uid)
-          : await bootstrapSync(this.db,this.uid,recordCounts(next));
-        if (!after) continue;
-        if (before && (before.revision !== after.revision ||
-          collections.some(name => before.domains[name] !== after.domains[name]))) continue;
-        // First bootstrap may have raced with a mutation in another tab.
-        if (!before && collections.some(name => after.domains[name] !== 0)) continue;
-        if (collections.some(name => recordCounts(next)[name] !== after.counts[name])) continue;
-        this.stored = next;
-        this.stamp = after;
-        saveManifest(this.uid, after.domains);
-        return decodeWorkspace(new Map([...next].map(([key,value]) => [key,value.data])));
-      }
-      throw new Error("Conflito: os dados mudaram durante o carregamento. Tente novamente.");
+  async load(requested: readonly Domain[] = collections): Promise<WorkspaceData> {
+    const names=[...new Set(requested)].sort() as Domain[];
+    if (!names.length) return this.decoded();
+    return this.gate.run(names.join(":"),async()=>{
+      const previous=this.loadQueue;
+      let release!:()=>void;
+      this.loadQueue=new Promise<void>(resolve=>{release=resolve;});
+      await previous;
+      try {return await this.loadDomains(names);}
+      finally {release();}
     });
+  }
+  private decoded(): WorkspaceData {
+    return decodeWorkspace(new Map([...this.stored].map(([key,value])=>[key,value.data])));
+  }
+  private async ensureSync():Promise<SyncStamp> {
+    const existing=await readSync(this.db,this.uid);
+    if (existing) return existing;
+    // Migrate existing pre-revision accounts without downloading entire histories.
+    const counts=emptyNumbers();
+    await Promise.all(collections.map(async name=>{
+      const aggregate=await getCountFromServer(collection(this.db,"users",this.uid,name));
+      counts[name]=aggregate.data().count;
+    }));
+    return bootstrapSync(this.db,this.uid,counts);
+  }
+  private async loadDomains(names:readonly Domain[]):Promise<WorkspaceData> {
+    for (let attempt=0;attempt<3;attempt++) {
+      const before=await this.ensureSync();
+      const required=names.filter(name=>!this.loadedDomains.has(name) ||
+        !this.stamp || this.stamp.domains[name]!==before.domains[name]);
+      if (!required.length) return this.decoded();
+      const manifest=readManifest(this.uid);
+      const groups=await Promise.all(required.map(async name=>{
+        const useCache=manifest?.domains[name]===before.domains[name] && persistentCacheSelected();
+        if (useCache) {
+          try {
+            const fromCache=await this.readCollection(name,"cache");
+            if (fromCache.size===before.counts[name]) return {name,records:fromCache};
+          } catch { /* Cache unavailable or evicted: fetch a complete page sequence. */ }
+        }
+        return {name,records:await this.readCollection(name,"server")};
+      }));
+      const after=await readSync(this.db,this.uid);
+      if (!after || before.revision!==after.revision ||
+          collections.some(name=>before.domains[name]!==after.domains[name])) continue;
+      if (groups.some(group=>group.records.size!==after.counts[group.name])) continue;
+      const next=new Map(this.stored);
+      for (const name of required) {
+        for (const key of next.keys()) if(key.startsWith(name+"/"))next.delete(key);
+      }
+      for (const group of groups)for(const [key,value] of group.records)next.set(key,value);
+      const known={...after.domains};
+      for (const name of collections) {
+        if (this.loadedDomains.has(name) && !required.includes(name) && this.stamp)
+          known[name]=this.stamp.domains[name];
+      }
+      this.stored=next;
+      this.stamp={...after,domains:known};
+      for(const name of required)this.loadedDomains.add(name);
+      saveManifest(this.uid,known);
+      return this.decoded();
+    }
+    throw new Error("Conflito: os dados mudaram durante o carregamento. Tente novamente.");
   }
 
   async hasExternalChanges(): Promise<boolean> {
     if (!this.stamp) return false;
-    const current = await readSync(this.db, this.uid);
-    return !current || collections.some(name => this.stamp!.domains[name] !== current.domains[name]);
+    const current=await readSync(this.db,this.uid);
+    return !current || [...this.loadedDomains].some(name=>this.stamp!.domains[name]!==current.domains[name]);
   }
 
   async loadTheme(): Promise<"light"|"dark"|undefined> {
