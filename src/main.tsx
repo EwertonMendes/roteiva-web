@@ -15,6 +15,7 @@ import "./site-experience.css";
 import "./demo.css";
 import "./features/auth/auth.css";
 import "./features/settings/settings.css";
+import "./features/typography/font-lab.css";
 
 class AppErrorBoundary extends Component<{children:ReactNode},{error:string}> {
   state={error:""};
