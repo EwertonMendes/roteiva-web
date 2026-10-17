@@ -73,3 +73,6 @@ A mesma aplicação na demonstração GitHub Pages usa rotas em `#/...` sob `/ro
 - [Instruções permanentes](AGENTS.md)
 
 O projeto permanece no **Spark**. Franquias têm limites; nenhuma habilitação de Blaze ou serviço pago faz parte desta entrega.
+
+
+**Economia de consultas (PR #13, em validação):** a rota atual controla quais domínios são necessários; navegar para outra tela carrega apenas os domínios ainda ausentes. Configurações e Biblioteca não precisam ler clientes/projetos no primeiro acesso. A exportação JSON sempre busca o conjunto completo antes de gerar a cópia. A codificação para salvar restringe o diff aos domínios efetivamente alterados; as consultas ainda leem domínios completos, sem paginação visível por lista.
