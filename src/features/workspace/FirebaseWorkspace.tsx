@@ -181,6 +181,8 @@ export function FirebaseWorkspace() {
     {initial && (overviewMetrics || routeFromLocation(window.location,{base:import.meta.env.BASE_URL,useHash:false}).view!=="overview") && <div inert={!!error || remoteChanges || loadingBusiness} aria-busy={saving}>
       <DashboardClient key={user.uid+"-"+version} firstName={profileContext?.profile.displayName || user.displayName || "Profissional"} profile={profileContext?.profile || null} onSaveProfile={profileContext?.saveProfile} email={user.email || ""} photoURL={user.photoURL || undefined}
         initialWorkspace={initial.workspace} initialTheme={initial.theme} onCommands={businessLoaded ? executeCommands : undefined} onLoadWorkspace={repository.hasLoaded(collections) ? undefined : ensureFullWorkspace} onRouteChange={onRouteChange}
+        canValidateProjectLink={repository.hasLoaded(domainsForRoute({view:"projects",projectId:1}))}
+        canValidateClientLink={repository.hasLoaded(domainsForRoute({view:"clients",clientId:1}))}
         projectPage={repository.hasLoaded(["projects","tasks"])?undefined:projectPage}
         onMoreProjects={()=>void fetchProjectPage(projectPage?.status||"Todos",false)}
         onProjectStatus={(status)=>{if(!repository.hasLoaded(["projects","tasks"]))void fetchProjectPage(status,true);}}

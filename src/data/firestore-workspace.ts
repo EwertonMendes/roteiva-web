@@ -54,6 +54,7 @@ export class FirestoreWorkspace {
   private readonly loadedDomains = new Set<Domain>();
   private readonly projectCursors=new Map<string,QueryDocumentSnapshot<DocumentData>|null>();
   private readonly pagedDomains=new Set<Domain>();
+  private readonly filteredProjectCounts=new Map<string,{revision:number;count:number}>();
   hasLoaded(domains:readonly Domain[]):boolean { return domains.every(name=>this.loadedDomains.has(name)); }
   constructor(db: Firestore, uid: string) {
     if (!uid || uid.includes("/")) throw new Error("UID inválido.");
@@ -254,9 +255,14 @@ export class FirestoreWorkspace {
     }
     let total=before.counts.projects;
     if(status){
-      const aggregate=await getCountFromServer(query(base,where("status","==",status)));
-      trackAggregation(this.uid);
-      total=aggregate.data().count;
+      const storedCount=this.filteredProjectCounts.get(status);
+      if(storedCount?.revision===before.domains.projects)total=storedCount.count;
+      else {
+        const aggregate=await getCountFromServer(query(base,where("status","==",status)));
+        trackAggregation(this.uid);
+        total=aggregate.data().count;
+        this.filteredProjectCounts.set(status,{revision:before.domains.projects,count:total});
+      }
     }
     trackRevision(this.uid);
     const after=await readSync(this.db,this.uid);

@@ -59,9 +59,9 @@ type DashboardProps = {
   onCommands?:(commands:readonly WorkspaceCommand[])=>void;
   overviewMetrics?:{clientCount?:number;receivableAmount?:number;projectCount?:number;projectStatuses?:Record<Status,number>}; projectPage?:{total:number;hasMore:boolean;status:string};
   onMoreProjects?:()=>void;onProjectStatus?:(status:Status|"Todos")=>void;
-  onSearchProjects?:()=>void; cloudStatus?:string; saving?:boolean; onLogout?:()=>void;
+  onSearchProjects?:()=>void; canValidateProjectLink?:boolean;canValidateClientLink?:boolean; cloudStatus?:string; saving?:boolean; onLogout?:()=>void;
 };
-export default function DashboardClient({ firstName, email, photoURL, profile, onSaveProfile, initialWorkspace, initialTheme, onThemeChange, onLoadWorkspace, onRouteChange, onCommands, overviewMetrics, projectPage, onMoreProjects, onProjectStatus, onSearchProjects, cloudStatus, saving, onLogout }: DashboardProps) {
+export default function DashboardClient({ firstName, email, photoURL, profile, onSaveProfile, initialWorkspace, initialTheme, onThemeChange, onLoadWorkspace, onRouteChange, onCommands, overviewMetrics, projectPage, onMoreProjects, onProjectStatus, onSearchProjects, canValidateProjectLink, canValidateClientLink, cloudStatus, saving, onLogout }: DashboardProps) {
   const routeEnvironment={base:import.meta.env.BASE_URL,useHash:isDemo};
   const initialRoute=()=>routeFromLocation(window.location,routeEnvironment);
   const [initialBrowserRoute]=useState<WorkspaceRoute>(initialRoute);
@@ -433,9 +433,9 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
   useEffect(()=>{
     if(!dataReady)return;
     const route=routeFromLocation(window.location,routeEnvironment);
-    if(route.projectId && !projects.some(p=>p.id===route.projectId))navigateRoute({view:"projects"},{replace:true});
-    if(route.clientId && !clientList.some(c=>c.id===route.clientId))navigateRoute({view:"clients"},{replace:true});
-  },[dataReady,projects,clientList]);
+    if(route.projectId && (isDemo||canValidateProjectLink) && !projects.some(p=>p.id===route.projectId))navigateRoute({view:"projects"},{replace:true});
+    if(route.clientId && (isDemo||canValidateClientLink) && !clientList.some(c=>c.id===route.clientId))navigateRoute({view:"clients"},{replace:true});
+  },[dataReady,projects,clientList,canValidateProjectLink,canValidateClientLink]);
 
   const pageTitles: Record<View, [string, string]> = {
     overview: [`Olá, ${firstName}.`, "Aqui está o ritmo da sua produção hoje."],
