@@ -16,6 +16,7 @@ import "./demo.css";
 import "./features/auth/auth.css";
 import "./features/settings/settings.css";
 import "./features/typography/font-lab.css";
+import "./typography.css";
 
 class AppErrorBoundary extends Component<{children:ReactNode},{error:string}> {
   state={error:""};
