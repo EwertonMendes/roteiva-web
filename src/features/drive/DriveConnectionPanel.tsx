@@ -61,6 +61,7 @@ export function DriveConnectionPanel({
   const [folderBusy,setFolderBusy]=useState(false);
   const [viewing,setViewing]=useState<DriveFolderLink|null>(null);
   const [files,setFiles]=useState<Item[]>([]);
+  const [viewPath,setViewPath]=useState<Trail[]>([]);
   const [filePage,setFilePage]=useState<string|null>(null);
   const [fileBusy,setFileBusy]=useState(false);
   const [preview,setPreview]=useState<Item|null>(null);
@@ -163,7 +164,6 @@ export function DriveConnectionPanel({
     if(!connection){await connect(selectedProjectId);return;}
     setPicker(true);setFolderList([]);
     setTrail([{id:"root",name:"Meu Drive"}]);setRootMode("root");
-    void browse("root",[{id:"root",name:"Meu Drive"}],null,false,"root");
   }
 
   useEffect(()=>{
@@ -200,12 +200,12 @@ export function DriveConnectionPanel({
     finally{setBusy(false);}
   }
 
-  async function openFiles(link:DriveFolderLink,token?:string|null,append=false){
+  async function openFiles(link:DriveFolderLink,token?:string|null,append=false,folderId=link.folderId,nextPath:Trail[]=[{id:link.folderId,name:link.folderName}]){
     setFileBusy(true);setError("");
     try{
       const qs=token?"?pageToken="+encodeURIComponent(token):"";
-      const data=await call<FilePage>("/integrations/drive/"+encodeURIComponent(link.connectionId)+"/folders/"+encodeURIComponent(link.folderId)+"/items"+qs);
-      setViewing(link);
+      const data=await call<FilePage>("/integrations/drive/"+encodeURIComponent(link.connectionId)+"/folders/"+encodeURIComponent(folderId)+"/items"+qs);
+      setViewing(link);setViewPath(nextPath);
       setFiles(old=>append?[...old,...data.files]:data.files);
       setFilePage(data.nextPageToken);
       if(data.incompleteSearch)setResult("O Google informou que a busca pode estar incompleta.");
@@ -271,7 +271,13 @@ export function DriveConnectionPanel({
       </div>
       {viewing && <div className="panel" style={{marginTop:16,padding:16}}>
         <div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"center",flexWrap:"wrap"}}>
-          <h3 style={{fontSize:15,display:"flex",gap:8,alignItems:"center"}}><FolderOpen size={18}/>{viewing.folderName}</h3>
+          <nav aria-label="Pastas da biblioteca" style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+            <FolderOpen size={18}/>
+            {viewPath.map((node,i)=><span key={node.id} style={{display:"inline-flex",gap:4,alignItems:"center"}}>
+              {i>0&&<ChevronRight size={13}/>}
+              <button className="secondary-button" onClick={()=>void openFiles(viewing,null,false,node.id,viewPath.slice(0,i+1))}>{node.name}</button>
+            </span>)}
+          </nav>
           <button className="secondary-button" onClick={()=>setViewing(null)}>Fechar</button>
         </div>
         {fileBusy && <p role="status">Carregando arquivos…</p>}
@@ -284,12 +290,13 @@ export function DriveConnectionPanel({
             </div>
             {file.mimeType!==FOLDER && !file.mimeType.startsWith("application/vnd.google-apps.") &&
               <button className="secondary-button" onClick={()=>setPreview(file)}>Prévia</button>}
+            {file.mimeType===FOLDER&&<button className="secondary-button" onClick={()=>void openFiles(viewing,null,false,file.id,[...viewPath,{id:file.id,name:file.name}])}>Abrir pasta</button>}
             <a className="secondary-button" target="_blank" rel="noreferrer" href={file.webViewLink||"https://drive.google.com/file/d/"+encodeURIComponent(file.id)+"/view"}>
               <ExternalLink size={14}/> Drive
             </a>
           </div>;})}
         </div>
-        {filePage && <button className="secondary-button" disabled={fileBusy} onClick={()=>void openFiles(viewing,filePage,true)}>Carregar mais arquivos</button>}
+        {filePage && <button className="secondary-button" disabled={fileBusy} onClick={()=>void openFiles(viewing,filePage,true,viewPath[viewPath.length-1]?.id||viewing.folderId,viewPath)}>Carregar mais arquivos</button>}
         <small style={{opacity:.7}}>Arquivos originais mantidos no Google Drive. Prévia incorporada depende das permissões e do navegador.</small>
       </div>}
     </>}
