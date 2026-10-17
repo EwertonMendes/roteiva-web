@@ -394,11 +394,42 @@ test("calendar windows include adjacent grid months, exclude distant history",as
   }
   const repo=new FirestoreWorkspace(db,"alice");
   const first=await repo.calendarWindow(2026,9);
-  assert.deepEqual(first.calendarEvents.map(e=>e.id).sort(),[202,203,204]);
+  assert.deepEqual(first.calendarEvents.map(e=>e.id).sort(),[202,203,204,205]);
   assert.equal(repo.hasLoaded(["events"]),false);
   const again=await repo.calendarWindow(2026,9);
-  assert.equal(again.calendarEvents.length,3);
+  assert.equal(again.calendarEvents.length,4);
   const shifted=await repo.calendarWindow(2026,10);
   assert.deepEqual(shifted.calendarEvents.map(e=>e.id).sort(),[202,203,204,205]);
   await assert.rejects(()=>repo.calendarWindow(2026,12),/inválido/);
+});
+
+
+test("financial month reads only requested month, and annual bars respect year and client",async()=>{
+  const db=dbFor("alice");
+  for(const [id,date,clientId,kind,amountCents] of [
+    [301,"2025-10-11",1,"income",99900],
+    [302,"2026-01-11",1,"income",10001],
+    [303,"2026-10-12",1,"income",20050],
+    [304,"2026-10-15",2,"income",5000],
+    [305,"2026-10-17",1,"expense",700],
+  ]){
+    await assertSucceeds(setDoc(doc(db,"users/alice/financeEntries/"+id),
+      {...fixtures.financeEntries,id,date,clientId,kind,amountCents,...meta("alice")}));
+  }
+  const repo=new FirestoreWorkspace(db,"alice");
+  const baseline=repo.diagnostics().serverDocumentsReturned;
+  const month=await repo.financeMonth(2026,9);
+  assert.deepEqual(month.financeEntries.map(x=>x.id).sort(),[303,304,305]);
+  assert.equal(repo.diagnostics().serverDocumentsReturned-baseline,3);
+  assert.equal(repo.hasLoaded(["financeEntries"]),false);
+  const all=await repo.financeYearBars(2026);
+  assert.equal(all[0],100.01);
+  assert.equal(all[9],250.5);
+  assert.equal(all.reduce((a,b)=>a+b,0),350.51);
+  const filtered=await repo.financeYearBars(2026,1);
+  assert.equal(filtered[9],200.5);
+  assert.equal(filtered[0],100.01);
+  const other=await repo.financeMonth(2025,9);
+  assert.equal(other.financeEntries.some(e=>e.id===301),true);
+  assert.equal((await repo.load(["financeEntries"])).financeEntries.length,5);
 });
