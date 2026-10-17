@@ -263,3 +263,30 @@ test("overview aggregates client count and receivables without fetching finance 
   assert.equal(repository.hasLoaded(["clients"]),false);
   assert.equal(repository.hasLoaded(["financeEntries"]),false);
 });
+
+test("typed commands preserve counts, reject duplicates, and detect concurrent edits",async()=>{
+  const db=dbFor("alice");
+  const owner=new FirestoreWorkspace(db,"alice");
+  const rival=new FirestoreWorkspace(db,"alice");
+  const before=await owner.load(["clients","projects","financeEntries"]);
+  await rival.load(["clients","projects","financeEntries"]);
+  const entry={
+    id:103,clientId:1,projectId:2,project:"Projeto",client:"Cliente",
+    kind:"income",amount:83.25,date:"17/10/2026",status:"A receber",
+  };
+  assert.equal(await owner.applyCommands([{kind:"saveFinance",entry}]),true);
+  assert.equal(await owner.applyCommands([{kind:"saveFinance",entry}]),false);
+  assert.equal((await getDoc(doc(db,"users/alice/financeEntries/103"))).data().amountCents,8325);
+  let revision=(await getDoc(doc(db,"users/alice/sync/state"))).data();
+  assert.equal(revision.counts.financeEntries,1);
+  assert.equal(await owner.applyCommands([{kind:"saveFinance",entry:{...entry,amount:84}}]),true);
+  revision=(await getDoc(doc(db,"users/alice/sync/state"))).data();
+  assert.equal(revision.counts.financeEntries,1);
+  await assert.rejects(()=>rival.applyCommands([{kind:"saveFinance",entry:{...entry,amount:40}}]),/Conflito/);
+  assert.equal(await owner.applyCommands([{kind:"deleteFinance",id:103}]),true);
+  revision=(await getDoc(doc(db,"users/alice/sync/state"))).data();
+  assert.equal(revision.counts.financeEntries,0);
+  assert.equal((await getDoc(doc(db,"users/alice/clients/1"))).exists(),true);
+  assert.equal((await getDoc(doc(db,"users/alice/projects/2"))).exists(),true);
+  assert.equal(before.clients.length,1);
+});
