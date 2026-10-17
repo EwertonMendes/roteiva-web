@@ -82,9 +82,7 @@
 .auth-account-note strong {font-size:13px;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .auth-account-note div>span {font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .auth-account-check {flex:none;background:#d5e7ad;border-radius:50%;width:26px;height:26px;color:#191919;display:grid;place-items:center;}
-.auth-information {padding:19px 20px;border-left:3px solid #afc87c;background:color-mix(in srgb,var(--card) 80%,transparent);margin-bottom:26px;}
-.auth-information strong {font-size:13px;}
-.auth-information p {color:var(--muted);font-size:12px;line-height:1.7;margin:8px 0 0;}
+.auth-invitation {margin:2px 0 30px;padding:5px 12px 5px 20px;border-left:2px solid #afc87c;color:var(--ink);max-width:460px;font-size:clamp(15px,1.2vw,17px);font-weight:500;line-height:1.65;letter-spacing:-.014em;}
 .auth-primary {width:100%;min-height:54px;gap:12px;justify-content:space-between;border:0;border-radius:12px;background:var(--ink);color:var(--card);padding:14px 18px;font-size:13px;font-weight:700;transition:transform .15s ease,opacity .15s ease;}
 .auth-row-actions {display:flex;align-items:center;gap:16px;}
 .auth-row-actions .auth-primary {width:auto;}

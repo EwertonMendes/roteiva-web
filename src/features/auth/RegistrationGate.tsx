@@ -60,7 +60,7 @@ export function RegistrationGate({children}: {children: ReactNode}) {
       {user.photoURL?<img src={user.photoURL} alt="" referrerPolicy="no-referrer"/>:<span className="auth-avatar-fallback">{user.displayName?.slice(0,1)||"R"}</span>}
       <div><strong>{user.displayName||"Conta Google"}</strong><span>{user.email}</span></div>
     </div>
-    <div className="auth-information"><strong>Nenhuma conta foi criada no Roteiva.</strong><p>Se quiser começar, vamos cadastrar seu perfil e preparar um espaço privado. Você pode sair sem criar nada.</p></div>
+    <p className="auth-invitation">Se quiser começar, vamos cadastrar seu perfil e preparar um espaço privado.</p>
     <button className="auth-primary" type="button" onClick={()=>setShowForm(true)}>Criar meu espaço <ArrowRight size={17}/></button>
     <button className="auth-link" type="button" onClick={()=>void logout()} disabled={busy}>Voltar e usar outra conta</button>
   </AuthLayout>;
