@@ -102,9 +102,17 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
   const workspace = { projects, clients: clientList, financeEntries, monthlyRevenue, calendarEvents, libraryAssets: libraryAssets.map((asset) => ({ ...asset, preview: undefined })), comments, reviewState, activities };
   function logActivity(text: string) { setActivities(current => [{id:crypto.randomUUID(),text, when: new Date().toISOString()}, ...current].slice(0, 150)); }
   const restoreWorkspace = useCallback((data: Partial<WorkspaceData>) => {
-    setProjects(data.projects || []); setClientList(data.clients || []); setFinanceEntries(data.financeEntries || []);
-    setCalendarEvents(data.calendarEvents || []);
-    setLibraryAssets(data.libraryAssets || []); setComments(data.comments || []); setReviewState(data.reviewState || "pending"); setActivities(data.activities || []);
+    const next={
+      projects:data.projects || [],clients:data.clients || [],financeEntries:data.financeEntries || [],
+      calendarEvents:data.calendarEvents || [],activities:data.activities || [],
+    };
+    // Hydration is not a user mutation. Without resetting the comparison anchor,
+    // loading one more domain could delete records that were not loaded before.
+    lastPersistedState.current=next;
+    setProjects(next.projects);setClientList(next.clients);setFinanceEntries(next.financeEntries);
+    setCalendarEvents(next.calendarEvents);
+    setLibraryAssets(data.libraryAssets || []);setComments(data.comments || []);
+    setReviewState(data.reviewState || "pending");setActivities(next.activities);
   }, []);
   function openEvent(entry: CalendarEvent | null = null, date = "") {
     setEditingEvent(entry); setEventDate(date); setEventError("");
