@@ -55,6 +55,8 @@ export class FirestoreWorkspace {
   private readonly projectCursors=new Map<string,QueryDocumentSnapshot<DocumentData>|null>();
   private readonly pagedDomains=new Set<Domain>();
   private readonly filteredProjectCounts=new Map<string,{revision:number;count:number}>();
+  private clientCursor:QueryDocumentSnapshot<DocumentData>|null|undefined;
+  private recurringCount:{revision:number;count:number}|undefined;
   hasLoaded(domains:readonly Domain[]):boolean { return domains.every(name=>this.loadedDomains.has(name)); }
   constructor(db: Firestore, uid: string) {
     if (!uid || uid.includes("/")) throw new Error("UID inválido.");
@@ -197,6 +199,70 @@ export class FirestoreWorkspace {
       return this.decoded();
     }
     throw new Error("Conflito: os dados mudaram durante o carregamento. Tente novamente.");
+  }
+
+  /**
+   * A bounded client directory. Linked project counters stay accurate because
+   * the clients route loads the projects domain separately; delivery history
+   * is loaded only on client detail, not on every client list row.
+   */
+  async clientPage(options:{reset?:boolean;size?:number}={}):
+    Promise<{workspace:WorkspaceData;total:number;recurring:number;hasMore:boolean}>{
+    const previous=this.loadQueue;
+    let release!:()=>void;
+    this.loadQueue=new Promise<void>(resolve=>{release=resolve;});
+    await previous;
+    try{return await this.readClientPage(options);}
+    finally{release();}
+  }
+  private async readClientPage(options:{reset?:boolean;size?:number}):
+    Promise<{workspace:WorkspaceData;total:number;recurring:number;hasMore:boolean}>{
+    if(this.loadedDomains.has("clients")){
+      const workspace=this.decoded();
+      return {workspace,total:workspace.clients.length,
+        recurring:workspace.clients.filter(c=>c.type==="Recorrente").length,hasMore:false};
+    }
+    if(options.reset)this.clientCursor=undefined;
+    if(this.clientCursor===null && !options.reset){
+      const workspace=this.decoded();
+      return {workspace,total:this.stamp?.counts.clients??workspace.clients.length,
+        recurring:this.recurringCount?.count??workspace.clients.filter(c=>c.type==="Recorrente").length,
+        hasMore:false};
+    }
+    const size=Math.max(1,Math.min(30,options.size||24));
+    const before=await this.ensureSync();
+    const base=collection(this.db,"users",this.uid,"clients");
+    const q=query(base,orderBy("createdAt","desc"),orderBy(documentId(),"desc"),
+      ...(this.clientCursor?[startAfter(this.clientCursor)]:[]),limit(size+1));
+    const page=await getDocsFromServer(q);
+    trackPage(this.uid,"server",page.size);
+    const docs=page.docs.slice(0,size);
+    const groups=new Map<string,Stored>();
+    for(const record of docs){
+      const {ownerUid:_owner,schemaVersion:_schema,revision,createdAt:_created,updatedAt:_updated,...data}=record.data();
+      groups.set("clients/"+record.id,{data:data as Data,revision});
+    }
+    let recurring=this.recurringCount?.count;
+    if(this.recurringCount?.revision!==before.domains.clients){
+      const result=await getCountFromServer(query(base,where("type","==","Recorrente")));
+      trackAggregation(this.uid);
+      recurring=result.data().count;
+      this.recurringCount={revision:before.domains.clients,count:recurring};
+    }
+    trackRevision(this.uid);
+    const after=await readSync(this.db,this.uid);
+    if(!after || after.domains.clients!==before.domains.clients)
+      throw new Error("Conflito: os clientes mudaram durante a paginação. Recarregue a lista.");
+    if(options.reset){
+      for(const key of this.stored.keys())if(key.startsWith("clients/"))this.stored.delete(key);
+    }
+    for(const [key,data] of groups)this.stored.set(key,data);
+    this.pagedDomains.add("clients");
+    this.stamp={...after,domains:{...(this.stamp?.domains||after.domains),
+      clients:after.domains.clients}};
+    const hasMore=page.docs.length>size;
+    this.clientCursor=hasMore?docs[docs.length-1]:null;
+    return {workspace:this.decoded(),total:after.counts.clients,recurring:recurring||0,hasMore};
   }
 
   /**
