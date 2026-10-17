@@ -226,3 +226,24 @@ test("domain-scoped writes preserve untouched collections and their revisions",a
   assert.equal(stamp.domains.financeEntries,2);
   assert.equal(await repository.save(state,["financeEntries"]),false);
 });
+
+test("legacy account migrates counts and reads only requested workspace domains",async()=>{
+  const db=dbFor("alice");
+  const repository=new FirestoreWorkspace(db,"alice");
+  const clients=await repository.load(["clients"]);
+  assert.equal(repository.hasLoaded(["clients"]),true);
+  assert.equal(repository.hasLoaded(["projects"]),false);
+  assert.equal(clients.clients.length,1);
+  assert.equal(clients.projects.length,0);
+  const revised={...clients,clients:clients.clients.map(c=>({...c,contact:"Contato otimizado"}))};
+  await repository.save(revised,["clients"]);
+  assert.equal((await getDoc(doc(db,"users/alice/projects/2"))).exists(),true);
+  const both=await repository.load(["projects"]);
+  assert.equal(both.clients[0].contact,"Contato otimizado");
+  assert.equal(both.projects.length,1);
+  const stamp=(await getDoc(doc(db,"users/alice/sync/state"))).data();
+  assert.equal(stamp.counts.clients,1);
+  assert.equal(stamp.counts.projects,1);
+  assert.equal(stamp.domains.clients,1);
+  assert.equal(stamp.domains.projects,0);
+});
