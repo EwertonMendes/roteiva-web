@@ -1,0 +1,206 @@
+/*
+ * Roteiva typography system (DEV rollout).
+ * All scale values use rem so user browser font preferences and zoom work.
+ * Keep this layer AFTER legacy CSS and BEFORE/AFTER the temporary font lab:
+ * the lab changes font-family only, never font-size.
+ */
+:root {
+  --type-caption: 0.8125rem;  /* 13px at user default 16px */
+  --type-support: 0.875rem;   /* 14px */
+  --type-label: 0.9375rem;    /* 15px */
+  --type-body: 1rem;         /* 16px */
+  --type-card: 1.125rem;     /* 18px */
+  --type-section: 1.375rem;  /* 22px */
+  --type-page: 2rem;        /* 32px */
+
+  --type-leading-tight: 1.2;
+  --type-leading-ui: 1.4;
+  --type-leading-body: 1.55;
+  --type-leading-meta: 1.45;
+
+  --type-weight-regular: 400;
+  --type-weight-medium: 500;
+  --type-weight-semibold: 600;
+  --type-weight-bold: 700;
+  --type-family: Ubuntu, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+html { text-size-adjust: 100%; -webkit-text-size-adjust: 100%; }
+body {
+  font-family: var(--type-family);
+  font-size: var(--type-body);
+  line-height: var(--type-leading-body);
+}
+/* Respect form controls' native focus/keyboard behavior. */
+button,input,select,textarea { font-family: inherit; }
+input,select,textarea { font-size: var(--type-body); line-height: var(--type-leading-ui); }
+input::placeholder,textarea::placeholder { opacity: 1; }
+button { line-height: var(--type-leading-ui); }
+button, [role="button"] { touch-action: manipulation; }
+
+/* Actual UI hierarchy — overrides old per-screen values without !important. */
+.app-shell .page-heading h1 { font-size: clamp(1.75rem,2vw + 1rem,2.25rem); line-height: var(--type-leading-tight); letter-spacing: -.035em; }
+.app-shell .page-heading p { font-size: var(--type-body); line-height: var(--type-leading-body); font-weight: var(--type-weight-regular); }
+.app-shell .panel-head h2,
+.app-shell .studio-section h2,
+.app-shell .flow-overview-head h2 { font-size: var(--type-section); line-height: var(--type-leading-tight); }
+.app-shell .project-card h3,
+.app-shell .comments-head h2,
+.app-shell .settings-section-head h3 { font-size: var(--type-card); line-height: var(--type-leading-tight); }
+.app-shell .eyebrow,
+.app-shell .nav-label,
+.app-shell .page-heading > div > span,
+.app-shell .panel-head > div > span,
+.app-shell .comments-head > div > span,
+.app-shell .client-summary span {
+  font-size: var(--type-caption);
+  font-weight: var(--type-weight-semibold);
+  letter-spacing: .045em;
+  line-height: var(--type-leading-meta);
+  text-transform: none;
+}
+.app-shell .sidebar nav > button,
+.app-shell .mobile-bottom-nav button,
+.app-shell .workspace-switch b,
+.app-shell .filter-pills button { font-size: var(--type-label); line-height: var(--type-leading-ui); }
+.app-shell .primary-button,
+.app-shell .secondary-button,
+.app-shell .heading-actions > .primary-button,
+.app-shell .heading-actions .workspace-tools .secondary-button {
+  font-size: var(--type-label);
+  line-height: var(--type-leading-ui);
+  font-weight: var(--type-weight-medium);
+  min-height: 2.75rem;
+}
+.app-shell .topbar .global-search input { font-size: var(--type-body); }
+.app-shell .global-search,
+.app-shell .sidebar nav > button { min-height: 2.75rem; }
+.app-shell .page-heading > div,
+.app-shell .project-name,
+.app-shell .project-card-copy,
+.app-shell .asset-copy,
+.app-shell .client-contact-meta,
+.app-shell .panel-head > div { min-width: 0; }
+.app-shell .project-name b,
+.app-shell .client-list button > div b,
+.app-shell .asset-copy b { font-size: var(--type-body); font-weight: var(--type-weight-semibold); line-height: var(--type-leading-ui); }
+.app-shell .project-name small,
+.app-shell .project-card-copy p,
+.app-shell .asset-copy small,
+.app-shell .asset-copy > span,
+.app-shell .comment header small { font-size: var(--type-support); line-height: var(--type-leading-meta); }
+.app-shell .comment p,
+.app-shell .activity-list p,
+.app-shell .flow-next p,
+.app-shell .studio-activity p { font-size: var(--type-body); line-height: var(--type-leading-body); overflow-wrap: anywhere; }
+.app-shell .comment-compose textarea { font-size: var(--type-body); min-height: 5rem; line-height: var(--type-leading-body); }
+.app-shell .status,
+.app-shell .client-type,
+.app-shell .payment-status { font-size: var(--type-caption); line-height: var(--type-leading-ui); max-width: none; white-space: normal; overflow-wrap: anywhere; }
+.app-shell .finance-table article,
+.app-shell .client-list button { font-size: var(--type-support); line-height: var(--type-leading-ui); }
+.app-shell .finance-table article strong,
+.app-shell .client-list button b { font-size: var(--type-label); }
+.app-shell .metric-grid article small,
+.app-shell .metric-grid article > span { font-size: var(--type-support); line-height: var(--type-leading-meta); }
+.app-shell .metric-grid article { min-height: 11rem; grid-template-columns: minmax(0, 1fr) minmax(0, .95fr); grid-template-rows: minmax(2.25rem,auto) minmax(2.75rem,1fr) auto; overflow-wrap: anywhere; }
+.app-shell .metric-grid article > span { max-width: none; }
+.app-shell .metric-grid article strong { font-variant-numeric: tabular-nums; }
+.app-shell .flow-numbers button strong,
+.app-shell .finance-metrics article strong,
+.app-shell .metric-grid article strong,
+.app-shell .donut b,
+.app-shell .timecode { font-variant-numeric: tabular-nums; }
+.app-shell .flow-legend > span,
+.app-shell .chart-legend,
+.app-shell .chart-y-axis { font-size: var(--type-caption); }
+.app-shell .chart-y-axis { line-height: var(--type-leading-meta); }
+.app-shell .calendar-week { font-size: var(--type-caption); letter-spacing: 0; }
+.app-shell .calendar-grid > button small { font-size: var(--type-caption); }
+.app-shell .calendar-grid .event-chip:not([aria-hidden="true"]) { font-size: var(--type-caption); line-height: var(--type-leading-ui); }
+.app-shell .calendar-grid > button { overflow: hidden; }
+.app-shell .library-summary small,
+.app-shell .settings-field small,
+.app-shell .auth-field em { font-size: var(--type-support); line-height: var(--type-leading-meta); }
+
+/* Formal input fields must not turn tiny in secondary panels. */
+.app-shell .studio-form :is(input,select,textarea),
+.app-shell .project-modal :is(input,select,textarea),
+.app-shell .settings-field :is(input,select),
+.app-shell .comment-compose textarea,
+.auth-page input { font-size: var(--type-body); }
+.app-shell .studio-form :is(input,select),
+.app-shell .project-modal :is(input,select),
+.app-shell .settings-field :is(input,select) { min-height: 2.75rem; }
+
+/* Let cards grow with font size/zoom. Don't shrink text to preserve fixed heights. */
+.app-shell .panel-head { height: auto; min-height: 4.75rem; gap: .75rem; padding-block: .85rem; }
+.app-shell .comments-head { height: auto; min-height: 4.75rem; padding-block: .85rem; }
+.app-shell .project-row,
+.app-shell .client-list button,
+.app-shell .finance-table article { min-height: 4.75rem; }
+.app-shell .project-row { grid-template-columns: 2.5rem minmax(0,1.5fr) minmax(0,.9fr) minmax(0,.9fr) minmax(0,.7fr) 1.1rem; }
+.app-shell .finance-table-head,
+.app-shell .finance-table article { grid-template-columns: minmax(0,1.6fr) minmax(0,1fr) minmax(0,.7fr) minmax(0,.7fr) minmax(0,.7fr) minmax(4rem,auto); }
+.app-shell .project-row > *,
+.app-shell .finance-table article > *,
+.app-shell .client-list button > * { min-width: 0; }
+.app-shell .settings-pref-row,
+.app-shell .settings-privacy-row { flex-wrap: wrap; }
+.app-shell .settings-privacy-row > *,
+.app-shell .settings-pref-row > * { min-width: 0; }
+
+/* Readability and meaning stay consistent across themes, including inactive hints. */
+:root { --muted: #626262; }
+:root[data-theme="dark"] { --muted: #b5b5b5; }
+.app-shell .project-name small,
+.app-shell .project-card-copy p,
+.app-shell .metric-grid article small,
+.app-shell .metric-grid article > span,
+.app-shell .client-contact-meta small,
+.app-shell .comment header small,
+.app-shell .activity-list p { color: var(--muted); }
+
+/* Compact viewport: adapt layout without reversing the typographic upgrade. */
+@media (max-width: 1200px) {
+  .app-shell .metric-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .app-shell .project-row { grid-template-columns: 2.5rem minmax(0,1.6fr) minmax(0,.8fr) auto; }
+  .app-shell .project-row .due-cell, .app-shell .project-row .progress-cell { display: none; }
+  .app-shell .finance-table-head, .app-shell .finance-table article { gap: .5rem; }
+}
+@media (max-width: 820px) {
+  .app-shell .page-heading h1 { font-size: clamp(1.75rem,6vw,2rem); }
+  .app-shell .page-heading p { font-size: var(--type-body); }
+  .app-shell .metric-grid article { min-height: 10.25rem; grid-template-columns: minmax(0,1fr); grid-template-rows: auto 1fr auto auto; gap: .3rem; }
+  .app-shell .metric-grid article > span { grid-column: 1; grid-row: 4; justify-self: start; text-align: left; }
+  .app-shell .metric-grid article small { grid-column: 1; grid-row: 3; }
+  .app-shell .metric-grid article strong { grid-column: 1; grid-row: 2; overflow-wrap: anywhere; }
+  .app-shell .project-row { grid-template-columns: 2.25rem minmax(0,1fr) 1.1rem; }
+  .app-shell .client-list button { grid-template-columns: minmax(0,1fr) auto 1.1rem; }
+  .app-shell .finance-table article { grid-template-columns: minmax(0,1fr) auto; }
+  .app-shell .calendar-grid .event-chip { font-size: 0; }
+  .app-shell .calendar-week { font-size: var(--type-caption); }
+  .app-shell .mobile-bottom-nav button { min-height: 3.25rem; font-size: var(--type-caption); }
+  .app-shell .primary-button,
+  .app-shell .secondary-button { min-height: 2.75rem; }
+  .app-shell .heading-actions > .primary-button { width: auto; min-width: 2.75rem; padding-inline: .75rem; }
+  .app-shell .panel-head { flex-wrap: wrap; align-items: center; }
+}
+@media (max-width: 430px) {
+  .app-shell .metric-grid { grid-template-columns: minmax(0,1fr); }
+  .app-shell .flow-numbers { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .app-shell .flow-numbers button { min-width: 0; }
+  .app-shell .mobile-bottom-nav { grid-template-columns: repeat(5,minmax(0,1fr)); }
+  .app-shell .mobile-bottom-nav button { padding-inline: .15rem; overflow-wrap: anywhere; }
+  .app-shell .client-list button { padding-inline: 1rem; }
+}
+
+/* Browser zoom up to 200%, or user enlarged font settings:
+   these flexible layouts must not overlap controls. */
+@media (max-width: 640px) {
+  .app-shell .page-heading,
+  .app-shell .heading-actions,
+  .app-shell .studio-toolbar { flex-wrap: wrap; }
+  .app-shell .metric-grid,
+  .app-shell .library-summary { grid-template-columns: minmax(0,1fr); }
+}
