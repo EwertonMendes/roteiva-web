@@ -207,3 +207,15 @@ CI valida ambos builds, regras e browser nos emuladores. Deploy DEV após CI ver
 
 Limitações: sem atualização em tempo real entre abas; conflitos por documento e reload explícito; sem fila offline privada. OAuth Google real, segunda conta e Safari/iOS dependem evidência registrada no roadmap. Os componentes Worker/Drive acima continuam PLANEJADOS.
 
+
+## 16. Primeiro acesso e registro consciente (PR #9)
+
+O primeiro login no Firebase Auth Google pode criar uma identidade no Firebase Authentication, **mas isso não constitui cadastro no Roteiva**. A aplicação consulta `users/{uid}` no Firestore após autenticar, sem criar/escrever um perfil durante login. `RegistrationGate` trata separadamente os estados de consulta, erro, conta existente, conta não cadastrada e cadastro em andamento. Erros de rede **não são interpretados como ausência de perfil**.
+
+- **Conta existente:** perfil antigo (`displayName`, `email`, `photoURL`) ou novo é reconhecido pela existência do documento. Sem atualização automática da conta, sem refazer onboarding e sem sobrescrever cadastros/lançamentos atuais. O nome registrado aparece na interface.
+- **Conta nova:** botão explícito `Criar conta` na tela de acesso, login Google, formulário curto, confirmação específica de que informações serão armazenadas no Firebase DEV e `registerProfile` em transação (cria uma vez; nunca sobrescreve). Na opção `Entrar` para UID desconhecido, a tela explica que ainda não há conta e pergunta se deseja prosseguir com o registro; sair não cria perfil.
+- **Contrato novo do perfil:** `studioName` (até 120 caracteres, opcional), `professionalType` (`freelancer|studio|producer|other`), `registrationCompletedAt`, `dataAcknowledgedAt` e campos básicos anteriores. Os timestamps de primeiro registro são imutáveis. Regras exigem dados completos + `request.time` para novas criações. As regras aceitam documentos antigos sem esses campos **somente em leituras e atualizações**, preservando perfis existentes.
+- **Dados de negócio:** as regras já exigem `member(uid)` (documento de perfil existente) para subcoleções. A autenticação sem confirmação de registro não cria documentos; a proteção de cliente se apoia em regras Firestore, não em verificações visuais. Qualquer cliente malicioso ainda pode enviar diretamente um perfil novo válido através do SDK: esta separação é consentimento/UX, não prova criptográfica de um clique no formulário.
+- **Transparência DEV:** o texto do checkbox é um reconhecimento específico do uso de dados do ambiente de testes; **não equivale** à aceitação de Termos de Uso/Política de Privacidade de produção. Documentos jurídicos definitivos e processo formal de aceite permanecem pendentes antes de cadastro público.
+
+Firebase Authentication e Firestore só operam no modo `firebase`. Demo Pages mantém a persistência `localStorage` e o mesmo frontend de gestão. Validar em CI auth emulado, regras de UID, novos/antigos perfis e navegador mobile/desktop; OAuth real e dispositivo físico não são substituídos pelos emuladores.

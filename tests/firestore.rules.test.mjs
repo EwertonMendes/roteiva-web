@@ -83,8 +83,17 @@ test("profile PII, creation, ownership, schema and orphan denial",async()=>{
   await assertFails(updateDoc(doc(alice,path),{plan:"studio",revision:2,updatedAt:serverTimestamp()}));
   await assertFails(deleteDoc(doc(alice,path)));
   await assertFails(setDoc(doc(charlie,"users/charlie/clients/10"),{...client,...meta("charlie")}));
-  await assertFails(setDoc(doc(charlie,"users/charlie"),{...profile,...meta("alice")}));
-  await assertSucceeds(setDoc(doc(charlie,"users/charlie"),{...profile,...meta("charlie")}));
+  const registration={...profile,studioName:"Estúdio de testes",professionalType:"freelancer",registrationCompletedAt:serverTimestamp(),dataAcknowledgedAt:serverTimestamp()};
+  await assertFails(setDoc(doc(charlie,"users/charlie"),{...registration,...meta("alice")}));
+  await assertFails(setDoc(doc(charlie,"users/charlie"),{...profile,...meta("charlie")})); // login alone cannot create a profile
+  await assertFails(setDoc(doc(charlie,"users/charlie"),{...registration,professionalType:"admin",...meta("charlie")}));
+  await assertFails(setDoc(doc(charlie,"users/charlie"),{...registration,studioName:"x".repeat(200),...meta("charlie")}));
+  await assertFails(setDoc(doc(charlie,"users/charlie"),{...registration,registrationCompletedAt:Timestamp.fromMillis(0),...meta("charlie")}));
+  await assertFails(setDoc(doc(charlie,"users/charlie"),{...registration,dataAcknowledgedAt:Timestamp.fromMillis(0),...meta("charlie")}));
+  await assertSucceeds(setDoc(doc(charlie,"users/charlie"),{...registration,...meta("charlie")}));
+  await assertFails(updateDoc(doc(charlie,"users/charlie"),{registrationCompletedAt:serverTimestamp(),revision:2,updatedAt:serverTimestamp()}));
+  await assertFails(updateDoc(doc(charlie,"users/charlie"),{dataAcknowledgedAt:serverTimestamp(),revision:2,updatedAt:serverTimestamp()}));
+  await assertFails(updateDoc(doc(charlie,"users/charlie"),{studioName:deleteField(),revision:2,updatedAt:serverTimestamp()}));
   await assertFails(setDoc(doc(charlie,"users/charlie/private/secret"),{role:"admin"}));
   await assertSucceeds(updateDoc(doc(alice,path),{displayName:"Novo nome",revision:2,updatedAt:serverTimestamp()}));
 });
@@ -106,7 +115,12 @@ test("atomic project+tasks references resolve with getAfter",async()=>{
 });
 test("repository: empty new account, CRUD, cents, refresh and conflict",async()=>{
   const db=dbFor("charlie"),a=new FirestoreWorkspace(db,"charlie");
-  await a.initializeProfile(profile);
+  assert.equal(await a.profileExists(),false);
+  await a.registerProfile({...profile,studioName:"Studio QA",professionalType:"freelancer",acknowledgedDataUse:true});
+  assert.equal(await a.profileExists(),true);
+  await a.registerProfile({...profile,studioName:"Outro estúdio",professionalType:"studio",acknowledgedDataUse:true});
+  const existing=await getDoc(doc(db,"users/charlie"));
+  assert.equal(existing.data().studioName,"Studio QA"); // idempotent: login never overwrites profile
   assert.deepEqual(await a.load(),emptyWorkspace());
   const workspace=emptyWorkspace();
   workspace.clients=[{...client,monthlyFee:99.99,projects:0,active:0,deliveries:[{id:31,title:"Entrega mensal",month:"2026-10",done:false}]}];
