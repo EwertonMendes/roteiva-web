@@ -308,3 +308,18 @@
 **Testes simulados:** Google token endpoint usa mocks; identidade Firebase usa JWTs RS256 assinados em teste e JWKS local; AES-GCM usa criptografia real com dados sintéticos; schema usa SQLite real e Wrangler/D1 local. Nenhum teste simulado comprova consentimento Google, renovação real, Picker, arquivos reais ou isolamento de duas contas reais. A suíte verifica assinatura/issuer/audience/expiry, AAD, ciphertext adulterado, consulta por owner, replay SQL, CORS e invalid_grant.
 
 - **Segurança operacional:** encerrado o bootstrap; environment cloudflare-development restrito à master e workflow normal condicionado ao CI frontend. Publicação automática pós-merge ainda deve ser observada; não confundir bootstrap real com execução futura na master.
+
+
+## PoC de conexão Google Drive DEV — PR #17 (17/10/2026)
+
+**Estado: IMPLEMENTADO (QA real pendente).** A Biblioteca DEV exibe painel de conexões reais autenticadas via Firebase. Iniciar autorização chama Worker, navega para a rota top-level com cookie de primeira parte e retorna a `/biblioteca`. Lista conexões do proprietário, consulta `about.get` do Google Drive por refresh no backend para provar autorização e permite revogação explícita.
+
+- [x] **IMPLEMENTADO:** painel Firebase DEV sem alteração visual ou dados da demonstração Pages.
+- [x] **IMPLEMENTADO:** endpoint de consulta mínima `/integrations/drive/:connectionId/about` por usuário, sem devolver credenciais.
+- [x] **IMPLEMENTADO:** `OAUTH_ENABLED=true` somente no Cloudflare DEV para o teste com contas autorizadas no Google Testing.
+- [x] **IMPLEMENTADO:** teste mock para refresh e resposta limitada da consulta de conta.
+- [ ] **PENDENTE:** deploy da PR após CI verde e merge, seguida de consentimento Google real, validação de cookie Chrome/Safari/mobile, Drive API real, expiração/reconexão e duas contas.
+- [ ] **PENDENTE:** Google Picker e chave pública restrita; seleção de arquivos, múltiplas pastas, mídia, uploads e aprovações.
+- [ ] **PENDENTE:** migração OAuth para In production após requisitos legais e de verificação; em Testing, tokens offline geralmente expiram em sete dias.
+
+Se houver falha em teste de segurança/cookie, desabilitar imediatamente OAuth via configuração e deploy, sem substituir por access token no localStorage. Não tratar mock ou build como evidência de acesso real.

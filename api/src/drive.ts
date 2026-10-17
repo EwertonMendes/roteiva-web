@@ -34,3 +34,21 @@ export async function disconnect(env: Env, uid: string, connectionId: string): P
     .bind(row.id,uid,row.revision+1).run();
   return Response.json({status:'disconnected'});
 }
+
+/** Minimal account-level Drive read for the OAuth PoC. No file contents. */
+export async function about(env: Env, uid: string, connectionId: string, fetcher: typeof fetch = fetch): Promise<Response> {
+  const row = await connection(env,uid,connectionId);
+  const token = await accessToken(env,row,fetcher);
+  const target = new URL('https://www.googleapis.com/drive/v3/about');
+  target.searchParams.set('fields','user(displayName,emailAddress)');
+  let response: Response;
+  try {
+    response = await fetcher(target,{headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(10000)});
+  } catch { throw new ApiError(502,'google_unavailable'); }
+  if (!response.ok) throw new ApiError(502,'drive_unavailable');
+  const details = await response.json() as {user?:{displayName?:string;emailAddress?:string}};
+  return Response.json({user:{
+    displayName:typeof details.user?.displayName==='string'?details.user.displayName:'',
+    emailAddress:typeof details.user?.emailAddress==='string'?details.user.emailAddress:'',
+  }});
+}

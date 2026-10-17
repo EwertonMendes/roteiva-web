@@ -15,7 +15,7 @@
         "FIREBASE_PROJECT_ID": "roteiva-web-dev",
         "FRONTEND_ORIGIN": "https://roteiva-web-dev.web.app",
         "OAUTH_REDIRECT_URI": "https://roteiva-api-dev.ewertonmendes9.workers.dev/oauth/drive/callback",
-        "OAUTH_ENABLED": "false",
+        "OAUTH_ENABLED": "true",
         "TOKEN_KEY_VERSION": "v1",
         "GOOGLE_CLIENT_ID": "479738001561-4gu97o42v4m8kiq1bga8ck3msmjp0me3.apps.googleusercontent.com"
       },

@@ -137,3 +137,31 @@ test('source rate limit does not use shared all-users bucket',async()=>{
  assert.equal(response.status,200);
  assert.deepEqual(keys,['dev:ip:203.0.113.9']);
 });
+
+test('Drive account probe refreshes server-side and returns only whitelisted account data',async()=>{
+ const {about}=await import('../src/drive.ts');
+ const row={id:'connection',owner_uid:'A',google_account_id:'google-A',google_email:'a@example.com',
+   status:'connected',scopes:'https://www.googleapis.com/auth/drive.file',revision:1,
+   encrypted_refresh_token:await encrypt(env,'synthetic-refresh',context(env,'A','google-A'))};
+ let tokenCalls=0,driveCalls=0;
+ const DB={prepare:()=>({bind:(id,uid)=>({first:async()=> id==='connection'&&uid==='A'?row:null})})};
+ const configured={...env,DB,GOOGLE_CLIENT_ID:'test',GOOGLE_CLIENT_SECRET:'synthetic'};
+ const fetcher=async(url,options)=>{
+   if(String(url).includes('oauth2.googleapis.com/token')){
+     tokenCalls++;
+     assert.equal(options.body.get('refresh_token'),'synthetic-refresh');
+     return Response.json({access_token:'short-lived',token_type:'Bearer',expires_in:3600});
+   }
+   driveCalls++;
+   assert.equal(options.headers.Authorization,'Bearer short-lived');
+   assert.equal(new URL(url).searchParams.get('fields'),'user(displayName,emailAddress)');
+   return Response.json({user:{displayName:'Conta Teste',emailAddress:'a@example.com',secret:'ignored'}});
+ };
+ const response=await about(configured,'A','connection',fetcher);
+ assert.equal(response.status,200);
+ const text=await response.text();
+ assert.deepEqual(JSON.parse(text),{user:{displayName:'Conta Teste',emailAddress:'a@example.com'}});
+ assert.ok(!text.includes('synthetic-refresh')&&!text.includes('short-lived')&&!text.includes('secret'));
+ assert.equal(tokenCalls,1);assert.equal(driveCalls,1);
+ await assert.rejects(()=>about(configured,'B','connection',fetcher),e=>e.status===404);
+});

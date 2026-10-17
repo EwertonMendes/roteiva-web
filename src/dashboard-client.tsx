@@ -17,6 +17,7 @@ import { FormEvent, useEffect, useLayoutEffect, useMemo, useState, useCallback }
 import { isDemo } from "./lib/firebase";
 import { hrefForWorkspaceRoute, routeFromLocation, type WorkspaceRoute } from "./lib/workspace-routing";
 import { SettingsPage } from "./features/settings/SettingsPage";
+import { DriveConnectionPanel } from "./features/drive/DriveConnectionPanel";
 import type { RoteivaProfile, ProfileChanges } from "./data/firestore-workspace";
 import type { WorkspaceCommand } from "./data/firestore-commands";
 import type { FirestoreUsage } from "./data/firestore-usage";
@@ -721,6 +722,7 @@ function LibraryView({ assets, query, onUpload }: { assets: LibraryAsset[]; quer
   const kinds: (AssetKind | "Todos")[] = ["Todos", "Vídeo", "Imagem", "Áudio", "Documento"];
 
   return <div className="library-layout">
+    {!isDemo && <DriveConnectionPanel />}
     <div className="library-summary"><article><span><HardDrive size={18} /></span><div><small>ARQUIVOS</small><b>{assets.length}</b></div></article><article><span><Film size={18} /></span><div><small>ARMAZENAMENTO</small><b>{totalMb >= 1024 ? `${(totalMb / 1024).toFixed(1)} GB` : `${Math.round(totalMb)} MB`}</b></div></article><article><span><CalendarDays size={18} /></span><div><small>ADICIONADOS ESTE MÊS</small><b>{assets.filter(a => toISOAdded(a.addedAt).slice(0,7) === new Date().toLocaleDateString("en-CA").slice(0,7)).length}</b></div></article></div>
     <section className="panel library-panel">
       <div className="library-toolbar"><div className="filter-pills">{kinds.map((item) => <button key={item} className={kind === item ? "active" : ""} onClick={() => setKind(item)}>{item}</button>)}</div><div><select aria-label="Ordenar arquivos" value={sort} onChange={e => setSort(e.target.value)}><option value="recent">Mais recentes</option><option value="name">Nome A–Z</option></select><button className={`view-button ${layout === "grid" ? "active" : ""}`} onClick={() => setLayout("grid")}><Grid2X2 size={16} /></button><button className={`view-button ${layout === "list" ? "active" : ""}`} onClick={() => setLayout("list")}><ListFilter size={16} /></button></div></div>

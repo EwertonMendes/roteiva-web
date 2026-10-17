@@ -47,7 +47,7 @@ pnpm test:firebase
 
 O Firestore usa centavos inteiros e datas civis ISO, sem converter dias da agenda em horários UTC. Apenas documentos alterados são gravados. Erros de rede, permissão e conflito exigem recuperação explícita da versão da nuvem; não há fila de gravação privada em localStorage. O cache persistente é opt-in em Configurações e contém registros privados neste dispositivo; por padrão usa memória. A reabertura consulta a revisão privada por UID e só reutiliza coleções persistidas com contagem completa e versão correspondente. O sincronismo por domínio acrescenta uma escrita por transação de negócio e não usa documento global compartilhado.
 
-**PARCIAL — PR #15:** fundação de API Worker/D1 DEV e contratos OAuth separados, com secrets no backend e integração desabilitada até PoC real. **PLANEJADO:** biblioteca Google Drive, upload de mídia, revisão remota, equipes, cobrança e PROD. A tela de revisão continua explicativa. A autenticação Google não concede acesso ao Drive.
+**PARCIAL — PRs #15–#17:** fundação Worker/D1 e OAuth no DEV; tela de conexão e consulta mínima de conta Drive para teste real, com OAuth ativado somente no DEV Google Testing (usuários permitidos). A validação com consentimento Google e navegadores reais ainda está pendente. **PLANEJADO:** biblioteca Google Drive, upload de mídia, revisão remota, equipes, cobrança e PROD. A tela de revisão continua explicativa. A autenticação Google não concede acesso ao Drive.
 
 
 ## Configurações do perfil e estúdio (PR #11)
