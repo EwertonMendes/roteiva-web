@@ -25,7 +25,7 @@ export async function persistDriveConsent(
     throw new ApiError(409, 'drive_permission_missing');
   }
 
-  if (folders && (!tokens.scope || !tokens.scope.split(/\\s+/).includes(DRIVE_READ_SCOPE))) {
+  if (folders && (!tokens.scope || !tokens.scope.split(/\s+/).includes(DRIVE_READ_SCOPE))) {
     throw new ApiError(409, 'drive_read_permission_missing');
   }
 
