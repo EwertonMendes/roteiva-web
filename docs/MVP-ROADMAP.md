@@ -323,3 +323,10 @@
 - [ ] **PENDENTE:** migração OAuth para In production após requisitos legais e de verificação; em Testing, tokens offline geralmente expiram em sete dias.
 
 Se houver falha em teste de segurança/cookie, desabilitar imediatamente OAuth via configuração e deploy, sem substituir por access token no localStorage. Não tratar mock ou build como evidência de acesso real.
+
+## Correção do callback OAuth — teste inicial (17/10/2026)
+
+- [x] **DIAGNÓSTICO:** navegador chegou ao callback Google real, mas a implementação antiga devolveu `offline_consent_required` genérico; o teste não comprovou concessão do refresh token nem acesso à API.
+- [x] **IMPLEMENTADO — aguarda CI:** validação separada de identidade, permissão Drive e refresh offline; `scope` omitido usa prova real `Drive about.get` em vez de presumir falha. Se o refresh não vier em novo vínculo, não salvar conexão sem renovação; vínculo existente somente reutiliza credencial cifrada da mesma conta.
+- [x] **IMPLEMENTADO — aguarda CI:** retorno do callback à Biblioteca com códigos estáticos de recuperação, sem página JSON/segredos.
+- [ ] **VALIDAÇÃO REAL PENDENTE:** repetir consentimento com a conta testadora no Chrome, confirmar `?drive=connected`, testar `Drive about.get` e reconectar após nova sessão. Tests mocks/CI e health não demonstram isso.
