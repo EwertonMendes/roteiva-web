@@ -53,6 +53,7 @@ export function DriveConnectionPanel({
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
   const [linkError,setLinkError]=useState("");
+  const [accountFailed,setAccountFailed]=useState(false);
   const [result,setResult]=useState("");
   const [confirmId,setConfirmId]=useState("");
   const [picker,setPicker]=useState(false);
@@ -100,8 +101,15 @@ export function DriveConnectionPanel({
     const linksRequest=readDriveLinks(user.uid)
       .then(folders=>setLinks(folders))
       .catch(()=>setLinkError("Não foi possível atualizar as pastas vinculadas. Tente Atualizar."));
-    const accounts=await call<{connections:Connection[]}>("/integrations/drive");
+    let accounts:{connections:Connection[]};
+    try {
+      accounts=await call<{connections:Connection[]}>("/integrations/drive");
+    } catch (cause) {
+      setAccountFailed(true);
+      throw cause;
+    }
     setConnections(accounts.connections);
+    setAccountFailed(false);
     // This request has its own error boundary; do not block account state.
     void linksRequest;
     return accounts.connections;
@@ -256,7 +264,10 @@ export function DriveConnectionPanel({
         {confirmId && <><button className="secondary-button" onClick={()=>setConfirmId("")}>Cancelar</button>
           <button className="secondary-button" disabled={busy} onClick={()=>void disconnect(confirmId)}>Confirmar desconexão</button></>}
       </div> : <p>Conecte sua conta uma vez e escolha pastas para trabalhar nos projetos. O Google solicitará leitura do seu Drive; o Roteiva organiza somente as pastas que você vincular.</p>}
-      {!connected.length ?
+      {!connected.length ? accountFailed ?
+        <button className="primary-button" disabled={busy} onClick={()=>void refresh().catch(e=>setError(e instanceof Error?e.message:"Não foi possível carregar o Drive."))}>
+          <RefreshCw size={16}/> Tentar carregar conexão novamente
+        </button> :
         <button className="primary-button" disabled={busy} onClick={()=>void connect(selectedProjectId)}>
           <Cloud size={16}/> {busy?"Conectando…":"Conectar Google Drive"}
         </button>
