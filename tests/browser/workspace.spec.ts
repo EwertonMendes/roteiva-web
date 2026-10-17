@@ -112,6 +112,8 @@ test("Google emulator session, CRUD, restoration, themes and separate users",asy
 });
 test("First login does not silently create a workspace",async({page},info)=>{
   await page.goto(cloud);
+  // Capture the actual login screen, not the Roteiva intro animation.
+  await expect(page.locator(".brand-intro")).toHaveCount(0);
   await page.screenshot({path:info.outputPath("login-screen.png"),fullPage:true});
   const email="unregistered-"+info.project.name+"@example.com";
   const popupPromise=page.waitForEvent("popup");
@@ -130,6 +132,10 @@ test("First login does not silently create a workspace",async({page},info)=>{
   await page.getByRole("button",{name:"Criar meu espaço",exact:true}).click();
   await expect(page.getByRole("heading",{name:"Vamos deixar tudo com a sua cara."})).toBeVisible();
   await page.screenshot({path:info.outputPath("registration-screen.png"),fullPage:true});
+  // Validate both palettes without changing persisted profile data.
+  await page.evaluate(()=>document.documentElement.setAttribute("data-theme","dark"));
+  await page.screenshot({path:info.outputPath("registration-dark.png"),fullPage:true});
+  await page.evaluate(()=>document.documentElement.setAttribute("data-theme","light"));
   await expect(page.getByRole("button",{name:"Criar meu espaço de trabalho"})).toBeDisabled();
   await page.getByRole("button",{name:"Sair sem criar conta"}).click();
   await expect(page.getByRole("button",{name:"Entrar com Google",exact:true})).toBeVisible();
