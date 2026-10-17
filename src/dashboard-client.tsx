@@ -60,9 +60,9 @@ type DashboardProps = {
   overviewMetrics?:{clientCount?:number;receivableAmount?:number;projectCount?:number;projectStatuses?:Record<Status,number>}; projectPage?:{total:number;hasMore:boolean;status:string};
   onMoreProjects?:()=>void;onProjectStatus?:(status:Status|"Todos")=>void;
   onSearchProjects?:()=>void; clientPage?:{total:number;recurring:number;hasMore:boolean};
-  onMoreClients?:()=>void;onSearchClients?:()=>void;canValidateProjectLink?:boolean;canValidateClientLink?:boolean; cloudStatus?:string; saving?:boolean; onLogout?:()=>void;
+  onMoreClients?:()=>void;onSearchClients?:()=>void;onClientCreated?:(client:Client)=>void;canValidateProjectLink?:boolean;canValidateClientLink?:boolean; cloudStatus?:string; saving?:boolean; onLogout?:()=>void;
 };
-export default function DashboardClient({ firstName, email, photoURL, profile, onSaveProfile, initialWorkspace, initialTheme, onThemeChange, onLoadWorkspace, onRouteChange, onCommands, overviewMetrics, projectPage, onMoreProjects, onProjectStatus, onSearchProjects, clientPage, onMoreClients, onSearchClients, canValidateProjectLink, canValidateClientLink, cloudStatus, saving, onLogout }: DashboardProps) {
+export default function DashboardClient({ firstName, email, photoURL, profile, onSaveProfile, initialWorkspace, initialTheme, onThemeChange, onLoadWorkspace, onRouteChange, onCommands, overviewMetrics, projectPage, onMoreProjects, onProjectStatus, onSearchProjects, clientPage, onMoreClients, onSearchClients, onClientCreated, canValidateProjectLink, canValidateClientLink, cloudStatus, saving, onLogout }: DashboardProps) {
   const routeEnvironment={base:import.meta.env.BASE_URL,useHash:isDemo};
   const initialRoute=()=>routeFromLocation(window.location,routeEnvironment);
   const [initialBrowserRoute]=useState<WorkspaceRoute>(initialRoute);
@@ -295,6 +295,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
         kind:"saveFinance" as const,entry:{...entry,client:name},
       })));
     }
+    if(!editingClient)onClientCreated?.(updated);
     commitCommands(commands);
     setClientModalOpen(false); setEditingClient(null);
     logActivity(`Cliente ${editingClient ? "atualizado" : "cadastrado"}: ${name}`);

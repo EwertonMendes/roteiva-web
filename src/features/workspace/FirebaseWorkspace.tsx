@@ -221,7 +221,10 @@ export function FirebaseWorkspace() {
         onSearchProjects={searchAllProjects}
         clientPage={repository.hasLoaded(["clients"])?undefined:clientPage}
         onMoreClients={()=>void fetchClientPage(false)}
-        onSearchClients={searchAllClients} onThemeChange={saveTheme}
+        onSearchClients={searchAllClients}
+        onClientCreated={(client)=>setClientPage(current=>current?{
+          ...current,total:current.total+1,recurring:current.recurring+(client.type==="Recorrente"?1:0),
+        }:current)} onThemeChange={saveTheme}
         overviewMetrics={overviewMetrics ? {
           clientCount:repository.hasLoaded(["clients"])?undefined:overviewMetrics.clientCount,
           receivableAmount:repository.hasLoaded(["financeEntries"])?undefined:overviewMetrics.receivableAmount,
