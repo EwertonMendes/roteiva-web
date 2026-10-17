@@ -100,7 +100,7 @@ export function StudioReviews() {
 export function FinancePanel({entries,clients,onAdd,onEdit,onDelete,onPeriodChange,serverBars}: {entries:FinanceEntry[];clients:Client[];onAdd:()=>void;onEdit:(e:FinanceEntry)=>void;onDelete:(e:FinanceEntry)=>void;onPeriodChange?:(year:number,month:number,clientId?:number)=>void;serverBars?:{key:string;bars:number[]}}) {
   const now=new Date();const [year,setYear]=useState(now.getFullYear());const [month,setMonth]=useState(now.getMonth());const [client,setClient]=useState("");const [status,setStatus]=useState("");
   const labels=["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
-  const years=Array.from(new Set([now.getFullYear(),now.getFullYear()-1,now.getFullYear()+1,...entries.map(e=>Number(isoDate(e.date).slice(0,4)))] )).filter(Number.isFinite).sort((a,b)=>b-a);
+  const years=Array.from(new Set([now.getFullYear()+1,...Array.from({length:16},(_,i)=>now.getFullYear()-i),...entries.map(e=>Number(isoDate(e.date).slice(0,4)))] )).filter(Number.isFinite).sort((a,b)=>b-a);
   const base=entries.filter(e=>!client||String(e.clientId)===client);
   const yearly=base.filter(e=>Number(isoDate(e.date).slice(0,4))===year);
   const prefix=`${year}-${String(month+1).padStart(2,"0")}`;
