@@ -47,7 +47,7 @@
 
 ## Evolução de onboarding — cadastro separado (PR #9)
 
-**Status inicial: IMPLEMENTADO, aguardando validação do CI e publicação DEV.**
+**Status: VALIDADO no CI da PR #9; deploy DEV somente após merge.**
 
 - [x] Diferenciar **Entrar** e **Criar conta** mantendo Google como único login.
 - [x] Não criar perfis Firestore em login ou restauração de sessão; apenas depois da confirmação do formulário.
@@ -55,8 +55,8 @@
 - [x] Criar formulário responsivo com nome, estúdio opcional, tipo de trabalho e ciência do uso de dados no ambiente DEV, sem inventar Termos/Política formais.
 - [x] Regras: exigir dados completos em novos perfis, timestamps imutáveis, manter compatibilidade para contas existentes e negar acesso entre UIDs.
 - [x] Preservar a demonstração sem Firebase e a chave `localStorage`.
-- [ ] Validar em CI: testes de regras/perfil legado, registro explícito, login/cadastro e navegador desktop/mobile.
-- [ ] Publicar após CI verde e verificar fluxo real no DEV sem afetar registros existentes.
+- [x] [CI PR #9 — run 38987657544](https://github.com/EwertonMendes/roteiva-web/actions/runs/38987657544): instalação congelada, testes de domínio, TypeScript, builds Firebase/Pages, **12 testes Firestore/repositório** e **10 Playwright desktop/mobile** (incluindo conta sem perfil, cadastro explícito, saída sem registro e perfis existentes).
+- [ ] Publicar após CI verde e verificar fluxo real no DEV sem afetar registros existentes; testes Google reais e aparelhos físicos ainda pendentes.
 - [ ] Antes de abrir cadastro público: providenciar e revisar Termos de Uso, Política de Privacidade, canal de suporte e processo de exclusão de conta/dados.
 
 **Escopo:** separação entre identidade Google e cadastro de negócio. Não confundir checkbox DEV com aceite jurídico definitivo.
