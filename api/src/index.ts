@@ -1,7 +1,7 @@
 import { ApiError, type Env } from './types.ts';
 import { identity } from './auth.ts';
 import { callback, start, launch, enabled } from './oauth.ts';
-import { metadata, disconnect } from './drive.ts';
+import { metadata, disconnect, about } from './drive.ts';
 const headers = {
   'Cache-Control':'no-store', 'Referrer-Policy':'no-referrer',
   'X-Content-Type-Options':'nosniff', 'Content-Security-Policy':"default-src 'none'; frame-ancestors 'none'",
@@ -43,12 +43,14 @@ export async function handle(request: Request, env: Env): Promise<Response> {
       const uid = await identity(request,env);
       if (!(await env.API_RATE_LIMIT.limit({key:'dev:uid:'+uid})).success) throw new ApiError(429,'rate_limited');
       response = await start(env,uid);
-    } else if (/^\/integrations\/drive\/[^/]+\/(metadata|disconnect)$/.test(url.pathname)) {
+    } else if (/^\/integrations\/drive\/[^/]+\/(metadata|disconnect|about)$/.test(url.pathname)) {
       enabled(env);
       const uid = await identity(request,env);
       if (!(await env.API_RATE_LIMIT.limit({key:'dev:uid:'+uid})).success) throw new ApiError(429,'rate_limited');
       const parts = url.pathname.split('/');
-      if (parts[4] === 'metadata' && request.method === 'GET') {
+      if (parts[4] === 'about' && request.method === 'GET') {
+        response = await about(env,uid,parts[3]);
+      } else if (parts[4] === 'metadata' && request.method === 'GET') {
         response = await metadata(env,uid,parts[3],url.searchParams.get('fileId') || '');
       } else if (parts[4] === 'disconnect' && request.method === 'POST') {
         if (origin !== env.FRONTEND_ORIGIN) throw new ApiError(403,'origin_required');

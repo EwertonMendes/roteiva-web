@@ -44,7 +44,7 @@ Não recrie READMEs concorrentes, documentos de teste avulsos ou planos paralelo
 - O BRBET antigo é referência conceitual, não uma dependência e não deve ser copiado cegamente; verificar direitos de reutilização antes de aproveitar código.
 - O escopo `drive.file` é o padrão desejado; **não pedir acesso irrestrito ao Drive** por conveniência.
 - Com uploads grandes, dados passam diretamente do navegador ao Drive quando a prova de conceito confirmar segurança e CORS; **não passar vídeo pelo Worker**.
-- API em api/ usa npm ci/package-lock próprios; frontend preserva PNPM/lockfile. OAuth permanece desabilitado até PoC real e QA de cookies entre web.app/workers.dev. Não reutilizar o bootstrap temporário da PR #15: environment cloudflare-development aceita somente master, pipeline normal aguarda CI frontend verde. Nenhuma infraestrutura PROD autorizada.
+- API em api/ usa npm ci/package-lock próprios; frontend preserva PNPM/lockfile. A PR #17 prepara uma PoC de conexão Drive em DEV usando navegador top-level para cookie seguro; OAuth ativado em DEV para usuários Google Testing, sujeito a consentimento real e QA Chrome/Safari. Não afirmar que o Drive completo está pronto. Não reutilizar o bootstrap temporário da PR #15: environment cloudflare-development aceita somente master, pipeline normal aguarda CI frontend verde. Nenhuma infraestrutura PROD autorizada.
 - Refresh tokens só no backend criptografados; acesso entre workspaces sempre verificado no servidor/regras.
 
 - A chave de demonstração `roteiva-pages-demo-workspace-v1` é um contrato de compatibilidade local; não alterá-la sem migração de dados. LocalStorage não é compartilhado entre domínios diferentes.
