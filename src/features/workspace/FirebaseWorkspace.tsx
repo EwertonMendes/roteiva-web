@@ -39,7 +39,7 @@ export function FirebaseWorkspace() {
     (async()=>{
       const route=routeFromLocation(window.location,{base:import.meta.env.BASE_URL,useHash:false});
       const domains=domainsForRoute(route);
-      const [workspaceState,theme,stats]=await Promise.all([
+      const [workspaceState,theme]=await Promise.all([
         (async()=>{
           if (domains.length) await repository.load(domains);
           if(route.view==="overview" || (route.view==="projects" && !route.projectId)){
@@ -50,8 +50,9 @@ export function FirebaseWorkspace() {
           return {workspace:domains.length ? await repository.load(domains) : emptyWorkspace()};
         })(),
         repository.loadTheme(),
-        route.view==="overview" ? repository.overviewMetrics() : Promise.resolve(undefined),
       ]);
+      const stats=route.view==="overview" ?
+        await repository.overviewMetrics(workspaceState.page?.workspace.projects) : undefined;
       if (active) {
         setBusinessLoaded(domains.length>0);
         if (stats) setOverviewMetrics(stats);

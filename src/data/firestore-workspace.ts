@@ -286,18 +286,25 @@ export class FirestoreWorkspace {
    * to render the overview. The composite index is declared with the rules.
    * A failed aggregation aborts the overview instead of reporting fake zeros.
    */
-  async overviewMetrics(): Promise<{clientCount:number;receivableAmount:number;projectCount:number;projectStatuses:Record<Status,number>}> {
+  async overviewMetrics(projects?:WorkspaceData["projects"]):
+    Promise<{clientCount:number;receivableAmount:number;projectCount:number;projectStatuses:Record<Status,number>}> {
     const statuses:Status[]=["Em produção","Em aprovação","Ajustes","Aprovado"];
-    const [clients,receivable,...statusCounts]=await Promise.all([
+    // Reuse a verified complete small page. Empty accounts should not spend
+    // four aggregation queries to discover that every project bucket is zero.
+    const pageComplete=!!projects && this.stamp?.counts.projects===projects.length;
+    const [clients,receivable,...counts]=await Promise.all([
       getCountFromServer(collection(this.db,"users",this.uid,"clients")),
       getAggregateFromServer(query(collection(this.db,"users",this.uid,"financeEntries"),
         where("kind","==","income"),where("status","==","A receber")),
         {amountCents:sum("amountCents")}),
-      ...statuses.map(status=>getCountFromServer(query(
-        collection(this.db,"users",this.uid,"projects"),where("status","==",status)))),
+      ...(pageComplete?[]:statuses.map(status=>getCountFromServer(query(
+        collection(this.db,"users",this.uid,"projects"),where("status","==",status))))),
     ]);
-    for(let i=0;i<2+statuses.length;i++)trackAggregation(this.uid);
-    const projectStatuses=Object.fromEntries(statuses.map((name,i)=>[name,statusCounts[i].data().count])) as Record<Status,number>;
+    for(let i=0;i<2+counts.length;i++)trackAggregation(this.uid);
+    const projectStatuses=Object.fromEntries(statuses.map((name,i)=>[
+      name,pageComplete ? projects!.filter(project=>project.status===name).length
+        : counts[i].data().count,
+    ])) as Record<Status,number>;
     return {clientCount:clients.data().count,
       receivableAmount:(receivable.data().amountCents ?? 0)/100,
       projectCount:Object.values(projectStatuses).reduce((sum,value)=>sum+value,0),
