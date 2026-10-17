@@ -40,7 +40,7 @@ export function WorkspaceTools({workspace, status, onNotify,loadWorkspace}: {wor
 export function TodayStudio({projects, clients, entries, events, activities, onView, overviewMetrics}: {projects: Project[]; clients:Client[]; entries: FinanceEntry[]; events: CalendarEvent[]; activities: {text: string; when: string}[]; onView: (v: View) => void; overviewMetrics?:{clientCount?:number;receivableAmount?:number;projectCount?:number;projectStatuses?:Record<Status,number>}}) {
   const active = overviewMetrics?.projectStatuses && overviewMetrics.projectCount!==undefined ? overviewMetrics.projectCount-overviewMetrics.projectStatuses.Aprovado :
     projects.filter(p=>p.status!=="Aprovado").length;
-  const approved = overviewMetrics?.projectStatuses.Aprovado ?? projects.filter(p=>p.status==="Aprovado").length;
+  const approved = overviewMetrics?.projectStatuses?.Aprovado ?? projects.filter(p=>p.status==="Aprovado").length;
   const pending = overviewMetrics?.projectStatuses ? overviewMetrics.projectStatuses["Em aprovação"]+overviewMetrics.projectStatuses.Ajustes :
     projects.filter(p=>p.status==="Em aprovação"||p.status==="Ajustes").length;
   const projectCount=overviewMetrics?.projectCount ?? projects.length;
