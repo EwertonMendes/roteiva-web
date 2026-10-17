@@ -244,7 +244,7 @@ service cloud.firestore {
         allow update: if member(uid) && valid_sync(request.resource.data,uid,id) && updating(request.resource.data);
         allow delete: if false;
       }
-      // Explicit folder-to-project links; file bodies and OAuth credentials never enter Firestore.
+      // Project-linked folders hold identifiers only, not credentials or files.
       match /driveFolders/{id} {
         allow read: if member(uid);
         allow create: if member(uid) && valid_driveFolders(request.resource.data,uid,id);
