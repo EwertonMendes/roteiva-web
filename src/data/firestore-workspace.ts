@@ -52,6 +52,7 @@ export class FirestoreWorkspace {
   private readonly gate = new FirestoreQueryGate();
   private loadQueue:Promise<void>=Promise.resolve();
   private readonly loadedDomains = new Set<Domain>();
+  private readonly projectCursors=new Map<string,QueryDocumentSnapshot<DocumentData>|null>();
   hasLoaded(domains:readonly Domain[]):boolean { return domains.every(name=>this.loadedDomains.has(name)); }
   constructor(db: Firestore, uid: string) {
     if (!uid || uid.includes("/")) throw new Error("UID inválido.");
@@ -194,6 +195,70 @@ export class FirestoreWorkspace {
       return this.decoded();
     }
     throw new Error("Conflito: os dados mudaram durante o carregamento. Tente novamente.");
+  }
+
+  /**
+   * Server-cursor pagination for the project catalogue. Only the requested
+   * page and its linked tasks enter memory; it does NOT mark either collection
+   * complete, so other views must explicitly call load() before full edits.
+   */
+  async projectPage(options:{status?:string;reset?:boolean;size?:number}={}):
+    Promise<{workspace:WorkspaceData;total:number;hasMore:boolean}> {
+    if(this.loadedDomains.has("projects") && this.loadedDomains.has("tasks")){
+      const workspace=this.decoded();
+      return {workspace,total:workspace.projects.length,hasMore:false};
+    }
+    const status=options.status && options.status!=="Todos" ? options.status : "";
+    const key=status||"Todos",size=Math.max(1,Math.min(30,options.size||24));
+    if(options.reset)this.projectCursors.delete(key);
+    const previous=this.projectCursors.get(key);
+    if(previous===null && !options.reset){
+      return {workspace:this.decoded(),total:this.stamp?.counts.projects||0,hasMore:false};
+    }
+    const before=await this.ensureSync();
+    const base=collection(this.db,"users",this.uid,"projects");
+    const conditions=status?[where("status","==",status)]:[];
+    const entries=query(base,...conditions,orderBy("createdAt","desc"),
+      orderBy(documentId(),"desc"),...(previous?[startAfter(previous)]:[]),limit(size+1));
+    const list=await getDocsFromServer(entries);
+    trackPage(this.uid,"server",list.size);
+    const docs=list.docs.slice(0,size);
+    const projects=new Map<string,Stored>();
+    for(const record of docs){
+      const {ownerUid:_o,schemaVersion:_s,revision,createdAt:_c,updatedAt:_u,...data}=record.data();
+      projects.set("projects/"+record.id,{revision,data:data as Data});
+    }
+    const tasks=new Map<string,Stored>();
+    const ids=docs.map(item=>Number(item.id)).filter(Number.isSafeInteger);
+    if(ids.length){
+      const taskQuery=query(collection(this.db,"users",this.uid,"tasks"),where("projectId","in",ids));
+      const taskDocs=await getDocsFromServer(taskQuery);
+      trackPage(this.uid,"server",taskDocs.size);
+      for(const record of taskDocs.docs){
+        const {ownerUid:_o,schemaVersion:_s,revision,createdAt:_c,updatedAt:_u,...data}=record.data();
+        tasks.set("tasks/"+record.id,{revision,data:data as Data});
+      }
+    }
+    let total=before.counts.projects;
+    if(status){
+      const aggregate=await getCountFromServer(query(base,where("status","==",status)));
+      trackAggregation(this.uid);
+      total=aggregate.data().count;
+    }
+    trackRevision(this.uid);
+    const after=await readSync(this.db,this.uid);
+    if(!after || before.domains.projects!==after.domains.projects ||
+      before.domains.tasks!==after.domains.tasks)
+      throw new Error("Conflito: os projetos mudaram durante a paginação. Recarregue a lista.");
+    if(options.reset){
+      for(const path of this.stored.keys()){
+        if(path.startsWith("projects/")||path.startsWith("tasks/"))this.stored.delete(path);
+      }
+    }
+    for(const [key,item] of [...projects,...tasks])this.stored.set(key,item);
+    const hasMore=list.docs.length>size;
+    this.projectCursors.set(key,hasMore?docs[docs.length-1]:null);
+    return {workspace:this.decoded(),total,hasMore};
   }
 
   async hasExternalChanges(): Promise<boolean> {
