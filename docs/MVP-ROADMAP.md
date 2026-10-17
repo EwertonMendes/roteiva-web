@@ -79,7 +79,7 @@
 
 ## Navegação por URL e restauração de tela — PR #12
 
-**Status: IMPLEMENTADO na branch, aguardando CI e publicação DEV.**
+**Status: VALIDADO no CI da PR #12; publicação DEV após merge.**
 
 - [x] URLs próprias para as sete seções do dashboard além da visão geral, incluindo Configurações.
 - [x] URLs estáveis de detalhes de projeto e cliente, restauradas após F5 sem recarregar a tela inicial.
@@ -88,7 +88,7 @@
 - [x] Preservar `/review` protegido e impedir renderização de dados alheios a partir de um ID na URL.
 - [x] Limpar a rota privada ao sair e voltar à lista quando um ID não pertence à conta.
 - [x] Testes unitários do parser/URL e Playwright de refresh, histórico, isolamento e demo.
-- [ ] Validar CI da PR #12 (TypeScript, builds Firebase/Pages, Firestore emulado e Playwright desktop/mobile).
+- [x] [CI PR #12 — execução 38994449773](https://github.com/EwertonMendes/roteiva-web/actions/runs/38994449773): parser/URLs, TypeScript, builds Firebase e Pages, regras/persistência Firebase e **14 testes Playwright** desktop/mobile; confirmado F5, URLs de detalhes, Voltar/Avançar, login direto, isolamento A/B e demo hash. Primeira rodada encontrou sincronização da gravação antes do F5, corrigida e revalidada.
 - [ ] Merge, deploy DEV e conferência manual do F5 em uma conta Google real.
 
 **Decisão:** URLs com pathname no Firebase e fragmento/hash no Pages, para funcionar sem criar um backend ou um mecanismo de fallback HTTP falso.
