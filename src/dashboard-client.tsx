@@ -462,7 +462,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     <div className="app-shell" inert={saving || undefined}>
       <aside className={`sidebar ${mobileOpen ? "mobile-open" : ""}`}>
         <div className="brand-lockup">
-          <img src={theme === "light" ? "roteiva-logo-black.png" : "roteiva-logo-white.png"} alt="Roteiva" />
+          <img src={`${import.meta.env.BASE_URL}${theme === "light" ? "roteiva-logo-black.png" : "roteiva-logo-white.png"}`} alt="Roteiva" />
           <button className="mobile-close" onClick={() => setMobileOpen(false)} aria-label="Fechar menu"><X size={18} /></button>
         </div>
         <nav>
