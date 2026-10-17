@@ -138,3 +138,11 @@ Chrome confirmou a tela de login do DEV, ausência de workspace anônimo, recupe
 O CI inicial falhou no mobile emulado ao tentar preencher `Nova tarefa` **fora da área visível**, sem valor ao final da chamada Playwright `.fill()`. O teste agora rola até o input, foca e digita via teclado. Não houve mudança funcional no formulário. O [CI 38984055813](https://github.com/EwertonMendes/roteiva-web/actions/runs/38984055813) passou as 12 verificações Firestore/repositório, oito testes de navegador desktop/mobile, TypeScript e builds Firebase/Pages. A publicação DEV do ajuste e a inspeção com autenticação real continuam distintas dos testes em emuladores.
 
 Permanecem pendentes logout/relogin com Google real, isolamento visual com segunda conta Google real e Safari/iOS ou aparelho móvel físico. Os testes A/B de regras não dispensam essas verificações.
+
+### PR #7 — Release comprovada, sem QA real presumido
+
+A PR #7 foi incorporada à master pelo [commit c11532e](https://github.com/EwertonMendes/roteiva-web/commit/c11532e9daf47c581eae4deea944a990fb83ecae). O [CI de PR 38984302906](https://github.com/EwertonMendes/roteiva-web/actions/runs/38984302906) e o [CI master 38984541920](https://github.com/EwertonMendes/roteiva-web/actions/runs/38984541920) passaram integralmente, incluindo 12 testes Firestore/repositório e oito Playwright desktop/mobile emuladores. O workflow [Firebase DEV 38984744995](https://github.com/EwertonMendes/roteiva-web/actions/runs/38984744995) publicou o mesmo commit com sucesso; Pages também foi publicado na master.
+
+A rota `/review` autenticada foi **validada em navegador automatizado contra emuladores**, com rótulo DEV e retorno ao painel. A inspeção visual autenticada diretamente no site publicado **ainda não foi comprovada**. Não declarar concluídos logout/relogin com conta Google real, isolamento com segunda conta Google real, Safari/iOS ou aparelho móvel físico.
+
+Esses testes devem ser executados sem apagar os registros `[QA]` já existentes e sem conceder acesso entre contas.
