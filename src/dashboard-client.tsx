@@ -18,6 +18,7 @@ import { isDemo, useEmulators } from "./lib/firebase";
 import { hrefForWorkspaceRoute, routeFromLocation, type WorkspaceRoute } from "./lib/workspace-routing";
 import { SettingsPage } from "./features/settings/SettingsPage";
 import { DriveConnectionPanel } from "./features/drive/DriveConnectionPanel";
+import { TypographyLab, TEMPORARY_FONT_LAB_ENABLED } from "./features/typography/TypographyLab";
 import type { RoteivaProfile, ProfileChanges } from "./data/firestore-workspace";
 import type { WorkspaceCommand } from "./data/firestore-commands";
 import type { FirestoreUsage } from "./data/firestore-usage";
@@ -498,6 +499,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
               if(value.trim() && view==="projects")onSearchProjects?.();
               if(value.trim() && view==="clients")onSearchClients?.();
             }} placeholder="Buscar projetos, clientes ou arquivos" /><kbd><Command size={11} /> K</kbd></label>
+          {TEMPORARY_FONT_LAB_ENABLED && !isDemo && <TypographyLab />}
           <div className="top-actions"><button className="icon-button" title="Ver atividades" aria-label="Ver atividades" onClick={() => { changeView("overview"); notify(activities[0]?.text || "Nenhuma atividade ainda"); }}><Bell size={18} /></button><button className="icon-button theme-toggle" onClick={toggleTheme} aria-label={theme === "light" ? "Ativar modo escuro" : "Ativar modo claro"} title={theme === "light" ? "Modo escuro" : "Modo claro"}>{theme === "light" ? <Moon size={18} /> : <Sun size={18} />}</button><button className="primary-button" onClick={startProject}><Plus size={17} /> Novo projeto</button></div>
         </header>
 
