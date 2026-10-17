@@ -243,12 +243,13 @@ Os quatro últimos que usam Wrangler dependem do runtime oficial instalado pelo 
 |---|---|
 | GET /health | SELECT mínimo no ledger de migrations, status/environment sem IDs ou dados privados; 503 se dependência falha |
 | GET /integrations/drive | Bearer Firebase, apenas resumo das conexões do próprio UID |
-| POST /oauth/drive/start | Bearer Firebase + Origin exata, retorna authorizationUrl e cookie HttpOnly; credentials:include necessário |
+| POST /oauth/drive/start | Bearer Firebase + Origin exata, retorna launchUrl para navegação top-level; sem Set-Cookie cross-site |
+| GET /oauth/drive/launch | Consome ticket efêmero de uso único, define cookie HttpOnly Secure SameSite=Lax em primeira parte e redireciona para Google |
 | GET /oauth/drive/callback | State/cookie/TTL/PKCE/nonce; 303 para biblioteca com resultado categórico |
 | GET /integrations/drive/:connectionId/metadata?fileId=... | Só metadado de arquivo autorizado, sem bytes/mídia; refresh no servidor |
 | POST /integrations/drive/:connectionId/disconnect | Origem exata e proprietário; revogação Google explícita, sem apagar arquivos |
 
-Rotas OAuth/metadados/desconexão bloqueadas enquanto OAUTH_ENABLED=false. Não há tela Conectar Drive publicada: a próxima fase deve preparar o cliente autenticado/PoC, resolver cookies entre sites e solicitar o consentimento real do proprietário no navegador. Callback não retorna tokens; respostas privadas no-store, no-referrer e sem conteúdo executável. Não registrar exceções, requests, URLs, cookies ou respostas OAuth. Invocation logs desabilitados para impedir retenção de code/state no callback; logs categóricos com requestId, amostragem 10%, sem traces nem exportação para terceiros.
+Migrations `0001_oauth.sql` e `0002_oauth_launch.sql` são aditivas e versionadas. O rate limiter da origem é por endereço recebido da borda Cloudflare, não uma chave única compartilhada por todos os usuários; existe também limiter por UID. O frontend futuro deve redirecionar a janela principal para `launchUrl` (nunca carregar via fetch/iframe). O ticket é uma capacidade de uso único; não guardar a URL em logs. Validar cookies no Chrome/Safari antes de habilitar a integração. Rotas OAuth/metadados/desconexão bloqueadas enquanto OAUTH_ENABLED=false. Não há tela Conectar Drive publicada: a próxima fase deve preparar o cliente autenticado/PoC, resolver cookies entre sites e solicitar o consentimento real do proprietário no navegador. Callback não retorna tokens; respostas privadas no-store, no-referrer e sem conteúdo executável. Não registrar exceções, requests, URLs, cookies ou respostas OAuth. Invocation logs desabilitados para impedir retenção de code/state no callback; logs categóricos com requestId, amostragem 10%, sem traces nem exportação para terceiros.
 
 ### Franquias e pendências de operação
 

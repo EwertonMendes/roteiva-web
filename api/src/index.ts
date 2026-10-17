@@ -1,6 +1,6 @@
 import { ApiError, type Env } from './types.ts';
 import { identity } from './auth.ts';
-import { callback, start, enabled } from './oauth.ts';
+import { callback, start, launch, enabled } from './oauth.ts';
 import { metadata, disconnect } from './drive.ts';
 const headers = {
   'Cache-Control':'no-store', 'Referrer-Policy':'no-referrer',
@@ -16,7 +16,10 @@ export async function handle(request: Request, env: Env): Promise<Response> {
         env.FRONTEND_ORIGIN !== 'https://roteiva-web-dev.web.app' ||
         env.OAUTH_REDIRECT_URI !== 'https://roteiva-api-dev.ewertonmendes9.workers.dev/oauth/drive/callback') throw new ApiError(503,'invalid_environment');
     if (origin && origin !== env.FRONTEND_ORIGIN) throw new ApiError(403,'origin_denied');
-    if (!(await env.API_RATE_LIMIT.limit({key:'dev:all'})).success) throw new ApiError(429,'rate_limited');
+    // Rate limiting per edge-provided source address prevents one user's traffic
+    // from exhausting the entire DEV account's shared 60/minute bucket.
+    const sourceIp = request.headers.get('CF-Connecting-IP') || 'unknown';
+    if (!(await env.API_RATE_LIMIT.limit({key:'dev:ip:'+sourceIp.slice(0,64)})).success) throw new ApiError(429,'rate_limited');
     if (request.method === 'OPTIONS') {
       if (!origin) throw new ApiError(403,'origin_required');
       response = new Response(null,{status:204,headers:{
@@ -26,6 +29,8 @@ export async function handle(request: Request, env: Env): Promise<Response> {
     } else if (url.pathname === '/health' && request.method === 'GET') {
       await env.DB.prepare('SELECT 1 FROM d1_migrations LIMIT 1').first();
       response = Response.json({status:'ok',environment:'dev'});
+    } else if (url.pathname === '/oauth/drive/launch' && request.method === 'GET') {
+      response = await launch(request,env);
     } else if (url.pathname === '/oauth/drive/callback' && request.method === 'GET') {
       response = await callback(request,env);
     } else if (url.pathname === '/integrations/drive' && request.method === 'GET') {
