@@ -123,6 +123,7 @@ export function FirebaseWorkspace() {
       const result=await repository.projectPage({status,reset,size:24});
       if(request===scopeRequest.current){
         setInitial(current=>current?{...current,workspace:result.workspace}:current);
+        setBusinessLoaded(true);
         setProjectPage({total:result.total,hasMore:result.hasMore,status});
       }
     }catch(reason){
@@ -141,6 +142,7 @@ export function FirebaseWorkspace() {
       const result=await repository.clientPage({reset,size:24});
       if(request===scopeRequest.current){
         setInitial(current=>current?{...current,workspace:result.workspace}:current);
+        setBusinessLoaded(true);
         setClientPage({total:result.total,recurring:result.recurring,hasMore:result.hasMore});
       }
     }catch(reason){
