@@ -321,3 +321,25 @@ test("server cursor pages return distinct projects, status filters and joined ta
   assert.equal(complete.projects.length,5);
   assert.equal(complete.projects.find(p=>p.id===12).tasks.length,1);
 });
+
+test("client directory uses bounded cursor, accurate recurring count, and never marks partial as complete",async()=>{
+  const db=dbFor("alice");
+  for(const id of [11,12,13]){
+    await assertSucceeds(setDoc(doc(db,"users/alice/clients/"+id),
+      {...client,id,name:"Cliente "+id,type:id===12||id===13?"Recorrente":"Avulso",...meta("alice")}));
+  }
+  const repo=new FirestoreWorkspace(db,"alice");
+  const first=await repo.clientPage({reset:true,size:2});
+  assert.equal(first.total,4);
+  assert.equal(first.recurring,2);
+  assert.equal(first.workspace.clients.length,2);
+  assert.equal(first.hasMore,true);
+  assert.equal(repo.hasLoaded(["clients"]),false);
+  const second=await repo.clientPage({size:2});
+  assert.equal(second.workspace.clients.length,4);
+  assert.equal(new Set(second.workspace.clients.map(c=>c.id)).size,4);
+  assert.equal(second.hasMore,false);
+  const complete=await repo.load(["clients","deliveries"]);
+  assert.equal(complete.clients.length,4);
+  assert.equal(repo.hasLoaded(["clients"]),true);
+});
