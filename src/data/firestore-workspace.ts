@@ -3,6 +3,7 @@ import { collections, decodeWorkspace, encodeWorkspace, equalData, type Data, ty
 import type { WorkspaceData } from "../domain/workspace";
 import { advanceSync, bootstrapSync, emptyNumbers, parseSync, persistentCacheSelected, readManifest, readSync, recordCounts, saveManifest, syncRef, type Domain, type SyncStamp } from "./firestore-sync.ts";
 import { FirestoreQueryGate } from "./firestore-query-gate.ts";
+import { trackAggregation, trackMutation, trackPage, trackRevision, usageSnapshot } from "./firestore-usage.ts";
 
 export type ProfessionalType = "freelancer" | "studio" | "producer" | "other";
 export type RoteivaProfile = {
@@ -111,6 +112,7 @@ export class FirestoreWorkspace {
       const base = collection(this.db, "users", this.uid, name);
       const q = query(base, orderBy(documentId()), ...(cursor ? [startAfter(cursor)] : []), limit(200));
       const page = source === "cache" ? await getDocsFromCache(q) : await getDocsFromServer(q);
+      trackPage(this.uid,source,page.size);
       for (const snapshot of page.docs) {
         const {ownerUid: _owner,schemaVersion: _schema,revision,createdAt: _created,updatedAt: _updated,...data} = snapshot.data();
         result.set(name + "/" + snapshot.id, {data:data as Data,revision});
@@ -140,12 +142,14 @@ export class FirestoreWorkspace {
     return decodeWorkspace(new Map([...this.stored].map(([key,value])=>[key,value.data])));
   }
   private async ensureSync():Promise<SyncStamp> {
+    trackRevision(this.uid);
     const existing=await readSync(this.db,this.uid);
     if (existing) return existing;
     // Migrate existing pre-revision accounts without downloading entire histories.
     const counts=emptyNumbers();
     await Promise.all(collections.map(async name=>{
       const aggregate=await getCountFromServer(collection(this.db,"users",this.uid,name));
+      trackAggregation(this.uid);
       counts[name]=aggregate.data().count;
     }));
     return bootstrapSync(this.db,this.uid,counts);
@@ -167,6 +171,7 @@ export class FirestoreWorkspace {
         }
         return {name,records:await this.readCollection(name,"server")};
       }));
+      trackRevision(this.uid);
       const after=await readSync(this.db,this.uid);
       if (!after || before.revision!==after.revision ||
           collections.some(name=>before.domains[name]!==after.domains[name])) continue;
@@ -192,6 +197,7 @@ export class FirestoreWorkspace {
 
   async hasExternalChanges(): Promise<boolean> {
     if (!this.stamp) return false;
+    trackRevision(this.uid);
     const current=await readSync(this.db,this.uid);
     return !current || [...this.loadedDomains].some(name=>this.stamp!.domains[name]!==current.domains[name]);
   }
@@ -200,6 +206,7 @@ export class FirestoreWorkspace {
     const snap=await getDocFromServer(this.ref("preferences/ui"));
     return snap.exists() ? snap.data().theme as "light"|"dark" : undefined;
   }
+  diagnostics() { return usageSnapshot(this.uid); }
   async saveTheme(theme:"light"|"dark") {
     const ref=this.ref("preferences/ui");
     await runTransaction(this.db,async tx=>{
@@ -247,6 +254,7 @@ export class FirestoreWorkspace {
       const committed = advanceSync(tx,synchronization,syncBefore,beforeCounts,afterCounts,touched);
       return {previous,committed};
     });
+    trackMutation(this.uid,keys.length);
     for (const key of keys) {
       const data = full.get(key);
       if (data) this.stored.set(key,{data,revision:(expected.get(key)?.revision||0)+1});
