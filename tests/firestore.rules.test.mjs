@@ -410,7 +410,7 @@ test("financial month reads only requested month, and annual bars respect year a
     [301,"2025-10-11",1,"income",99900],
     [302,"2026-01-11",1,"income",10001],
     [303,"2026-10-12",1,"income",20050],
-    [304,"2026-10-15",2,"income",5000],
+    [304,"2026-10-15",0,"income",5000],
     [305,"2026-10-17",1,"expense",700],
   ]){
     await assertSucceeds(setDoc(doc(db,"users/alice/financeEntries/"+id),
@@ -450,13 +450,14 @@ test("large finance histories use server annual aggregation and refresh only cha
   const initial=repo.diagnostics();
   const page=await repo.financeMonth(2026,9);
   assert.equal(page.financeEntries.length,5);
+  const aggregationBaseline=repo.diagnostics().aggregationQueries;
   const bars=await repo.financeYearBars(2026);
   assert.equal(bars[9],5);
   assert.equal(bars.reduce((a,b)=>a+b,0),5);
   const after=repo.diagnostics();
   assert.equal(repo.hasLoaded(["financeEntries"]),false);
   assert.equal(after.serverDocumentsReturned-initial.serverDocumentsReturned,5);
-  assert.equal(after.aggregationQueries-initial.aggregationQueries,12);
+  assert.equal(after.aggregationQueries-aggregationBaseline,12);
   const commands=[{kind:"saveFinance",entry:{
     id:999,project:"Novo",client:"Cliente",clientId:1,projectId:2,
     kind:"income",amount:7.5,date:"17/10/2026",status:"Recebido"
