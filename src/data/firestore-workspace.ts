@@ -57,6 +57,7 @@ export class FirestoreWorkspace {
   private readonly filteredProjectCounts=new Map<string,{revision:number;count:number}>();
   private clientCursor:QueryDocumentSnapshot<DocumentData>|null|undefined;
   private recurringCount:{revision:number;count:number}|undefined;
+  private readonly rangeRevisions=new Map<string,number>();
   hasLoaded(domains:readonly Domain[]):boolean { return domains.every(name=>this.loadedDomains.has(name)); }
   constructor(db: Firestore, uid: string) {
     if (!uid || uid.includes("/")) throw new Error("UID inválido.");
@@ -199,6 +200,69 @@ export class FirestoreWorkspace {
       return this.decoded();
     }
     throw new Error("Conflito: os dados mudaram durante o carregamento. Tente novamente.");
+  }
+
+
+  /**
+   * A verified date window, not a full domain. Query bounds use the canonical
+   * ISO civil-date field; old finance history and unrelated agenda months
+   * cannot consume reads on the current screen. Never marks a domain complete.
+   */
+  private async dateWindow(name:"events"|"financeEntries",start:string,end:string):
+    Promise<WorkspaceData> {
+    const previous=this.loadQueue;
+    let release!:()=>void;
+    this.loadQueue=new Promise<void>(resolve=>{release=resolve;});
+    await previous;
+    try{
+      if(this.loadedDomains.has(name))return this.decoded();
+      const before=await this.ensureSync();
+      const key=name+":"+start+":"+end;
+      if(this.rangeRevisions.get(key)===before.domains[name] && this.stamp?.domains[name]===before.domains[name])
+        return this.decoded();
+      const base=collection(this.db,"users",this.uid,name);
+      let cursor:QueryDocumentSnapshot<DocumentData>|undefined;
+      const results=new Map<string,Stored>();
+      while(true){
+        const q=query(base,where("date",">=",start),where("date","<",end),
+          orderBy("date"),orderBy(documentId()),...(cursor?[startAfter(cursor)]:[]),limit(200));
+        const snapshot=await getDocsFromServer(q);
+        trackPage(this.uid,"server",snapshot.size);
+        for(const record of snapshot.docs){
+          const {ownerUid:_o,schemaVersion:_s,revision,createdAt:_c,updatedAt:_u,...data}=record.data();
+          results.set(name+"/"+record.id,{data:data as Data,revision});
+        }
+        if(snapshot.size<200)break;
+        cursor=snapshot.docs[snapshot.docs.length-1];
+      }
+      trackRevision(this.uid);
+      const after=await readSync(this.db,this.uid);
+      if(!after||before.domains[name]!==after.domains[name])
+        throw Error("Conflito: os registros foram atualizados durante a consulta. Recarregue.");
+      // Replace only this date window; other years and pending local records
+      // remain intact. No inference of deletions outside the window.
+      for(const [path,record] of this.stored){
+        if(path.startsWith(name+"/") && typeof record.data.date==="string" &&
+          record.data.date>=start && record.data.date<end)this.stored.delete(path);
+      }
+      for(const [path,item] of results)this.stored.set(path,item);
+      this.pagedDomains.add(name);
+      this.stamp={...after,domains:{...(this.stamp?.domains??after.domains),[name]:after.domains[name]}};
+      this.rangeRevisions.set(key,after.domains[name]);
+      return this.decoded();
+    }finally{release();}
+  }
+  async financeYear(year:number):Promise<WorkspaceData>{
+    if(!Number.isInteger(year)||year<2000||year>2100)throw Error("Ano financeiro inválido.");
+    return this.dateWindow("financeEntries",year+"-01-01",(year+1)+"-01-01");
+  }
+  async calendarWindow(year:number,month:number):Promise<WorkspaceData>{
+    if(!Number.isInteger(year)||year<2000||year>2100||!Number.isInteger(month)||month<0||month>11)
+      throw Error("Período de agenda inválido.");
+    // 42-cell calendar includes adjacent months; fetch one on either side.
+    const start=new Date(Date.UTC(year,month-1,1)).toISOString().slice(0,10);
+    const end=new Date(Date.UTC(year,month+2,1)).toISOString().slice(0,10);
+    return this.dateWindow("events",start,end);
   }
 
   /**

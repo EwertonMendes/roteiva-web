@@ -24,9 +24,9 @@ export function domainsForRoute(route:WorkspaceRoute):readonly Domain[] {
         ? ["clients","projects","financeEntries","deliveries","activities"]
         : ["projects","activities"];
     case "finance":
-      return ["financeEntries","clients","projects","activities"];
+      return ["clients","projects","activities"];
     case "calendar":
-      return ["events","projects","activities"];
+      return ["projects","activities"];
     case "reviews":
       return ["clients","projects","tasks","activities"];
   }
