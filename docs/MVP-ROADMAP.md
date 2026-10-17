@@ -63,7 +63,7 @@
 
 ## Configurações da conta e do estúdio — PR #11
 
-**Estado: IMPLEMENTADO na branch, aguardando CI e deploy DEV.**
+**Estado: VALIDADO no CI da PR #11, publicação DEV pendente do merge.**
 
 - [x] Criar uma tela de configurações alinhada à identidade visual do Roteiva, responsiva e com temas claro/escuro.
 - [x] Permitir editar nome profissional, nome do estúdio e tipo de atuação, com Firestore revisionado e validação.
@@ -71,7 +71,7 @@
 - [x] Preservar conta antiga, dados existentes e timestamps do cadastro, e-mail/foto Google somente leitura.
 - [x] Reutilizar tema salvo e exportação JSON dos dados carregados, com limitações explícitas.
 - [x] Estender Security Rules para edição restrita ao UID e preservar registro e identidade.
-- [ ] CI com testes Firestore de concorrência/contas antigas e QA browser desktop/mobile aprovados.
+- [x] [CI da PR #11 — execução 38992248908](https://github.com/EwertonMendes/roteiva-web/actions/runs/38992248908): instalação congelada, testes de domínio, TypeScript, builds Firebase/Pages, testes de segurança e persistência com Firebase Emulator, Playwright Chromium desktop/mobile aprovados.
 - [ ] Merge, deploy DEV e conferência com conta Google real.
 - [ ] Futuro: eliminação segura de conta, exportação integral e políticas legais antes do beta público.
 
