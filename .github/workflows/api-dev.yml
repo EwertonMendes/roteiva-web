@@ -5,6 +5,15 @@ on:
   push:
     branches: [master]
   workflow_dispatch:
+    inputs:
+      dev_bootstrap:
+        description: Initial DEV publication from audited PR branch
+        type: boolean
+        default: false
+      expected_sha:
+        description: Exact reviewed commit to publish
+        type: string
+        required: false
 permissions:
   contents: read
 concurrency:
@@ -33,7 +42,11 @@ jobs:
           path: api/package-lock.json
           retention-days: 7
   deploy:
-    if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
+    if: >-
+      (github.ref == 'refs/heads/master' && github.event_name != 'pull_request') ||
+      (github.event_name == 'workflow_dispatch' && inputs.dev_bootstrap &&
+       github.ref == 'refs/heads/codex/drive-infrastructure-dev' && inputs.expected_sha == github.sha &&
+       github.actor == 'EwertonMendes')
     needs: validate
     runs-on: ubuntu-latest
     environment: cloudflare-development

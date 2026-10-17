@@ -93,7 +93,7 @@ test('rate limit rejects before touching D1',async()=>{
 test('OAuth starts scoped offline PKCE flow and callback rejects missing browser binding',async()=>{
  const {start,callback}=await import('../src/oauth.ts');
  let inserts=0;
- const DB={prepare(sql){return {bind(...args){return {run:async()=>{if(sql.startsWith('INSERT')) inserts++; return {meta:{changes:1}}}}}}};
+ const DB={prepare:sql=>({bind:(...args)=>({run:async()=>{if(sql.startsWith('INSERT')) inserts++; return {meta:{changes:1}};}})})};
  const configured={...env,DB,OAUTH_ENABLED:'true',GOOGLE_CLIENT_ID:'test',GOOGLE_CLIENT_SECRET:'synthetic'};
  const response=await start(configured,'A');
  const {authorizationUrl}=await response.json();
