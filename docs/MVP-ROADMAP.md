@@ -77,6 +77,22 @@
 
 **Não implementa Drive, cobrança, edição de conta Google ou exclusão irreversível.**
 
+## Navegação por URL e restauração de tela — PR #12
+
+**Status: IMPLEMENTADO na branch, aguardando CI e publicação DEV.**
+
+- [x] URLs próprias para as sete seções do dashboard além da visão geral, incluindo Configurações.
+- [x] URLs estáveis de detalhes de projeto e cliente, restauradas após F5 sem recarregar a tela inicial.
+- [x] Navegação Voltar/Avançar com `pushState`/`popstate` e links diretos com Firebase Hosting SPA rewrite existente.
+- [x] GitHub Pages usa rotas `#/...`, mantendo o mesmo frontend e a persistência local da demonstração.
+- [x] Preservar `/review` protegido e impedir renderização de dados alheios a partir de um ID na URL.
+- [x] Limpar a rota privada ao sair e voltar à lista quando um ID não pertence à conta.
+- [x] Testes unitários do parser/URL e Playwright de refresh, histórico, isolamento e demo.
+- [ ] Validar CI da PR #12 (TypeScript, builds Firebase/Pages, Firestore emulado e Playwright desktop/mobile).
+- [ ] Merge, deploy DEV e conferência manual do F5 em uma conta Google real.
+
+**Decisão:** URLs com pathname no Firebase e fragmento/hash no Pages, para funcionar sem criar um backend ou um mecanismo de fallback HTTP falso.
+
 ## Fase 0 — Prova técnica mais arriscada: Google Drive + Worker
 
 **Prioridade P0.** Fazer **antes** de migrar a biblioteca completa, para validar que é possível usar Drive com segurança e arquivos grandes sem proxy.
