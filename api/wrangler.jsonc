@@ -1,0 +1,41 @@
+{
+  "name": "roteiva-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-17",
+  "workers_dev": false,
+  "preview_urls": false,
+  "env": {
+    "dev": {
+      "name": "roteiva-api-dev",
+      "workers_dev": true,
+      "preview_urls": false,
+      "account_id": "b3855f9c192541a01a45b2dae7b6a7f8",
+      "vars": {
+        "ENVIRONMENT": "dev",
+        "FIREBASE_PROJECT_ID": "roteiva-web-dev",
+        "FRONTEND_ORIGIN": "https://roteiva-web-dev.web.app",
+        "OAUTH_REDIRECT_URI": "https://roteiva-api-dev.ewertonmendes9.workers.dev/oauth/drive/callback",
+        "OAUTH_ENABLED": "false",
+        "TOKEN_KEY_VERSION": "v1"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "roteiva-drive-dev",
+          "database_id": "302adc88-76b2-4827-bb16-99662fa0408b",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "observability": {
+        "enabled": true,
+        "head_sampling_rate": 0.1,
+        "logs": {
+          "invocation_logs": false
+        }
+      },
+      "limits": {
+        "cpu_ms": 10
+      }
+    }
+  }
+}

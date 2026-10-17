@@ -1,0 +1,25 @@
+{
+  "name": "@roteiva/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test tests/*.test.mjs",
+    "build": "wrangler deploy --env dev --dry-run --outdir dist",
+    "migrate:local": "wrangler d1 migrations apply DB --env dev --local",
+    "migrate:dev": "wrangler d1 migrations apply DB --env dev --remote",
+    "deploy:dev": "wrangler deploy --env dev"
+  },
+  "dependencies": {
+    "jose": "6.1.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "4.20251011.0",
+    "typescript": "5.9.3",
+    "wrangler": "4.45.0"
+  }
+}
