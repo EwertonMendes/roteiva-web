@@ -160,7 +160,7 @@ test("Direct routes, refresh and browser Back/Forward preserve each user's scree
   await page.getByLabel("Nome do projeto",{exact:true}).fill("Projeto com URL");
   await page.locator("form.project-modal").getByRole("button",{name:"Criar projeto",exact:true}).click();
   await settled(page);
-  await expect(page).toHaveURL(/\\/projetos\\/[1-9][0-9]*$/);
+  await expect(page).toHaveURL(new RegExp("/projetos/[1-9][0-9]*$"));
   const projectURL=page.url();
   await expect(page.getByLabel("Nova tarefa",{exact:true})).toBeVisible();
   await page.reload();await settled(page);
@@ -180,7 +180,7 @@ test("Direct routes, refresh and browser Back/Forward preserve each user's scree
   await page.getByLabel("Contato principal",{exact:true}).fill("Contato de teste");
   await page.getByRole("button",{name:"Salvar cliente"}).click();await settled(page);
   await page.locator(".client-list button").filter({hasText:"Cliente com URL"}).click();
-  await expect(page).toHaveURL(/\\/clientes\\/[1-9][0-9]*$/);
+  await expect(page).toHaveURL(new RegExp("/clientes/[1-9][0-9]*$"));
   const clientURL=page.url();
   await page.reload();await settled(page);
   await expect(page).toHaveURL(clientURL);
@@ -264,12 +264,12 @@ test("Pages stays anonymous and uses the unchanged localStorage key",async({page
   await expect(page.getByText("Modo demonstração",{exact:true})).toBeVisible();
   await expect(page.getByRole("button",{name:"Entrar com Google",exact:true})).toHaveCount(0);
   await navigate(page,"Clientes");
-  await expect(page).toHaveURL(/\\/roteiva-web\\/#\\/clientes$/);
+  await expect(page).toHaveURL(new RegExp("/roteiva-web/#/clientes$"));
   await page.reload();
   await expect(page.getByRole("heading",{name:"Clientes",exact:true})).toBeVisible();
-  await expect(page).toHaveURL(/\\/roteiva-web\\/#\\/clientes$/);
+  await expect(page).toHaveURL(new RegExp("/roteiva-web/#/clientes$"));
   await page.goBack();
-  await expect(page).toHaveURL(/\\/roteiva-web\\/#\\/clientes$|\\/roteiva-web\\/$/);
+  await expect(page).toHaveURL(new RegExp("/roteiva-web/(#/clientes)?$"));
   await page.goto("http://127.0.0.1:4174/roteiva-web/#/clientes");
   await expect(page.getByRole("heading",{name:"Clientes",exact:true})).toBeVisible();
   await page.getByRole("button",{name:"Novo cliente",exact:true}).click();
