@@ -327,7 +327,8 @@ export class FirestoreWorkspace {
     }else{
       const base=collection(this.db,"users",this.uid,"financeEntries");
       const indexes=refreshOnly ? [...new Set(affectedMonths)] : Array.from({length:12},(_,i)=>i);
-      const values=await Promise.all(indexes.map(async i=>{
+      let values:number[];
+      try{values=await Promise.all(indexes.map(async i=>{
         const start=new Date(Date.UTC(year,i,1)).toISOString().slice(0,10);
         const end=new Date(Date.UTC(year,i+1,1)).toISOString().slice(0,10);
         const filtered=query(base,...(clientId?[where("clientId","==",clientId)]:[]),
@@ -335,7 +336,18 @@ export class FirestoreWorkspace {
         const result=await getAggregateFromServer(filtered,{amountCents:sum("amountCents")});
         trackAggregation(this.uid);
         return Number(result.data().amountCents??0)/100;
-      }));
+      }));}
+      catch(error){
+        if(!missingQueryIndex(error))throw error;
+        // The annual chart is essential; return exact values by reading
+        // the ordinary collection while an index is unavailable.
+        await this.load(["financeEntries"]);
+        const records=this.decoded().financeEntries;
+        values=indexes.map(i=>records.filter(entry=>
+          entry.kind!=="expense" && (!clientId||entry.clientId===clientId) &&
+          entry.date.endsWith("/"+year) && Number(entry.date.slice(3,5))===i+1)
+          .reduce((n,entry)=>n+Math.round(entry.amount*100),0)/100);
+      }
       bars=refreshOnly ? [...cached!.bars] : Array(12).fill(0);
       indexes.forEach((month,i)=>{bars[month]=values[i];});
     }
