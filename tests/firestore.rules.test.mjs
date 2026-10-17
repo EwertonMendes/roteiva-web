@@ -343,3 +343,21 @@ test("client directory uses bounded cursor, accurate recurring count, and never 
   assert.equal(complete.clients.length,4);
   assert.equal(repo.hasLoaded(["clients"]),true);
 });
+
+test("client and project cursors reject pages mixed across remote revisions",async()=>{
+  const db=dbFor("alice");
+  await assertSucceeds(setDoc(doc(db,"users/alice/projects/11"),
+    {...project,id:11,clientId:1,...meta("alice")}));
+  await assertSucceeds(setDoc(doc(db,"users/alice/clients/11"),
+    {...client,id:11,name:"Cliente onze",...meta("alice")}));
+  const first=new FirestoreWorkspace(db,"alice"),second=new FirestoreWorkspace(db,"alice");
+  const projectPage=await first.projectPage({reset:true,size:1});
+  assert.equal(projectPage.hasMore,true);
+  const other=await second.load(["projects","clients"]);
+  await second.applyCommands([{kind:"saveProject",project:{...other.projects.find(p=>p.id===2),name:"Atualizado em outra aba"}}]);
+  await assert.rejects(()=>first.projectPage({size:1}),/Conflito/);
+  const clientPage=await first.clientPage({reset:true,size:1});
+  assert.equal(clientPage.hasMore,true);
+  await second.applyCommands([{kind:"saveClient",client:{...other.clients.find(c=>c.id===1),contact:"Mudou remotamente"}}]);
+  await assert.rejects(()=>first.clientPage({size:1}),/Conflito/);
+});
