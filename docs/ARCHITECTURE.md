@@ -219,3 +219,13 @@ O primeiro login no Firebase Auth Google pode criar uma identidade no Firebase A
 - **Transparência DEV:** o texto do checkbox é um reconhecimento específico do uso de dados do ambiente de testes; **não equivale** à aceitação de Termos de Uso/Política de Privacidade de produção. Documentos jurídicos definitivos e processo formal de aceite permanecem pendentes antes de cadastro público.
 
 Firebase Authentication e Firestore só operam no modo `firebase`. Demo Pages mantém a persistência `localStorage` e o mesmo frontend de gestão. Validar em CI auth emulado, regras de UID, novos/antigos perfis e navegador mobile/desktop; OAuth real e dispositivo físico não são substituídos pelos emuladores.
+
+## 17. Perfil editável e identificação do estúdio (PR #11)
+
+O contexto `RegistrationGate` já consulta o perfil proprietário `users/{uid}`. Agora propaga a leitura completa (`displayName`, `studioName`, `professionalType`, `revision`, indicador de conta antiga) e uma operação `saveProfile` para o dashboard, sem novo listener nem duplicar documentos. `FirebaseWorkspace` não grava nome, foto ou e-mail a cada login.
+
+`FirestoreWorkspace.saveProfile` recebe mudanças validadas e a revisão esperada. Uma transação lê o documento atual, compara `revision`, escreve somente `displayName`, `studioName`, `professionalType`, `revision+1`, `updatedAt`, ou rejeita o conflito. **Não altera** `ownerUid`, `schemaVersion`, `createdAt`, e-mail/foto, `registrationCompletedAt` nem `dataAcknowledgedAt`. Regras impõem proprietário e imutabilidade de identidade Google. Perfis anteriores ao onboarding permanecem "legacy": podem acrescentar estúdio e atuação em par, sem alterar o estado original nem simular um novo aceite; perfis atuais preservam timestamps obrigatórios.
+
+`src/features/settings/SettingsPage.tsx` reutiliza o tema e `WorkspaceTools` existente. A navegação `Configurações` e o nome do estúdio no topo usam o mesmo componente React para desktop/mobile. Nome do estúdio vazio -> rótulo alternativo `Roteiva Studio`. O modo Pages apresenta a seção sem permitir alterar perfil remoto. A exportação é apenas dos dados carregados em memória; procedimento completo para exportação/eliminação de todas as subcoleções e da identidade Auth permanece separado e pendente.
+
+A experiência não oferece botão de exclusão inoperante nem modifica a estrutura das coleções de projeto. Evidência de conclusão: CI Firestore Emulator (UID A/B, perfis antigos e novos, concorrência) e Playwright Chromium desktop/mobile, além de deploy DEV após merge.
