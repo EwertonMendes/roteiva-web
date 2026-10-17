@@ -164,3 +164,11 @@ A função `saveProfile(changes, expectedRevision)` valida os campos, lê o docu
 As regras Firestore proíbem alterações de UID, e-mail/foto, timestamps de cadastro e campos administrativos. O QA deve incluir conta antiga, conta nova, tentativa cruzada de edição, atualização concorrente, nome no cabeçalho, recarga da página, tema e preservação de projetos. O GitHub Pages continua sem gravação no Firebase.
 
 A opção de exportação JSON reutiliza o componente existente e **não garante backup de registros que não foram carregados**; não inclui mídia, segredos nem autenticação. Exclusão de conta e tratamento LGPD/termos são **pendências** do beta, não recursos falsamente anunciados.
+
+## Rotas e comportamento do navegador — PR #12
+
+A tabela de rotas está em `src/lib/workspace-routing.ts`. O Firebase Hosting mantém seu rewrite SPA `** → /index.html` e serve as URLs de seção e detalhe diretamente. `DashboardClient` extrai a tela e o ID da URL antes da primeira renderização; ao navegar, usa `pushState` e no histórico usa `popstate`. `/review` continua uma rota à parte em `src/main.tsx`; o layout, os dados e o login não são duplicados.
+
+Como o GitHub Pages é estático e não oferece fallback correto para subrotas, a build em modo `demo` usa `/roteiva-web/#/clientes` e `/roteiva-web/#/projetos/:id`, com o mesmo módulo e a mesma chave de `localStorage`. Não adicionar roteador pesado nem dependência nova apenas para essa navegação, e não fazer URL limpa no Pages sem infraestrutura de fallback.
+
+**Testar:** `pnpm test` inclui `tests/workspace-routing.test.mjs`. `pnpm test:firebase` também cobre F5, links diretos, Back/Forward, IDs existentes/inexistentes, login com rota salva e outra conta Google no Auth Emulator, além da demonstração hash em desktop/mobile. O parser de rotas não lê nem autoriza documentos; as Security Rules Firestore permanecem a fronteira de permissão. Após logout explícito, um link de detalhe da sessão anterior sai da barra de endereço. Manter essa validação ao adicionar novas seções.
