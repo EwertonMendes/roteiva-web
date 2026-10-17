@@ -290,3 +290,31 @@ test("typed commands preserve counts, reject duplicates, and detect concurrent e
   assert.equal((await getDoc(doc(db,"users/alice/projects/2"))).exists(),true);
   assert.equal(before.clients.length,1);
 });
+
+test("server cursor pages return distinct projects, status filters and joined tasks",async()=>{
+  const db=dbFor("alice");
+  for(const id of [11,12,13,14]){
+    await assertSucceeds(setDoc(doc(db,"users/alice/projects/"+id),
+      {...project,id,clientId:1,status:id===14?"Aprovado":"Em produção",...meta("alice")}));
+  }
+  await assertSucceeds(setDoc(doc(db,"users/alice/tasks/50"),
+    {...fixtures.tasks,id:50,projectId:12,...meta("alice")}));
+  const repo=new FirestoreWorkspace(db,"alice");
+  const first=await repo.projectPage({reset:true,size:2});
+  assert.equal(first.workspace.projects.length,2);
+  assert.equal(first.total,5);
+  assert.equal(first.hasMore,true);
+  assert.equal(repo.hasLoaded(["projects"]),false);
+  const second=await repo.projectPage({size:2});
+  assert.equal(second.workspace.projects.length,4);
+  assert.equal(new Set(second.workspace.projects.map(p=>p.id)).size,4);
+  const last=await repo.projectPage({size:2});
+  assert.equal(last.workspace.projects.length,5);
+  assert.equal(last.hasMore,false);
+  const filtered=await repo.projectPage({status:"Aprovado",reset:true,size:2});
+  assert.deepEqual(filtered.workspace.projects.map(p=>p.id),[14]);
+  assert.equal(filtered.total,1);
+  const complete=await repo.load(["projects","tasks"]);
+  assert.equal(complete.projects.length,5);
+  assert.equal(complete.projects.find(p=>p.id===12).tasks.length,1);
+});
