@@ -49,6 +49,11 @@ export function FirebaseWorkspace() {
           if(route.view==="overview" || (route.view==="projects" && !route.projectId)){
             const size=route.view==="overview"?4:24;
             const page=await repository.projectPage({reset:true,size});
+            if(route.view==="overview"){
+              const d=new Date(),year=d.getFullYear(),month=d.getMonth();
+              const workspace=await repository.calendarWindow(year,month);
+              return {workspace,page:{...page,workspace},calendar:`${year}-${month}`};
+            }
             return {workspace:page.workspace,page};
           }
           if(route.view==="clients" && !route.clientId){
@@ -214,8 +219,9 @@ export function FirebaseWorkspace() {
     finally{if(request===scopeRequest.current)setLoadingBusiness(false);}
   },[repository,calendarPeriod]);
   const onRouteChange=useCallback((route:WorkspaceRoute)=>{
-    if (route.view==="overview" && !overviewMetrics) {
-      void repository.overviewMetrics().then(setOverviewMetrics).catch(reason=>setError(dataErrorMessage(reason)));
+    if(route.view==="overview"){
+      if(!overviewMetrics)void repository.overviewMetrics().then(setOverviewMetrics).catch(reason=>setError(dataErrorMessage(reason)));
+      if(!calendarPeriod){const d=new Date();void loadCalendarPeriod(d.getFullYear(),d.getMonth());}
     }
     if(route.view==="projects" && !route.projectId && !repository.hasLoaded(["projects","tasks"])){
       if(!projectPage || projectPage.status!=="Todos")void fetchProjectPage("Todos",true);
@@ -286,6 +292,7 @@ export function FirebaseWorkspace() {
         onSearchProjects={searchAllProjects}
         clientPage={repository.hasLoaded(["clients"])?undefined:clientPage}
         onMoreClients={()=>void fetchClientPage(false)}
+        eventCount={repository.totalCount("events")}
         onSearchClients={searchAllClients}
         onFinancePeriodChange={(year,month,clientId)=>void loadFinancePeriod(year,month,clientId)}
         financeBars={financeBars}

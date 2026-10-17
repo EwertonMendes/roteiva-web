@@ -58,6 +58,7 @@ export class FirestoreWorkspace {
   private clientCursor:QueryDocumentSnapshot<DocumentData>|null|undefined;
   private recurringCount:{revision:number;count:number}|undefined;
   private readonly rangeRevisions=new Map<string,number>();
+  private readonly peekKeys=new Map<string,Set<string>>();
   private readonly financeBarCache=new Map<string,{revision:number;bars:number[]}>();
   hasLoaded(domains:readonly Domain[]):boolean { return domains.every(name=>this.loadedDomains.has(name)); }
   constructor(db: Firestore, uid: string) {
@@ -236,6 +237,17 @@ export class FirestoreWorkspace {
         if(snapshot.size<200)break;
         cursor=snapshot.docs[snapshot.docs.length-1];
       }
+      const newPeek=new Set<string>();
+      if(name==="events"){
+        const future=query(base,where("date",">=",end),orderBy("date"),orderBy(documentId()),limit(4));
+        const extra=await getDocsFromServer(future);
+        trackPage(this.uid,"server",extra.size);
+        for(const record of extra.docs){
+          const {ownerUid:_o,schemaVersion:_s,revision,createdAt:_c,updatedAt:_u,...data}=record.data();
+          const path=name+"/"+record.id;
+          results.set(path,{data:data as Data,revision});newPeek.add(path);
+        }
+      }
       trackRevision(this.uid);
       const after=await readSync(this.db,this.uid);
       if(!after||before.domains[name]!==after.domains[name])
@@ -246,6 +258,8 @@ export class FirestoreWorkspace {
         if(path.startsWith(name+"/") && typeof record.data.date==="string" &&
           record.data.date>=start && record.data.date<end)this.stored.delete(path);
       }
+      for(const path of this.peekKeys.get(key)||[])if(!results.has(path))this.stored.delete(path);
+      this.peekKeys.set(key,newPeek);
       for(const [path,item] of results)this.stored.set(path,item);
       this.pagedDomains.add(name);
       this.stamp={...after,domains:{...(this.stamp?.domains??after.domains),[name]:after.domains[name]}};
@@ -505,6 +519,7 @@ export class FirestoreWorkspace {
       projectStatuses};
   }
   diagnostics() { return usageSnapshot(this.uid); }
+  totalCount(domain:Domain):number|undefined{return this.stamp?.counts[domain];}
   async saveTheme(theme:"light"|"dark") {
     const ref=this.ref("preferences/ui");
     await runTransaction(this.db,async tx=>{
