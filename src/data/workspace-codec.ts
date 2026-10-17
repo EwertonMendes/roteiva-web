@@ -3,24 +3,26 @@ import { toISO } from "../studio-finance.ts";
 export type Data = Record<string, string | number | boolean>;
 export type Records = Map<string, Data>;
 export const collections = ["clients", "projects", "tasks", "deliveries", "events", "financeEntries", "activities"] as const;
-export function encodeWorkspace(workspace: WorkspaceData): Records {
+export type CollectionName = typeof collections[number];
+export function encodeWorkspace(workspace: WorkspaceData, scope?: ReadonlySet<CollectionName>): Records {
+  const accepts=(name:CollectionName) => !scope || scope.has(name);
   const records: Records = new Map();
   const put = (collection: string, id: number | string, data: Data) => records.set(collection + "/" + id, data);
   for (const c of workspace.clients) {
-    put("clients", c.id, {id:c.id,name:c.name,contact:c.contact,email:c.email || "",phone:c.phone || "",color:c.color,initials:c.initials,type:c.type,since:c.since,packageTitle:c.packageTitle || "",monthlyDeliverables:c.monthlyDeliverables || 0,monthlyFeeCents:Math.round((c.monthlyFee || 0)*100)});
-    for (const d of c.deliveries || []) put("deliveries",d.id,{...d,clientId:c.id});
+    if (accepts("clients")) put("clients", c.id, {id:c.id,name:c.name,contact:c.contact,email:c.email || "",phone:c.phone || "",color:c.color,initials:c.initials,type:c.type,since:c.since,packageTitle:c.packageTitle || "",monthlyDeliverables:c.monthlyDeliverables || 0,monthlyFeeCents:Math.round((c.monthlyFee || 0)*100)});
+    for (const d of c.deliveries || []) if (accepts("deliveries")) put("deliveries",d.id,{...d,clientId:c.id});
   }
   for (const p of workspace.projects) {
-    put("projects",p.id,{id:p.id,name:p.name,clientId:p.clientId || 0,client:p.client,status:p.status,dueDate:p.dueDate || "",description:p.description || "",template:p.template || "Livre",color:p.color,initials:p.initials});
-    for (const t of p.tasks || []) put("tasks",t.id,{...t,projectId:p.id});
+    if (accepts("projects")) put("projects",p.id,{id:p.id,name:p.name,clientId:p.clientId || 0,client:p.client,status:p.status,dueDate:p.dueDate || "",description:p.description || "",template:p.template || "Livre",color:p.color,initials:p.initials});
+    for (const t of p.tasks || []) if (accepts("tasks")) put("tasks",t.id,{...t,projectId:p.id});
   }
-  for (const e of workspace.calendarEvents) put("events",e.id,{...e,projectId:e.projectId || 0,endTime:e.endTime || "",autoDeadline:!!e.autoDeadline});
+  for (const e of workspace.calendarEvents) if (accepts("events")) put("events",e.id,{...e,projectId:e.projectId || 0,endTime:e.endTime || "",autoDeadline:!!e.autoDeadline});
   for (const e of workspace.financeEntries) {
     const {amount, ...rest} = e;
-    put("financeEntries",e.id,{...rest,projectId:e.projectId || 0,clientId:e.clientId || 0,kind:e.kind || "income",date:toISO(e.date),amountCents:Math.round(amount*100)});
+    if (accepts("financeEntries")) put("financeEntries",e.id,{...rest,projectId:e.projectId || 0,clientId:e.clientId || 0,kind:e.kind || "income",date:toISO(e.date),amountCents:Math.round(amount*100)});
   }
   for (const a of workspace.activities) {
-    if (a.id) put("activities",a.id,{id:a.id,text:a.text,when:a.when});
+    if (a.id && accepts("activities")) put("activities",a.id,{id:a.id,text:a.text,when:a.when});
   }
   return records;
 }

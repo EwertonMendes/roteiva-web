@@ -3,6 +3,7 @@ import DashboardClient from "../../dashboard-client";
 import { firebaseServices } from "../../lib/firebase";
 import { FirestoreWorkspace, dataErrorMessage } from "../../data/firestore-workspace";
 import type { WorkspaceData } from "../../domain/workspace";
+import type { Domain } from "../../data/firestore-sync";
 import { useAuth } from "../auth/AuthProvider";
 import { useRegistrationProfile } from "../auth/RegistrationGate";
 
@@ -69,7 +70,7 @@ export function FirebaseWorkspace() {
       failed.current=true;setError(dataErrorMessage(reason));setStatus("Alterações não confirmadas");
     }).finally(()=>{pending.current--;if(!pending.current)setSaving(false);});
   },[]);
-  const save=useCallback((workspace:WorkspaceData)=>enqueue(()=>repository.save(workspace)),[repository,enqueue]);
+  const save=useCallback((workspace:WorkspaceData,dirtyDomains:readonly Domain[])=>enqueue(()=>repository.save(workspace,dirtyDomains)),[repository,enqueue]);
   const saveTheme=useCallback((theme:"light"|"dark")=>enqueue(()=>repository.saveTheme(theme)),[repository,enqueue]);
   if (!user) return null;
   return <>

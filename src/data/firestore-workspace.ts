@@ -170,16 +170,26 @@ export class FirestoreWorkspace {
       tx.set(ref,{theme,ownerUid:this.uid,schemaVersion:1,revision:(before.data()?.revision || 0)+1,createdAt:before.data()?.createdAt || serverTimestamp(),updatedAt:serverTimestamp()});
     });
   }
-  async save(workspace: WorkspaceData): Promise<boolean> {
-    const next = encodeWorkspace(workspace);
-    const keys = [...new Set([...this.stored.keys(),...next.keys()])]
-      .filter(key => !equalData(this.stored.get(key)?.data,next.get(key)));
+  async save(workspace: WorkspaceData, dirtyDomains?: readonly Domain[]): Promise<boolean> {
+    if (dirtyDomains && !dirtyDomains.length) return false;
+    const scope = dirtyDomains ? new Set(dirtyDomains) : undefined;
+    const part = encodeWorkspace(workspace, scope);
+    const full = new Map<string,Data>();
+    if (scope) {
+      for (const [key,value] of this.stored) {
+        if (!scope.has(key.split("/")[0] as Domain)) full.set(key,value.data);
+      }
+    }
+    for (const [key,data] of part) full.set(key,data);
+    const keys = [...new Set([...this.stored.keys(),...full.keys()])]
+      .filter(key => (!scope || scope.has(key.split("/")[0] as Domain)) &&
+        !equalData(this.stored.get(key)?.data,full.get(key)));
     if (!keys.length) return false;
     // Reserve space in transactions for the sync document and Security Rules reads.
     if (keys.length > 350) throw new Error("Muitas alterações simultâneas. Recarregue e edite em etapas menores.");
     const expected = new Map(keys.map(key => [key,this.stored.get(key)]));
     const beforeCounts = recordCounts(this.stored);
-    const afterCounts = recordCounts(next);
+    const afterCounts = recordCounts(full);
     const touched = new Set(keys.map(key => key.split("/")[0] as Domain));
     const result = await runTransaction(this.db, async tx => {
       const synchronization = syncRef(this.db,this.uid);
@@ -191,7 +201,7 @@ export class FirestoreWorkspace {
         }
       });
       keys.forEach((key,index) => {
-        const data = next.get(key),ref=this.ref(key),before=snapshots[index].data();
+        const data = full.get(key),ref=this.ref(key),before=snapshots[index].data();
         if (!data) tx.delete(ref);
         else tx.set(ref,{...data,ownerUid:this.uid,schemaVersion:1,revision:(before?.revision||0)+1,
           createdAt:before?.createdAt||serverTimestamp(),updatedAt:serverTimestamp()});
@@ -201,7 +211,7 @@ export class FirestoreWorkspace {
       return {previous,committed};
     });
     for (const key of keys) {
-      const data = next.get(key);
+      const data = full.get(key);
       if (data) this.stored.set(key,{data,revision:(expected.get(key)?.revision||0)+1});
       else this.stored.delete(key);
     }
