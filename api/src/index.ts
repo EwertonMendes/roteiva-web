@@ -43,10 +43,8 @@ export async function handle(request: Request, env: Env): Promise<Response> {
       if (origin !== env.FRONTEND_ORIGIN) throw new ApiError(403,'origin_required');
       const uid = await identity(request,env);
       if (!(await env.API_RATE_LIMIT.limit({key:'dev:uid:'+uid})).success) throw new ApiError(429,'rate_limited');
-      const mode=url.searchParams.get('mode');
-      if (mode!==null && mode!=='folders') throw new ApiError(400,'invalid_oauth_mode');
-      response = await start(env,uid,mode==='folders'?'folders':'files');
-    } else if (/^\\/integrations\\/drive\\/[^/]+\\/folders(?:\\/[^/]+\\/items)?$/.test(url.pathname) && request.method==='GET') {
+      response = await start(env,uid);
+    } else if (/^\/integrations\/drive\/[^/]+\/folders(?:\/[^/]+\/items)?$/ && request.method==='GET') {
       enabled(env);
       const uid=await identity(request,env);
       if (!(await env.API_RATE_LIMIT.limit({key:'dev:uid:'+uid})).success) throw new ApiError(429,'rate_limited');
