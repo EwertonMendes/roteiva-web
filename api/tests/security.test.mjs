@@ -90,20 +90,50 @@ test('rate limit rejects before touching D1',async()=>{
  const response=await handle(new Request('https://api.example/health'),{...env,API_RATE_LIMIT:{limit:async()=>({success:false})}});
  assert.equal(response.status,429);
 });
-test('OAuth starts scoped offline PKCE flow and callback rejects missing browser binding',async()=>{
- const {start,callback}=await import('../src/oauth.ts');
- let inserts=0;
- const DB={prepare:sql=>({bind:(...args)=>({run:async()=>{if(sql.startsWith('INSERT')) inserts++; return {meta:{changes:1}};}})})};
+test('OAuth first-party launch uses one-time ticket, PKCE and Lax callback cookie',async()=>{
+ const {start,launch,callback}=await import('../src/oauth.ts');
+ let inserted,used=false,insertCount=0;
+ const DB={prepare:sql=>({bind:(...args)=>{
+   if(sql.startsWith('INSERT INTO oauth_transactions')) return {run:async()=>{inserted=args;insertCount++;return {meta:{changes:1}};}};
+   if(sql.startsWith('UPDATE oauth_transactions')) return {first:async()=>{
+     if(used || !inserted || args[2]!==inserted[6]) return null;
+     used=true;
+     return {owner_uid:'A',state_hash:inserted[0],encrypted_verifier:inserted[2],nonce:inserted[3],encrypted_state:inserted[7]};
+   }};
+   return {run:async()=>({meta:{changes:1}})};
+ }})};
  const configured={...env,DB,OAUTH_ENABLED:'true',GOOGLE_CLIENT_ID:'test',GOOGLE_CLIENT_SECRET:'synthetic'};
  const response=await start(configured,'A');
- const {authorizationUrl}=await response.json();
- const target=new URL(authorizationUrl);
+ const {launchUrl}=await response.json();
+ assert.equal(response.headers.get('Set-Cookie'),null);
+ assert.equal(new URL(launchUrl).origin,'https://roteiva-api-dev.ewertonmendes9.workers.dev');
+ assert.equal(new URL(launchUrl).pathname,'/oauth/drive/launch');
+ assert.equal(new URL(launchUrl).searchParams.get('ticket').length,43);
+ assert.equal(insertCount,1);
+ const launched=await launch(new Request(launchUrl),configured);
+ assert.equal(launched.status,303);
+ assert.match(launched.headers.get('Set-Cookie'),/HttpOnly; Secure; SameSite=Lax/);
+ const target=new URL(launched.headers.get('Location'));
+ assert.equal(target.origin,'https://accounts.google.com');
  assert.equal(target.searchParams.get('access_type'),'offline');
  assert.equal(target.searchParams.get('code_challenge_method'),'S256');
  assert.equal(target.searchParams.get('scope'),'openid email https://www.googleapis.com/auth/drive.file');
  assert.equal(target.searchParams.get('state').length,43);
- assert.ok(response.headers.get('Set-Cookie').includes('HttpOnly; Secure; SameSite=None'));
- assert.equal(inserts,1);
+ assert.equal(await hashTest(target.searchParams.get('state')),inserted[0]);
+ await assert.rejects(()=>launch(new Request(launchUrl),configured),e=>e.code==='expired_or_used_launch');
  await assert.rejects(()=>callback(new Request(configured.OAUTH_REDIRECT_URI+'?state='+target.searchParams.get('state')),configured),e=>e.code==='invalid_oauth_state');
  await assert.rejects(()=>start(env,'A'),e=>e.code==='oauth_not_configured');
+});
+
+async function hashTest(value) {
+ const {hash}=await import('../src/crypto.ts');
+ return hash(value);
+}
+
+test('source rate limit does not use shared all-users bucket',async()=>{
+ const keys=[];
+ const limited={...env,DB:{prepare:()=>({first:async()=>({})})},API_RATE_LIMIT:{limit:async({key})=>{keys.push(key);return {success:true};}}};
+ const response=await handle(new Request('https://api.example/health',{headers:{'CF-Connecting-IP':'203.0.113.9'}}),limited);
+ assert.equal(response.status,200);
+ assert.deepEqual(keys,['dev:ip:203.0.113.9']);
 });
