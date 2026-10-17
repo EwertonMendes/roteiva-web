@@ -11,7 +11,7 @@ const FOLDER = 'application/vnd.google-apps.folder';
 const idPattern = /^[A-Za-z0-9_-]{10,200}$/;
 
 function validateId(id: string, allowRoot = false) {
-  if ((allowRoot && id === 'root') || idPattern.test(id)) return id;
+  if ((allowRoot && (id === 'root' || id === 'all')) || idPattern.test(id)) return id;
   throw new ApiError(400, 'invalid_folder_id');
 }
 function validatePage(page: string | null): string {
@@ -49,7 +49,9 @@ export async function listFolders(env:Env,uid:string,connectionId:string,parent:
   const pageToken=validatePage(page);
   const token=await authorize(env,uid,connectionId,fetcher);
   const url=new URL('https://www.googleapis.com/drive/v3/files');
-  url.searchParams.set('q',`'${parentId}' in parents and mimeType = '${FOLDER}' and trashed = false`);
+  url.searchParams.set('q',parentId === 'all'
+    ? `mimeType = '${FOLDER}' and trashed = false`
+    : `'${parentId}' in parents and mimeType = '${FOLDER}' and trashed = false`);
   url.searchParams.set('fields','nextPageToken,files(id,name,mimeType,parents),incompleteSearch');
   url.searchParams.set('pageSize','100');
   url.searchParams.set('orderBy','name');
