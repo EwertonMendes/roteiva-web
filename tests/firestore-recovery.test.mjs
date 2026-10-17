@@ -5,6 +5,7 @@ import {firestoreCode,missingQueryIndex,transientFirestoreRead,retryFirestoreRea
 test("recognize missing indexes without retrying permanent security failures",()=>{
   assert.equal(missingQueryIndex({code:"failed-precondition",message:"The query requires an index."}),true);
   assert.equal(missingQueryIndex({code:"firestore/failed-precondition",message:"index is building"}),true);
+  assert.equal(missingQueryIndex({code:"invalid-argument",message:"unsupported query"}),true);
   assert.equal(missingQueryIndex({code:"permission-denied",message:"no access"}),false);
   assert.equal(transientFirestoreRead({code:"unavailable"}),true);
   assert.equal(transientFirestoreRead({code:"permission-denied"}),false);
