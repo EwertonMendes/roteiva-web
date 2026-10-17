@@ -14,6 +14,13 @@ const messages:Record<string,string> = {
   rate_limited:"Muitas solicitações. Aguarde alguns instantes e tente novamente.",
   drive_unavailable:"Não foi possível consultar o Drive. Tente novamente.",
   google_unavailable:"O Google está indisponível temporariamente.",
+  offline_access_unavailable:"O Google não forneceu uma credencial de acesso contínuo. Revise o acesso deste aplicativo nas permissões da sua Conta Google e tente conectar novamente.",
+  drive_permission_missing:"O acesso aos arquivos do Google Drive não foi concedido. Tente conectar novamente e confira as permissões solicitadas.",
+  drive_verification_unavailable:"Não foi possível confirmar o acesso ao Drive neste momento. Tente novamente em alguns instantes.",
+  google_identity_missing:"O Google não confirmou a identidade da conta. Tente novamente.",
+  invalid_google_identity:"Não conseguimos validar com segurança a conta Google. Tente novamente.",
+  connection_changed:"Essa conexão foi modificada. Atualize e tente novamente.",
+  connection_failed:"A conexão não pôde ser concluída. Tente novamente ou consulte o suporte.",
 };
 
 export function DriveConnectionPanel() {
@@ -111,6 +118,7 @@ export function DriveConnectionPanel() {
     <p>Conecte seu Drive para testar a autorização segura. Seus arquivos permanecem na conta Google. A biblioteca de pastas e mídia será implementada depois da validação desta etapa.</p>
     {callback==="connected"&&<p role="status"><CheckCircle2 size={16}/> O Google retornou uma conexão autorizada. Confira sua conta abaixo.</p>}
     {callback==="cancelled"&&<p role="status">Autorização cancelada. Nenhuma conexão foi alterada.</p>}
+    {callback && callback!=="connected" && callback!=="cancelled" && <p role="alert" className="auth-error">{messages[callback] || messages.connection_failed}</p>}
     {loading?<p role="status">Consultando conexões…</p>:
       connections.length? <div style={{display:"grid",gap:12}}>
         {connections.map(item=><div key={item.id} className="panel" style={{padding:16,display:"grid",gap:10}}>
