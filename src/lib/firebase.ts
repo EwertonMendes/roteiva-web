@@ -1,9 +1,22 @@
-import { getApp, getApps, initializeApp } from "firebase/app";
+import { deleteApp, getApp, getApps, initializeApp } from "firebase/app";
 import { connectAuthEmulator, getAuth } from "firebase/auth";
-import { connectFirestoreEmulator, getFirestore } from "firebase/firestore";
+import { clearIndexedDbPersistence, connectFirestoreEmulator, getFirestore, initializeFirestore, memoryLocalCache, persistentLocalCache, persistentMultipleTabManager, terminate } from "firebase/firestore";
 
 export const appMode = import.meta.env.VITE_APP_MODE;
 export const isDemo = appMode === "demo";
+export const CACHE_CONSENT_KEY = "roteiva-private-cache";
+export function persistentCacheEnabled(): boolean {
+  try { return typeof window !== "undefined" && localStorage.getItem(CACHE_CONSENT_KEY) === "enabled"; }
+  catch { return false; }
+}
+/** Must run before navigating to a different account while persistent storage is active. */
+export async function purgePrivateCache(): Promise<void> {
+  if (!persistentCacheEnabled()) return;
+  const {app,db} = firebaseServices();
+  await terminate(db);
+  await clearIndexedDbPersistence(db);
+  await deleteApp(app);
+}
 export const useEmulators = import.meta.env.VITE_USE_EMULATORS === "true";
 export function firebaseServices() {
   if (appMode !== "demo" && appMode !== "firebase") throw new Error("Defina VITE_APP_MODE como demo ou firebase.");
@@ -24,7 +37,11 @@ export function firebaseServices() {
   const existing = getApps().length > 0;
   const app = existing ? getApp() : initializeApp(config);
   const auth = getAuth(app);
-  const db = getFirestore(app);
+  const db = existing ? getFirestore(app) : initializeFirestore(app, {
+    localCache: persistentCacheEnabled()
+      ? persistentLocalCache({tabManager: persistentMultipleTabManager()})
+      : memoryLocalCache(),
+  });
   if (useEmulators && !existing) {
     connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
     connectFirestoreEmulator(db, "127.0.0.1", 8080);

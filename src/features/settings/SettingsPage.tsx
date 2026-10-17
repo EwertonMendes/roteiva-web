@@ -3,6 +3,7 @@ import { ArrowUpRight, Check, Cloud, Download, LockKeyhole, Moon, ShieldCheck, S
 import type { ProfileChanges, ProfessionalType, RoteivaProfile } from "../../data/firestore-workspace";
 import { dataErrorMessage } from "../../data/firestore-workspace";
 import { WorkspaceTools } from "../../studio-features";
+import { CACHE_CONSENT_KEY, persistentCacheEnabled, purgePrivateCache } from "../../lib/firebase";
 
 const occupations:{value:ProfessionalType;label:string}[]=[
   {value:"freelancer",label:"Videomaker / freelancer"},
@@ -24,6 +25,22 @@ export function SettingsPage({profile,email,photoURL,theme,toggleTheme,workspace
   const [studio,setStudio]=useState(profile?.studioName||"");
   const [occupation,setOccupation]=useState<ProfessionalType>(profile?.professionalType||"freelancer");
   const [busy,setBusy]=useState(false);
+  const [localCache,setLocalCache]=useState(persistentCacheEnabled);
+  const [cacheBusy,setCacheBusy]=useState(false);
+  const [cacheError,setCacheError]=useState("");
+  async function changePrivateCache(enable:boolean) {
+    if (!onSaveProfile || cacheBusy) return;
+    setCacheBusy(true);setCacheError("");
+    try {
+      if (!enable) await purgePrivateCache();
+      localStorage.setItem(CACHE_CONSENT_KEY, enable ? "enabled" : "disabled");
+      setLocalCache(enable);
+      window.location.reload();
+    } catch {
+      setCacheError("Não foi possível limpar o cache privado. Feche outras abas do Roteiva e tente novamente.");
+      setCacheBusy(false);
+    }
+  }
   const [feedback,setFeedback]=useState<{kind:"success"|"error";message:string}|null>(null);
   useEffect(()=>{
     setName(profile?.displayName||"");setStudio(profile?.studioName||"");

@@ -188,3 +188,20 @@ test("repository: empty new account, CRUD, cents, refresh and conflict",async()=
   workspace.financeEntries=[]; await a.save(workspace);
   assert.equal((await getDoc(doc(db,"users/charlie/financeEntries/10"))).exists(),false);
 });
+
+test("sync stamps are private, versioned and cannot be deleted", async () => {
+  const alice=dbFor("alice"),bob=dbFor("bob"),anon=dbFor();
+  const path="users/alice/sync/state",ref=doc(alice,path);
+  const counts={clients:1,projects:1,tasks:0,deliveries:0,events:0,financeEntries:0,activities:0};
+  const domains={clients:0,projects:0,tasks:0,deliveries:0,events:0,financeEntries:0,activities:0};
+  await assertFails(getDoc(doc(bob,path)));
+  await assertFails(getDoc(doc(anon,path)));
+  await assertFails(setDoc(doc(bob,path),{...meta("alice"),domains,counts}));
+  await assertFails(setDoc(ref,{...meta("alice"),domains,counts:{...counts,clients:-1}}));
+  await assertSucceeds(setDoc(ref,{...meta("alice"),domains,counts}));
+  await assertSucceeds(getDoc(ref));
+  await assertFails(updateDoc(ref,{counts:{...counts,clients:"invalid"},revision:2,updatedAt:serverTimestamp()}));
+  await assertFails(updateDoc(ref,{ownerUid:"bob",revision:2,updatedAt:serverTimestamp()}));
+  await assertSucceeds(updateDoc(ref,{domains:{...domains,clients:1},revision:2,updatedAt:serverTimestamp()}));
+  await assertFails(deleteDoc(ref));
+});

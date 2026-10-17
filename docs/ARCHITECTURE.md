@@ -57,7 +57,7 @@ Um frontend em `src/`; modo explícito `VITE_APP_MODE` seleciona demo ou Firebas
 
 `features/auth` inicializa persistência e observa onAuthStateChanged. ProtectedRoute espera sessão antes de montar o workspace; troca de UID desmonta o estado privado. Popup parte diretamente do clique após preparar persistência. Sem scopes Drive ou fallback de redirecionamento não validado.
 
-`FirebaseWorkspace` carrega e confirma gravações do servidor; o codec adapta as telas preservadas. Erros bloqueiam edição e oferecem recuperar a nuvem, descartando rascunhos não confirmados. Tema, Ubuntu, animações e responsividade existentes são preservados. Demo mantém localStorage, sem inicializar Firebase nem importar dados antigos. Dados de negócio privados ficam em memória, sem cache Firestore persistente em disco.
+`FirebaseWorkspace` carrega e confirma gravações do servidor; o codec adapta as telas preservadas. Erros bloqueiam edição e oferecem recuperar a nuvem, descartando rascunhos não confirmados. Tema, Ubuntu, animações e responsividade existentes são preservados. Demo mantém localStorage, sem inicializar Firebase nem importar dados antigos. Dados de negócio privados usam cache em memória por padrão. Cache persistente oficial Firestore (IndexedDB, múltiplas abas) pode ser ativado explicitamente em Configurações, com alerta sobre dados privados no dispositivo e apagamento na desativação/logout. Sem consentimento, nenhum cache Firestore persistente é criado.
 
 ## 5. Identidade e autorização
 
@@ -87,9 +87,9 @@ Contratos em domain/workspace.ts e data/workspace-codec.ts; persistência em dat
 
 Moeda em centavos inteiros. Datas civis YYYY-MM-DD, mês YYYY-MM e horários HH:mm; regras validam dias reais e ano bissexto. Datas da agenda não viram timestamps UTC. activities não é auditoria inviolável.
 
-Leitura inicial por coleção/UID, em páginas de 200. Sem listeners globais; recarregar explicitamente para buscar mudanças de outra aba. Cada transação grava apenas documentos alterados e compara revision lida; conflito impede sobrescrita silenciosa. Nomes denormalizados de vínculos são atualizados junto da edição do cliente. Falhas de rede/permissão bloqueiam novas edições e permitem recarregar a nuvem. Sem fila offline ou migração automática.
+Leitura por coleção/UID em páginas de 200 ainda inclui todas as sete coleções na primeira carga; a migração para consultas por tela e paginação visível está pendente. Com consentimento, cache de documentos pode ser reutilizado após verificar `users/{uid}/sync/state`: revisões independentes e contagens das sete coleções. O cache só é aceito se a versão armazenada corresponder à versão remota e se a contagem de documentos disponíveis for completa; caso contrário consulta o servidor. O stamp é inicializado atomicamente depois da primeira leitura e atualizado na mesma transação das mutações. Sem listeners globais: no retorno à aba, depois de um intervalo mínimo, a aplicação verifica o estado e pede recarga explícita se houve alteração remota. Cada transação grava apenas documentos alterados e compara revision lida; conflito impede sobrescrita silenciosa. Nomes denormalizados de vínculos são atualizados junto da edição do cliente. Falhas de rede/permissão bloqueiam novas edições e permitem recarregar a nuvem. Sem fila offline ou migração automática.
 
-Sem índices compostos exigidos: consultas ordenam por documentId. Tarefas e entregas são documentos independentes. Exportação JSON/CSV preservada, sem mídia. Exclusões de lançamento/agenda são pontuais; exclusão de conta e limpeza completa continuam planejadas.
+Sem índices compostos exigidos na fase atual: consultas ordenam por documentId. Índices por filtros e agregações dependem da migração futura para consultas por tela. Tarefas e entregas são documentos independentes. Exportação JSON/CSV preservada, sem mídia. Exclusões de lançamento/agenda são pontuais; exclusão de conta e limpeza completa continuam planejadas.
 
 ## 7. Backend — Cloudflare Workers (PLANEJADO)
 

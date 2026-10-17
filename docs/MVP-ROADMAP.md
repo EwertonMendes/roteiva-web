@@ -266,3 +266,19 @@
 **Riscos/limites:** emuladores não substituem OAuth real; Safari/iOS/navegadores embutidos não estão validados; sem listener entre abas (recarregar explicitamente); sem fila offline; o recarregamento de recuperação descarta rascunhos não confirmados. Histórico activities não é auditoria inviolável. Não há promessa de custo ilimitado ou segurança exaustiva. Perfil e exclusão completa de conta continuam sem UI para evitar limpeza parcial.
 
 **IAM autorizado e aplicado:** Firebase Rules Admin, Cloud Datastore Index Admin e Service Usage Viewer adicionados à conta de deploy existente somente no DEV. Sem Blaze ou novas chaves.
+
+
+## Otimização de consultas e cache Firestore — 16/10/2026
+
+**Objetivo:** reduzir consultas redundantes sem perder isolamento por UID, integridade de vínculos, concorrência ou compatibilidade da demonstração.
+
+- [x] **IMPLEMENTADO (aguarda validação CI/QA):** cache persistente oficial multiaba somente por consentimento explícito nas Configurações; memória por padrão; tentativa de limpeza ao desabilitar e no logout.
+- [x] **IMPLEMENTADO (aguarda validação CI/QA):** documento privado `users/{uid}/sync/state` com revisões e contagens por coleção; regras estritas para schema/propriedade; atualização transacional das revisões nas gravações do workspace.
+- [x] **IMPLEMENTADO (aguarda validação CI/QA):** cache só reutilizado quando existe manifesto por UID/schema, revisão igual à remota e contagem completa; fallback para leitura do servidor, detecção de concorrência durante o bootstrap e revalidação ao retomar a aba.
+- [x] **IMPLEMENTADO (aguarda validação CI/QA):** deduplicação de carregamento concorrente e testes unitários e de segurança para a sincronização.
+- [ ] **PLANEJADO:** substituir carregamento inicial integral por queries menores por funcionalidade, paginação com botão Carregar mais, índices e métricas agregadas; implementar precauções para não tratar cargas parciais como workspaces completos.
+- [ ] **PLANEJADO:** substituir o efeito de salvamento do snapshot completo pelos comandos explícitos das ações de negócio, preservando transações e retornos de erro.
+- [ ] **PLANEJADO:** métricas DEV de reads/writes por sessão e comparação de custos faturáveis antes/depois.
+- [ ] **VALIDAÇÃO PENDENTE:** CI da PR, QA duas contas reais, F5 com cache consentido, exclusões, concorrência, IndexedDB em mobile e impacto real nas quotas.
+
+**Decisão de segurança:** não persistir dados em disco sem consentimento explícito do usuário; o SDK do Firebase não oferece limpeza criptográfica segura de cache do navegador. Dados privados em dispositivo compartilhado exigem cache desativado. Nenhum recurso novo foi provisionado e a demonstração permanece local.

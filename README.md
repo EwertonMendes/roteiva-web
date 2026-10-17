@@ -45,7 +45,7 @@ pnpm test:firebase
 - `tests/`: regras nos emuladores com usuários A/B e testes Chromium desktop/mobile.
 - `.github/workflows/`: CI/Pages e publicação DEV após CI verde na master.
 
-O Firestore usa centavos inteiros e datas civis ISO, sem converter dias da agenda em horários UTC. Apenas documentos alterados são gravados. Erros de rede, permissão e conflito exigem recuperação explícita da versão da nuvem; não há fila de gravação privada em localStorage.
+O Firestore usa centavos inteiros e datas civis ISO, sem converter dias da agenda em horários UTC. Apenas documentos alterados são gravados. Erros de rede, permissão e conflito exigem recuperação explícita da versão da nuvem; não há fila de gravação privada em localStorage. O cache persistente é opt-in em Configurações e contém registros privados neste dispositivo; por padrão usa memória. A reabertura consulta a revisão privada por UID e só reutiliza coleções persistidas com contagem completa e versão correspondente. O sincronismo por domínio acrescenta uma escrita por transação de negócio e não usa documento global compartilhado.
 
 **PLANEJADO:** Google Drive, upload de mídia, revisão remota, Worker/D1 de OAuth, equipes, cobrança e PROD. A tela de revisão continua explicativa. A autenticação Google não concede acesso ao Drive.
 
