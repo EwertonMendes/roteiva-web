@@ -3,6 +3,7 @@ import { ApiError, type Env } from './types.ts';
 import { context, decrypt, encrypt, hash, random } from './crypto.ts';
 import { consumeState } from './repository.ts';
 import { DRIVE_SCOPE, tokenRequest } from './google.ts';
+import { persistDriveConsent } from './consent.ts';
 
 const googleKeys = createRemoteJWKSet(new URL('https://www.googleapis.com/oauth2/v3/certs'));
 const COOKIE = '__Host-roteiva-oauth';
@@ -74,19 +75,33 @@ export async function callback(request: Request, env: Env): Promise<Response> {
   if (url.searchParams.has('error')) return finish(env,'cancelled');
   const code = url.searchParams.get('code');
   if (!code || code.length > 4096) throw new ApiError(400,'invalid_oauth_code');
-  const verifier = await decrypt(env,tx.encrypted_verifier,context(env,tx.owner_uid,stateHash,'pkce'));
-  const tokens = await tokenRequest(env,{grant_type:'authorization_code',code,redirect_uri:env.OAUTH_REDIRECT_URI,code_verifier:verifier});
-  if (!tokens.refresh_token || !tokens.id_token || !tokens.scope?.split(' ').includes(DRIVE_SCOPE)) throw new ApiError(409,'offline_consent_required');
-  const {payload} = await jwtVerify(tokens.id_token,googleKeys,{
-    algorithms:['RS256'],issuer:['https://accounts.google.com','accounts.google.com'],
-    audience:env.GOOGLE_CLIENT_ID,requiredClaims:['sub','exp','iat','nonce','email'],
-  });
-  if (payload.nonce !== tx.nonce || !payload.sub || payload.email_verified !== true || typeof payload.email !== 'string') throw new ApiError(400,'invalid_google_identity');
-  const encrypted = await encrypt(env,tokens.refresh_token,context(env,tx.owner_uid,payload.sub));
-  const now = Date.now();
-  await env.DB.prepare("INSERT INTO drive_connections (id,owner_uid,google_account_id,google_email,encrypted_refresh_token,status,scopes,created_at,updated_at) VALUES (?,?,?,?,?,'connected',?,?,?) ON CONFLICT(owner_uid,google_account_id) DO UPDATE SET google_email=excluded.google_email,encrypted_refresh_token=excluded.encrypted_refresh_token,status='connected',scopes=excluded.scopes,revision=drive_connections.revision+1,updated_at=excluded.updated_at")
-    .bind(crypto.randomUUID(),tx.owner_uid,payload.sub,payload.email,encrypted,tokens.scope,now,now).run();
-  return finish(env,'connected');
+  // Errors after a verified state/cookie belong in the Roteiva UI. Never leave
+  // the user on a raw Worker JSON response, or put provider details in a URL.
+  try {
+    const verifier = await decrypt(env,tx.encrypted_verifier,context(env,tx.owner_uid,stateHash,'pkce'));
+    const tokens = await tokenRequest(env,{grant_type:'authorization_code',code,redirect_uri:env.OAUTH_REDIRECT_URI,code_verifier:verifier});
+    if (!tokens.id_token) throw new ApiError(409,'google_identity_missing');
+    const {payload} = await jwtVerify(tokens.id_token,googleKeys,{
+      algorithms:['RS256'],issuer:['https://accounts.google.com','accounts.google.com'],
+      audience:env.GOOGLE_CLIENT_ID,requiredClaims:['sub','exp','iat','nonce','email'],
+    });
+    if (payload.nonce !== tx.nonce || !payload.sub || payload.email_verified !== true || typeof payload.email !== 'string') {
+      throw new ApiError(400,'invalid_google_identity');
+    }
+    await persistDriveConsent(env, tx.owner_uid, tokens, {sub:payload.sub,email:payload.email});
+    return finish(env,'connected');
+  } catch (error) {
+    // All credentials remain backend-only. Distinct, static codes let the UI
+    // offer a precise recovery action without disclosing tokens or stack traces.
+    const recoverable = new Set([
+      'offline_access_unavailable', 'drive_permission_missing',
+      'drive_verification_unavailable', 'google_identity_missing',
+      'invalid_google_identity', 'reconnect_required', 'connection_changed',
+      'google_unavailable',
+    ]);
+    const code = error instanceof ApiError && recoverable.has(error.code) ? error.code : 'connection_failed';
+    return finish(env,code);
+  }
 }
 
 function finish(env: Env, result: string): Response {
