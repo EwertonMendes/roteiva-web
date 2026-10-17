@@ -9,8 +9,9 @@ export function firestoreCode(error:unknown):string {
 export function missingQueryIndex(error:unknown):boolean {
   const code=firestoreCode(error);
   const message=(error as {message?:unknown}|null)?.message;
-  return code==="failed-precondition" &&
-    (typeof message!=="string" || /index|índice|query requires|building/i.test(message));
+  return (code==="failed-precondition" &&
+    (typeof message!=="string" || /index|índice|query requires|building/i.test(message))) ||
+    code==="invalid-argument" || code==="unimplemented";
 }
 export function transientFirestoreRead(error:unknown):boolean {
   return ["unavailable","deadline-exceeded","aborted","internal"].includes(firestoreCode(error));
