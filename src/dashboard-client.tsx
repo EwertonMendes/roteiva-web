@@ -12,7 +12,7 @@ import {
 import { ProjectDetail, ClientDetail, TodayStudio, StudioReviews, WorkspaceTools, FinancePanel, projectTemplates } from "./studio-features";
 import { validTimeRange, overlaps, eventRange, eventDuration } from "./studio-calendar";
 import { toISO as toISOAdded, parseMoney, splitInstallments } from "./studio-finance";
-import { FormEvent, useEffect, useMemo, useState, useCallback } from "react";
+import { FormEvent, useEffect, useLayoutEffect, useMemo, useState, useCallback } from "react";
 
 import { isDemo } from "./lib/firebase";
 import { hrefForWorkspaceRoute, routeFromLocation, type WorkspaceRoute } from "./lib/workspace-routing";
@@ -155,7 +155,9 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     setDataReady(true);
   },[restoreWorkspace,initialWorkspace,initialTheme]);
 
-  useEffect(() => {
+  // Queue persistence before the new UI can be painted/reloaded, closing the
+  // gap between a mutation appearing on screen and the unload protection.
+  useLayoutEffect(() => {
     if (!dataReady) return;
     const payload={projects,clients:clientList,financeEntries,calendarEvents,libraryAssets:libraryAssets.map(asset=>({...asset,preview:undefined})),comments,reviewState,activities};
     if (!isDemo) { onWorkspaceChange?.(payload); return; }
