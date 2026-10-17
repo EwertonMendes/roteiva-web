@@ -274,12 +274,33 @@ export class FirestoreWorkspace {
     const end=new Date(Date.UTC(year,month+1,1)).toISOString().slice(0,10);
     return this.dateWindow("financeEntries",start,end);
   }
-  async financeYearBars(year:number,clientId?:number):Promise<number[]>{
+  affectedFinanceMonths(commands:readonly WorkspaceCommand[],year:number):number[]{
+    const months=new Set<number>();
+    const add=(date:unknown)=>{
+      if(typeof date!=="string"||!date.startsWith(year+"-"))return;
+      const month=Number(date.slice(5,7))-1;
+      if(Number.isInteger(month)&&month>=0&&month<12)months.add(month);
+    };
+    for(const command of commands){
+      const changed=encodeCommand(command);
+      if(changed.collection!=="financeEntries")continue;
+      add(this.stored.get(changed.key)?.data.date);
+      add(changed.data?.date);
+    }
+    return [...months];
+  }
+  async financeYearBars(year:number,clientId?:number,affectedMonths?:readonly number[]):Promise<number[]>{
     if(!Number.isInteger(year)||year<2000||year>2100)throw Error("Ano financeiro inválido.");
     const stamp=await this.ensureSync();
     const key=year+":"+(clientId||"all");
     const cached=this.financeBarCache.get(key);
     if(cached?.revision===stamp.domains.financeEntries)return [...cached.bars];
+    const refreshOnly=!!affectedMonths && !!cached &&
+      cached.revision===stamp.domains.financeEntries-1;
+    if(refreshOnly && !affectedMonths.length){
+      this.financeBarCache.set(key,{revision:stamp.domains.financeEntries,bars:cached.bars});
+      return [...cached.bars];
+    }
     let bars:number[];
     // For small accounts a single complete read is cheaper and immediately
     // supports all filters, export and monthly charts without 12 aggregations.
@@ -293,7 +314,8 @@ export class FirestoreWorkspace {
         .reduce((n,entry)=>n+Math.round(entry.amount*100),0)/100);
     }else{
       const base=collection(this.db,"users",this.uid,"financeEntries");
-      const values=await Promise.all(Array.from({length:12},async(_,i)=>{
+      const indexes=refreshOnly ? [...new Set(affectedMonths)] : Array.from({length:12},(_,i)=>i);
+      const values=await Promise.all(indexes.map(async i=>{
         const start=new Date(Date.UTC(year,i,1)).toISOString().slice(0,10);
         const end=new Date(Date.UTC(year,i+1,1)).toISOString().slice(0,10);
         const filtered=query(base,...(clientId?[where("clientId","==",clientId)]:[]),
@@ -302,7 +324,8 @@ export class FirestoreWorkspace {
         trackAggregation(this.uid);
         return Number(result.data().amountCents??0)/100;
       }));
-      bars=values;
+      bars=refreshOnly ? [...cached!.bars] : Array(12).fill(0);
+      indexes.forEach((month,i)=>{bars[month]=values[i];});
     }
     trackRevision(this.uid);
     const after=await readSync(this.db,this.uid);

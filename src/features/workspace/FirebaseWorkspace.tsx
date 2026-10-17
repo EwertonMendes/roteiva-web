@@ -261,8 +261,18 @@ export function FirebaseWorkspace() {
     }).finally(()=>{pending.current--;if(!pending.current)setSaving(false);});
   },[]);
   const saveTheme=useCallback((theme:"light"|"dark")=>enqueue(()=>repository.saveTheme(theme)),[repository,enqueue]);
-  const executeCommands=useCallback((commands:readonly WorkspaceCommand[])=>
-    enqueue(()=>repository.applyCommands(commands)),[repository,enqueue]);
+  const executeCommands=useCallback((commands:readonly WorkspaceCommand[])=>enqueue(async()=>{
+    const parsed=financePeriod?.split("-")||[];
+    const year=Number(parsed[0]),clientId=Number(parsed[2])||undefined;
+    const touchesFinance=commands.some(c=>c.kind==="saveFinance"||c.kind==="deleteFinance");
+    const months=touchesFinance && financePeriod && financeBars && Number.isInteger(year)
+      ? repository.affectedFinanceMonths(commands,year) : undefined;
+    const changed=await repository.applyCommands(commands);
+    if(changed && months && financeBars?.key===year+"-"+(clientId||"")){
+      const bars=await repository.financeYearBars(year,clientId,months);
+      setFinanceBars({key:year+"-"+(clientId||""),bars});
+    }
+  }),[repository,enqueue,financePeriod,financeBars]);
   if (!user) return null;
   return <>
     {saving && <div className="cloud-operation" role="status">Salvando na nuvem…</div>}
