@@ -36,8 +36,11 @@ test("semantic icon labels remain accessible, responsive and functional", async 
   await filters.getByRole("button", { name: "Em produção", exact: true }).click();
   await expect(filters.getByRole("button", { name: "Em produção", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(filters.getByRole("button", { name: "Todos", exact: true })).toHaveAttribute("aria-pressed", "false");
-  await filters.getByRole("button", { name: "Todos", exact: true }).focus();
-  await page.keyboard.press("Enter");
+  // Previous selection may trigger an asynchronous project page refresh.
+  // Press Enter on the live button itself (rather than the document's current focus),
+  // which re-focuses the target if the filter row was replaced during the refresh.
+  await expect(page.locator("[aria-busy]").first()).toHaveAttribute("aria-busy", "false");
+  await filters.getByRole("button", { name: "Todos", exact: true }).press("Enter");
   await expect(filters.getByRole("button", { name: "Todos", exact: true })).toHaveAttribute("aria-pressed", "true");
 
   await page.goto(app + "/clientes");
