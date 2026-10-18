@@ -6,6 +6,7 @@ import type { FirestoreUsage } from "../../data/firestore-usage";
 import { WorkspaceTools } from "../../studio-features";
 import { IconLabel } from "../ui/IconLabel";
 import { CACHE_CONSENT_KEY, persistentCacheEnabled, purgePrivateCache } from "../../lib/firebase";
+import { AccountDeletionAction } from "./AccountDeletionAction";
 
 const occupations:{value:ProfessionalType;label:string}[]=[
   {value:"freelancer",label:"Videomaker / freelancer"},
@@ -160,7 +161,7 @@ export function SettingsPage({profile,email,photoURL,theme,toggleTheme,workspace
         </div>
       </div>}
       {cacheError && <p role="alert" className="settings-feedback settings-feedback-error">{cacheError}</p>}
-      <p className="settings-note"><Info size={15}/> Exclusão de conta e dados ainda não está disponível. Esse procedimento precisa ser implementado com segurança antes da abertura pública.</p>
+      {onSaveProfile&&<AccountDeletionAction/>}
     </section>
     <footer className="settings-footer"><Cloud size={14}/>{onSaveProfile?"ROTEIVA DEV · PERFIL PRIVADO":"ROTEIVA DEMO · SOMENTE NESTE NAVEGADOR"}</footer>
   </div>;

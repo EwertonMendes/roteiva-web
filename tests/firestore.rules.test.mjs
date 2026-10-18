@@ -498,3 +498,40 @@ test("Drive folder links: user-owned projects only, no cross-account reads or ed
   }
   await assertSucceeds(deleteDoc(ref));
 });
+
+test("deletion marker blocks all client mutations while retaining per-owner isolation",async()=>{
+  const alice=dbFor("alice"),bob=dbFor("bob");
+  const root=doc(alice,"users/alice"),item=doc(alice,"users/alice/projects/2");
+  await env.withSecurityRulesDisabled(async admin=>{
+    await updateDoc(doc(admin.firestore(),"users/alice"),{deletionState:"deleting"});
+  });
+  await assertSucceeds(getDoc(root));
+  await assertFails(getDoc(item));
+  await assertFails(updateDoc(root,{displayName:"After deletion",revision:2,updatedAt:serverTimestamp()}));
+  await assertFails(updateDoc(root,{deletionState:"active",revision:2,updatedAt:serverTimestamp()}));
+  await assertFails(setDoc(doc(alice,"users/alice/clients/333"),{...client,id:333,...meta("alice")}));
+  await assertFails(updateDoc(item,{name:"Modified",revision:2,updatedAt:serverTimestamp()}));
+  await assertFails(deleteDoc(item));
+  await assertFails(getDoc(doc(bob,"users/alice")));
+  // A different account remains usable.
+  await assertSucceeds(updateDoc(doc(bob,"users/bob/projects/2"),{name:"Unchanged isolation",revision:2,updatedAt:serverTimestamp()}));
+});
+
+test("residual JWT cannot recreate a deleted profile or remove the independent fence",async()=>{
+  const alice=dbFor('alice'),bob=dbFor('bob');
+  await env.withSecurityRulesDisabled(async admin=>{
+    await setDoc(doc(admin.firestore(),'accountDeletionFences/alice'),{deleting:true});
+    await deleteDoc(doc(admin.firestore(),'users/alice'));
+  });
+  const registration={...profile,...meta('alice'),studioName:'Disposable',professionalType:'freelancer',
+    registrationCompletedAt:serverTimestamp(),dataAcknowledgedAt:serverTimestamp()};
+  await assertFails(setDoc(doc(alice,'users/alice'),registration));
+  await assertFails(getDoc(doc(alice,'users/alice/projects/2')));
+  await assertFails(setDoc(doc(alice,'users/alice/clients/10'),{...client,...meta('alice')}));
+  for(const db of [alice,bob,dbFor()]){
+    await assertFails(getDoc(doc(db,'accountDeletionFences/alice')));
+    await assertFails(deleteDoc(doc(db,'accountDeletionFences/alice')));
+    await assertFails(setDoc(doc(db,'accountDeletionFences/alice'),{deleting:false}));
+  }
+  await assertSucceeds(getDoc(doc(bob,'users/bob/projects/2')));
+});

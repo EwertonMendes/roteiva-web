@@ -395,3 +395,17 @@ Critérios de aceite: fluxo sem rolagem modal+fundo, sem mudança na propriedade
 - `pr-29`: build Firebase real, que permanece bloqueado para testes autenticados até o domínio de preview ser autorizado no Firebase Authentication e a origem exata autorizada na API DEV; não ampliar CORS genericamente nem liberar credenciais em PRs não confiáveis.
 
 A URL do DEV principal não mudou e o merge não foi executado. CI para preview deve permanecer limitado à PR interna #29 e usando exclusivamente o site Firebase DEV, com validade de sete dias. A validação de login/Drive real continua pendente.
+
+### Exclusão permanente de conta — PR #30 (DEV, 18/10/2026)
+
+- [x] Fluxo de confirmação no React e reautenticação recente; inclusão também para contas sem cadastro concluído.
+- [x] Executor idempotente Worker/D1 em etapas com lease e cron, revogação Google Drive, limpeza recursiva de subcoleções Firestore e Auth no encerramento.
+- [x] Bloqueios de gravação nas regras Firestore e de novas conexões OAuth no D1.
+- [x] Testes de erro, paginação, UID isolado e fluxo de exclusão simulado.
+- [ ] Concluir CI do HEAD atualizado e QA visual desktop/mobile.
+- [ ] Homologar fluxo Google real completo no DEV publicado: confirmação/reautenticação, saga D1/Cron e Drive preservado com conta Google descartável nova.
+- [x] Provisionamento administrativo DEV (18/10/2026): conta exclusiva, papel customizado com seis permissões, segredo Worker via stdin, smoke real com duas identidades novas/71 documentos; isolamento e exclusão Auth idempotente confirmados. Sem validação Google/Drive pela interface neste smoke. Detalhes e limitações em [ACCOUNT-DELETION.md](ACCOUNT-DELETION.md).
+- [x] Revisão: fence contra recriação por JWT residual, 404 de enumeração falha fechado, limites de execução/lease, `failed_phase` e guards OAuth duráveis; testes locais de 1.001 documentos, pai ausente e revisão manual. Rules Emulator e Playwright: 42 aprovados, dois skips previstos. CI do commit final ainda precisa passar.
+- [ ] Configurar alertas operacionais, rotina de retomada de `manual_review` e documentar resultados da homologação; merge/deploy após aprovação.
+
+A configuração da branch deixa `ACCOUNT_DELETION_ENABLED=true` para DEV; sem a credencial administrativa exata, o endpoint falha fechado e o botão fica indisponível. A URL DEV principal continua com o código anterior até o merge. Documentação `docs/ACCOUNT-DELETION.md`.

@@ -4,6 +4,8 @@ import { context, decrypt, encrypt, hash, random } from './crypto.ts';
 import { consumeState } from './repository.ts';
 import { DRIVE_SCOPE, DRIVE_READ_SCOPE, tokenRequest } from './google.ts';
 import { persistDriveConsent } from './consent.ts';
+import { assertNotDeleting } from './account-deletion.ts';
+import {beginExchange,rememberGrant,finishExchange} from './oauth-guard.ts';
 
 const googleKeys = createRemoteJWKSet(new URL('https://www.googleapis.com/oauth2/v3/certs'));
 const COOKIE = '__Host-roteiva-oauth';
@@ -48,6 +50,7 @@ export async function launch(request: Request, env: Env): Promise<Response> {
     owner_uid:string;state_hash:string;encrypted_state:string;encrypted_verifier:string;nonce:string
   }>();
   if (!tx || !tx.encrypted_state || !tx.encrypted_verifier) throw new ApiError(400,'expired_or_used_launch');
+  if(env.ACCOUNT_DELETION_ENABLED==='true')await assertNotDeleting(env,tx.owner_uid);
   const state = await decrypt(env,tx.encrypted_state,context(env,tx.owner_uid,tx.state_hash,'oauth_state'));
   const verifier = await decrypt(env,tx.encrypted_verifier,context(env,tx.owner_uid,tx.state_hash,'pkce'));
   const target = new URL('https://accounts.google.com/o/oauth2/v2/auth');
@@ -72,14 +75,18 @@ export async function callback(request: Request, env: Env): Promise<Response> {
   const stateHash = await hash(state);
   const tx = await consumeState(env,stateHash,await hash(browser));
   if (!tx) throw new ApiError(400,'expired_or_used_state');
+  if(env.ACCOUNT_DELETION_ENABLED==='true')await assertNotDeleting(env,tx.owner_uid);
   if (url.searchParams.has('error')) return finish(env,'cancelled');
   const code = url.searchParams.get('code');
   if (!code || code.length > 4096) throw new ApiError(400,'invalid_oauth_code');
   // Errors after a verified state/cookie belong in the Roteiva UI. Never leave
   // the user on a raw Worker JSON response, or put provider details in a URL.
+  let exchangeId:string|undefined;
   try {
     const verifier = await decrypt(env,tx.encrypted_verifier,context(env,tx.owner_uid,stateHash,'pkce'));
+    exchangeId=await beginExchange(env,tx.owner_uid);
     const tokens = await tokenRequest(env,{grant_type:'authorization_code',code,redirect_uri:env.OAUTH_REDIRECT_URI,code_verifier:verifier});
+    await rememberGrant(env,tx.owner_uid,exchangeId,tokens.refresh_token||tokens.access_token);
     if (!tokens.id_token) throw new ApiError(409,'google_identity_missing');
     const {payload} = await jwtVerify(tokens.id_token,googleKeys,{
       algorithms:['RS256'],issuer:['https://accounts.google.com','accounts.google.com'],
@@ -89,8 +96,11 @@ export async function callback(request: Request, env: Env): Promise<Response> {
       throw new ApiError(400,'invalid_google_identity');
     }
     await persistDriveConsent(env, tx.owner_uid, tokens, {sub:payload.sub,email:payload.email}, fetch, true);
+    await finishExchange(env,tx.owner_uid,exchangeId);
     return finish(env,'connected');
   } catch (error) {
+    // A retained guard is reconciled by the deletion executor. Never discard an
+    // issued credential on an OAuth/deletion race or claim the grant is revoked.
     // All credentials remain backend-only. Distinct, static codes let the UI
     // offer a precise recovery action without disclosing tokens or stack traces.
     const recoverable = new Set([
