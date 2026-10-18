@@ -516,3 +516,22 @@ test("deletion marker blocks all client mutations while retaining per-owner isol
   // A different account remains usable.
   await assertSucceeds(updateDoc(doc(bob,"users/bob/projects/2"),{name:"Unchanged isolation",revision:2,updatedAt:serverTimestamp()}));
 });
+
+test("residual JWT cannot recreate a deleted profile or remove the independent fence",async()=>{
+  const alice=dbFor('alice'),bob=dbFor('bob');
+  await env.withSecurityRulesDisabled(async admin=>{
+    await setDoc(doc(admin.firestore(),'accountDeletionFences/alice'),{deleting:true});
+    await deleteDoc(doc(admin.firestore(),'users/alice'));
+  });
+  const registration={...profile,...meta('alice'),studioName:'Disposable',professionalType:'freelancer',
+    registrationCompletedAt:serverTimestamp(),dataAcknowledgedAt:serverTimestamp()};
+  await assertFails(setDoc(doc(alice,'users/alice'),registration));
+  await assertFails(getDoc(doc(alice,'users/alice/projects/2')));
+  await assertFails(setDoc(doc(alice,'users/alice/clients/10'),{...client,...meta('alice')}));
+  for(const db of [alice,bob,dbFor()]){
+    await assertFails(getDoc(doc(db,'accountDeletionFences/alice')));
+    await assertFails(deleteDoc(doc(db,'accountDeletionFences/alice')));
+    await assertFails(setDoc(doc(db,'accountDeletionFences/alice'),{deleting:false}));
+  }
+  await assertSucceeds(getDoc(doc(bob,'users/bob/projects/2')));
+});

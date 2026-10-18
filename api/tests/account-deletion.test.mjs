@@ -2,8 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {generateKeyPair,exportPKCS8} from 'jose';
 import {database} from './helpers/database.mjs';
-import {deletionConfigured,deleteFirestoreChunk} from '../src/firebase-admin.ts';
+import {deletionConfigured,deleteFirestoreChunk,deleteIdentity} from '../src/firebase-admin.ts';
 import {advanceDeletion,assertNotDeleting,requestDeletion,runPendingDeletions,deletionStatus} from '../src/account-deletion.ts';
+import {beginExchange,rememberGrant,revokeGuard,finishExchange} from '../src/oauth-guard.ts';
+import {base64url} from '../src/crypto.ts';
 const now=()=>Date.now();
 
 test('disabled-by-default deletion cannot accept an irreversible operation',async t=>{
@@ -178,4 +180,87 @@ test('Firestore deletion percent-encodes paths with reserved characters and cann
   const done=await deleteFirestoreChunk({FIREBASE_PROJECT_ID:'roteiva-web-dev'},'user-A','dummy',1,fetcher);
   assert.equal(done,false);
   assert.ok(urls.some(x=>x.endsWith('/a%231')),'reserved character is encoded as URL path, not fragment');
+});
+
+test('Firebase administrative delete uses the official project endpoint and only USER_NOT_FOUND is idempotent',async()=>{
+ const env={FIREBASE_PROJECT_ID:'roteiva-web-dev'};
+ const call=async(url,init)=>{
+   assert.equal(url,'https://identitytoolkit.googleapis.com/v1/projects/roteiva-web-dev/accounts:delete');
+   assert.equal(init.method,'POST');
+   assert.deepEqual(JSON.parse(init.body),{localId:'disposable'});
+   assert.equal(init.headers.Authorization,'Bearer synthetic');
+   return Response.json({error:{message:'USER_NOT_FOUND'}},{status:400});
+ };
+ await deleteIdentity(env,'disposable','synthetic',call);
+ for(const status of [400,403,404,500])await assert.rejects(()=>deleteIdentity(env,'disposable','synthetic',
+   async()=>Response.json({error:{message:'OTHER_ERROR'}},{status})));
+});
+
+test('Firestore database 404 cannot be interpreted as an empty user tree',async()=>{
+ await assert.rejects(()=>deleteFirestoreChunk({FIREBASE_PROJECT_ID:'roteiva-web-dev'},'owner-A','synthetic',20,
+   async()=>Response.json({error:{status:'NOT_FOUND'}},{status:404})),e=>e.code==='admin_service_unavailable');
+});
+
+test('Firestore drains multiple document pages, missing parents and thousands of records across bounded chunks',async()=>{
+ const prefix='projects/roteiva-web-dev/databases/(default)/documents/users/owner-A';
+ const docs=new Set(Array.from({length:1001},(_,n)=>prefix+'/projects/p'+String(n).padStart(4,'0')));
+ docs.add(prefix+'/orphan/missing/notes/n1');
+ const fetcher=async(url,init={})=>{
+   const target=String(url).replace('https://firestore.googleapis.com/v1/','').split('?')[0];
+   if(target.endsWith(':listCollectionIds')){
+     const parent=target.slice(0,-':listCollectionIds'.length);
+     const ids=new Set([...docs].filter(d=>d.startsWith(parent+'/')).map(d=>d.slice(parent.length+1).split('/')[0]));
+     return Response.json({collectionIds:[...ids]});
+   }
+   if(init.method==='DELETE'){docs.delete(target);return Response.json({});}
+   const children=[...new Set([...docs].filter(d=>d.startsWith(target+'/')).map(d=>target+'/'+d.slice(target.length+1).split('/')[0]))].sort();
+   return Response.json({documents:children.slice(0,30).map(name=>({name})),...(children.length>30?{nextPageToken:'more'}:{})});
+ };
+ let done=false,chunks=0;
+ while(!done&&chunks++<100)done=await deleteFirestoreChunk({FIREBASE_PROJECT_ID:'roteiva-web-dev'},'owner-A','synthetic',20,fetcher);
+ assert.equal(done,true);assert.equal(docs.size,0);assert.ok(chunks>50);
+});
+
+test('manual review retains failed stage, releases lease and cannot be retried automatically',async t=>{
+ const db=database();t.after(db.close);
+ const {privateKey}=await generateKeyPair('RS256',{extractable:true});
+ const env={DB:db.DB,ENVIRONMENT:'dev',FIREBASE_PROJECT_ID:'roteiva-web-dev',ACCOUNT_DELETION_ENABLED:'true',
+   FIREBASE_ADMIN_CREDENTIALS_JSON:JSON.stringify({type:'service_account',project_id:'roteiva-web-dev',client_email:'test@roteiva-web-dev.iam.gserviceaccount.com',
+     private_key:await exportPKCS8(privateKey),token_uri:'https://oauth2.googleapis.com/token'})};
+ const stamp=Date.now();
+ db.sql.prepare("INSERT INTO account_deletions(owner_uid,operation_id,phase,attempts,next_attempt_at,created_at,updated_at) VALUES('owner-A','op-A','locking',9,?,?,?)").run(stamp,stamp,stamp);
+ const original=globalThis.fetch;let calls=0;
+ globalThis.fetch=async()=>{calls++;return Response.json({},{status:503});};t.after(()=>{globalThis.fetch=original;});
+ await advanceDeletion(env,'owner-A');
+ const job=db.sql.prepare('SELECT phase,failed_phase,lease_id,attempts FROM account_deletions').get();
+ assert.equal(job.phase,'manual_review');assert.equal(job.failed_phase,'locking');assert.equal(job.lease_id,null);assert.equal(job.attempts,10);
+ await runPendingDeletions(env);assert.equal(calls,1);
+ assert.throws(()=>db.sql.prepare("INSERT INTO oauth_transactions(state_hash,owner_uid,browser_hash,encrypted_verifier,nonce,expires_at,created_at) VALUES('late','owner-A','','','',0,0)").run(),/account_deleting/);
+});
+
+test('in-flight Google grant is fenced, encrypted and retained on temporary revocation failure',async t=>{
+ const db=database();t.after(db.close);
+ const env={DB:db.DB,ENVIRONMENT:'dev',TOKEN_KEY_VERSION:'v1',TOKEN_KEYS:JSON.stringify({v1:base64url(crypto.getRandomValues(new Uint8Array(32)))})};
+ const exchange=await beginExchange(env,'owner-A');
+ assert.equal(await revokeGuard(env,'owner-A'),false,'live exchange blocks progress');
+ await rememberGrant(env,'owner-A',exchange,'synthetic-refresh-secret');
+ assert.ok(!db.sql.prepare('SELECT encrypted_token FROM oauth_exchange_guards').get().encrypted_token.includes('synthetic-refresh-secret'));
+ const stamp=Date.now();
+ db.sql.prepare("INSERT INTO account_deletions(owner_uid,operation_id,phase,next_attempt_at,created_at,updated_at) VALUES('owner-A','op-A','revoking',?,?,?)").run(stamp,stamp,stamp);
+ await assert.rejects(()=>beginExchange(env,'owner-A'),/account_deleting/);
+ const original=globalThis.fetch;t.after(()=>{globalThis.fetch=original;});
+ globalThis.fetch=async(url,init)=>{
+   assert.equal(url,'https://oauth2.googleapis.com/revoke');assert.equal(init.redirect,'manual');
+   assert.equal(init.body.get('token'),'synthetic-refresh-secret');
+   return Response.json({error:'temporarily_unavailable'},{status:503});
+ };
+ await assert.rejects(()=>revokeGuard(env,'owner-A'),e=>e.code==='google_revocation_unavailable');
+ assert.equal(db.sql.prepare('SELECT COUNT(*) n FROM oauth_exchange_guards').get().n,1);
+ globalThis.fetch=async()=>new Response(null,{status:200});
+ assert.equal(await revokeGuard(env,'owner-A'),false);
+ assert.equal(await revokeGuard(env,'owner-A'),true);
+ const other=await beginExchange(env,'owner-B');
+ db.sql.prepare('UPDATE oauth_exchange_guards SET started_at=0 WHERE exchange_id=?').run(other);
+ await assert.rejects(()=>revokeGuard(env,'owner-B'),e=>e.code==='oauth_exchange_unresolved');
+ await finishExchange(env,'owner-B',other);
 });

@@ -37,7 +37,7 @@ export async function adminToken(env:Env,fetcher:typeof fetch=fetch):Promise<str
       .sign(await importPKCS8(a.private_key,'RS256'));
   }catch{throw new ApiError(503,'admin_token_unavailable');}
   let response:Response;
-  try{response=await fetcher(a.token_uri,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
+  try{response=await fetcher(a.token_uri,{method:'POST',redirect:'manual',headers:{'Content-Type':'application/x-www-form-urlencoded'},
     body:new URLSearchParams({grant_type:'urn:ietf:params:oauth:grant-type:jwt-bearer',assertion}),
     signal:AbortSignal.timeout(10000)});}
   catch{throw new ApiError(503,'admin_token_unavailable');}
@@ -49,10 +49,10 @@ export async function adminToken(env:Env,fetcher:typeof fetch=fetch):Promise<str
 async function adminRequest(url:string,token:string,method:'POST'|'PATCH'|'DELETE',
   body?:unknown,fetcher:typeof fetch=fetch):Promise<Record<string,unknown>>{
   let response:Response;
-  try{response=await fetcher(url,{method,headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},
+  try{response=await fetcher(url,{method,redirect:'manual',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},
     ...(body===undefined?{}:{body:JSON.stringify(body)}),signal:AbortSignal.timeout(15000)});}
   catch{throw new ApiError(503,'admin_service_unavailable');}
-  if(response.status===404)return {missing:true};
+  if(response.status===404&&method==='DELETE')return {missing:true};
   if(response.status===403)throw new ApiError(503,'admin_permission_denied');
   if(!response.ok)throw new ApiError(503,'admin_service_unavailable');
   if(response.status===204)return {};
@@ -63,10 +63,19 @@ function uidPart(uid:string):string{
   return encodeURIComponent(uid);
 }
 const root=(env:Env,uid:string)=>firestoreRoot(env)+'/users/'+uidPart(uid);
+const fence=(env:Env,uid:string)=>firestoreRoot(env)+'/accountDeletionFences/'+uidPart(uid);
 export async function lockAccount(env:Env,uid:string,token:string,fetcher:typeof fetch=fetch){
+  // Independent of the profile: survives root removal and blocks residual JWTs
+  // from recreating a profile. Only the backend can write/remove this fence.
+  const marker=await adminRequest(fence(env,uid)+'?updateMask.fieldPaths=deleting',
+    token,'PATCH',{fields:{deleting:{booleanValue:true}}},fetcher);
+  if(marker.missing)throw new ApiError(503,'admin_service_unavailable');
   const data=await adminRequest(root(env,uid)+'?updateMask.fieldPaths=deletionState&updateMask.fieldPaths=ownerUid',
     token,'PATCH',{fields:{deletionState:{stringValue:'deleting'},ownerUid:{stringValue:uid}}},fetcher);
   if(data.missing)throw new ApiError(503,'admin_service_unavailable');
+}
+export async function deleteFence(env:Env,uid:string,token:string,fetcher:typeof fetch=fetch){
+  await adminRequest(fence(env,uid),token,'DELETE',undefined,fetcher);
 }
 async function collectionIds(parent:string,token:string,fetcher:typeof fetch):Promise<string[]>{
   // Collection ID pages may exceed 100. Never treat a truncated page as
@@ -94,22 +103,30 @@ async function collectionIds(parent:string,token:string,fetcher:typeof fetch):Pr
 async function documents(collection:string,token:string,fetcher:typeof fetch):Promise<{name:string}[]>{
   let r:Response;
   try{r=await fetcher(collection+'?pageSize=30&showMissing=true',
-    {headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(15000)});}
+    {redirect:'manual',headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(15000)});}
   catch{throw new ApiError(503,'admin_service_unavailable');}
-  if(r.status===404)return [];
   if(!r.ok)throw new ApiError(503,r.status===403?'admin_permission_denied':'admin_service_unavailable');
   const data=await r.json() as {documents?:{name:string}[]};
   return data.documents||[];
 }
 export async function deleteFirestoreChunk(env:Env,uid:string,token:string,maxDeletes=20,fetcher:typeof fetch=fetch):Promise<boolean>{
   let left=maxDeletes;
+  const deadline=Date.now()+35000;
+  let requests=0;
+  const exhausted=Symbol('chunk budget');
+  const boundedFetch:typeof fetch=async(input,init)=>{
+    const remaining=deadline-Date.now();
+    if(remaining<1000||requests>=100)throw exhausted;
+    requests++;
+    return fetcher(input,{...init,signal:AbortSignal.timeout(Math.min(15000,remaining))});
+  };
   const prefix='projects/'+projectId(env)+'/databases/(default)/documents/users/'+uidPart(uid)+'/';
   async function walk(parent:string,depth:number):Promise<void>{
     if(left<=0)return;
-    if(depth>16)throw new ApiError(503,'unexpected_collection_depth');
-    for(const id of await collectionIds(parent,token,fetcher)){
+    if(depth>100)throw new ApiError(503,'unexpected_collection_depth');
+    for(const id of await collectionIds(parent,token,boundedFetch)){
       if(left<=0)return;
-      for(const doc of await documents(parent+'/'+encodeURIComponent(id),token,fetcher)){
+      for(const doc of await documents(parent+'/'+encodeURIComponent(id),token,boundedFetch)){
         if(left<=0)return;
         if(!doc.name.startsWith(prefix))throw new ApiError(503,'invalid_firestore_path');
         const rest=doc.name.slice(prefix.length);
@@ -119,13 +136,20 @@ export async function deleteFirestoreChunk(env:Env,uid:string,token:string,maxDe
         const child=root(env,uid)+'/'+segments.map(encodeURIComponent).join('/');
         await walk(child,depth+1);
         if(left<=0)return;
-        await adminRequest(child,token,'DELETE',undefined,fetcher);
+        await adminRequest(child,token,'DELETE',undefined,boundedFetch);
         left--;
       }
     }
   }
-  await walk(root(env,uid),0);
-  return left>0 && (await collectionIds(root(env,uid),token,fetcher)).length===0;
+  try{
+    await walk(root(env,uid),0);
+    return left>0 && (await collectionIds(root(env,uid),token,boundedFetch)).length===0;
+  }catch(error){
+    // Request wrappers sanitize transport failures; a consumed budget means
+    // cooperative yield, not a failed job or permission to advance to Auth.
+    if(requests>=100||Date.now()>=deadline-1000||error===exhausted)return false;
+    throw error;
+  }
 }
 export async function deleteRoot(env:Env,uid:string,token:string,fetcher:typeof fetch=fetch){
   if((await collectionIds(root(env,uid),token,fetcher)).length)throw new ApiError(503,'firestore_not_empty');
@@ -133,7 +157,7 @@ export async function deleteRoot(env:Env,uid:string,token:string,fetcher:typeof 
 }
 export async function deleteIdentity(env:Env,uid:string,token:string,fetcher:typeof fetch=fetch){
   let response:Response;
-  try{response=await fetcher(identityRoot(env)+':delete',{method:'POST',
+  try{response=await fetcher(identityRoot(env)+':delete',{method:'POST',redirect:'manual',
     headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},
     body:JSON.stringify({localId:uid}),signal:AbortSignal.timeout(15000)});}
   catch{throw new ApiError(503,'admin_service_unavailable');}

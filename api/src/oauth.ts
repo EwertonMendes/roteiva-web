@@ -5,6 +5,7 @@ import { consumeState } from './repository.ts';
 import { DRIVE_SCOPE, DRIVE_READ_SCOPE, tokenRequest } from './google.ts';
 import { persistDriveConsent } from './consent.ts';
 import { assertNotDeleting } from './account-deletion.ts';
+import {beginExchange,rememberGrant,finishExchange} from './oauth-guard.ts';
 
 const googleKeys = createRemoteJWKSet(new URL('https://www.googleapis.com/oauth2/v3/certs'));
 const COOKIE = '__Host-roteiva-oauth';
@@ -80,9 +81,12 @@ export async function callback(request: Request, env: Env): Promise<Response> {
   if (!code || code.length > 4096) throw new ApiError(400,'invalid_oauth_code');
   // Errors after a verified state/cookie belong in the Roteiva UI. Never leave
   // the user on a raw Worker JSON response, or put provider details in a URL.
+  let exchangeId:string|undefined;
   try {
     const verifier = await decrypt(env,tx.encrypted_verifier,context(env,tx.owner_uid,stateHash,'pkce'));
+    exchangeId=await beginExchange(env,tx.owner_uid);
     const tokens = await tokenRequest(env,{grant_type:'authorization_code',code,redirect_uri:env.OAUTH_REDIRECT_URI,code_verifier:verifier});
+    await rememberGrant(env,tx.owner_uid,exchangeId,tokens.refresh_token||tokens.access_token);
     if (!tokens.id_token) throw new ApiError(409,'google_identity_missing');
     const {payload} = await jwtVerify(tokens.id_token,googleKeys,{
       algorithms:['RS256'],issuer:['https://accounts.google.com','accounts.google.com'],
@@ -92,8 +96,11 @@ export async function callback(request: Request, env: Env): Promise<Response> {
       throw new ApiError(400,'invalid_google_identity');
     }
     await persistDriveConsent(env, tx.owner_uid, tokens, {sub:payload.sub,email:payload.email}, fetch, true);
+    await finishExchange(env,tx.owner_uid,exchangeId);
     return finish(env,'connected');
   } catch (error) {
+    // A retained guard is reconciled by the deletion executor. Never discard an
+    // issued credential on an OAuth/deletion race or claim the grant is revoked.
     // All credentials remain backend-only. Distinct, static codes let the UI
     // offer a precise recovery action without disclosing tokens or stack traces.
     const recoverable = new Set([

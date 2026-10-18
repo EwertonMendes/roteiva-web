@@ -6,7 +6,7 @@ import {join} from "node:path";
 async function sources(root) {
   const paths=[];
   for (const entry of await readdir(root,{withFileTypes:true})) {
-    const path=join(root,entry.name);
+    const path=join(root,entry.name).replaceAll('\\','/');
     if(entry.isDirectory()) paths.push(...await sources(path));
     else if(/\.(tsx?|jsx?)$/.test(path)) paths.push(path);
   }
