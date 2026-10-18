@@ -1,8 +1,8 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-// A mesma aplicação é gerada para a raiz do Firebase e para /roteiva-web/ no Pages.
-// O comando build:pages sobrescreve --base e --outDir, sem duplicar frontends.
+// Frontend estático para Firebase Hosting. O modo demo existe apenas localmente para QA.
+// Não existe mais deploy no GitHub Pages.
 export default defineConfig({
   plugins: [react()],
   base: "/",

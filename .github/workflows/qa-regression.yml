@@ -1,0 +1,48 @@
+name: QA regression (manual or nightly)
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '20 7 * * *'
+permissions:
+  contents: read
+concurrency:
+  group: qa-regression
+  cancel-in-progress: true
+jobs:
+  regression:
+    name: Full security and desktop/mobile browser regression
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: pnpm install --frozen-lockfile
+      - name: Install browser and compile isolated emulator/demo modes
+        run: |
+          pnpm exec playwright install --with-deps chromium
+          pnpm build:emulator
+          pnpm build:demo
+      - name: Run Firestore isolation and Chromium desktop/mobile suite
+        run: pnpm test:firebase
+      - name: Archive failure context
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-failure-evidence
+          path: |
+            test-results/
+            playwright-report/
+          if-no-files-found: ignore
+          retention-days: 7

@@ -1,0 +1,84 @@
+name: Firestore security DEV
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - 'firestore.rules'
+      - 'firestore.indexes.json'
+      - 'firebase.json'
+      - 'src/data/**'
+      - 'src/features/auth/**'
+      - 'src/features/workspace/**'
+      - 'tests/firestore.rules.test.mjs'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/firebase-infra.yml'
+  push:
+    branches: [master]
+    paths:
+      - 'firestore.rules'
+      - 'firestore.indexes.json'
+      - 'firebase.json'
+      - '.github/workflows/firebase-infra.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: firestore-infra-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  validate:
+    name: Security rules and account isolation
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: pnpm install --frozen-lockfile
+      - name: Firestore rules and multi-account isolation (no browser)
+        run: pnpm test:rules
+  deploy:
+    name: Deploy Firestore rules and indexes DEV
+    needs: validate
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    environment: firebase-development
+    concurrency:
+      group: firestore-rules-dev
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Guard DEV project and commit
+        env:
+          CONFIGURED_PROJECT: ${{ vars.FIREBASE_PROJECT_ID }}
+        run: |
+          test "$CONFIGURED_PROJECT" = "roteiva-web-dev"
+          test "$(git ls-remote origin refs/heads/master | cut -f1)" = "$GITHUB_SHA" || {
+            echo "Outdated SHA: skip stale DEV deploy"; exit 1;
+          }
+      - uses: google-github-actions/auth@v3
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+      - name: Deploy only Firestore infrastructure
+        run: pnpm exec firebase deploy --only firestore:rules,firestore:indexes --project roteiva-web-dev --non-interactive

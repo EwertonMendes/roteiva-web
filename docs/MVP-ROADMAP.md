@@ -434,3 +434,12 @@ A correção não altera o fluxo seguro de exclusão da PR #32 nem os dados Fire
 - [ ] VALIDAR: visual DEV após merge, sem excluir contas reais durante homologação desta PR.
 
 A cópia persistida é privada e potencialmente sensível em computadores compartilhados: orientação de privacidade precisa refletir que o logout apaga a cópia quando tecnicamente possível. A revisão remota permanece necessária para evitar apresentar dados desatualizados.
+
+## Infraestrutura — pipeline rápida DEV (2026-10-18)
+
+- **IMPLEMENTADO NO CÓDIGO; VALIDAR NA PR:** separar validação e deploy do frontend Firebase, API Cloudflare/D1 e regras Firestore; retirar GitHub Pages e a dependência `workflow_run`. Evidência: `.github/workflows/frontend.yml`, `api.yml`, `firebase-infra.yml`.
+- **IMPLEMENTADO NO CÓDIGO; VALIDAR NA PR:** mover regressão completa desktop/mobile para workflow noturno/manual sem bloquear UI. Evidência: `.github/workflows/qa-regression.yml`, `playwright.config.ts`.
+- **IMPLEMENTADO NO CÓDIGO; VALIDAR NA PR:** preview manual e isolado de qualquer PR interna pela master, canal expirando em 7 dias; verificar autenticação/CORS antes de aceitar teste Drive real. Evidência: `.github/workflows/preview.yml`.
+- **PARCIAL/BLOQUEADO POR SEGURANÇA:** operações Firebase somente em repositório privado com conta de serviço separada; contagem/leitura e fixtures; dados de negócio sem mutações administrativas genéricas. Evidência: `.github/workflows/firebase-ops.yml`, `scripts/firebase-ops.mjs`, `tests/firebase-ops.test.mjs`.
+- **PLANEJADO:** provisionar PROD com Firebase, Worker, D1, segredos e OAuth próprios após aprovação. Exemplos de configuração foram adicionados; nenhum deploy PROD está habilitado.
+- **PENDENTE:** verificar a duração real das pipelines após abrir e mesclar PR. A meta de até 60 segundos vale para deploys comuns, não Playwright/infra pesada ou indisponibilidade externa.
