@@ -111,3 +111,31 @@ test("full deletion saga is resumable, verifies service calls and leaves another
  assert.ok(accountDeletion!==-1 && firestoreRootDeletion>accountDeletion,'Auth is deleted before the final marker');
  assert.equal((await (await deletionStatus(env,'user-A')).json()).operation.status,'completed');
 });
+
+
+test('failed admin lock preserves durable job and schedules retry without deleting identity',async t=>{
+ const {privateKey}=await generateKeyPair('RS256',{extractable:true});
+ const db=database();t.after(db.close);
+ const account={type:'service_account',project_id:'roteiva-web-dev',client_email:'unit@roteiva-web-dev.iam.gserviceaccount.com',
+ private_key:await exportPKCS8(privateKey),token_uri:'https://oauth2.googleapis.com/token'};
+ const config={ENVIRONMENT:'dev',FIREBASE_PROJECT_ID:'roteiva-web-dev',ACCOUNT_DELETION_ENABLED:'true',
+   FIREBASE_ADMIN_CREDENTIALS_JSON:JSON.stringify(account),DB:db.DB};
+ const original=globalThis.fetch;
+ let rootWrites=0,identityDeletes=0;
+ globalThis.fetch=async(url)=>{
+   if(String(url)==='https://oauth2.googleapis.com/token')return Response.json({access_token:'admin-test'});
+   if(String(url).includes('firestore.googleapis.com')){rootWrites++;return Response.json({error:{status:'UNAVAILABLE'}},{status:503});}
+   if(String(url).includes('identitytoolkit.googleapis.com')){identityDeletes++;return Response.json({});}
+   throw Error('Unexpected URL');
+ };
+ t.after(()=>{globalThis.fetch=original;});
+ const request=new Request('https://test.local',{method:'POST',
+   body:JSON.stringify({phrase:'EXCLUIR MINHA CONTA',acknowledged:true})});
+ await assert.rejects(()=>requestDeletion(request,config,'owner-a'),e=>e.code==='deletion_not_locked');
+ const job=db.sql.prepare('SELECT phase,attempts,next_attempt_at FROM account_deletions WHERE owner_uid=?').get('owner-a');
+ assert.equal(job.phase,'locking');assert.equal(job.attempts,1);
+ assert.ok(job.next_attempt_at>Date.now());
+ assert.equal(rootWrites,1);assert.equal(identityDeletes,0);
+ await runPendingDeletions(config);
+ assert.equal(rootWrites,1,'retry waits until next_attempt_at');
+});
