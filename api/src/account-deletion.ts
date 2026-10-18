@@ -38,8 +38,9 @@ export async function requestDeletion(request:Request,env:Env,uid:string):Promis
   return Response.json({status:'processing',operationId:job.operation_id},{status:202});
 }
 async function changePhase(env:Env,job:Job,lease:string,phase:Phase){
-  const res=await env.DB.prepare('UPDATE account_deletions SET phase=?,attempts=0,next_attempt_at=?,updated_at=?,error_code=NULL WHERE owner_uid=? AND lease_id=? AND phase=?')
-    .bind(phase,Date.now(),Date.now(),job.owner_uid,lease,job.phase).run();
+  const now=Date.now();
+  const res=await env.DB.prepare('UPDATE account_deletions SET phase=?,attempts=0,next_attempt_at=?,updated_at=?,completed_at=CASE WHEN ?=\'completed\' THEN ? ELSE completed_at END,error_code=NULL WHERE owner_uid=? AND lease_id=? AND phase=?')
+    .bind(phase,now,now,phase,now,job.owner_uid,lease,job.phase).run();
   if(res.meta.changes!==1)throw new ApiError(503,'deletion_lease_lost');
 }
 async function revokeConnections(env:Env,uid:string):Promise<void>{
@@ -87,8 +88,6 @@ async function runPhase(env:Env,job:Job,lease:string):Promise<void>{
     // Keep the Firestore deletion marker until Auth has been removed.
     await deleteRoot(uid,token);
     await changePhase(env,job,lease,'completed');
-    await env.DB.prepare('UPDATE account_deletions SET completed_at=? WHERE owner_uid=?')
-      .bind(Date.now(),uid).run();
   }
 }
 export async function advanceDeletion(env:Env,uid:string):Promise<void>{
@@ -121,7 +120,13 @@ export async function runPendingDeletions(env:Env):Promise<void>{
   const now=Date.now();
   const rows=await env.DB.prepare("SELECT owner_uid FROM account_deletions WHERE phase NOT IN ('completed','manual_review') AND lease_until<? AND next_attempt_at<=? ORDER BY created_at LIMIT 10")
     .bind(now,now).all<{owner_uid:string}>();
-  for(const row of rows.results)await advanceDeletion(env,row.owner_uid);
+  for(const row of rows.results){
+    try{await advanceDeletion(env,row.owner_uid);}
+    catch{
+      // Do not let one database/lease failure starve every other account.
+      console.error(JSON.stringify({event:'account_deletion_scheduler_failure'}));
+    }
+  }
   // Minimal operational tombstone: 24h for idempotent status/recovery.
   await env.DB.prepare("DELETE FROM account_deletions WHERE phase='completed' AND completed_at<?")
     .bind(now-86400000).run();
