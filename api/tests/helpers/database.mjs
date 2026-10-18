@@ -3,7 +3,7 @@ import {readFileSync} from 'node:fs';
 
 export function database(...rows) {
   const sql = new DatabaseSync(':memory:');
-  for (const migration of ['0001_oauth.sql','0002_oauth_launch.sql','0003_access_token_cache.sql']) {
+  for (const migration of ['0001_oauth.sql','0002_oauth_launch.sql','0003_access_token_cache.sql','0004_account_deletion.sql','0005_deletion_fences.sql']) {
     sql.exec(readFileSync(new URL('../../migrations/'+migration,import.meta.url),'utf8'));
   }
   for (const row of rows) {
