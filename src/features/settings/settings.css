@@ -60,3 +60,17 @@
 @media(max-width:980px){.settings-pref-row,.settings-privacy-row{align-items:flex-start;flex-direction:column}.settings-privacy-row .workspace-tools{align-items:flex-start}}
 @media(max-width:620px){.settings-layout{gap:13px}.settings-identity{min-height:193px;padding:27px 23px;border-radius:15px}.settings-orbit{right:-250px;opacity:.5}.settings-identity h2{font-size:32px}.settings-editor{padding:22px 18px;border-radius:15px}.settings-form-grid{grid-template-columns:1fr;gap:17px}.settings-profile-summary{gap:10px}.settings-profile-summary img,.settings-monogram{width:43px;height:43px}.settings-actions{flex-direction:column;align-items:stretch}.settings-actions .primary-button{width:100%}.settings-theme-choices{width:100%}.settings-theme-choices button{flex:1;justify-content:center}}
 @media(prefers-reduced-motion:reduce){.settings-layout *{transition:none!important}}
+
+/* Destructive actions are visually isolated from ordinary settings. */
+.settings-danger-zone{border-color:color-mix(in srgb,#d64045 53%,var(--line));}
+.settings-danger-zone .settings-section-head>svg{color:#d65b60;}
+.settings-danger-eyebrow{display:inline-flex;align-items:center;gap:8px;color:#d75b5f;font-size:var(--type-caption);font-weight:800;letter-spacing:.12em;}
+.settings-danger-zone .account-delete{margin-top:22px;border-top:1px solid var(--line);padding-top:4px;}
+.settings-danger-zone .settings-privacy-row{margin-top:18px;}
+.settings-danger-zone .settings-privacy-row>div:first-child{max-width:650px;}
+.settings-danger-zone .account-delete .settings-privacy-row>button{background:#ba2535;border:1px solid #ba2535;color:white;display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:10px;min-height:42px;padding:10px 16px;font-weight:700;transition:background .15s,border-color .15s;}
+.settings-danger-zone .account-delete .settings-privacy-row>button:hover:not(:disabled){background:#a51f30;border-color:#a51f30;}
+.settings-danger-zone .account-delete .settings-privacy-row>button:focus-visible{outline:2px solid #e65b64;outline-offset:3px;}
+.settings-danger-zone .account-delete .settings-privacy-row>button:disabled{opacity:.48;cursor:not-allowed;}
+@media(max-width:620px){.settings-danger-zone .account-delete .settings-privacy-row>button{width:100%}}
+@media(prefers-reduced-motion:reduce){.settings-danger-zone .account-delete .settings-privacy-row>button{transition:none}}
