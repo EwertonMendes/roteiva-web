@@ -97,7 +97,7 @@ export function AccountDeletionAction({compact=false}:{compact?:boolean}){
       <div><strong><Trash2 size={16}/> Excluir minha conta</strong>
         {!compact&&<p>Exclusão permanente da conta e dos dados armazenados no Roteiva. Seus arquivos originais no Google Drive serão preservados.</p>}
       </div>
-      <button type="button" className="secondary-button" disabled={!ready||!available||!!progress} onClick={()=>{setError("");setOpened(true);}}>
+      <button type="button" className="secondary-button" disabled={!ready||!available||!!progress} onClick={()=>{setError("");setText("");setChecked(false);setOpened(true);}}>
         <Trash2 size={15}/> Excluir conta
       </button>
     </div>

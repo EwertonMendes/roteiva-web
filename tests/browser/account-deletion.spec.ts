@@ -59,5 +59,13 @@ test("deletion modal blocks incomplete confirmation and cancellation never calls
   await expect(dialog.getByLabel("Digite EXCLUIR MINHA CONTA para confirmar:")).toHaveValue("");
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
+  await open.click();
+  await dialog.getByLabel("Digite EXCLUIR MINHA CONTA para confirmar:").fill("EXCLUIR MINHA CONTA");
+  await dialog.getByRole("checkbox",{name:"Entendo que esta exclusão é irreversível."}).check();
+  await page.keyboard.press("Escape");
+  await open.click();
+  await expect(submit).toBeDisabled();
+  await expect(dialog.getByLabel("Digite EXCLUIR MINHA CONTA para confirmar:")).toHaveValue("");
+  await expect(dialog.getByRole("checkbox")).not.toBeChecked();
   expect(submissions).toBe(0);
 });
