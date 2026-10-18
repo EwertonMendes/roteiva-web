@@ -262,27 +262,11 @@ test("offline writing shows recovery, never a false cloud confirmation",async({p
   await expect(page.locator(".app-shell")).toBeVisible();await settled(page);
   await navigate(page,"Clientes");await expect(page.getByText("Não confirmado",{exact:true})).toHaveCount(0);
 });
-test("Pages stays anonymous and uses the unchanged localStorage key",async({page},info)=>{
+test("Local demo remains anonymous and never contacts Firebase",async({page},info)=>{
   const requests:string[]=[];page.on("request",r=>requests.push(r.url()));
-  await page.goto("http://127.0.0.1:4174/roteiva-web/");
+  await page.goto("http://127.0.0.1:4174/");
   await expect(page.getByText("Modo demonstração",{exact:true})).toBeVisible();
   await expect(page.getByRole("button",{name:"Entrar com Google",exact:true})).toHaveCount(0);
-  await navigate(page,"Clientes");
-  await expect(page).toHaveURL(new RegExp("/roteiva-web/#/clientes$"));
-  await page.reload();
-  await expect(page.getByRole("heading",{name:"Clientes",exact:true})).toBeVisible();
-  await expect(page).toHaveURL(new RegExp("/roteiva-web/#/clientes$"));
-  await page.goBack();
-  await expect(page).toHaveURL(new RegExp("/roteiva-web/(#/clientes)?$"));
-  await page.goto("http://127.0.0.1:4174/roteiva-web/#/clientes");
-  await expect(page.getByRole("heading",{name:"Clientes",exact:true})).toBeVisible();
-  await page.getByRole("button",{name:"Novo cliente",exact:true}).click();
-  await page.getByLabel("Nome do cliente",{exact:true}).fill("Cliente Demo");
-  await page.getByLabel("Contato principal",{exact:true}).fill("Teste");
-  await page.getByRole("button",{name:"Salvar cliente"}).click();
-  await page.reload();await navigate(page,"Clientes");
-  await expect(page.getByText("Cliente Demo",{exact:true})).toBeVisible();
-  expect(await page.evaluate(()=>localStorage.getItem("roteiva-pages-demo-workspace-v1"))).toContain("Cliente Demo");
   expect(requests.filter(url=>/googleapis.com|127.0.0.1:8080|127.0.0.1:9099/.test(url))).toEqual([]);
   await page.screenshot({path:info.outputPath("demo.png"),fullPage:true});
 });

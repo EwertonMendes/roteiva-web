@@ -1,0 +1,89 @@
+name: Firebase preview (manual PR)
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'Open PR number to preview (same-repository PR only)'
+        required: true
+        type: number
+permissions:
+  contents: read
+  pull-requests: read
+concurrency:
+  group: firebase-preview-pr-${{ inputs.pr_number }}
+  cancel-in-progress: true
+jobs:
+  build:
+    name: Build untrusted PR without deployment secrets
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    outputs:
+      pr_sha: ${{ steps.resolve.outputs.sha }}
+    steps:
+      - name: Validate PR is open, internal and targets master
+        id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+        run: |
+          payload="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER")"
+          echo "$payload" | jq -e --arg repo "$GITHUB_REPOSITORY" '.state == "open" and .base.ref == "master" and .head.repo.full_name == $repo' >/dev/null
+          echo "sha=$(echo "$payload" | jq -r '.head.sha')" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.resolve.outputs.sha }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Validate and compile preview
+        run: |
+          pnpm test
+          pnpm typecheck
+          pnpm build
+          node scripts/verify-static-build.mjs dist /
+      - uses: actions/upload-artifact@v4
+        with:
+          name: preview-dist
+          path: dist/
+          retention-days: 1
+  deploy:
+    name: Deploy temporary DEV Hosting channel
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    environment: firebase-development
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          name: preview-dist
+          path: dist/
+      - name: Guard preview target
+        env:
+          CONFIGURED_PROJECT: ${{ vars.FIREBASE_PROJECT_ID }}
+        run: test "$CONFIGURED_PROJECT" = "roteiva-web-dev"
+      - uses: google-github-actions/auth@v3
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+      - name: Deploy ONLY preview Hosting, never live or database
+        run: pnpm exec firebase hosting:channel:deploy "pr-${{ inputs.pr_number }}" --project roteiva-web-dev --expires 7d --non-interactive

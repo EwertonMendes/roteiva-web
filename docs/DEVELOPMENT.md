@@ -14,12 +14,13 @@ React 19/Vite 8/TypeScript, sem SSR, Next/Vinext ou Functions. API Worker/D1 DEV
 | `pnpm test` | Agenda, dinheiro e mensagens de falha do login |
 | `pnpm typecheck` | TypeScript sem emissão |
 | `pnpm build` | Firebase explícito → dist/ |
-| `pnpm build:pages` | Demo explícita → dist-pages/ sob /roteiva-web/ |
+| `pnpm build:demo` | Demo de QA local → dist-demo/ (sem deploy público) |
 | `pnpm build:emulator` | Firebase fictício → dist-emulator/ |
 | `pnpm exec playwright install chromium` | Navegador de teste |
-| `pnpm test:firebase` | Auth/Firestore Emulator + regras, repositório e navegador |
+| `pnpm test:rules` | Firestore Emulator: regras, isolamento A/B e repositório (sem navegador) |
+| `pnpm test:firebase` | Regressão completa: regras + Playwright desktop/mobile |
 | `node scripts/verify-static-build.mjs dist /` | SPA e assets Firebase |
-| `node scripts/verify-static-build.mjs dist-pages /roteiva-web/` | Artefatos Pages |
+| `node --test tests/firebase-ops.test.mjs` | Contrato de operações administrativas, sem credenciais |
 
 As dependências desta PR foram instaladas e o lockfile gerado em GitHub Actions. Nenhuma CLI ou clone foi instalado no computador do proprietário. O job temporário que preparou o lockfile foi retirado; não é parte do CI final.
 
@@ -44,9 +45,9 @@ Nunca colocar service account JSON, private keys, refresh tokens ou segredos adm
 
 Google é o único provedor habilitado. Sessão em persistência local gerenciada pelo Firebase Auth; estado observado por `onAuthStateChanged`; telas privadas somente após a verificação. Popup acionado diretamente pelo clique, após inicializar persistência. Bloqueio, cancelamento, rede e expiração têm mensagens próprias.
 
-Domínios autorizados: `roteiva-web-dev.web.app`, `roteiva-web-dev.firebaseapp.com`, `localhost` (desenvolvimento). O Pages não é domínio de login. Não há escopos Drive. Redirecionamento OAuth automático não foi adicionado: exige validação específica de armazenamento entre origens e mobile. Safari/iOS e navegadores embutidos devem ter QA real antes de divulgação ampla.
+Domínios autorizados: `roteiva-web-dev.web.app`, `roteiva-web-dev.firebaseapp.com`, `localhost` (desenvolvimento). A demo local não é domínio de login. Não há escopos Drive. Redirecionamento OAuth automático não foi adicionado: exige validação específica de armazenamento entre origens e mobile. Safari/iOS e navegadores embutidos devem ter QA real antes de divulgação ampla.
 
-Por padrão, dados privados ficam em memória e no Firestore. O usuário pode optar pelo cache persistente em Configurações somente para dispositivo pessoal; a aplicação utiliza IndexedDB oficial com isolamento lógico por UID, revisão e contagens de completude. A desativação/logout tentam limpar esse cache após finalizar o Firestore; abas extras podem impedir a limpeza e devem ser fechadas. Nenhuma migração da demo. Carregamento sob demanda por rota; Projetos e Clientes usam páginas de até 24 e cursor Firestore; Projetos traz as tarefas de cada página e Clientes carrega projetos completos para contadores; demais domínios completos usam blocos internos de até 200; exportação exige todos os domínios; sem listeners globais. Atualizações concorrentes de um mesmo documento são rejeitadas pela revisão, com recuperação explícita. Atualizações independentes não regravam coleções inteiras. Uma transação limita alterações simultâneas a 350 documentos para reservar espaço às revisões; pacotes de entregas permitem até 100 itens.
+O cache do Firestore é habilitado automaticamente e revalidado com revisão/contagens por UID antes de reaproveitar coleções persistidas. O logout tenta limpar a persistência; abas extras podem impedir essa limpeza e devem ser fechadas. Nenhuma migração da demo. Carregamento sob demanda por rota; Projetos e Clientes usam páginas de até 24 e cursor Firestore; Projetos traz as tarefas de cada página e Clientes carrega projetos completos para contadores; demais domínios completos usam blocos internos de até 200; exportação exige todos os domínios; sem listeners globais. Atualizações concorrentes de um mesmo documento são rejeitadas pela revisão, com recuperação explícita. Atualizações independentes não regravam coleções inteiras. Uma transação limita alterações simultâneas a 350 documentos para reservar espaço às revisões; pacotes de entregas permitem até 100 itens.
 
 Exportação JSON/CSV preservada. O JSON reflete os dados carregados e não inclui mídia. Ao perder rede/permissão ou ocorrer conflito, o painel oferece recarregar a nuvem, descartando alterações não confirmadas. Uma navegação enquanto grava dispara aviso de saída.
 
@@ -56,35 +57,47 @@ Exportação JSON/CSV preservada. O JSON reflete os dados carregados e não incl
 
 `firestore.indexes.json` tem listas vazias: consultas usam ordenação pelo ID de documento dentro do UID, sem índices compostos necessários. Não criar índices especulativos.
 
-O teste de regras cobre leitura/listagem, criação, atualização/exclusão cruzadas A/B, anônimo, UID forjado, mudança de owner, campos administrativos, timestamps, remoção de campos, strings excessivas, tipos/valores inválidos, órfãos e referências. O repositório testa CRUD, centavos, reabertura, preferência e conflito real. Chromium testa popup Google simulado, cancelamento, CRUD, reidratação, duas contas, offline, temas e demo em desktop/mobile.
+O teste de regras cobre leitura/listagem, criação, atualização/exclusão cruzadas A/B, anônimo, UID forjado, mudança de owner, campos administrativos, timestamps, remoção de campos, strings excessivas, tipos/valores inválidos, órfãos e referências. O repositório testa CRUD, centavos, reabertura, preferência e conflito real. Chromium testa popup Google simulado, cancelamento, CRUD, reidratação, duas contas, offline, temas e demo local em desktop/mobile.
 
 O runner Node usa `--test-force-exit` após todos os testes e hooks de cleanup: conexões internas do SDK mantêm handles abertos após o relatório final. Falhas dos testes continuam retornando código não zero; o flag não ignora testes nem assertions.
 
 **Limite da evidência:** emuladores não comprovam OAuth do Google em produção, duas contas Google reais, Safari/iOS ou cotas reais. Ver status/evidências no roadmap. Artefatos de QA são mantidos por sete dias no Actions. Não marcar testes planejados como executados.
 
-## Deploy GitHub Actions
+## CI/CD por responsabilidade — revisão de 18/10/2026
 
-`deploy-pages.yml` valida PR/push/dispatch: instalação congelada, domínio, TypeScript, builds Firebase/Pages, emuladores e navegador. Somente master fora de PR publica Pages.
+O Roteiva **não publica mais GitHub Pages**. O ambiente DEV segue no Firebase Hosting (frontend) e Cloudflare Worker/D1 (API). Os deploys não dependem de um workflow principal nem de uma suite Playwright de vários minutos.
 
-**Preview isolado da Biblioteca 2.0 (PR #29):** no workflow `deploy-pages.yml`, somente a PR #29 da branch interna `feat/library-explorer-ux`, após sucesso integral da validação, pode usar a identidade já protegida do ambiente `firebase-development` para executar `firebase hosting:channel:deploy pr-29 --project roteiva-web-dev --expires 7d --non-interactive`. O comando publica **apenas Hosting no canal temporário**, nunca o canal `live`, as regras Firestore, os índices ou o Worker. O endereço gerado vem dos logs de execução, não é o URL normal do DEV. O preview é público na web, mas mantém Firebase Auth/Firestore e API DEV existentes; o login Google poderá exigir que o domínio temporário seja autorizado em Firebase Authentication, a confirmar sem conceder permissões extras. Não testar dados sigilosos antes dessa verificação. A PR continua não mesclada enquanto o dono não aprovar o visual.
+| Workflow | PR | Push na master | Manual/agendado |
+|---|---|---|---|
+| `frontend.yml` | `pnpm test`, typecheck e build | Repete validação e publica **somente Hosting** no DEV | Dispatch opcional na master |
+| `api.yml` | typecheck, testes Worker/D1, migrações locais e dry-run | Repete validação, aplica migrações D1 remotas e publica Worker DEV | Dispatch opcional na master |
+| `firebase-infra.yml` | Regras no emulador, isolamento A/B | Revalida e publica **somente rules/indexes** | Dispatch opcional na master |
+| `qa-regression.yml` | Não executa em todo PR | Não bloqueia publicação rápida | Manual ou toda noite, Playwright desktop/mobile + emuladores |
+| `preview.yml` | Sem auto deploy com secrets em PR | Não publica | Dispatch na master com número de PR interno; build sem secrets, canal Hosting temporário |
+| `account-deletion-monitor-dev.yml` | — | — | A cada 15 min, executa monitoramento separado da exclusão |
+| `firebase-ops.yml` | — | — | Dispatch na master com credencial administrativa separada, **somente quando repo privado** |
 
-**Revisão visual sem autenticação (somente PR #29):** o CI também compila `VITE_LIBRARY_REVIEW=true pnpm exec vite build --mode demo --outDir dist --base /` e publica um canal `pr-29-design` separado. O conjunto de componentes da Biblioteca é o mesmo da PR, mas as pastas, arquivos e projetos são exemplos em memória (sem sessão Firebase, dados privados, chamadas Worker ou sincronização de operações). Serve **somente para aprovar responsividade, navegação e organização**; não atesta integração Google. O canal funcional `pr-29` precisa de domínio autorizado no Firebase Authentication e liberação explícita de origem pela API para funcionar com a conta real; esta PR não enfraquece CORS nem muda o Worker. Ambos os canais de preview expiram em 7 dias.
+**Segurança das mudanças críticas:** PRs alterando `firestore.rules`, `src/data/**`, auth e workspace disparam validação Firestore no emulador. Ao mexer em exclusão permanente, autenticação sensível, autorização ou Drive OAuth, execute manualmente `qa-regression.yml` e confira o resultado antes do merge, independentemente de o CI rápido passar. Testes E2E não foram removidos, apenas deslocados.
 
-`deploy-firebase.yml` aguarda sucesso do workflow CI após push na master, faz checkout **do SHA validado**, confere o ID DEV e publica regras, índices e Hosting. Dispatch manual somente na master executa os testes completos novamente antes de publicar. Environment final: `firebase-development`; o antigo nome `firebase-production` não identificava um projeto PROD e não é usado no workflow novo.
+O pipeline `firebase-infra.yml` faz deploy de rules/indexes somente quando um push inclui esses caminhos/arquivo de workflow; alterações em serviços de dados acionam a validação relevante no PR. Não existe deploy de rules/indexes em cada atualização visual. Se houver necessidade de publicação manual da infraestrutura, use o dispatch na master, não a pipeline de frontend.
 
-Configuração de repositório reaproveitada:
-- Variable `FIREBASE_PROJECT_ID=roteiva-web-dev`, validada por igualdade.
-- Secret `FIREBASE_SERVICE_ACCOUNT`, somente em etapa de autenticação após validação.
-- Conta existente `roteiva-github-deploy-dev@roteiva-web-dev.iam.gserviceaccount.com`.
+**Segredos/variáveis já existentes em DEV:** `firebase-development` recebe `FIREBASE_PROJECT_ID=roteiva-web-dev` e `FIREBASE_SERVICE_ACCOUNT`; `cloudflare-development` recebe `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_D1_DATABASE_ID` e `CLOUDFLARE_API_TOKEN`. IDs são conferidos antes de acessar provedores. Builds de PR não têm acesso a credenciais. O deploy do Worker usa seu `api/package-lock.json` e executa migrações versionadas antes do release. Commits obsoletos são bloqueados antes de publicar.
 
-Papéis existentes auditados: Firebase Hosting Admin e API Keys Viewer. Com autorização explícita do proprietário em 16/10/2026, adicionados Firebase Rules Admin (`roles/firebaserules.admin`) e Cloud Datastore Index Admin (`roles/datastore.indexAdmin`) somente no projeto DEV. Após o primeiro deploy retornar 403 na consulta do estado da API Firestore, o proprietário também autorizou `roles/serviceusage.serviceUsageViewer`: leitura de serviços/cotas/métricas, sem habilitar APIs ou cobrança. Estes papéis não dão acesso de leitura/escrita aos documentos, mas permitem alterar a segurança e os índices. Não conceder Editor/Owner/Firestore User por conveniência. WIF é uma melhoria futura: elimina chave persistente, mas exige pool, provider e binding IAM restrito ao repo/master; não criar outro mecanismo de credenciais sem auditoria e autorização.
+**Preview reutilizável:** em Actions > Firebase preview (manual PR) > Run workflow, escolha `master` e informe o número de uma PR **interna** aberta contra master. O job de build valida o PR via GitHub, sem credenciais e publica o artefato; o job de deploy usa código confiável da master e o canal `pr-N`, que expira em 7 dias. Somente o frontend vai para o canal, nunca Worker, Firestore rules/indexes nem dados. Canais podem exigir autorização do domínio em Firebase Auth/CORS; preview não é certificação de integração Google Drive.
 
-O comando explícito é:
-```bash
-pnpm exec firebase deploy --only firestore:rules,firestore:indexes,hosting --project roteiva-web-dev --non-interactive
-```
+### Operações Firebase via GitHub
 
-O Hosting serve `dist/` e aplica o fallback SPA `/index.html`. **Cabeçalhos de cache são avaliados pelo URL solicitado antes do rewrite**, portanto o padrão global `**` define `Cache-Control: no-cache, no-store, must-revalidate` para a entrada HTML (incluindo `/configuracoes`, `/biblioteca`, `/projetos/:id` e futuras rotas). A regra posterior `/assets/**` sobrescreve o header com `public, max-age=31536000, immutable` para JS/CSS versionados pelo Vite. `node --test tests/firebase-hosting-cache.test.mjs` valida o contrato e a publicação verifica cabeçalhos HTTP reais com `node scripts/verify-hosting-cache.mjs https://roteiva-web-dev.web.app`; falhas causam CI vermelho mesmo depois da publicação, para investigação. Nenhum comando tem projeto PROD ou cria projeto/banco. Auth foi configurado no Console e não é sobrescrito no deploy.
+O projeto está **público**. Por isso `firebase-ops.yml` tem guard obrigatório de visibilidade privada e fica efetivamente **bloqueado no estado atual**. Não existem dados de clientes em logs públicos. O GitHub app conectado pode executar o workflow por dispatch depois que as pré-condições estiverem habilitadas. Para ativar sem vazar dados, torne o repositório privado ou isole os workflows administrativos num repositório privado, configure environment `firebase-data-development` com `FIREBASE_PROJECT_ID=roteiva-web-dev`, `FIREBASE_DATA_OPS_ENABLED=true` e `FIREBASE_DATA_SERVICE_ACCOUNT` de privilégios mínimos (Firestore leitura + fixtures DEV quando necessário). Essa identidade **não** deve reutilizar `FIREBASE_SERVICE_ACCOUNT` do deploy. Nunca registrar credenciais em Vite.
+
+`scripts/firebase-ops.mjs` suporta `read` para documentos sob `users/{uid}`, `count` para coleções sob um usuário e `create-fixture`/`delete-fixture` sob `opsFixtures/{id}`. Acesso a coleções comerciais é **somente leitura** neste primeiro contrato. Escritas de cliente/projeto/financeiro exigem operações de domínio com validação de esquema, revisão e stamp sincronizados; o script **rejeita patches genéricos** que quebrariam a integridade. Caminhos são validados e limitados; no caso de leitura, o resultado só pode ser visto em logs de **repositório privado**. Inputs de Actions não devem conter valores pessoais.
+
+### Preparação PROD, ainda não provisionado
+
+`.env.production.example` e `firebase.prod.example.json` são modelos não executáveis sem IDs reais. O Cloudflare Worker PROD ainda precisará de conta/banco D1/segredos OAuth distintos, callbacks próprios, ambiente protegido, migrações e validação de smoke tests. **Nenhum workflow publica PROD**, e não devemos apontar PROD para recursos DEV. Meta de deploy comum até 60s será avaliada em runs reais; filas externas, testes de segurança e migrações podem ultrapassá-la.
+
+### Firebase Hosting cache
+
+O Hosting DEV serve `dist/`, reescreve links profundos para `/index.html` e mantém HTML sem cache e `/assets/**` versionados com cache imutável. Os testes `tests/firebase-hosting-cache.test.mjs` e `scripts/verify-hosting-cache.mjs` verificam o contrato após publicação. A infraestrutura permanece no plano Spark (sem provisionar cobrança).
 
 ## Franquias e consumo
 

@@ -1,0 +1,56 @@
+name: Firebase data operations DEV (private repository only)
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: 'Read account document, count collection, or manage isolated fixture'
+        type: choice
+        required: true
+        options: [read, count, create-fixture, delete-fixture]
+      document_path:
+        description: 'Path without project prefix; never put customer data in inputs'
+        required: true
+        type: string
+      confirmation:
+        description: 'Only for deleting a fixture: DELETE-DEV-FIXTURE'
+        required: false
+        type: string
+permissions:
+  contents: read
+env:
+  FIREBASE_PROJECT: roteiva-web-dev
+  GITHUB_REPOSITORY_PRIVATE: ${{ github.event.repository.private }}
+jobs:
+  ops:
+    name: Protected DEV data operation
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    environment: firebase-data-development
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fail closed on public repository, wrong project or disabled operations
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CONFIGURED_PROJECT: ${{ vars.FIREBASE_PROJECT_ID }}
+          OPS_ENABLED: ${{ vars.FIREBASE_DATA_OPS_ENABLED }}
+        run: |
+          test "$(gh api "repos/$GITHUB_REPOSITORY" --jq .private)" = "true" || {
+            echo "::error::Private Firebase operations require a PRIVATE repository. No customer data may be exposed in public Actions logs."; exit 1;
+          }
+          test "$CONFIGURED_PROJECT" = "roteiva-web-dev"
+          test "$OPS_ENABLED" = "true"
+      - name: Authenticate dedicated least-privilege data identity
+        id: auth
+        uses: google-github-actions/auth@v3
+        with:
+          credentials_json: ${{ secrets.FIREBASE_DATA_SERVICE_ACCOUNT }}
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/datastore
+      - name: Perform bounded, audited DEV operation
+        env:
+          ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          OPERATION: ${{ inputs.operation }}
+          DOCUMENT_PATH: ${{ inputs.document_path }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: node scripts/firebase-ops.mjs
