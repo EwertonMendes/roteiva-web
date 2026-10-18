@@ -21,6 +21,7 @@ import { SettingsPage } from "./features/settings/SettingsPage";
 import { IconLabel } from "./features/ui/IconLabel";
 import { PROJECT_STATUS_ICONS, PROJECT_STATUS_LABELS } from "./features/ui/project-status";
 import { DriveConnectionPanel } from "./features/drive/DriveConnectionPanel";
+import { LibraryReviewDemo } from "./features/drive/LibraryReviewDemo";
 import { TypographyLab, TEMPORARY_FONT_LAB_ENABLED } from "./features/typography/TypographyLab";
 import type { RoteivaProfile, ProfileChanges } from "./data/firestore-workspace";
 import type { WorkspaceCommand } from "./data/firestore-commands";
@@ -512,7 +513,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
               {view === "settings" ? null : view === "clients" ? <button className="primary-button" onClick={() => { setEditingClient(null); setClientModalOpen(true); }}><UserRoundPlus size={17} /> Novo cliente</button>
                 : view === "finance" ? <button className="primary-button" onClick={() => openFinanceModal()}><Plus size={17} /> Nova receita</button>
                 : view === "calendar" ? <button className="primary-button" onClick={() => openEvent()}><Plus size={17} /> Novo compromisso</button>
-                : view === "library" ? <><select aria-label="Projeto dos arquivos" value={libraryProject} onChange={e => setLibraryProject(e.target.value)}><option value="">Todos os projetos</option>{projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select><details className="rl-page-more"><summary aria-label="Mais ações da Biblioteca" title="Mais ações da Biblioteca"><MoreHorizontal size={18}/></summary><div className="rl-page-more-content"><WorkspaceTools workspace={workspace} loadWorkspace={onLoadWorkspace} status={isDemo?saveStatus:cloudStatus||""} onNotify={notify}/></div></details>{isDemo && <label className="primary-button upload-button"><Upload size={17} /> {uploading ? "Enviando…" : "Adicionar arquivos"}<input type="file" disabled multiple onChange={(event) => { uploadAssets(event.target.files, Number(libraryProject) || undefined); event.target.value = ""; }} /></label>}</>
+                : view === "library" ? (isDemo && import.meta.env.VITE_LIBRARY_REVIEW === "true" ? null : <><select aria-label="Projeto dos arquivos" value={libraryProject} onChange={e => setLibraryProject(e.target.value)}><option value="">Todos os projetos</option>{projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select><details className="rl-page-more"><summary aria-label="Mais ações da Biblioteca" title="Mais ações da Biblioteca"><MoreHorizontal size={18}/></summary><div className="rl-page-more-content"><WorkspaceTools workspace={workspace} loadWorkspace={onLoadWorkspace} status={isDemo?saveStatus:cloudStatus||""} onNotify={notify}/></div></details>{isDemo && <label className="primary-button upload-button"><Upload size={17} /> {uploading ? "Enviando…" : "Adicionar arquivos"}<input type="file" disabled multiple onChange={(event) => { uploadAssets(event.target.files, Number(libraryProject) || undefined); event.target.value = ""; }} /></label>}</>)
                 : <button className="primary-button" onClick={startProject}><Plus size={17} /> Criar projeto</button>}
             </div>
           </div>
@@ -727,6 +728,7 @@ function LibraryView({ assets, query, onUpload, projects, selectedProjectId, onS
   const totalMb = assets.reduce((total, asset) => total + Number(asset.size.replace(",", ".").replace(/[^0-9.]/g, "")) * (asset.size.includes("KB") ? .001 : 1), 0);
   const kinds: (AssetKind | "Todos")[] = ["Todos", "Vídeo", "Imagem", "Áudio", "Documento"];
 
+  if (isDemo && import.meta.env.VITE_LIBRARY_REVIEW === "true") return <LibraryReviewDemo />;
   return <div className="library-layout">
     {!isDemo && (!useEmulators || (import.meta.env.MODE === "emulator" && new URLSearchParams(window.location.search).get("driveE2E") === "1")) && <DriveConnectionPanel projects={projects} selectedProjectId={selectedProjectId} onSelectProject={onSelectProject} onLinkedFolderCountChange={onLinkedFolderCountChange} />}
     {(isDemo || assets.length>0) && <>
