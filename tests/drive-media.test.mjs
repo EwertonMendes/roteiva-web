@@ -24,3 +24,12 @@ test("preview has keyboard navigation and keeps Drive fallback",()=>{
   assert.match(ui,/event.key==="ArrowRight"/);
   assert.match(ui,/Abrir no Drive/);
 });
+
+test("thumbnail shows progress during fetch and falls back on unavailable media",()=>{
+  assert.match(loader,/type Phase = "idle"\|"loading"\|"loaded"\|"unavailable"/);
+  assert.match(loader,/data-thumbnail-state=\{current.phase\}/);
+  assert.match(loader,/setState\(\{key,src:null,phase:"loading"\}\)/);
+  assert.match(loader,/phase:url\?"loaded":"unavailable"/);
+  assert.match(loader,/className="rl-thumb-loading"/);
+  assert.match(loader,/IntersectionObserver/);
+});

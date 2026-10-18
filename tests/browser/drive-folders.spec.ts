@@ -33,7 +33,7 @@ async function createProject(page:Page){
   await expect(page.locator("[aria-busy]").first()).toHaveAttribute("aria-busy","false");
 }
 
-function mockDrive(page:Page,accountAvailable:()=>boolean){
+function mockDrive(page:Page,accountAvailable:()=>boolean,thumbnail?:{wait:()=>Promise<void>}){
   return page.route(api+"/integrations/**",async route=>{
     const endpoint=new URL(route.request().url());
     const headers={
@@ -60,10 +60,22 @@ function mockDrive(page:Page,accountAvailable:()=>boolean){
         ],nextPageToken:null,
       });
     }
+    if(endpoint.pathname.endsWith("/thumbnail") && thumbnail){
+      await thumbnail.wait();
+      if(endpoint.pathname.includes("file_unavailable123")){
+        return route.fulfill({status:404,headers,body:""});
+      }
+      // Tiny valid PNG: exercise the same private binary response the Worker returns.
+      return route.fulfill({status:200,headers:{...headers,"Content-Type":"image/png"},
+        body:Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL/nwAAAABJRU5ErkJggg==","base64")});
+    }
     if(endpoint.pathname.endsWith("/items")){
       return json({folder:{id:folderId,name:"Campanha de vídeos"},
         files:[{id:"file_1234567890",name:"Roteiro.pdf",mimeType:"application/pdf",size:"33000",
-          modifiedTime:"2026-10-17T15:00:00Z",webViewLink:"https://drive.google.com/file/d/file_1234567890/view"}],
+          modifiedTime:"2026-10-17T15:00:00Z",webViewLink:"https://drive.google.com/file/d/file_1234567890/view",
+          ...(thumbnail?{thumbnailLink:"https://lh3.googleusercontent.com/preview"}:{})},
+        ...(thumbnail?[{id:"file_unavailable123",name:"Imagem sem miniatura.jpg",mimeType:"image/jpeg",
+          thumbnailLink:"https://lh3.googleusercontent.com/preview"}]:[])],
         nextPageToken:null,
       });
     }
@@ -134,4 +146,30 @@ test("mobile shows one navigation level and a full-height folder picker",async({
   await expect(panel.getByTitle("Campanha de vídeos")).toBeVisible();
   await panel.getByTitle("Campanha de vídeos").click();
   await expect(panel.getByRole("button",{name:/Roteiro.pdf/})).toBeVisible();
+});
+
+test("private thumbnails show loading while pending and recover to image or icon",async({page},info)=>{
+  test.skip(info.project.name!=="desktop","Shared component; mobile layout covered in existing test");
+  let release!:()=>void;
+  const wait=new Promise<void>(resolve=>{release=resolve;});
+  await mockDrive(page,()=>true,{wait:()=>wait});
+  await signUp(page,"drive-loading-"+info.project.name+"@example.com");
+  await createProject(page);
+  await page.goto(cloud+"/biblioteca?driveE2E=1");
+  const panel=page.getByRole("region",{name:"Biblioteca Google Drive"});
+  await panel.getByRole("button",{name:"Vincular pasta",exact:true}).first().click();
+  const dialog=page.getByRole("dialog",{name:"Selecionar pastas do Google Drive"});
+  await dialog.getByLabel("Projeto para vincular pastas").selectOption({label:"Projeto Drive Teste"});
+  await dialog.getByRole("checkbox",{name:"Selecionar Campanha de vídeos"}).check();
+  await dialog.getByRole("button",{name:"Vincular 1 pasta"}).click();
+  await expect(dialog).toHaveCount(0);
+  const pdf=panel.getByRole("button",{name:/Roteiro.pdf/});
+  const missing=panel.getByRole("button",{name:/Imagem sem miniatura.jpg/});
+  await expect(pdf.locator('[data-thumbnail-state="loading"]')).toBeVisible();
+  await expect(missing.locator('[data-thumbnail-state="loading"]')).toBeVisible();
+  await expect(pdf.locator(".rl-thumb-loading")).toBeVisible();
+  release();
+  await expect(pdf.locator('[data-thumbnail-state="loaded"] img')).toBeVisible();
+  await expect(missing.locator('[data-thumbnail-state="unavailable"] svg')).toBeVisible();
+  await expect(panel.locator('[data-thumbnail-state="loading"]')).toHaveCount(0);
 });
