@@ -265,3 +265,18 @@ test('Drive and OAuth transport failures have independent safe error codes',asyn
   }),e=>e.code==='drive_transport_failed'&&!e.message.includes('private details'));
   assert.equal(saved().status,'connected');
 });
+
+test('token POST never forwards client credentials or refresh token on redirect',async t=>{
+  const {env,row,saved}=await setup(t);
+  let calls=0;
+  await assert.rejects(()=>accessCredential(env,row,async(url,options)=>{
+    assert.equal(url,'https://oauth2.googleapis.com/token');
+    assert.equal(options.redirect,'manual');
+    assert.equal(options.body.get('refresh_token'),'synthetic-refresh');
+    calls++;
+    return new Response(null,{status:302,headers:{Location:'https://evil.example/steal'}});
+  }),e=>e.code==='google_token_redirect_blocked');
+  assert.equal(calls,1);
+  assert.ok(saved().encrypted_refresh_token);
+  assert.equal(saved().status,'connected');
+});
