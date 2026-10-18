@@ -505,7 +505,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
         </header>
 
         <section className="page">
-          {isDemo ? <div className="pages-demo-notice" role="note"><b>Modo demonstração</b><span>Projetos, clientes, agenda e financeiro ficam salvos apenas neste navegador. Sem login, sincronização, uploads ou links públicos de aprovação.</span></div> : view!=="library" ? <div className="cloud-banner" role="status"><b>Roteiva DEV</b><span>{cloudStatus}</span></div> : null}
+          {isDemo ? <div className="pages-demo-notice" role="note"><b>Modo demonstração</b><span>Explore o Roteiva com dados salvos apenas neste navegador. Entre na sua conta para trabalhar com seus próprios projetos.</span></div> : view!=="library" ? <div className="cloud-banner" role="status"><b>Seu espaço</b><span>{cloudStatus}</span></div> : null}
           <div className="page-heading">
             <div><span className="eyebrow">ROTEIVA / {view === "overview" ? "PAINEL" : pageTitles[view][0].toUpperCase()}</span><h1>{pageTitles[view][0]}</h1><p>{pageTitles[view][1]}</p></div>
             <div className="heading-actions">

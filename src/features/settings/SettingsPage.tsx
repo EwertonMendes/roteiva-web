@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { ArrowUpRight, Check, Cloud, Download, LockKeyhole, Moon, ShieldCheck, Sun, UserRound, Video, Info, Building2, BriefcaseBusiness, HardDrive, Activity } from "lucide-react";
+import { ArrowUpRight, Check, Cloud, Download, LockKeyhole, Moon, ShieldCheck, Sun, UserRound, Video, Info, Building2, BriefcaseBusiness, HardDrive } from "lucide-react";
 import type { ProfileChanges, ProfessionalType, RoteivaProfile } from "../../data/firestore-workspace";
 import { dataErrorMessage } from "../../data/firestore-workspace";
 import type { FirestoreUsage } from "../../data/firestore-usage";
@@ -24,7 +24,7 @@ type SettingsProps={
   usage?:Readonly<FirestoreUsage>;
 };
 
-export function SettingsPage({profile,email,photoURL,theme,toggleTheme,workspace,onLoadWorkspace,cloudStatus,onNotify,onSaveProfile,usage}:SettingsProps){
+export function SettingsPage({profile,email,photoURL,theme,toggleTheme,workspace,onLoadWorkspace,cloudStatus,onNotify,onSaveProfile}:SettingsProps){
   const [name,setName]=useState(profile?.displayName||"");
   const [studio,setStudio]=useState(profile?.studioName||"");
   const [occupation,setOccupation]=useState<ProfessionalType>(profile?.professionalType||"freelancer");
@@ -75,7 +75,7 @@ export function SettingsPage({profile,email,photoURL,theme,toggleTheme,workspace
         <span className="settings-kicker"><Video size={14}/> IDENTIDADE DO SEU TRABALHO</span>
         <h2>{studioName}</h2>
         <p>Um espaço organizado para tudo o que você cria.</p>
-        <div className="settings-identity-tag"><span className="settings-status-dot"/>{onSaveProfile?"ESPAÇO PRIVADO · FIREBASE DEV":"MODO DEMONSTRAÇÃO"}</div>
+        <div className="settings-identity-tag"><span className="settings-status-dot"/>{onSaveProfile?"SEU ESPAÇO PRIVADO":"MODO DEMONSTRAÇÃO"}</div>
       </div>
       <div className="settings-orbit" aria-hidden="true"><span/><span/><span/></div>
     </section>
@@ -114,7 +114,7 @@ export function SettingsPage({profile,email,photoURL,theme,toggleTheme,workspace
           </select>
         </label>
       </div>
-      {!onSaveProfile&&<p className="settings-note"><Info size={15}/> O cadastro fica disponível somente no Roteiva DEV autenticado. Esta é a demonstração sem conta.</p>}
+      {!onSaveProfile&&<p className="settings-note"><Info size={15}/> Na demonstração, suas alterações ficam apenas neste navegador. Entre na sua conta para personalizar seu perfil.</p>}
       {feedback&&<p className={`settings-feedback settings-feedback-${feedback.kind}`} role={feedback.kind==="error"?"alert":"status"}>{feedback.kind==="success"?<Check size={16}/>:<Info size={16}/>} {feedback.message}{feedback.kind==="error"&&feedback.message.startsWith("Conflito")&&<button type="button" onClick={()=>window.location.reload()}>Atualizar perfil</button>}</p>}
       <div className="settings-actions">
         <span>{profile?.legacy?"Seu cadastro antigo continua preservado.":"Os dados são exclusivos da sua conta."}</span>
@@ -142,27 +142,19 @@ export function SettingsPage({profile,email,photoURL,theme,toggleTheme,workspace
         <LockKeyhole size={20} strokeWidth={1.5}/>
       </div>
       <div className="settings-privacy-row">
-        <div><strong><Download size={16}/> Exportar dados do espaço</strong><p>Baixe uma cópia JSON dos registros carregados. A exportação não inclui arquivos de mídia, credenciais nem dados de autenticação.</p></div>
+        <div><strong><Download size={16}/> Exportar dados do espaço</strong><p>Baixe uma cópia dos seus registros para guardar com você. Os arquivos do Google Drive não fazem parte desta cópia.</p></div>
         <WorkspaceTools workspace={workspace} loadWorkspace={onLoadWorkspace} status={cloudStatus} onNotify={onNotify}/>
       </div>
       {onSaveProfile && <div className="settings-privacy-row">
         <div><strong><HardDrive size={16} aria-hidden="true"/> Cache neste dispositivo</strong>
-          <p>Opcional para reduzir consultas após reiniciar. Este navegador poderá armazenar clientes, projetos e dados financeiros. Ative somente em um dispositivo pessoal. Desativar apaga o cache e recarrega a página.</p>
+          <p>Guarde uma cópia dos seus registros neste navegador para abrir seu espaço mais rápido. Ative apenas em um dispositivo pessoal. Ao desativar, a cópia deste navegador será apagada.</p>
         </div>
         <button type="button" className="secondary-button" disabled={cacheBusy || busy}
           onClick={()=>void changePrivateCache(!localCache)}>{cacheBusy?"Aplicando…":localCache?"Desativar cache":"Ativar cache"}</button>
       </div>}
-      {usage&&<div className="settings-privacy-row" role="status">
-        <div><strong><Activity size={16} aria-hidden="true"/> Diagnóstico da sessão</strong>
-          <p>Consultas ao servidor: {usage.serverQueries}; documentos retornados: {usage.serverDocumentsReturned};
-          agregações: {usage.aggregationQueries}; conferências de revisão: {usage.revisionReads};
-          documentos alterados: {usage.mutationDocuments}; revisões gravadas: {usage.mutationRevisions}.
-          Estes números são locais e não representam as leituras faturáveis, índices, regras ou tentativas de transação.</p>
-        </div>
-      </div>}
       {cacheError && <p role="alert" className="settings-feedback settings-feedback-error">{cacheError}</p>}
       {onSaveProfile&&<AccountDeletionAction/>}
     </section>
-    <footer className="settings-footer"><Cloud size={14}/>{onSaveProfile?"ROTEIVA DEV · PERFIL PRIVADO":"ROTEIVA DEMO · SOMENTE NESTE NAVEGADOR"}</footer>
+    <footer className="settings-footer"><Cloud size={14}/>{onSaveProfile?"ROTEIVA · SEU ESPAÇO PRIVADO":"ROTEIVA DEMO · SOMENTE NESTE NAVEGADOR"}</footer>
   </div>;
 }

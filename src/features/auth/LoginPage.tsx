@@ -8,13 +8,15 @@ export function LoginPage() {
   const [intent,setIntent]=useState<AuthIntent>("login");
   const joining=intent==="register";
   const deletionRequested=new URLSearchParams(window.location.search).get("deletion")==="requested";
+  const deletionCompleted=new URLSearchParams(window.location.search).get("deletion")==="completed";
   return <AuthLayout
     section={joining?"01 — NOVA CONTA":"01 — BOAS-VINDAS"}
     title={joining?"Comece do seu jeito.":"Tudo pronto para criar."}
     description={joining
       ?"Sua conta Google é o primeiro passo. Depois, vamos configurar seu espaço em poucos segundos."
       :"Acesse seu espaço de trabalho e continue de onde a última produção parou."}>
-    {deletionRequested&&<p className="auth-invitation" role="status">Sua solicitação de exclusão permanente foi aceita. O Roteiva continuará removendo os dados mesmo com o navegador fechado. A conclusão depende da confirmação do servidor; não é possível desfazer a solicitação.</p>}
+    {deletionRequested&&<p className="auth-invitation" role="status">Recebemos seu pedido de exclusão. Você não precisa manter esta página aberta. Seus arquivos no Google Drive serão preservados.</p>}
+    {deletionCompleted&&<p className="auth-invitation" role="status">Sua conta e seus dados do Roteiva foram excluídos. Seus arquivos no Google Drive foram preservados.</p>}
     <div className="auth-tabs" role="group" aria-label="Escolha como acessar">
       <button type="button" className={!joining?"auth-tab active":"auth-tab"} aria-pressed={!joining} disabled={busy} onClick={()=>setIntent("login")}>Entrar</button>
       <button type="button" className={joining?"auth-tab active":"auth-tab"} aria-pressed={joining} disabled={busy} onClick={()=>setIntent("register")}>Criar conta</button>

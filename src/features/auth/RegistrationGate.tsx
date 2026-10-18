@@ -5,7 +5,8 @@ import { firebaseServices } from "../../lib/firebase";
 import { useAuth } from "./AuthProvider";
 import { AuthLayout } from "./AuthLayout";
 import { RegistrationPage, type RegistrationValues } from "./RegistrationPage";
-import { AccountDeletionAction } from "../settings/AccountDeletionAction";
+import { AccountDeletionPending } from './AccountDeletionPending';
+import { fetchAccountDeletionStatus } from '../settings/AccountDeletionAction';
 
 type Status = "checking" | "registered" | "missing" | "deleting" | "error";
 type ProfileContext = {
@@ -30,7 +31,12 @@ export function RegistrationGate({children}: {children: ReactNode}) {
     setStatus("checking");
     setError("");
     repository.loadProfile()
-      .then(result=>{if(active){setProfile(result);setStatus(result?.deletionState==="deleting"?"deleting":result?"registered":"missing");}})
+      .then(async result=>{
+        // The profile is removed before Auth. A durable job still closes the
+        // workspace while the final identity step is being retried.
+        const deleting=result?.deletionState==='deleting'||(!result&&(await fetchAccountDeletionStatus()).operation!==null);
+        if(active){setProfile(result);setStatus(deleting?'deleting':result?'registered':'missing');}
+      })
       .catch(reason=>{if(active){setError(dataErrorMessage(reason));setStatus("error");}});
     return ()=>{active=false;};
   },[repository,attempt]);
@@ -63,10 +69,7 @@ export function RegistrationGate({children}: {children: ReactNode}) {
   if(!user)return null;
   if(status==="checking")return <main className="studio-loading" role="status">Verificando seu cadastro…</main>;
   if(status==="registered" && profile)return <RegistrationProfileContext.Provider value={{profile,saveProfile}}>{children}</RegistrationProfileContext.Provider>;
-  if(status==="deleting")return <AuthLayout section="PRIVACIDADE" title="Exclusão em andamento." description="A solicitação de exclusão foi recebida e seu espaço está bloqueado para novas alterações. O processo continua mesmo com o navegador fechado.">
-    <p className="auth-invitation">Se houver falha em algum serviço, o sistema retomará a limpeza automaticamente. Não é possível cancelar a exclusão.</p>
-    <button type="button" className="auth-primary" onClick={()=>void logout()} disabled={busy}>Sair da conta</button>
-  </AuthLayout>;
+  if(status==="deleting")return <AccountDeletionPending/>;
   if(status==="error")return <AuthLayout section="CONEXÃO" title="Não foi possível consultar seu cadastro." description="Não vamos criar uma nova conta enquanto não for possível confirmar o estado do seu espaço.">
     <p className="auth-error" role="alert">{error}</p>
     <div className="auth-row-actions"><button className="auth-primary" onClick={()=>setAttempt(n=>n+1)}>Tentar novamente <ArrowRight size={16}/></button><button className="auth-link" onClick={()=>void logout()} disabled={busy}>Trocar conta</button></div>
@@ -80,6 +83,5 @@ export function RegistrationGate({children}: {children: ReactNode}) {
     <p className="auth-invitation">Se quiser começar, vamos cadastrar seu perfil e preparar um espaço privado.</p>
     <button className="auth-primary" type="button" onClick={()=>setShowForm(true)}>Criar meu espaço <ArrowRight size={17}/></button>
     <button className="auth-link" type="button" onClick={()=>void logout()} disabled={busy}>Voltar e usar outra conta</button>
-    <AccountDeletionAction compact />
   </AuthLayout>;
 }

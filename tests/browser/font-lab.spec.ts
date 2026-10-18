@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "./fixtures";
 
 const app = "http://127.0.0.1:4173";
 const candidates = [
@@ -19,7 +19,7 @@ async function register(page: Page, email: string) {
   await popup.locator("#sign-in").click();
   await page.getByLabel("Como podemos chamar você?").fill("Tipografia");
   await page.getByLabel("Nome do estúdio ou marca").fill("Estúdio de Teste");
-  await page.getByLabel("Entendo que meu perfil e os dados de trabalho").check();
+  await page.getByLabel("Concordo com o uso dos meus dados").check();
   await page.getByRole("button",{name:"Criar meu espaço de trabalho"}).click();
   await expect(page.locator(".app-shell")).toBeVisible();
   await expect(page.locator("[aria-busy]").first()).toHaveAttribute("aria-busy", "false");

@@ -113,10 +113,11 @@ export async function deleteFirestoreChunk(env:Env,uid:string,token:string,maxDe
   let left=maxDeletes;
   const deadline=Date.now()+35000;
   let requests=0;
+  let budgetExhausted=false;
   const exhausted=Symbol('chunk budget');
   const boundedFetch:typeof fetch=async(input,init)=>{
     const remaining=deadline-Date.now();
-    if(remaining<1000||requests>=100)throw exhausted;
+    if(remaining<1000||requests>=30){budgetExhausted=true;throw exhausted;}
     requests++;
     return fetcher(input,{...init,signal:AbortSignal.timeout(Math.min(15000,remaining))});
   };
@@ -147,7 +148,10 @@ export async function deleteFirestoreChunk(env:Env,uid:string,token:string,maxDe
   }catch(error){
     // Request wrappers sanitize transport failures; a consumed budget means
     // cooperative yield, not a failed job or permission to advance to Auth.
-    if(requests>=100||Date.now()>=deadline-1000||error===exhausted)return false;
+    if(budgetExhausted||error===exhausted){
+      if(left===maxDeletes)throw new ApiError(503,'firestore_traversal_budget_exhausted');
+      return false;
+    }
     throw error;
   }
 }

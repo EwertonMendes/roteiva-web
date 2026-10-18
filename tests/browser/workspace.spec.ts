@@ -1,4 +1,4 @@
-import {test,expect,type Page} from "@playwright/test";
+import {test,expect,type Page} from "./fixtures";
 import {readFile} from "node:fs/promises";
 const cloud="http://127.0.0.1:4173";
 async function googlePopup(page:Page,email:string,existing=false) {
@@ -22,7 +22,7 @@ async function login(page:Page,email:string,existing=false) {
     await expect(page.locator(".app-shell")).toHaveCount(0);
     await page.getByLabel("Como podemos chamar você?").fill("Profissional de teste");
     await page.getByLabel("Nome do estúdio ou marca").fill("Estúdio de QA");
-    await page.getByLabel("Entendo que meu perfil e os dados de trabalho").check();
+    await page.getByLabel("Concordo com o uso dos meus dados").check();
     await page.getByRole("button",{name:"Criar meu espaço de trabalho"}).click();
   }
   await expect(page.locator(".app-shell")).toBeVisible();
@@ -98,7 +98,7 @@ test("Google emulator session, CRUD, restoration, themes and separate users",asy
   await expect(page.getByText("Montar primeiro corte",{exact:true})).toBeVisible();
   await page.screenshot({path:info.outputPath("workspace.png"),fullPage:true});
   await page.goto(cloud+"/review");
-  await expect(page.getByText("ROTEIVA DEV · REVISÃO EM BREVE",{exact:true})).toBeVisible();
+  await expect(page.getByText("REVISÃO EM BREVE",{exact:true})).toBeVisible();
   await expect(page.getByText("MODO DEMONSTRAÇÃO",{exact:true})).toHaveCount(0);
   await page.screenshot({path:info.outputPath("review.png"),fullPage:true});
   await page.getByRole("link",{name:"Voltar ao painel",exact:true}).click();
@@ -222,6 +222,8 @@ test("First login does not silently create a workspace",async({page},info)=>{
   await popup.locator("#display-name-input").fill("Novo profissional");
   await popup.locator("#sign-in").click();
   await expect(page.getByRole("heading",{name:"Ainda não encontramos seu espaço."})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Excluir conta',exact:true})).toHaveCount(0);
+  await expect(page.getByText('Excluir minha conta',{exact:true})).toHaveCount(0);
   await expect(page.locator(".auth-invitation")).toHaveText("Se quiser começar, vamos cadastrar seu perfil e preparar um espaço privado.");
   await expect(page.getByText("Nenhuma conta foi criada no Roteiva.")).toHaveCount(0);
   await expect(page.locator(".app-shell")).toHaveCount(0);

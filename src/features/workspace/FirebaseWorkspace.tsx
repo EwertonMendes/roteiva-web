@@ -345,7 +345,7 @@ export function FirebaseWorkspace() {
       {failedWrite
         ? <><p>Essa gravação não foi confirmada. Para evitar duplicações, ela não será repetida automaticamente. Ao recuperar os dados confirmados, alterações locais não salvas serão descartadas.</p>
             <button className="primary-button" disabled={saving} onClick={()=>setVersion(v=>v+1)}>Recarregar dados da nuvem</button></>
-        : <p>Se sua sessão ou as permissões de acesso expiraram, entre novamente. Os dados confirmados no Firebase permanecem preservados.</p>}
+        : <p>Entre novamente para continuar. Seus dados já salvos permanecem na sua conta.</p>}
       <button className="secondary-button" disabled={saving||busy} onClick={()=>void logout()}>Sair da conta</button>
     </section>}
     {!initial && !error && <main className="studio-loading" role="status">Sincronizando seu espaço…</main>}

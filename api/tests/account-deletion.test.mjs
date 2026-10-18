@@ -105,12 +105,12 @@ test("full deletion saga is resumable, verifies service calls and leaves another
  assert.equal(db.sql.prepare('SELECT phase FROM account_deletions WHERE owner_uid=?').get('user-A').phase,'firestore');
  await runPendingDeletions(env); // verify empty and advance
  assert.equal(db.sql.prepare('SELECT phase FROM account_deletions WHERE owner_uid=?').get('user-A').phase,'identity');
- await runPendingDeletions(env); // identity, root marker, completed
+ await runPendingDeletions(env); // root, identity last, completed
  assert.equal(db.sql.prepare('SELECT phase FROM account_deletions WHERE owner_uid=?').get('user-A').phase,'completed');
  assert.equal(db.sql.prepare('SELECT count(*) AS n FROM drive_connections WHERE owner_uid=?').get('other-user').n,1);
  const accountDeletion=calls.findIndex(x=>x.url.includes('identitytoolkit.googleapis.com'));
  const firestoreRootDeletion=calls.findIndex(x=>x.url.endsWith('/users/user-A') && x.method==='DELETE');
- assert.ok(accountDeletion!==-1 && firestoreRootDeletion>accountDeletion,'Auth is deleted before the final marker');
+ assert.ok(firestoreRootDeletion!==-1 && accountDeletion>firestoreRootDeletion,'Auth is the final remote deletion');
  assert.equal((await (await deletionStatus(env,'user-A')).json()).operation.status,'completed');
 });
 
@@ -205,7 +205,10 @@ test('Firestore drains multiple document pages, missing parents and thousands of
  const prefix='projects/roteiva-web-dev/databases/(default)/documents/users/owner-A';
  const docs=new Set(Array.from({length:1001},(_,n)=>prefix+'/projects/p'+String(n).padStart(4,'0')));
  docs.add(prefix+'/orphan/missing/notes/n1');
+ let invocationFetches=0,maxInvocationFetches=0;
  const fetcher=async(url,init={})=>{
+   invocationFetches++;maxInvocationFetches=Math.max(maxInvocationFetches,invocationFetches);
+   if(invocationFetches>50)throw Error('Cloudflare Free external subrequest limit');
    const target=String(url).replace('https://firestore.googleapis.com/v1/','').split('?')[0];
    if(target.endsWith(':listCollectionIds')){
      const parent=target.slice(0,-':listCollectionIds'.length);
@@ -217,8 +220,78 @@ test('Firestore drains multiple document pages, missing parents and thousands of
    return Response.json({documents:children.slice(0,30).map(name=>({name})),...(children.length>30?{nextPageToken:'more'}:{})});
  };
  let done=false,chunks=0;
- while(!done&&chunks++<100)done=await deleteFirestoreChunk({FIREBASE_PROJECT_ID:'roteiva-web-dev'},'owner-A','synthetic',20,fetcher);
+ while(!done&&chunks++<100){
+   invocationFetches=0;
+   done=await deleteFirestoreChunk({FIREBASE_PROJECT_ID:'roteiva-web-dev'},'owner-A','synthetic',20,fetcher);
+ }
  assert.equal(done,true);assert.equal(docs.size,0);assert.ok(chunks>50);
+ assert.ok(maxInvocationFetches<=40,'reserve external calls for admin token and other cron maintenance');
+});
+
+test('cron budgets one account per invocation and rotates after partial progress',async t=>{
+ const db=database();t.after(db.close);
+ const {privateKey}=await generateKeyPair('RS256',{extractable:true});
+ const env={DB:db.DB,ENVIRONMENT:'dev',FIREBASE_PROJECT_ID:'roteiva-web-dev',ACCOUNT_DELETION_ENABLED:'true',
+   FIREBASE_ADMIN_CREDENTIALS_JSON:JSON.stringify({type:'service_account',project_id:'roteiva-web-dev',
+     client_email:'test@roteiva-web-dev.iam.gserviceaccount.com',private_key:await exportPKCS8(privateKey),
+     token_uri:'https://oauth2.googleapis.com/token'})};
+ const stamp=Date.now()-10000;
+ for(const owner of ['owner-A','owner-B'])db.sql.prepare("INSERT INTO account_deletions(owner_uid,operation_id,phase,attempts,failed_phase,error_code,next_attempt_at,created_at,updated_at) VALUES(?,?,'firestore',3,'firestore','admin_service_unavailable',?,?,?)")
+   .run(owner,'operation-'+owner,stamp,stamp,stamp);
+ const original=globalThis.fetch;t.after(()=>{globalThis.fetch=original;});
+ let calls=0;const visited=new Set();
+ globalThis.fetch=async(url,init={})=>{
+   assert.ok(++calls<=50,'entire cron invocation stays within Free quota');
+   const target=String(url);
+   if(target==='https://oauth2.googleapis.com/token')return Response.json({access_token:'synthetic'});
+   const owner=target.includes('/owner-A')?'owner-A':'owner-B';visited.add(owner);
+   if(target.endsWith(':listCollectionIds'))return Response.json({collectionIds:/\/users\/owner-[AB]\/projects\//.test(target)?[]:['projects']});
+   if(init.method==='DELETE')return Response.json({});
+   return Response.json({documents:Array.from({length:30},(_,n)=>({name:'projects/roteiva-web-dev/databases/(default)/documents/users/'+owner+'/projects/p'+n}))});
+ };
+ await runPendingDeletions(env);
+ assert.equal(visited.size,1);
+ const first=[...visited][0];
+ assert.deepEqual({...db.sql.prepare('SELECT phase,attempts,failed_phase,error_code FROM account_deletions WHERE owner_uid=?').get(first)},
+   {phase:'firestore',attempts:0,failed_phase:null,error_code:null});
+ calls=0;await runPendingDeletions(env);
+ assert.equal(visited.size,2,'a large account does not starve the next due account');
+});
+
+test('last allowed request failure is not hidden as a cooperative yield',async()=>{
+ let calls=0;
+ const prefix='projects/roteiva-web-dev/databases/(default)/documents/users/owner-A';
+ await assert.rejects(()=>deleteFirestoreChunk({FIREBASE_PROJECT_ID:'roteiva-web-dev'},'owner-A','synthetic',20,
+   async(url,init={})=>{
+     if(++calls===30)return Response.json({error:{status:'PERMISSION_DENIED'}},{status:403});
+     if(String(url).endsWith(':listCollectionIds'))return Response.json({collectionIds:String(url).includes('/projects/p')?[]:['projects']});
+     if(init.method==='DELETE')return Response.json({});
+     return Response.json({documents:Array.from({length:30},(_,n)=>({name:prefix+'/projects/p'+n}))});
+   }),error=>error.code==='admin_permission_denied');
+ assert.equal(calls,30);
+});
+
+test('final profile failure preserves Auth and retries the identity phase',async t=>{
+ const db=database();t.after(db.close);
+ const {privateKey}=await generateKeyPair('RS256',{extractable:true});
+ const env={DB:db.DB,ENVIRONMENT:'dev',FIREBASE_PROJECT_ID:'roteiva-web-dev',ACCOUNT_DELETION_ENABLED:'true',
+   FIREBASE_ADMIN_CREDENTIALS_JSON:JSON.stringify({type:'service_account',project_id:'roteiva-web-dev',
+     client_email:'test@roteiva-web-dev.iam.gserviceaccount.com',private_key:await exportPKCS8(privateKey),
+     token_uri:'https://oauth2.googleapis.com/token'})};
+ const stamp=Date.now()-1000;
+ db.sql.prepare("INSERT INTO account_deletions(owner_uid,operation_id,phase,next_attempt_at,created_at,updated_at) VALUES('owner-A','operation-A','identity',?,?,?)").run(stamp,stamp,stamp);
+ const original=globalThis.fetch;t.after(()=>{globalThis.fetch=original;});
+ let identityCalls=0;
+ globalThis.fetch=async(url,init={})=>{
+   if(String(url)==='https://oauth2.googleapis.com/token')return Response.json({access_token:'synthetic'});
+   if(String(url).includes('identitytoolkit')){identityCalls++;return Response.json({});}
+   if(init.method==='DELETE')return Response.json({error:{status:'UNAVAILABLE'}},{status:503});
+   return Response.json({collectionIds:[]});
+ };
+ await advanceDeletion(env,'owner-A');
+ assert.equal(identityCalls,0);
+ const job=db.sql.prepare('SELECT phase,failed_phase,attempts FROM account_deletions').get();
+ assert.equal(job.phase,'identity');assert.equal(job.failed_phase,'identity');assert.equal(job.attempts,1);
 });
 
 test('manual review retains failed stage, releases lease and cannot be retried automatically',async t=>{
