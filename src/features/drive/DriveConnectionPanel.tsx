@@ -1,18 +1,17 @@
-import { useCallback, useEffect, useState } from "react";
-import { CheckCircle2, ChevronRight, Cloud, ExternalLink, File, FileAudio, FileImage, FileText, FileVideo, Folder, FolderOpen, Link2, RefreshCw, ShieldCheck, Unplug, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ChevronDown, Cloud, FolderOpen, Link2, MoreHorizontal, Plus, RefreshCw, ShieldCheck, Unplug } from "lucide-react";
 import { useAuth } from "../auth/AuthProvider";
 import { driveFolderLinkId, linkDriveFolder, readDriveLinks, unlinkDriveFolder, type DriveFolderLink } from "../../data/drive-folder-links";
 import type { Project } from "../../domain/workspace";
+import { DRIVE_FOLDER, DriveFileExplorer, DriveFolderPicker, DrivePreview, DriveUnlinkConfirm, driveFileUrl, isPreviewable, type DriveItem, type DriveTrail } from "./DriveLibraryUI";
+import "./drive-library.css";
 
 const API = "https://roteiva-api-dev.ewertonmendes9.workers.dev";
 const READ = "https://www.googleapis.com/auth/drive.readonly";
 const INTENT = "roteiva-drive-folder-project";
 type Connection = {id:string;google_email:string;status:"connected"|"reconnect_required"|"revocation_pending";scopes:string};
-type Item = {id:string;name:string;mimeType:string;size?:string;modifiedTime?:string;webViewLink?:string};
-type FolderPage = {folders:Item[];nextPageToken:string|null;incompleteSearch?:boolean};
-type FilePage = {folder:{id:string;name:string};files:Item[];nextPageToken:string|null;incompleteSearch?:boolean};
-type Trail = {id:string;name:string};
-const FOLDER = "application/vnd.google-apps.folder";
+type FolderPage = {folders:DriveItem[];nextPageToken:string|null;incompleteSearch?:boolean};
+type FilePage = {folder:{id:string;name:string};files:DriveItem[];nextPageToken:string|null;incompleteSearch?:boolean};
 const messages:Record<string,string> = {
   oauth_not_configured:"A integração do Drive ainda não está disponível neste ambiente.",
   reconnect_required:"Sua autorização expirou. Conecte novamente.",
@@ -44,22 +43,20 @@ const messages:Record<string,string> = {
   connection_changed:"A conexão foi alterada. Atualize para continuar.",
   connection_failed:"Não foi possível concluir a conexão. Tente novamente.",
 };
-const kindIcon = (mime:string) => mime===FOLDER?Folder:
-  mime.startsWith("video/")?FileVideo:mime.startsWith("image/")?FileImage:
-  mime.startsWith("audio/")?FileAudio:mime.includes("pdf")||mime.includes("document")?FileText:File;
-const sizeText=(s?:string)=>{
-  const n=Number(s);if(!Number.isFinite(n)||n<0)return "";
-  return n>=1e9?(n/1e9).toFixed(1)+" GB":n>=1e6?(n/1e6).toFixed(1)+" MB":Math.max(1,Math.ceil(n/1000))+" KB";
-};
+
 function oauthError(code:string|null):string {
   if (!code||code==="connected"||code==="cancelled")return "";
   return messages[code] || messages.connection_failed;
 }
 
+
 export function DriveConnectionPanel({
-  projects, selectedProjectId, onSelectProject,
+  projects,selectedProjectId,onSelectProject,onLinkedFolderCountChange,
 }:{
-  projects:readonly Project[]; selectedProjectId?:number; onSelectProject:(id:string)=>void;
+  projects:readonly Project[];
+  selectedProjectId?:number;
+  onSelectProject:(id:string)=>void;
+  onLinkedFolderCountChange?:(count:number)=>void;
 }) {
   const {user}=useAuth();
   const [connections,setConnections]=useState<Connection[]>([]);
@@ -72,23 +69,28 @@ export function DriveConnectionPanel({
   const [result,setResult]=useState("");
   const [confirmId,setConfirmId]=useState("");
   const [picker,setPicker]=useState(false);
-  const [trail,setTrail]=useState<Trail[]>([{id:"root",name:"Meu Drive"}]);
-  const [folderList,setFolderList]=useState<Item[]>([]);
+  const [trail,setTrail]=useState<DriveTrail[]>([{id:"root",name:"Meu Drive"}]);
+  const [folderList,setFolderList]=useState<DriveItem[]>([]);
   const [folderPage,setFolderPage]=useState<string|null>(null);
   const [folderBusy,setFolderBusy]=useState(false);
   const [viewing,setViewing]=useState<DriveFolderLink|null>(null);
-  const [files,setFiles]=useState<Item[]>([]);
-  const [viewPath,setViewPath]=useState<Trail[]>([]);
+  const [files,setFiles]=useState<DriveItem[]>([]);
+  const [viewPath,setViewPath]=useState<DriveTrail[]>([]);
   const [filePage,setFilePage]=useState<string|null>(null);
   const [fileBusy,setFileBusy]=useState(false);
-  const [preview,setPreview]=useState<Item|null>(null);
+  const [preview,setPreview]=useState<DriveItem|null>(null);
+  const [unlinkTarget,setUnlinkTarget]=useState<DriveFolderLink|null>(null);
   const [selectedAccount,setSelectedAccount]=useState("");
   const [rootMode,setRootMode]=useState<"root"|"all">("root");
+  const folderRequest=useRef(0);
+  const fileRequest=useRef(0);
+  const autoOpened=useRef("");
+  const countCallback=useRef(onLinkedFolderCountChange);
+  countCallback.current=onLinkedFolderCountChange;
   const connected=connections.filter(c=>c.status==="connected");
   const authorized=connected.filter(c=>c.scopes.split(/\s+/).includes(READ));
   const connection=authorized.find(c=>c.id===selectedAccount)||authorized[0];
   const relevant=selectedProjectId?links.filter(l=>l.projectId===selectedProjectId):links;
-  const thisProject=projects.find(p=>p.id===selectedProjectId);
   const callback=new URLSearchParams(window.location.search).get("drive");
 
   const call=useCallback(async <T,>(path:string,method:"GET"|"POST"="GET"):Promise<T>=>{
@@ -106,27 +108,19 @@ export function DriveConnectionPanel({
     return response.json() as Promise<T>;
   },[user]);
 
-  // Authentication state must NEVER depend on a successful Firestore query:
-  // Drive accounts live in Worker/D1; project links live in Firestore.
-  // Fetch them independently so a transient link failure cannot show
-  // "Conectar" for an already connected Google account.
   const refresh=useCallback(async()=>{
     if(!user)return [];
     setLinkError("");
+    // Connection and folder links have independent failure boundaries.
     const linksRequest=readDriveLinks(user.uid)
-      .then(folders=>setLinks(folders))
-      .catch(()=>setLinkError("Não foi possível atualizar as pastas vinculadas. Tente Atualizar."));
+      .then(folders=>{setLinks(folders);countCallback.current?.(folders.length);})
+      .catch(()=>setLinkError("Não foi possível atualizar as pastas vinculadas. Tente atualizar novamente."));
     let accounts:{connections:Connection[]};
-    try {
-      accounts=await call<{connections:Connection[]}>("/integrations/drive");
-    } catch (cause) {
-      setAccountFailed(true);
-      throw cause;
-    }
+    try{accounts=await call<{connections:Connection[]}>("/integrations/drive");}
+    catch(cause){setAccountFailed(true);throw cause;}
+    finally{void linksRequest;}
     setConnections(accounts.connections);
     setAccountFailed(false);
-    // This request has its own error boundary; do not block account state.
-    void linksRequest;
     return accounts.connections;
   },[call,user]);
 
@@ -137,94 +131,91 @@ export function DriveConnectionPanel({
       try{
         await refresh();
         if(!active)return;
-        if (callback && callback!=="connected") sessionStorage.removeItem(INTENT);
+        if(callback&&callback!=="connected")sessionStorage.removeItem(INTENT);
       }catch(e){if(active)setError(e instanceof Error?e.message:"Falha ao carregar o Drive.");}
       finally{if(active)setReady(true);}
     }
     void init();
     return ()=>{active=false;};
-    // Only initialize when the signed-in identity changes; project changes
-    // must not reset the folder chooser or refresh the same data repeatedly.
+    // Do not re-initialize on selection changes; identity owns the integration.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   },[user?.uid]);
 
   useEffect(()=>{
-    if(!ready || callback!=="connected")return;
+    if(!ready||callback!=="connected")return;
     const pending=sessionStorage.getItem(INTENT);
     if(!pending)return;
-    if(projects.some(project=>String(project.id)===pending) && authorized.length){
-      sessionStorage.removeItem(INTENT);
-      onSelectProject(pending);
-      setPicker(true);
+    if(projects.some(p=>String(p.id)===pending)&&authorized.length){
+      sessionStorage.removeItem(INTENT);onSelectProject(pending);setPicker(true);
     }
   },[ready,callback,projects,authorized.length,onSelectProject]);
 
   async function connect(projectId?:number){
     setError("");setResult("");setBusy(true);
-    try {
-      if(projectId && Number.isSafeInteger(projectId))sessionStorage.setItem(INTENT,String(projectId));
+    try{
+      if(projectId&&Number.isSafeInteger(projectId))sessionStorage.setItem(INTENT,String(projectId));
       else sessionStorage.removeItem(INTENT);
       const {launchUrl}=await call<{launchUrl:string}>("/oauth/drive/start","POST");
       const url=new URL(launchUrl);
-      if(url.origin!==API || url.pathname!=="/oauth/drive/launch")throw new Error("Resposta do Google inválida.");
-      // Direct navigation creates the secure first-party OAuth cookie.
+      if(url.origin!==API||url.pathname!=="/oauth/drive/launch")throw new Error("Resposta do Google inválida.");
       window.location.assign(url.toString());
     }catch(e){
       sessionStorage.removeItem(INTENT);
-      setError(e instanceof Error?e.message:"Não foi possível conectar.");
-      setBusy(false);
+      setError(e instanceof Error?e.message:"Não foi possível conectar.");setBusy(false);
     }
   }
 
-  async function browse(parent:string, nextTrail:Trail[],pageToken?:string|null,append=false, mode:"root"|"all"=rootMode){
+  async function browse(parent:string,nextTrail:DriveTrail[],pageToken?:string|null,append=false,mode:"root"|"all"=rootMode){
     if(!connection)return;
+    const requestId=++folderRequest.current;
     setFolderBusy(true);setError("");
+    if(!append){setFolderList([]);setFolderPage(null);setTrail(nextTrail);}
     try{
       const params=new URLSearchParams({parentId:parent});
       if(pageToken)params.set("pageToken",pageToken);
       const data=await call<FolderPage>("/integrations/drive/"+encodeURIComponent(connection.id)+"/folders?"+params);
+      if(requestId!==folderRequest.current)return;
       setFolderList(old=>append?[...old,...data.folders]:data.folders);
-      setFolderPage(data.nextPageToken);
-      setTrail(nextTrail);setRootMode(mode);
-    }catch(e){setError(e instanceof Error?e.message:"Não foi possível abrir a pasta.");}
-    finally{setFolderBusy(false);}
+      setFolderPage(data.nextPageToken);setTrail(nextTrail);setRootMode(mode);
+      if(data.incompleteSearch)setResult("O Google informou que alguns resultados podem estar incompletos.");
+    }catch(e){if(requestId===folderRequest.current)setError(e instanceof Error?e.message:"Não foi possível abrir a pasta.");}
+    finally{if(requestId===folderRequest.current)setFolderBusy(false);}
   }
 
-  async function chooseFolders(){
+  function closePicker(){++folderRequest.current;setPicker(false);setError("");}
+  function chooseFolders(){
     setError("");
-    // Always open a responsive chooser, even when the toolbar has "Sem projeto".
-    // The project is selectable inside the dialog instead of silently disabling
-    // the only action. Missing extended Google permission is handled in-dialog.
+    if(!connected.length){void connect(selectedProjectId);return;}
     setPicker(true);setFolderList([]);setFolderPage(null);
     setTrail([{id:"root",name:"Meu Drive"}]);setRootMode("root");
   }
-
   useEffect(()=>{
-    if(picker && connection && selectedProjectId){
-      void browse("root",[{id:"root",name:"Meu Drive"}],null,false,"root");
-    }
-    // Loading follows the dialog/project/account lifetime; it never relies
-    // on the user clicking an invisible or disabled toolbar control.
+    if(picker&&connection&&selectedProjectId)void browse("root",[{id:"root",name:"Meu Drive"}],null,false,"root");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   },[picker,connection?.id,selectedProjectId]);
 
-  async function addFolder(folder:Item){
-    if(!user||!selectedProjectId||!connection)return;
-    if(links.some(l=>l.connectionId===connection.id&&l.projectId===selectedProjectId&&l.folderId===folder.id)){
-      setResult("Esta pasta já está vinculada a este projeto.");return;
-    }
+  async function linkFolders(items:DriveItem[]):Promise<boolean>{
+    if(!user||!selectedProjectId||!connection)return false;
     setBusy(true);setError("");
-    try{
-      await linkDriveFolder(user.uid,selectedProjectId,connection.id,folder);
-      const linked:DriveFolderLink={
-        id:driveFolderLinkId(selectedProjectId,connection.id,folder.id),
-        projectId:selectedProjectId,connectionId:connection.id,
-        folderId:folder.id,folderName:folder.name,
-      };
-      setLinks(current=>current.some(item=>item.id===linked.id)?current:[...current,linked]);
-      setResult("Pasta \""+folder.name+"\" vinculada ao projeto.");
-    }catch(e){setError(e instanceof Error?e.message:"Não foi possível vincular a pasta.");}
-    finally{setBusy(false);}
+    const failed:string[]=[];
+    let completed=0;
+    for(const folder of items){
+      if(links.some(l=>l.connectionId===connection.id&&l.projectId===selectedProjectId&&l.folderId===folder.id))continue;
+      try{
+        await linkDriveFolder(user.uid,selectedProjectId,connection.id,folder);
+        const link:DriveFolderLink={id:driveFolderLinkId(selectedProjectId,connection.id,folder.id),
+          projectId:selectedProjectId,connectionId:connection.id,folderId:folder.id,folderName:folder.name};
+        setLinks(old=>{
+          if(old.some(item=>item.id===link.id))return old;
+          const next=[...old,link];countCallback.current?.(next.length);return next;
+        });
+        completed++;
+      }catch{failed.push(folder.name);}
+    }
+    setBusy(false);
+    if(completed)setResult(completed===1?"Pasta vinculada ao projeto.":completed+" pastas vinculadas ao projeto.");
+    if(failed.length){setError("Não foi possível vincular: "+failed.join(", ")+". Confira a conexão e tente novamente.");return false;}
+    return true;
   }
 
   async function removeFolder(link:DriveFolderLink){
@@ -232,175 +223,116 @@ export function DriveConnectionPanel({
     setBusy(true);setError("");
     try{
       await unlinkDriveFolder(user.uid,link.id);
-      if(viewing?.id===link.id){setViewing(null);setFiles([]);}
-      setLinks(old=>old.filter(l=>l.id!==link.id));
-      setResult("Vínculo removido. Nenhum arquivo foi apagado do Drive.");
+      if(viewing?.id===link.id){++fileRequest.current;setViewing(null);setFiles([]);autoOpened.current="";}
+      setLinks(old=>{const next=old.filter(l=>l.id!==link.id);countCallback.current?.(next.length);return next;});
+      setUnlinkTarget(null);setResult("Vínculo removido. Nenhum arquivo foi apagado do Drive.");
     }catch(e){setError(e instanceof Error?e.message:"Não foi possível desvincular.");}
     finally{setBusy(false);}
   }
 
-  async function openFiles(link:DriveFolderLink,token?:string|null,append=false,folderId=link.folderId,nextPath:Trail[]=[{id:link.folderId,name:link.folderName}]){
+  async function openFiles(link:DriveFolderLink,token?:string|null,append=false,folderId=link.folderId,nextPath:DriveTrail[]=[{id:link.folderId,name:link.folderName}]){
+    const requestId=++fileRequest.current;
     setFileBusy(true);setError("");
+    if(!append){setViewing(link);setViewPath(nextPath);setFiles([]);setFilePage(null);}
     try{
       const qs=token?"?pageToken="+encodeURIComponent(token):"";
       const data=await call<FilePage>("/integrations/drive/"+encodeURIComponent(link.connectionId)+"/folders/"+encodeURIComponent(folderId)+"/items"+qs);
+      if(requestId!==fileRequest.current)return;
       setViewing(link);setViewPath(nextPath);
       setFiles(old=>append?[...old,...data.files]:data.files);
       setFilePage(data.nextPageToken);
-      if(data.incompleteSearch)setResult("O Google informou que a busca pode estar incompleta.");
-    }catch(e){setError(e instanceof Error?e.message:"Não foi possível visualizar os arquivos.");}
-    finally{setFileBusy(false);}
+      if(data.incompleteSearch)setResult("O Google informou que alguns resultados podem estar incompletos.");
+    }catch(e){if(requestId===fileRequest.current)setError(e instanceof Error?e.message:"Não foi possível visualizar os arquivos.");}
+    finally{if(requestId===fileRequest.current)setFileBusy(false);}
   }
+
+  useEffect(()=>{
+    ++fileRequest.current;setViewing(null);setFiles([]);autoOpened.current="";
+  },[selectedProjectId]);
+
+  useEffect(()=>{
+    if(!ready||!relevant.length||viewing)return;
+    const first=relevant[0];
+    const key=(selectedProjectId||"all")+":"+first.id;
+    if(autoOpened.current===key)return;
+    autoOpened.current=key;
+    void openFiles(first);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[ready,links,selectedProjectId,connection?.id,viewing]);
 
   async function disconnect(id:string){
     setBusy(true);setError("");
     try{
       await call("/integrations/drive/"+encodeURIComponent(id)+"/disconnect","POST");
-      setConfirmId("");setPicker(false);setViewing(null);
+      setConfirmId("");setPicker(false);setViewing(null);++fileRequest.current;
       await refresh();
-      setResult("Conta desconectada. Os arquivos originais permanecem no Google Drive.");
+      setResult("Conta desconectada. Seus arquivos permanecem no Google Drive.");
     }catch(e){setError(e instanceof Error?e.message:"Não foi possível desconectar.");}
     finally{setBusy(false);}
   }
+  function openItem(file:DriveItem){
+    if(!viewing)return;
+    if(file.mimeType===DRIVE_FOLDER){void openFiles(viewing,null,false,file.id,[...viewPath,{id:file.id,name:file.name}]);return;}
+    if(isPreviewable(file)){setPreview(file);return;}
+    window.open(driveFileUrl(file),"_blank","noopener,noreferrer");
+  }
 
-  return <section className="panel studio-section" aria-label="Biblioteca Google Drive">
-    <div className="studio-toolbar" style={{justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
-      <div><span className="eyebrow">ARQUIVOS DOS PROJETOS</span>
-        <h2 style={{display:"flex",alignItems:"center",gap:8}}><Cloud size={21}/> Google Drive</h2></div>
-      <button className="secondary-button" disabled={!ready||busy} onClick={()=>void refresh().catch(e=>setError(e.message))}>
-        <RefreshCw size={15}/> Atualizar
-      </button>
-    </div>
-    {!ready ? <p role="status">Carregando integração…</p> : <>
-      {connected.length ? <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",margin:"10px 0 16px"}}>
-        <ShieldCheck size={17}/><strong>{connected.map(c=>c.google_email).join(", ")}</strong>
-        <span style={{fontSize:"var(--type-support)",opacity:.8}}>{authorized.length?"Drive conectado":"Permissões de pastas pendentes"}</span>
-        <button className="secondary-button" disabled={busy} onClick={()=>{setConfirmId(connected[0].id===confirmId?"":connected[0].id);}}><Unplug size={14}/> Desconectar</button>
-        {confirmId && <><button className="secondary-button" onClick={()=>setConfirmId("")}>Cancelar</button>
-          <button className="secondary-button" disabled={busy} onClick={()=>void disconnect(confirmId)}>Confirmar desconexão</button></>}
-      </div> : <p>Conecte sua conta uma vez e escolha pastas para trabalhar nos projetos. O Google solicitará leitura do seu Drive; o Roteiva organiza somente as pastas que você vincular.</p>}
-      {!connected.length ? accountFailed ?
-        <button className="primary-button" disabled={busy} onClick={()=>void refresh().catch(e=>setError(e instanceof Error?e.message:"Não foi possível carregar o Drive."))}>
-          <RefreshCw size={16}/> Tentar carregar conexão novamente
-        </button> :
-        <button className="primary-button" disabled={busy} onClick={()=>void connect(selectedProjectId)}>
-          <Cloud size={16}/> {busy?"Conectando…":"Conectar Google Drive"}
-        </button>
-        : <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center",marginBottom:16}}>
-          <button className="primary-button" disabled={busy} onClick={()=>void chooseFolders()}>
-            <Link2 size={16}/> Vincular pastas {thisProject?"ao "+thisProject.name:"ao projeto"}
-          </button>
-          {!selectedProjectId && <small>Escolha o projeto na próxima janela para vincular as pastas.</small>}
-          {!authorized.length && <small>Ao vincular, o Google pedirá uma única atualização da permissão de leitura para sua conta já conectada.</small>}
-        </div>}
-      {callback==="connected" && <p role="status"><CheckCircle2 size={15}/> Drive autorizado. {selectedProjectId?"Selecione agora as pastas do projeto.":"Escolha um projeto para vincular suas pastas."}</p>}
-      {callback==="cancelled" && <p role="status">Autorização cancelada.</p>}
-      {oauthError(callback) && <p role="alert" className="auth-error">{oauthError(callback)}</p>}
-      {error && <p role="alert" className="auth-error">{error}</p>}
-      {linkError && <p role="alert" className="auth-error">{linkError}</p>}
-      {result && <p role="status">{result}</p>}
-      <div style={{display:"grid",gap:10,marginTop:16}}>
-        <h3 style={{fontSize:15}}>Pastas vinculadas {thisProject?"— "+thisProject.name:""}</h3>
-        {relevant.map(link=><div className="panel" key={link.id} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",flexWrap:"wrap"}}>
-          <FolderOpen size={19}/>
-          <div style={{flex:1,minWidth:160}}>
-            <strong>{link.folderName}</strong>
-            <div style={{fontSize:"var(--type-support)",opacity:.7}}>{projects.find(p=>p.id===link.projectId)?.name||"Projeto indisponível"}</div>
-          </div>
-          <button className="secondary-button" disabled={fileBusy||busy} onClick={()=>void openFiles(link)}>Ver arquivos</button>
-          <button className="secondary-button" disabled={busy} onClick={()=>void removeFolder(link)} aria-label={"Desvincular "+link.folderName}><X size={15}/></button>
-        </div>)}
-        {!relevant.length&&<p style={{opacity:.75}}>Nenhuma pasta vinculada {thisProject?"a este projeto":"aos projetos"}.</p>}
+  const linkedIds=new Set(links.filter(link=>link.projectId===selectedProjectId&&link.connectionId===connection?.id).map(link=>link.folderId));
+  const currentAccount=connection||connected.find(c=>c.id===selectedAccount)||connected[0];
+  return <section className="rl-library" aria-label="Biblioteca Google Drive">
+    <header className="rl-toolbar">
+      <div className="rl-title"><span className="rl-title-icon"><FolderOpen size={20}/></span><div><h2>Arquivos dos projetos</h2><p>Explore as pastas vinculadas ao seu Google Drive.</p></div></div>
+      <div className="rl-toolbar-actions">
+        {connected.length?<details className="rl-account"><summary aria-label="Gerenciar Google Drive"><ShieldCheck size={16}/><span className="rl-account-text">Drive conectado</span><ChevronDown size={14}/></summary>
+          <div className="rl-account-panel"><div><strong>Google Drive conectado</strong><p>{currentAccount?.google_email}</p></div>
+            {authorized.length>1&&<select aria-label="Selecionar conta Google Drive" value={connection?.id||""} onChange={e=>setSelectedAccount(e.target.value)}>
+              {authorized.map(c=><option key={c.id} value={c.id}>{c.google_email}</option>)}</select>}
+            <button className="secondary-button" type="button" disabled={busy} onClick={()=>void refresh().catch(e=>setError(e instanceof Error?e.message:"Não foi possível atualizar."))}><RefreshCw size={15}/> Atualizar conexão</button>
+            {confirmId?<><p>Desconectar esta conta? As pastas vinculadas não serão apagadas.</p>
+              <button className="secondary-button" type="button" disabled={busy} onClick={()=>setConfirmId("")}>Cancelar</button>
+              <button className="secondary-button" type="button" disabled={busy} onClick={()=>void disconnect(confirmId)}><Unplug size={15}/> Confirmar desconexão</button></>:
+              <button className="secondary-button" type="button" disabled={busy} onClick={()=>setConfirmId(currentAccount?.id||"")}><Unplug size={15}/> Desconectar</button>}
+          </div></details>:null}
+        <button className="primary-button" type="button" disabled={!ready||busy||accountFailed} onClick={chooseFolders}><Plus size={16}/>{connected.length?"Vincular pasta":"Conectar Drive"}</button>
       </div>
-      {viewing && <div className="panel" style={{marginTop:16,padding:16}}>
-        <div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"center",flexWrap:"wrap"}}>
-          <nav aria-label="Pastas da biblioteca" style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
-            <FolderOpen size={18}/>
-            {viewPath.map((node,i)=><span key={node.id} style={{display:"inline-flex",gap:4,alignItems:"center"}}>
-              {i>0&&<ChevronRight size={13}/>}
-              <button className="secondary-button" onClick={()=>void openFiles(viewing,null,false,node.id,viewPath.slice(0,i+1))}>{node.name}</button>
-            </span>)}
-          </nav>
-          <button className="secondary-button" onClick={()=>setViewing(null)}>Fechar</button>
-        </div>
-        {fileBusy && <p role="status">Carregando arquivos…</p>}
-        {!files.length&&!fileBusy && <p>Nenhum arquivo encontrado diretamente nesta pasta.</p>}
-        <div style={{display:"grid",gap:8,marginTop:12}}>
-          {files.map(file=>{const Icon=kindIcon(file.mimeType);return <div key={file.id} style={{display:"flex",gap:10,alignItems:"center",padding:"10px 0",borderBottom:"1px solid var(--border,#ffffff19)",flexWrap:"wrap"}}>
-            <Icon size={19}/><div style={{flex:1,minWidth:160}}>
-              <strong style={{fontSize:13}}>{file.name}</strong>
-              <div style={{fontSize:"var(--type-support)",opacity:.65}}>{file.mimeType===FOLDER?"Subpasta":sizeText(file.size)} {file.modifiedTime?" · "+new Date(file.modifiedTime).toLocaleDateString("pt-BR"):""}</div>
-            </div>
-            {file.mimeType!==FOLDER && !file.mimeType.startsWith("application/vnd.google-apps.") &&
-              <button className="secondary-button" onClick={()=>setPreview(file)}>Prévia</button>}
-            {file.mimeType===FOLDER&&<button className="secondary-button" onClick={()=>void openFiles(viewing,null,false,file.id,[...viewPath,{id:file.id,name:file.name}])}>Abrir pasta</button>}
-            <a className="secondary-button" target="_blank" rel="noreferrer" href={file.webViewLink||"https://drive.google.com/file/d/"+encodeURIComponent(file.id)+"/view"}>
-              <ExternalLink size={14}/> Drive
-            </a>
-          </div>;})}
-        </div>
-        {filePage && <button className="secondary-button" disabled={fileBusy} onClick={()=>void openFiles(viewing,filePage,true,viewPath[viewPath.length-1]?.id||viewing.folderId,viewPath)}>Carregar mais arquivos</button>}
-        <small style={{opacity:.7}}>Arquivos originais mantidos no Google Drive. Prévia incorporada depende das permissões e do navegador.</small>
-      </div>}
-    </>}
-    {picker && <div role="presentation" style={{position:"fixed",inset:0,zIndex:400,background:"rgba(0,0,0,.76)",display:"grid",placeItems:"center",padding:16}} onMouseDown={e=>{if(e.target===e.currentTarget)setPicker(false);}}>
-      <div role="dialog" aria-modal="true" aria-label="Selecionar pastas do Google Drive" className="panel" style={{width:"min(660px,100%)",maxHeight:"min(80vh,820px)",overflow:"auto",padding:20}}>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12}}>
-          <div><h2 style={{fontSize:19}}>Vincular pastas</h2>
-            <p style={{fontSize:13,opacity:.8}}>Selecione o projeto e as pastas que deseja organizar.</p></div>
-          <button className="secondary-button" onClick={()=>setPicker(false)} aria-label="Fechar seletor"><X size={18}/></button>
-        </div>
-        <label style={{display:"grid",gap:7,margin:"14px 0"}}>
-          <span style={{fontSize:"var(--type-support)",opacity:.8}}>Projeto para vincular as pastas</span>
-          <select aria-label="Projeto para vincular pastas" value={selectedProjectId??""} onChange={event=>onSelectProject(event.target.value)}
-            style={{width:"100%",padding:"10px",borderRadius:8}}>
-            <option value="">Selecione um projeto</option>
-            {projects.map(project=><option key={project.id} value={project.id}>{project.name}</option>)}
-          </select>
-        </label>
-        {!selectedProjectId ? <p role="status">Escolha um projeto para carregar suas pastas do Google Drive.</p>
-          : !connection ? <div style={{display:"grid",gap:10}}>
-              <p>Seu Google Drive precisa autorizar a leitura de pastas. Os arquivos permanecem na sua conta.</p>
-              <button className="primary-button" disabled={busy} onClick={()=>void connect(selectedProjectId)}>
-                <Cloud size={16}/> Continuar com Google Drive
-              </button>
-            </div> : <>
-        <div style={{display:"flex",gap:8,flexWrap:"wrap",margin:"16px 0"}}>
-          <button className="secondary-button" onClick={()=>void browse("root",[{id:"root",name:"Meu Drive"}],null,false,"root")}>Meu Drive</button>
-          <button className="secondary-button" onClick={()=>void browse("all",[{id:"all",name:"Todas as pastas"}],null,false,"all")}>Todas as pastas</button>
-        </div>
-        <nav aria-label="Localização" style={{display:"flex",alignItems:"center",gap:5,flexWrap:"wrap",marginBottom:12}}>
-          {trail.map((node,i)=><span key={node.id} style={{display:"inline-flex",alignItems:"center",gap:5}}>
-            {i>0&&<ChevronRight size={13}/>}
-            <button className="secondary-button" onClick={()=>void browse(node.id,trail.slice(0,i+1))}>{node.name}</button>
-          </span>)}
-        </nav>
-        {folderBusy&&<p role="status">Buscando pastas…</p>}
-        <div style={{display:"grid",gap:7}}>
-          {folderList.map(folder=><div key={folder.id} style={{display:"flex",alignItems:"center",gap:9,padding:"10px",border:"1px solid var(--border,#ffffff20)",borderRadius:10}}>
-            <Folder size={17}/><button onClick={()=>void browse(folder.id,[...trail,{id:folder.id,name:folder.name}])} style={{flex:1,textAlign:"left",background:"none",color:"inherit",border:0,cursor:"pointer",padding:4}}>
-              {folder.name} <ChevronRight size={12} style={{display:"inline"}}/>
+    </header>
+    {!ready?<div className="rl-status" role="status">Carregando Biblioteca…</div>:null}
+    {callback==="connected"&&<div className="rl-status" role="status"><ShieldCheck size={17}/><p>Google Drive autorizado.</p></div>}
+    {callback==="cancelled"&&<div className="rl-status" role="status">Autorização cancelada.</div>}
+    {oauthError(callback)&&<div className="rl-status" role="alert">{oauthError(callback)}</div>}
+    {error&&<div className="rl-status" role="alert"><p>{error}</p>{accountFailed&&<button className="rl-retry" type="button" onClick={()=>void refresh().catch(e=>setError(e instanceof Error?e.message:"Falha ao atualizar."))}>Tentar novamente</button>}</div>}
+    {linkError&&<div className="rl-status" role="alert"><p>{linkError}</p><button className="rl-retry" type="button" onClick={()=>void refresh().catch(e=>setError(e instanceof Error?e.message:"Falha ao atualizar."))}>Atualizar</button></div>}
+    {result&&<div className="rl-status" role="status">{result}</div>}
+    {ready&&!connected.length&&!accountFailed?<div className="rl-status"><Cloud size={18}/><p>Conecte sua conta Google para escolher pastas dos projetos. Os arquivos continuarão armazenados no seu Drive.</p></div>:null}
+    {ready&&connected.length>0&&!authorized.length?<div className="rl-status" role="alert"><p>É necessário autorizar a leitura das pastas existentes.</p><button type="button" className="rl-retry" onClick={()=>void connect(selectedProjectId)}>Autorizar acesso</button></div>:null}
+    <div className="rl-explorer" data-mobile-detail={!!viewing}>
+      <aside className="rl-folders" aria-label="Pastas vinculadas">
+        <div className="rl-folders-header"><h3>Pastas {selectedProjectId?"do projeto":"dos projetos"}</h3><small>{relevant.length}</small></div>
+        <div className="rl-folder-list">
+          {relevant.map(link=><div className="rl-folder-entry" data-active={viewing?.id===link.id} key={link.id}>
+            <button className="rl-folder-button" type="button" title={link.folderName} onClick={()=>void openFiles(link)} aria-current={viewing?.id===link.id?"true":undefined}>
+              <FolderOpen size={18}/><span><b>{link.folderName}</b><small>{projects.find(p=>p.id===link.projectId)?.name||"Projeto indisponível"}</small></span>
             </button>
-            <button className="primary-button" disabled={busy} onClick={()=>void addFolder(folder)}>
-              {links.some(l=>l.projectId===selectedProjectId&&l.connectionId===connection.id&&l.folderId===folder.id)?"Vinculada":"Vincular"}
-            </button>
+            <details className="rl-menu"><summary aria-label={"Opções da pasta "+link.folderName}><MoreHorizontal size={18}/></summary>
+              <div className="rl-menu-items"><button type="button" onClick={()=>void openFiles(link)}>Abrir pasta</button>
+                <button type="button" disabled={busy} onClick={()=>setUnlinkTarget(link)}>Desvincular do projeto</button>
+              </div></details>
           </div>)}
-          {!folderBusy&&!folderList.length&&<p>Nenhuma pasta encontrada nesta localização.</p>}
+          {!relevant.length&&<div className="rl-state"><FolderOpen size={27}/><p>Nenhuma pasta vinculada {selectedProjectId?"a este projeto":"aos projetos"}.</p>
+            <button type="button" className="secondary-button" disabled={!ready||busy} onClick={chooseFolders}>Vincular pasta</button></div>}
         </div>
-        {folderPage&&<button className="secondary-button" disabled={folderBusy} onClick={()=>void browse(trail[trail.length-1].id,trail,folderPage,true)}>Carregar mais</button>}
-        <p style={{fontSize:"var(--type-support)",marginTop:12,opacity:.75}}>Você pode vincular quantas pastas precisar. Os arquivos continuam no Google Drive.</p>
-        </>}
-        {error && <p role="alert" className="auth-error">{error}</p>}
-      </div>
-    </div>}
-    {preview && <div role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)setPreview(null);}} style={{position:"fixed",inset:0,zIndex:500,background:"rgba(0,0,0,.85)",display:"grid",placeItems:"center",padding:16}}>
-      <div role="dialog" aria-modal="true" aria-label={"Prévia de "+preview.name} className="panel" style={{width:"min(1000px,100%)",padding:12}}>
-        <div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"center",padding:"5px 8px 12px"}}>
-          <strong>{preview.name}</strong><button className="secondary-button" onClick={()=>setPreview(null)}><X size={17}/> Fechar</button>
-        </div>
-        <iframe title={"Prévia de "+preview.name} referrerPolicy="no-referrer" allow="fullscreen" src={"https://drive.google.com/file/d/"+encodeURIComponent(preview.id)+"/preview"} style={{width:"100%",height:"min(65vh,650px)",border:0,borderRadius:8}}/>
-        <p style={{marginTop:8,fontSize:"var(--type-support)"}}>Caso não abra, acesse o arquivo diretamente no <a href={preview.webViewLink||"https://drive.google.com/file/d/"+encodeURIComponent(preview.id)+"/view"} target="_blank" rel="noreferrer">Google Drive</a>.</p>
-      </div>
-    </div>}
+      </aside>
+      <DriveFileExplorer folderName={viewing?.folderName} path={viewPath} files={files} loading={fileBusy} hasMore={!!filePage}
+        onBack={()=>{++fileRequest.current;setViewing(null);setFiles([]);autoOpened.current="back";}}
+        onNavigate={(id,path)=>{if(viewing)void openFiles(viewing,null,false,id,path);}}
+        onOpen={openItem} onMore={()=>{if(viewing&&filePage)void openFiles(viewing,filePage,true,viewPath.at(-1)?.id||viewing.folderId,viewPath);}}/>
+    </div>
+    {picker&&<DriveFolderPicker projects={projects} projectId={selectedProjectId} onProjectChange={onSelectProject}
+      folders={folderList} path={trail} loading={folderBusy} working={busy} canRead={!!connection}
+      hasMore={!!folderPage} linkedIds={linkedIds} error={error} onClose={closePicker}
+      onNavigate={(id,path)=>void browse(id,path)} onMore={()=>void browse(trail.at(-1)?.id||"root",trail,folderPage,true)}
+      onLink={linkFolders} onConnect={()=>void connect(selectedProjectId)}/>}
+    {preview&&<DrivePreview item={preview} onClose={()=>setPreview(null)}/>}
+    {unlinkTarget&&<DriveUnlinkConfirm name={unlinkTarget.folderName} busy={busy} onCancel={()=>setUnlinkTarget(null)} onConfirm={()=>void removeFolder(unlinkTarget)}/>}
   </section>;
 }
