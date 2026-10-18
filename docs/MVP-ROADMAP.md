@@ -443,3 +443,10 @@ A cópia persistida é privada e potencialmente sensível em computadores compar
 - **PARCIAL/BLOQUEADO POR SEGURANÇA:** operações Firebase somente em repositório privado com conta de serviço separada; contagem/leitura e fixtures; dados de negócio sem mutações administrativas genéricas. Evidência: `.github/workflows/firebase-ops.yml`, `scripts/firebase-ops.mjs`, `tests/firebase-ops.test.mjs`.
 - **PLANEJADO:** provisionar PROD com Firebase, Worker, D1, segredos e OAuth próprios após aprovação. Exemplos de configuração foram adicionados; nenhum deploy PROD está habilitado.
 - **PENDENTE:** verificar a duração real das pipelines após abrir e mesclar PR. A meta de até 60 segundos vale para deploys comuns, não Playwright/infra pesada ou indisponibilidade externa.
+
+
+## Biblioteca — miniaturas e visualização aprimorada (18/10/2026)
+
+- **IMPLEMENTADO NO CÓDIGO, VALIDAR NO DEV:** lista/grade persistida como preferência visual, miniaturas imagens/vídeos/PDF quando `thumbnailLink` disponível, carregamento sob demanda, limite de requisições e fallback de ícones. Evidência: `DriveThumbnail.tsx`, `DriveLibraryUI.tsx` e CSS.
+- **IMPLEMENTADO NO CÓDIGO, VALIDAR NO DEV:** proxy de miniaturas privadas: identidade Firebase, conexão do usuário, escopo, URL Google permitida, tipo de imagem, tamanho máximo e sem original `alt=media`. Evidência: `api/src/thumbnails.ts`, `api/tests/thumbnails.test.mjs`.
+- **PENDENTE QA REAL:** vídeos e PDFs de conta Google conectada, permissões não compartilhadas, iframe em navegadores mobile e cópia de URL externa. Não confundir suíte de testes unitários com confirmação manual Google OAuth.

@@ -88,3 +88,8 @@ Frontend e API validam alterações de forma independente; commits na `master` p
 `firebase-ops.yml` implementa consultas restritas e fixtures de manutenção, mas fica **bloqueado enquanto o repositório for público**, ou sem a conta administrativa dedicada e habilitação explícita no ambiente `firebase-data-development`. Não existe acesso administrativo liberado aos documentos reais em Actions públicos. Escritas arbitrárias em registros de clientes não são permitidas, pois contornariam regras, revisões e stamps da aplicação. Consulte [DEVELOPMENT](docs/DEVELOPMENT.md).
 
 A configuração PROD é somente um modelo, sem ambiente/credenciais provisionados nem workflow habilitado. Os tempos de 1 minuto são metas, não garantias para migrações, emuladores ou filas do GitHub.
+
+
+## Miniaturas e visualização da Biblioteca
+
+O Roteiva mostra miniaturas fornecidas pelo Google Drive para mídia quando disponíveis, com modos **Lista** e **Grade**, e modal de visualização ampliada no Google Drive. Miniaturas privadas passam por uma rota curta e autenticada do Worker, sob demanda e em memória; vídeos não são transferidos pelo Worker. Documentos sem thumb mantêm ícone do tipo. O preview integrado exige origem DEV principal devido a Auth/CORS, portanto a validação funcional deve ocorrer após deploy conjunto de frontend e API.

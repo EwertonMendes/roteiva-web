@@ -4,6 +4,7 @@ import { useAuth } from "../auth/AuthProvider";
 import { driveFolderLinkId, linkDriveFolder, readDriveLinks, unlinkDriveFolder, type DriveFolderLink } from "../../data/drive-folder-links";
 import type { Project } from "../../domain/workspace";
 import { DRIVE_FOLDER, DriveFileExplorer, DriveFolderPicker, DrivePreview, DriveUnlinkConfirm, driveFileUrl, isPreviewable, type DriveItem, type DriveTrail } from "./DriveLibraryUI";
+import {clearDriveThumbnailCache} from "./DriveThumbnail";
 import "./drive-library.css";
 
 const API = "https://roteiva-api-dev.ewertonmendes9.workers.dev";
@@ -92,6 +93,24 @@ export function DriveConnectionPanel({
   const authorized=connected.filter(c=>c.scopes.split(/\s+/).includes(READ));
   const connection=authorized.find(c=>c.id===selectedAccount)||authorized[0];
   const relevant=selectedProjectId?links.filter(l=>l.projectId===selectedProjectId):links;
+  // Google Drive media is private. Use the existing Firebase session, never public thumbnail URLs.
+  const getThumbnail=useCallback(async(file:DriveItem):Promise<Blob|null>=>{
+    if(!user||!connection||!file.thumbnailLink)return null;
+    const path="/integrations/drive/"+encodeURIComponent(connection.id)+"/files/"+encodeURIComponent(file.id)+"/thumbnail";
+    for(let attempt=0;attempt<2;attempt++){
+      const token=await user.getIdToken(attempt===1);
+      const response=await fetch(API+path,{headers:{Authorization:"Bearer "+token},cache:"no-store"});
+      if(response.status===401&&attempt===0)continue;
+      if(!response.ok)return null; // A missing/expired Google thumbnail gracefully keeps the file icon.
+      const type=(response.headers.get("Content-Type")||"").split(";")[0];
+      if(!type.startsWith("image/"))return null;
+      const blob=await response.blob();
+      return blob.size>0&&blob.size<=1024*1024?blob:null;
+    }
+    return null;
+  },[user,connection?.id]);
+  useEffect(()=>()=>clearDriveThumbnailCache(),[user?.uid,connection?.id]);
+
   const callback=new URLSearchParams(window.location.search).get("drive");
 
   const call=useCallback(async <T,>(path:string,method:"GET"|"POST"="GET"):Promise<T>=>{
@@ -269,6 +288,7 @@ export function DriveConnectionPanel({
     setBusy(true);setError("");
     try{
       await call("/integrations/drive/"+encodeURIComponent(id)+"/disconnect","POST");
+      clearDriveThumbnailCache();
       setConfirmId("");setPicker(false);setViewing(null);++fileRequest.current;
       await refresh();
       setResult("Conta desconectada. Seus arquivos permanecem no Google Drive.");
@@ -328,6 +348,7 @@ export function DriveConnectionPanel({
         </div>
       </aside>
       <DriveFileExplorer folderName={viewing?.folderName} path={viewPath} files={files} loading={fileBusy} hasMore={!!filePage}
+        thumbnailScope={(user?.uid||"")+":"+(viewing?.connectionId||connection?.id||"")} getThumbnail={getThumbnail}
         onBack={()=>{++fileRequest.current;setViewing(null);setFiles([]);autoOpened.current=(selectedProjectId||"all")+":"+(relevant[0]?.id||"");}}
         onNavigate={(id,path)=>{if(viewing)void openFiles(viewing,null,false,id,path);}}
         onOpen={openItem} onMore={()=>{if(viewing&&filePage)void openFiles(viewing,filePage,true,viewPath.at(-1)?.id||viewing.folderId,viewPath);}}/>
@@ -337,7 +358,11 @@ export function DriveConnectionPanel({
       hasMore={!!folderPage} mode={rootMode} onModeChange={mode=>void browse(mode,[{id:mode,name:mode==="root"?"Meu Drive":"Todas as pastas"}],null,false,mode)} linkedIds={linkedIds} error={error} onClose={closePicker}
       onNavigate={(id,path)=>void browse(id,path)} onMore={()=>void browse(trail.at(-1)?.id||"root",trail,folderPage,true)}
       onLink={linkFolders} onConnect={()=>void connect(selectedProjectId)}/>}
-    {preview&&<DrivePreview item={preview} onClose={()=>setPreview(null)}/>}
+    {preview&&<DrivePreview item={preview} onClose={()=>setPreview(null)}
+      position={files.filter(isPreviewable).findIndex(file=>file.id===preview.id)+1}
+      total={files.filter(isPreviewable).length}
+      onPrevious={(()=>{const list=files.filter(isPreviewable);const index=list.findIndex(file=>file.id===preview.id);return index>0?()=>setPreview(list[index-1]):undefined;})()}
+      onNext={(()=>{const list=files.filter(isPreviewable);const index=list.findIndex(file=>file.id===preview.id);return index>=0&&index<list.length-1?()=>setPreview(list[index+1]):undefined;})()}/>} 
     {unlinkTarget&&<DriveUnlinkConfirm name={unlinkTarget.folderName} busy={busy} onCancel={()=>setUnlinkTarget(null)} onConfirm={()=>void removeFolder(unlinkTarget)}/>}
   </section>;
 }
