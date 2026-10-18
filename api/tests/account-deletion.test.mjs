@@ -61,7 +61,7 @@ test('Firestore recursive deletion preserves root while deleting nested descenda
   if(init.method==='DELETE')return Response.json({});
   return Response.json({});
  };
- assert.equal(await deleteFirestoreChunk('user-A','synthetic',5,fetcher),false);
+ assert.equal(await deleteFirestoreChunk({FIREBASE_PROJECT_ID:'roteiva-web-dev'},'user-A','synthetic',5,fetcher),false);
  const removed=calls.filter(c=>c.method==='DELETE').map(c=>c.url);
  assert.ok(removed[0].endsWith('/users/user-A/projects/p1/notes/n1'));
  assert.ok(removed[1].endsWith('/users/user-A/projects/p1'));

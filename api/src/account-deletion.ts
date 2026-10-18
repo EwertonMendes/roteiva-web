@@ -73,20 +73,20 @@ async function runPhase(env:Env,job:Job,lease:string):Promise<void>{
   const uid=job.owner_uid;
   if(job.phase==='locking'){
     const token=await adminToken(env);
-    await lockAccount(uid,token);
+    await lockAccount(env,uid,token);
     await changePhase(env,job,lease,'revoking');
   }else if(job.phase==='revoking'){
     await revokeConnections(env,uid);
     await changePhase(env,job,lease,'firestore');
   }else if(job.phase==='firestore'){
     const token=await adminToken(env);
-    const empty=await deleteFirestoreChunk(uid,token,20);
+    const empty=await deleteFirestoreChunk(env,uid,token,20);
     if(empty)await changePhase(env,job,lease,'identity');
   }else if(job.phase==='identity'){
     const token=await adminToken(env);
-    await deleteIdentity(uid,token);
+    await deleteIdentity(env,uid,token);
     // Keep the Firestore deletion marker until Auth has been removed.
-    await deleteRoot(uid,token);
+    await deleteRoot(env,uid,token);
     await changePhase(env,job,lease,'completed');
   }
 }

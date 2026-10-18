@@ -1,6 +1,6 @@
 # Exclusão permanente de conta — arquitetura e ativação segura
 
-**Estado:** implementação candidata na PR #30; bloqueada por configuração até homologação administrativa.
+**Estado:** implementação candidata na PR #30; pronta para ativação no DEV após provisionar a credencial administrativa e concluir homologação.
 
 O processo de exclusão é definitivo, sem prazo de recuperação. O modal exige a
 frase exata `EXCLUIR MINHA CONTA`, confirmação explícita e reautenticação
@@ -19,8 +19,8 @@ a palavra, isoladamente, nunca autoriza uma exclusão.
 - `account_deletions` é armazenamento operacional mínimo, sem email ou
   credencial OAuth. Concluídos mantêm marcador por 24h para idempotência
   e bloqueio das sessões Firebase ainda não expiradas.
-- `ACCOUNT_DELETION_ENABLED=false` mantém a funcionalidade inativa mesmo
-  se a branch vier a ser mergeada. O Worker precisa do segredo
+- `ACCOUNT_DELETION_ENABLED=true` liga a rota no ambiente DEV, mas a execução
+  continua indisponível enquanto não existir uma credencial administrativa válida. O Worker precisa do segredo
   `FIREBASE_ADMIN_CREDENTIALS_JSON`, **nunca** `VITE_*` ou um arquivo
   versionado. Não adicionar a chave privada a GitHub, D1, logs ou docs.
 
@@ -81,3 +81,5 @@ A limpeza de cache local tenta remover dados do dispositivo corrente, mas não
 é possível apagar de forma garantida arquivos já exportados ou o cache offline
 de outros dispositivos. A retenção de backups e logs precisa seguir política
 documentada, com limitações legais aplicáveis.
+
+O executor administrativo utiliza `FIREBASE_PROJECT_ID` como fonte dos caminhos REST, validando que o `project_id` da credencial instalada coincide exatamente. A lógica é compartilhável com PROD futuramente, mas o gateway Worker atual continua DEV-only; uma futura implantação PROD exigirá infraestrutura, segredos, IAM e validação específicos, sem redirecionar a conta de serviço DEV.

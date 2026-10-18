@@ -12,7 +12,7 @@
       "account_id": "b3855f9c192541a01a45b2dae7b6a7f8",
       "vars": {
         "ENVIRONMENT": "dev",
-        "ACCOUNT_DELETION_ENABLED": "false",
+        "ACCOUNT_DELETION_ENABLED": "true",
         "FIREBASE_PROJECT_ID": "roteiva-web-dev",
         "FRONTEND_ORIGIN": "https://roteiva-web-dev.web.app",
         "OAUTH_REDIRECT_URI": "https://roteiva-api-dev.ewertonmendes9.workers.dev/oauth/drive/callback",
