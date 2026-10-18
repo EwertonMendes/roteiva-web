@@ -25,8 +25,8 @@ test("semantic icon labels remain accessible, responsive and functional", async 
   await enterWorkspace(page, "icons-"+info.project.name+"@example.com");
 
   await page.goto(app + "/projetos");
-  const filters = page.locator(".filter-pills button");
-  await expect(filters).toHaveCount(5);
+  const filters = page.locator(".filter-pills");
+  await expect(filters.locator("button")).toHaveCount(5);
   for (const title of ["Todos", "Em produção", "Em aprovação", "Ajustes", "Aprovado"]) {
     const button = filters.getByRole("button", { name: title, exact: true });
     await expect(button).toHaveCount(1);
