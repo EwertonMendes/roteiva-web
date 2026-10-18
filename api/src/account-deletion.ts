@@ -89,9 +89,10 @@ async function runPhase(env:Env,job:Job,lease:string):Promise<void>{
     if(empty)await changePhase(env,job,lease,'identity');
   }else if(job.phase==='identity'){
     const token=await adminToken(env);
-    await deleteIdentity(env,uid,token);
-    // Keep the Firestore deletion marker until Auth has been removed.
+    // The independent fence survives profile removal. Auth is the final
+    // remote deletion; a root failure must preserve the identity for recovery.
     await deleteRoot(env,uid,token);
+    await deleteIdentity(env,uid,token);
     await changePhase(env,job,lease,'completed');
   }
 }

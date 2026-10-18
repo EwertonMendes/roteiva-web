@@ -105,12 +105,12 @@ test("full deletion saga is resumable, verifies service calls and leaves another
  assert.equal(db.sql.prepare('SELECT phase FROM account_deletions WHERE owner_uid=?').get('user-A').phase,'firestore');
  await runPendingDeletions(env); // verify empty and advance
  assert.equal(db.sql.prepare('SELECT phase FROM account_deletions WHERE owner_uid=?').get('user-A').phase,'identity');
- await runPendingDeletions(env); // identity, root marker, completed
+ await runPendingDeletions(env); // root, identity last, completed
  assert.equal(db.sql.prepare('SELECT phase FROM account_deletions WHERE owner_uid=?').get('user-A').phase,'completed');
  assert.equal(db.sql.prepare('SELECT count(*) AS n FROM drive_connections WHERE owner_uid=?').get('other-user').n,1);
  const accountDeletion=calls.findIndex(x=>x.url.includes('identitytoolkit.googleapis.com'));
  const firestoreRootDeletion=calls.findIndex(x=>x.url.endsWith('/users/user-A') && x.method==='DELETE');
- assert.ok(accountDeletion!==-1 && firestoreRootDeletion>accountDeletion,'Auth is deleted before the final marker');
+ assert.ok(firestoreRootDeletion!==-1 && accountDeletion>firestoreRootDeletion,'Auth is the final remote deletion');
  assert.equal((await (await deletionStatus(env,'user-A')).json()).operation.status,'completed');
 });
 
@@ -269,6 +269,29 @@ test('last allowed request failure is not hidden as a cooperative yield',async()
      return Response.json({documents:Array.from({length:30},(_,n)=>({name:prefix+'/projects/p'+n}))});
    }),error=>error.code==='admin_permission_denied');
  assert.equal(calls,30);
+});
+
+test('final profile failure preserves Auth and retries the identity phase',async t=>{
+ const db=database();t.after(db.close);
+ const {privateKey}=await generateKeyPair('RS256',{extractable:true});
+ const env={DB:db.DB,ENVIRONMENT:'dev',FIREBASE_PROJECT_ID:'roteiva-web-dev',ACCOUNT_DELETION_ENABLED:'true',
+   FIREBASE_ADMIN_CREDENTIALS_JSON:JSON.stringify({type:'service_account',project_id:'roteiva-web-dev',
+     client_email:'test@roteiva-web-dev.iam.gserviceaccount.com',private_key:await exportPKCS8(privateKey),
+     token_uri:'https://oauth2.googleapis.com/token'})};
+ const stamp=Date.now()-1000;
+ db.sql.prepare("INSERT INTO account_deletions(owner_uid,operation_id,phase,next_attempt_at,created_at,updated_at) VALUES('owner-A','operation-A','identity',?,?,?)").run(stamp,stamp,stamp);
+ const original=globalThis.fetch;t.after(()=>{globalThis.fetch=original;});
+ let identityCalls=0;
+ globalThis.fetch=async(url,init={})=>{
+   if(String(url)==='https://oauth2.googleapis.com/token')return Response.json({access_token:'synthetic'});
+   if(String(url).includes('identitytoolkit')){identityCalls++;return Response.json({});}
+   if(init.method==='DELETE')return Response.json({error:{status:'UNAVAILABLE'}},{status:503});
+   return Response.json({collectionIds:[]});
+ };
+ await advanceDeletion(env,'owner-A');
+ assert.equal(identityCalls,0);
+ const job=db.sql.prepare('SELECT phase,failed_phase,attempts FROM account_deletions').get();
+ assert.equal(job.phase,'identity');assert.equal(job.failed_phase,'identity');assert.equal(job.attempts,1);
 });
 
 test('manual review retains failed stage, releases lease and cannot be retried automatically',async t=>{

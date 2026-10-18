@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "./fixtures";
 
 const cloud = "http://127.0.0.1:4173";
 const api = "https://roteiva-api-dev.ewertonmendes9.workers.dev";

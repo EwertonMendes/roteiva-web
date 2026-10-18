@@ -52,7 +52,7 @@ do token assinado. A conta de serviço deve apontar exclusivamente para
    a cada execução. Preserva o marcador raiz para bloquear sessões antigas.
 4. `identity`: elimina a identidade Firebase via Identity Toolkit Admin
    usando `firebaseauth.users.delete`; repetição de `USER_NOT_FOUND`
-   é tratada como idempotente. Só depois apaga o marcador raiz.
+   é tratada como idempotente. Antes dessa chamada, reinspeciona e remove o perfil raiz; a fence independente mantém o bloqueio. Falha na remoção do perfil preserva Auth para retomada.
 5. `completed`: registra conclusão mínima; operações com JWT residual são
    bloqueadas enquanto o tombstone existir. O usuário não pode desfazer.
 
@@ -115,7 +115,7 @@ Rotação: no máximo a cada 30 dias (primeira revisão até 17/11/2026), ou ime
 
 ## Correções de segurança e recuperação
 
-`accountDeletionFences/{uid}` é marcador mínimo, administrativo e inacessível ao cliente. É gravado antes de bloquear o perfil e impede também a recriação de `users/{uid}` por JWT residual após a exclusão Auth. O perfil raiz continua sendo removido após Auth. Cron retém a fence e o tombstone D1 por pelo menos 24h após `completed`, acima da validade de uma hora dos ID tokens; remove a fence antes do tombstone e preserva o job se essa limpeza falhar. Não configurar TTL que remova a fence enquanto houver operação incompleta.
+`accountDeletionFences/{uid}` é marcador mínimo, administrativo e inacessível ao cliente. É gravado antes de bloquear o perfil e impede também a recriação de `users/{uid}` por JWT residual após a exclusão Auth. O perfil raiz é removido antes de Auth, que passa a ser a última exclusão remota. Quando o perfil está ausente, o primeiro acesso consulta o job autenticado antes de liberar o convite ao cadastro; falha de consulta não afirma que a conta está liberada. Cron retém a fence e o tombstone D1 por pelo menos 24h após `completed`, acima da validade de uma hora dos ID tokens; remove a fence antes do tombstone e preserva o job se essa limpeza falhar. Não configurar TTL que remova a fence enquanto houver operação incompleta.
 
 Limites por passo: um vínculo Drive por execução, até 20 exclusões Firestore e orçamento de 35 segundos/30 chamadas; lease de 120 segundos. Cron processa uma conta por invocação, mais no máximo um guard abandonado e uma retenção expirada. O limite Free de 50 chamadas externas é por invocação inteira, não por conta. O orçamento anterior de 100 era incompatível com esse limite; a falha real observada foi categorizada como indisponibilidade administrativa, sem diagnóstico remoto que comprove sua causa exata. A correção reserva chamadas para tokens/manutenção e ordena jobs por próxima tentativa/último progresso, evitando que uma árvore grande monopolize a fila. Progresso parcial bem-sucedido zera falhas anteriores. Árvores usuais avançam por reinspeção e remoção das primeiras páginas, incluindo `showMissing=true`. Consumo do orçamento sem nenhuma remoção gera erro explícito para revisão, em vez de espera infinita. Orçamento não permite avançar para Auth sem confirmar árvore vazia. Erro remoto na última chamada não pode ser confundido com yield. Erro 404 de enumeração é falha de dependência, nunca prova de ausência. Limites de fanout/profundidade e árvores que não progridem exigem investigação operacional. Referência: [limites Workers](https://developers.cloudflare.com/workers/platform/limits/).
 

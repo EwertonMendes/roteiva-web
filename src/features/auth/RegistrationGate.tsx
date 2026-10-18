@@ -6,6 +6,7 @@ import { useAuth } from "./AuthProvider";
 import { AuthLayout } from "./AuthLayout";
 import { RegistrationPage, type RegistrationValues } from "./RegistrationPage";
 import { AccountDeletionPending } from './AccountDeletionPending';
+import { fetchAccountDeletionStatus } from '../settings/AccountDeletionAction';
 
 type Status = "checking" | "registered" | "missing" | "deleting" | "error";
 type ProfileContext = {
@@ -30,7 +31,12 @@ export function RegistrationGate({children}: {children: ReactNode}) {
     setStatus("checking");
     setError("");
     repository.loadProfile()
-      .then(result=>{if(active){setProfile(result);setStatus(result?.deletionState==="deleting"?"deleting":result?"registered":"missing");}})
+      .then(async result=>{
+        // The profile is removed before Auth. A durable job still closes the
+        // workspace while the final identity step is being retried.
+        const deleting=result?.deletionState==='deleting'||(!result&&(await fetchAccountDeletionStatus()).operation!==null);
+        if(active){setProfile(result);setStatus(deleting?'deleting':result?'registered':'missing');}
+      })
       .catch(reason=>{if(active){setError(dataErrorMessage(reason));setStatus("error");}});
     return ()=>{active=false;};
   },[repository,attempt]);
