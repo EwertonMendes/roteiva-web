@@ -4,23 +4,30 @@ import { clearIndexedDbPersistence, connectFirestoreEmulator, getFirestore, init
 
 export const appMode = import.meta.env.VITE_APP_MODE;
 export const isDemo = appMode === "demo";
-export const CACHE_CONSENT_KEY = "roteiva-private-cache";
+/** Persistent cache is an internal optimization, not a user preference.
+ * Firestore falls back to volatile memory in browsers without persistence.
+ */
 export function persistentCacheEnabled(): boolean {
-  try { return typeof window !== "undefined" && localStorage.getItem(CACHE_CONSENT_KEY) === "enabled"; }
-  catch { return false; }
+  return typeof window !== "undefined";
 }
 /** Must run before navigating to a different account while persistent storage is active. */
 export async function purgePrivateCache(): Promise<void> {
   if (!persistentCacheEnabled()) return;
   const {app,db} = firebaseServices();
-  await terminate(db);
-  await clearIndexedDbPersistence(db);
+  // Invalidate manifests first: another tab may prevent IndexedDB deletion,
+  // but no old snapshot can be reused without a fresh server revision.
   try {
     for (const key of Object.keys(localStorage)) {
-      if (key.startsWith("roteiva-cache-v2:")) localStorage.removeItem(key);
+      if (key.startsWith("roteiva-cache-v2:") || key === "roteiva-private-cache")
+        localStorage.removeItem(key);
     }
-  } catch { /* Storage inaccessible: no reusable manifest can be read. */ }
-  await deleteApp(app);
+  } catch { /* Inaccessible storage cannot supply a reusable manifest. */ }
+  await terminate(db);
+  try {
+    await clearIndexedDbPersistence(db);
+  } finally {
+    await deleteApp(app);
+  }
 }
 export const useEmulators = import.meta.env.VITE_USE_EMULATORS === "true";
 export function firebaseServices() {

@@ -64,7 +64,11 @@ test("semantic icon labels remain accessible, responsive and functional", async 
     await expect(label).toBeVisible();
     await expect(label.locator("svg[aria-hidden='true']")).toHaveCount(1);
   }
-  await expect(page.getByText("Cache neste dispositivo", { exact: false })).toBeVisible();
+  const danger=page.getByRole("region",{name:"Zona de perigo"});
+  await expect(danger).toBeVisible();
+  await expect(danger.locator(".settings-danger-eyebrow svg")).toHaveCount(1);
+  await expect(danger.getByRole("button",{name:"Excluir conta",exact:true}).locator("svg")).toHaveCount(1);
+  await expect(page.getByText("Cache neste dispositivo",{exact:false})).toHaveCount(0);
   await expect(page.getByText("Diagnóstico da sessão", { exact: false })).toHaveCount(0);
 
   // Icons are decorative and must never cause page-wide horizontal scrolling,

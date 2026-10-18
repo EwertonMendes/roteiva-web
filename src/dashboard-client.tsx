@@ -517,7 +517,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
                 : <button className="primary-button" onClick={startProject}><Plus size={17} /> Criar projeto</button>}
             </div>
           </div>
-          {view === "settings" && <SettingsPage profile={profile} email={email} photoURL={photoURL} theme={theme} toggleTheme={toggleTheme} workspace={workspace} onLoadWorkspace={onLoadWorkspace} cloudStatus={isDemo ? saveStatus : cloudStatus || ""} onNotify={notify} onSaveProfile={onSaveProfile} usage={usage} />}
+          {view === "settings" && <SettingsPage profile={profile} email={email} photoURL={photoURL} theme={theme} toggleTheme={toggleTheme} onSaveProfile={onSaveProfile} />}
           {view === "overview" && <><TodayStudio clients={clientList} projects={projects} entries={financeEntries} events={calendarEvents} activities={activities} onView={changeView} overviewMetrics={overviewMetrics} /><Overview projects={projects} setView={changeView} onOpenProject={openProject} /></>}
           {view === "projects" && (selectedProject && projects.some(p => p.id === selectedProject) ? <ProjectDetail project={projects.find(p => p.id === selectedProject)!} clients={clientList} entries={financeEntries} assets={libraryAssets} events={calendarEvents} onSave={updateProject} onBack={() => changeView("projects")} onRevenue={addLinkedRevenue} onUpload={uploadAssets} onEvent={(p) => { openEvent(null, p.dueDate); }} uploading={uploading} /> : <ProjectsView projects={filtered.map(p => ({...p, files: libraryAssets.filter(a => a.projectId === p.id).length}))}
                   statusFilter={statusFilter} setStatusFilter={(status)=>{
