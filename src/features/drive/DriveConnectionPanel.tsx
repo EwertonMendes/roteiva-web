@@ -323,13 +323,13 @@ export function DriveConnectionPanel({
         </div>
       </aside>
       <DriveFileExplorer folderName={viewing?.folderName} path={viewPath} files={files} loading={fileBusy} hasMore={!!filePage}
-        onBack={()=>{++fileRequest.current;setViewing(null);setFiles([]);autoOpened.current="back";}}
+        onBack={()=>{++fileRequest.current;setViewing(null);setFiles([]);autoOpened.current=(selectedProjectId||"all")+":"+(relevant[0]?.id||"");}}
         onNavigate={(id,path)=>{if(viewing)void openFiles(viewing,null,false,id,path);}}
         onOpen={openItem} onMore={()=>{if(viewing&&filePage)void openFiles(viewing,filePage,true,viewPath.at(-1)?.id||viewing.folderId,viewPath);}}/>
     </div>
     {picker&&<DriveFolderPicker projects={projects} projectId={selectedProjectId} onProjectChange={onSelectProject}
       folders={folderList} path={trail} loading={folderBusy} working={busy} canRead={!!connection}
-      hasMore={!!folderPage} linkedIds={linkedIds} error={error} onClose={closePicker}
+      hasMore={!!folderPage} mode={rootMode} onModeChange={mode=>void browse(mode,[{id:mode,name:mode==="root"?"Meu Drive":"Todas as pastas"}],null,false,mode)} linkedIds={linkedIds} error={error} onClose={closePicker}
       onNavigate={(id,path)=>void browse(id,path)} onMore={()=>void browse(trail.at(-1)?.id||"root",trail,folderPage,true)}
       onLink={linkFolders} onConnect={()=>void connect(selectedProjectId)}/>}
     {preview&&<DrivePreview item={preview} onClose={()=>setPreview(null)}/>}
