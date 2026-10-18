@@ -28,6 +28,21 @@ export function driveFileUrl(file:DriveItem) {
   return fallback;
 }
 export const isPreviewable=(item:DriveItem)=>item.mimeType!==DRIVE_FOLDER && !item.mimeType.startsWith("application/vnd.google-apps.");
+export function readableFileType(mime:string){
+  if(mime===DRIVE_FOLDER)return "Pasta";
+  if(mime==="application/pdf")return "PDF";
+  if(mime.startsWith("image/"))return "Imagem";
+  if(mime.startsWith("video/"))return "Vídeo";
+  if(mime.startsWith("audio/"))return "Áudio";
+  if(mime==="application/vnd.google-apps.document")return "Documento Google";
+  if(mime==="application/vnd.google-apps.spreadsheet")return "Planilha Google";
+  if(mime==="application/vnd.google-apps.presentation")return "Apresentação Google";
+  if(mime.includes("presentation"))return "Apresentação";
+  if(mime.includes("spreadsheet")||mime.includes("excel"))return "Planilha";
+  if(mime.includes("document")||mime.includes("word"))return "Documento";
+  return "Arquivo";
+}
+
 
 /** Keep overlays keyboard accessible and prevent the page behind them from scrolling. */
 function useOverlayFocus(onClose:()=>void) {
@@ -136,7 +151,7 @@ export function DriveFolderPicker({projects,projectId,onProjectChange,folders,pa
       {error&&<p role="alert" className="rl-error">{error}</p>}
       <footer className="rl-picker-footer"><span>{selected.length} {selected.length===1?"pasta selecionada":"pastas selecionadas"}</span>
         <div><button type="button" className="secondary-button" onClick={onClose} disabled={submitting}>Cancelar</button>
-          <button type="button" className="primary-button" onClick={()=>void commit()} disabled={!selected.length||!canRead||working||submitting}>{submitting?"Vinculando…":`Vincular ${selected.length||""} ${selected.length===1?"pasta":"pastas"}`}</button>
+          <button type="button" className="primary-button" onClick={()=>void commit()} disabled={!selected.length||!canRead||working||submitting}>{submitting?"Vinculando…":selected.length?`Vincular ${selected.length} ${selected.length===1?"pasta":"pastas"}`:"Vincular pastas"}</button>
         </div>
       </footer>
     </div>
@@ -176,7 +191,7 @@ export function DriveFileExplorer({folderName,path,files,loading,hasMore,onBack,
         const isFolder=file.mimeType===DRIVE_FOLDER;
         return <div className="rl-file-row" key={file.id}>
           <button type="button" className="rl-file-open" title={file.name} onClick={()=>onOpen(file)} disabled={loading}>
-            <span className="rl-file-icon"><Icon size={19}/></span><span className="rl-file-name">{file.name}<small>{isFolder?"Subpasta":file.mimeType.split("/").at(-1)?.toUpperCase()||"Arquivo"}</small></span>
+            <span className="rl-file-icon"><Icon size={19}/></span><span className="rl-file-name">{file.name}<small>{isFolder?"Subpasta":readableFileType(file.mimeType)}{!isFolder&&readableSize(file.size)?" · "+readableSize(file.size):""}</small></span>
           </button>
           <time>{file.modifiedTime?new Date(file.modifiedTime).toLocaleDateString("pt-BR"):"—"}</time>
           <span className="rl-file-size">{readableSize(file.size)||"—"}</span>
