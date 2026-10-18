@@ -13,7 +13,9 @@ export async function tokenRequest(env: Env, fields: Record<string,string>, fetc
     response = await fetcher('https://oauth2.googleapis.com/token', {
       method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'},
       body:new URLSearchParams({...fields, client_id:env.GOOGLE_CLIENT_ID, client_secret:env.GOOGLE_CLIENT_SECRET}),
-      signal:AbortSignal.timeout(10000),
+      // Unlike Drive metadata GETs, token POSTs must never forward a client
+      // secret or refresh token to a redirect destination.
+      redirect:'manual',signal:AbortSignal.timeout(10000),
     });
   } catch (error) {
     // Distinguish token transport from Drive REST transport. Never copy the
@@ -21,6 +23,7 @@ export async function tokenRequest(env: Env, fields: Record<string,string>, fetc
     throw new ApiError(502,
       error instanceof Error && error.name === 'TimeoutError' ? 'google_token_timeout' : 'google_token_transport_failed');
   }
+  if (response.status >= 300 && response.status < 400) throw new ApiError(502,'google_token_redirect_blocked');
   // Google's OAuth error code is a finite vocabulary. Never log provider bodies,
   // token URLs, headers, credentials, or descriptions from untrusted responses.
   const result = await response.json().catch(()=>null) as (Tokens & {error?:string}) | null;
