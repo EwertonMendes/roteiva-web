@@ -77,7 +77,7 @@ export function DriveThumbnail({item,scope,getThumbnail}:{item:DriveItem;scope:s
     observer.observe(ref.current);
     return ()=>{live=false;observer.disconnect();};
   },[key,available,getThumbnail]);
-  return <span className={"rl-file-icon"+(src?" rl-file-icon--image":"")} ref={ref}>
+  return <span className={"rl-file-icon"+(src?" rl-file-icon--image":"")} ref={ref} data-mime={item.mimeType}>
     {src?<img src={src} alt="" loading="lazy" decoding="async"/>:<Icon size={20}/>}
     {item.mimeType.startsWith("video/")&&<span className="rl-video-mark" aria-hidden="true"><Play size={11} fill="currentColor"/></span>}
   </span>;
