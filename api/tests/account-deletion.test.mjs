@@ -68,3 +68,46 @@ test('Firestore recursive deletion preserves root while deleting nested descenda
  assert.ok(!removed.some(x=>x.endsWith('/users/user-A')));
  assert.ok(calls.every(x=>x.url.startsWith(origin)));
 });
+
+
+test("full deletion saga is resumable, verifies service calls and leaves another user's records untouched",async t=>{
+ const {privateKey}=await generateKeyPair('RS256',{extractable:true});
+ const db=database();t.after(db.close);
+ const stamp=Date.now();
+ db.sql.prepare("INSERT INTO drive_connections(id,owner_uid,google_account_id,google_email,status,scopes,created_at,updated_at) VALUES(?,?,?,?,'connected','readonly',?,?)")
+  .run('account-B-connection','other-user','other-google','b@example.com',stamp,stamp);
+ const env={DB:db.DB,ENVIRONMENT:'dev',FIREBASE_PROJECT_ID:'roteiva-web-dev',
+   ACCOUNT_DELETION_ENABLED:'true',
+   FIREBASE_ADMIN_CREDENTIALS_JSON:JSON.stringify({type:'service_account',project_id:'roteiva-web-dev',
+     client_email:'test@roteiva-web-dev.iam.gserviceaccount.com',private_key:await exportPKCS8(privateKey),
+     token_uri:'https://oauth2.googleapis.com/token'})};
+ const orig=globalThis.fetch;
+ const calls=[];
+ globalThis.fetch=async(input,init={})=>{
+   const url=String(input);calls.push({url,method:init.method||'GET'});
+   if(url==='https://oauth2.googleapis.com/token')return Response.json({access_token:'synthetic-admin-token'});
+   if(url.includes('firestore.googleapis.com')){
+     if(url.endsWith(':listCollectionIds'))return Response.json({collectionIds:[]});
+     return Response.json({});
+   }
+   if(url.includes('identitytoolkit.googleapis.com'))return Response.json({});
+   throw new Error('Unexpected external endpoint');
+ };
+ t.after(()=>{globalThis.fetch=orig;});
+ const req=new Request('https://example.test',{method:'POST',body:JSON.stringify({phrase:'EXCLUIR MINHA CONTA',acknowledged:true})});
+ const accepted=await requestDeletion(req,env,'user-A');
+ assert.equal(accepted.status,202);
+ assert.equal(db.sql.prepare('SELECT phase FROM account_deletions WHERE owner_uid=?').get('user-A').phase,'revoking');
+ await assert.rejects(()=>assertNotDeleting(env,'user-A'),e=>e.code==='account_deleting');
+ await runPendingDeletions(env); // revocation
+ assert.equal(db.sql.prepare('SELECT phase FROM account_deletions WHERE owner_uid=?').get('user-A').phase,'firestore');
+ await runPendingDeletions(env); // verify empty and advance
+ assert.equal(db.sql.prepare('SELECT phase FROM account_deletions WHERE owner_uid=?').get('user-A').phase,'identity');
+ await runPendingDeletions(env); // identity, root marker, completed
+ assert.equal(db.sql.prepare('SELECT phase FROM account_deletions WHERE owner_uid=?').get('user-A').phase,'completed');
+ assert.equal(db.sql.prepare('SELECT count(*) AS n FROM drive_connections WHERE owner_uid=?').get('other-user').n,1);
+ const accountDeletion=calls.findIndex(x=>x.url.includes('identitytoolkit.googleapis.com'));
+ const firestoreRootDeletion=calls.findIndex(x=>x.url.endsWith('/users/user-A') && x.method==='DELETE');
+ assert.ok(accountDeletion!==-1 && firestoreRootDeletion>accountDeletion,'Auth is deleted before the final marker');
+ assert.equal((await (await deletionStatus(env,'user-A')).json()).operation.status,'completed');
+});
