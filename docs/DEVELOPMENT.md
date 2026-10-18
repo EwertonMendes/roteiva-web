@@ -66,6 +66,8 @@ O runner Node usa `--test-force-exit` após todos os testes e hooks de cleanup: 
 
 `deploy-pages.yml` valida PR/push/dispatch: instalação congelada, domínio, TypeScript, builds Firebase/Pages, emuladores e navegador. Somente master fora de PR publica Pages.
 
+**Preview isolado da Biblioteca 2.0 (PR #29):** no workflow `deploy-pages.yml`, somente a PR #29 da branch interna `feat/library-explorer-ux`, após sucesso integral da validação, pode usar a identidade já protegida do ambiente `firebase-development` para executar `firebase hosting:channel:deploy pr-29 --project roteiva-web-dev --expires 7d --non-interactive`. O comando publica **apenas Hosting no canal temporário**, nunca o canal `live`, as regras Firestore, os índices ou o Worker. O endereço gerado vem dos logs de execução, não é o URL normal do DEV. O preview é público na web, mas mantém Firebase Auth/Firestore e API DEV existentes; o login Google poderá exigir que o domínio temporário seja autorizado em Firebase Authentication, a confirmar sem conceder permissões extras. Não testar dados sigilosos antes dessa verificação. A PR continua não mesclada enquanto o dono não aprovar o visual.
+
 `deploy-firebase.yml` aguarda sucesso do workflow CI após push na master, faz checkout **do SHA validado**, confere o ID DEV e publica regras, índices e Hosting. Dispatch manual somente na master executa os testes completos novamente antes de publicar. Environment final: `firebase-development`; o antigo nome `firebase-production` não identificava um projeto PROD e não é usado no workflow novo.
 
 Configuração de repositório reaproveitada:
