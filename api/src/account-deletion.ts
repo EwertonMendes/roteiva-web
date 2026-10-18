@@ -9,7 +9,7 @@ const MAX_ATTEMPTS=10;
 
 export async function assertNotDeleting(env:Env,uid:string):Promise<void>{
   const job=await env.DB.prepare('SELECT phase FROM account_deletions WHERE owner_uid=?').bind(uid).first<{phase:Phase}>();
-  if(job&&job.phase!=='completed')throw new ApiError(409,'account_deleting');
+  if(job)throw new ApiError(409,'account_deleting');
 }
 export async function deletionStatus(env:Env,uid:string):Promise<Response>{
   const row=await env.DB.prepare('SELECT operation_id,phase,created_at FROM account_deletions WHERE owner_uid=?')
