@@ -1,11 +1,8 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { ArrowUpRight, Check, Cloud, Download, LockKeyhole, Moon, ShieldCheck, Sun, UserRound, Video, Info, Building2, BriefcaseBusiness, HardDrive } from "lucide-react";
+import { ArrowUpRight, Check, Cloud, LockKeyhole, Moon, ShieldCheck, Sun, UserRound, Video, Info, Building2, BriefcaseBusiness, AlertTriangle } from "lucide-react";
 import type { ProfileChanges, ProfessionalType, RoteivaProfile } from "../../data/firestore-workspace";
 import { dataErrorMessage } from "../../data/firestore-workspace";
-import type { FirestoreUsage } from "../../data/firestore-usage";
-import { WorkspaceTools } from "../../studio-features";
 import { IconLabel } from "../ui/IconLabel";
-import { CACHE_CONSENT_KEY, persistentCacheEnabled, purgePrivateCache } from "../../lib/firebase";
 import { AccountDeletionAction } from "./AccountDeletionAction";
 
 const occupations:{value:ProfessionalType;label:string}[]=[
@@ -19,32 +16,14 @@ type SettingsProps={
   profile?: RoteivaProfile | null;
   email:string; photoURL?:string;
   theme:"light"|"dark"; toggleTheme:()=>void;
-  workspace:object; onLoadWorkspace?:()=>Promise<object>; cloudStatus:string; onNotify:(message:string)=>void;
   onSaveProfile?:(changes:ProfileChanges)=>Promise<void>;
-  usage?:Readonly<FirestoreUsage>;
 };
 
-export function SettingsPage({profile,email,photoURL,theme,toggleTheme,workspace,onLoadWorkspace,cloudStatus,onNotify,onSaveProfile}:SettingsProps){
+export function SettingsPage({profile,email,photoURL,theme,toggleTheme,onSaveProfile}:SettingsProps){
   const [name,setName]=useState(profile?.displayName||"");
   const [studio,setStudio]=useState(profile?.studioName||"");
   const [occupation,setOccupation]=useState<ProfessionalType>(profile?.professionalType||"freelancer");
   const [busy,setBusy]=useState(false);
-  const [localCache,setLocalCache]=useState(persistentCacheEnabled);
-  const [cacheBusy,setCacheBusy]=useState(false);
-  const [cacheError,setCacheError]=useState("");
-  async function changePrivateCache(enable:boolean) {
-    if (!onSaveProfile || cacheBusy) return;
-    setCacheBusy(true);setCacheError("");
-    try {
-      if (!enable) await purgePrivateCache();
-      localStorage.setItem(CACHE_CONSENT_KEY, enable ? "enabled" : "disabled");
-      setLocalCache(enable);
-      window.location.reload();
-    } catch {
-      setCacheError("Não foi possível limpar o cache privado. Feche outras abas do Roteiva e tente novamente.");
-      setCacheBusy(false);
-    }
-  }
   const [feedback,setFeedback]=useState<{kind:"success"|"error";message:string}|null>(null);
   useEffect(()=>{
     setName(profile?.displayName||"");setStudio(profile?.studioName||"");
@@ -136,25 +115,16 @@ export function SettingsPage({profile,email,photoURL,theme,toggleTheme,workspace
       </div>
     </section>
 
-    <section className="settings-editor settings-privacy" aria-labelledby="settings-privacy-title">
+    {onSaveProfile&&<section className="settings-editor settings-danger-zone" aria-labelledby="settings-danger-title">
       <div className="settings-section-head">
-        <div><span className="settings-index">04 / CONTROLE</span><h3 id="settings-privacy-title">Dados e privacidade</h3><p>Você mantém o controle sobre as informações do seu espaço.</p></div>
-        <LockKeyhole size={20} strokeWidth={1.5}/>
-      </div>
-      <div className="settings-privacy-row">
-        <div><strong><Download size={16}/> Exportar dados do espaço</strong><p>Baixe uma cópia dos seus registros para guardar com você. Os arquivos do Google Drive não fazem parte desta cópia.</p></div>
-        <WorkspaceTools workspace={workspace} loadWorkspace={onLoadWorkspace} status={cloudStatus} onNotify={onNotify}/>
-      </div>
-      {onSaveProfile && <div className="settings-privacy-row">
-        <div><strong><HardDrive size={16} aria-hidden="true"/> Cache neste dispositivo</strong>
-          <p>Guarde uma cópia dos seus registros neste navegador para abrir seu espaço mais rápido. Ative apenas em um dispositivo pessoal. Ao desativar, a cópia deste navegador será apagada.</p>
+        <div><span className="settings-danger-eyebrow"><AlertTriangle size={14}/> AÇÕES IRREVERSÍVEIS</span>
+          <h3 id="settings-danger-title">Zona de perigo</h3>
+          <p>Alterações nesta área podem resultar na perda permanente dos seus dados.</p>
         </div>
-        <button type="button" className="secondary-button" disabled={cacheBusy || busy}
-          onClick={()=>void changePrivateCache(!localCache)}>{cacheBusy?"Aplicando…":localCache?"Desativar cache":"Ativar cache"}</button>
-      </div>}
-      {cacheError && <p role="alert" className="settings-feedback settings-feedback-error">{cacheError}</p>}
-      {onSaveProfile&&<AccountDeletionAction/>}
-    </section>
+        <AlertTriangle size={21} strokeWidth={1.65} aria-hidden="true"/>
+      </div>
+      <AccountDeletionAction/>
+    </section>}
     <footer className="settings-footer"><Cloud size={14}/>{onSaveProfile?"ROTEIVA · SEU ESPAÇO PRIVADO":"ROTEIVA DEMO · SOMENTE NESTE NAVEGADOR"}</footer>
   </div>;
 }
