@@ -288,15 +288,15 @@ test("Pages stays anonymous and uses the unchanged localStorage key",async({page
   await page.screenshot({path:info.outputPath("demo.png"),fullPage:true});
 });
 
-test("persistent cache is opt-in, survives refresh, and is cleared on logout",async({page},info)=>{
+test("automatic persistent cache is isolated per UID, survives reload and clears on logout",async({page},info)=>{
   await page.goto(cloud);
   await login(page,"cache-"+info.project.name+"@example.com");
   await page.goto(cloud+"/configuracoes");
-  await expect(page.getByRole("button",{name:"Ativar cache"})).toBeVisible();
-  await page.getByRole("button",{name:"Ativar cache"}).click();
-  await expect(page.locator(".app-shell")).toBeVisible();
-  await expect(page.getByRole("button",{name:"Desativar cache"})).toBeVisible();
-  await expect.poll(()=>page.evaluate(()=>localStorage.getItem("roteiva-private-cache"))).toBe("enabled");
+  await expect(page.getByRole("heading",{name:"Zona de perigo"})).toBeVisible();
+  await expect(page.getByRole("button",{name:/Ativar cache|Desativar cache|Exportar cópia/})).toHaveCount(0);
+  // Legacy opt-out is deliberately ignored. Persistence is not a user setting.
+  await page.evaluate(()=>localStorage.setItem("roteiva-private-cache","disabled"));
+  await page.reload();await settled(page);
   await page.goto(cloud+"/clientes");
   await page.getByRole("button",{name:"Novo cliente",exact:true}).click();
   await page.getByLabel("Nome do cliente",{exact:true}).fill("Cliente cache seguro");
@@ -305,34 +305,30 @@ test("persistent cache is opt-in, survives refresh, and is cleared on logout",as
   await page.reload();await settled(page);
   await expect(page.getByText("Cliente cache seguro",{exact:true}).first()).toBeVisible();
   await logout(page);
-  await expect.poll(()=>page.evaluate(()=>localStorage.getItem("roteiva-private-cache"))).toBe("enabled");
-  // On shared browsers the opted-in setting remains, but account data is cleared.
+  await expect.poll(()=>page.evaluate(()=>Object.keys(localStorage).filter(key=>key.startsWith("roteiva-cache-v2:")))).toEqual([]);
+  await expect.poll(()=>page.evaluate(()=>localStorage.getItem("roteiva-private-cache"))).toBe(null);
   await login(page,"cache-other-"+info.project.name+"@example.com");
   await page.goto(cloud+"/clientes");
   await expect(page.getByText("Cliente cache seguro",{exact:true})).toHaveCount(0);
-  await page.goto(cloud+"/configuracoes");
-  await page.getByRole("button",{name:"Desativar cache"}).click();
-  await expect(page.getByRole("button",{name:"Ativar cache"})).toBeVisible();
-  await expect.poll(()=>page.evaluate(()=>localStorage.getItem("roteiva-private-cache"))).toBe("disabled");
 });
 
-test("settings deep link defers business loading but exports complete records on demand",async({page},info)=>{
+test("danger zone is separate and red, no export or cache settings remain",async({page},info)=>{
   await page.goto(cloud);
-  await login(page,"settings-lazy-"+info.project.name+"@example.com");
-  await navigate(page,"Clientes");
-  await page.getByRole("button",{name:"Novo cliente",exact:true}).click();
-  await page.getByLabel("Nome do cliente",{exact:true}).fill("Registro preservado na exportação");
-  await page.getByLabel("Contato principal",{exact:true}).fill("Teste de carga");
-  await page.getByRole("button",{name:"Salvar cliente"}).click();await settled(page);
+  await login(page,"danger-zone-"+info.project.name+"@example.com");
   await page.goto(cloud+"/configuracoes");
-  await expect(page.getByRole("heading",{name:"Perfil profissional"})).toBeVisible();
-  const promise=page.waitForEvent("download");
-  await page.getByRole("button",{name:"Exportar cópia"}).last().click();
-  const download=await promise;
-  const contents=await readFile(await download.path(),"utf8");
-  expect(contents).toContain("Registro preservado na exportação");
-  await navigate(page,"Clientes");
-  await expect(page.getByText("Registro preservado na exportação",{exact:true}).first()).toBeVisible();
+  const zone=page.getByRole("region",{name:"Zona de perigo"});
+  await expect(zone).toBeVisible();
+  await expect(page.getByText("04 / CONTROLE")).toHaveCount(0);
+  await expect(page.getByText("Dados e privacidade")).toHaveCount(0);
+  await expect(page.getByRole("button",{name:"Exportar cópia"})).toHaveCount(0);
+  await expect(page.getByRole("button",{name:/Ativar cache|Desativar cache/})).toHaveCount(0);
+  const button=zone.getByRole("button",{name:"Excluir conta",exact:true});
+  await expect(button).toBeEnabled();
+  await expect(button).toHaveCSS("background-color","rgb(186, 37, 53)");
+  await button.click();
+  await expect(page.getByRole("dialog",{name:"Excluir sua conta?"})).toBeVisible();
+  await page.getByRole("button",{name:"Cancelar"}).click();
+  await expect(page.getByRole("dialog",{name:"Excluir sua conta?"})).toHaveCount(0);
 });
 
 test("temporary read disconnection recovers without asking for manual reload",async({page,context},info)=>{
