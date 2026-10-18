@@ -15,7 +15,12 @@ export async function tokenRequest(env: Env, fields: Record<string,string>, fetc
       body:new URLSearchParams({...fields, client_id:env.GOOGLE_CLIENT_ID, client_secret:env.GOOGLE_CLIENT_SECRET}),
       signal:AbortSignal.timeout(10000),
     });
-  } catch { throw new ApiError(502,'google_unavailable'); }
+  } catch (error) {
+    // Distinguish token transport from Drive REST transport. Never copy the
+    // exception text: it may contain upstream request information.
+    throw new ApiError(502,
+      error instanceof Error && error.name === 'TimeoutError' ? 'google_token_timeout' : 'google_token_transport_failed');
+  }
   // Google's OAuth error code is a finite vocabulary. Never log provider bodies,
   // token URLs, headers, credentials, or descriptions from untrusted responses.
   const result = await response.json().catch(()=>null) as (Tokens & {error?:string}) | null;
@@ -28,7 +33,7 @@ export async function tokenRequest(env: Env, fields: Record<string,string>, fetc
     if (response.status === 429 || response.status === 503 || response.status === 502 || response.status === 500)
       throw new ApiError(503,'google_temporarily_unavailable');
     if (response.status >= 400 && response.status < 500) throw new ApiError(503,'google_oauth_rejected');
-    throw new ApiError(502,'google_unavailable');
+    throw new ApiError(502,'google_token_upstream_failed');
   }
   if (!result || typeof result.access_token !== 'string' || !result.access_token ||
       result.token_type?.toLowerCase() !== 'bearer' || !Number.isFinite(result.expires_in) ||
