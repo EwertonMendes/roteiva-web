@@ -5,6 +5,7 @@ import { firebaseServices } from "../../lib/firebase";
 import { useAuth } from "./AuthProvider";
 import { AuthLayout } from "./AuthLayout";
 import { RegistrationPage, type RegistrationValues } from "./RegistrationPage";
+import { AccountDeletionAction } from "../settings/AccountDeletionAction";
 
 type Status = "checking" | "registered" | "missing" | "deleting" | "error";
 type ProfileContext = {
@@ -79,5 +80,6 @@ export function RegistrationGate({children}: {children: ReactNode}) {
     <p className="auth-invitation">Se quiser começar, vamos cadastrar seu perfil e preparar um espaço privado.</p>
     <button className="auth-primary" type="button" onClick={()=>setShowForm(true)}>Criar meu espaço <ArrowRight size={17}/></button>
     <button className="auth-link" type="button" onClick={()=>void logout()} disabled={busy}>Voltar e usar outra conta</button>
+    <AccountDeletionAction compact />
   </AuthLayout>;
 }
