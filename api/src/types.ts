@@ -10,6 +10,8 @@ export interface Env {
   GOOGLE_CLIENT_SECRET?: string;
   TOKEN_KEYS?: string;
   TOKEN_KEY_VERSION: string;
+  ACCOUNT_DELETION_ENABLED?: string;
+  FIREBASE_ADMIN_CREDENTIALS_JSON?: string;
 }
 export class ApiError extends Error {
   status: number;
