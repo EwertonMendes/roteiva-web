@@ -108,6 +108,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
   const [eventError, setEventError] = useState("");
   const [saveStatus, setSaveStatus] = useState("Carregando dados…");
   const [libraryProject, setLibraryProject] = useState("");
+  const [linkedFolderCount, setLinkedFolderCount] = useState<number|null>(null);
   const [uploading, setUploading] = useState(false);
   const storageKey = "roteiva-pages-demo-workspace-v1";
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -479,7 +480,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
           })}
           <small className="nav-label second">FERRAMENTAS</small>
           <button className={view === "calendar" ? "active" : ""} onClick={() => changeView("calendar")}><AnimatedNavIcon icon={CalendarDays} hoverIcon={CalendarCheck2} kind="calendar" /><span>Calendário</span><em>{eventCount ?? calendarEvents.length}</em></button>
-          <button className={view === "library" ? "active" : ""} onClick={() => changeView("library")}><AnimatedNavIcon icon={Grid2X2} hoverIcon={LibraryBig} kind="library" /><span>Biblioteca</span><em>{libraryAssets.length}</em></button>
+          <button className={view === "library" ? "active" : ""} onClick={() => changeView("library")}><AnimatedNavIcon icon={Grid2X2} hoverIcon={LibraryBig} kind="library" /><span>Biblioteca</span><em>{isDemo?libraryAssets.length:linkedFolderCount??"—"}</em></button>
           <button className={view === "settings" ? "active" : ""} onClick={() => changeView("settings")}><AnimatedNavIcon icon={Settings2} hoverIcon={UserRound} kind="settings" /><span>Configurações</span></button>
         </nav>
         <div className="sidebar-profile">
@@ -492,26 +493,26 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
         <header className="topbar">
           <button className="menu-button" onClick={() => setMobileOpen(true)} aria-label="Abrir menu" aria-expanded={mobileOpen}><Menu size={20} /></button>
           <button type="button" className="workspace-switch" onClick={()=>changeView("settings")} title="Abrir configurações do estúdio" aria-label="Abrir configurações do estúdio"><span className="sync-dot">R</span><b title={workspaceName}>{workspaceName}</b><ChevronDown size={14} /></button>
-          <label className="global-search"><Search size={17} /><input value={query} onChange={(e) => {
+          {view!=="library"&&<label className="global-search"><Search size={17} /><input value={query} onChange={(e) => {
               const value=e.target.value;
               setQuery(value);
               if(value.trim() && view==="projects")onSearchProjects?.();
               if(value.trim() && view==="clients")onSearchClients?.();
-            }} placeholder="Buscar projetos, clientes ou arquivos" /><kbd><Command size={11} /> K</kbd></label>
+            }} placeholder="Buscar projetos e clientes" /><kbd><Command size={11} /> K</kbd></label>}
           {TEMPORARY_FONT_LAB_ENABLED && !isDemo && <TypographyLab />}
           <div className="top-actions"><button className="icon-button" title="Ver atividades" aria-label="Ver atividades" onClick={() => { changeView("overview"); notify(activities[0]?.text || "Nenhuma atividade ainda"); }}><Bell size={18} /></button><button className="icon-button theme-toggle" onClick={toggleTheme} aria-label={theme === "light" ? "Ativar modo escuro" : "Ativar modo claro"} title={theme === "light" ? "Modo escuro" : "Modo claro"}>{theme === "light" ? <Moon size={18} /> : <Sun size={18} />}</button><button className="primary-button" onClick={startProject}><Plus size={17} /> Novo projeto</button></div>
         </header>
 
         <section className="page">
-          {isDemo ? <div className="pages-demo-notice" role="note"><b>Modo demonstração</b><span>Projetos, clientes, agenda e financeiro ficam salvos apenas neste navegador. Sem login, sincronização, uploads ou links públicos de aprovação.</span></div> : <div className="cloud-banner" role="status"><b>Roteiva DEV</b><span>{cloudStatus}</span></div>}
+          {isDemo ? <div className="pages-demo-notice" role="note"><b>Modo demonstração</b><span>Projetos, clientes, agenda e financeiro ficam salvos apenas neste navegador. Sem login, sincronização, uploads ou links públicos de aprovação.</span></div> : view!=="library" ? <div className="cloud-banner" role="status"><b>Roteiva DEV</b><span>{cloudStatus}</span></div> : null}
           <div className="page-heading">
             <div><span className="eyebrow">ROTEIVA / {view === "overview" ? "PAINEL" : pageTitles[view][0].toUpperCase()}</span><h1>{pageTitles[view][0]}</h1><p>{pageTitles[view][1]}</p></div>
             <div className="heading-actions">
-              {view !== "settings" && <WorkspaceTools workspace={workspace} loadWorkspace={onLoadWorkspace} status={isDemo ? saveStatus : cloudStatus || ""} onNotify={notify} />}
+              {view !== "settings" && view !== "library" && <WorkspaceTools workspace={workspace} loadWorkspace={onLoadWorkspace} status={isDemo ? saveStatus : cloudStatus || ""} onNotify={notify} />}
               {view === "settings" ? null : view === "clients" ? <button className="primary-button" onClick={() => { setEditingClient(null); setClientModalOpen(true); }}><UserRoundPlus size={17} /> Novo cliente</button>
                 : view === "finance" ? <button className="primary-button" onClick={() => openFinanceModal()}><Plus size={17} /> Nova receita</button>
                 : view === "calendar" ? <button className="primary-button" onClick={() => openEvent()}><Plus size={17} /> Novo compromisso</button>
-                : view === "library" ? <><select aria-label="Projeto dos arquivos" value={libraryProject} onChange={e => setLibraryProject(e.target.value)}><option value="">Sem projeto</option>{projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>{isDemo && <label className="primary-button upload-button"><Upload size={17} /> {uploading ? "Enviando…" : "Adicionar arquivos"}<input type="file" disabled multiple onChange={(event) => { uploadAssets(event.target.files, Number(libraryProject) || undefined); event.target.value = ""; }} /></label>}</>
+                : view === "library" ? <><select aria-label="Projeto dos arquivos" value={libraryProject} onChange={e => setLibraryProject(e.target.value)}><option value="">Todos os projetos</option>{projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>{isDemo && <label className="primary-button upload-button"><Upload size={17} /> {uploading ? "Enviando…" : "Adicionar arquivos"}<input type="file" disabled multiple onChange={(event) => { uploadAssets(event.target.files, Number(libraryProject) || undefined); event.target.value = ""; }} /></label>}</>
                 : <button className="primary-button" onClick={startProject}><Plus size={17} /> Criar projeto</button>}
             </div>
           </div>
@@ -533,7 +534,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
           {view === "reviews" && <StudioReviews />}
           {view === "finance" && <FinancePanel entries={financeEntries} clients={clientList} onPeriodChange={onFinancePeriodChange} serverBars={financeBars} onAdd={() => openFinanceModal()} onEdit={(entry) => openFinanceModal(entry)} onDelete={setDeletingFinanceEntry} />}
           {view === "calendar" && <CalendarView events={calendarEvents} onMonthChange={onCalendarMonthChange} onAdd={(date) => openEvent(null, date)} onEdit={(entry) => openEvent(entry)} onDelete={(entry) => { if (window.confirm(`Excluir o compromisso “${entry.title}”?`)) { commitCommands([{kind:"deleteEvent",id:entry.id}]); setCalendarEvents(current => current.filter(e => e.id !== entry.id)); logActivity(`Compromisso excluído: ${entry.title}`); } }} />}
-          {view === "library" && <LibraryView assets={libraryAssets} query={query} onUpload={(files) => uploadAssets(files, Number(libraryProject) || undefined)} projects={projects} selectedProjectId={Number(libraryProject)||undefined} onSelectProject={setLibraryProject} />}
+          {view === "library" && <LibraryView assets={libraryAssets} query={query} onUpload={(files) => uploadAssets(files, Number(libraryProject) || undefined)} projects={projects} selectedProjectId={Number(libraryProject)||undefined} onSelectProject={setLibraryProject} onLinkedFolderCountChange={setLinkedFolderCount} />}
         </section>
       </main>
 
@@ -718,7 +719,7 @@ function assetIcon(kind: AssetKind) {
   return kind === "Vídeo" ? FileVideo : kind === "Imagem" ? ImageIcon : kind === "Áudio" ? FileAudio : FileText;
 }
 
-function LibraryView({ assets, query, onUpload, projects, selectedProjectId, onSelectProject }: { assets: LibraryAsset[]; query: string; onUpload: (files: FileList | null) => void; projects: readonly Project[]; selectedProjectId?:number; onSelectProject:(id:string)=>void }) {
+function LibraryView({ assets, query, onUpload, projects, selectedProjectId, onSelectProject, onLinkedFolderCountChange }: { assets: LibraryAsset[]; query: string; onUpload: (files: FileList | null) => void; projects: readonly Project[]; selectedProjectId?:number; onSelectProject:(id:string)=>void; onLinkedFolderCountChange?:(count:number)=>void }) {
   const [kind, setKind] = useState<AssetKind | "Todos">("Todos");
   const [layout, setLayout] = useState<"grid" | "list">("grid");
   const [sort, setSort] = useState("recent");
@@ -727,7 +728,7 @@ function LibraryView({ assets, query, onUpload, projects, selectedProjectId, onS
   const kinds: (AssetKind | "Todos")[] = ["Todos", "Vídeo", "Imagem", "Áudio", "Documento"];
 
   return <div className="library-layout">
-    {!isDemo && (!useEmulators || (import.meta.env.MODE === "emulator" && new URLSearchParams(window.location.search).get("driveE2E") === "1")) && <DriveConnectionPanel projects={projects} selectedProjectId={selectedProjectId} onSelectProject={onSelectProject} />}
+    {!isDemo && (!useEmulators || (import.meta.env.MODE === "emulator" && new URLSearchParams(window.location.search).get("driveE2E") === "1")) && <DriveConnectionPanel projects={projects} selectedProjectId={selectedProjectId} onSelectProject={onSelectProject} onLinkedFolderCountChange={onLinkedFolderCountChange} />}
     {(isDemo || assets.length>0) && <>
     <div className="library-summary"><article><span><HardDrive size={18} /></span><div><small>ARQUIVOS</small><b>{assets.length}</b></div></article><article><span><Film size={18} /></span><div><small>ARMAZENAMENTO</small><b>{totalMb >= 1024 ? `${(totalMb / 1024).toFixed(1)} GB` : `${Math.round(totalMb)} MB`}</b></div></article><article><span><CalendarDays size={18} /></span><div><small>ADICIONADOS ESTE MÊS</small><b>{assets.filter(a => toISOAdded(a.addedAt).slice(0,7) === new Date().toLocaleDateString("en-CA").slice(0,7)).length}</b></div></article></div>
     <section className="panel library-panel">
