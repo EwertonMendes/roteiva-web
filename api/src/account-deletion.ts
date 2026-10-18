@@ -130,6 +130,12 @@ export async function runPendingDeletions(env:Env):Promise<void>{
       console.error(JSON.stringify({event:'account_deletion_scheduler_failure'}));
     }
   }
+  // A stalled deletion must not be invisible to operations. This log contains
+  // only an aggregate count, never account identifiers or personal data.
+  const review=await env.DB.prepare("SELECT COUNT(*) AS total FROM account_deletions WHERE phase='manual_review'")
+    .first<{total:number}>();
+  if(review&&review.total>0)
+    console.error(JSON.stringify({event:'account_deletion_manual_review_pending',count:review.total}));
   // Minimal operational tombstone: 24h for idempotent status/recovery.
   await env.DB.prepare("DELETE FROM account_deletions WHERE phase='completed' AND completed_at<?")
     .bind(now-86400000).run();
