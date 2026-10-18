@@ -1,5 +1,4 @@
 import {test,expect,type Page} from "./fixtures";
-import {readFile} from "node:fs/promises";
 const cloud="http://127.0.0.1:4173";
 async function googlePopup(page:Page,email:string,existing=false) {
   const popupPromise=page.waitForEvent("popup");
