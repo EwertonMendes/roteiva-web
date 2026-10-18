@@ -65,7 +65,7 @@ async function revokeConnections(env:Env,uid:string):Promise<boolean>{
       catch{throw new ApiError(503,'google_revocation_unavailable');}
       if(!response.ok){
         const code=(await response.json().catch(()=>({}))) as {error?:string};
-        if(code.error!=='invalid_token')throw new ApiError(503,'google_revocation_unavailable');
+        if(response.status!==400||code.error!=='invalid_token')throw new ApiError(503,'google_revocation_unavailable');
       }
     }
     await env.DB.prepare('DELETE FROM drive_connections WHERE owner_uid=? AND id=?').bind(uid,row.id).run();
@@ -123,6 +123,15 @@ export async function advanceDeletion(env:Env,uid:string):Promise<void>{
 export async function runPendingDeletions(env:Env):Promise<void>{
   if(!deletionConfigured(env))return;
   const now=Date.now();
+  // Failed callbacks must not retain recoverable OAuth credentials indefinitely,
+  // even if the account never requests deletion. Live callbacks finish well
+  // before this grace period; ambiguous exchanges remain for manual review.
+  const orphanGrants=await env.DB.prepare('SELECT DISTINCT owner_uid FROM oauth_exchange_guards WHERE started_at<? AND encrypted_token IS NOT NULL LIMIT 5')
+    .bind(now-900000).all<{owner_uid:string}>();
+  for(const row of orphanGrants.results){
+    try{await revokeGuard(env,row.owner_uid);}
+    catch{console.error(JSON.stringify({event:'oauth_exchange_revocation_retry'}));}
+  }
   const rows=await env.DB.prepare("SELECT owner_uid FROM account_deletions WHERE phase NOT IN ('completed','manual_review') AND lease_until<? AND next_attempt_at<=? ORDER BY created_at LIMIT 10")
     .bind(now,now).all<{owner_uid:string}>();
   for(const row of rows.results){

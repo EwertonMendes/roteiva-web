@@ -105,6 +105,8 @@ Limites por passo: um vínculo Drive por execução, até 20 exclusões Firestor
 
 A migração aditiva `0006_deletion_recovery.sql` preserva `failed_phase`, bloqueia transações OAuth tardias e cria `oauth_exchange_guards`. Antes de trocar um código Google, o callback cria um guard durável; credenciais emitidas são guardadas criptografadas até persistência do vínculo. A exclusão espera esses guards e revoga o token retido antes de limpar vínculos. Interrupção na janela entre emissão remota e persistência deixa guard sem token: após dois minutos produz `oauth_exchange_unresolved` e, esgotadas as tentativas, requer revisão; **não** declara revogação nem conclusão. O operador precisa confirmar/revogar a concessão Google antes de remover somente esse guard. Guards de callbacks malsucedidos também precisam de reconciliação e não devem ser descartados por expiração automática.
 
+O Cron também reconcilia tokens de callbacks falhos após 15 minutos, mesmo sem exclusão solicitada, por revogação efetiva e remoção do guard. Guards sem token não são descartados; o monitor alerta para qualquer guard com mais de 15 minutos. Nenhuma credencial é considerada revogada apenas porque o callback falhou.
+
 ## Operação e alerta
 
 Logs de aplicação categóricos têm sampling 100%, com logs de invocação desativados. `account_deletion_manual_review_pending` contém apenas contagem. O workflow `Monitor account deletion DEV`, na `master`, consulta somente contagens D1 a cada 15 minutos e falha diante de revisão manual ou ausência de progresso por duas horas. GitHub pode atrasar schedules; a entrega de notificações depende das preferências de Actions dos responsáveis e precisa ser confirmada operacionalmente. O workflow não é prova de alerta entregue.

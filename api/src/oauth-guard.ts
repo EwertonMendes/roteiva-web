@@ -32,7 +32,7 @@ export async function revokeGuard(env:Env,uid:string):Promise<boolean>{
   catch{throw new ApiError(503,'google_revocation_unavailable');}
   if(!response.ok){
     const body=await response.json().catch(()=>({})) as {error?:string};
-    if(body.error!=='invalid_token')throw new ApiError(503,'google_revocation_unavailable');
+    if(response.status!==400||body.error!=='invalid_token')throw new ApiError(503,'google_revocation_unavailable');
   }
   await finishExchange(env,uid,row.exchange_id);
   return false; // Yield after one remote revocation; recheck on the next tick.
