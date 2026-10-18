@@ -11,7 +11,9 @@ a palavra, isoladamente, nunca autoriza uma exclusão.
 
 - `POST /account/deletion`: determina o UID pelo Firebase ID token assinado,
   testa credenciais administrativas, registra operação com UID único no D1,
-  bloqueia o documento `users/{uid}` no Firestore e responde HTTP 202.
+  tenta bloquear o documento `users/{uid}` no Firestore e responde HTTP 202
+  após persistir o pedido. Se o bloqueio falhar, o estado `locking` é
+  retomado pelo Cron e nunca é confundido com exclusão concluída.
 - `GET /account/deletion/status`: devolve disponibilidade e situação;
   não retorna tokens, nomes de arquivos ou dados privados.
 - Cloudflare Cron executa `runPendingDeletions` uma vez por minuto; cada

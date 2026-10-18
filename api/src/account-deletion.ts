@@ -34,8 +34,11 @@ export async function requestDeletion(request:Request,env:Env,uid:string):Promis
   await advanceDeletion(env,uid);
   const job=await env.DB.prepare('SELECT operation_id,phase FROM account_deletions WHERE owner_uid=?')
     .bind(uid).first<{operation_id:string;phase:Phase}>();
-  if(!job||job.phase==='locking')throw new ApiError(503,'deletion_not_locked');
-  return Response.json({status:job.phase==='completed'?'completed':'processing',operationId:job.operation_id},{status:job.phase==='completed'?200:202});
+  if(!job)throw new ApiError(503,'deletion_state_unavailable');
+  // The durable D1 request is irreversible once created. If Firestore is
+  // temporarily unavailable, the cron will keep retrying the lock.
+  const status=job.phase==='completed'?'completed':job.phase==='manual_review'?'manual_review':'processing';
+  return Response.json({status,operationId:job.operation_id},{status:status==='completed'?200:202});
 }
 async function changePhase(env:Env,job:Job,lease:string,phase:Phase){
   const now=Date.now();

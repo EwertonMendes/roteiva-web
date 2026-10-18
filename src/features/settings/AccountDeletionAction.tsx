@@ -75,10 +75,10 @@ export function AccountDeletionAction({compact=false}:{compact?:boolean}){
       provider.setCustomParameters({prompt:"select_account"});
       await reauthenticateWithPopup(user,provider);
       if(firebaseServices().auth.currentUser?.uid!==user.uid)throw new Error("A conta Google autenticada é diferente da sua conta Roteiva.");
-      const response=await api<{status:string;operationId:string}>("/account/deletion","POST",
+      const response=await api<{status:"processing"|"completed"|"manual_review";operationId:string}>("/account/deletion","POST",
         {phrase:CONFIRM,acknowledged:true});
-      if(response.status!=="processing")throw new Error("Não recebemos confirmação do servidor.");
-      setProgress({id:response.operationId,status:"processing"});
+      if(!["processing","completed","manual_review"].includes(response.status))throw new Error("Não recebemos confirmação do servidor.");
+      setProgress({id:response.operationId,status:response.status});
       setOpened(false);
       // Once accepted, no local copy should remain available to the next login.
       try{await signOut(firebaseServices().auth);}catch{/* server blocks all account writes */}

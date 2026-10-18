@@ -131,7 +131,9 @@ test('failed admin lock preserves durable job and schedules retry without deleti
  t.after(()=>{globalThis.fetch=original;});
  const request=new Request('https://test.local',{method:'POST',
    body:JSON.stringify({phrase:'EXCLUIR MINHA CONTA',acknowledged:true})});
- await assert.rejects(()=>requestDeletion(request,config,'owner-a'),e=>e.code==='deletion_not_locked');
+ const accepted=await requestDeletion(request,config,'owner-a');
+ assert.equal(accepted.status,202);
+ assert.equal((await accepted.json()).status,'processing');
  const job=db.sql.prepare('SELECT phase,attempts,next_attempt_at FROM account_deletions WHERE owner_uid=?').get('owner-a');
  assert.equal(job.phase,'locking');assert.equal(job.attempts,1);
  assert.ok(job.next_attempt_at>Date.now());
