@@ -414,3 +414,12 @@ O DEV publicado tem `ACCOUNT_DELETION_ENABLED=true` e credencial administrativa 
 ### Exclusão sem confirmação Google redundante (18/10/2026)
 
 **IMPLEMENTADO, CI/publicação rastreados na PR:** aproveitar login recente sem popup extra. O Worker mantém `auth_time <= 300s`; sessão antiga requer confirmação explícita com Google. Modal mostra e-mail, provedor recebe login_hint e seleção de conta diferente deve interromper a submissão sem trocar a conta Roteiva. Testes API e browser incluem login recente/antigo, cancelamento e conta incorreta. Sem mudança em IAM, credenciais, Firestore Rules, CORS ou dados de contas reais. Ver [ACCOUNT-DELETION.md](ACCOUNT-DELETION.md).
+
+### Cache de HTML em rotas do Firebase Hosting (18/10/2026)
+
+- [x] Identificada causa: `/index.html` estava com `no-cache`, mas os deep links SPA (por exemplo `/configuracoes`) não correspondiam ao header e podiam guardar HTML antigo por uma hora.
+- [x] IMPLEMENTADO em PR: cabeçalho `no-cache, no-store, must-revalidate` para todas as rotas antes do rewrite, sobreposto por `max-age=31536000, immutable` em `/assets/**` (assets hashed).
+- [x] IMPLEMENTADO em PR: teste do contrato e verificação pós-deploy dos headers HTTP reais no workflow Firebase DEV.
+- [ ] VALIDAR após merge: CI verde, deploy DEV confirmado e headers reais corretos para `/`, `/configuracoes`, `/biblioteca`, `/index.html`, deep link e asset hashed. Se a verificação pós-deploy falhar, investigar sem ignorar o resultado.
+
+A correção não altera o fluxo seguro de exclusão da PR #32 nem os dados Firestore/D1; não atualiza automaticamente uma aba já aberta antes do deploy.

@@ -84,7 +84,7 @@ O comando explícito é:
 pnpm exec firebase deploy --only firestore:rules,firestore:indexes,hosting --project roteiva-web-dev --non-interactive
 ```
 
-O Hosting serve dist/, fallback SPA /index.html e cache longo somente para assets versionados. Nenhum comando tem projeto PROD ou cria projeto/banco. Auth foi configurado no Console e não é sobrescrito no deploy.
+O Hosting serve `dist/` e aplica o fallback SPA `/index.html`. **Cabeçalhos de cache são avaliados pelo URL solicitado antes do rewrite**, portanto o padrão global `**` define `Cache-Control: no-cache, no-store, must-revalidate` para a entrada HTML (incluindo `/configuracoes`, `/biblioteca`, `/projetos/:id` e futuras rotas). A regra posterior `/assets/**` sobrescreve o header com `public, max-age=31536000, immutable` para JS/CSS versionados pelo Vite. `node --test tests/firebase-hosting-cache.test.mjs` valida o contrato e a publicação verifica cabeçalhos HTTP reais com `node scripts/verify-hosting-cache.mjs https://roteiva-web-dev.web.app`; falhas causam CI vermelho mesmo depois da publicação, para investigação. Nenhum comando tem projeto PROD ou cria projeto/banco. Auth foi configurado no Console e não é sobrescrito no deploy.
 
 ## Franquias e consumo
 

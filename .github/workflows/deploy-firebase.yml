@@ -54,6 +54,8 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         run: pnpm test:firebase
       - run: pnpm build && node scripts/verify-static-build.mjs dist /
+      - name: Validate SPA Hosting cache contract
+        run: node --test tests/firebase-hosting-cache.test.mjs
       - name: Guard DEV project
         env:
           CONFIGURED_PROJECT: ${{ vars.FIREBASE_PROJECT_ID }}
@@ -65,3 +67,5 @@ jobs:
           credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
       - name: Deploy tested rules, indexes and SPA exclusively to DEV
         run: pnpm exec firebase deploy --only firestore:rules,firestore:indexes,hosting --project roteiva-web-dev --non-interactive
+      - name: Verify published route and hashed-asset cache headers
+        run: node scripts/verify-hosting-cache.mjs https://roteiva-web-dev.web.app
