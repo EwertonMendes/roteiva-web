@@ -67,7 +67,7 @@ function mockDrive(page:Page,accountAvailable:()=>boolean,thumbnail?:{wait:()=>P
       }
       // Tiny valid PNG: exercise the same private binary response the Worker returns.
       return route.fulfill({status:200,headers:{...headers,"Content-Type":"image/png"},
-        body:Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL/nwAAAABJRU5ErkJggg==","base64")});
+        body:Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR42mPQTZkGAAHpASiHbU1PAAAAAElFTkSuQmCC","base64")});
     }
     if(endpoint.pathname.endsWith("/items")){
       return json({folder:{id:folderId,name:"Campanha de vídeos"},
