@@ -7,7 +7,8 @@ import {
   ArrowUpRight, Building2, Moon, UserRound,
   MoreHorizontal, Pencil, Plus, ReceiptText, Search, Sparkles, Sun, Trash2,
   UserRoundPlus, Users, WalletCards, X, Upload, Image as ImageIcon,
-  FileVideo, FileAudio, FileText, HardDrive, ChevronLeft, Settings2, type LucideIcon,
+  FileVideo, FileAudio, FileText, HardDrive, ChevronLeft, Settings2,
+  LayoutGrid, UsersRound, Repeat2, ContactRound, type LucideIcon,
 } from "lucide-react";
 import { ProjectDetail, ClientDetail, TodayStudio, StudioReviews, WorkspaceTools, FinancePanel, projectTemplates } from "./studio-features";
 import { validTimeRange, overlaps, eventRange, eventDuration } from "./studio-calendar";
@@ -17,6 +18,8 @@ import { FormEvent, useEffect, useLayoutEffect, useMemo, useState, useCallback }
 import { isDemo, useEmulators } from "./lib/firebase";
 import { hrefForWorkspaceRoute, routeFromLocation, type WorkspaceRoute } from "./lib/workspace-routing";
 import { SettingsPage } from "./features/settings/SettingsPage";
+import { IconLabel } from "./features/ui/IconLabel";
+import { PROJECT_STATUS_ICONS, PROJECT_STATUS_LABELS } from "./features/ui/project-status";
 import { DriveConnectionPanel } from "./features/drive/DriveConnectionPanel";
 import { TypographyLab, TEMPORARY_FONT_LAB_ENABLED } from "./features/typography/TypographyLab";
 import type { RoteivaProfile, ProfileChanges } from "./data/firestore-workspace";
@@ -45,8 +48,9 @@ function AnimatedNavIcon({ icon: Icon, hoverIcon: HoverIcon, kind }: { icon: Luc
 }
 
 function StatusBadge({ status }: { status: Status }) {
-  const labels: Record<Status, string> = { "Em produção": "Em produção", "Em aprovação": "Em aprovação", Ajustes: "Ajustes pedidos", Aprovado: "Aprovado" };
-  return <span className={`status status-${status.toLowerCase().replaceAll(" ", "-")}`}>{labels[status]}</span>;
+  return <span className={`status status-with-icon status-${status.toLowerCase().replaceAll(" ", "-")}`}>
+    <IconLabel icon={PROJECT_STATUS_ICONS[status]} size={14}>{PROJECT_STATUS_LABELS[status]}</IconLabel>
+  </span>;
 }
 
 function BrandAvatar({ initials, color, large = false }: { initials: string; color: string; large?: boolean }) {
@@ -636,7 +640,11 @@ function ProjectsView({ projects, statusFilter, setStatusFilter, onOpen, total, 
 }) {
   const filters: (Status | "Todos")[] = ["Todos", "Em produção", "Em aprovação", "Ajustes", "Aprovado"];
   return <div className="panel full-panel">
-    <div className="filter-bar"><div className="filter-pills">{filters.map((filter) => <button key={filter} className={statusFilter === filter ? "active" : ""} onClick={() => setStatusFilter(filter)}>{filter}</button>)}</div><span className="field-hint">{total!==undefined&&total>projects.length?`${projects.length} de ${total}`:`${projects.length}`} projetos encontrados</span></div>
+    <div className="filter-bar"><div className="filter-pills">{filters.map((filter) =>
+      <button key={filter} type="button" className={statusFilter === filter ? "active" : ""}
+        aria-pressed={statusFilter === filter} onClick={() => setStatusFilter(filter)}>
+        <IconLabel icon={filter === "Todos" ? LayoutGrid : PROJECT_STATUS_ICONS[filter]} size={16}>{filter}</IconLabel>
+      </button>)}</div><span className="field-hint">{total!==undefined&&total>projects.length?`${projects.length} de ${total}`:`${projects.length}`} projetos encontrados</span></div>
     <div className="project-cards">{projects.map((project) => <article className="project-card" key={project.id} onClick={() => onOpen(project.id)}>
       <div className={`project-cover ${project.color}`}><span className="cover-grid" /><BrandAvatar initials={project.initials} color={project.color} large /><button aria-label={`Abrir projeto ${project.name}`} onClick={(e) => { e.stopPropagation(); onOpen(project.id); }}><ChevronRight size={17} /></button><em><Film size={14} /> {project.files} arquivos</em></div>
       <div className="project-card-copy"><StatusBadge status={project.status} /><h3>{project.name}</h3><p>{project.client}</p><div className="card-progress"><span><i style={{ width: `${project.progress}%` }} /></span><b>{project.progress}%</b></div><footer><span><CalendarDays size={14} /> {project.due}</span><span>{project.template || "Produção"}</span></footer></div>
@@ -655,8 +663,8 @@ function ClientsView({ clients, onOpen, onAdd,totalCount,recurringCount,activePr
   const total = totalCount ?? clients.length;
   const activeProjects = activeProjectsCount ?? clients.reduce((n,client)=>n+client.active,0);
   return <div className="panel full-panel client-panel">
-    <div className="client-summary"><div><span>CLIENTES CADASTRADOS</span><strong>{total}</strong><small>{activeProjects} {activeProjects === 1 ? "projeto em produção" : "projetos em produção"}</small></div><div><span>CLIENTES RECORRENTES</span><strong>{recurring}</strong><small className="positive">{Math.round(recurring / Math.max(1, total) * 100)}% da carteira</small></div><div><span>CLIENTES AVULSOS</span><strong>{total - recurring}</strong><small>Trabalhos pontuais</small></div></div>
-    <div className="client-toolbar"><div><b>Carteira de clientes</b><small>{total>clients.length?`${clients.length} de ${total} carregados · `:""}Classifique cada relacionamento para entender melhor sua receita.</small></div><button className="secondary-button" onClick={onAdd}><UserRoundPlus size={15} /> Adicionar cliente</button></div>
+    <div className="client-summary"><div><span className="client-summary-label"><IconLabel icon={UsersRound} size={18}>CLIENTES CADASTRADOS</IconLabel></span><strong>{total}</strong><small>{activeProjects} {activeProjects === 1 ? "projeto em produção" : "projetos em produção"}</small></div><div><span className="client-summary-label"><IconLabel icon={Repeat2} size={18}>CLIENTES RECORRENTES</IconLabel></span><strong>{recurring}</strong><small className="positive">{Math.round(recurring / Math.max(1, total) * 100)}% da carteira</small></div><div><span className="client-summary-label"><IconLabel icon={UserRound} size={18}>CLIENTES AVULSOS</IconLabel></span><strong>{total - recurring}</strong><small>Trabalhos pontuais</small></div></div>
+    <div className="client-toolbar"><div><b><IconLabel icon={ContactRound}>Carteira de clientes</IconLabel></b><small>{total>clients.length?`${clients.length} de ${total} carregados · `:""}Classifique cada relacionamento para entender melhor sua receita.</small></div><button className="secondary-button" onClick={onAdd}><UserRoundPlus size={15} /> Adicionar cliente</button></div>
     <div className="client-list-head"><span>Cliente</span><span>Relacionamento</span><span>Contato</span><span>Projetos</span><span>Desde</span><span /></div>
     <div className="client-list">{clients.map((client) => <button key={client.id} onClick={() => onOpen(client.id)}><div><BrandAvatar initials={client.initials} color={client.color} /><b>{client.name}</b></div><span><i className={`client-type ${client.type === "Recorrente" ? "recurring" : "one-off"}`}>{client.type === "Recorrente" ? <><Building2 size={12} /> Recorrente</> : <><ReceiptText size={12} /> Avulso</>}</i></span><span className="client-contact-meta"><b>{client.contact}</b><small>{client.phone || client.email || "Sem telefone ou e-mail"}</small>{client.phone && client.email && <small>{client.email}</small>}</span><span>{client.projects}</span><span>{client.since}</span><ChevronRight size={16} /></button>)}{!clients.length && <div className="empty-state"><Users size={30} /><h3>Nenhum cliente cadastrado</h3><p>Adicione o primeiro cliente e defina se o relacionamento é recorrente ou avulso.</p><button className="primary-button" onClick={onAdd}>Adicionar primeiro cliente</button></div>}</div>{hasMore&&<div className="modal-actions"><button type="button" className="secondary-button" onClick={onMore}>Carregar mais clientes <ChevronDown size={16}/></button></div>}
   </div>;

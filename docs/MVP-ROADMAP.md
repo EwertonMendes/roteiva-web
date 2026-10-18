@@ -341,3 +341,13 @@ Se houver falha em teste de segurança/cookie, desabilitar imediatamente OAuth v
 - [ ] **REQUISITO para público:** escopo restrito `drive.readonly` exige cumprir política e revisão de segurança Google antes de habilitar para usuários externos.
 
 Não confundir biblioteca navegável MVP com aprovação/produção audiovisual completa.
+
+## Refinamento de interface — iconografia semântica (17/10/2026)
+
+- **IMPLEMENTADO; validação CI/QA pendente nesta PR:** mapear filtros e badges de status dos projetos com o mesmo ícone Lucide e texto, mantendo os filtros funcionais via teclado e `aria-pressed`.
+- **IMPLEMENTADO; validação CI/QA pendente nesta PR:** ícones contextuais nos indicadores/links de clientes, quatro métricas e filtros financeiros, cabeçalhos de gráficos/alerta, e campos selecionados de Configurações.
+- **IMPLEMENTADO; validação CI/QA pendente nesta PR:** componente acessível `IconLabel`, CSS adaptativo claro/escuro/mobile e regressão `tests/browser/semantic-icons.spec.ts`.
+- **Sem alterações:** dados Firestore, autenticação, Worker/Drive, cálculos e exportações, navegação e laboratório temporário de fontes.
+- **Aceite:** `pnpm typecheck`, `pnpm test`, builds Firebase/Pages/Emulator, testes Playwright desktop/mobile e validação visual final pelo proprietário no DEV; a auditoria visual humana pode exigir ajustes finos posteriores.
+
+Evidências: `src/features/ui/`, `src/dashboard-client.tsx`, `src/studio-features.tsx`, `src/features/settings/SettingsPage.tsx`, `tests/browser/semantic-icons.spec.ts` e a PR desta implementação.

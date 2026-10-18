@@ -1,9 +1,10 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { ArrowUpRight, Check, Cloud, Download, LockKeyhole, Moon, ShieldCheck, Sun, UserRound, Video, Info } from "lucide-react";
+import { ArrowUpRight, Check, Cloud, Download, LockKeyhole, Moon, ShieldCheck, Sun, UserRound, Video, Info, Building2, BriefcaseBusiness, HardDrive, Activity } from "lucide-react";
 import type { ProfileChanges, ProfessionalType, RoteivaProfile } from "../../data/firestore-workspace";
 import { dataErrorMessage } from "../../data/firestore-workspace";
 import type { FirestoreUsage } from "../../data/firestore-usage";
 import { WorkspaceTools } from "../../studio-features";
+import { IconLabel } from "../ui/IconLabel";
 import { CACHE_CONSENT_KEY, persistentCacheEnabled, purgePrivateCache } from "../../lib/firebase";
 
 const occupations:{value:ProfessionalType;label:string}[]=[
@@ -89,7 +90,7 @@ export function SettingsPage({profile,email,photoURL,theme,toggleTheme,workspace
         <div className="settings-linked"><ShieldCheck size={15}/> Google</div>
       </div>
       <div className="settings-form-grid">
-        <label className="settings-field"><span>Nome profissional</span>
+        <label className="settings-field"><span><IconLabel icon={UserRound}>Nome profissional</IconLabel></span>
           <input aria-label="Nome profissional" autoComplete="name" maxLength={120} required minLength={2} value={name} onChange={e=>{setName(e.target.value);setFeedback(null);}} disabled={!onSaveProfile||busy}/>
         </label>
         <label className="settings-field settings-readonly"><span>E-mail de acesso <LockKeyhole size={13}/></span>
@@ -103,10 +104,10 @@ export function SettingsPage({profile,email,photoURL,theme,toggleTheme,workspace
         <Video size={20} strokeWidth={1.5}/>
       </div>
       <div className="settings-form-grid">
-        <label className="settings-field"><span>Nome do estúdio ou marca <em>opcional</em></span>
+        <label className="settings-field"><span><IconLabel icon={Building2}>Nome do estúdio ou marca</IconLabel> <em>opcional</em></span>
           <input aria-label="Nome do estúdio ou marca" maxLength={120} autoComplete="organization" value={studio} placeholder="Ex.: Estúdio Aurora" onChange={e=>{setStudio(e.target.value);setFeedback(null);}} disabled={!onSaveProfile||busy}/>
         </label>
-        <label className="settings-field"><span>Tipo de atuação</span>
+        <label className="settings-field"><span><IconLabel icon={BriefcaseBusiness}>Tipo de atuação</IconLabel></span>
           <select aria-label="Tipo de atuação" value={occupation} onChange={e=>{setOccupation(e.target.value as ProfessionalType);setFeedback(null);}} disabled={!onSaveProfile||busy}>
             {occupations.map(item=><option key={item.value} value={item.value}>{item.label}</option>)}
           </select>
@@ -144,14 +145,14 @@ export function SettingsPage({profile,email,photoURL,theme,toggleTheme,workspace
         <WorkspaceTools workspace={workspace} loadWorkspace={onLoadWorkspace} status={cloudStatus} onNotify={onNotify}/>
       </div>
       {onSaveProfile && <div className="settings-privacy-row">
-        <div><strong><LockKeyhole size={16}/> Cache neste dispositivo</strong>
+        <div><strong><HardDrive size={16} aria-hidden="true"/> Cache neste dispositivo</strong>
           <p>Opcional para reduzir consultas após reiniciar. Este navegador poderá armazenar clientes, projetos e dados financeiros. Ative somente em um dispositivo pessoal. Desativar apaga o cache e recarrega a página.</p>
         </div>
         <button type="button" className="secondary-button" disabled={cacheBusy || busy}
           onClick={()=>void changePrivateCache(!localCache)}>{cacheBusy?"Aplicando…":localCache?"Desativar cache":"Ativar cache"}</button>
       </div>}
       {usage&&<div className="settings-privacy-row" role="status">
-        <div><strong><Info size={16}/> Diagnóstico da sessão</strong>
+        <div><strong><Activity size={16} aria-hidden="true"/> Diagnóstico da sessão</strong>
           <p>Consultas ao servidor: {usage.serverQueries}; documentos retornados: {usage.serverDocumentsReturned};
           agregações: {usage.aggregationQueries}; conferências de revisão: {usage.revisionReads};
           documentos alterados: {usage.mutationDocuments}; revisões gravadas: {usage.mutationRevisions}.
