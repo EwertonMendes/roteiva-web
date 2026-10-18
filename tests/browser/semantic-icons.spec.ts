@@ -33,15 +33,16 @@ test("semantic icon labels remain accessible, responsive and functional", async 
     await expect(button.locator("svg[aria-hidden='true']")).toHaveCount(1);
   }
   await expect(filters.getByRole("button", { name: "Todos", exact: true })).toHaveAttribute("aria-pressed", "true");
+  // Mouse and keyboard get independent fresh views: the page may fetch a
+  // new project window asynchronously after changing a server-side filter.
   await filters.getByRole("button", { name: "Em produção", exact: true }).click();
   await expect(filters.getByRole("button", { name: "Em produção", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(filters.getByRole("button", { name: "Todos", exact: true })).toHaveAttribute("aria-pressed", "false");
-  // Previous selection may trigger an asynchronous project page refresh.
-  // Press Enter on the live button itself (rather than the document's current focus),
-  // which re-focuses the target if the filter row was replaced during the refresh.
-  await expect(page.locator("[aria-busy]").first()).toHaveAttribute("aria-busy", "false");
-  await filters.getByRole("button", { name: "Todos", exact: true }).press("Enter");
+  await page.goto(app + "/projetos");
   await expect(filters.getByRole("button", { name: "Todos", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("[aria-busy]").first()).toHaveAttribute("aria-busy", "false");
+  await filters.getByRole("button", { name: "Em aprovação", exact: true }).press("Enter");
+  await expect(filters.getByRole("button", { name: "Em aprovação", exact: true })).toHaveAttribute("aria-pressed", "true");
 
   await page.goto(app + "/clientes");
   await expect(page.locator(".client-summary > div")).toHaveCount(3);
