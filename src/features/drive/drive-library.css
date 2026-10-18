@@ -187,3 +187,18 @@
 .rl-page-more-content .workspace-tools {display:grid;gap:10px;white-space:normal;}
 .rl-page-more-content .workspace-tools>span {font-size:.75rem;color:var(--muted);}
 .rl-page-more-content .workspace-tools button {white-space:nowrap;}
+
+/* Compile-time UX review: no backend or real user data, only the production components. */
+.rl-review-notice {display:flex;gap:10px;align-items:flex-start;padding:12px 14px;margin:0 0 18px;border:1px solid var(--line);border-radius:12px;background:var(--subtle);color:var(--ink);font-size:.8125rem;line-height:1.5;}
+.rl-review-notice svg {flex-shrink:0;margin-top:1px;}
+.rl-review-notice strong {font-weight:650;}
+.rl-review-account {display:flex;align-items:center;gap:7px;font-size:.8125rem;color:var(--muted);padding:0 11px;min-height:38px;border:1px solid var(--line);border-radius:10px;background:var(--subtle);}
+.rl-review-project {display:flex;align-items:center;gap:10px;margin:0 0 14px;font-size:.875rem;}
+.rl-review-project label {color:var(--muted);}
+.rl-review-project select {min-width:170px;max-width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;color:var(--ink);background:var(--subtle);}
+@media(max-width:560px) {
+  .rl-review-notice {font-size:.8rem;}
+  .rl-review-account {display:none;}
+  .rl-review-project {justify-content:space-between;}
+  .rl-review-project select {width:min(240px,70%);}
+}
