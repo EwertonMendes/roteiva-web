@@ -65,6 +65,7 @@ export function DriveConnectionPanel({
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
   const [linkError,setLinkError]=useState("");
+  const [linksLoaded,setLinksLoaded]=useState(false);
   const [accountFailed,setAccountFailed]=useState(false);
   const [result,setResult]=useState("");
   const [confirmId,setConfirmId]=useState("");
@@ -113,8 +114,8 @@ export function DriveConnectionPanel({
     setLinkError("");
     // Connection and folder links have independent failure boundaries.
     const linksRequest=readDriveLinks(user.uid)
-      .then(folders=>{setLinks(folders);countCallback.current?.(folders.length);})
-      .catch(()=>setLinkError("Não foi possível atualizar as pastas vinculadas. Tente atualizar novamente."));
+      .then(folders=>{setLinks(folders);setLinksLoaded(true);})
+      .catch(()=>{setLinksLoaded(false);setLinkError("Não foi possível atualizar as pastas vinculadas. Tente atualizar novamente.");});
     let accounts:{connections:Connection[]};
     try{accounts=await call<{connections:Connection[]}>("/integrations/drive");}
     catch(cause){setAccountFailed(true);throw cause;}
@@ -123,6 +124,10 @@ export function DriveConnectionPanel({
     setAccountFailed(false);
     return accounts.connections;
   },[call,user]);
+
+  useEffect(()=>{
+    if(linksLoaded)countCallback.current?.(links.length);
+  },[links,linksLoaded]);
 
   useEffect(()=>{
     let active=true;
@@ -207,7 +212,7 @@ export function DriveConnectionPanel({
           projectId:selectedProjectId,connectionId:connection.id,folderId:folder.id,folderName:folder.name};
         setLinks(old=>{
           if(old.some(item=>item.id===link.id))return old;
-          const next=[...old,link];countCallback.current?.(next.length);return next;
+          return [...old,link];
         });
         completed++;
       }catch{failed.push(folder.name);}
@@ -224,7 +229,7 @@ export function DriveConnectionPanel({
     try{
       await unlinkDriveFolder(user.uid,link.id);
       if(viewing?.id===link.id){++fileRequest.current;setViewing(null);setFiles([]);autoOpened.current="";}
-      setLinks(old=>{const next=old.filter(l=>l.id!==link.id);countCallback.current?.(next.length);return next;});
+      setLinks(old=>old.filter(l=>l.id!==link.id));
       setUnlinkTarget(null);setResult("Vínculo removido. Nenhum arquivo foi apagado do Drive.");
     }catch(e){setError(e instanceof Error?e.message:"Não foi possível desvincular.");}
     finally{setBusy(false);}
