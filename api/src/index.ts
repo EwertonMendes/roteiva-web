@@ -52,6 +52,7 @@ export async function handle(request: Request, env: Env): Promise<Response> {
     } else if (url.pathname === '/oauth/drive/start' && request.method === 'POST') {
       if (origin !== env.FRONTEND_ORIGIN) throw new ApiError(403,'origin_required');
       const uid = await identity(request,env);
+      await assertNotDeleting(env,uid);
       if (!(await env.API_RATE_LIMIT.limit({key:'dev:uid:'+uid})).success) throw new ApiError(429,'rate_limited');
       response = await start(env,uid);
     } else if (/^\/integrations\/drive\/[^/]+\/folders(?:\/[^/]+\/items)?$/.test(url.pathname) && request.method==='GET') {
@@ -66,6 +67,7 @@ export async function handle(request: Request, env: Env): Promise<Response> {
     } else if (/^\/integrations\/drive\/[^/]+\/(metadata|disconnect|about)$/.test(url.pathname)) {
       enabled(env);
       const uid = await identity(request,env);
+      await assertNotDeleting(env,uid);
       if (!(await env.API_RATE_LIMIT.limit({key:'dev:uid:'+uid})).success) throw new ApiError(429,'rate_limited');
       const parts = url.pathname.split('/');
       if (parts[4] === 'about' && request.method === 'GET') {
