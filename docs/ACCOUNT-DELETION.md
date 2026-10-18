@@ -42,7 +42,7 @@ do token assinado. A conta de serviço deve apontar exclusivamente para
 ## Etapas da execução
 
 1. `locking`: registra `deletionState: "deleting"` (ou documento marcador
-   para conta sem cadastro). Regras negam gravações do cliente e login mostra
+   para conta sem cadastro). Regras negam leituras de subcoleções e gravações do cliente; o perfil continua consultável apenas pelo proprietário para mostrar
    "Exclusão em andamento". Se o bloqueio falhar, mantém job agendado.
 2. `revoking`: invalida cache/tokens Drive em D1, tenta revogar os tokens
    Google e remove conexões + OAuth pendentes sem apagar arquivos originais

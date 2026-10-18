@@ -506,7 +506,7 @@ test("deletion marker blocks all client mutations while retaining per-owner isol
     await updateDoc(doc(admin.firestore(),"users/alice"),{deletionState:"deleting"});
   });
   await assertSucceeds(getDoc(root));
-  await assertSucceeds(getDoc(item));
+  await assertFails(getDoc(item));
   await assertFails(updateDoc(root,{displayName:"After deletion",revision:2,updatedAt:serverTimestamp()}));
   await assertFails(updateDoc(root,{deletionState:"active",revision:2,updatedAt:serverTimestamp()}));
   await assertFails(setDoc(doc(alice,"users/alice/clients/333"),{...client,id:333,...meta("alice")}));
