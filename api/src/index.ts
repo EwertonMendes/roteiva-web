@@ -3,6 +3,7 @@ import { identity } from './auth.ts';
 import { callback, start, launch, enabled } from './oauth.ts';
 import { metadata, disconnect, about } from './drive.ts';
 import { listFolders, listFolderItems } from './folders.ts';
+import { thumbnail } from './thumbnails.ts';
 import { deletionStatus, requestDeletion, assertNotDeleting, runPendingDeletions } from './account-deletion.ts';
 const headers = {
   'Cache-Control':'no-store', 'Referrer-Policy':'no-referrer',
@@ -64,6 +65,13 @@ export async function handle(request: Request, env: Env): Promise<Response> {
       response=parts.length===5
         ? await listFolders(env,uid,parts[3],url.searchParams.get('parentId')||'root',url.searchParams.get('pageToken'))
         : await listFolderItems(env,uid,parts[3],parts[5],url.searchParams.get('pageToken'));
+    } else if (/^\/integrations\/drive\/[^/]+\/files\/[^/]+\/thumbnail$/.test(url.pathname) && request.method==='GET') {
+      enabled(env);
+      const uid=await identity(request,env);
+      await assertNotDeleting(env,uid);
+      if (!(await env.API_RATE_LIMIT.limit({key:'dev:uid:'+uid})).success) throw new ApiError(429,'rate_limited');
+      const parts=url.pathname.split('/');
+      response=await thumbnail(env,uid,parts[3],parts[5]);
     } else if (/^\/integrations\/drive\/[^/]+\/(metadata|disconnect|about)$/.test(url.pathname)) {
       enabled(env);
       const uid = await identity(request,env);

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Check, ChevronRight, ExternalLink, File, FileAudio, FileImage, FileText, FileVideo, Folder, FolderOpen, Link2, LoaderCircle, Search, X, MoreHorizontal } from "lucide-react";
+import {DriveThumbnail} from "./DriveThumbnail";
+import { ArrowLeft, Check, ChevronLeft, ChevronRight, Grid2X2, List, ExternalLink, File, FileAudio, FileImage, FileText, FileVideo, Folder, FolderOpen, Link2, LoaderCircle, Search, X, MoreHorizontal } from "lucide-react";
 
-export type DriveItem = {id:string;name:string;mimeType:string;size?:string;modifiedTime?:string;webViewLink?:string};
+export type DriveItem = {id:string;name:string;mimeType:string;size?:string;modifiedTime?:string;thumbnailLink?:string;webViewLink?:string};
 export type DriveTrail = {id:string;name:string};
 export const DRIVE_FOLDER = "application/vnd.google-apps.folder";
 
@@ -164,15 +165,45 @@ type ExplorerProps={
   files:DriveItem[];
   loading:boolean;
   hasMore:boolean;
+  thumbnailScope?:string;
+  getThumbnail?:(file:DriveItem)=>Promise<Blob|null>;
   onBack:()=>void;
   onNavigate:(id:string,path:DriveTrail[])=>void;
   onOpen:(file:DriveItem)=>void;
   onMore:()=>void;
 };
-export function DriveFileExplorer({folderName,path,files,loading,hasMore,onBack,onNavigate,onOpen,onMore}:ExplorerProps){
+type ViewMode="list"|"grid";
+const VIEW_KEY="roteiva-drive-view-v1";
+function savedView():ViewMode{
+  try{return window.localStorage.getItem(VIEW_KEY)==="grid"?"grid":"list";}catch{return "list";}
+}
+const noThumbnail=async (_:DriveItem):Promise<Blob|null>=>null;
+export function DriveFileExplorer({folderName,path,files,loading,hasMore,thumbnailScope="",getThumbnail=noThumbnail,onBack,onNavigate,onOpen,onMore}:ExplorerProps){
   const [filter,setFilter]=useState("");
+  const [view,setView]=useState<ViewMode>(savedView);
   useEffect(()=>setFilter(""),[path.map(item=>item.id).join("/")]);
+  function changeView(next:ViewMode){
+    setView(next);
+    try{localStorage.setItem(VIEW_KEY,next);}catch{/* UX preference can remain in memory */}
+  }
   const visible=files.filter(f=>f.name.toLocaleLowerCase("pt-BR").includes(filter.toLocaleLowerCase("pt-BR")));
+  const makeRow=(file:DriveItem)=>{
+    const isFolder=file.mimeType===DRIVE_FOLDER;
+    return <div className="rl-file-row" key={file.id}>
+      <button type="button" className="rl-file-open" title={file.name} onClick={()=>onOpen(file)} disabled={loading}>
+        <DriveThumbnail item={file} scope={thumbnailScope} getThumbnail={getThumbnail}/>
+        <span className="rl-file-name">{file.name}<small>{isFolder?"Subpasta":readableFileType(file.mimeType)}{!isFolder&&readableSize(file.size)?" · "+readableSize(file.size):""}</small></span>
+      </button>
+      <time>{file.modifiedTime?new Date(file.modifiedTime).toLocaleDateString("pt-BR"):"—"}</time>
+      <span className="rl-file-size">{readableSize(file.size)||"—"}</span>
+      <details className="rl-menu"><summary title={"Opções de "+file.name} aria-label={"Opções de "+file.name}><MoreHorizontal size={19}/></summary>
+        <div className="rl-menu-items">
+          <button type="button" onClick={()=>onOpen(file)}>{isFolder?"Abrir pasta":isPreviewable(file)?"Visualizar":"Abrir no Drive"}</button>
+          <a href={driveFileUrl(file)} target="_blank" rel="noreferrer"><ExternalLink size={14}/> Abrir no Google Drive</a>
+        </div>
+      </details>
+    </div>;
+  };
   return <section className="rl-content" aria-label="Arquivos da pasta">
     {folderName?<><header className="rl-content-head">
       <button type="button" className="rl-back" onClick={onBack} aria-label="Voltar para as pastas"><ArrowLeft size={18}/></button>
@@ -182,26 +213,17 @@ export function DriveFileExplorer({folderName,path,files,loading,hasMore,onBack,
       </span>)}</nav>
       <span className="rl-file-count">{files.length} {files.length===1?"item carregado":"itens carregados"}</span>
     </header>
-    <div className="rl-content-tools"><label className="rl-search"><Search size={16}/><input aria-label="Filtrar arquivos carregados" placeholder="Filtrar itens desta pasta" value={filter} onChange={e=>setFilter(e.target.value)}/>{filter&&<button type="button" onClick={()=>setFilter("")} aria-label="Limpar filtro"><X size={15}/></button>}</label></div>
-    <div className="rl-file-head" aria-hidden="true"><span>Nome</span><span>Modificado</span><span>Tamanho</span><span/></div>
-    <div className="rl-files">
+    <div className="rl-content-tools">
+      <label className="rl-search"><Search size={16}/><input aria-label="Filtrar arquivos carregados" placeholder="Filtrar itens desta pasta" value={filter} onChange={e=>setFilter(e.target.value)}/>{filter&&<button type="button" onClick={()=>setFilter("")} aria-label="Limpar filtro"><X size={15}/></button>}</label>
+      <div className="rl-view-switch" role="group" aria-label="Modo de visualização">
+        <button type="button" title="Visualização em lista" aria-label="Visualização em lista" aria-pressed={view==="list"} onClick={()=>changeView("list")}><List size={17}/></button>
+        <button type="button" title="Visualização em grade" aria-label="Visualização em grade" aria-pressed={view==="grid"} onClick={()=>changeView("grid")}><Grid2X2 size={17}/></button>
+      </div>
+    </div>
+    {view==="list"&&<div className="rl-file-head" aria-hidden="true"><span>Nome</span><span>Modificado</span><span>Tamanho</span><span/></div>}
+    <div className="rl-files" data-view={view}>
       {loading&&!files.length&&<div className="rl-state" role="status"><LoaderCircle size={23} className="rl-spin"/><p>Carregando arquivos…</p></div>}
-      {visible.map(file=>{
-        const Icon=driveKindIcon(file.mimeType);
-        const isFolder=file.mimeType===DRIVE_FOLDER;
-        return <div className="rl-file-row" key={file.id}>
-          <button type="button" className="rl-file-open" title={file.name} onClick={()=>onOpen(file)} disabled={loading}>
-            <span className="rl-file-icon"><Icon size={19}/></span><span className="rl-file-name">{file.name}<small>{isFolder?"Subpasta":readableFileType(file.mimeType)}{!isFolder&&readableSize(file.size)?" · "+readableSize(file.size):""}</small></span>
-          </button>
-          <time>{file.modifiedTime?new Date(file.modifiedTime).toLocaleDateString("pt-BR"):"—"}</time>
-          <span className="rl-file-size">{readableSize(file.size)||"—"}</span>
-          <details className="rl-menu"><summary title={"Opções de "+file.name} aria-label={"Opções de "+file.name}><MoreHorizontal size={19}/></summary>
-            <div className="rl-menu-items">
-              <button type="button" onClick={()=>onOpen(file)}>{isFolder?"Abrir pasta":isPreviewable(file)?"Visualizar":"Abrir no Drive"}</button>
-              <a href={driveFileUrl(file)} target="_blank" rel="noreferrer"><ExternalLink size={14}/> Abrir no Google Drive</a>
-            </div></details>
-        </div>;
-      })}
+      {visible.map(makeRow)}
       {!loading&&!visible.length&&<div className="rl-state"><FolderOpen size={27}/><p>{filter?"Nenhum item corresponde ao filtro nesta página.":"Esta pasta está vazia."}</p></div>}
       {hasMore&&<button type="button" className="rl-load-more" onClick={onMore} disabled={loading}>Carregar mais arquivos</button>}
     </div>
@@ -209,13 +231,29 @@ export function DriveFileExplorer({folderName,path,files,loading,hasMore,onBack,
   </section>;
 }
 
-export function DrivePreview({item,onClose}:{item:DriveItem;onClose:()=>void}){
+export function DrivePreview({item,onClose,onPrevious,onNext,position,total}:{item:DriveItem;onClose:()=>void;onPrevious?:()=>void;onNext?:()=>void;position?:number;total?:number}){
   const ref=useOverlayFocus(onClose);
+  useEffect(()=>{
+    const onKey=(event:KeyboardEvent)=>{
+      if(event.altKey||event.ctrlKey||event.metaKey)return;
+      const target=event.target;
+      if(target instanceof HTMLElement && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))return;
+      if(event.key==="ArrowLeft"&&onPrevious){event.preventDefault();onPrevious();}
+      if(event.key==="ArrowRight"&&onNext){event.preventDefault();onNext();}
+    };
+    document.addEventListener("keydown",onKey);
+    return ()=>document.removeEventListener("keydown",onKey);
+  },[onPrevious,onNext]);
   return <div className="rl-overlay rl-preview-overlay" onMouseDown={e=>{if(e.target===e.currentTarget)onClose();}}>
     <div className="rl-preview" ref={ref} role="dialog" aria-modal="true" aria-label={"Prévia de "+item.name} tabIndex={-1}>
-      <header><strong title={item.name}>{item.name}</strong><div><a className="secondary-button" href={driveFileUrl(item)} target="_blank" rel="noreferrer"><ExternalLink size={15}/> Abrir no Drive</a><button type="button" className="rl-icon-button" onClick={onClose} aria-label="Fechar prévia"><X size={18}/></button></div></header>
-      <iframe title={"Prévia de "+item.name} referrerPolicy="no-referrer" allow="fullscreen" src={"https://drive.google.com/file/d/"+encodeURIComponent(item.id)+"/preview"}/>
-      <p>A prévia depende das permissões do Google Drive e do navegador. Se ela não abrir, use “Abrir no Drive”.</p>
+      <header><div className="rl-preview-title"><strong title={item.name}>{item.name}</strong><small>{readableFileType(item.mimeType)}{position&&total?" · "+position+" de "+total:""}</small></div>
+        <div><a className="secondary-button" href={driveFileUrl(item)} target="_blank" rel="noreferrer"><ExternalLink size={15}/> Abrir no Drive</a><button type="button" className="rl-icon-button" onClick={onClose} aria-label="Fechar prévia"><X size={18}/></button></div></header>
+      <div className="rl-preview-body">
+        {onPrevious&&<button type="button" className="rl-preview-nav rl-preview-nav-prev" onClick={onPrevious} aria-label="Visualizar arquivo anterior"><ChevronLeft size={21}/></button>}
+        <iframe key={item.id} title={"Prévia de "+item.name} referrerPolicy="no-referrer" allow="fullscreen" src={"https://drive.google.com/file/d/"+encodeURIComponent(item.id)+"/preview"}/>
+        {onNext&&<button type="button" className="rl-preview-nav rl-preview-nav-next" onClick={onNext} aria-label="Visualizar próximo arquivo"><ChevronRight size={21}/></button>}
+      </div>
+      <p>A prévia depende das permissões do Google Drive. Se não carregar, use “Abrir no Drive”.</p>
     </div>
   </div>;
 }
