@@ -73,7 +73,7 @@ async function collectionIds(parent:string,token:string,fetcher:typeof fetch):Pr
   // Firestore IDs may contain Unicode or spaces; never silently skip an ID
   // because that could make an incomplete cleanup appear successful.
   return (ids as unknown[]||[]).map(x=>{
-    if(typeof x!=='string'||x.length<1||x.length>1500||x.includes('/')||/[\\x00-\\x1F\\x7F]/.test(x))
+    if(typeof x!=='string'||x.length<1||x.length>1500||x.includes('/')||/[\x00-\x1F\x7F]/.test(x))
       throw new ApiError(503,'unsupported_collection_id');
     return x;
   });
