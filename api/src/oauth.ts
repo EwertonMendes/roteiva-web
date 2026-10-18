@@ -4,6 +4,7 @@ import { context, decrypt, encrypt, hash, random } from './crypto.ts';
 import { consumeState } from './repository.ts';
 import { DRIVE_SCOPE, DRIVE_READ_SCOPE, tokenRequest } from './google.ts';
 import { persistDriveConsent } from './consent.ts';
+import { assertNotDeleting } from './account-deletion.ts';
 
 const googleKeys = createRemoteJWKSet(new URL('https://www.googleapis.com/oauth2/v3/certs'));
 const COOKIE = '__Host-roteiva-oauth';
@@ -48,6 +49,7 @@ export async function launch(request: Request, env: Env): Promise<Response> {
     owner_uid:string;state_hash:string;encrypted_state:string;encrypted_verifier:string;nonce:string
   }>();
   if (!tx || !tx.encrypted_state || !tx.encrypted_verifier) throw new ApiError(400,'expired_or_used_launch');
+  if(env.ACCOUNT_DELETION_ENABLED==='true')await assertNotDeleting(env,tx.owner_uid);
   const state = await decrypt(env,tx.encrypted_state,context(env,tx.owner_uid,tx.state_hash,'oauth_state'));
   const verifier = await decrypt(env,tx.encrypted_verifier,context(env,tx.owner_uid,tx.state_hash,'pkce'));
   const target = new URL('https://accounts.google.com/o/oauth2/v2/auth');
@@ -72,6 +74,7 @@ export async function callback(request: Request, env: Env): Promise<Response> {
   const stateHash = await hash(state);
   const tx = await consumeState(env,stateHash,await hash(browser));
   if (!tx) throw new ApiError(400,'expired_or_used_state');
+  if(env.ACCOUNT_DELETION_ENABLED==='true')await assertNotDeleting(env,tx.owner_uid);
   if (url.searchParams.has('error')) return finish(env,'cancelled');
   const code = url.searchParams.get('code');
   if (!code || code.length > 4096) throw new ApiError(400,'invalid_oauth_code');
