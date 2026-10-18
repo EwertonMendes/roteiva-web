@@ -386,3 +386,12 @@ Evidências: `src/features/ui/`, `src/dashboard-client.tsx`, `src/studio-feature
 - [ ] Validar visual real no DEV: mobile/desktop, dark/light, várias pastas e paginação, pastas compartilhadas, acessibilidade e erros/reconexão OAuth.
 
 Critérios de aceite: fluxo sem rolagem modal+fundo, sem mudança na propriedade dos arquivos, filtragem explícita somente dos itens carregados, navegação sem sobrescrita de resultados anteriores, nenhuma regressão do OAuth. Evidência: [PR #29](https://github.com/EwertonMendes/roteiva-web/pull/29), `src/features/drive/DriveConnectionPanel.tsx`, `DriveLibraryUI.tsx`, `drive-library.css`, `tests/browser/drive-folders.spec.ts`.
+
+## Prévia visual da Biblioteca (PR #29)
+
+**IMPLEMENTADO na branch de PR; teste manual pendente.** Para evitar confundir a versão antiga publicada no DEV com a nova Biblioteca ainda não mergeada, a PR tem dois previews:
+
+- `pr-29-design`: build demo temporário com a mesma UI de produção e registros sintéticos, sem login nem Google Drive. Testa o desenho móvel/desktop, navegação hierárquica e vínculo múltiplo em memória; não confirma integração ou persistência.
+- `pr-29`: build Firebase real, que permanece bloqueado para testes autenticados até o domínio de preview ser autorizado no Firebase Authentication e a origem exata autorizada na API DEV; não ampliar CORS genericamente nem liberar credenciais em PRs não confiáveis.
+
+A URL do DEV principal não mudou e o merge não foi executado. CI para preview deve permanecer limitado à PR interna #29 e usando exclusivamente o site Firebase DEV, com validade de sete dias. A validação de login/Drive real continua pendente.
