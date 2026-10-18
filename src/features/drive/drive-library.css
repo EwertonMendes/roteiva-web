@@ -178,3 +178,12 @@
 
 /* Keep contextual menus visible for rows near the bottom of scroll panes. */
 .rl-file-row:nth-last-child(-n+3) .rl-menu-items,.rl-folder-entry:nth-last-child(-n+3) .rl-menu-items {top:auto;bottom:calc(100% + 3px);}
+
+/* Preserve the workspace backup action, without competing with library navigation. */
+.rl-page-more {position:relative;align-self:center;}
+.rl-page-more>summary {list-style:none;display:grid;place-items:center;width:40px;height:40px;cursor:pointer;border:1px solid var(--line);border-radius:10px;background:var(--subtle);color:var(--ink);}
+.rl-page-more>summary::-webkit-details-marker {display:none;}
+.rl-page-more-content {position:absolute;right:0;top:calc(100% + 8px);z-index:30;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:12px;min-width:225px;box-shadow:0 14px 36px #0002;}
+.rl-page-more-content .workspace-tools {display:grid;gap:10px;white-space:normal;}
+.rl-page-more-content .workspace-tools>span {font-size:.75rem;color:var(--muted);}
+.rl-page-more-content .workspace-tools button {white-space:nowrap;}
