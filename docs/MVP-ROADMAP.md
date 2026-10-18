@@ -351,3 +351,9 @@ Não confundir biblioteca navegável MVP com aprovação/produção audiovisual 
 - **Aceite:** `pnpm typecheck`, `pnpm test`, builds Firebase/Pages/Emulator, testes Playwright desktop/mobile e validação visual final pelo proprietário no DEV; a auditoria visual humana pode exigir ajustes finos posteriores.
 
 Evidências: `src/features/ui/`, `src/dashboard-client.tsx`, `src/studio-features.tsx`, `src/features/settings/SettingsPage.tsx`, `tests/browser/semantic-icons.spec.ts` e a PR desta implementação.
+
+## Refinamento UI — simplificação da barra lateral (outubro/2026)
+
+- **IMPLEMENTADO; revisão visual final pendente:** remover o cartão informativo de estúdio/arquivos/sincronização da sidebar, mantendo logo, navegação e perfil com saída no rodapé, em mobile e desktop.
+- Evidências: `src/dashboard-client.tsx`, regras residuais removidas em `src/globals.css`, `src/responsive.css`, `src/refined-theme.css`, regressão em `tests/browser/typography.spec.ts`. Validação de CI e publicação pela PR correspondente.
+- Sem mudanças em Firestore, banco, Worker, credenciais, autenticação, navegação, arquivo no Drive ou decisões de arquitetura.
