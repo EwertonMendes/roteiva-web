@@ -167,9 +167,9 @@ test('Firestore deletion percent-encodes paths with reserved characters and cann
   const urls=[];
   const fetcher=async (url,init={})=>{
     const str=String(url);urls.push(str);
+    if(str.includes('/a%231:listCollectionIds'))return Response.json({collectionIds:[]});
     if(str.endsWith(':listCollectionIds'))return Response.json({collectionIds:['projects']});
     if(str.includes('/projects?pageSize='))return Response.json({documents:[{name:prefix+'/users/user-A/projects/a#1'}]});
-    if(str.includes('/a%231:listCollectionIds'))return Response.json({collectionIds:[]});
     if(str.endsWith('/a%231')&&init.method==='DELETE')return Response.json({});
     throw Error('unexpected URL '+str);
   };
