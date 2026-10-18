@@ -1,0 +1,114 @@
+/* Semantic icons — Roteiva. Decorative SVGs always accompany visible text. */
+.ui-icon-label {
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  max-width: 100%;
+  min-width: 0;
+  line-height: inherit;
+  vertical-align: middle;
+}
+.ui-icon-label > svg {
+  display: block;
+  flex: 0 0 auto;
+  color: inherit;
+}
+.ui-icon-label > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Project status vocabulary is shared between filter buttons and status badges. */
+.app-shell .filter-pills button .ui-icon-label { gap: .45rem; white-space: nowrap; }
+.app-shell .filter-pills button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.app-shell .filter-pills button:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+.app-shell .status-with-icon::before { display: none; }
+.app-shell .status-with-icon .ui-icon-label { gap: .35rem; }
+.app-shell .status-with-icon svg { flex-shrink: 0; }
+
+/* Headings and cards: icons supplement, but never compete with, titles or values. */
+.app-shell .client-summary .client-summary-label .ui-icon-label {
+  display: inline-flex;
+  align-items: center;
+  gap: .6rem;
+  letter-spacing: .025em;
+  line-height: var(--type-leading-ui);
+  font-size: var(--type-support);
+  font-weight: var(--type-weight-medium);
+}
+.app-shell .client-summary .client-summary-label svg { color: var(--muted); }
+.app-shell .client-summary > div { min-width: 0; }
+.app-shell .client-summary .client-summary-label .ui-icon-label > span {
+  display: inline;
+  min-width: 0;
+  letter-spacing: inherit;
+}
+.app-shell .client-toolbar .ui-icon-label,
+.app-shell .studio-section h2 .ui-icon-label { font-weight: inherit; }
+
+/* Native selects remain untouched: icons sit in the labels, outside the menu. */
+.app-shell .finance-filters label > .ui-icon-label {
+  font-weight: var(--type-weight-semibold);
+  font-size: var(--type-support);
+  gap: .5rem;
+}
+.app-shell .finance-filters label > .ui-icon-label svg { color: var(--muted); }
+.app-shell .finance-filters label,
+.app-shell .finance-filters label select { min-width: 0; }
+
+.app-shell .finance-metrics .finance-metric-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: .65rem;
+  line-height: var(--type-leading-meta);
+  letter-spacing: .035em;
+}
+.app-shell .finance-metrics .finance-metric-label > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.app-shell .finance-metrics .finance-metric-label > svg {
+  flex: 0 0 auto;
+  opacity: .8;
+  color: currentColor;
+}
+.app-shell .studio-alert {
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+  line-height: var(--type-leading-ui);
+}
+.app-shell .studio-alert > svg { flex: 0 0 auto; }
+.app-shell .panel-head .ui-icon-label { gap: .45rem; }
+.app-shell .panel-head .ui-icon-label > span { overflow-wrap: anywhere; }
+.app-shell .contact-links .ui-icon-label { overflow-wrap: anywhere; }
+
+/* Settings already has section icons. Add only meaningful field/utility icons. */
+.app-shell .settings-field > span .ui-icon-label { font: inherit; gap: .5rem; }
+.app-shell .settings-field > span .ui-icon-label svg { color: var(--muted); }
+.app-shell .settings-privacy-row strong > svg { flex: 0 0 auto; }
+
+/* Icon text remains visible on phones. Filters may scroll in their own row. */
+@media (max-width: 820px) {
+  .app-shell .filter-pills button { min-height: 2.75rem; flex: 0 0 auto; }
+  .app-shell .client-summary .client-summary-label .ui-icon-label { gap: .35rem; }
+  .app-shell .finance-metrics .finance-metric-label { gap: .35rem; }
+  .app-shell .finance-metrics .finance-metric-label > svg { width: 16px; height: 16px; }
+}
+@media (max-width: 430px) {
+  .app-shell .client-summary .client-summary-label .ui-icon-label > span {
+    font-size: var(--type-caption);
+  }
+  .app-shell .client-summary .client-summary-label svg { width: 16px; height: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-shell .filter-pills button .ui-icon-label svg { transition: none; }
+}
