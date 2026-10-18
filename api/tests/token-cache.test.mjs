@@ -78,7 +78,7 @@ test('reconnection during refresh is not overwritten or invalidated by old inval
   const fresh=await encrypt(env,'new-consent-refresh',context(env,'A','google-A'));
   sql.prepare("UPDATE drive_connections SET revision=revision+1,encrypted_refresh_token=?,refresh_lease_id=NULL,refresh_lease_until=0").run(fresh);
   resume.resolve();
-  await assert.rejects(()=>pending,e=>e.code==='reconnect_required');
+  await assert.rejects(()=>pending,e=>e.code==='connection_changed');
   assert.equal(saved().revision,2);assert.equal(saved().status,'connected');
   assert.equal(saved().encrypted_refresh_token,fresh);
 });
@@ -90,7 +90,7 @@ test('expired lease can be taken over; former holder cannot publish or invalidat
   sql.exec('UPDATE drive_connections SET refresh_lease_until=0');
   const replacement=await accessCredential(env,row,async()=>token('replacement'));
   resume.resolve();
-  await assert.rejects(()=>pending,e=>e.code==='reconnect_required');
+  assert.equal(await pending,'replacement');
   assert.equal(saved().status,'connected');
   assert.equal(saved().access_token_version,replacement.version);
   assert.equal(await accessToken(env,row,async()=>token()),'replacement');

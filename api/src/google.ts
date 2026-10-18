@@ -86,7 +86,12 @@ export async function accessCredential(env: Env, input: Connection, fetcher: typ
         metric('refresh_failed',started);
         if (error instanceof ApiError && error.code === 'reconnect_required') {
           // Revision guard prevents an old invalid_grant invalidating a new consent.
-          await invalidate(env,row,lease);
+          if (!await invalidate(env,row,lease)) {
+            const current = await loadTokenConnection(env,input.owner_uid,input.id);
+            const replacement = await cached(env,current);
+            if (replacement) { metric('hit_after_race',started); return replacement; }
+            throw new ApiError(409,'connection_changed');
+          }
         }
         throw error;
       } finally {
