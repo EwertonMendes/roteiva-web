@@ -44,3 +44,14 @@ Toda alteração de UI deve preservar as funcionalidades já disponíveis e ser 
 - A lateral exibe marca, navegação e perfil da pessoa usuária com ação de saída no rodapé.
 - O cartão informativo redundante sobre o nome do estúdio, quantidade de arquivos e sincronização foi retirado da lateral. Informações equivalentes continuam nas telas e na barra superior quando relevantes.
 - O perfil permanece ancorado ao rodapé tanto no desktop quanto no menu mobile aberto. Não reintroduzir o cartão sem uma necessidade funcional concreta.
+
+
+## Biblioteca 2.0 — explorador minimalista (PR #29, em validação)
+
+- Organização centrada nos arquivos, não no provedor: conta Drive e atualização ficam num menu discreto; projeto escolhido em um único controle no cabeçalho.
+- Desktop: painel esquerdo para pastas vinculadas, direito para conteúdo com caminho de navegação, metadados essenciais e ações secundárias em menu. Uma pasta aberta substitui o conteúdo, sem empilhar painéis novos.
+- Mobile: pastas e arquivos em níveis alternados, com voltar visível; nada de duas colunas comprimidas. O seletor vira tela inteira com lista rolável e confirmação fixa.
+- Vinculação: checkbox separado da ação de abrir pasta, permitindo selecionar várias pastas inclusive após navegar; distinguir visualmente as já vinculadas.
+- Filtros dos resultados carregados são indicados explicitamente como locais; não simular busca global. Priorizar uma interação para abrir pasta/arquivo.
+- Usar tokens `--card`, `--line`, `--subtle`, `--ink`, `--muted`; não fixar cores dependentes de tema. Garantir labels, foco visível, Escape, scroll de fundo bloqueado e redução de movimento.
+- Evitar representar pasta vinculada como arquivo importado no contador ou expor email/gestão da conta como conteúdo principal.
