@@ -25,12 +25,16 @@ async function createTestAccount(page:Page,email:string){
 test("deletion modal blocks incomplete confirmation and cancellation never calls the API",async({page},info)=>{
   let submissions=0;
   await page.route(api+"/account/deletion**",async route=>{
+    const headers={"Access-Control-Allow-Origin":cloud,
+      "Access-Control-Allow-Methods":"GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers":"Authorization, Content-Type"};
+    if(route.request().method()==="OPTIONS")return route.fulfill({status:204,headers});
     if(route.request().url().includes("/account/deletion/status")){
-      return route.fulfill({status:200,headers:{"Access-Control-Allow-Origin":cloud},
+      return route.fulfill({status:200,headers,
         contentType:"application/json",body:JSON.stringify({available:true,operation:null})});
     }
     submissions++;
-    return route.fulfill({status:503,headers:{"Access-Control-Allow-Origin":cloud},
+    return route.fulfill({status:503,headers,
       contentType:"application/json",body:JSON.stringify({error:{code:"deletion_unavailable"}})});
   });
   await createTestAccount(page,"deletion-confirm-"+info.project.name+"@example.com");
