@@ -116,6 +116,16 @@ jobs:
             --project roteiva-web-dev \
             --expires 7d \
             --non-interactive
+      - name: Build separate static UX review without Firebase Auth
+        run: |
+          VITE_LIBRARY_REVIEW=true pnpm exec vite build --mode demo --outDir dist --base /
+          node scripts/verify-static-build.mjs dist /
+      - name: Publish UI-only preview (synthetic data, no backend)
+        run: |
+          pnpm exec firebase hosting:channel:deploy pr-29-design \
+            --project roteiva-web-dev \
+            --expires 7d \
+            --non-interactive
 
   deploy:
     name: Publish Pages
