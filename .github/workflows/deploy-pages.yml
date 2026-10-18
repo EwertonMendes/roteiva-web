@@ -75,6 +75,58 @@ jobs:
         with:
           path: dist-pages
 
+  preview:
+    name: Preview Firebase Hosting (PR 29)
+    needs: build
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.number == 29 &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'feat/library-explorer-ux'
+    runs-on: ubuntu-latest
+    environment: firebase-development
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build and validate frontend preview
+        run: |
+          pnpm run build
+          node scripts/verify-static-build.mjs dist /
+      - name: Guard isolated Firebase DEV target
+        env:
+          CONFIGURED_PROJECT: ${{ vars.FIREBASE_PROJECT_ID }}
+        run: test "$CONFIGURED_PROJECT" = "roteiva-web-dev"
+      - name: Authenticate existing protected deployment identity
+        uses: google-github-actions/auth@v3
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+      - name: Publish ONLY the PR 29 preview channel (never live)
+        run: |
+          pnpm exec firebase hosting:channel:deploy pr-29 \
+            --project roteiva-web-dev \
+            --expires 7d \
+            --non-interactive
+      - name: Build separate static UX review without Firebase Auth
+        run: |
+          VITE_LIBRARY_REVIEW=true pnpm exec vite build --mode demo --outDir dist --base /
+          node scripts/verify-static-build.mjs dist /
+      - name: Publish UI-only preview (synthetic data, no backend)
+        run: |
+          pnpm exec firebase hosting:channel:deploy pr-29-design \
+            --project roteiva-web-dev \
+            --expires 7d \
+            --non-interactive
+
   deploy:
     name: Publish Pages
     if: github.event_name != 'pull_request'
