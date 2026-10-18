@@ -342,6 +342,16 @@ Se houver falha em teste de segurança/cookie, desabilitar imediatamente OAuth v
 
 Não confundir biblioteca navegável MVP com aprovação/produção audiovisual completa.
 
+## Refinamento de interface — iconografia semântica (17/10/2026)
+
+- **IMPLEMENTADO; validação CI/QA pendente nesta PR:** mapear filtros e badges de status dos projetos com o mesmo ícone Lucide e texto, mantendo os filtros funcionais via teclado e `aria-pressed`.
+- **IMPLEMENTADO; validação CI/QA pendente nesta PR:** ícones contextuais nos indicadores/links de clientes, quatro métricas e filtros financeiros, cabeçalhos de gráficos/alerta, e campos selecionados de Configurações.
+- **IMPLEMENTADO; validação CI/QA pendente nesta PR:** componente acessível `IconLabel`, CSS adaptativo claro/escuro/mobile e regressão `tests/browser/semantic-icons.spec.ts`.
+- **Sem alterações:** dados Firestore, autenticação, Worker/Drive, cálculos e exportações, navegação e laboratório temporário de fontes.
+- **Aceite:** `pnpm typecheck`, `pnpm test`, builds Firebase/Pages/Emulator, testes Playwright desktop/mobile e validação visual final pelo proprietário no DEV; a auditoria visual humana pode exigir ajustes finos posteriores.
+
+Evidências: `src/features/ui/`, `src/dashboard-client.tsx`, `src/studio-features.tsx`, `src/features/settings/SettingsPage.tsx`, `tests/browser/semantic-icons.spec.ts` e a PR desta implementação.
+
 ## Cache e renovação coordenada de tokens Drive — 17/10/2026
 
 **Estado: IMPLEMENTADO e publicado no DEV pela PR #25 (sem merge automático).** Sem mudança de escopos, frontend, regras Firestore, arquivos do Drive ou infraestrutura paga.
@@ -351,5 +361,5 @@ Não confundir biblioteca navegável MVP com aprovação/produção audiovisual 
 - [x] Invalidação em consentimento/desconexão/revogação; invalid_grant antigo não invalida nova conexão.
 - [x] Cliente único de GETs Drive; um retry em 401, sem renovar por 403/cota; eventos categóricos sem credenciais.
 - [x] Testes com SQL/AES reais e Google simulado para expiração, concorrência e falhas.
-- [x] CI frontend e 36 testes API; migration remota 0003 e publicação DEV. Evidência de execução registrada em DEVELOPMENT.md.
+- [ ] CI do HEAD, migration remota e publicação DEV.
 - [ ] QA do proprietário com conexão real, leitura repetida de pastas, expiração real e comparação de métricas. Nenhuma redução percentual/latência real presumida.
