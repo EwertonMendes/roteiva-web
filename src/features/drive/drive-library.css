@@ -169,3 +169,9 @@
   .rl-confirm {border-radius:18px 18px 0 0;width:100%;align-self:flex-end;margin:0;}
 }
 @media(prefers-reduced-motion:reduce){.rl-spin {animation:none;}}
+
+
+.rl-picker-modes {display:flex;gap:6px;padding:3px 22px 9px;}
+.rl-picker-modes button {border:1px solid transparent;border-radius:9px;background:transparent;color:var(--rl-muted);padding:8px 11px;font-size:.8125rem;}
+.rl-picker-modes button[aria-pressed="true"] {color:var(--rl-ink);background:var(--rl-hover);border-color:var(--rl-border);}
+@media(max-width:560px){.rl-picker-modes{padding:3px 16px 8px;}}
