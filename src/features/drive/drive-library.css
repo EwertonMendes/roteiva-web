@@ -265,3 +265,12 @@
 .rl-file-icon:not(.rl-file-icon--image)[data-mime^="image/"] {color:#54a9ab;background:#429c9c1a;}
 .rl-file-icon:not(.rl-file-icon--image)[data-mime^="audio/"] {color:#d19c51;background:#d49b451a;}
 .rl-file-icon:not(.rl-file-icon--image)[data-mime^="application/vnd.google-apps."] {color:#598ec9;background:#477ab81b;}
+
+/* Thumbnail lifecycle: only show a loading indicator during an active request. */
+.rl-thumb-loading {position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:5px;background:var(--rl-hover);color:var(--rl-muted);overflow:hidden;}
+.rl-thumb-loading-spin {flex:none;animation:rl-rotate 1s linear infinite;}
+.rl-thumb-loading>span {display:none;white-space:nowrap;font-size:.7rem;}
+.rl-files[data-view="grid"] .rl-thumb-loading {flex-direction:column;gap:8px;}
+.rl-files[data-view="grid"] .rl-thumb-loading-spin {width:23px;height:23px;}
+.rl-files[data-view="grid"] .rl-thumb-loading>span {display:block;}
+@media(prefers-reduced-motion:reduce){.rl-thumb-loading-spin {animation:none;}}

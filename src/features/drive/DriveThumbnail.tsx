@@ -1,8 +1,10 @@
 import {useEffect, useRef, useState} from "react";
-import {Play} from "lucide-react";
+import {LoaderCircle, Play} from "lucide-react";
 import {driveKindIcon, type DriveItem, DRIVE_FOLDER} from "./DriveLibraryUI";
 
 type GetThumbnail = (item:DriveItem)=>Promise<Blob|null>;
+type Phase = "idle"|"loading"|"loaded"|"unavailable";
+type ThumbnailState={key:string;phase:Phase;src:string|null};
 const MAX_CACHE=48;
 const MAX_CONCURRENT=4;
 const cache=new Map<string,string>();
@@ -56,29 +58,61 @@ function resolveThumbnail(key:string,item:DriveItem,getThumbnail:GetThumbnail):P
   return operation;
 }
 
-/** Lazy thumbnail only when the row/card intersects the viewport; graceful icon fallback. */
+function initialState(key:string,available:boolean):ThumbnailState{
+  const src=available?cache.get(key)||null:null;
+  return {key,src,phase:src?"loaded":available?"idle":"unavailable"};
+}
+
+/** Keep an icon when offscreen; display a spinner only during the actual request. */
 export function DriveThumbnail({item,scope,getThumbnail}:{item:DriveItem;scope:string;getThumbnail:GetThumbnail}){
   const Icon=driveKindIcon(item.mimeType);
   const ref=useRef<HTMLSpanElement>(null);
   const key=scope+":"+item.id+":"+(item.modifiedTime||"");
   const available=Boolean(item.thumbnailLink) && item.mimeType!==DRIVE_FOLDER;
-  const [src,setSrc]=useState<string|null>(()=>cache.get(key)||null);
+  const [state,setState]=useState<ThumbnailState>(()=>initialState(key,available));
+  // Avoid showing an image belonging to a previous item if React reuses the component.
+  const current=state.key===key?state:initialState(key,available);
   useEffect(()=>{
-    setSrc(cache.get(key)||null);
-    if(!available)return;
-    let live=true;
+    const cached=initialState(key,available);
+    setState(cached);
+    if(!available || cached.phase==="loaded")return;
+    let active=true;
+    let started=false;
     const load=()=>{
-      void resolveThumbnail(key,item,getThumbnail).then(url=>{if(live)setSrc(url);});
+      if(started)return;
+      started=true;
+      setState({key,src:null,phase:"loading"});
+      void resolveThumbnail(key,item,getThumbnail).then(url=>{
+        if(active)setState({key,src:url,phase:url?"loaded":"unavailable"});
+      });
     };
-    if(!ref.current || typeof IntersectionObserver==="undefined"){load();return ()=>{live=false;};}
+    if(!ref.current || typeof IntersectionObserver==="undefined"){
+      load();
+      return ()=>{active=false;};
+    }
     const observer=new IntersectionObserver(entries=>{
       if(entries.some(entry=>entry.isIntersecting)){observer.disconnect();load();}
     },{rootMargin:"160px"});
     observer.observe(ref.current);
-    return ()=>{live=false;observer.disconnect();};
+    return ()=>{active=false;observer.disconnect();};
   },[key,available,getThumbnail]);
-  return <span className={"rl-file-icon"+(src?" rl-file-icon--image":"")} ref={ref} data-mime={item.mimeType}>
-    {src?<img src={src} alt="" loading="lazy" decoding="async"/>:<Icon size={20}/>}
-    {item.mimeType.startsWith("video/")&&<span className="rl-video-mark" aria-hidden="true"><Play size={11} fill="currentColor"/></span>}
+
+  function handleImageError(){
+    if(current.src && cache.get(key)===current.src){
+      cache.delete(key);
+      URL.revokeObjectURL(current.src);
+    }
+    setState({key,src:null,phase:"unavailable"});
+  }
+  return <span className={"rl-file-icon"+(current.src?" rl-file-icon--image":"")} ref={ref}
+    data-mime={item.mimeType} data-thumbnail-state={current.phase}
+    title={current.phase==="loading"?"Carregando miniatura":undefined}>
+    {current.phase==="loading"
+      ? <span className="rl-thumb-loading" aria-hidden="true"><LoaderCircle size={19} className="rl-thumb-loading-spin"/><span>Carregando prévia</span></span>
+      :current.src
+        ? <img src={current.src} alt="" loading="lazy" decoding="async" onError={handleImageError}/>
+        :<Icon size={20}/>}
+    {current.phase!=="loading" && item.mimeType.startsWith("video/") &&
+      <span className="rl-video-mark" aria-hidden="true"><Play size={11} fill="currentColor"/></span>}
   </span>;
 }

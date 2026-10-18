@@ -104,11 +104,11 @@ test("sidebar logo always loads from site root on nested Firebase routes and in 
   }
 });
 
-test("GitHub Pages demo resolves logo under /roteiva-web/ instead of the browser root",async({page})=>{
-  await page.goto("http://127.0.0.1:4174/roteiva-web/#/projetos");
+test("local demo loads its logo from the site root, without the retired Pages prefix",async({page})=>{
+  await page.goto("http://127.0.0.1:4174/");
   const logo=page.locator(".brand-lockup img");
   await expect(logo).toBeVisible();
-  await expect(logo).toHaveAttribute("src",/^\/roteiva-web\/roteiva-logo-(black|white)\.png$/);
+  await expect(logo).toHaveAttribute("src",/^\/roteiva-logo-(black|white)\.png$/);
   await expect.poll(()=>logo.evaluate((img:HTMLImageElement)=>img.complete && img.naturalWidth>0)).toBe(true);
 });
 
