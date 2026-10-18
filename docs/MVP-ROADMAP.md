@@ -352,6 +352,12 @@ Não confundir biblioteca navegável MVP com aprovação/produção audiovisual 
 
 Evidências: `src/features/ui/`, `src/dashboard-client.tsx`, `src/studio-features.tsx`, `src/features/settings/SettingsPage.tsx`, `tests/browser/semantic-icons.spec.ts` e a PR desta implementação.
 
+## Refinamento UI — simplificação da barra lateral (outubro/2026)
+
+- **IMPLEMENTADO; revisão visual final pendente:** remover o cartão informativo de estúdio/arquivos/sincronização da sidebar, mantendo logo, navegação e perfil com saída no rodapé, em mobile e desktop.
+- Evidências: `src/dashboard-client.tsx`, regras residuais removidas em `src/globals.css`, `src/responsive.css`, `src/refined-theme.css`, regressão em `tests/browser/typography.spec.ts`. Validação de CI e publicação pela PR correspondente.
+- Sem mudanças em Firestore, banco, Worker, credenciais, autenticação, navegação, arquivo no Drive ou decisões de arquitetura.
+
 ## Cache e renovação coordenada de tokens Drive — 17/10/2026
 
 **Estado: IMPLEMENTADO e publicado no DEV pela PR #25 (sem merge automático).** Sem mudança de escopos, frontend, regras Firestore, arquivos do Drive ou infraestrutura paga.

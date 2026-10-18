@@ -53,7 +53,6 @@
   .main { overflow-x: clip; }
   .sidebar { width: min(310px, 86vw); overflow-y: auto; padding-top: max(18px, env(safe-area-inset-top)); padding-bottom: max(18px, env(safe-area-inset-bottom)); }
   .sidebar nav > button { min-height: 47px; font-size: var(--type-label); }
-  .sidebar .storage-card { margin-top: 20px; }
   .sidebar .sidebar-profile { margin-top: auto; padding-top: 20px; }
   .mobile-scrim { z-index: 29; }
   .topbar { height: 62px; margin: 8px 12px 0; padding: 0 12px; gap: 9px; border-radius: 18px; }

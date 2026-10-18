@@ -111,3 +111,23 @@ test("GitHub Pages demo resolves logo under /roteiva-web/ instead of the browser
   await expect(logo).toHaveAttribute("src",/^\/roteiva-web\/roteiva-logo-(black|white)\.png$/);
   await expect.poll(()=>logo.evaluate((img:HTMLImageElement)=>img.complete && img.naturalWidth>0)).toBe(true);
 });
+
+test("sidebar has no redundant workspace card and keeps user profile anchored", async ({page},info) => {
+  await enterWorkspace(page, "sidebar-clean-" + info.project.name + "@example.com");
+  const sidebar = page.locator(".sidebar");
+  await expect(sidebar.locator(".storage-card")).toHaveCount(0);
+  await expect(sidebar.getByText("Seu espaço de produção")).toHaveCount(0);
+  const profile = sidebar.locator(".sidebar-profile");
+  if(info.project.name === "mobile"){
+    await page.getByRole("button", {name:"Abrir menu"}).click();
+  }
+  await expect(profile).toBeVisible();
+  await expect(sidebar.getByRole("navigation")).toBeVisible();
+  const offsets = await profile.evaluate(node => {
+    const el = node as HTMLElement;
+    const container = el.closest(".sidebar") as HTMLElement;
+    return {profileBottom:el.getBoundingClientRect().bottom, sidebarBottom:container.getBoundingClientRect().bottom};
+  });
+  expect(offsets.sidebarBottom - offsets.profileBottom).toBeGreaterThanOrEqual(0);
+  expect(offsets.sidebarBottom - offsets.profileBottom).toBeLessThanOrEqual(40);
+});
