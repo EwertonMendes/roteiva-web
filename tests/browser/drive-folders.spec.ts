@@ -72,6 +72,7 @@ function mockDrive(page:Page,accountAvailable:()=>boolean){
 }
 
 test("folder picker links multiple folders, explorer opens files in one click and links survive reload",async({page},info)=>{
+  test.skip(info.project.name!=="desktop","Desktop explorer covered separately from mobile hierarchy");
   await mockDrive(page,()=>true);
   await signUp(page,"drive-folder-"+info.project.name+"@example.com");
   await createProject(page);
@@ -115,6 +116,7 @@ test("account retrieval error never shows a fake disconnected state and retries 
 });
 
 test("mobile shows one navigation level and a full-height folder picker",async({page},info)=>{
+  test.skip(info.project.name!=="mobile","Covered by the mobile Playwright project");
   await page.setViewportSize({width:390,height:844});
   await mockDrive(page,()=>true);
   await signUp(page,"drive-mobile-"+info.project.name+"@example.com");
