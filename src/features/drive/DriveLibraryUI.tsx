@@ -67,6 +67,8 @@ type FolderPickerProps={
   working:boolean;
   canRead:boolean;
   hasMore:boolean;
+  mode:"root"|"all";
+  onModeChange:(mode:"root"|"all")=>void;
   linkedIds:ReadonlySet<string>;
   error:string;
   onNavigate:(id:string,path:DriveTrail[])=>void;
@@ -75,7 +77,7 @@ type FolderPickerProps={
   onConnect:()=>void;
   onClose:()=>void;
 };
-export function DriveFolderPicker({projects,projectId,onProjectChange,folders,path,loading,working,canRead,hasMore,linkedIds,error,onNavigate,onMore,onLink,onConnect,onClose}:FolderPickerProps){
+export function DriveFolderPicker({projects,projectId,onProjectChange,folders,path,loading,working,canRead,hasMore,mode,onModeChange,linkedIds,error,onNavigate,onMore,onLink,onConnect,onClose}:FolderPickerProps){
   const ref=useOverlayFocus(onClose);
   const [chosen,setChosen]=useState<Record<string,DriveItem>>({});
   const [filter,setFilter]=useState("");
@@ -101,6 +103,10 @@ export function DriveFolderPicker({projects,projectId,onProjectChange,folders,pa
       {!projectId?<div className="rl-picker-empty"><FolderOpen size={30}/><p>Escolha um projeto para carregar suas pastas do Google Drive.</p></div>
       :!canRead?<div className="rl-picker-empty"><Link2 size={30}/><p>É necessário autorizar a leitura das pastas existentes na sua conta Google.</p><button className="primary-button" type="button" onClick={onConnect} disabled={working}>Autorizar Google Drive</button></div>
       :<>
+        <div className="rl-picker-modes" role="group" aria-label="Local de pesquisa">
+          <button type="button" aria-pressed={mode==="root"} onClick={()=>onModeChange("root")} disabled={loading}>Meu Drive</button>
+          <button type="button" aria-pressed={mode==="all"} onClick={()=>onModeChange("all")} disabled={loading}>Todas as pastas</button>
+        </div>
         <nav className="rl-breadcrumbs" aria-label="Localização no Google Drive">{path.map((entry,i)=><span key={entry.id}>
           {i>0&&<ChevronRight size={13}/>}
           <button type="button" onClick={()=>onNavigate(entry.id,path.slice(0,i+1))} disabled={loading}>{entry.name}</button>
