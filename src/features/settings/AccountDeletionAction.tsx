@@ -24,7 +24,7 @@ async function api<T>(path:string,method:"GET"|"POST",body?:unknown):Promise<T>{
   }
   return await r.json() as T;
 }
-export function AccountDeletionAction(){
+export function AccountDeletionAction({compact=false}:{compact?:boolean}){
   const {user}=useAuth();
   const [ready,setReady]=useState(false);
   const [available,setAvailable]=useState(false);
@@ -92,10 +92,10 @@ export function AccountDeletionAction(){
         setError(message.startsWith("Firebase:")?"Não foi possível confirmar sua identidade Google. Tente novamente.":message);
     }finally{setBusy(false);}
   }
-  return <div className="account-delete">
+  return <div className={"account-delete"+(compact?" account-delete-compact":"")}>
     <div className="settings-privacy-row">
       <div><strong><Trash2 size={16}/> Excluir minha conta</strong>
-        <p>Exclusão permanente da conta e dos dados armazenados no Roteiva. Seus arquivos originais no Google Drive serão preservados.</p>
+        {!compact&&<p>Exclusão permanente da conta e dos dados armazenados no Roteiva. Seus arquivos originais no Google Drive serão preservados.</p>}
       </div>
       <button type="button" className="secondary-button" disabled={!ready||!available||!!progress} onClick={()=>{setError("");setOpened(true);}}>
         <Trash2 size={15}/> Excluir conta
