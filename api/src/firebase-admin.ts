@@ -109,5 +109,17 @@ export async function deleteRoot(uid:string,token:string,fetcher:typeof fetch=fe
   await adminRequest(root(uid),token,'DELETE',undefined,fetcher);
 }
 export async function deleteIdentity(uid:string,token:string,fetcher:typeof fetch=fetch){
-  await adminRequest(IDENTITY+':delete',token,'POST',{localId:uid},fetcher);
+  let response:Response;
+  try{response=await fetcher(IDENTITY+':delete',{method:'POST',
+    headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},
+    body:JSON.stringify({localId:uid}),signal:AbortSignal.timeout(15000)});}
+  catch{throw new ApiError(503,'admin_service_unavailable');}
+  if(response.ok)return;
+  if(response.status===400||response.status===404){
+    // Retry after a successful remote deletion may report USER_NOT_FOUND.
+    const error=await response.json().catch(()=>({})) as {error?:{message?:string}};
+    if(error.error?.message==='USER_NOT_FOUND')return;
+  }
+  if(response.status===403)throw new ApiError(503,'admin_permission_denied');
+  throw new ApiError(503,'admin_service_unavailable');
 }
