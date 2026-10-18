@@ -39,6 +39,12 @@ test('Firebase signed JWT validates issuer, audience, expiry, signature and auth
     .setExpirationTime(options.exp||now+300).sign(options.key||privateKey);
  }
  assert.equal(await verifyFirebase(await token(),'roteiva-web-dev',keys),'A');
+ assert.equal(await verifyFirebase(await token(),'roteiva-web-dev',keys,300),'A');
+ // A freshly issued JWT may still belong to an old login. Refreshing it must
+ // not satisfy recent-authentication checks for an irreversible request.
+ const oldLogin=await token({claims:{auth_time:now-600}});
+ assert.equal(await verifyFirebase(oldLogin,'roteiva-web-dev',keys),'A');
+ await assert.rejects(()=>verifyFirebase(oldLogin,'roteiva-web-dev',keys,300),e=>e.status===401);
  for (const bad of ['malformed',await token({audience:'other'}),await token({issuer:'https://evil.example'}),
    await token({exp:now-100}),await token({claims:{auth_time:now+3600}}),
    await token({key:(await generateKeyPair('RS256')).privateKey})])

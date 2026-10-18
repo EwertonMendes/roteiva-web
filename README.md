@@ -58,7 +58,7 @@ O perfil é salvo no próprio `users/{uid}` do Firestore com revisão sequencial
 
 **Fora deste PR:** exclusão irreversível de conta, edição de foto/e-mail do Google, políticas legais, billing, Drive e trabalho em equipe. A demonstração Pages continua sem conta e mostra as configurações em modo leitura.
 
-**Exclusão permanente (PR #30):** publicada e verificada no DEV com conta de teste autorizada: dados e identidade removidos, concessão Drive revogada, arquivo original preservado e outra conta intacta. A [PR #31](https://github.com/EwertonMendes/roteiva-web/pull/31) corrige o acompanhamento da conclusão, o orçamento de execução e a linguagem ao cliente; exclusão fica apenas em Configurações após cadastro. Veja os resultados e aceites ainda pendentes em [ACCOUNT-DELETION.md](docs/ACCOUNT-DELETION.md).
+**Exclusão permanente (PR #30):** publicada e verificada no DEV com conta de teste autorizada: dados e identidade removidos, concessão Drive revogada, arquivo original preservado e outra conta intacta. A [PR #31](https://github.com/EwertonMendes/roteiva-web/pull/31) corrige o acompanhamento da conclusão, o orçamento de execução e a linguagem ao cliente; exclusão fica apenas em Configurações após cadastro. Login recente é aproveitado na confirmação; uma sessão antiga exige confirmar a mesma conta com Google, sem aceitar outra identidade. Veja os resultados e aceites ainda pendentes em [ACCOUNT-DELETION.md](docs/ACCOUNT-DELETION.md).
 
 ## Navegação com URLs persistentes (PR #12)
 

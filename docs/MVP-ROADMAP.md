@@ -410,3 +410,7 @@ A URL do DEV principal não mudou e o merge não foi executado. CI para preview 
 - [ ] Confirmar entrega de alertas de Actions aos responsáveis em falha; a execução saudável do monitor não comprova notificação entregue.
 
 O DEV publicado tem `ACCOUNT_DELETION_ENABLED=true` e credencial administrativa validada; sem a credencial exata, o endpoint falha fechado. O teste destrutivo completo foi verificado. A PR #31 corrige acompanhamento, orçamento e linguagem; sua publicação é feita pelo pipeline oficial da master após CI aprovado. O caso sem cadastro não possui mais entrada destrutiva na UI por decisão do proprietário. A correção inclui linguagem comercial nas telas, polling sem falso sucesso e lotes compatíveis com o limite Workers Free. Evidências em [ACCOUNT-DELETION.md](ACCOUNT-DELETION.md).
+
+### Exclusão sem confirmação Google redundante (18/10/2026)
+
+**IMPLEMENTADO, CI/publicação rastreados na PR:** aproveitar login recente sem popup extra. O Worker mantém `auth_time <= 300s`; sessão antiga requer confirmação explícita com Google. Modal mostra e-mail, provedor recebe login_hint e seleção de conta diferente deve interromper a submissão sem trocar a conta Roteiva. Testes API e browser incluem login recente/antigo, cancelamento e conta incorreta. Sem mudança em IAM, credenciais, Firestore Rules, CORS ou dados de contas reais. Ver [ACCOUNT-DELETION.md](ACCOUNT-DELETION.md).

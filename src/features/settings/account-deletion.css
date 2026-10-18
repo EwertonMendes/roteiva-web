@@ -10,7 +10,7 @@
 .account-delete-dialog header svg{flex-shrink:0}
 .account-delete-dialog header h2{font-size:1.22rem;line-height:1.35;margin:0}
 .account-delete-dialog header button{width:38px;height:38px;background:var(--subtle);border:1px solid var(--line);border-radius:10px;color:var(--ink);display:grid;place-items:center}
-.account-delete-dialog>p{font-size:.875rem;line-height:1.6;color:var(--muted);margin:17px 0}
+.account-delete-dialog>p{font-size:.875rem;line-height:1.6;color:var(--muted);margin:17px 0;overflow-wrap:anywhere}
 .account-delete-dialog>p strong{color:var(--ink)}
 .account-delete-preserve{display:flex;align-items:flex-start;gap:9px;font-size:.83rem;background:var(--subtle);border-radius:11px;border:1px solid var(--line);padding:12px}
 .account-delete-preserve svg{flex-shrink:0}

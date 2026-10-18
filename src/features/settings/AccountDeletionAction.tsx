@@ -8,6 +8,9 @@ import "./account-deletion.css";
 const BASE="https://roteiva-api-dev.ewertonmendes9.workers.dev";
 const CONFIRM="EXCLUIR MINHA CONTA";
 export type StatusResponse={available:boolean;operation:{id:string;status:"processing"|"completed"|"manual_review"}|null};
+class DeletionApiError extends Error{
+  constructor(readonly code:string,message:string){super(message);}
+}
 async function api<T>(path:string,method:"GET"|"POST",body?:unknown):Promise<T>{
   const {auth}=firebaseServices();
   if(!auth.currentUser)throw new Error("Sua sessão expirou. Entre novamente.");
@@ -18,7 +21,7 @@ async function api<T>(path:string,method:"GET"|"POST",body?:unknown):Promise<T>{
     const data=await r.json().catch(()=>({})) as {error?:{code?:string}};
     const code=data.error?.code||"";
     if(code==="deletion_unavailable")throw new Error("Não foi possível solicitar a exclusão agora. Tente novamente mais tarde.");
-    if(code==="invalid_identity")throw new Error("Confirme sua identidade Google novamente.");
+    if(r.status===401&&code==="invalid_identity")throw new DeletionApiError(code,"Para proteger sua conta, confirme sua identidade com o Google antes de continuar.");
     throw new Error("Não foi possível concluir a solicitação com segurança. Tente novamente.");
   }
   return await r.json() as T;
@@ -35,6 +38,7 @@ export function AccountDeletionAction({compact=false}:{compact?:boolean}){
   const [text,setText]=useState("");
   const [checked,setChecked]=useState(false);
   const [busy,setBusy]=useState(false);
+  const [needsIdentityConfirmation,setNeedsIdentityConfirmation]=useState(false);
   const [error,setError]=useState("");
   const dialogRef=useRef<HTMLDivElement>(null);
   const canConfirm=text===CONFIRM&&checked&&!busy;
@@ -71,11 +75,14 @@ export function AccountDeletionAction({compact=false}:{compact?:boolean}){
     if(!canConfirm||!user)return;
     setBusy(true);setError("");
     try{
-      // The confirmation phrase prevents mistakes; Google popup proves user
-      // presence. The backend independently checks JWT auth_time <= 5 minutes.
-      const provider=new GoogleAuthProvider();
-      provider.setCustomParameters({prompt:"select_account"});
-      await reauthenticateWithPopup(user,provider);
+      // The server is the source of truth for signed auth_time <= 5 minutes.
+      // A recent login needs no second popup. If rejected, the next explicit
+      // click opens Google synchronously, preserving the browser user gesture.
+      if(needsIdentityConfirmation){
+        const provider=new GoogleAuthProvider();
+        if(user.email)provider.setCustomParameters({login_hint:user.email});
+        await reauthenticateWithPopup(user,provider);
+      }
       if(firebaseServices().auth.currentUser?.uid!==user.uid)throw new Error("A conta Google autenticada é diferente da sua conta Roteiva.");
       const response=await api<{status:"processing"|"completed"|"manual_review";operationId:string}>("/account/deletion","POST",
         {phrase:CONFIRM,acknowledged:true});
@@ -89,8 +96,12 @@ export function AccountDeletionAction({compact=false}:{compact?:boolean}){
       }
       window.location.replace("/?deletion=requested");
     }catch(e){
+      if(e instanceof DeletionApiError)setNeedsIdentityConfirmation(true);
       const message=e instanceof Error?e.message:"Não foi possível confirmar a operação.";
-      if(!/popup-closed|cancelled-popup-request|popup-blocked/.test(message))
+      const code=(e as {code?:string})?.code;
+      if(code==='auth/user-mismatch')setError('Essa conta Google é diferente da conta que você quer excluir. Use '+(user.email||'a mesma conta aberta no Roteiva')+'.');
+      else if(code==='auth/popup-blocked')setError('Seu navegador bloqueou a confirmação do Google. Permita a abertura da janela e tente novamente.');
+      else if(!/popup-closed|cancelled-popup-request/.test(message))
         setError(message.startsWith("Firebase:")?"Não foi possível confirmar sua identidade Google. Tente novamente.":message);
     }finally{setBusy(false);}
   }
@@ -99,7 +110,7 @@ export function AccountDeletionAction({compact=false}:{compact?:boolean}){
       <div><strong><Trash2 size={16}/> Excluir minha conta</strong>
         {!compact&&<p>Exclusão permanente da conta e dos dados armazenados no Roteiva. Seus arquivos originais no Google Drive serão preservados.</p>}
       </div>
-      <button type="button" className="secondary-button" disabled={!ready||!available||!!progress} onClick={()=>{setError("");setText("");setChecked(false);setOpened(true);}}>
+      <button type="button" className="secondary-button" disabled={!ready||!available||!!progress} onClick={()=>{setError("");setText("");setChecked(false);setNeedsIdentityConfirmation(false);setOpened(true);}}>
         <Trash2 size={15}/> Excluir conta
       </button>
     </div>
@@ -111,6 +122,7 @@ export function AccountDeletionAction({compact=false}:{compact?:boolean}){
       <div className="account-delete-dialog" ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="delete-title" aria-describedby="delete-desc" tabIndex={-1}>
         <header><div><AlertTriangle size={22}/><h2 id="delete-title">Excluir sua conta?</h2></div><button type="button" disabled={busy} onClick={dismiss} aria-label="Fechar"><X size={19}/></button></header>
         <p id="delete-desc">Esta ação é <strong>permanente</strong>. Seu perfil, projetos, clientes, agenda, financeiro e demais informações no Roteiva serão eliminados. Não será possível recuperá-los.</p>
+        {user?.email&&<p>Você está excluindo a conta <strong>{user.email}</strong>.</p>}
         <div className="account-delete-preserve"><CheckCircle2 size={17}/><span>Os arquivos originais do seu Google Drive não serão apagados.</span></div>
         <p>Se precisar de uma cópia dos seus registros, cancele e exporte os dados antes de continuar.</p>
         <label htmlFor="delete-confirm">Digite <strong>{CONFIRM}</strong> para confirmar:</label>
@@ -121,7 +133,7 @@ export function AccountDeletionAction({compact=false}:{compact?:boolean}){
         {error&&<p className="account-delete-error" role="alert">{error}</p>}
         <footer><button type="button" className="secondary-button" disabled={busy} onClick={dismiss}>Cancelar</button>
           <button type="button" className="account-delete-danger" disabled={!canConfirm} onClick={()=>void request()}>
-            {busy?<><LoaderCircle size={16} className="account-delete-spin"/> Confirmando…</>:<><Trash2 size={16}/> Excluir definitivamente</>}
+            {busy?<><LoaderCircle size={16} className="account-delete-spin"/> Confirmando…</>:<><Trash2 size={16}/> {needsIdentityConfirmation?'Confirmar com Google':'Excluir definitivamente'}</>}
           </button></footer>
       </div>
     </div>}
