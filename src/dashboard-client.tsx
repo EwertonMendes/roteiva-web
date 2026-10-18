@@ -5,7 +5,7 @@ import {
   ChevronRight, CirclePause, CirclePlay, Clock3, Command, Film, Folder, FolderOpen,
   Grid2X2, LayoutDashboard, LibraryBig, ListFilter, Menu, PanelsTopLeft,
   ArrowUpRight, Building2, Moon, UserRound,
-  MoreHorizontal, Pencil, Plus, ReceiptText, Search, Sparkles, Sun, Trash2,
+  MoreHorizontal, Pencil, Plus, ReceiptText, Search, Sun, Trash2,
   UserRoundPlus, Users, WalletCards, X, Upload, Image as ImageIcon,
   FileVideo, FileAudio, FileText, HardDrive, ChevronLeft, Settings2,
   LayoutGrid, UsersRound, Repeat2, ContactRound, type LucideIcon,
@@ -482,11 +482,6 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
           <button className={view === "library" ? "active" : ""} onClick={() => changeView("library")}><AnimatedNavIcon icon={Grid2X2} hoverIcon={LibraryBig} kind="library" /><span>Biblioteca</span><em>{libraryAssets.length}</em></button>
           <button className={view === "settings" ? "active" : ""} onClick={() => changeView("settings")}><AnimatedNavIcon icon={Settings2} hoverIcon={UserRound} kind="settings" /><span>Configurações</span></button>
         </nav>
-        <div className="storage-card">
-          <div><span><Sparkles size={15} /> {workspaceName}</span><b>{libraryAssets.length} arquivos</b></div>
-          <p>Seu espaço de produção</p>
-          <small className="sync-status" role="status">{isDemo ? saveStatus : cloudStatus}</small>
-        </div>
         <div className="sidebar-profile">
           {photoURL ? <img className="profile-photo" src={photoURL} alt="Foto do usuário" referrerPolicy="no-referrer" /> : <span>{firstName.slice(0, 2).toUpperCase()}</span>}<div><b>{firstName}</b><small>{email}</small></div>{onLogout ? <button className="icon-button" onClick={signOut} aria-label="Sair da conta" title="Sair da conta">↪</button> : <MoreHorizontal size={18} />}
         </div>
