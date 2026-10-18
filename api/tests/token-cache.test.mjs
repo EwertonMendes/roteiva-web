@@ -149,3 +149,43 @@ test('transient refresh failure releases lease, preserves refresh credential and
   await assert.rejects(()=>accessToken(env,row,fail),e=>e.code==='token_refresh_retry_later');
   assert.equal(calls,1);
 });
+
+test('actual disconnect path atomically clears cache and removes only its owner connection',async(t)=>{
+  const {disconnect}=await import('../src/drive.ts');
+  const {env,row,saved}=await setup(t);
+  await accessToken(env,row,async()=>token());
+  let revoked=0;
+  await disconnect(env,'A',row.id,async(url,options)=>{
+    revoked++;
+    assert.equal(url,'https://oauth2.googleapis.com/revoke');
+    assert.equal(options.body.get('token'),'synthetic-refresh');
+    assert.equal(saved().status,'revocation_pending');
+    assert.equal(saved().encrypted_access_token,null);
+    return new Response(null,{status:200});
+  });
+  assert.equal(revoked,1);assert.equal(saved(),undefined);
+});
+
+test('actual consent upsert invalidates cache and revision before future reads',async(t)=>{
+  const {persistDriveConsent}=await import('../src/consent.ts');
+  const {env,row,saved}=await setup(t);
+  await accessToken(env,row,async()=>token('before-consent'));
+  await persistDriveConsent(env,'A',{
+    access_token:'consent-access',refresh_token:'new-refresh',token_type:'Bearer',expires_in:3600,
+    scope:'https://www.googleapis.com/auth/drive.file',
+  },{sub:'google-A',email:'a@example.com'},async()=>Response.json({user:{emailAddress:'a@example.com'}}));
+  assert.equal(saved().encrypted_access_token,null);
+  assert.equal(saved().access_token_version,null);assert.equal(saved().revision,2);
+  assert.equal(await accessToken(env,row,async(url,options)=>{
+    assert.equal(options.body.get('refresh_token'),'new-refresh');return token('after-consent');
+  }),'after-consent');
+});
+
+test('waiting for another live lease is time bounded and never calls Google',async(t)=>{
+  const {env,row,sql}=await setup(t);
+  sql.exec("UPDATE drive_connections SET refresh_lease_id='occupied',refresh_lease_until=(unixepoch()+30)*1000");
+  const started=Date.now();
+  await assert.rejects(()=>accessToken(env,row,async()=>{throw Error('must not call Google');}),e=>e.code==='token_refresh_busy');
+  assert.ok(Date.now()-started>=8000);
+  assert.ok(Date.now()-started<15000);
+});

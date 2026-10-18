@@ -9,7 +9,7 @@ export async function metadata(env: Env, uid: string, connectionId: string, file
   target.searchParams.set('fields','id,name,mimeType,size,modifiedTime');
   return Response.json({file:await driveJson(env,row,target,fetch,'file_unavailable')});
 }
-export async function disconnect(env: Env, uid: string, connectionId: string): Promise<Response> {
+export async function disconnect(env: Env, uid: string, connectionId: string, fetcher: typeof fetch = fetch): Promise<Response> {
   const row = await connection(env,uid,connectionId);
   // Block future refresh before revocation. Preserve ciphertext only for a bounded manual retry.
   const result = await env.DB.prepare("UPDATE drive_connections SET status='revocation_pending',encrypted_access_token=NULL,access_token_expires_at=0,access_token_version=NULL,refresh_lease_id=NULL,refresh_lease_until=0,refresh_retry_after=0,revision=revision+1,updated_at=? WHERE id=? AND owner_uid=? AND revision=?")
@@ -17,7 +17,7 @@ export async function disconnect(env: Env, uid: string, connectionId: string): P
   if (result.meta.changes !== 1) throw new ApiError(409,'connection_changed');
   if (row.encrypted_refresh_token) {
     const token = await decrypt(env,row.encrypted_refresh_token,context(env,uid,row.google_account_id));
-    const response = await fetch('https://oauth2.googleapis.com/revoke',{
+    const response = await fetcher('https://oauth2.googleapis.com/revoke',{
       method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
       body:new URLSearchParams({token}),signal:AbortSignal.timeout(10000),
     });
