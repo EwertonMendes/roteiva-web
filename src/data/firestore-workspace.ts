@@ -14,6 +14,7 @@ export type RoteivaProfile = {
   professionalType: ProfessionalType;
   revision: number;
   legacy: boolean;
+  deletionState?: "deleting";
 };
 export type ProfileChanges = Pick<RoteivaProfile, "displayName" | "studioName" | "professionalType">;
 export function validateProfileChanges(profile: ProfileChanges): ProfileChanges {
@@ -33,6 +34,7 @@ function readProfile(data:DocumentData): RoteivaProfile {
       ? data.professionalType as ProfessionalType : "freelancer",
     revision:data.revision as number,
     legacy:!data.registrationCompletedAt,
+    deletionState:data.deletionState==="deleting"?"deleting":undefined,
   };
 }
 
