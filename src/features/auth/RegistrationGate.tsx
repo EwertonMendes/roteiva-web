@@ -6,7 +6,7 @@ import { useAuth } from "./AuthProvider";
 import { AuthLayout } from "./AuthLayout";
 import { RegistrationPage, type RegistrationValues } from "./RegistrationPage";
 
-type Status = "checking" | "registered" | "missing" | "error";
+type Status = "checking" | "registered" | "missing" | "deleting" | "error";
 type ProfileContext = {
   profile:RoteivaProfile;
   saveProfile:(changes:ProfileChanges)=>Promise<void>;
@@ -29,7 +29,7 @@ export function RegistrationGate({children}: {children: ReactNode}) {
     setStatus("checking");
     setError("");
     repository.loadProfile()
-      .then(result=>{if(active){setProfile(result);setStatus(result?"registered":"missing");}})
+      .then(result=>{if(active){setProfile(result);setStatus(result?.deletionState==="deleting"?"deleting":result?"registered":"missing");}})
       .catch(reason=>{if(active){setError(dataErrorMessage(reason));setStatus("error");}});
     return ()=>{active=false;};
   },[repository,attempt]);
@@ -62,6 +62,10 @@ export function RegistrationGate({children}: {children: ReactNode}) {
   if(!user)return null;
   if(status==="checking")return <main className="studio-loading" role="status">Verificando seu cadastro…</main>;
   if(status==="registered" && profile)return <RegistrationProfileContext.Provider value={{profile,saveProfile}}>{children}</RegistrationProfileContext.Provider>;
+  if(status==="deleting")return <AuthLayout section="PRIVACIDADE" title="Exclusão em andamento." description="A solicitação de exclusão foi recebida e seu espaço está bloqueado para novas alterações. O processo continua mesmo com o navegador fechado.">
+    <p className="auth-invitation">Se houver falha em algum serviço, o sistema retomará a limpeza automaticamente. Não é possível cancelar a exclusão.</p>
+    <button type="button" className="auth-primary" onClick={()=>void logout()} disabled={busy}>Sair da conta</button>
+  </AuthLayout>;
   if(status==="error")return <AuthLayout section="CONEXÃO" title="Não foi possível consultar seu cadastro." description="Não vamos criar uma nova conta enquanto não for possível confirmar o estado do seu espaço.">
     <p className="auth-error" role="alert">{error}</p>
     <div className="auth-row-actions"><button className="auth-primary" onClick={()=>setAttempt(n=>n+1)}>Tentar novamente <ArrowRight size={16}/></button><button className="auth-link" onClick={()=>void logout()} disabled={busy}>Trocar conta</button></div>
