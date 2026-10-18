@@ -165,8 +165,8 @@ type ExplorerProps={
   files:DriveItem[];
   loading:boolean;
   hasMore:boolean;
-  thumbnailScope:string;
-  getThumbnail:(file:DriveItem)=>Promise<Blob|null>;
+  thumbnailScope?:string;
+  getThumbnail?:(file:DriveItem)=>Promise<Blob|null>;
   onBack:()=>void;
   onNavigate:(id:string,path:DriveTrail[])=>void;
   onOpen:(file:DriveItem)=>void;
@@ -177,7 +177,8 @@ const VIEW_KEY="roteiva-drive-view-v1";
 function savedView():ViewMode{
   try{return window.localStorage.getItem(VIEW_KEY)==="grid"?"grid":"list";}catch{return "list";}
 }
-export function DriveFileExplorer({folderName,path,files,loading,hasMore,thumbnailScope,getThumbnail,onBack,onNavigate,onOpen,onMore}:ExplorerProps){
+const noThumbnail=async (_:DriveItem):Promise<Blob|null>=>null;
+export function DriveFileExplorer({folderName,path,files,loading,hasMore,thumbnailScope="",getThumbnail=noThumbnail,onBack,onNavigate,onOpen,onMore}:ExplorerProps){
   const [filter,setFilter]=useState("");
   const [view,setView]=useState<ViewMode>(savedView);
   useEffect(()=>setFilter(""),[path.map(item=>item.id).join("/")]);
