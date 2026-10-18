@@ -15,7 +15,7 @@ async function enterWorkspace(page: Page, email: string) {
   await popup.locator("#sign-in").click();
   await page.getByLabel("Como podemos chamar você?").fill("Teste Ícones");
   await page.getByLabel("Nome do estúdio ou marca").fill("Estúdio QA");
-  await page.getByLabel("Entendo que meu perfil e os dados de trabalho").check();
+  await page.getByLabel("Concordo com o uso dos meus dados").check();
   await page.getByRole("button", { name: "Criar meu espaço de trabalho" }).click();
   await expect(page.locator(".app-shell")).toBeVisible();
   await expect(page.locator("[aria-busy]").first()).toHaveAttribute("aria-busy", "false");
@@ -65,7 +65,7 @@ test("semantic icon labels remain accessible, responsive and functional", async 
     await expect(label.locator("svg[aria-hidden='true']")).toHaveCount(1);
   }
   await expect(page.getByText("Cache neste dispositivo", { exact: false })).toBeVisible();
-  await expect(page.getByText("Diagnóstico da sessão", { exact: false })).toBeVisible();
+  await expect(page.getByText("Diagnóstico da sessão", { exact: false })).toHaveCount(0);
 
   // Icons are decorative and must never cause page-wide horizontal scrolling,
   // in either theme or at a larger user font preference.

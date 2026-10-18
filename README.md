@@ -58,6 +58,8 @@ O perfil é salvo no próprio `users/{uid}` do Firestore com revisão sequencial
 
 **Fora deste PR:** exclusão irreversível de conta, edição de foto/e-mail do Google, políticas legais, billing, Drive e trabalho em equipe. A demonstração Pages continua sem conta e mostra as configurações em modo leitura.
 
+**Exclusão permanente (PR #30):** publicada e verificada no DEV com conta de teste autorizada: dados e identidade removidos, concessão Drive revogada, arquivo original preservado e outra conta intacta. A correção posterior do acompanhamento da conclusão e da linguagem ao cliente está em validação. Veja os resultados e aceites ainda pendentes em [ACCOUNT-DELETION.md](docs/ACCOUNT-DELETION.md).
+
 ## Navegação com URLs persistentes (PR #12)
 
 O Firebase DEV utiliza caminhos reais para as telas internas (`/projetos`, `/clientes`, `/financeiro`, `/calendario`, `/biblioteca`, `/aprovacoes`, `/configuracoes`) e para detalhes de projetos e clientes (`/projetos/:id`, `/clientes/:id`). A URL sobrevive ao F5, pode ser usada como link e respeita Voltar/Avançar. `/review` permanece uma página separada e protegida.

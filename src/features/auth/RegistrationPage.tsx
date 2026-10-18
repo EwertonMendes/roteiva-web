@@ -49,9 +49,9 @@ export function RegistrationPage({user,submitting,error,onSubmit,onExit}:{
       </fieldset>
       <label className="auth-confirmation">
         <input type="checkbox" name="dataAcknowledgement" checked={acknowledged} onChange={e=>setAcknowledged(e.target.checked)} required/>
-        <span>Entendo que meu perfil e os dados de trabalho que cadastrar serão armazenados no projeto Roteiva DEV, usando Firebase. <b>*</b></span>
+        <span>Concordo com o uso dos meus dados para criar minha conta e organizar meu espaço no Roteiva. <b>*</b></span>
       </label>
-      <details className="auth-data-note"><summary><CircleHelp size={15}/> Como meus dados são usados?</summary><p>Usamos seu nome, e-mail e foto da conta Google para identificação no Roteiva e os dados de trabalho para organizar seu espaço. O acesso aos registros é protegido pelas regras do Firebase por usuário. Este é um ambiente de desenvolvimento; use dados de teste, não dados confidenciais. Ainda não há integração com Google Drive. A formalização dos Termos de Uso e da Política de Privacidade está pendente antes da abertura pública.</p></details>
+      <details className="auth-data-note"><summary><CircleHelp size={15}/> Como meus dados são usados?</summary><p>Seu nome, e-mail e foto do Google identificam sua conta. Os dados de clientes e projetos ficam no seu espaço privado. A conexão com o Google Drive é opcional, e seus arquivos continuam na sua conta Google.</p></details>
       {error&&<p className="auth-error" role="alert">{error}</p>}
       <button className="auth-primary" type="submit" disabled={!valid||submitting}>{submitting?"Criando seu espaço…":"Criar meu espaço de trabalho"}<ArrowRight size={17}/></button>
       <button className="auth-link" type="button" disabled={submitting} onClick={onExit}><ChevronLeft size={16}/> Sair sem criar conta</button>

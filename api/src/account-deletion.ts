@@ -105,7 +105,13 @@ export async function advanceDeletion(env:Env,uid:string):Promise<void>{
     const job=await env.DB.prepare('SELECT * FROM account_deletions WHERE owner_uid=? AND lease_id=?')
       .bind(uid,lease).first<Job>();
     if(!job)return;
-    try{await runPhase(env,job,lease);}
+    try{
+      await runPhase(env,job,lease);
+      // Successful partial progress is not a failure. Refresh scheduling so a
+      // large tree cannot monopolize every cron tick or accumulate old errors.
+      await env.DB.prepare('UPDATE account_deletions SET attempts=0,failed_phase=NULL,error_code=NULL,updated_at=?,next_attempt_at=? WHERE owner_uid=? AND lease_id=? AND phase=?')
+        .bind(Date.now(),Date.now(),uid,lease,job.phase).run();
+    }
     catch(error){
       const code=error instanceof ApiError?error.code:'deletion_step_failed';
       const count=job.attempts+1;
@@ -126,13 +132,15 @@ export async function runPendingDeletions(env:Env):Promise<void>{
   // Failed callbacks must not retain recoverable OAuth credentials indefinitely,
   // even if the account never requests deletion. Live callbacks finish well
   // before this grace period; ambiguous exchanges remain for manual review.
-  const orphanGrants=await env.DB.prepare('SELECT DISTINCT owner_uid FROM oauth_exchange_guards WHERE started_at<? AND encrypted_token IS NOT NULL LIMIT 5')
+  const orphanGrants=await env.DB.prepare('SELECT DISTINCT owner_uid FROM oauth_exchange_guards WHERE started_at<? AND encrypted_token IS NOT NULL LIMIT 1')
     .bind(now-900000).all<{owner_uid:string}>();
   for(const row of orphanGrants.results){
     try{await revokeGuard(env,row.owner_uid);}
     catch{console.error(JSON.stringify({event:'oauth_exchange_revocation_retry'}));}
   }
-  const rows=await env.DB.prepare("SELECT owner_uid FROM account_deletions WHERE phase NOT IN ('completed','manual_review') AND lease_until<? AND next_attempt_at<=? ORDER BY created_at LIMIT 10")
+  // The external-fetch allowance belongs to the entire invocation, not each
+  // account. Leave room for token minting, orphan grants and retention cleanup.
+  const rows=await env.DB.prepare("SELECT owner_uid FROM account_deletions WHERE phase NOT IN ('completed','manual_review') AND lease_until<? AND next_attempt_at<=? ORDER BY next_attempt_at,updated_at LIMIT 1")
     .bind(now,now).all<{owner_uid:string}>();
   for(const row of rows.results){
     try{await advanceDeletion(env,row.owner_uid);}
@@ -148,7 +156,7 @@ export async function runPendingDeletions(env:Env):Promise<void>{
   if(review&&review.total>0)
     console.error(JSON.stringify({event:'account_deletion_manual_review_pending',count:review.total}));
   // Minimal operational tombstone: 24h for idempotent status/recovery.
-  const expired=await env.DB.prepare("SELECT owner_uid FROM account_deletions WHERE phase='completed' AND completed_at<? LIMIT 10")
+  const expired=await env.DB.prepare("SELECT owner_uid FROM account_deletions WHERE phase='completed' AND completed_at<? LIMIT 1")
     .bind(now-86400000).all<{owner_uid:string}>();
   for(const row of expired.results){
     try{

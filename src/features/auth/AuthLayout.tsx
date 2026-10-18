@@ -17,7 +17,7 @@ export function AuthLayout({children,section,title,description}: AuthLayoutProps
     <aside className="auth-story" aria-label="Apresentação do Roteiva">
       <div className="auth-story-top">
         <img src={import.meta.env.BASE_URL+"roteiva-logo-white.png"} alt="Roteiva" className="auth-story-logo"/>
-        <span className="auth-story-edition">STUDIO / DEV</span>
+        <span className="auth-story-edition">SEU ESTÚDIO, CONECTADO</span>
       </div>
       <div className="auth-story-art" aria-hidden="true">
         <span className="auth-art-ring auth-art-ring-one"/>
@@ -48,7 +48,7 @@ export function AuthLayout({children,section,title,description}: AuthLayoutProps
           <p>{description}</p>
         </header>
         {children}
-        <div className="auth-bottom"><span>ROTEIVA</span><span>AMBIENTE DE DESENVOLVIMENTO</span></div>
+        <div className="auth-bottom"><span>ROTEIVA</span><span>SEU TRABALHO, EM ORDEM</span></div>
       </div>
     </section>
   </main>;

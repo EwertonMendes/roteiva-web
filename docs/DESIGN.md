@@ -26,6 +26,10 @@
 
 Toda alteração de UI deve preservar as funcionalidades já disponíveis e ser conferida em desktop e celular. Veja [roadmap](MVP-ROADMAP.md).
 
+## Linguagem voltada ao cliente
+
+Textos de interface devem explicar o benefício, o estado confirmado e a próxima ação com linguagem comercial simples. Não expor ambientes DEV, nomes de infraestrutura, retries, limpeza de serviços, quotas ou diagnóstico técnico. Esses detalhes pertencem aos logs seguros e à documentação operacional. Mensagens de erro precisam ser úteis e honestas; não afirmar conclusão antes da confirmação do servidor. Configurações não exibem o painel interno de métricas de consultas. A identidade visual e os avisos necessários de privacidade/irreversibilidade permanecem preservados. O primeiro acesso convida a criar o espaço ou trocar de conta; exclusão permanente pertence às Configurações, após cadastro.
+
 ## Iconografia semântica (outubro/2026)
 
 - Biblioteca única: `lucide-react` (SVG); sem novos pacotes e sem substituir os ícones animados de navegação.
@@ -34,7 +38,7 @@ Toda alteração de UI deve preservar as funcionalidades já disponíveis e ser 
 - Filtros de projetos declaram `aria-pressed` e mantêm texto visível; chips de status não acumulam ponto decorativo e ícone.
 - Clientes: ícones discretos em indicadores superiores, cabeçalho da carteira e links de telefone/e-mail na ficha; as células continuam majoritariamente textuais.
 - Financeiro: filtros recebem ícones no label (nunca dentro das opções nativas), indicadores numéricos recebem símbolo secundário, alerta de atraso e cabeçalhos de gráficos/tabela.
-- Configurações: evitar redundância com ícones existentes; apenas labels de identificação, cache local e diagnóstico usam símbolos específicos.
+- Configurações: evitar redundância com ícones existentes; labels de identificação e armazenamento local usam símbolos específicos. Diagnóstico técnico não integra a interface do cliente.
 - Tamanhos usuais: filtros 16px, indicadores 18–19px, etiquetas 14–16px, cabeçalhos 16–20px; traço coerente, ritmo de 6–8px e cores herdadas do tema.
 - CSS em `src/features/ui/semantic-icons.css`, carregado depois da camada tipográfica; respeitar layouts responsivos e `prefers-reduced-motion`.
 - Somente ícones decorativos: jamais depender exclusivamente de cor ou desenho para comunicar estado/resultado. Texto, teclado, foco e contraste continuam mandatórios.

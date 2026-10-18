@@ -17,7 +17,7 @@ async function signUp(page:Page,email:string){
   await popup.locator("#sign-in").click();
   await page.getByLabel("Como podemos chamar você?").fill("Teste Drive");
   await page.getByLabel("Nome do estúdio ou marca").fill("Estúdio Drive");
-  await page.getByLabel("Entendo que meu perfil e os dados de trabalho").check();
+  await page.getByLabel("Concordo com o uso dos meus dados").check();
   await page.getByRole("button",{name:"Criar meu espaço de trabalho"}).click();
   await expect(page.locator(".app-shell")).toBeVisible();
   await expect(page.locator("[aria-busy]").first()).toHaveAttribute("aria-busy","false");

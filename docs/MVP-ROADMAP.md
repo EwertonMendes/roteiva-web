@@ -398,14 +398,15 @@ A URL do DEV principal não mudou e o merge não foi executado. CI para preview 
 
 ### Exclusão permanente de conta — PR #30 (DEV, 18/10/2026)
 
-- [x] Fluxo de confirmação no React e reautenticação recente; inclusão também para contas sem cadastro concluído.
+- [x] Fluxo de confirmação no React e reautenticação recente em Configurações. Por decisão do proprietário em 18/10, retirar a ação da tela de primeiro acesso para manter foco no cadastro; backend tolera ausência de perfil.
 - [x] Executor idempotente Worker/D1 em etapas com lease e cron, revogação Google Drive, limpeza recursiva de subcoleções Firestore e Auth no encerramento.
 - [x] Bloqueios de gravação nas regras Firestore e de novas conexões OAuth no D1.
 - [x] Testes de erro, paginação, UID isolado e fluxo de exclusão simulado.
-- [ ] Concluir CI do HEAD atualizado e QA visual desktop/mobile.
-- [ ] Homologar fluxo Google real completo no DEV publicado: confirmação/reautenticação, saga D1/Cron e Drive preservado com conta Google descartável nova.
+- [x] CI do HEAD atualizado: [API/57 testes](https://github.com/EwertonMendes/roteiva-web/actions/runs/39138799295), [frontend/28 Rules/42 browser](https://github.com/EwertonMendes/roteiva-web/actions/runs/39138799304). QA visual real desktop escuro/mobile claro (390×844), confirmação rigorosa e cancelamento conferidos.
+- [x] Fluxo Google real no DEV: conta de teste especificamente autorizada, reautenticação, Cron retomou falha Firestore e concluiu; 23 caminhos/identidade ausentes, controle intacto, Drive original preservado e concessão revogada.
 - [x] Provisionamento administrativo DEV (18/10/2026): conta exclusiva, papel customizado com seis permissões, segredo Worker via stdin, smoke real com duas identidades novas/71 documentos; isolamento e exclusão Auth idempotente confirmados. Sem validação Google/Drive pela interface neste smoke. Detalhes e limitações em [ACCOUNT-DELETION.md](ACCOUNT-DELETION.md).
-- [x] Revisão: fence contra recriação por JWT residual, 404 de enumeração falha fechado, limites de execução/lease, `failed_phase` e guards OAuth duráveis; testes locais de 1.001 documentos, pai ausente e revisão manual. Rules Emulator e Playwright: 42 aprovados, dois skips previstos. CI do commit final ainda precisa passar.
-- [ ] Configurar alertas operacionais, rotina de retomada de `manual_review` e documentar resultados da homologação; merge/deploy após aprovação.
+- [x] Revisão: fence contra recriação por JWT residual, 404 de enumeração falha fechado, limites de execução/lease, `failed_phase` e guards OAuth duráveis; testes locais de 1.001 documentos, pai ausente e revisão manual. Rules Emulator e Playwright: 42 aprovados, dois skips previstos. CI da PR #30 aprovado; novas correções de runtime/UX em validação.
+- [x] Runbook de retomada individual e monitor DEV implementados; [monitor executado](https://github.com/EwertonMendes/roteiva-web/actions/runs/39139569153), sem pendências nesse instante. Merge PR #30 e deploys oficiais [Worker/D1](https://github.com/EwertonMendes/roteiva-web/actions/runs/39139423106)/[Firebase](https://github.com/EwertonMendes/roteiva-web/actions/runs/39139422996) aprovados; migrações `0004`–`0006` e Cron remoto conferidos.
+- [ ] Confirmar entrega de alertas de Actions aos responsáveis em falha; a execução saudável do monitor não comprova notificação entregue.
 
-A configuração da branch deixa `ACCOUNT_DELETION_ENABLED=true` para DEV; sem a credencial administrativa exata, o endpoint falha fechado e o botão fica indisponível. A URL DEV principal continua com o código anterior até o merge. Documentação `docs/ACCOUNT-DELETION.md`.
+O DEV publicado tem `ACCOUNT_DELETION_ENABLED=true` e credencial administrativa validada; sem a credencial exata, o endpoint falha fechado. O teste destrutivo completo foi verificado. Publicação da correção de acompanhamento ainda pendente. O caso sem cadastro não possui mais entrada destrutiva na UI por decisão do proprietário. A correção inclui linguagem comercial nas telas, polling sem falso sucesso e lotes compatíveis com o limite Workers Free. Evidências em [ACCOUNT-DELETION.md](ACCOUNT-DELETION.md).

@@ -1,4 +1,6 @@
 import {expect,test,type Page} from "@playwright/test";
+import {initializeTestEnvironment} from '@firebase/rules-unit-testing';
+import {collection,getDocs,query,where,updateDoc} from 'firebase/firestore';
 
 const cloud="http://127.0.0.1:4173";
 const api="https://roteiva-api-dev.ewertonmendes9.workers.dev";
@@ -16,7 +18,7 @@ async function createTestAccount(page:Page,email:string){
   await popup.locator("#sign-in").click();
   await page.getByLabel("Como podemos chamar você?").fill("Pessoa QA");
   await page.getByLabel("Nome do estúdio ou marca").fill("Estúdio Exclusão QA");
-  await page.getByLabel("Entendo que meu perfil e os dados de trabalho").check();
+  await page.getByLabel("Concordo com o uso dos meus dados").check();
   await page.getByRole("button",{name:"Criar meu espaço de trabalho"}).click();
   await expect(page.locator(".app-shell")).toBeVisible();
   await expect(page.locator("[aria-busy]").first()).toHaveAttribute("aria-busy","false");
@@ -68,4 +70,40 @@ test("deletion modal blocks incomplete confirmation and cancellation never calls
   await expect(dialog.getByLabel("Digite EXCLUIR MINHA CONTA para confirmar:")).toHaveValue("");
   await expect(dialog.getByRole("checkbox")).not.toBeChecked();
   expect(submissions).toBe(0);
+});
+
+test('pending deletion reports delays honestly and leaves only after server confirmation',async({page},info)=>{
+  let status:'unavailable'|'manual_review'|'completed'='unavailable';
+  await page.route(api+'/account/deletion/status',async route=>{
+    const headers={'Access-Control-Allow-Origin':cloud,
+      'Access-Control-Allow-Methods':'GET, OPTIONS',
+      'Access-Control-Allow-Headers':'Authorization, Content-Type'};
+    if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
+    return route.fulfill({status:status==='unavailable'?503:200,headers,
+      contentType:'application/json',body:JSON.stringify({available:true,
+        operation:{id:'test-operation',status}})});
+  });
+  const email='deletion-progress-'+info.project.name+'@example.com';
+  await createTestAccount(page,email);
+  const environment=await initializeTestEnvironment({projectId:'demo-roteiva',firestore:{host:'127.0.0.1',port:8080}});
+  try{
+    await environment.withSecurityRulesDisabled(async context=>{
+      const profiles=await getDocs(query(collection(context.firestore(),'users'),where('email','==',email)));
+      expect(profiles.size).toBe(1);
+      await updateDoc(profiles.docs[0].ref,{deletionState:'deleting'});
+    });
+  }finally{await environment.cleanup();}
+  await page.reload();
+  await expect(page.getByRole('heading',{name:'Estamos excluindo sua conta.'})).toBeVisible();
+  await expect(page.getByRole('status')).toContainText('Não conseguimos atualizar o andamento agora.');
+  await expect(page.getByText('Sua conta e seus dados do Roteiva foram excluídos.')).toHaveCount(0);
+  await expect(page.getByText(/STUDIO \/ DEV|AMBIENTE DE DESENVOLVIMENTO|retomará a limpeza|Firestore/)).toHaveCount(0);
+  await page.clock.install();
+  status='manual_review';
+  await page.clock.runFor(11000);
+  await expect(page.getByRole('status')).toContainText('A exclusão está demorando mais que o esperado.');
+  status='completed';
+  await page.clock.runFor(11000);
+  await expect(page).toHaveURL(/deletion=completed/);
+  await expect(page.getByText('Sua conta e seus dados do Roteiva foram excluídos. Seus arquivos no Google Drive foram preservados.')).toBeVisible();
 });
