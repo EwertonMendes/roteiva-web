@@ -96,8 +96,14 @@ for(const profilePresent of [true,false])test('pending deletion reports delays h
   }finally{await environment.cleanup();}
   // Before root removal the profile marker is enough; afterwards a failed
   // status lookup must close the gate until it can verify the durable job.
-  status=profilePresent?'unavailable':'manual_review';
+  status='unavailable';
   await page.reload();
+  if(!profilePresent){
+    await expect(page.getByRole('heading',{name:'Não foi possível consultar seu cadastro.'})).toBeVisible();
+    await expect(page.getByRole('button',{name:'Criar meu espaço',exact:true})).toHaveCount(0);
+    status='manual_review';
+    await page.getByRole('button',{name:'Tentar novamente'}).click();
+  }
   await expect(page.getByRole('heading',{name:'Estamos excluindo sua conta.'})).toBeVisible();
   await expect(page.getByRole('status')).toContainText(profilePresent?'Não conseguimos atualizar o andamento agora.':'A exclusão está demorando mais que o esperado.');
   await expect(page.getByText('Sua conta e seus dados do Roteiva foram excluídos.')).toHaveCount(0);
