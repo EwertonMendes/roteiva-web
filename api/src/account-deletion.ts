@@ -1,5 +1,5 @@
 import { ApiError, type Env } from './types.ts';
-import { adminToken, deletionConfigured, deleteFirebaseIdentity, deleteFirestoreChunk, deleteRoot, lockAccount } from './firebase-admin.ts';
+import { adminToken, deletionConfigured, deleteIdentity, deleteFirestoreChunk, deleteRoot, lockAccount } from './firebase-admin.ts';
 import { decrypt, context } from './crypto.ts';
 
 type Phase='locking'|'revoking'|'firestore'|'identity'|'completed'|'manual_review';
@@ -83,7 +83,7 @@ async function runPhase(env:Env,job:Job,lease:string):Promise<void>{
     if(empty)await changePhase(env,job,lease,'identity');
   }else if(job.phase==='identity'){
     const token=await adminToken(env);
-    await deleteFirebaseIdentity(uid,token);
+    await deleteIdentity(uid,token);
     // Keep the Firestore deletion marker until Auth has been removed.
     await deleteRoot(uid,token);
     await changePhase(env,job,lease,'completed');
