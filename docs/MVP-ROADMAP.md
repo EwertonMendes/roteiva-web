@@ -423,3 +423,14 @@ O DEV publicado tem `ACCOUNT_DELETION_ENABLED=true` e credencial administrativa 
 - [ ] VALIDAR após merge: CI verde, deploy DEV confirmado e headers reais corretos para `/`, `/configuracoes`, `/biblioteca`, `/index.html`, deep link e asset hashed. Se a verificação pós-deploy falhar, investigar sem ignorar o resultado.
 
 A correção não altera o fluxo seguro de exclusão da PR #32 nem os dados Firestore/D1; não atualiza automaticamente uma aba já aberta antes do deploy.
+
+### Ajustes de Configurações — Zona de perigo / cache automático (18/10/2026)
+
+- [x] IMPLEMENTADO em PR: remover `04 / CONTROLE` e `Dados e privacidade`, incluindo botões de exportar dados e ativar/desativar cache.
+- [x] IMPLEMENTADO em PR: `Zona de perigo` separada visualmente com destaque vermelho para `Excluir conta`, preservando o modal seguro e o processo de exclusão existente.
+- [x] IMPLEMENTADO em PR: armazenamento persistente automático com revalidação via revisão/contagem por UID no servidor; navegador sem persistência usa cache volátil ou leitura normal.
+- [x] IMPLEMENTADO em PR: limpeza de manifestos antes da tentativa de apagar IndexedDB após logout.
+- [ ] VALIDAR: CI e testes Playwright desktop/mobile (interface, reload, isolamento de usuário e logout), Firebase Rules e ausência de controles antigos.
+- [ ] VALIDAR: visual DEV após merge, sem excluir contas reais durante homologação desta PR.
+
+A cópia persistida é privada e potencialmente sensível em computadores compartilhados: orientação de privacidade precisa refletir que o logout apaga a cópia quando tecnicamente possível. A revisão remota permanece necessária para evitar apresentar dados desatualizados.
