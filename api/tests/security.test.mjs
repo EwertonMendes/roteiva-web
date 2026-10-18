@@ -83,7 +83,7 @@ test('refresh stays backend-only; transient error preserves token; invalid_grant
  assert.equal(saved().status,'connected');
  assert.ok(!saved().encrypted_access_token.includes('short-lived'));
  db.sql.exec('UPDATE drive_connections SET access_token_expires_at=0');
- await assert.rejects(()=>accessToken(configured,row,async()=>Response.json({error:'server_error'},{status:503})),e=>e.status===502);
+ await assert.rejects(()=>accessToken(configured,row,async()=>Response.json({error:'server_error'},{status:503})),e=>e.status===503 && e.code==='google_temporarily_unavailable');
  assert.equal(saved().status,'connected');
  assert.ok(saved().encrypted_refresh_token);
  db.sql.exec('UPDATE drive_connections SET refresh_retry_after=0');

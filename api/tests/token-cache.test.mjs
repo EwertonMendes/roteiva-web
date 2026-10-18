@@ -189,3 +189,31 @@ test('waiting for another live lease is time bounded and never calls Google',asy
   assert.ok(Date.now()-started>=8000);
   assert.ok(Date.now()-started<15000);
 });
+
+test('OAuth refresh categorizes permanent configuration failure without revoking stored Drive data', async t => {
+  for (const [googleError, code] of [
+    ['invalid_client','google_oauth_client_invalid'],
+    ['unauthorized_client','google_oauth_client_invalid'],
+    ['invalid_request','google_oauth_request_invalid'],
+    ['unsupported_grant_type','google_oauth_request_invalid'],
+    ['access_denied','google_oauth_rejected'],
+  ]) {
+    const {env,row,saved} = await setup(t);
+    await assert.rejects(
+      () => accessCredential(env,row,async()=>Response.json({error:googleError,error_description:'not safe to echo'},{status:400})),
+      e => e.code===code && !String(e.message).includes('not safe to echo'),
+    );
+    assert.equal(saved().status,'connected');
+    assert.ok(saved().encrypted_refresh_token);
+    assert.equal(saved().refresh_lease_id,null);
+  }
+});
+
+test('OAuth refresh classifies temporary provider errors separately from permanent OAuth rejection',async t=>{
+  const {env,row,saved}=await setup(t);
+  await assert.rejects(
+    () => accessCredential(env,row,async()=>Response.json({error:'server_error'},{status:503})),
+    e => e.status===503 && e.code==='google_temporarily_unavailable',
+  );
+  assert.equal(saved().status,'connected');
+});
