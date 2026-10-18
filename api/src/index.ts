@@ -3,6 +3,7 @@ import { identity } from './auth.ts';
 import { callback, start, launch, enabled } from './oauth.ts';
 import { metadata, disconnect, about } from './drive.ts';
 import { listFolders, listFolderItems } from './folders.ts';
+import { deletionStatus, requestDeletion, assertNotDeleting, runPendingDeletions } from './account-deletion.ts';
 const headers = {
   'Cache-Control':'no-store', 'Referrer-Policy':'no-referrer',
   'X-Content-Type-Options':'nosniff', 'Content-Security-Policy':"default-src 'none'; frame-ancestors 'none'",
@@ -34,8 +35,17 @@ export async function handle(request: Request, env: Env): Promise<Response> {
       response = await launch(request,env);
     } else if (url.pathname === '/oauth/drive/callback' && request.method === 'GET') {
       response = await callback(request,env);
+     } else if (url.pathname === '/account/deletion/status' && request.method === 'GET') {
+      const uid=await identity(request,env);
+      response=await deletionStatus(env,uid);
+    } else if (url.pathname === '/account/deletion' && request.method === 'POST') {
+      if(origin!==env.FRONTEND_ORIGIN)throw new ApiError(403,'origin_required');
+      const uid=await identity(request,env,300);
+      if(!(await env.API_RATE_LIMIT.limit({key:'dev:delete:'+uid})).success)throw new ApiError(429,'rate_limited');
+      response=await requestDeletion(request,env,uid);
     } else if (url.pathname === '/integrations/drive' && request.method === 'GET') {
       const uid = await identity(request,env);
+      await assertNotDeleting(env,uid);
       if (!(await env.API_RATE_LIMIT.limit({key:'dev:uid:'+uid})).success) throw new ApiError(429,'rate_limited');
       const rows = await env.DB.prepare('SELECT id,google_email,status,scopes,updated_at FROM drive_connections WHERE owner_uid=? ORDER BY created_at LIMIT 20').bind(uid).all();
       response = Response.json({connections:rows.results});
@@ -47,6 +57,7 @@ export async function handle(request: Request, env: Env): Promise<Response> {
     } else if (/^\/integrations\/drive\/[^/]+\/folders(?:\/[^/]+\/items)?$/.test(url.pathname) && request.method==='GET') {
       enabled(env);
       const uid=await identity(request,env);
+      await assertNotDeleting(env,uid);
       if (!(await env.API_RATE_LIMIT.limit({key:'dev:uid:'+uid})).success) throw new ApiError(429,'rate_limited');
       const parts=url.pathname.split('/');
       response=parts.length===5
@@ -85,4 +96,4 @@ export async function handle(request: Request, env: Env): Promise<Response> {
   }
   return result;
 }
-export default {fetch:handle};
+export default {fetch:handle, scheduled(_controller:ScheduledController,env:Env,ctx:ExecutionContext){ctx.waitUntil(runPendingDeletions(env));}};
