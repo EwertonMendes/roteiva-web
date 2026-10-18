@@ -38,3 +38,9 @@ Toda alteração de UI deve preservar as funcionalidades já disponíveis e ser 
 - Tamanhos usuais: filtros 16px, indicadores 18–19px, etiquetas 14–16px, cabeçalhos 16–20px; traço coerente, ritmo de 6–8px e cores herdadas do tema.
 - CSS em `src/features/ui/semantic-icons.css`, carregado depois da camada tipográfica; respeitar layouts responsivos e `prefers-reduced-motion`.
 - Somente ícones decorativos: jamais depender exclusivamente de cor ou desenho para comunicar estado/resultado. Texto, teclado, foco e contraste continuam mandatórios.
+
+## Barra lateral simplificada (outubro/2026)
+
+- A lateral exibe marca, navegação e perfil da pessoa usuária com ação de saída no rodapé.
+- O cartão informativo redundante sobre o nome do estúdio, quantidade de arquivos e sincronização foi retirado da lateral. Informações equivalentes continuam nas telas e na barra superior quando relevantes.
+- O perfil permanece ancorado ao rodapé tanto no desktop quanto no menu mobile aberto. Não reintroduzir o cartão sem uma necessidade funcional concreta.
