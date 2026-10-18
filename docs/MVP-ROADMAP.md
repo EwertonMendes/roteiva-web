@@ -361,5 +361,5 @@ Evidências: `src/features/ui/`, `src/dashboard-client.tsx`, `src/studio-feature
 - [x] Invalidação em consentimento/desconexão/revogação; invalid_grant antigo não invalida nova conexão.
 - [x] Cliente único de GETs Drive; um retry em 401, sem renovar por 403/cota; eventos categóricos sem credenciais.
 - [x] Testes com SQL/AES reais e Google simulado para expiração, concorrência e falhas.
-- [ ] CI do HEAD, migration remota e publicação DEV.
+- [x] CI frontend e 36 testes API; migration remota 0003 e publicação DEV. Evidência em DEVELOPMENT.md.
 - [ ] QA do proprietário com conexão real, leitura repetida de pastas, expiração real e comparação de métricas. Nenhuma redução percentual/latência real presumida.
