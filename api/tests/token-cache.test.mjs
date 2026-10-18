@@ -143,7 +143,7 @@ test('Drive 403 permission, quota and outages never trigger token refresh/reconn
 test('transient refresh failure releases lease, preserves refresh credential and applies cooldown',async(t)=>{
   const {env,row,saved}=await setup(t);let calls=0;
   const fail=async()=>{calls++;throw Error('network');};
-  await assert.rejects(()=>accessToken(env,row,fail),e=>e.code==='google_unavailable');
+  await assert.rejects(()=>accessToken(env,row,fail),e=>e.code==='google_token_transport_failed');
   assert.equal(saved().status,'connected');assert.ok(saved().encrypted_refresh_token);
   assert.equal(saved().refresh_lease_id,null);
   await assert.rejects(()=>accessToken(env,row,fail),e=>e.code==='token_refresh_retry_later');
@@ -215,5 +215,53 @@ test('OAuth refresh classifies temporary provider errors separately from permane
     () => accessCredential(env,row,async()=>Response.json({error:'server_error'},{status:503})),
     e => e.status===503 && e.code==='google_temporarily_unavailable',
   );
+  assert.equal(saved().status,'connected');
+});
+
+test('Drive follows only fixed Google Drive REST redirect targets and never leaks credentials',async t=>{
+  const {env,row}=await setup(t);
+  const seen=[];
+  const get=async(url,options)=>{
+    const u=String(url);
+    if(u.includes('oauth2.googleapis.com'))return token();
+    seen.push({url:u,auth:options.headers.Authorization,redirect:options.redirect});
+    if(seen.length===1)return new Response(null,{status:302,headers:{Location:'https://content.googleapis.com/drive/v3/about?fields=user'}});
+    return Response.json({ok:true});
+  };
+  assert.deepEqual(await driveJson(env,row,target(),get),{ok:true});
+  assert.equal(seen.length,2);
+  assert.equal(seen[0].auth,seen[1].auth);
+  assert.ok(seen.every(x=>x.auth==='Bearer access-A'&&x.redirect==='manual'));
+});
+
+test('Drive never forwards a Bearer token to a redirected untrusted host',async t=>{
+  const {env,row,saved}=await setup(t);
+  let requests=0;
+  await assert.rejects(()=>driveJson(env,row,target(),async(url)=>{
+    if(String(url).includes('oauth2.googleapis.com'))return token();
+    requests++;
+    return new Response(null,{status:302,headers:{Location:'https://evil.example/drive/v3/files'}});
+  }),e=>e.code==='drive_redirect_denied');
+  assert.equal(requests,1);
+  assert.equal(saved().status,'connected');
+});
+
+test('Drive rejects redirect loops without repeating requests indefinitely',async t=>{
+  const {env,row}=await setup(t);
+  let requests=0;
+  await assert.rejects(()=>driveJson(env,row,target(),async(url)=>{
+    if(String(url).includes('oauth2.googleapis.com'))return token();
+    requests++;
+    return new Response(null,{status:301,headers:{Location:target().toString()}});
+  }),e=>e.code==='drive_redirect_invalid');
+  assert.equal(requests,1);
+});
+
+test('Drive and OAuth transport failures have independent safe error codes',async t=>{
+  const {env,row,saved}=await setup(t);
+  await assert.rejects(()=>driveJson(env,row,target(),async url=>{
+    if(String(url).includes('oauth2.googleapis.com'))return token();
+    throw Error('network with private details');
+  }),e=>e.code==='drive_transport_failed'&&!e.message.includes('private details'));
   assert.equal(saved().status,'connected');
 });
