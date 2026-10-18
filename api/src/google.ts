@@ -91,7 +91,12 @@ export async function accessCredential(env: Env, input: Connection, fetcher: typ
         metric('refresh_succeeded',started);
         return {value:token.access_token,version,expiresAt:expiry};
       } catch (error) {
+        // Bounded diagnostic vocabulary only: no raw provider errors, credentials,
+        // account identifiers, connection IDs or request URLs in platform logs.
         metric('refresh_failed',started);
+        if (error instanceof ApiError) console.info(JSON.stringify({
+          event:'drive_refresh_failure',code:error.code,
+        }));
         if (error instanceof ApiError && error.code === 'reconnect_required') {
           // Revision guard prevents an old invalid_grant invalidating a new consent.
           if (!await invalidate(env,row,lease)) {
