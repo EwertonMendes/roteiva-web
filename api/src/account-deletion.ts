@@ -45,7 +45,7 @@ async function changePhase(env:Env,job:Job,lease:string,phase:Phase){
 async function revokeConnections(env:Env,uid:string):Promise<void>{
   // A Google Drive credential is never deleted until revocation succeeds.
   // Disabled credentials are rejected by all authenticated API routes.
-  const rows=await env.DB.prepare('SELECT * FROM drive_connections WHERE owner_uid=? LIMIT 20')
+  const rows=await env.DB.prepare('SELECT * FROM drive_connections WHERE owner_uid=? LIMIT 100')
     .bind(uid).all<{id:string;google_account_id:string;encrypted_refresh_token:string|null}>();
   for(const row of rows.results){
     await env.DB.prepare("UPDATE drive_connections SET status='revocation_pending',encrypted_access_token=NULL,access_token_expires_at=0,access_token_version=NULL,refresh_lease_id=NULL,refresh_lease_until=0,revision=revision+1,updated_at=? WHERE owner_uid=? AND id=?")
@@ -64,6 +64,8 @@ async function revokeConnections(env:Env,uid:string):Promise<void>{
     }
     await env.DB.prepare('DELETE FROM drive_connections WHERE owner_uid=? AND id=?').bind(uid,row.id).run();
   }
+  const outstanding=await env.DB.prepare('SELECT 1 FROM drive_connections WHERE owner_uid=? LIMIT 1').bind(uid).first();
+  if(outstanding)throw new ApiError(503,'drive_connections_remaining');
   await env.DB.prepare('DELETE FROM oauth_transactions WHERE owner_uid=?').bind(uid).run();
 }
 async function runPhase(env:Env,job:Job,lease:string):Promise<void>{
@@ -78,10 +80,12 @@ async function runPhase(env:Env,job:Job,lease:string):Promise<void>{
   }else if(job.phase==='firestore'){
     const token=await adminToken(env);
     const empty=await deleteFirestoreChunk(uid,token,20);
-    if(empty){await deleteRoot(uid,token);await changePhase(env,job,lease,'identity');}
+    if(empty)await changePhase(env,job,lease,'identity');
   }else if(job.phase==='identity'){
     const token=await adminToken(env);
     await deleteFirebaseIdentity(uid,token);
+    // Keep the Firestore deletion marker until Auth has been removed.
+    await deleteRoot(uid,token);
     await changePhase(env,job,lease,'completed');
     await env.DB.prepare('UPDATE account_deletions SET completed_at=? WHERE owner_uid=?')
       .bind(Date.now(),uid).run();
