@@ -288,7 +288,7 @@ Observabilidade: eventos drive_token_cache com outcome e duração, sem UID, e-m
 
 ## Biblioteca 2.0 — composição da interface DEV (PR #29)
 
-**Estado: implementação da UI na branch de PR, aguardando validação de CI/usuário.** Os contratos do Worker `GET /integrations/drive/:connectionId/folders` e `.../folders/:folderId/items` e a coleção privada Firestore `users/{uid}/driveFolders` permanecem inalterados. O Drive é fonte dos arquivos; Firestore registra apenas os metadados mínimos do vínculo com o projeto. Desvincular remove apenas o documento de vínculo, sem apagar mídia nem modificar o Google Drive.
+**Estado: implementado e validado no CI da PR #29 (TypeScript, builds e emuladores/browser); QA com Google Drive real e merge pendentes.** Os contratos do Worker `GET /integrations/drive/:connectionId/folders` e `.../folders/:folderId/items` e a coleção privada Firestore `users/{uid}/driveFolders` permanecem inalterados. O Drive é fonte dos arquivos; Firestore registra apenas os metadados mínimos do vínculo com o projeto. Desvincular remove apenas o documento de vínculo, sem apagar mídia nem modificar o Google Drive.
 
 No frontend, `DriveConnectionPanel` orquestra estado de conta, permissões e vínculos. `DriveLibraryUI` fornece as vistas do explorador, seletor, prévia e confirmação de desvinculação, com estilos isolados em `drive-library.css`. O seletor permite seleção múltipla através de pastas/páginas, executando gravações individuais já autorizadas; uma falha parcial preserva os vínculos confirmados e mantém o seletor aberto. Ações no projeto não criam upload ou permissão Google adicionais.
 
