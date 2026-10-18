@@ -81,8 +81,11 @@ export function advanceSync(
 }
 type SnapshotManifest = {version: number; domains: DomainNumbers};
 function manifestKey(uid: string): string { return "roteiva-cache-v2:" + uid; }
+/** A cache hit is only safe after verifying server revisions and counts.
+ * Storage failures fall back to a full server read.
+ */
 export function persistentCacheSelected(): boolean {
-  try { return typeof window !== "undefined" && window.localStorage.getItem("roteiva-private-cache") === "enabled"; }
+  try { return typeof window !== "undefined" && !!window.localStorage; }
   catch { return false; }
 }
 export function readManifest(uid: string): SnapshotManifest | null {
