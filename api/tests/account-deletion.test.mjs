@@ -38,7 +38,7 @@ test('real SQL lease accepts exactly one concurrent executor',async t=>{
 });
 test('strict confirmation does not generate jobs from a wrong phrase',async t=>{
  const db=database();t.after(db.close);
- const {privateKey}=await generateKeyPair('RS256');
+ const {privateKey}=await generateKeyPair('RS256',{extractable:true});
  const env={DB:db.DB,ENVIRONMENT:'dev',FIREBASE_PROJECT_ID:'roteiva-web-dev',ACCOUNT_DELETION_ENABLED:'true',
  FIREBASE_ADMIN_CREDENTIALS_JSON:JSON.stringify({type:'service_account',project_id:'roteiva-web-dev',
    client_email:'test@roteiva-web-dev.iam.gserviceaccount.com',private_key:await exportPKCS8(privateKey),
