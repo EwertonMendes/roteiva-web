@@ -78,7 +78,7 @@ type FolderPickerProps={
   onClose:()=>void;
 };
 export function DriveFolderPicker({projects,projectId,onProjectChange,folders,path,loading,working,canRead,hasMore,mode,onModeChange,linkedIds,error,onNavigate,onMore,onLink,onConnect,onClose}:FolderPickerProps){
-  const ref=useOverlayFocus(onClose);
+  const ref=useOverlayFocus(()=>{if(!working&&!submitting)onClose();});
   const [chosen,setChosen]=useState<Record<string,DriveItem>>({});
   const [filter,setFilter]=useState("");
   const [submitting,setSubmitting]=useState(false);
