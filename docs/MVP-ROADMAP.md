@@ -369,3 +369,20 @@ Evidências: `src/features/ui/`, `src/dashboard-client.tsx`, `src/studio-feature
 - [x] Testes com SQL/AES reais e Google simulado para expiração, concorrência e falhas.
 - [x] CI frontend e 36 testes API; migration remota 0003 e publicação DEV. Evidência em DEVELOPMENT.md.
 - [ ] QA do proprietário com conexão real, leitura repetida de pastas, expiração real e comparação de métricas. Nenhuma redução percentual/latência real presumida.
+
+
+## Biblioteca 2.0 — explorador de projetos (PR #29, outubro/2026)
+
+**Estado: IMPLEMENTADO na branch de PR; CI, deploy DEV e QA real ainda pendentes.** A PR trata UX da listagem/vinculação existente, não conclui a Fase 4 (uploads, versões, permissões de revisão e busca global continuam planejados).
+
+- [x] Explorer desktop em duas colunas; no mobile, navegação em um nível e retorno explícito.
+- [x] Vínculo múltiplo em uma única confirmação com seleção persistida ao navegar; vínculos existentes sinalizados, sem exclusão da mídia.
+- [x] Seletor com Meu Drive/Todas as pastas, histórico de navegação, rolagem contida, Escape/foco e filtro local de itens carregados.
+- [x] Conta Google recolhida no topo; confirmação de desvinculação; prévia/abrir no Google Drive e tratamento de erro.
+- [x] Contador de pastas baseado em `driveFolders` no modo Firebase (a demo conserva seus próprios registros); remover busca global enganosa de arquivos.
+- [x] Ignorar respostas obsoletas de consultas ao navegar/trocar projeto e reutilizar os contratos atuais sem migrar Firestore/D1.
+- [x] Testes Playwright adicionados em `tests/browser/drive-folders.spec.ts` (seleção múltipla, F5, recuperação e mobile) — execução/resultado a registrar após CI.
+- [ ] Confirmar CI TypeScript, builds Firebase/Pages, emuladores e Playwright.
+- [ ] Validar visual real no DEV: mobile/desktop, dark/light, várias pastas e paginação, pastas compartilhadas, acessibilidade e erros/reconexão OAuth.
+
+Critérios de aceite: fluxo sem rolagem modal+fundo, sem mudança na propriedade dos arquivos, filtragem explícita somente dos itens carregados, navegação sem sobrescrita de resultados anteriores, nenhuma regressão do OAuth. Evidência: [PR #29](https://github.com/EwertonMendes/roteiva-web/pull/29), `src/features/drive/DriveConnectionPanel.tsx`, `DriveLibraryUI.tsx`, `drive-library.css`, `tests/browser/drive-folders.spec.ts`.
