@@ -70,7 +70,13 @@ async function collectionIds(parent:string,token:string,fetcher:typeof fetch):Pr
   if(result.nextPageToken)throw new ApiError(503,'unexpected_collection_fanout');
   const ids=result.collectionIds;
   if(ids!==undefined&&!Array.isArray(ids))throw new ApiError(503,'admin_service_unavailable');
-  return (ids as string[]||[]).filter(x=>typeof x==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(x));
+  // Firestore IDs may contain Unicode or spaces; never silently skip an ID
+  // because that could make an incomplete cleanup appear successful.
+  return (ids as unknown[]||[]).map(x=>{
+    if(typeof x!=='string'||x.length<1||x.length>1500||x.includes('/')||/[\\x00-\\x1F\\x7F]/.test(x))
+      throw new ApiError(503,'unsupported_collection_id');
+    return x;
+  });
 }
 async function documents(collection:string,token:string,fetcher:typeof fetch):Promise<{name:string}[]>{
   let r:Response;
