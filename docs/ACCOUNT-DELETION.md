@@ -2,7 +2,7 @@
 
 **Estado:** implementação candidata na PR #30; pronta para ativação no DEV após provisionar a credencial administrativa e concluir homologação.
 
-O processo de exclusão é definitivo, sem prazo de recuperação. O modal exige a
+O processo de exclusão é definitivo, sem prazo de recuperação. A aplicação informa claramente quando a solicitação foi aceita, sem afirmar que a limpeza já foi concluída. O modal exige a
 frase exata `EXCLUIR MINHA CONTA`, confirmação explícita e reautenticação
 Google via Firebase. O backend valida a frase e `auth_time` ≤ 300 segundos;
 a palavra, isoladamente, nunca autoriza uma exclusão.

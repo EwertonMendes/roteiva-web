@@ -35,7 +35,7 @@ export async function requestDeletion(request:Request,env:Env,uid:string):Promis
   const job=await env.DB.prepare('SELECT operation_id,phase FROM account_deletions WHERE owner_uid=?')
     .bind(uid).first<{operation_id:string;phase:Phase}>();
   if(!job||job.phase==='locking')throw new ApiError(503,'deletion_not_locked');
-  return Response.json({status:'processing',operationId:job.operation_id},{status:202});
+  return Response.json({status:job.phase==='completed'?'completed':'processing',operationId:job.operation_id},{status:job.phase==='completed'?200:202});
 }
 async function changePhase(env:Env,job:Job,lease:string,phase:Phase){
   const now=Date.now();

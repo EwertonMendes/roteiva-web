@@ -139,3 +139,41 @@ test('failed admin lock preserves durable job and schedules retry without deleti
  await runPendingDeletions(config);
  assert.equal(rootWrites,1,'retry waits until next_attempt_at');
 });
+
+
+test('Firestore deletion visits paginated subcollection IDs before reporting completion',async()=>{
+  let collectionPage=0,folderCount=0;
+  const fetcher=async (url,init={})=>{
+    const target=String(url);
+    if(target.endsWith(':listCollectionIds')){
+      if(target.includes('pageToken=second'))throw new Error('Token must be sent in POST JSON, not URL');
+      const body=JSON.parse(init.body);
+      if(!body.pageToken){collectionPage++;return Response.json({collectionIds:['first'],nextPageToken:'second'});}
+      assert.equal(body.pageToken,'second');
+      return Response.json({collectionIds:['second']});
+    }
+    if(target.includes('/first?')||target.includes('/second?')){
+      folderCount++;return Response.json({documents:[]});
+    }
+    throw Error('unexpected Firestore request '+target);
+  };
+  const empty=await deleteFirestoreChunk({FIREBASE_PROJECT_ID:'roteiva-web-dev'},'user-A','dummy',20,fetcher);
+  assert.equal(empty,false,'collection IDs exist even when the first page is empty');
+  assert.equal(folderCount,2);
+  assert.equal(collectionPage,2,'IDs are enumerated in every verification pass');
+});
+test('Firestore deletion percent-encodes paths with reserved characters and cannot access other users',async()=>{
+  const prefix='projects/roteiva-web-dev/databases/(default)/documents';
+  const urls=[];
+  const fetcher=async (url,init={})=>{
+    const str=String(url);urls.push(str);
+    if(str.endsWith(':listCollectionIds'))return Response.json({collectionIds:['projects']});
+    if(str.includes('/projects?pageSize='))return Response.json({documents:[{name:prefix+'/users/user-A/projects/a#1'}]});
+    if(str.includes('/a%231:listCollectionIds'))return Response.json({collectionIds:[]});
+    if(str.endsWith('/a%231')&&init.method==='DELETE')return Response.json({});
+    throw Error('unexpected URL '+str);
+  };
+  const done=await deleteFirestoreChunk({FIREBASE_PROJECT_ID:'roteiva-web-dev'},'user-A','dummy',1,fetcher);
+  assert.equal(done,false);
+  assert.ok(urls.some(x=>x.endsWith('/a%231')),'reserved character is encoded as URL path, not fragment');
+});
