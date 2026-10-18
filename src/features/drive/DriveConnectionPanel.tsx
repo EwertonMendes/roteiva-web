@@ -31,6 +31,7 @@ const messages:Record<string,string> = {
   google_token_transport_failed:"Não foi possível renovar o acesso pelo serviço de autenticação do Google. Tente novamente em instantes.",
   google_token_timeout:"O serviço de autenticação do Google demorou demais para responder. Tente novamente.",
   google_token_upstream_failed:"O serviço de autenticação do Google retornou uma resposta inesperada. A equipe precisa verificar a integração.",
+  google_token_redirect_blocked:"A autenticação do Google retornou um redirecionamento não esperado. A solicitação foi interrompida para proteger sua conta.",
   google_temporarily_unavailable:"O Google está temporariamente indisponível. Tente novamente em instantes.",
   google_oauth_client_invalid:"A autorização Google do Roteiva precisa de correção no servidor. Seus vínculos foram preservados.",
   google_oauth_request_invalid:"O servidor do Roteiva não conseguiu renovar a autorização Google. A equipe precisa revisar a configuração.",
