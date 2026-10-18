@@ -16,10 +16,18 @@ export async function tokenRequest(env: Env, fields: Record<string,string>, fetc
       signal:AbortSignal.timeout(10000),
     });
   } catch { throw new ApiError(502,'google_unavailable'); }
+  // Google's OAuth error code is a finite vocabulary. Never log provider bodies,
+  // token URLs, headers, credentials, or descriptions from untrusted responses.
   const result = await response.json().catch(()=>null) as (Tokens & {error?:string}) | null;
   if (!response.ok) {
-    if (result?.error === 'invalid_grant') throw new ApiError(409,'reconnect_required');
-    if (response.status === 429) throw new ApiError(429,'google_rate_limited');
+    const reason = typeof result?.error === 'string' ? result.error : '';
+    if (reason === 'invalid_grant' || reason === 'invalid_rapt') throw new ApiError(409,'reconnect_required');
+    if (reason === 'invalid_client' || reason === 'unauthorized_client') throw new ApiError(503,'google_oauth_client_invalid');
+    if (reason === 'invalid_scope' || reason === 'unsupported_grant_type' || reason === 'invalid_request')
+      throw new ApiError(503,'google_oauth_request_invalid');
+    if (response.status === 429 || response.status === 503 || response.status === 502 || response.status === 500)
+      throw new ApiError(503,'google_temporarily_unavailable');
+    if (response.status >= 400 && response.status < 500) throw new ApiError(503,'google_oauth_rejected');
     throw new ApiError(502,'google_unavailable');
   }
   if (!result || typeof result.access_token !== 'string' || !result.access_token ||
