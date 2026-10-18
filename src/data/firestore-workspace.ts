@@ -41,10 +41,10 @@ function readProfile(data:DocumentData): RoteivaProfile {
 type Stored = {data: Data; revision: number};
 export function dataErrorMessage(error: unknown): string {
   const code = (error as {code?:string})?.code || "";
-  if (code.includes("permission-denied")) return "Sem permissão para acessar ou salvar estes dados. Entre novamente ou verifique as regras do projeto.";
+  if (code.includes("permission-denied")) return "Não foi possível acessar ou salvar seus dados. Entre novamente e tente outra vez.";
   if (code.includes("unauthenticated")) return "Sua sessão expirou. Saia e entre novamente.";
   if (code.includes("unavailable") || code.includes("deadline-exceeded")) return "Sem conexão com a nuvem. As alterações não foram confirmadas. Reconecte e recarregue os dados.";
-  if (code.includes("resource-exhausted")) return "A cota do projeto foi atingida. Aguarde a renovação da franquia.";
+  if (code.includes("resource-exhausted")) return "O Roteiva está temporariamente indisponível. Tente novamente mais tarde.";
   return error instanceof Error && error.message.startsWith("Conflito") ? error.message : "Não foi possível salvar ou carregar os dados. Recarregue para recuperar a versão da nuvem.";
 }
 export class FirestoreWorkspace {

@@ -34,7 +34,7 @@ async function createProject(page:Page){
 }
 
 function mockDrive(page:Page,accountAvailable:()=>boolean){
-  return page.route(api+"/**",async route=>{
+  return page.route(api+"/integrations/**",async route=>{
     const endpoint=new URL(route.request().url());
     const headers={
       "Access-Control-Allow-Origin":cloud,
