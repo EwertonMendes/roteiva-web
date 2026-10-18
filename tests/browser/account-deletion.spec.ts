@@ -72,6 +72,70 @@ test("deletion modal blocks incomplete confirmation and cancellation never calls
   expect(submissions).toBe(0);
 });
 
+async function confirmDeletion(page:Page){
+  await page.goto(cloud+'/configuracoes');
+  await page.getByRole('button',{name:'Excluir conta',exact:true}).click();
+  const dialog=page.getByRole('dialog',{name:'Excluir sua conta?'});
+  await dialog.getByLabel('Digite EXCLUIR MINHA CONTA para confirmar:').fill('EXCLUIR MINHA CONTA');
+  await dialog.getByRole('checkbox',{name:'Entendo que esta exclusão é irreversível.'}).check();
+  await dialog.getByRole('button',{name:'Excluir definitivamente'}).click();
+  return dialog;
+}
+
+for(const needsReauth of [false,true])test('deletion reuses recent login and asks Google only when server requires it; reauth='+needsReauth,async({page},info)=>{
+  let submissions=0;
+  let requestedUid:string|undefined;
+  await page.route(api+'/account/deletion',async route=>{
+    const headers={'Access-Control-Allow-Origin':cloud,'Access-Control-Allow-Methods':'POST, OPTIONS',
+      'Access-Control-Allow-Headers':'Authorization, Content-Type'};
+    if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
+    submissions++;
+    expect(route.request().postDataJSON()).toEqual({phrase:'EXCLUIR MINHA CONTA',acknowledged:true});
+    expect(route.request().headers().authorization).toMatch(/^Bearer /);
+    const token=route.request().headers().authorization.slice('Bearer '.length);
+    const claims=JSON.parse(Buffer.from(token.split('.')[1],'base64url').toString());
+    requestedUid??=claims.sub;
+    expect(claims.sub).toBe(requestedUid);
+    if(needsReauth&&submissions===1)return route.fulfill({status:401,headers,contentType:'application/json',
+      body:JSON.stringify({error:{code:'invalid_identity'}})});
+    return route.fulfill({status:202,headers,contentType:'application/json',
+      body:JSON.stringify({status:'processing',operationId:'test-operation'})});
+  });
+  const email='deletion-submit-'+needsReauth+'-'+info.project.name+'@example.com';
+  await createTestAccount(page,email);
+  let popups=0;page.on('popup',()=>{popups++;});
+  const dialog=await confirmDeletion(page);
+  if(needsReauth){
+    const confirmGoogle=dialog.getByRole('button',{name:'Confirmar com Google'});
+    await expect(confirmGoogle).toBeEnabled();
+    await expect(dialog.getByRole('alert')).toContainText('confirme sua identidade com o Google');
+    expect(submissions).toBe(1);expect(popups).toBe(0);
+    // Cancelling Google must leave the account open and must not submit again.
+    let pending=page.waitForEvent('popup');await confirmGoogle.click();
+    let popup=await pending;await popup.waitForLoadState('load');await popup.close();
+    await expect(confirmGoogle).toBeEnabled();expect(submissions).toBe(1);
+    // Google can offer another account. Firebase must reject it without
+    // changing the Roteiva identity or submitting a destructive request.
+    pending=page.waitForEvent('popup');await confirmGoogle.click();
+    popup=await pending;await popup.waitForLoadState('load');
+    await popup.getByRole('button',{name:'Add new account',exact:true}).click();
+    await popup.locator('#email-input').fill('wrong-deletion-'+info.project.name+'@example.com');
+    await popup.locator('#display-name-input').fill('Outra pessoa QA');
+    await popup.locator('#sign-in').click();
+    await expect(dialog.getByRole('alert')).toContainText('Essa conta Google é diferente');
+    await expect(dialog.getByRole('alert')).toContainText(email);
+    expect(submissions).toBe(1);
+    await expect(dialog.getByText('Você está excluindo a conta', {exact:false})).toContainText(email);
+    pending=page.waitForEvent('popup');await confirmGoogle.click();
+    popup=await pending;await popup.waitForLoadState('load');
+    await popup.getByText(email,{exact:true}).click();
+  }
+  await expect(page).toHaveURL(/deletion=requested/);
+  expect(submissions).toBe(needsReauth?2:1);
+  expect(popups).toBe(needsReauth?3:0);
+  await expect(page.getByRole('status')).toContainText('Recebemos seu pedido de exclusão.');
+});
+
 for(const profilePresent of [true,false])test('pending deletion reports delays honestly and confirms completion; profile present='+profilePresent,async({page},info)=>{
   let status:'idle'|'unavailable'|'manual_review'|'completed'='idle';
   await page.route(api+'/account/deletion/status',async route=>{
