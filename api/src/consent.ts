@@ -69,7 +69,7 @@ export async function persistDriveConsent(
   const now = Date.now();
   const result = await env.DB.prepare(
     "INSERT INTO drive_connections (id,owner_uid,google_account_id,google_email,encrypted_refresh_token,status,scopes,created_at,updated_at) VALUES (?,?,?,?,?,'connected',?,?,?) " +
-    "ON CONFLICT(owner_uid,google_account_id) DO UPDATE SET google_email=excluded.google_email,encrypted_refresh_token=excluded.encrypted_refresh_token,status='connected',scopes=excluded.scopes,revision=drive_connections.revision+1,updated_at=excluded.updated_at " +
+    "ON CONFLICT(owner_uid,google_account_id) DO UPDATE SET encrypted_access_token=NULL,access_token_expires_at=0,access_token_version=NULL,refresh_lease_id=NULL,refresh_lease_until=0,refresh_retry_after=0,google_email=excluded.google_email,encrypted_refresh_token=excluded.encrypted_refresh_token,status='connected',scopes=excluded.scopes,revision=drive_connections.revision+1,updated_at=excluded.updated_at " +
     "WHERE drive_connections.status!='revocation_pending'"
   ).bind(
     crypto.randomUUID(), ownerUid, account.sub, account.email, encrypted,

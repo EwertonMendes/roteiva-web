@@ -298,3 +298,15 @@ A barra superior do ambiente DEV possui um seletor **Fonte (teste)**. Mantemos *
 - Teste Playwright: `tests/browser/font-lab.spec.ts`, com mock do CSS remoto apenas no teste, verificando os 11 itens, troca imediata, persistência na sessão, reset e contraste dos options em claro/escuro.
 
 O seletor não altera ainda a escala de tamanhos do produto: decidir a família primeiro, depois refatorar a hierarquia tipográfica e legibilidade sem testes contaminados por mudanças simultâneas.
+
+## Otimização dos access tokens Drive (17/10/2026)
+
+Migration aditiva `api/migrations/0003_access_token_cache.sql`; aplicar antes do Worker novo com o workflow normal. Não apagar conexões nem editar migrations antigas. As colunas novas são ignoradas pelo Worker antigo; após rollback, nova revisão impede reutilizar cache de credencial antiga. Banco/Secrets/escopos existentes preservados. Sem instalação local ou nova plataforma.
+
+O cache usa AES-GCM, TTL real de expires_in com margem de 60s, lease SQL de 20s, espera limitada de 8s e cooldown de 2s em falha (5s se houve token rotacionado sem publicação). Não há cron: renovação só sob demanda. Não ampliar validade do Google. Uma desconexão/reconexão invalida cache no D1; não usar cache HTTP, localStorage ou Map global para credenciais.
+
+Comandos mantidos: npm ci --ignore-scripts, npm audit --audit-level=high, npm run typecheck, npm test, npm run migrate:local, npm run build. Testes novos usam SQLite real em memória, as três migrations, AES-GCM real e endpoints Google simulados. Cobrem reutilização, margem, concorrência, takeover/fencing, isolamento A/B/conta/ambiente, rotação, reconexão/desconexão em voo, invalid_grant, cooldown e retry de GET em 401. Isso não representa grant Google real nem medição de latência de produção.
+
+QA DEV: abrir a Biblioteca com conexão existente, navegar entre pastas/recarregar, conferir ausência de novas telas de consentimento e eventos hit após o primeiro refresh_succeeded; verificar logs por janela sem capturar dados privados. Aguardar expiração real ou usar somente credenciais sintéticas nos testes; nunca adulterar tokens reais para provar expiração. Conferir desconexão/reconexão voluntária e manter os arquivos no Drive. Métricas de economia reais dependem do uso DEV após publicação. Respostas 403 de arquivo/cota não pedem reconexão automaticamente.
+
+Rollback de código não remove a migration. Rotação de chaves deve considerar os access tokens cifrados: eles podem ser descartados e reconstruídos a partir do refresh token; não remover uma chave ainda usada por refresh tokens. A operação GET pode terminar se já enviada antes da revogação; futuras aquisições consultam status/revisão no D1.

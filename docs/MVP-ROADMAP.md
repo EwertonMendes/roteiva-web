@@ -341,3 +341,15 @@ Se houver falha em teste de segurança/cookie, desabilitar imediatamente OAuth v
 - [ ] **REQUISITO para público:** escopo restrito `drive.readonly` exige cumprir política e revisão de segurança Google antes de habilitar para usuários externos.
 
 Não confundir biblioteca navegável MVP com aprovação/produção audiovisual completa.
+
+## Cache e renovação coordenada de tokens Drive — 17/10/2026
+
+**Estado: IMPLEMENTADO, aguardando CI e publicação DEV.** Sem mudança de escopos, frontend, regras Firestore, arquivos do Drive ou infraestrutura paga.
+
+- [x] Cache D1 cifrado com expiração Google/margem 60s, isolamento por proprietário/conta/revisão e migration aditiva 0003.
+- [x] Lease SQL de 20s, polling limitado 8s, fencing de resposta atrasada e cooldown transitório; rotação de refresh/cache atômica.
+- [x] Invalidação em consentimento/desconexão/revogação; invalid_grant antigo não invalida nova conexão.
+- [x] Cliente único de GETs Drive; um retry em 401, sem renovar por 403/cota; eventos categóricos sem credenciais.
+- [x] Testes com SQL/AES reais e Google simulado para expiração, concorrência e falhas.
+- [ ] CI do HEAD, migration remota e publicação DEV.
+- [ ] QA do proprietário com conexão real, leitura repetida de pastas, expiração real e comparação de métricas. Nenhuma redução percentual/latência real presumida.

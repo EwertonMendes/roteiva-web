@@ -1,4 +1,5 @@
 import test from 'node:test';
+import {database} from './helpers/database.mjs';
 import assert from 'node:assert/strict';
 import {encrypt,base64url,context} from '../src/crypto.ts';
 import {listFolders,listFolderItems} from '../src/folders.ts';
@@ -16,7 +17,7 @@ async function setup(scopes=DRIVE_SCOPE+' '+DRIVE_READ_SCOPE) {
   const row={id:connectionId,owner_uid:'alice',google_account_id:'google-alice',
     status:'connected',revision:1,scopes,
     encrypted_refresh_token:await encrypt(env,'test-refresh',context(env,'alice','google-alice'))};
-  env.DB={prepare:()=>({bind:(id,uid)=>({first:async()=>id===connectionId&&uid==='alice'?row:null})})};
+  const db=database(row);env.DB=db.DB;
   const urls=[];
   const fetcher=async(url,options)=>{
     urls.push(String(url));
@@ -38,11 +39,11 @@ async function setup(scopes=DRIVE_SCOPE+' '+DRIVE_READ_SCOPE) {
     return Response.json({files:[{id:folderId,name:'Campanha',mimeType:folderMime,parents:['root']}],
       nextPageToken:'next-page'});
   };
-  return {env,fetcher,urls};
+  return {env,fetcher,urls,close:db.close};
 }
 
-test('project folder picker lists actual folders through a private user-scoped backend',async()=>{
-  const {env,fetcher,urls}=await setup();
+test('project folder picker lists actual folders through a private user-scoped backend',async(t)=>{
+  const {env,fetcher,urls,close}=await setup();t.after(close);
   const response=await listFolders(env,'alice',connectionId,'root',null,fetcher);
   assert.equal(response.status,200);
   assert.deepEqual((await response.json()).folders,[{id:folderId,name:'Campanha',mimeType:folderMime,
@@ -55,8 +56,8 @@ test('project folder picker lists actual folders through a private user-scoped b
   assert.ok(urls.some(url=>new URL(url).searchParams.get('q')===`mimeType = '${folderMime}' and trashed = false`));
 });
 
-test('folder content lists existing video files without downloading binary objects',async()=>{
-  const {env,fetcher,urls}=await setup();
+test('folder content lists existing video files without downloading binary objects',async(t)=>{
+  const {env,fetcher,urls,close}=await setup();t.after(close);
   const response=await listFolderItems(env,'alice',connectionId,folderId,null,fetcher);
   const data=await response.json();
   assert.equal(data.folder.name,'Campanha');
@@ -66,11 +67,11 @@ test('folder content lists existing video files without downloading binary objec
   assert.ok(urls.every(url=>!url.includes('alt=media')));
 });
 
-test('Drive folder browsing rejects other owner, insufficient scope and malformed identifiers',async()=>{
-  const first=await setup();
+test('Drive folder browsing rejects other owner, insufficient scope and malformed identifiers',async(t)=>{
+  const first=await setup();t.after(first.close);
   await assert.rejects(()=>listFolders(first.env,'bob',connectionId,'root',null,first.fetcher),
     e=>e.status===404);
-  const narrow=await setup(DRIVE_SCOPE);
+  const narrow=await setup(DRIVE_SCOPE);t.after(narrow.close);
   await assert.rejects(()=>listFolders(narrow.env,'alice',connectionId,'root',null,narrow.fetcher),
     e=>e.code==='drive_read_permission_missing');
   await assert.rejects(()=>listFolders(first.env,'alice',connectionId,"' or true",null,first.fetcher),

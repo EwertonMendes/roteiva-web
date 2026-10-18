@@ -1,4 +1,5 @@
 import test from 'node:test';
+import {database} from './helpers/database.mjs';
 import assert from 'node:assert/strict';
 import { generateKeyPair, SignJWT, createLocalJWKSet, exportJWK } from 'jose';
 import { encrypt, decrypt, context, base64url } from '../src/crypto.ts';
@@ -67,23 +68,29 @@ test('connection lookup binds owner; state consumption is atomic, browser-bound 
  assert.ok(query.startsWith('DELETE')); assert.ok(query.includes('RETURNING'));
  assert.deepEqual(args.slice(0,2),['hash','browserHash']);
 });
-test('refresh stays backend-only; transient error preserves token; invalid_grant clears ciphertext', async()=>{
- let invalidated=false;
+test('refresh stays backend-only; transient error preserves token; invalid_grant clears ciphertext', async(t)=>{
  const row={id:'c',owner_uid:'A',google_account_id:'g',status:'connected',revision:1,
  encrypted_refresh_token:await encrypt(env,'synthetic',context(env,'A','g'))};
- const DB={prepare:()=>({bind:()=>({run:async()=>{invalidated=true;return {meta:{changes:1}}}})})};
- const configured={...env,DB,GOOGLE_CLIENT_ID:'test',GOOGLE_CLIENT_SECRET:'synthetic'};
+ const db=database(row);t.after(db.close);
+ const configured={...env,DB:db.DB,GOOGLE_CLIENT_ID:'test',GOOGLE_CLIENT_SECRET:'synthetic'};
  const ok=async(url,options)=>{
    assert.equal(url,'https://oauth2.googleapis.com/token');
    assert.equal(options.body.get('refresh_token'),'synthetic');
    return Response.json({access_token:'short-lived',token_type:'Bearer',expires_in:3600});
  };
  assert.equal(await accessToken(configured,row,ok),'short-lived');
- assert.equal(invalidated,false);
+ const saved=()=>db.sql.prepare('SELECT * FROM drive_connections WHERE id=?').get('c');
+ assert.equal(saved().status,'connected');
+ assert.ok(!saved().encrypted_access_token.includes('short-lived'));
+ db.sql.exec('UPDATE drive_connections SET access_token_expires_at=0');
  await assert.rejects(()=>accessToken(configured,row,async()=>Response.json({error:'server_error'},{status:503})),e=>e.status===502);
- assert.equal(invalidated,false);
+ assert.equal(saved().status,'connected');
+ assert.ok(saved().encrypted_refresh_token);
+ db.sql.exec('UPDATE drive_connections SET refresh_retry_after=0');
  await assert.rejects(()=>accessToken(configured,row,async()=>Response.json({error:'invalid_grant'},{status:400})),e=>e.code==='reconnect_required');
- assert.equal(invalidated,true);
+ assert.equal(saved().status,'reconnect_required');
+ assert.equal(saved().encrypted_refresh_token,null);
+ assert.equal(saved().encrypted_access_token,null);
 });
 
 test('rate limit rejects before touching D1',async()=>{
@@ -138,13 +145,13 @@ test('source rate limit does not use shared all-users bucket',async()=>{
  assert.deepEqual(keys,['dev:ip:203.0.113.9']);
 });
 
-test('Drive account probe refreshes server-side and returns only whitelisted account data',async()=>{
+test('Drive account probe refreshes server-side and returns only whitelisted account data',async(t)=>{
  const {about}=await import('../src/drive.ts');
  const row={id:'connection',owner_uid:'A',google_account_id:'google-A',google_email:'a@example.com',
    status:'connected',scopes:'https://www.googleapis.com/auth/drive.file',revision:1,
    encrypted_refresh_token:await encrypt(env,'synthetic-refresh',context(env,'A','google-A'))};
  let tokenCalls=0,driveCalls=0;
- const DB={prepare:()=>({bind:(id,uid)=>({first:async()=> id==='connection'&&uid==='A'?row:null})})};
+ const db=database(row);t.after(db.close);const DB=db.DB;
  const configured={...env,DB,GOOGLE_CLIENT_ID:'test',GOOGLE_CLIENT_SECRET:'synthetic'};
  const fetcher=async(url,options)=>{
    if(String(url).includes('oauth2.googleapis.com/token')){
