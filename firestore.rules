@@ -157,7 +157,7 @@ service cloud.firestore {
         d.activities is int && d.activities>=0 && d.activities<1000000;
     }
     function hasRegistration(d) {
-      return d.keys().hasAll(["studioName","professionalType","registrationCompletedAt","dataAcknowledgedAt","deletionState"]);
+      return d.keys().hasAll(["studioName","professionalType","registrationCompletedAt","dataAcknowledgedAt"]);
     }
     function modernProfile(d) {
       return hasRegistration(d) && text(d.displayName,2,120) &&
