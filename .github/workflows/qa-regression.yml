@@ -6,12 +6,12 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: qa-regression-${{ github.ref }}
+  group: qa-regression
   cancel-in-progress: true
 jobs:
   regression:
     name: Full security and desktop/mobile browser regression
-    if: github.ref == 'refs/heads/master' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/feat/saas-access-seven-day-trial')
+    if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
