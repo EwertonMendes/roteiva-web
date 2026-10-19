@@ -44,7 +44,7 @@ jobs:
   deploy:
     name: Deploy Cloudflare Worker DEV
     needs: validate
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/master' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/feat/saas-access-seven-day-trial'))
     runs-on: ubuntu-latest
     timeout-minutes: 3
     environment: cloudflare-development
@@ -69,7 +69,8 @@ jobs:
         run: |
           test "$ACCOUNT" = "b3855f9c192541a01a45b2dae7b6a7f8"
           test "$DATABASE" = "302adc88-76b2-4827-bb16-99662fa0408b"
-          test "$(git ls-remote origin refs/heads/master | cut -f1)" = "$GITHUB_SHA" || {
+          test "$GITHUB_REF" = "refs/heads/master" || test "$GITHUB_REF" = "refs/heads/feat/saas-access-seven-day-trial"
+          test "$(git ls-remote origin "$GITHUB_REF" | cut -f1)" = "$GITHUB_SHA" || {
             echo "Outdated SHA: skip stale DEV deploy"; exit 1;
           }
       - name: Apply versioned migrations before Worker rollout
