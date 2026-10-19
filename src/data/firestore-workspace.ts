@@ -115,7 +115,9 @@ export class FirestoreWorkspace {
       });
       return true;
     });
-    if (created) await bootstrapSync(this.db,this.uid,emptyNumbers());
+    // Trial enrollment is server-side. The first authorized load bootstraps sync
+    // from real collection counts (including legacy workspaces), not guessed zeros.
+    void created;
   }
   private async readCollection(name: Domain, source: "server" | "cache"): Promise<Map<string, Stored>> {
     const result = new Map<string, Stored>();
