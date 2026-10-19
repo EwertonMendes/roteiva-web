@@ -32,7 +32,8 @@ async function setup(scopes=DRIVE_SCOPE+' '+DRIVE_READ_SCOPE) {
       assert.match(u.searchParams.get('q'),/FOLDER_1234567890/);
       return Response.json({files:[
         {id:'video_123456789',name:'Entrega.mp4',mimeType:'video/mp4',size:'2048000',
-         webViewLink:'https://drive.google.com/file/d/video_123456789/view'},
+         webViewLink:'https://drive.google.com/file/d/video_123456789/view',
+         thumbnailLink:'https://lh3.googleusercontent.com/d/video_123456789'},
       ],nextPageToken:'next-page'});
     }
     assert.equal(u.searchParams.get('pageSize'),'100');
@@ -63,6 +64,8 @@ test('folder content lists existing video files without downloading binary objec
   assert.equal(data.folder.name,'Campanha');
   assert.equal(data.files[0].mimeType,'video/mp4');
   assert.equal(data.files[0].size,'2048000');
+  assert.ok(data.files[0].thumbnailTicket);
+  assert.equal(data.files[0].thumbnailLink,undefined,'Upstream thumbnail URLs are never returned in cleartext');
   assert.equal(data.nextPageToken,'next-page');
   assert.ok(urls.every(url=>!url.includes('alt=media')));
 });
@@ -80,4 +83,18 @@ test('Drive folder browsing rejects other owner, insufficient scope and malforme
     e=>e.code==='invalid_folder_id');
   await assert.rejects(()=>listFolders(first.env,'alice',connectionId,'root','x'.repeat(2050),first.fetcher),
     e=>e.code==='invalid_page_token');
+});
+
+test('remote search stays within a folder, escapes Google Drive query syntax and preserves pagination',async t=>{
+  const {env,fetcher,urls,close}=await setup();t.after(close);
+  const result=await listFolderItems(env,'alice',connectionId,folderId,'page-2',fetcher,"client's\\report");
+  assert.equal(result.status,200);
+  const searchUrl=urls.map(url=>new URL(url)).find(url=>url.searchParams.get('q')?.includes('name contains'));
+  assert.ok(searchUrl);
+  const q=searchUrl.searchParams.get('q');
+  assert.match(q,/FOLDER_1234567890/);
+  assert.ok(q.includes("name contains 'client\\'s\\\\report'"));
+  assert.equal(searchUrl.searchParams.get('pageToken'),'page-2');
+  await assert.rejects(()=>listFolderItems(env,'alice',connectionId,folderId,null,fetcher,'x'.repeat(101)),
+    e=>e.code==='invalid_search');
 });

@@ -22,13 +22,15 @@ export async function handle(request: Request, env: Env): Promise<Response> {
     // Rate limiting per edge-provided source address prevents one user's traffic
     // from exhausting the entire DEV account's shared 60/minute bucket.
     const sourceIp = request.headers.get('CF-Connecting-IP') || 'unknown';
-    if (!(await env.API_RATE_LIMIT.limit({key:'dev:ip:'+sourceIp.slice(0,64)})).success) throw new ApiError(429,'rate_limited');
     if (request.method === 'OPTIONS') {
       if (!origin) throw new ApiError(403,'origin_required');
       response = new Response(null,{status:204,headers:{
         'Access-Control-Allow-Methods':'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Max-Age':'600',
+        'Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Max-Age':'3600',
       }});
+    } else if (!(await (url.pathname.endsWith('/thumbnail') ? env.API_THUMB_LIMIT : env.API_RATE_LIMIT)
+        .limit({key:'dev:ip:'+sourceIp.slice(0,64)})).success) {
+      throw new ApiError(429,'rate_limited');
     } else if (url.pathname === '/health' && request.method === 'GET') {
       await env.DB.prepare('SELECT 1 FROM d1_migrations LIMIT 1').first();
       response = Response.json({status:'ok',environment:'dev'});
@@ -64,14 +66,14 @@ export async function handle(request: Request, env: Env): Promise<Response> {
       const parts=url.pathname.split('/');
       response=parts.length===5
         ? await listFolders(env,uid,parts[3],url.searchParams.get('parentId')||'root',url.searchParams.get('pageToken'))
-        : await listFolderItems(env,uid,parts[3],parts[5],url.searchParams.get('pageToken'));
+        : await listFolderItems(env,uid,parts[3],parts[5],url.searchParams.get('pageToken'),fetch,url.searchParams.get('search'));
     } else if (/^\/integrations\/drive\/[^/]+\/files\/[^/]+\/thumbnail$/.test(url.pathname) && request.method==='GET') {
       enabled(env);
       const uid=await identity(request,env);
       await assertNotDeleting(env,uid);
-      if (!(await env.API_RATE_LIMIT.limit({key:'dev:uid:'+uid})).success) throw new ApiError(429,'rate_limited');
+      if (!(await env.API_THUMB_LIMIT.limit({key:'dev:uid:'+uid})).success) throw new ApiError(429,'rate_limited');
       const parts=url.pathname.split('/');
-      response=await thumbnail(env,uid,parts[3],parts[5]);
+      response=await thumbnail(env,uid,parts[3],parts[5],url.searchParams.get('ticket'));
     } else if (/^\/integrations\/drive\/[^/]+\/(metadata|disconnect|about)$/.test(url.pathname)) {
       enabled(env);
       const uid = await identity(request,env);

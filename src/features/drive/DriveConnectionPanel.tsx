@@ -5,6 +5,7 @@ import { driveFolderLinkId, linkDriveFolder, readDriveLinks, unlinkDriveFolder, 
 import type { Project } from "../../domain/workspace";
 import { DRIVE_FOLDER, DriveFileExplorer, DriveFolderPicker, DrivePreview, DriveUnlinkConfirm, driveFileUrl, isPreviewable, type DriveItem, type DriveTrail } from "./DriveLibraryUI";
 import {clearDriveThumbnailCache} from "./DriveThumbnail";
+import {cacheKey,getCachedFolder,setCachedFolder,clearDriveFolderCache} from "./drive-folder-cache";
 import "./drive-library.css";
 
 const API = "https://roteiva-api-dev.ewertonmendes9.workers.dev";
@@ -80,6 +81,11 @@ export function DriveConnectionPanel({
   const [viewPath,setViewPath]=useState<DriveTrail[]>([]);
   const [filePage,setFilePage]=useState<string|null>(null);
   const [fileBusy,setFileBusy]=useState(false);
+  const [searchText,setSearchText]=useState("");
+  const [remote,setRemote]=useState<{term:string;folderId:string;files:DriveItem[];page:string|null}|null>(null);
+  const [searchBusy,setSearchBusy]=useState(false);
+  const searchRequest=useRef(0);
+  const previousScope=useRef("");
   const [preview,setPreview]=useState<DriveItem|null>(null);
   const [unlinkTarget,setUnlinkTarget]=useState<DriveFolderLink|null>(null);
   const [selectedAccount,setSelectedAccount]=useState("");
@@ -93,23 +99,47 @@ export function DriveConnectionPanel({
   const authorized=connected.filter(c=>c.scopes.split(/\s+/).includes(READ));
   const connection=authorized.find(c=>c.id===selectedAccount)||authorized[0];
   const relevant=selectedProjectId?links.filter(l=>l.projectId===selectedProjectId):links;
-  // Google Drive media is private. Use the existing Firebase session, never public thumbnail URLs.
-  const getThumbnail=useCallback(async(file:DriveItem):Promise<Blob|null>=>{
-    if(!user||!connection||!file.thumbnailLink)return null;
-    const path="/integrations/drive/"+encodeURIComponent(connection.id)+"/files/"+encodeURIComponent(file.id)+"/thumbnail";
-    for(let attempt=0;attempt<2;attempt++){
-      const token=await user.getIdToken(attempt===1);
-      const response=await fetch(API+path,{headers:{Authorization:"Bearer "+token},cache:"no-store"});
-      if(response.status===401&&attempt===0)continue;
-      if(!response.ok)return null; // A missing/expired Google thumbnail gracefully keeps the file icon.
+  // Reuse short-lived list metadata (sealed ticket), never expose upstream Google URLs.
+  const getThumbnail=useCallback(async(file:DriveItem,signal?:AbortSignal,accountId?:string):Promise<Blob|null>=>{
+    if(!user||!accountId||(!file.thumbnailTicket&&!file.thumbnailLink))return null;
+    const base="/integrations/drive/"+encodeURIComponent(accountId)+"/files/"+encodeURIComponent(file.id)+"/thumbnail";
+    const load=async(useTicket:boolean,forceToken=false):Promise<Response>=>{
+      const token=await user.getIdToken(forceToken);
+      const path=useTicket&&file.thumbnailTicket?base+"?ticket="+encodeURIComponent(file.thumbnailTicket):base;
+      return fetch(API+path,{headers:{Authorization:"Bearer "+token},signal,cache:"no-store"});
+    };
+    try{
+      let response=await load(Boolean(file.thumbnailTicket));
+      if(response.status===401)response=await load(Boolean(file.thumbnailTicket),true);
+      // Expired link / rotated connection revision: authenticate and request fresh metadata.
+      if(file.thumbnailTicket&&(response.status===410||response.status===403))response=await load(false);
+      if(!response.ok)return null;
       const type=(response.headers.get("Content-Type")||"").split(";")[0];
       if(!type.startsWith("image/"))return null;
       const blob=await response.blob();
       return blob.size>0&&blob.size<=1024*1024?blob:null;
+    }catch{return null;}
+  },[user]);
+
+  useEffect(()=>{
+    if(!user?.uid || (ready&&!connection)){
+      if(previousScope.current){
+        clearDriveThumbnailCache();clearDriveFolderCache();
+        ++fileRequest.current;++searchRequest.current;
+        setRemote(null);
+      }
+      previousScope.current="";
+      return;
     }
-    return null;
-  },[user,connection?.id]);
-  useEffect(()=>()=>clearDriveThumbnailCache(),[user?.uid,connection?.id]);
+    if(!connection?.id)return; // OAuth metadata still loading; preserve session cache.
+    const scope=user.uid+":"+connection.id;
+    if(previousScope.current&&previousScope.current!==scope){
+      clearDriveThumbnailCache();clearDriveFolderCache();
+      ++fileRequest.current;++searchRequest.current;
+      setRemote(null);
+    }
+    previousScope.current=scope;
+  },[user?.uid,connection?.id,ready]);
 
   const callback=new URLSearchParams(window.location.search).get("drive");
 
@@ -123,7 +153,8 @@ export function DriveConnectionPanel({
     }
     if(!response?.ok){
       const payload=await response?.json().catch(()=>({})) as {error?:{code?:string}}|undefined;
-      throw new Error(messages[payload?.error?.code||""]||"Não foi possível concluir a operação.");
+      const code=payload?.error?.code||"service_unavailable";
+      throw Object.assign(new Error(messages[code]||"Não foi possível concluir a operação."),{code});
     }
     return response.json() as Promise<T>;
   },[user]);
@@ -247,6 +278,7 @@ export function DriveConnectionPanel({
     setBusy(true);setError("");
     try{
       await unlinkDriveFolder(user.uid,link.id);
+      clearDriveFolderCache();
       if(viewing?.id===link.id){++fileRequest.current;setViewing(null);setFiles([]);autoOpened.current="";}
       setLinks(old=>old.filter(l=>l.id!==link.id));
       setUnlinkTarget(null);setResult("Vínculo removido. Nenhum arquivo foi apagado do Drive.");
@@ -254,20 +286,85 @@ export function DriveConnectionPanel({
     finally{setBusy(false);}
   }
 
-  async function openFiles(link:DriveFolderLink,token?:string|null,append=false,folderId=link.folderId,nextPath:DriveTrail[]=[{id:link.folderId,name:link.folderName}]){
+  async function openFiles(link:DriveFolderLink,token?:string|null,append=false,
+    folderId=link.folderId,nextPath:DriveTrail[]=[{id:link.folderId,name:link.folderName}]){
+    if(!user)return;
     const requestId=++fileRequest.current;
-    setFileBusy(true);setError("");
-    if(!append){setViewing(link);setViewPath(nextPath);setFiles([]);setFilePage(null);}
+    const key=cacheKey(user.uid,link.connectionId,folderId,"",token||"");
+    const cached=!append?getCachedFolder(key):undefined;
+    setFileBusy(!cached);setError("");
+    if(!append){
+      ++searchRequest.current;
+      setSearchText("");setRemote(null);setSearchBusy(false);
+      setViewing(link);setViewPath(nextPath);
+      setFiles(cached?.files||[]);setFilePage(cached?.nextPageToken||null);
+    }
     try{
+      // Fresh results render instantly. Revalidate older entries in the background.
+      if(cached&&Date.now()-cached.fetchedAt<30_000)return;
       const qs=token?"?pageToken="+encodeURIComponent(token):"";
-      const data=await call<FilePage>("/integrations/drive/"+encodeURIComponent(link.connectionId)+"/folders/"+encodeURIComponent(folderId)+"/items"+qs);
+      const data=await call<FilePage>("/integrations/drive/"+encodeURIComponent(link.connectionId)+
+        "/folders/"+encodeURIComponent(folderId)+"/items"+qs);
       if(requestId!==fileRequest.current)return;
+      setCachedFolder(key,{files:data.files,nextPageToken:data.nextPageToken});
       setViewing(link);setViewPath(nextPath);
       setFiles(old=>append?[...old,...data.files]:data.files);
       setFilePage(data.nextPageToken);
       if(data.incompleteSearch)setResult("O Google informou que alguns resultados podem estar incompletos.");
-    }catch(e){if(requestId===fileRequest.current)setError(e instanceof Error?e.message:"Não foi possível visualizar os arquivos.");}
-    finally{if(requestId===fileRequest.current)setFileBusy(false);}
+    }catch(e){
+      if(requestId!==fileRequest.current)return;
+      const code=(e as {code?:string}).code;
+      if(code==="connection_not_found"||code==="reconnect_required"||code==="drive_permission_denied"||
+        code==="authentication_required"||code==="invalid_identity"||code==="drive_folder_not_found"){
+        clearDriveFolderCache();setFiles([]);setFilePage(null);
+      }
+      setError(e instanceof Error?e.message:"Não foi possível visualizar os arquivos.");
+    }finally{if(requestId===fileRequest.current)setFileBusy(false);}
+  }
+
+  useEffect(()=>{
+    const folderId=viewPath.at(-1)?.id||viewing?.folderId;
+    const term=searchText.trim();
+    const requestId=++searchRequest.current;
+    setRemote(null);setSearchBusy(false);
+    if(!user||!viewing||!folderId||term.length<2)return;
+    const owner=user.uid,account=viewing.connectionId;
+    const timer=window.setTimeout(async()=>{
+      const key=cacheKey(owner,account,folderId,term);
+      const cached=getCachedFolder(key);
+      if(cached){
+        if(requestId===searchRequest.current)setRemote({term,folderId,files:cached.files,page:cached.nextPageToken});
+        if(Date.now()-cached.fetchedAt<30_000)return;
+      }
+      if(requestId===searchRequest.current)setSearchBusy(true);
+      try{
+        const qs=new URLSearchParams({search:term});
+        const response=await call<FilePage>("/integrations/drive/"+encodeURIComponent(account)+
+          "/folders/"+encodeURIComponent(folderId)+"/items?"+qs);
+        if(requestId!==searchRequest.current)return;
+        setCachedFolder(key,{files:response.files,nextPageToken:response.nextPageToken});
+        setRemote({term,folderId,files:response.files,page:response.nextPageToken});
+      }catch(e){
+        if(requestId===searchRequest.current)setError(e instanceof Error?e.message:"Falha na busca.");
+      }finally{if(requestId===searchRequest.current)setSearchBusy(false);}
+    },280);
+    return ()=>window.clearTimeout(timer);
+  },[searchText,viewing?.id,viewPath,call,user?.uid]);
+  
+  async function loadMoreSearch(){
+    if(!viewing||!user||!remote?.page||searchBusy)return;
+    const current=remote;
+    const requestId=searchRequest.current;
+    const folderId=current.folderId;
+    setSearchBusy(true);
+    try{
+      const params=new URLSearchParams({search:current.term,pageToken:current.page});
+      const data=await call<FilePage>("/integrations/drive/"+encodeURIComponent(viewing.connectionId)+
+        "/folders/"+encodeURIComponent(folderId)+"/items?"+params);
+      if(requestId!==searchRequest.current)return;
+      setRemote({...current,files:[...current.files,...data.files],page:data.nextPageToken});
+    }catch(e){if(requestId===searchRequest.current)setError(e instanceof Error?e.message:"Falha na busca.");}
+    finally{if(requestId===searchRequest.current)setSearchBusy(false);}
   }
 
   useEffect(()=>{
@@ -288,7 +385,7 @@ export function DriveConnectionPanel({
     setBusy(true);setError("");
     try{
       await call("/integrations/drive/"+encodeURIComponent(id)+"/disconnect","POST");
-      clearDriveThumbnailCache();
+      clearDriveThumbnailCache();clearDriveFolderCache();
       setConfirmId("");setPicker(false);setViewing(null);++fileRequest.current;
       await refresh();
       setResult("Conta desconectada. Seus arquivos permanecem no Google Drive.");
@@ -347,11 +444,18 @@ export function DriveConnectionPanel({
             <button type="button" className="secondary-button" disabled={!ready||busy} onClick={chooseFolders}>Vincular pasta</button></div>}
         </div>
       </aside>
-      <DriveFileExplorer folderName={viewing?.folderName} path={viewPath} files={files} loading={fileBusy} hasMore={!!filePage}
+      <DriveFileExplorer folderName={viewing?.folderName} path={viewPath} files={files} loading={fileBusy} hasMore={searchText.trim().length>=2
+          ? (remote&&searchText.trim()===remote.term?!!remote.page:false)
+          : !!filePage}
         thumbnailScope={(user?.uid||"")+":"+(viewing?.connectionId||connection?.id||"")} getThumbnail={getThumbnail}
+        searchResults={remote?.folderId===(viewPath.at(-1)?.id||viewing?.folderId)?remote?.files:undefined}
+        searchTerm={remote?.term} searchLoading={searchBusy} onSearchChange={setSearchText}
         onBack={()=>{++fileRequest.current;setViewing(null);setFiles([]);autoOpened.current=(selectedProjectId||"all")+":"+(relevant[0]?.id||"");}}
         onNavigate={(id,path)=>{if(viewing)void openFiles(viewing,null,false,id,path);}}
-        onOpen={openItem} onMore={()=>{if(viewing&&filePage)void openFiles(viewing,filePage,true,viewPath.at(-1)?.id||viewing.folderId,viewPath);}}/>
+        onOpen={openItem} onMore={()=>{
+          if(remote&&searchText.trim()===remote.term){void loadMoreSearch();}
+          else if(viewing&&filePage)void openFiles(viewing,filePage,true,viewPath.at(-1)?.id||viewing.folderId,viewPath);
+        }}/>
     </div>
     {picker&&<DriveFolderPicker projects={projects} projectId={selectedProjectId} onProjectChange={onSelectProject}
       folders={folderList} path={trail} loading={folderBusy} working={busy} canRead={!!connection}

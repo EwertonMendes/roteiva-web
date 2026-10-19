@@ -2,35 +2,47 @@ import {useEffect, useRef, useState} from "react";
 import {LoaderCircle, Play} from "lucide-react";
 import {driveKindIcon, type DriveItem, DRIVE_FOLDER} from "./DriveLibraryUI";
 
-type GetThumbnail = (item:DriveItem)=>Promise<Blob|null>;
+type GetThumbnail = (item:DriveItem,signal?:AbortSignal,accountId?:string)=>Promise<Blob|null>;
 type Phase = "idle"|"loading"|"loaded"|"unavailable";
 type ThumbnailState={key:string;phase:Phase;src:string|null};
-const MAX_CACHE=48;
-const MAX_CONCURRENT=4;
+const MAX_CACHE=64;
+const MAX_CONCURRENT=6;
 const cache=new Map<string,string>();
 const pending=new Map<string,Promise<string|null>>();
-const tasks:Array<()=>void>=[];
+type Queued={key:string;priority:number;run:()=>void;cancel:()=>void;controller:AbortController};
+const tasks:Queued[]=[];
+const active=new Set<AbortController>();
 let running=0;
 let generation=0;
 
 function runNext(){
-  while(running<MAX_CONCURRENT && tasks.length){
-    const task=tasks.shift();
-    if(task){running++;task();}
+  // Visible thumbnails outrank near-viewport prefetches even when scrolled rapidly.
+  while(running<MAX_CONCURRENT&&tasks.length){
+    tasks.sort((a,b)=>b.priority-a.priority);
+    const task=tasks.shift()!;
+    if(task.controller.signal.aborted)continue;
+    running++;active.add(task.controller);task.run();
   }
 }
-function enqueue<T>(operation:()=>Promise<T>):Promise<T>{
+function promote(key:string){
+  for(const task of tasks)if(task.key===key)task.priority=2;
+}
+function enqueue<T>(key:string,operation:(signal:AbortSignal)=>Promise<T>):Promise<T>{
+  const controller=new AbortController();
   return new Promise((resolve,reject)=>{
-    tasks.push(()=>{
-      operation().then(resolve,reject).finally(()=>{running--;runNext();});
-    });
+    tasks.push({key,priority:1,controller,cancel:()=>resolve(null as T),run:()=>{
+      operation(controller.signal).then(resolve,reject).finally(()=>{
+        active.delete(controller);running--;runNext();
+      });
+    }});
     runNext();
   });
 }
-
-/** No persistence of Google Drive binaries: bound object URLs to the current browser session. */
 export function clearDriveThumbnailCache(){
   generation++;
+  for(const task of tasks){task.controller.abort();task.cancel();}
+  tasks.splice(0);
+  for(const controller of active)controller.abort();
   for(const url of cache.values())URL.revokeObjectURL(url);
   cache.clear();pending.clear();
 }
@@ -40,10 +52,10 @@ function resolveThumbnail(key:string,item:DriveItem,getThumbnail:GetThumbnail):P
   const existing=pending.get(key);
   if(existing)return existing;
   const epoch=generation;
-  const operation=enqueue(async()=>{
+  const operation=enqueue(key,async(signal)=>{
     if(epoch!==generation)return null;
     try {
-      const blob=await getThumbnail(item);
+      const blob=await getThumbnail(item,signal,scope.slice(scope.lastIndexOf(':')+1));
       if(epoch!==generation || !blob || blob.size===0 || blob.size>1024*1024 || !blob.type.startsWith("image/"))return null;
       const objectUrl=URL.createObjectURL(blob);
       cache.set(key,objectUrl);
@@ -90,11 +102,19 @@ export function DriveThumbnail({item,scope,getThumbnail}:{item:DriveItem;scope:s
       load();
       return ()=>{active=false;};
     }
-    const observer=new IntersectionObserver(entries=>{
-      if(entries.some(entry=>entry.isIntersecting)){observer.disconnect();load();}
-    },{rootMargin:"160px"});
-    observer.observe(ref.current);
-    return ()=>{active=false;observer.disconnect();};
+    const prefetch=new IntersectionObserver(entries=>{
+      if(entries.some(entry=>entry.isIntersecting)){prefetch.disconnect();load();}
+    },{rootMargin:"180px"});
+    const visible=new IntersectionObserver(entries=>{
+      if(entries.some(entry=>entry.isIntersecting)){
+        visible.disconnect();
+        load();
+        promote(key);
+      }
+    });
+    prefetch.observe(ref.current);
+    visible.observe(ref.current);
+    return ()=>{active=false;prefetch.disconnect();visible.disconnect();};
   },[key,available,getThumbnail]);
 
   function handleImageError(){

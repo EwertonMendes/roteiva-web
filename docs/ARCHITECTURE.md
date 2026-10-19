@@ -324,3 +324,10 @@ Estado: PR #30 publicada no DEV, IAM validado e exclusão real confirmada em 18/
 ## Decisão de segurança: prévias Google Drive (18/10/2026)
 
 A Biblioteca usa Drive API somente para metadados e tokens OAuth restritos ao Worker. Miniaturas são imagens transitórias de até 1 MiB, requisitadas via endpoint autenticado, com verificação de UID e da conexão, sem aceitar URL arbitrária do navegador. O cliente só gera `blob:` URLs em memória, com carregamento sob demanda, sem salvar conteúdo de mídia em Firestore/D1 ou cache persistente. O backend não transfere vídeos originais; a prévia ampliada continua no visualizador do Google Drive, sujeita às permissões/cookies do navegador. Contrato de fallback: ausência de miniatura mantém ícone correto por MIME; expiração da URL provoca nova leitura dos metadados ao tentar carregar novamente. Esse recurso está no DEV, não cria dependência de Storage ou transcodificação.
+
+
+### Otimização Drive — arquitetura de cache segura
+
+O cliente mantém um LRU em memória para listas (24 entradas) por UID/conexão/pasta/busca, e cache de miniaturas com URL Blob temporária. Não há armazenamento persistente de mídias nem respostas sensíveis. O Worker emite tickets cifrados (AES-GCM com contexto de uso distinto dos tokens OAuth) para reutilizar o `thumbnailLink` obtido na listagem. Validar sempre JWT Firebase, dono da conexão, revisão e escopo; tickets expiram em 90 segundos. Nunca reutilizar entre usuários nem permitir URL de destino arbitrária. A rota legada faz consulta de metadados para compatibilidade.
+
+Limites separados para preflight, listagens e thumbs evitam que 27 miniaturas impeçam a navegação. Google Drive continua sendo fonte de verdade; o cache reduz latência percebida e revalida dados envelhecidos. Não há sincronização incremental, tabelas D1 adicionais nem uso de Firebase Storage.

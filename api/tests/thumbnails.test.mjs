@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {database} from './helpers/database.mjs';
 import {base64url, context, encrypt} from '../src/crypto.ts';
 import {DRIVE_SCOPE, DRIVE_READ_SCOPE} from '../src/google.ts';
-import {allowedThumbnailUrl, thumbnail} from '../src/thumbnails.ts';
+import {allowedThumbnailUrl,thumbnail,sealThumbnailTicket} from '../src/thumbnails.ts';
 
 const id='photo_1234567890';
 const account='aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa';
@@ -34,7 +34,7 @@ async function fixture({scopes=DRIVE_SCOPE+' '+DRIVE_READ_SCOPE,thumb='https://l
 
 test('thumbnail proxy reads private metadata and returns bounded image without binary originals',async t=>{
   const f=await fixture();t.after(f.close);
-  const response=await thumbnail(f.env,'alice',account,id,f.fetcher);
+  const response=await thumbnail(f.env,'alice',account,id,null,f.fetcher);
   assert.equal(response.status,200);
   assert.equal(response.headers.get('Content-Type'),'image/jpeg');
   assert.equal(response.headers.get('Cache-Control'),'private, no-store');
@@ -53,19 +53,43 @@ test('the upstream thumbnail URL must be Google HTTPS without embedded credentia
 
 test('owner, scope and file identifiers are enforced before any thumbnail fetch',async t=>{
   const f=await fixture();t.after(f.close);
-  await assert.rejects(()=>thumbnail(f.env,'bob',account,id,f.fetcher),e=>e.status===404);
-  await assert.rejects(()=>thumbnail(f.env,'alice',account,'bad?',f.fetcher),e=>e.status===400);
+  await assert.rejects(()=>thumbnail(f.env,'bob',account,id,null,f.fetcher),e=>e.status===404);
+  await assert.rejects(()=>thumbnail(f.env,'alice',account,'bad?',null,f.fetcher),e=>e.status===400);
   const g=await fixture({scopes:DRIVE_SCOPE});t.after(g.close);
-  await assert.rejects(()=>thumbnail(g.env,'alice',account,id,g.fetcher),e=>e.code==='drive_read_permission_missing');
+  await assert.rejects(()=>thumbnail(g.env,'alice',account,id,null,g.fetcher),e=>e.code==='drive_read_permission_missing');
 });
 
 test('oversized images, redirects and unsupported MIME types are never returned',async t=>{
   const huge=await fixture({length:1024*1024+1});t.after(huge.close);
-  await assert.rejects(()=>thumbnail(huge.env,'alice',account,id,huge.fetcher),e=>e.code==='thumbnail_unavailable');
+  await assert.rejects(()=>thumbnail(huge.env,'alice',account,id,null,huge.fetcher),e=>e.code==='thumbnail_unavailable');
   const redirect=await fixture({status:302});t.after(redirect.close);
-  await assert.rejects(()=>thumbnail(redirect.env,'alice',account,id,redirect.fetcher),e=>e.code==='thumbnail_unavailable');
+  await assert.rejects(()=>thumbnail(redirect.env,'alice',account,id,null,redirect.fetcher),e=>e.code==='thumbnail_unavailable');
   const html=await fixture({mime:'text/html'});t.after(html.close);
-  await assert.rejects(()=>thumbnail(html.env,'alice',account,id,html.fetcher),e=>e.code==='thumbnail_unavailable');
+  await assert.rejects(()=>thumbnail(html.env,'alice',account,id,null,html.fetcher),e=>e.code==='thumbnail_unavailable');
   const noThumb=await fixture({thumb:'https://malicious.example/x'});t.after(noThumb.close);
-  await assert.rejects(()=>thumbnail(noThumb.env,'alice',account,id,noThumb.fetcher),e=>e.code==='thumbnail_unavailable');
+  await assert.rejects(()=>thumbnail(noThumb.env,'alice',account,id,null,noThumb.fetcher),e=>e.code==='thumbnail_unavailable');
+});
+
+test('sealed thumbnail ticket avoids a second Google metadata query and cannot cross accounts',async t=>{
+  const f=await fixture();t.after(f.close);
+  const ticket=await sealThumbnailTicket(f.env,'alice',account,1,id,'https://lh3.googleusercontent.com/d/thumbnail123');
+  assert.ok(ticket);
+  assert.ok(!ticket.includes('googleusercontent'));
+  const response=await thumbnail(f.env,'alice',account,id,ticket,f.fetcher);
+  assert.equal(response.status,200);
+  assert.equal(f.urls.filter(url=>url.includes('/drive/v3/files/')).length,0);
+  await assert.rejects(()=>thumbnail(f.env,'bob',account,id,ticket,f.fetcher),e=>e.status===404);
+  await assert.rejects(()=>thumbnail(f.env,'alice',account,'other_file_123',ticket,f.fetcher),e=>e.status===403);
+  const tampered=(ticket[0]==='A'?'B':'A')+ticket.slice(1);
+  await assert.rejects(()=>thumbnail(f.env,'alice',account,id,tampered,f.fetcher),e=>e.status===400);
+});
+test('tickets reject revoked connections, invalid URLs and changes in connection revision',async t=>{
+  const f=await fixture();t.after(f.close);
+  const missing=await sealThumbnailTicket(f.env,'alice',account,1,id,'https://evil.example/a');
+  assert.equal(missing,undefined);
+  const ticket=await sealThumbnailTicket(f.env,'alice',account,1,id,'https://lh3.googleusercontent.com/x');
+  f.env.DB.prepare('UPDATE drive_connections SET revision=2 WHERE id=?').bind(account).run();
+  await assert.rejects(()=>thumbnail(f.env,'alice',account,id,ticket,f.fetcher),e=>e.status===403);
+  f.env.DB.prepare('UPDATE drive_connections SET status=\'reconnect_required\' WHERE id=?').bind(account).run();
+  await assert.rejects(()=>thumbnail(f.env,'alice',account,id,ticket,f.fetcher),e=>e.status===409);
 });

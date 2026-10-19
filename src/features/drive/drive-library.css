@@ -394,3 +394,7 @@
 .rl-files[data-view="grid"] .rl-thumb-loading-spin {width:23px;height:23px;}
 .rl-files[data-view="grid"] .rl-thumb-loading>span {display:block;}
 @media(prefers-reduced-motion:reduce){.rl-thumb-loading-spin {animation:none;}}
+
+/* Remote search status spans the grid without forcing thumbnail rows to resize. */
+.rl-search-progress {grid-column:1/-1;display:block;padding:8px 14px;color:var(--rl-muted);font-size:.76rem;}
+.rl-files[data-view="grid"] .rl-search-progress {align-self:start;}
