@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import {DriveThumbnail} from "./DriveThumbnail";
 import { ArrowLeft, Check, ChevronLeft, ChevronRight, Grid2X2, List, ExternalLink, File, FileAudio, FileImage, FileText, FileVideo, Folder, FolderOpen, Link2, LoaderCircle, Search, X, MoreHorizontal } from "lucide-react";
 
-export type DriveItem = {id:string;name:string;mimeType:string;size?:string;modifiedTime?:string;thumbnailLink?:string;webViewLink?:string};
+export type DriveItem = {id:string;name:string;mimeType:string;size?:string;modifiedTime?:string;thumbnailLink?:string;thumbnailTicket?:string;webViewLink?:string};
 export type DriveTrail = {id:string;name:string};
 export const DRIVE_FOLDER = "application/vnd.google-apps.folder";
 
@@ -166,7 +166,11 @@ type ExplorerProps={
   loading:boolean;
   hasMore:boolean;
   thumbnailScope?:string;
-  getThumbnail?:(file:DriveItem)=>Promise<Blob|null>;
+  getThumbnail?:(file:DriveItem,signal?:AbortSignal,accountId?:string)=>Promise<Blob|null>;
+  searchResults?:DriveItem[];
+  searchTerm?:string;
+  searchLoading?:boolean;
+  onSearchChange?:(text:string)=>void;
   onBack:()=>void;
   onNavigate:(id:string,path:DriveTrail[])=>void;
   onOpen:(file:DriveItem)=>void;
@@ -178,7 +182,7 @@ function savedView():ViewMode{
   try{return window.localStorage.getItem(VIEW_KEY)==="grid"?"grid":"list";}catch{return "list";}
 }
 const noThumbnail=async (_:DriveItem):Promise<Blob|null>=>null;
-export function DriveFileExplorer({folderName,path,files,loading,hasMore,thumbnailScope="",getThumbnail=noThumbnail,onBack,onNavigate,onOpen,onMore}:ExplorerProps){
+export function DriveFileExplorer({folderName,path,files,loading,hasMore,thumbnailScope="",getThumbnail=noThumbnail,searchResults,searchTerm,searchLoading=false,onSearchChange,onBack,onNavigate,onOpen,onMore}:ExplorerProps){
   const [filter,setFilter]=useState("");
   const [view,setView]=useState<ViewMode>(savedView);
   useEffect(()=>setFilter(""),[path.map(item=>item.id).join("/")]);
@@ -186,7 +190,8 @@ export function DriveFileExplorer({folderName,path,files,loading,hasMore,thumbna
     setView(next);
     try{localStorage.setItem(VIEW_KEY,next);}catch{/* UX preference can remain in memory */}
   }
-  const visible=files.filter(f=>f.name.toLocaleLowerCase("pt-BR").includes(filter.toLocaleLowerCase("pt-BR")));
+  const source=searchResults && searchTerm?.trim()===filter.trim()?searchResults:files;
+  const visible=source.filter(f=>f.name.toLocaleLowerCase("pt-BR").includes(filter.toLocaleLowerCase("pt-BR")));
   const makeRow=(file:DriveItem)=>{
     const isFolder=file.mimeType===DRIVE_FOLDER;
     return <div className="rl-file-row" key={file.id}>
@@ -223,8 +228,9 @@ export function DriveFileExplorer({folderName,path,files,loading,hasMore,thumbna
     {view==="list"&&<div className="rl-file-head" aria-hidden="true"><span>Nome</span><span>Modificado</span><span>Tamanho</span><span/></div>}
     <div className="rl-files" data-view={view}>
       {loading&&!files.length&&<div className="rl-state" role="status"><LoaderCircle size={23} className="rl-spin"/><p>Carregando arquivos…</p></div>}
+      {searchLoading&&<span className="rl-search-progress" role="status">Buscando no Drive…</span>}
       {visible.map(makeRow)}
-      {!loading&&!visible.length&&<div className="rl-state"><FolderOpen size={27}/><p>{filter?"Nenhum item corresponde ao filtro nesta página.":"Esta pasta está vazia."}</p></div>}
+      {!loading&&!searchLoading&&!visible.length&&<div className="rl-state"><FolderOpen size={27}/><p>{filter?"Nenhum item corresponde à busca.":"Esta pasta está vazia."}</p></div>}
       {hasMore&&<button type="button" className="rl-load-more" onClick={onMore} disabled={loading}>Carregar mais arquivos</button>}
     </div>
     </>:<div className="rl-state rl-intro"><FolderOpen size={32}/><h3>Selecione uma pasta</h3><p>Escolha uma pasta à esquerda para visualizar seus arquivos.</p></div>}

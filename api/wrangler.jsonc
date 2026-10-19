@@ -20,7 +20,11 @@
         "TOKEN_KEY_VERSION": "v1",
         "GOOGLE_CLIENT_ID": "479738001561-4gu97o42v4m8kiq1bga8ck3msmjp0me3.apps.googleusercontent.com"
       },
-      "triggers": {"crons": ["* * * * *"]},
+      "triggers": {
+        "crons": [
+          "* * * * *"
+        ]
+      },
       "d1_databases": [
         {
           "binding": "DB",
@@ -42,6 +46,14 @@
           "namespace_id": "479738001561",
           "simple": {
             "limit": 60,
+            "period": 60
+          }
+        },
+        {
+          "name": "API_THUMB_LIMIT",
+          "namespace_id": "479738001562",
+          "simple": {
+            "limit": 240,
             "period": 60
           }
         }

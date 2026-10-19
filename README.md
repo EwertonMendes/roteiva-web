@@ -93,3 +93,8 @@ A configuração PROD é somente um modelo, sem ambiente/credenciais provisionad
 ## Miniaturas e visualização da Biblioteca
 
 O Roteiva mostra miniaturas fornecidas pelo Google Drive para mídia quando disponíveis, com modos **Lista** e **Grade**, e modal de visualização ampliada no Google Drive. Miniaturas privadas passam por uma rota curta e autenticada do Worker, sob demanda e em memória; vídeos não são transferidos pelo Worker. Documentos sem thumb mantêm ícone do tipo. O preview integrado exige origem DEV principal devido a Auth/CORS, portanto a validação funcional deve ocorrer após deploy conjunto de frontend e API.
+
+
+### Google Drive mais rápido — DEV
+
+A Biblioteca reaproveita listagens recentes por sessão e busca nomes remotamente dentro da pasta, com paginação; miniaturas utilizam tickets autenticados de curta duração, evitando uma segunda consulta Google para cada arquivo. A fila prioriza imagens visíveis e conserva o cache em memória ao navegar entre telas. O conteúdo dos arquivos permanece no Drive e não é copiado para Firestore/D1.

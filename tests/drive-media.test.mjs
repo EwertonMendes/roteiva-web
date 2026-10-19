@@ -12,8 +12,8 @@ test("list/grid mode is explicit and stored as a nonprivate local preference",()
 });
 test("thumbnail binary is authenticated, lazy and never loaded from an untrusted link in an image tag",()=>{
   assert.match(loader,/IntersectionObserver/);
-  assert.match(loader,/MAX_CONCURRENT=4/);
-  assert.match(loader,/MAX_CACHE=48/);
+  assert.match(loader,/MAX_CONCURRENT=6/);
+  assert.match(loader,/MAX_CACHE=64/);
   assert.match(parent,/\/files\/".encodeURIComponent\(file.id\)."\/thumbnail"/);
   assert.match(parent,/getIdToken/);
   assert.doesNotMatch(ui,/<img[^>]*thumbnailLink/);
@@ -32,4 +32,14 @@ test("thumbnail shows progress during fetch and falls back on unavailable media"
   assert.match(loader,/phase:url\?"loaded":"unavailable"/);
   assert.match(loader,/className="rl-thumb-loading"/);
   assert.match(loader,/IntersectionObserver/);
+});
+
+test("fast Drive listing uses account-scoped in-memory cache and debounced remote search",()=>{
+  assert.match(parent,/getCachedFolder/);
+  assert.match(parent,/setCachedFolder/);
+  assert.match(parent,/clearDriveFolderCache/);
+  assert.ok(parent.includes("window.setTimeout(async()=>"));
+  assert.match(ui,/searchResults/);
+  assert.match(parent,/thumbnailTicket/);
+  assert.ok(loader.includes("promote(key)"));
 });
