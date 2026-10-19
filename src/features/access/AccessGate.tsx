@@ -1,5 +1,5 @@
 import {createContext,useContext,useEffect,useState,type ReactNode} from "react";
-import {doc,onSnapshot,type Timestamp} from "firebase/firestore";
+import {watchAccess,type AccessInfo} from "../../data/access-watch";
 import {Clock3,ShieldAlert,ArrowRight,RefreshCw,LogOut} from "lucide-react";
 import {firebaseServices} from "../../lib/firebase";
 import {useAuth} from "../auth/AuthProvider";
@@ -8,7 +8,6 @@ import {AccountDeletionAction} from "../settings/AccountDeletionAction";
 import "./access.css";
 
 const BASE="https://roteiva-api-dev.ewertonmendes9.workers.dev";
-export type AccessInfo={source:"trial"|"complimentary"|"subscription"|"none";unlimited:boolean;suspended:boolean;accessUntil:Date;trialEndsAt:Date};
 const AccessContext=createContext<AccessInfo|null>(null);
 export const useAccess=()=>useContext(AccessContext);
 export async function ensureUserAccess():Promise<void>{
@@ -21,20 +20,6 @@ export async function ensureUserAccess():Promise<void>{
   if(!response.ok)throw new Error(response.status===429
     ?"Muitas tentativas. Aguarde um pouco antes de tentar novamente."
     :"Não foi possível verificar o acesso à sua conta. Tente novamente.");
-}
-function parseAccess(value:Record<string,unknown>):AccessInfo{
-  function time(field:string):Date{
-    const raw=value[field] as Timestamp|undefined;
-    if(!raw||typeof raw.toDate!=="function")throw new Error("Estado de acesso inválido.");
-    const date=raw.toDate();
-    if(!Number.isFinite(date.getTime()))throw new Error("Data de acesso inválida.");
-    return date;
-  }
-  if(value.schemaVersion!==1||typeof value.unlimited!=="boolean"||typeof value.suspended!=="boolean"||
-     !["trial","complimentary","subscription","none"].includes(String(value.source)))
-    throw new Error("Estado de acesso inválido.");
-  return {source:value.source as AccessInfo["source"],unlimited:value.unlimited,suspended:value.suspended,
-    accessUntil:time("accessUntil"),trialEndsAt:time("trialEndsAt")};
 }
 export function AccessGate({children}:{children:ReactNode}){
   const {user,logout,busy}=useAuth();
@@ -54,13 +39,9 @@ export function AccessGate({children}:{children:ReactNode}){
     setAccess(null);setError("");
     void ensureUserAccess().then(()=>{
       if(!active)return;
-      const ref=doc(firebaseServices().db,"users",user.uid,"access","current");
-      unsubscribe=onSnapshot(ref,{includeMetadataChanges:true},snapshot=>{
-        if(!active||snapshot.metadata.fromCache)return;
-        if(!snapshot.exists()){setError("Não foi possível confirmar seu acesso.");return;}
-        try{setAccess(parseAccess(snapshot.data()));setError("");setNow(Date.now());}
-        catch{setError("O servidor retornou um estado de acesso inválido.");}
-      },()=>{if(active)setError("Não foi possível acompanhar o estado do acesso.");});
+      unsubscribe=watchAccess(firebaseServices().db,user.uid,value=>{
+        if(active){setAccess(value);setError("");setNow(Date.now());}
+      },reason=>{if(active)setError(reason.message);});
     }).catch(reason=>{if(active)setError(reason instanceof Error?reason.message:"Falha ao verificar acesso.");});
     return()=>{active=false;unsubscribe();};
   },[user?.uid,attempt]);
