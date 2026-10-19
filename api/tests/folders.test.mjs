@@ -87,7 +87,7 @@ test('Drive folder browsing rejects other owner, insufficient scope and malforme
 
 test('remote search stays within a folder, escapes Google Drive query syntax and preserves pagination',async t=>{
   const {env,fetcher,urls,close}=await setup();t.after(close);
-  const result=await listFolderItems(env,'alice',connectionId,folderId,'page-2',fetcher,"client's\\report");
+  const result=await listFolderItems(env,'alice',connectionId,folderId,'page-2',fetcher,String.raw`client's\\report`);
   assert.equal(result.status,200);
   const searchUrl=urls.map(url=>new URL(url)).find(url=>url.searchParams.get('q')?.includes('name contains'));
   assert.ok(searchUrl);

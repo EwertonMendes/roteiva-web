@@ -127,7 +127,7 @@ export function DriveFolderPicker({projects,projectId,onProjectChange,folders,pa
           {i>0&&<ChevronRight size={13}/>}
           <button type="button" onClick={()=>onNavigate(entry.id,path.slice(0,i+1))} disabled={loading}>{entry.name}</button>
         </span>)}</nav>
-        <label className="rl-search"><Search size={17}/><input aria-label="Filtrar pastas carregadas" placeholder="Filtrar pastas desta página" value={filter} onChange={e=>{setFilter(e.target.value);onSearchChange?.(e.target.value);}}/>{filter&&<button type="button" onClick={()=>{setFilter("");onSearchChange?.("");}} aria-label="Limpar filtro"><X size={15}/></button>}</label>
+        <label className="rl-search"><Search size={17}/><input aria-label="Filtrar pastas carregadas" placeholder="Filtrar pastas desta página" value={filter} onChange={e=>setFilter(e.target.value)}/>{filter&&<button type="button" onClick={()=>setFilter("")} aria-label="Limpar filtro"><X size={15}/></button>}</label>
         <div className="rl-picker-list" role="group" aria-label="Pastas disponíveis">
           {loading && !folders.length ? <p className="rl-empty" role="status"><LoaderCircle size={18} className="rl-spin"/> Buscando pastas…</p> : null}
           {visible.map(folder=>{

@@ -47,7 +47,7 @@ export function clearDriveThumbnailCache(){
   cache.clear();pending.clear();
 }
 
-function resolveThumbnail(key:string,item:DriveItem,getThumbnail:GetThumbnail):Promise<string|null>{
+function resolveThumbnail(key:string,item:DriveItem,getThumbnail:GetThumbnail,accountId:string):Promise<string|null>{
   if(cache.has(key))return Promise.resolve(cache.get(key)!);
   const existing=pending.get(key);
   if(existing)return existing;
@@ -55,7 +55,7 @@ function resolveThumbnail(key:string,item:DriveItem,getThumbnail:GetThumbnail):P
   const operation=enqueue(key,async(signal)=>{
     if(epoch!==generation)return null;
     try {
-      const blob=await getThumbnail(item,signal,scope.slice(scope.lastIndexOf(':')+1));
+      const blob=await getThumbnail(item,signal,accountId);
       if(epoch!==generation || !blob || blob.size===0 || blob.size>1024*1024 || !blob.type.startsWith("image/"))return null;
       const objectUrl=URL.createObjectURL(blob);
       cache.set(key,objectUrl);
@@ -94,7 +94,7 @@ export function DriveThumbnail({item,scope,getThumbnail}:{item:DriveItem;scope:s
       if(started)return;
       started=true;
       setState({key,src:null,phase:"loading"});
-      void resolveThumbnail(key,item,getThumbnail).then(url=>{
+      void resolveThumbnail(key,item,getThumbnail,scope.slice(scope.lastIndexOf(':')+1)).then(url=>{
         if(active)setState({key,src:url,phase:url?"loaded":"unavailable"});
       });
     };

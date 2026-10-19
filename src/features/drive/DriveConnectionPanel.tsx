@@ -358,7 +358,7 @@ export function DriveConnectionPanel({
     const folderId=current.folderId;
     setSearchBusy(true);
     try{
-      const params=new URLSearchParams({search:current.term,pageToken:current.page});
+      const params=new URLSearchParams({search:current.term,pageToken:current.page!});
       const data=await call<FilePage>("/integrations/drive/"+encodeURIComponent(viewing.connectionId)+
         "/folders/"+encodeURIComponent(folderId)+"/items?"+params);
       if(requestId!==searchRequest.current)return;
