@@ -1,7 +1,11 @@
 import { ApiError, type Env } from './types.ts';
 import { adminToken } from './firebase-admin.ts';
-import { assertNotDeleting } from './account-deletion.ts';
 
+
+async function assertNotDeleting(env:Env,uid:string):Promise<void> {
+  const row=await env.DB.prepare('SELECT 1 FROM account_deletions WHERE owner_uid=?').bind(uid).first();
+  if(row)throw new ApiError(409,'account_deleting');
+}
 export const TRIAL_DAYS=7;
 export const TRIAL_MS=TRIAL_DAYS*24*60*60*1000;
 export const PAYMENT_GRACE_MS=3*24*60*60*1000;
@@ -69,8 +73,8 @@ async function publish(env:Env,uid:string,state:AccessState,token:string):Promis
     const saved=await current.json() as {fields?:Record<string,{stringValue?:string;booleanValue?:boolean;timestampValue?:string}>};
     const f=saved.fields;
     if(f?.source?.stringValue===state.source && f?.unlimited?.booleanValue===state.unlimited &&
-       f?.suspended?.booleanValue===state.suspended && f?.accessUntil?.timestampValue===state.accessUntil &&
-       f?.trialEndsAt?.timestampValue===state.trialEndsAt)return;
+       f?.suspended?.booleanValue===state.suspended && Date.parse(f?.accessUntil?.timestampValue||'')===Date.parse(state.accessUntil) &&
+       Date.parse(f?.trialEndsAt?.timestampValue||'')===Date.parse(state.trialEndsAt))return;
   }
   const fields={
     ownerUid:{stringValue:uid},schemaVersion:{integerValue:'1'},source:{stringValue:state.source},
