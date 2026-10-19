@@ -359,3 +359,6 @@ O endpoint `GET /integrations/drive/:connectionId/files/:fileId/thumbnail` exige
 - O CORS OPTIONS validado não consome rate limit. Requests normais usam 60/min; miniaturas têm binding próprio `API_THUMB_LIMIT` de 240/min, com limites separados por IP e UID. Em DEV, `wrangler.jsonc` configura ambos.
 - A busca local é imediata e a busca remota ocorre após 280ms com o parâmetro `search` limitado e escapado; consulta apenas os filhos da pasta atual, com paginação. A busca não é recursiva.
 - Métricas agregadas `drive_folder_list`/`drive_thumbnail` registram duração, quantidade, bytes e modo (ticket/fallback), sem IDs, nomes, tokens ou URLs pessoais. Validar p50/p95 em ambiente DEV real; a meta de 1s não é uma garantia externa.
+
+### Correção de compatibilidade de miniaturas (19/10/2026)
+A listagem privada passou a retornar `thumbnailTicket` no lugar de `thumbnailLink`, mantendo este último apenas como fallback legado. O frontend deve verificar os dois formatos antes de iniciar o loading. Teste unitário do contrato com ticket somente, mais E2E desktop (PDF + imagem sem miniatura, token na query, loading, sucesso e fallback). Sem retornar a exibir links Google no DOM. A API existente permanece inalterada.

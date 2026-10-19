@@ -1,6 +1,7 @@
 import {useEffect, useRef, useState} from "react";
 import {LoaderCircle, Play} from "lucide-react";
-import {driveKindIcon, type DriveItem, DRIVE_FOLDER} from "./DriveLibraryUI";
+import {driveKindIcon, type DriveItem} from "./DriveLibraryUI";
+import {hasDriveThumbnailSource} from "./drive-thumbnail-source";
 
 type GetThumbnail = (item:DriveItem,signal?:AbortSignal,accountId?:string)=>Promise<Blob|null>;
 type Phase = "idle"|"loading"|"loaded"|"unavailable";
@@ -80,7 +81,7 @@ export function DriveThumbnail({item,scope,getThumbnail}:{item:DriveItem;scope:s
   const Icon=driveKindIcon(item.mimeType);
   const ref=useRef<HTMLSpanElement>(null);
   const key=scope+":"+item.id+":"+(item.modifiedTime||"");
-  const available=Boolean(item.thumbnailLink) && item.mimeType!==DRIVE_FOLDER;
+  const available=hasDriveThumbnailSource(item);
   const [state,setState]=useState<ThumbnailState>(()=>initialState(key,available));
   // Avoid showing an image belonging to a previous item if React reuses the component.
   const current=state.key===key?state:initialState(key,available);
@@ -115,7 +116,7 @@ export function DriveThumbnail({item,scope,getThumbnail}:{item:DriveItem;scope:s
     prefetch.observe(ref.current);
     visible.observe(ref.current);
     return ()=>{active=false;prefetch.disconnect();visible.disconnect();};
-  },[key,available,getThumbnail]);
+  },[key,available,getThumbnail,item.thumbnailTicket,item.thumbnailLink]);
 
   function handleImageError(){
     if(current.src && cache.get(key)===current.src){
