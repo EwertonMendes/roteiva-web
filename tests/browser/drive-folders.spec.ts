@@ -33,7 +33,7 @@ async function createProject(page:Page){
   await expect(page.locator("[aria-busy]").first()).toHaveAttribute("aria-busy","false");
 }
 
-function mockDrive(page:Page,accountAvailable:()=>boolean,thumbnail?:{wait:()=>Promise<void>},manyFiles=false){
+function mockDrive(page:Page,accountAvailable:()=>boolean,thumbnail?:{wait:()=>Promise<void>;onRequest?:(url:URL)=>void},manyFiles=false){
   return page.route(api+"/integrations/**",async route=>{
     const endpoint=new URL(route.request().url());
     const headers={
@@ -61,6 +61,7 @@ function mockDrive(page:Page,accountAvailable:()=>boolean,thumbnail?:{wait:()=>P
       });
     }
     if(endpoint.pathname.endsWith("/thumbnail") && thumbnail){
+      thumbnail.onRequest?.(endpoint);
       await thumbnail.wait();
       if(endpoint.pathname.includes("file_unavailable123")){
         return route.fulfill({status:404,headers,body:""});
@@ -73,9 +74,9 @@ function mockDrive(page:Page,accountAvailable:()=>boolean,thumbnail?:{wait:()=>P
       return json({folder:{id:folderId,name:"Campanha de vídeos"},
         files:[{id:"file_1234567890",name:"Roteiro.pdf",mimeType:"application/pdf",size:"33000",
           modifiedTime:"2026-10-17T15:00:00Z",webViewLink:"https://drive.google.com/file/d/file_1234567890/view",
-          ...(thumbnail?{thumbnailLink:"https://lh3.googleusercontent.com/preview"}:{})},
+          ...(thumbnail?{thumbnailTicket:"opaque-e2e-pdf-ticket"}:{})},
         ...(thumbnail?[{id:"file_unavailable123",name:"Imagem sem miniatura.jpg",mimeType:"image/jpeg",
-          thumbnailLink:"https://lh3.googleusercontent.com/preview"}]:[]),
+          thumbnailTicket:"opaque-e2e-image-ticket"}]:[]),
         ...(manyFiles?Array.from({length:12},(_,index)=>({
           id:"sample_spreadsheet_"+index,name:"Planilha de produção e custos "+index+".gsheet",
           mimeType:"application/vnd.google-apps.spreadsheet",size:"90000",
@@ -157,7 +158,10 @@ test("private thumbnails show loading while pending and recover to image or icon
   test.skip(info.project.name!=="desktop","Shared component; mobile layout covered in existing test");
   let release!:()=>void;
   const wait=new Promise<void>(resolve=>{release=resolve;});
-  await mockDrive(page,()=>true,{wait:()=>wait});
+  const thumbTickets:string[]=[];
+  await mockDrive(page,()=>true,{wait:()=>wait,onRequest:url=>{
+    thumbTickets.push(url.searchParams.get("ticket")||"");
+  }});
   await signUp(page,"drive-loading-"+info.project.name+"@example.com");
   await createProject(page);
   await page.goto(cloud+"/biblioteca?driveE2E=1");
@@ -177,6 +181,7 @@ test("private thumbnails show loading while pending and recover to image or icon
   await expect(pdf.locator('[data-thumbnail-state="loaded"] img')).toBeVisible();
   await expect(missing.locator('[data-thumbnail-state="unavailable"] svg')).toBeVisible();
   await expect(panel.locator('[data-thumbnail-state="loading"]')).toHaveCount(0);
+  expect(thumbTickets.sort()).toEqual(["opaque-e2e-image-ticket","opaque-e2e-pdf-ticket"]);
 });
 
 

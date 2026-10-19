@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
+import {hasDriveThumbnailSource} from "../src/features/drive/drive-thumbnail-source.ts";
 
 const ui=readFileSync(new URL("../src/features/drive/DriveLibraryUI.tsx",import.meta.url),"utf8");
 const loader=readFileSync(new URL("../src/features/drive/DriveThumbnail.tsx",import.meta.url),"utf8");
@@ -42,4 +43,14 @@ test("fast Drive listing uses account-scoped in-memory cache and debounced remot
   assert.match(ui,/searchResults/);
   assert.match(parent,/thumbnailTicket/);
   assert.ok(loader.includes("promote(key)"));
+});
+
+test("ticket-only Drive v3 responses trigger thumbnail requests, without raw thumbnail links",()=>{
+  const item={id:"private-pdf-123",name:"Roteiro.pdf",mimeType:"application/pdf",thumbnailTicket:"opaque-encrypted-ticket"};
+  assert.equal(hasDriveThumbnailSource(item),true);
+  assert.equal(hasDriveThumbnailSource({...item,thumbnailTicket:undefined}),false);
+  assert.equal(hasDriveThumbnailSource({...item,thumbnailTicket:undefined,thumbnailLink:"https://lh3.googleusercontent.com/legacy"}),true);
+  assert.equal(hasDriveThumbnailSource({...item,mimeType:"application/vnd.google-apps.folder"}),false);
+  assert.ok(loader.includes("hasDriveThumbnailSource(item)"));
+  assert.ok(parent.includes("file.thumbnailTicket"));
 });
