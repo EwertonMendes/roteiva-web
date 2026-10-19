@@ -4,6 +4,7 @@ import type { ProfileChanges, ProfessionalType, RoteivaProfile } from "../../dat
 import { dataErrorMessage } from "../../data/firestore-workspace";
 import { IconLabel } from "../ui/IconLabel";
 import { AccountDeletionAction } from "./AccountDeletionAction";
+import { AccessSummary } from "../access/AccessGate";
 
 const occupations:{value:ProfessionalType;label:string}[]=[
   {value:"freelancer",label:"Videomaker / freelancer"},
@@ -114,6 +115,8 @@ export function SettingsPage({profile,email,photoURL,theme,toggleTheme,onSavePro
         </div>
       </div>
     </section>
+
+    {onSaveProfile&&<AccessSummary/>}
 
     {onSaveProfile&&<section className="settings-editor settings-danger-zone" aria-labelledby="settings-danger-title">
       <div className="settings-section-head">
