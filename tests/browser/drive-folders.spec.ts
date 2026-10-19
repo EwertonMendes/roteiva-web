@@ -33,7 +33,7 @@ async function createProject(page:Page){
   await expect(page.locator("[aria-busy]").first()).toHaveAttribute("aria-busy","false");
 }
 
-function mockDrive(page:Page,accountAvailable:()=>boolean,thumbnail?:{wait:()=>Promise<void>}){
+function mockDrive(page:Page,accountAvailable:()=>boolean,thumbnail?:{wait:()=>Promise<void>},manyFiles=false){
   return page.route(api+"/integrations/**",async route=>{
     const endpoint=new URL(route.request().url());
     const headers={
@@ -75,7 +75,12 @@ function mockDrive(page:Page,accountAvailable:()=>boolean,thumbnail?:{wait:()=>P
           modifiedTime:"2026-10-17T15:00:00Z",webViewLink:"https://drive.google.com/file/d/file_1234567890/view",
           ...(thumbnail?{thumbnailLink:"https://lh3.googleusercontent.com/preview"}:{})},
         ...(thumbnail?[{id:"file_unavailable123",name:"Imagem sem miniatura.jpg",mimeType:"image/jpeg",
-          thumbnailLink:"https://lh3.googleusercontent.com/preview"}]:[])],
+          thumbnailLink:"https://lh3.googleusercontent.com/preview"}]:[]),
+        ...(manyFiles?Array.from({length:12},(_,index)=>({
+          id:"sample_spreadsheet_"+index,name:"Planilha de produção e custos "+index+".gsheet",
+          mimeType:"application/vnd.google-apps.spreadsheet",size:"90000",
+          modifiedTime:"2026-10-17T15:00:00Z"
+        })):[])],
         nextPageToken:null,
       });
     }
@@ -172,4 +177,54 @@ test("private thumbnails show loading while pending and recover to image or icon
   await expect(pdf.locator('[data-thumbnail-state="loaded"] img')).toBeVisible();
   await expect(missing.locator('[data-thumbnail-state="unavailable"] svg')).toBeVisible();
   await expect(panel.locator('[data-thumbnail-state="loading"]')).toHaveCount(0);
+});
+
+
+test("grid cards keep media, names and menus inside separate non-overlapping tracks on desktop/mobile",async({page},info)=>{
+  if(info.project.name==="mobile")await page.setViewportSize({width:390,height:844});
+  await mockDrive(page,()=>true,undefined,true);
+  await signUp(page,"drive-grid-"+info.project.name+"@example.com");
+  await createProject(page);
+  await page.goto(cloud+"/biblioteca?driveE2E=1");
+  const panel=page.getByRole("region",{name:"Biblioteca Google Drive"});
+  await panel.getByRole("button",{name:"Vincular pasta",exact:true}).first().click();
+  const dialog=page.getByRole("dialog",{name:"Selecionar pastas do Google Drive"});
+  await dialog.getByLabel("Projeto para vincular pastas").selectOption({label:"Projeto Drive Teste"});
+  await dialog.getByRole("checkbox",{name:"Selecionar Campanha de vídeos"}).check();
+  await dialog.getByRole("button",{name:"Vincular 1 pasta"}).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(panel.getByRole("button",{name:/Roteiro.pdf/})).toBeVisible();
+  await panel.getByRole("button",{name:"Visualização em grade"}).click();
+  const tiles=panel.locator('.rl-files[data-view="grid"] .rl-file-row');
+  await expect(tiles).toHaveCount(13);
+  // The actual computed geometry catches rows collapsing underneath thumbnails;
+  // the previous implementation stacked 50px tracks while cards overflowed them.
+  const boxes=await tiles.evaluateAll(elements=>elements.map(element=>{
+    const card=element.getBoundingClientRect();
+    const media=element.querySelector(".rl-file-icon")!.getBoundingClientRect();
+    const name=element.querySelector(".rl-file-name")!.getBoundingClientRect();
+    const menu=element.querySelector(".rl-menu")!.getBoundingClientRect();
+    const rect=(r:DOMRect)=>({left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height});
+    return {card:rect(card),media:rect(media),name:rect(name),menu:rect(menu)};
+  }));
+  expect(boxes.length).toBe(13);
+  for(const [index,tile] of boxes.entries()){
+    expect(tile.card.height, "card height "+index).toBeGreaterThanOrEqual(175);
+    expect(tile.media.height, "media height "+index).toBeGreaterThan(85);
+    expect(tile.media.top, "media starts inside card "+index).toBeGreaterThanOrEqual(tile.card.top-1);
+    expect(tile.media.bottom, "media ends before text "+index).toBeLessThanOrEqual(tile.name.top+1);
+    expect(tile.name.bottom, "text fits card "+index).toBeLessThanOrEqual(tile.card.bottom+1);
+    expect(tile.menu.bottom, "menu fits card "+index).toBeLessThanOrEqual(tile.card.bottom+1);
+    expect(tile.menu.left, "menu fits horizontally "+index).toBeGreaterThanOrEqual(tile.card.left-1);
+    for(let other=index+1;other<boxes.length;other++){
+      const next=boxes[other].card;
+      const overlapX=Math.min(tile.card.right,next.right)-Math.max(tile.card.left,next.left);
+      const overlapY=Math.min(tile.card.bottom,next.bottom)-Math.max(tile.card.top,next.top);
+      expect(overlapX<1 || overlapY<1, "cards "+index+" and "+other+" must not overlap").toBe(true);
+    }
+  }
+  await panel.getByRole("button",{name:"Visualização em lista"}).click();
+  await expect(panel.locator('.rl-files[data-view="list"] .rl-file-row')).toHaveCount(13);
+  await panel.getByRole("button",{name:"Visualização em grade"}).click();
+  await expect(tiles).toHaveCount(13);
 });
