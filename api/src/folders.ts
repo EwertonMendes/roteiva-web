@@ -60,11 +60,12 @@ export async function listFolders(env:Env,uid:string,connectionId:string,parent:
 function cleanSearch(value:string|null):string {
   if(!value)return '';
   const trimmed=value.trim();
-  if(trimmed.length>100||/[\\x00-\\x1F\\x7F]/.test(trimmed))throw new ApiError(400,'invalid_search');
+  if(trimmed.length>100||Array.from(trimmed).some(char=>char.charCodeAt(0)<32||char.charCodeAt(0)===127))
+    throw new ApiError(400,'invalid_search');
   return trimmed.length>=2?trimmed:'';
 }
 function driveQuote(value:string){
-  return value.replace(/\\\\/g,'\\\\\\\\').replace(/'/g,"\\\\'");
+  return value.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
 }
 
 /** Parallel folder validation and listing remove a sequential Drive round-trip. */
