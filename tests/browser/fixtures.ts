@@ -1,4 +1,6 @@
 import {test as base} from '@playwright/test';
+import {initializeTestEnvironment} from '@firebase/rules-unit-testing';
+import {doc,getDoc,setDoc,Timestamp} from 'firebase/firestore';
 export {expect,type Page} from '@playwright/test';
 
 // Emulator identities must never call the real DEV service. Individual tests
@@ -25,18 +27,19 @@ export const test=base.extend<{deletionService:void}>({
       catch{return route.fulfill({status:401,headers,body:'{}'});}
       if(!/^[A-Za-z0-9_-]{1,128}$/.test(uid))
         return route.fulfill({status:401,headers,body:'{}'});
-      const path='http://127.0.0.1:8080/v1/projects/demo-roteiva/databases/(default)/documents/users/'+encodeURIComponent(uid)+'/access/current';
-      const current=await fetch(path);
-      if(current.status===404){
-        const trialEndsAt=new Date(Date.now()+604800000).toISOString();
-        const result=await fetch(path,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({fields:{
-          ownerUid:{stringValue:uid},schemaVersion:{integerValue:'1'},source:{stringValue:'trial'},
-          suspended:{booleanValue:false},unlimited:{booleanValue:false},
-          trialEndsAt:{timestampValue:trialEndsAt},accessUntil:{timestampValue:trialEndsAt},
-          updatedAt:{timestampValue:new Date().toISOString()}
-        }})});
-        if(!result.ok)throw new Error('Unable to seed emulator entitlement: '+result.status);
-      }else if(!current.ok)throw new Error('Emulator entitlement read failed: '+current.status);
+      const environment=await initializeTestEnvironment({projectId:'demo-roteiva',firestore:{host:'127.0.0.1',port:8080}});
+      try{
+        await environment.withSecurityRulesDisabled(async context=>{
+          const ref=doc(context.firestore(),'users',uid,'access','current');
+          const existing=await getDoc(ref);
+          if(!existing.exists()){
+            const end=Timestamp.fromMillis(Date.now()+604800000);
+            await setDoc(ref,{ownerUid:uid,schemaVersion:1,source:'trial',
+              suspended:false,unlimited:false,trialEndsAt:end,accessUntil:end,
+              updatedAt:Timestamp.now()});
+          }
+        });
+      }finally{await environment.cleanup();}
       await route.fulfill({status:200,headers,contentType:'application/json',body:'{}'});
     });
     await use();
