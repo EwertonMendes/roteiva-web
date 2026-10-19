@@ -51,7 +51,7 @@ jobs:
   deploy:
     name: Deploy Firestore rules and indexes DEV
     needs: validate
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/master' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/feat/saas-access-seven-day-trial'))
     runs-on: ubuntu-latest
     timeout-minutes: 4
     environment: firebase-development
@@ -74,7 +74,8 @@ jobs:
           CONFIGURED_PROJECT: ${{ vars.FIREBASE_PROJECT_ID }}
         run: |
           test "$CONFIGURED_PROJECT" = "roteiva-web-dev"
-          test "$(git ls-remote origin refs/heads/master | cut -f1)" = "$GITHUB_SHA" || {
+          test "$GITHUB_REF" = "refs/heads/master" || test "$GITHUB_REF" = "refs/heads/feat/saas-access-seven-day-trial"
+          test "$(git ls-remote origin "$GITHUB_REF" | cut -f1)" = "$GITHUB_SHA" || {
             echo "Outdated SHA: skip stale DEV deploy"; exit 1;
           }
       - uses: google-github-actions/auth@v3
