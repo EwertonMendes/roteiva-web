@@ -28,6 +28,7 @@ export function RegistrationPage({user,submitting,error,onSubmit,onExit}:{
       <div><strong>{user.email||"Conta Google"}</strong><span>Identidade confirmada pelo Google</span></div>
       <span className="auth-account-check" aria-label="Google conectado"><Check size={16}/></span>
     </div>
+    <p className="auth-invitation">Comece com <strong>7 dias de acesso gratuito</strong> a todas as ferramentas. Não precisa de cartão e nenhuma cobrança será feita automaticamente.</p>
     <form className="register-form" onSubmit={submit} noValidate>
       <label className="auth-field" htmlFor="registration-name">
         <span>Como podemos chamar você? <b>*</b></span>
