@@ -4,7 +4,7 @@ import { callback, start, launch, enabled } from './oauth.ts';
 import { metadata, disconnect, about } from './drive.ts';
 import { listFolders, listFolderItems } from './folders.ts';
 import { thumbnail } from './thumbnails.ts';
-import { deletionStatus, requestDeletion, assertNotDeleting, runPendingDeletions } from './account-deletion.ts';
+import { deletionStatus, requestDeletion, runPendingDeletions } from './account-deletion.ts';
 import { ensureAccess, assertActiveAccess } from './access.ts';
 const headers = {
   'Cache-Control':'no-store', 'Referrer-Policy':'no-referrer',
