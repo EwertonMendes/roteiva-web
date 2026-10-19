@@ -2,6 +2,7 @@ import { ApiError, type Env } from './types.ts';
 import { adminToken, deletionConfigured, deleteIdentity, deleteFirestoreChunk, deleteRoot, deleteFence, lockAccount } from './firebase-admin.ts';
 import { decrypt, context } from './crypto.ts';
 import {revokeGuard} from './oauth-guard.ts';
+import {eraseAccess} from './access.ts';
 
 type Phase='locking'|'revoking'|'firestore'|'identity'|'completed'|'manual_review';
 type Job={owner_uid:string;operation_id:string;phase:Phase;attempts:number;lease_id:string|null;lease_until:number;next_attempt_at:number};
@@ -92,6 +93,7 @@ async function runPhase(env:Env,job:Job,lease:string):Promise<void>{
     // The independent fence survives profile removal. Auth is the final
     // remote deletion; a root failure must preserve the identity for recovery.
     await deleteRoot(env,uid,token);
+    await eraseAccess(env,uid);
     await deleteIdentity(env,uid,token);
     await changePhase(env,job,lease,'completed');
   }
