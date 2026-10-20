@@ -1,5 +1,6 @@
 import { ApiError, type Env } from './types.ts';
 import { adminToken } from './firebase-admin.ts';
+import {retainTrialIdentity,type TrialPrincipal} from './trial-identity.ts';
 
 
 async function assertNotDeleting(env:Env,uid:string):Promise<void> {
@@ -103,18 +104,27 @@ async function publish(env:Env,uid:string,token:string):Promise<AccessState> {
   await assertNotDeleting(env,uid);
   return state;
 }
-export async function ensureAccess(env:Env,uid:string,adminBearer?:string):Promise<Response> {
+export async function ensureAccess(env:Env,uid:string,adminBearer?:string,principal?:TrialPrincipal):Promise<Response> {
   await assertNotDeleting(env,uid);
   // Prove registration before creating any trial. Firebase Auth alone is insufficient.
   const token=adminBearer||await adminToken(env);
   const created=await verifiedProfile(env,uid,token);
-  return Response.json(await provisionAccess(env,uid,created,token));
+  // The Cron backfills only accounts that predate the beta cutoff.
+  // Customer-facing ensure always supplies a trusted Google principal.
+  if(adminBearer&&!principal){
+    const rollout=await env.DB.prepare('SELECT cutoff_at FROM access_rollout WHERE id=1').first<{cutoff_at:number}>();
+    if(!rollout||created>rollout.cutoff_at)throw new ApiError(503,'access_backfill_ineligible');
+  }
+  const allowed=principal?await retainTrialIdentity(env,principal):true;
+  if(principal?.uid!==undefined&&principal.uid!==uid)throw new ApiError(401,'invalid_identity');
+  return Response.json(await provisionAccess(env,uid,created,token,allowed));
 }
-async function provisionAccess(env:Env,uid:string,created:number,token:string):Promise<AccessState> {
+async function provisionAccess(env:Env,uid:string,created:number,token:string,allowTrial:boolean):Promise<AccessState> {
   await assertNotDeleting(env,uid);
   const now=Date.now();
+  const start=allowTrial?now:now-TRIAL_MS;
   await env.DB.prepare('INSERT OR IGNORE INTO access_accounts (owner_uid,trial_started_at,trial_ends_at,created_at,updated_at) VALUES (?,?,?,?,?)')
-    .bind(uid,now,now+TRIAL_MS,now,now).run();
+    .bind(uid,start,start+TRIAL_MS,now,now).run();
   const rollout=await env.DB.prepare('SELECT cutoff_at,beta_ends_at FROM access_rollout WHERE id=1')
     .first<{cutoff_at:number;beta_ends_at:number}>();
   if(!rollout)throw new ApiError(503,'access_provision_unavailable');
