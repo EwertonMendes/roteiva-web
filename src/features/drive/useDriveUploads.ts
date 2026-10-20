@@ -77,7 +77,7 @@ export function useDriveUploads(
   pumpRef.current=pump;
 
   const enqueue=useCallback((files:File[],destination:UploadDestination)=>{
-    if(disposed.current)return;
+    if(disposed.current)return {added:0,rejected:files.length};
     const added=files.filter(file=>file.size>0 && Number.isSafeInteger(file.size)
       && file.size<=5_000_000_000_000).map(file=>{
       const entry:UploadEntry={id:crypto.randomUUID(),name:file.name,size:file.size,
