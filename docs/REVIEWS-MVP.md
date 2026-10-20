@@ -40,17 +40,17 @@ A rota pública `/review/{capability}` funciona sem cadastro no Roteiva. O modo 
 
 ## Checklist de aceite
 
-- [ ] Migrar D1 no DEV com verificação de integridade e preservar o estado anterior.
+- [x] Migrar D1 no DEV com verificação de integridade e preservar o estado anterior (20/10/2026, migrations 0013/0014).
 - [x] Validação local da API Worker, frontend, typechecks e builds; CI do SHA final deve ser conferido na PR.
 - [x] Playwright desktop/mobile: cliente abre, comenta, aprova/solicita ajustes e reabre a página (contratos simulados; Firestore/Auth emulados).
-- [x] Isolamento A/B com Firebase assinado/Google simulado na API e regras A/B nos emuladores; duas contas reais continuam pendentes.
-- [ ] Google real (duas contas): publicar link, modo Google específico, arquivo com permissão prévia, preview/fallback, nova versão, exclusão/expiração/desconexão e revogação ACL confirmada.
-- [ ] Sem credenciais reais/tokens em traces, logs, URL de API e artefatos.
-- [ ] PR revisada e somente então merge/deploy DEV; PROD está fora do escopo.
+- [x] Isolamento A/B na API/emuladores e duas identidades Google reais no portal restrito; evidências abaixo.
+- [ ] Aceite Google real completo: link, duas identidades, ACL prévia, preview/fallback, V2, aprovação, expiração/cron, desconexão e revogação confirmados; exclusão concluída; limitações de Picker/dispositivos listadas abaixo.
+- [x] Nenhum segredo real versionado; capacidades usadas em cabeçalho da API; traces reais não foram publicados. Capturas privadas não mostram credenciais.
+- [ ] PR revisada e somente então merge; publicação antecipada em DEV autorizada pelo proprietário. PROD está fora do escopo.
 
 ## Auditoria adicional — 20/10/2026
 
-**IMPLEMENTADO e testado localmente; homologação Google remota continua pendente.** A execução anterior `39489418187` terminou com sucesso no SHA `20a2b38`. Havia somente a PR #55 aberta, sem conflito de merge com a master `650897a`, no início desta auditoria.
+**IMPLEMENTADO, automatizado e publicado no DEV; homologação Google real detalhada abaixo, com limitações explícitas.** A execução anterior `39489418187` terminou com sucesso no SHA `20a2b38`. Havia somente a PR #55 aberta, sem conflito de merge com a master `650897a`, no início desta auditoria.
 
 Correções verificáveis:
 
@@ -77,21 +77,43 @@ Os skips são testes desktop de múltiplas pastas/miniaturas no projeto mobile e
 
 Evidências automatizadas: `api/tests/reviews.test.mjs` cobre HTTP com Firebase assinado e Google simulado, isolamento A/B, Google autorizado/incorreto, ACL preexistente, grupos/domínio/terceiros, criação fora da pasta, resposta Google perdida, grant versus close com compensação falhando, retry pelo cron, publicação concorrente, troca de versão concorrente e decisão duplicada. `tests/browser/reviews-workflow.spec.ts` usa Auth/Firestore emulados e um contrato HTTP de revisão com estado e validação de todos os payloads; percorre criação de cliente/projeto, upload direto em dois blocos (308/Range), bloqueio até confirmação, comentário, ajustes, V2, aprovação e encerramento. `tests/browser/reviews.spec.ts` cobre aprovação direta, confirmação de ajustes e recuperação de rede. Esses testes **não** homologam o Google real.
 
-### Infraestrutura observada (somente leitura)
+### Publicação no DEV existente — 20/10/2026
 
-Cloudflare DEV consultado em 20/10/2026: cron real `* * * * *` configurado; D1 tem migrations até `0012_drive_uploads.sql`; `PRAGMA foreign_key_check` remoto retornou zero violações. `0013`/`0014` foram aplicadas apenas no D1 local, com segunda execução sem migrações pendentes. A rotina de revisões ainda não está publicada no Worker DEV; cron configurado não comprova execução remota dessa rotina. Nenhum recurso DEV/PROD ou dado existente foi migrado nesta auditoria.
+O proprietário autorizou explicitamente usar o DEV existente, incluindo suas contas e dados descartáveis, para homologar a PR antes do merge. Não foi criado ambiente, cliente OAuth ou credencial adicional. Essa autorização substitui a proposta anterior de ambiente separado; o pipeline automático continua com seu gate de master.
 
-O pipeline oficial da API exige master e SHA atual para deploy DEV. A PR permanece draft sem merge: não contornar esse gate com publicação manual da branch no Worker compartilhado. O preview Hosting oficial pode mostrar a UI, mas **não homologa o fluxo conectado**: a API atual ainda não contém `/reviews`, e a allowlist CORS aceita apenas a origem DEV principal. Isso precisa de uma decisão de ambiente para homologar a API antes do merge, ou aprovação humana para a etapa DEV prevista pelo projeto.
+Código publicado: `96ccb8ed40002ba2ea097b3c1f30b0db3b3dfe73`. D1 DEV recebeu `0013_reviews.sql` e `0014_review_grant_coordination.sql`; verificação remota confirmou zero violações de chaves estrangeiras e preservou contagens anteriores de conexão/OAuth/exclusão. Worker DEV versão `c62b4bfa-2fdc-460c-a10a-6fa348afc46b`, cron `* * * * *`. Hosting DEV publicado no mesmo projeto `roteiva-web-dev`, build e cache da SPA verificados. Foram usados os comandos e verificações dos workflows oficiais, executados na branch por autorização expressa; nenhum merge ou deploy PROD.
 
-### Procedimento de aceite Google real ainda necessário
+CI do código publicado: [API](https://github.com/EwertonMendes/roteiva-web/actions/runs/39512218264), [frontend](https://github.com/EwertonMendes/roteiva-web/actions/runs/39512218104) e [regressão completa](https://github.com/EwertonMendes/roteiva-web/actions/runs/39512218097) aprovados.
+
+### Procedimento para reproduzir o aceite Google real
 
 O proprietário autorizou e foi criada uma pasta nova descartável no seu Drive, com uma imagem PNG de teste, confirmadas por metadados da API (somente ACL de proprietário). Isso valida criação/upload pelo conector, **não** a integração de revisão do Roteiva. Referências exatas são entregues ao proprietário fora do repositório público.
 
-1. Disponibilizar Worker com código da PR e D1 isolado com migrations `0001`–`0014`, OAuth/segredos e origem Hosting compatíveis pelo pipeline aprovado. Não apontar preview para banco de produção nem remover dados DEV existentes. Para um novo ambiente, separar recursos e credenciais; não exportar tokens do D1 nem segredos do Worker.
+1. Worker, D1 e Hosting já publicados no DEV existente, com migrations `0001`–`0014` e OAuth/segredos existentes. Usar as contas e dados descartáveis do DEV autorizados pelo proprietário; não criar outro ambiente.
 2. Na conta proprietária, vincular a pasta descartável a um projeto de teste e autorizá-la pelo Picker do Roteiva. Um arquivo criado por outro aplicativo pode ainda precisar de autorização `drive.file`.
 3. Criar aprovação modo link somente para o PNG de teste; conferir `permissions.list` do próprio arquivo antes/depois (`supportsAllDrives=true`, campos `id,type,role,emailAddress,permissionDetails`). Confirmar `anyone/reader`, abrir o portal sem sessão e testar preview/fallback.
-4. Encerrar, conferir remoção da ACL criada pelo Roteiva e recusar o token antigo. Repetir com vencimento controlado no ambiente **isolado**, observar execução do cron e confirmar remoção externa; não alterar validade em dados reais.
+4. Encerrar, conferir remoção da ACL criada pelo Roteiva e recusar o token antigo. Repetir com vencimento controlado no ambiente **DEV**, observar execução do cron e confirmar remoção externa; não alterar validade em dados reais.
 5. Repetir com duas identidades Google distintas em modo restrito: destinatário correto entra; conta incorreta recebe recusa no backend. Conferir ACL `user/reader` e posterior remoção. Testar ACL externa preexistente sem apagá-la, herança/Shared Drives, restrição Workspace e falha temporária Google.
-6. Solicitar ajustes, publicar V2 e comprovar revogação de V1; repetir encerramento durante concessão, desconexão e exclusão usando **somente uma conta descartável**, nunca a conta pessoal do proprietário. Validar Safari e aparelho físico separadamente da viewport mobile Chromium.
+6. Solicitar ajustes, publicar V2 e comprovar revogação de V1; repetir encerramento durante concessão, desconexão e exclusão usando **somente uma conta descartável**, conforme autorização do proprietário para contas DEV descartáveis. Validar Safari e aparelho físico separadamente da viewport mobile Chromium.
 
 Não registrar ID Tokens, URLs de sessão resumable ou capacidades de convite em logs/traces públicos. Na falha de migração, manter código anterior e schema aditivo; inspecionar conflito/backup antes de tentar de novo. Não remover tabelas de revisão para voltar código: isso perderia a referência às ACLs que ainda precisam ser revogadas.
+
+### Homologação real — DEV existente
+
+Fixtures sintéticas e contas DEV descartáveis autorizadas pelo proprietário. IDs, URLs de capacidade e capturas privadas ficam fora do repositório público.
+
+| Cenário real | Evidência e resultado |
+|---|---|
+| Pasta e autorização | Nova pasta descartável vinculada ao projeto DEV. Arquivo criado pelo conector foi corretamente recusado sem autorização `drive.file`. |
+| Upload integrado | PNGs V1/V2 enviados diretamente pelo Roteiva à pasta de QA previamente autorizada; confirmação Google e seleção automática no compositor. |
+| Publicação por link | Revisão V1 publicada. Metadados externos confirmaram `anyone/reader`; portal aberto, comentário persistido e ajustes solicitados. |
+| Nova versão e aprovação | V2 publicada e aprovada explicitamente no portal; V1 retornou a somente proprietário, V2 recebeu sua própria ACL pública. Histórico profissional preservou comentário/decisão V1. |
+| Encerramento | Revisão encerrada; portal recusou URL antiga. Metadados externos confirmaram remoção da ACL pública V2. Diálogo nativo exigiu clique humano devido a bloqueio do controle Chrome. |
+| Google restrito A/B | Conta principal, diferente da destinatária, recusada. Login Google normal com a segunda conta liberou portal, iframe e comentário; `author_email` persistido correspondeu à identidade destinatária verificada. ACL externa continha somente proprietário e revisora `user/reader`. Seletor OAuth exigiu clique humano no Chrome; identidade não foi simulada. |
+| Prévia e fallback | Prévia incorporada do PNG foi observada carregada em Google restrito; fallback abriu e exibiu arquivo no Drive. O PNG é intencionalmente de 1 pixel. |
+| Expiração e cron | Antecipada apenas a validade da fixture Google restrita no D1 autorizado. Portal recusou por vencimento imediatamente; sem encerramento manual dessa revisão, cron mudou `pending` para `closed`. Google confirmou retirada da ACL da revisora. Execução real do cron observada com resultado `ok`, sem exceções. |
+| ACL preexistente | Permissão da revisora concedida externamente antes de uma terceira revisão. Publicação restrita aceita; após expiração/cron, revisão fechada e permissão externa preservada. |
+| Desconexão | Fluxo oficial da Biblioteca concluiu após encerrar os convites; interface voltou a Conectar Drive. Arquivos/pastas Google permaneceram disponíveis. |
+| Exclusão de conta DEV | Pedido aceito após reautenticação Google real, sessão encerrada e saga concluída pelo cron em `completed`, sem erros. API administrativa confirmou zero contas Auth correspondentes, perfil antigo ausente e nenhuma subcoleção restante. Arquivos Google confirmados preservados. Nesta execução os convites já estavam encerrados antes do pedido. |
+
+Limitações explícitas: o Picker de autorização da nova pasta abriu iframe vazio em duas tentativas, cancelável com Escape. Auditoria somente de metadados confirmou APIs Drive/Picker habilitadas e chave existente limitada à API Picker com referrers DEV/Docs; nenhum segredo foi lido ou alterado. Upload/aprovações funcionaram na pasta QA previamente autorizada. A causa do Picker vazio continua sem confirmação; repetir a autorização pelo botão da Biblioteca no Chrome e verificar se o próprio Google carrega a lista de pastas. Não ampliar escopos nem criar outra credencial para mascarar o problema. Safari/aparelho físico, Shared Drives/herança, política restritiva Workspace e falha Google controlada não foram homologados remotamente nesta execução; as falhas/concorrência e isolamento possuem cobertura automatizada separada. Exclusão com convite ainda ativo está coberta por testes integrados, não por este cenário real já encerrado.

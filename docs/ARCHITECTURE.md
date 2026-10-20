@@ -402,3 +402,5 @@ inclusão expressamente autorizada. Recuperação com rede real ficou manual/pen
 por preferência do proprietário; A/B remoto, revogação, Safari e dispositivo físico
 também pendentes. Não extrapolar o sucesso Chrome para esses aceites.
 Configuração e matriz: [DRIVE-UPLOAD.md](DRIVE-UPLOAD.md).
+
+**Decisão operacional do proprietário — 20/10/2026:** homologar a PR #55 diretamente no DEV existente e em suas contas/dados descartáveis. Worker, D1 e Hosting receberam o código validado antes do merge, com os segredos OAuth existentes. Não criar ambiente ou credenciais de QA adicionais para esse aceite. Pipeline automático permanece limitado à master; detalhes verificáveis em [REVIEWS-MVP.md](REVIEWS-MVP.md).

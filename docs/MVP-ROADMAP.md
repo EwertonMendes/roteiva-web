@@ -173,7 +173,7 @@
 
 ## Fase 5 — Revisão segura e feedback de clientes
 
-**Status: implementado em branch na PR #55 — QA e aceite real pendentes.** Consulte [REVIEWS-MVP.md](REVIEWS-MVP.md). Não considerar entregue no ambiente DEV ou master até teste/merge/deploy.
+**Status: implementado na PR #55 e publicado no DEV existente; fluxos centrais homologados com Google real, aceite integral parcial por limitações documentadas.** Publicação antecipada autorizada pelo proprietário em 20/10/2026; não houve merge. Migrações 0013/0014 aplicadas com integridade e contagens preservadas; Worker/Hosting publicados, CI completo aprovado. Consulte [REVIEWS-MVP.md](REVIEWS-MVP.md).
 
 - [x] Central de aprovações com pesquisa por cliente/projeto/título, estados e paginação; atalhos de cliente/projeto.
 - [x] Seleção de até 8 arquivos existentes do Google Drive, com validação server-side de projeto, pasta e descendência.
@@ -183,7 +183,7 @@
 - [x] Isolamento por proprietário no backend, Hash/AES-GCM de convites e sem exposição pública do Firestore.
 - [ ] Testar publicações e revogações de ACL com duas contas reais Google.
 - [x] Testes automatizados locais: 129 API, 37 frontend, 30 regras e 81 E2E aprovados (3 variantes de viewport ignoradas por desenho); Google real/Safari/aparelho físico e pipelines do SHA final são aceites separados.
-- [x] Auditoria adicional da PR #55: claims/leases de ACL, compensação recuperável, fence de versão pública e transição D1; testes em `api/tests/reviews.test.mjs`. Ciclo completo desktop/mobile em `tests/browser/reviews-workflow.spec.ts`, incluindo upload resumable e encerramento; validação Google real continua separada em [REVIEWS-MVP.md](REVIEWS-MVP.md).
+- [x] Auditoria adicional da PR #55: claims/leases de ACL, compensação recuperável, fence de versão pública e transição D1; testes em `api/tests/reviews.test.mjs`. Ciclo completo desktop/mobile em `tests/browser/reviews-workflow.spec.ts`, incluindo upload resumable e encerramento; homologação Google real agora confirma link, duas identidades, comentário/ajustes/V2/aprovação, ACL prévia, revogação, cron, desconexão e exclusão DEV concluída; limitações de Picker/dispositivos em [REVIEWS-MVP.md](REVIEWS-MVP.md).
 - [ ] Deploy DEV e homologação por cliente real antes de habilitar como recurso comercial.
 
 **Fora do MVP:** player próprio com timeline, streaming pelo Worker, edição de imagens, assinatura legal, notificações automáticas e aprovação parcial por arquivo.
