@@ -1,4 +1,5 @@
 import { ApiError, type Env } from './types.ts';
+import {closeOwnerReviews} from './reviews.ts';
 import { adminToken, deletionConfigured, deleteIdentity, deleteFirestoreChunk, deleteRoot, deleteFence, lockAccount } from './firebase-admin.ts';
 import { decrypt, context } from './crypto.ts';
 import {revokeGuard} from './oauth-guard.ts';
@@ -60,6 +61,7 @@ async function changePhase(env:Env,job:Job,lease:string,phase:Phase){
 }
 async function revokeConnections(env:Env,uid:string):Promise<boolean>{
   if(!await revokeGuard(env,uid))return false;
+  if(!await closeOwnerReviews(env,uid))return false;
   // A Google Drive credential is never deleted until revocation succeeds.
   // Disabled credentials are rejected by all authenticated API routes.
   const rows=await env.DB.prepare('SELECT * FROM drive_connections WHERE owner_uid=? LIMIT 1')
