@@ -173,19 +173,19 @@
 
 ## Fase 5 — Revisão segura e feedback de clientes
 
-**Prioridade P1.** Dependente da Fase 4.
+**Status: implementado em branch na PR #55 — QA e aceite real pendentes.** Consulte [REVIEWS-MVP.md](REVIEWS-MVP.md). Não considerar entregue no ambiente DEV ou master até teste/merge/deploy.
 
-- [ ] Definir fluxo de convite autenticado com Google, por entrega e versão; validado com profissional real.
-- [ ] Vincular concessão de acesso no Firestore à permissão real do Google Drive para a conta revisora.
-- [ ] Exibir vídeo via visualizador/preview compatível; fallback para abrir no Drive se incorporação falhar.
-- [ ] Implementar comentários por timestamp manual, status da revisão e histórico de decisões.
-- [ ] Permitir solicitar alterações, aprovar e enviar nova versão mantendo rastreabilidade.
-- [ ] Revogar convite e acesso ao arquivo (Firestore + Drive), tratando falhas parciais.
-- [ ] Testar acesso indevido, expiração, reenvios, formatos não reproduzíveis e mobile.
+- [x] Central de aprovações com pesquisa por cliente/projeto/título, estados e paginação; atalhos de cliente/projeto.
+- [x] Seleção de até 8 arquivos existentes do Google Drive, com validação server-side de projeto, pasta e descendência.
+- [x] Links revogáveis e expiráveis com dois modos: link aberto e Google autorizado.
+- [x] Portal mobile: prévia/fallback, comentários, timestamp manual, aprovação e solicitação de ajustes.
+- [x] História por versão, reenvio após ajustes, decisões únicas e exclusão/expiração com revogação coordenada.
+- [x] Isolamento por proprietário no backend, Hash/AES-GCM de convites e sem exposição pública do Firestore.
+- [ ] Testar publicações e revogações de ACL com duas contas reais Google.
+- [ ] Concluir testes automatizados, QA desktop/mobile e estados interrompidos.
+- [ ] Deploy DEV e homologação por cliente real antes de habilitar como recurso comercial.
 
-**Aceite:** um profissional compartilha uma versão somente com cliente autorizado, cliente comenta e aprova, owner acompanha retorno e consegue revogar integralmente. **Estado:** PLANEJADO.
-
-**Fora do aceite do MVP:** player proprietário com timeline controlada, comentário automático no ponto pausado, revisão anônima por link, transcodificação e streaming próprio.
+**Fora do MVP:** player próprio com timeline, streaming pelo Worker, edição de imagens, assinatura legal, notificações automáticas e aprovação parcial por arquivo.
 
 ## Fase 6 — Pronto para piloto comercial
 
