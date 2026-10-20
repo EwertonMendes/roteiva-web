@@ -29,5 +29,6 @@ test('D1 runtime: concurrent claims, rollback, immutable constraints and deletio
  await DB.exec(`CREATE TRIGGER injected_failure BEFORE INSERT ON trial_identity_claims WHEN (SELECT COUNT(*) FROM trial_identity_claims)=${before+1} BEGIN SELECT RAISE(ABORT,'injected_failure'); END;`);
  await assert.rejects(()=>retainTrialIdentity(env,p('failing','fail@gmail.com','google-fail')),/injected_failure/);
  assert.equal((await DB.prepare('SELECT COUNT(*) n FROM trial_identity_claims').first()).n,before);
+ assert.deepEqual((await DB.prepare('PRAGMA quick_check').all()).results.map(r=>r.quick_check),['ok']);
  assert.equal((await DB.prepare('PRAGMA foreign_key_check').all()).results.length,0);
 });
