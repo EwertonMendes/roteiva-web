@@ -5,7 +5,10 @@ import { driveFolderLinkId, linkDriveFolder, readDriveLinks, unlinkDriveFolder, 
 import type { Project } from "../../domain/workspace";
 import { DRIVE_FOLDER, DriveFileExplorer, DriveFolderPicker, DrivePreview, DriveUnlinkConfirm, driveFileUrl, isPreviewable, type DriveItem, type DriveTrail } from "./DriveLibraryUI";
 import {clearDriveThumbnailCache} from "./DriveThumbnail";
-import {cacheKey,getCachedFolder,setCachedFolder,clearDriveFolderCache} from "./drive-folder-cache";
+import {cacheKey,getCachedFolder,setCachedFolder,clearDriveFolderCache,invalidateDriveFolderCache} from "./drive-folder-cache";
+import {DriveUploadQueue} from "./DriveUploadQueue";
+import {useDriveUploads,type UploadDestination} from "./useDriveUploads";
+import type {UploadSession,UploadedFile} from "./drive-upload-client";
 import "./drive-library.css";
 
 const API = "https://roteiva-api-dev.ewertonmendes9.workers.dev";
@@ -43,6 +46,15 @@ const messages:Record<string,string> = {
   drive_folder_not_found:"Pasta indisponível ou sem permissão.",
   invalid_google_response:"Não foi possível interpretar os dados do Drive.",
   connection_changed:"A conexão foi alterada. Atualize para continuar.",
+  invalid_upload:"Arquivo inválido ou não suportado.",
+  upload_folder_not_linked:"Esta pasta não está mais vinculada ao projeto.",
+  upload_project_denied:"Você não possui autorização para enviar arquivos neste projeto.",
+  folder_authorization_unavailable:"Não foi possível confirmar o vínculo da pasta. Tente novamente.",
+  drive_upload_permission_missing:"O Google não autorizou gravação nesta pasta. Autorize-a para o Roteiva.",
+  drive_upload_unavailable:"O Google Drive não conseguiu iniciar este envio.",
+  drive_upload_transport_failed:"Não foi possível iniciar o envio. Verifique sua conexão.",
+  upload_session_invalid:"O Google retornou uma sessão inválida.",
+  drive_upload_not_confirmed:"O Google ainda não confirmou este arquivo.",
   connection_failed:"Não foi possível concluir a conexão. Tente novamente.",
 };
 
@@ -143,12 +155,12 @@ export function DriveConnectionPanel({
 
   const callback=new URLSearchParams(window.location.search).get("drive");
 
-  const call=useCallback(async <T,>(path:string,method:"GET"|"POST"="GET"):Promise<T>=>{
+  const call=useCallback(async <T,>(path:string,method:"GET"|"POST"="GET",payload?:unknown):Promise<T>=>{
     if(!user)throw new Error("Entre novamente no Roteiva.");
     let response:Response|undefined;
     for(let i=0;i<2;i++){
       const token=await user.getIdToken(i===1);
-      response=await fetch(API+path,{method,headers:{Authorization:"Bearer "+token},cache:"no-store"});
+      response=await fetch(API+path,{method,headers:{Authorization:"Bearer "+token,...(payload!==undefined?{"Content-Type":"application/json"}:{})},...(payload===undefined?{}:{body:JSON.stringify(payload)}),cache:"no-store"});
       if(response.status!==401)break;
     }
     if(!response?.ok){
@@ -158,6 +170,44 @@ export function DriveConnectionPanel({
     }
     return response.json() as Promise<T>;
   },[user]);
+
+  const createUpload=useCallback((file:File,dest:UploadDestination):Promise<UploadSession>=>{
+    const path="/integrations/drive/"+encodeURIComponent(dest.connectionId)+"/folders/"+
+      encodeURIComponent(dest.targetFolderId)+"/uploads";
+    return call<UploadSession>(path,"POST",{projectId:dest.projectId,linkedFolderId:dest.linkedFolderId,
+      name:file.name,size:file.size,mimeType:file.type||"application/octet-stream"});
+  },[call]);
+  const confirmUpload=useCallback((uploaded:UploadedFile,file:File,dest:UploadDestination):Promise<UploadedFile>=>{
+    const path="/integrations/drive/"+encodeURIComponent(dest.connectionId)+"/folders/"+
+      encodeURIComponent(dest.targetFolderId)+"/uploads/complete";
+    return call<{file:UploadedFile}>(path,"POST",{projectId:dest.projectId,linkedFolderId:dest.linkedFolderId,
+      fileId:uploaded.id,size:file.size}).then(result=>result.file);
+  },[call]);
+  const onUploadComplete=useCallback((uploaded:UploadedFile,dest:UploadDestination)=>{
+    if(!user)return;
+    invalidateDriveFolderCache(user.uid,dest.connectionId,dest.targetFolderId);
+    if(viewing?.connectionId!==dest.connectionId||viewing.projectId!==dest.projectId||
+       (viewPath.at(-1)?.id||viewing.folderId)!==dest.targetFolderId)return;
+    const item:DriveItem={id:uploaded.id,name:uploaded.name,mimeType:uploaded.mimeType,
+      size:uploaded.size,webViewLink:uploaded.webViewLink};
+    setFiles(previous=>[item,...previous.filter(existing=>existing.id!==item.id)]);
+    setRemote(previous=>{
+      if(!previous||previous.folderId!==dest.targetFolderId||
+         !item.name.toLocaleLowerCase("pt-BR").includes(previous.term.toLocaleLowerCase("pt-BR")))return previous;
+      return {...previous,files:[item,...previous.files.filter(existing=>existing.id!==item.id)]};
+    });
+  },[user?.uid,viewing?.id,viewing?.connectionId,viewing?.projectId,viewing?.folderId,viewPath]);
+  const uploads=useDriveUploads(createUpload,confirmUpload,onUploadComplete);
+  function uploadFiles(chosen:File[]){
+    if(!viewing||!user||!viewPath.length)return;
+    const destination:UploadDestination={
+      connectionId:viewing.connectionId,linkedFolderId:viewing.folderId,
+      targetFolderId:viewPath.at(-1)?.id||viewing.folderId,
+      projectId:viewing.projectId,folderName:viewPath.at(-1)?.name||viewing.folderName,
+    };
+    const {rejected}=uploads.enqueue(chosen,destination);
+    if(rejected)setError(rejected+" arquivo(s) vazio(s), muito grande(s) ou inválido(s) não foram adicionados.");
+  }
 
   const refresh=useCallback(async()=>{
     if(!user)return [];
@@ -452,11 +502,12 @@ export function DriveConnectionPanel({
         searchTerm={remote?.term} searchLoading={searchBusy} onSearchChange={setSearchText}
         onBack={()=>{++fileRequest.current;setViewing(null);setFiles([]);autoOpened.current=(selectedProjectId||"all")+":"+(relevant[0]?.id||"");}}
         onNavigate={(id,path)=>{if(viewing)void openFiles(viewing,null,false,id,path);}}
-        onOpen={openItem} onMore={()=>{
+        onOpen={openItem} onUploadFiles={uploadFiles} uploadDisabled={!viewing||!user||fileBusy} onMore={()=>{
           if(remote&&searchText.trim()===remote.term){void loadMoreSearch();}
           else if(viewing&&filePage)void openFiles(viewing,filePage,true,viewPath.at(-1)?.id||viewing.folderId,viewPath);
         }}/>
     </div>
+    <DriveUploadQueue uploads={uploads.uploads} onCancel={uploads.cancel} onRetry={uploads.retry} onDismiss={uploads.dismiss}/>
     {picker&&<DriveFolderPicker projects={projects} projectId={selectedProjectId} onProjectChange={onSelectProject}
       folders={folderList} path={trail} loading={folderBusy} working={busy} canRead={!!connection}
       hasMore={!!folderPage} mode={rootMode} onModeChange={mode=>void browse(mode,[{id:mode,name:mode==="root"?"Meu Drive":"Todas as pastas"}],null,false,mode)} linkedIds={linkedIds} error={error} onClose={closePicker}
