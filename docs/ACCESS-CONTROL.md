@@ -2,7 +2,7 @@
 
 ## Estado em 19/10/2026
 
-**PARCIAL — implantação e homologação distintas:** migrations `0007`/`0008`, Worker com provisionamento e frontend integrado foram publicados pelos pipelines oficiais. As três contas existentes receberam projeções válidas e cortesia fixa; o backfill terminou. A conta existente confirmou a cortesia e a listagem de quatro arquivos Drive sem reconexão ou alteração dos arquivos. A PR #48 permanece em rascunho: `0009`, encerramento da compatibilidade Drive e regras comerciais finais ainda não foram publicados. A conta descartável autorizada concluiu cadastro e segundo login Google: trial de 604.800.000 ms, sem cortesia beta, com prazo e updateTime da projeção inalterados após recarga e novo login. Os gates para ativação final estão cumpridos. Suspensão/cortesia/reativação e exclusão serão homologadas com as regras finais ativas; expiração ainda não foi homologada remotamente.
+**IMPLANTADO EM DEV; HOMOLOGAÇÃO REAL PARCIAL:** migrations 0007/0008/0009, Worker final, frontend integrado e regras comerciais restritivas foram publicados pelos pipelines oficiais. As três contas existentes receberam projeções válidas e cortesia fixa; backfill concluído. A conta existente confirmou cortesia e listagem de quatro arquivos Drive sem reconexão ou alteração dos arquivos. A fixture Google autorizada concluiu cadastro e segundo login: trial exato de sete dias, sem beta grant; repetição preservou prazo/updateTime da projeção. Suspensão retirou o workspace da sessão ativa e resistiu à reverificação; cortesia reativou acesso sem alterar trial nem o projeto descartável salvo. Após login manual recente, o pedido de exclusão foi aceito; saga em processamento, última fase revoking sem erros. Conclusão ainda não confirmada. Expiração e isolamento A/B remotos ainda não foram homologados.
 
 | Entrega | Evidência de publicação DEV |
 | --- | --- |
@@ -11,7 +11,7 @@
 | Diagnóstico, PR #45 | [API 39355610134](https://github.com/EwertonMendes/roteiva-web/actions/runs/39355610134), merge `2d1bd62` |
 | Correção runtime, PR #46 | [API 39356216592](https://github.com/EwertonMendes/roteiva-web/actions/runs/39356216592), merge `5734a1a` |
 | Frontend, PR #47 | [Hosting 39356744391](https://github.com/EwertonMendes/roteiva-web/actions/runs/39356744391), merge `f45927d` |
-| Enforcement, PR #48 | [Rascunho com checks aprovados](https://github.com/EwertonMendes/roteiva-web/pull/48), sem deploy |
+| Enforcement, PR #48 | [API 39358435356](https://github.com/EwertonMendes/roteiva-web/actions/runs/39358435356), [regras finais 39358435474](https://github.com/EwertonMendes/roteiva-web/actions/runs/39358435474), merge `b0ae124` |
 
 Validação automatizada final: 82 testes API, 27 unitários frontend, 30 testes Rules e 55 Playwright desktop/mobile aprovados (três skips previstos); TypeScript, builds e migrations locais até `0009` aprovados. Essas evidências não substituem os cenários remotos pendentes. DEV: [aplicação](https://roteiva-web-dev.web.app). Não houve alteração PROD, cobrança, IAM ou proteções GitHub.
 
@@ -75,7 +75,7 @@ Worker publicado pelo run 39355067084, regras preparatórias pelo 39355067202; a
 
 QA frontend desta fase: regressão inicial teve 53 aprovados, três skips por viewport e dois casos de Agenda com fixture UTC diferente da data civil do browser. Corrigida exclusivamente a data do teste; repetição focada desktop/mobile aprovou ambos (2/2). Resultado combinado: 55 cenários aprovados, e a suíte completa foi posteriormente repetida com as regras finais (55 aprovados). Isso não valida Google/Drive remoto.
 
-## Fase final — enforcement (preparado, ainda não publicado)
+## Fase final — enforcement (publicado)
 
 As regras finais exigem projeção com ownerUid do caminho, schemaVersion 1, suspensão falsa e prazo superior a request.time (ou concessão ilimitada). Ausência/corrupção nega operações de negócio. Status próprio e perfil permanecem legíveis; exclusão segue endpoint autenticado sem exigir acesso comercial. O cliente nunca escreve benefícios.
 
@@ -89,3 +89,15 @@ A ordem segura substitui qualquer orientação simplificada de deny-first: (1) a
 
 Homologação automatizada final: 30 Rules + 55 Playwright passaram integralmente (três skips esperados). D1 remoto confirmou três contas/três cortesias, durações exatas e backfill completed_at preenchido; Firestore confirmou três projeções válidas e contagens de negócio inalteradas. A UI foi publicada pela PR #47; o smoke de cadastro/login descartável foi concluído, conforme o início. A publicação final pode prosseguir; cenários de bloqueio e exclusão serão verificados depois da ativação.
 Recuperação real após PR #46: a conta existente recebeu projeção de cortesia e a Biblioteca voltou a listar quatro arquivos de uma pasta já vinculada, sem reconectar Drive ou alterar arquivos. A cobertura inicial terminou nos três perfis. A cortesia termina em `2026-11-19T01:44:48Z` para essa coorte, sem renovação em retries. A comparação usa contagens agregadas, não hashes integrais dos dados privados.
+
+### Evidência final de publicação e QA
+
+Pipeline API 39358435356 aplicou 0009 com zero violações FK e contagens operacionais preservadas, publicou ACCESS_PROVISION_ON_DRIVE=false e Worker `f88428b4-3458-4c76-80fb-e808341b728d`. Regras finais publicadas pelo run 39358435474. A publicação final sucedeu o smoke de cadastro/login; os gates anteriores neste documento descrevem essa sequência operacional.
+
+Fixture autorizada: trial de `2026-10-20T02:13:07.386Z` até `2026-10-27T02:13:07.386Z` (26/10 às 23:13 em São Paulo), 604.800.000 ms e zero concessões beta. Recarga e segundo login preservaram prazo e updateTime. Projeto criado pela UI permaneceu salvo após suspensão/reativação e recarga. Só a fixture recebeu mutações: fence adquirida/verificada, negação/projeção com CAS, ledger alterado, correspondência verificada e fence liberada. Cortesia de QA até `2026-10-28T02:13:07.386Z`, trial original intacto. Nenhum endpoint ADM.
+
+Exclusão recusou login com auth_time superior a cinco minutos; confirmação Google automática não retornou ao aplicativo. Não declarar sucesso nem remover identidade por outra via para simular o fluxo. Aguardar autenticação recente concluída manualmente. Expiração e isolamento A/B remotos continuam pendentes.
+
+Medição após enforcement (19/10 às 23:27–23:31 em São Paulo): billing Firebase desabilitado; read_ops_count 359 e write_ops_count 14 nas 24h anteriores (métrica legada write_count 15, sujeita a atraso). Console Worker: aproximadamente 1,62 mil invocações/24h, 121 subrequests e zero erros de runtime reportados; versão f88428b4 com 100% do tráfego e 27 invocações no instante observado. Invocações incluem Cron; não equivalem à contagem de requisições HTTP faturáveis. Não é previsão de consumo em escala.
+
+Regressão oficial da master publicada: [QA 39358964120](https://github.com/EwertonMendes/roteiva-web/actions/runs/39358964120), commit b0ae124, concluída com sucesso: 30 testes Rules e 55 Playwright desktop/mobile, três skips previstos. Evidência automatizada distinta da homologação Google/Drive real.
