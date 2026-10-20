@@ -280,7 +280,7 @@ test("upload uses file picker and drag-and-drop, confirms Drive and updates the 
   });
   const queue=panel.getByLabel("Transferências para Google Drive");
   await expect(queue.getByText("Arquivo enviado para Campanha de vídeos")).toBeVisible();
-  await expect(panel.getByRole("button",{name:/Novo arquivo.txt/})).toBeVisible();
+  await expect(panel.locator(".rl-files .rl-file-open").filter({hasText:"Novo arquivo.txt"})).toBeVisible();
   expect(seen.filter(x=>x.kind==="init")).toHaveLength(1);
   expect(seen.filter(x=>x.kind==="complete")).toHaveLength(1);
   const init=seen.find(x=>x.kind==="init")!.body as Record<string,unknown>;
