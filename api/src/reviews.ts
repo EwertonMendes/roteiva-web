@@ -259,13 +259,14 @@ async function grant(env:Env,r:Review,a:Asset,ownerToken:string):Promise<void>{
     throw new ApiError(409,'review_existing_public_permission');
   if(a.grant_state==='unshared'&&match&&r.access_mode==='google'){
     // Pre-existing Google ACL belongs to the user, not Roteiva: never revoke it.
-    await env.DB.prepare("UPDATE review_assets SET grant_state='granted',permission_id=NULL WHERE review_id=? AND version=? AND file_id=? AND grant_state='unshared'")
-      .bind(r.id,a.version,a.file_id).run();
+    const saved=await env.DB.prepare("UPDATE review_assets SET grant_state='granted',permission_id=NULL WHERE review_id=? AND version=? AND file_id=? AND grant_state='unshared' AND EXISTS(SELECT 1 FROM review_requests WHERE id=? AND status='publishing')")
+      .bind(r.id,a.version,a.file_id,r.id).run();
+    if(saved.meta.changes!==1)throw new ApiError(409,'review_busy');
     return;
   }
   if(a.grant_state==='unshared'){
-    const lock=await env.DB.prepare("UPDATE review_assets SET grant_state='granting' WHERE review_id=? AND version=? AND file_id=? AND grant_state='unshared'")
-      .bind(r.id,a.version,a.file_id).run();
+    const lock=await env.DB.prepare("UPDATE review_assets SET grant_state='granting' WHERE review_id=? AND version=? AND file_id=? AND grant_state='unshared' AND EXISTS(SELECT 1 FROM review_requests WHERE id=? AND status='publishing')")
+      .bind(r.id,a.version,a.file_id,r.id).run();
     if(lock.meta.changes!==1)throw new ApiError(409,'review_busy');
   }
   // In the authenticated mode, a pre-existing user ACL is never considered ours.
@@ -279,8 +280,14 @@ async function grant(env:Env,r:Review,a:Asset,ownerToken:string):Promise<void>{
     if(typeof created.id!=='string'||!created.id)throw new ApiError(503,'review_drive_unavailable');
     id=created.id;
   }
-  await env.DB.prepare("UPDATE review_assets SET grant_state='granted',permission_id=? WHERE review_id=? AND version=? AND file_id=? AND grant_state='granting'")
-    .bind(id,r.id,a.version,a.file_id).run();
+  const saved=await env.DB.prepare("UPDATE review_assets SET grant_state='granted',permission_id=? WHERE review_id=? AND version=? AND file_id=? AND grant_state='granting' AND EXISTS(SELECT 1 FROM review_requests WHERE id=? AND status='publishing')")
+    .bind(id,r.id,a.version,a.file_id,r.id).run();
+  if(saved.meta.changes!==1){
+    // Closing an invitation may race a Google grant. Compensate immediately:
+    // a late ACL must never outlive a review whose state already closed.
+    if(id)await mutatePermission(env,row,a.file_id,'DELETE',undefined,id);
+    throw new ApiError(409,'review_busy');
+  }
 }
 async function revokeAsset(env:Env,r:Review,a:Asset):Promise<void>{
   if(a.grant_state==='revoked'||a.grant_state==='unshared')return;
