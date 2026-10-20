@@ -118,3 +118,12 @@
  .review-portal-confirm{align-self:center;margin:auto;max-width:calc(100% - 28px)}
 }
 @media(prefers-reduced-motion:reduce){.reviews-list-item{transition:none}}
+
+.review-upload-zone{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  flex-wrap:wrap;border:1px dashed var(--line,#d1d1d1);background:var(--subtle,#f6f6f6);
+  border-radius:12px;padding:15px}
+.review-upload-zone label{position:relative;cursor:pointer}
+.review-upload-zone label input{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden}
+.review-upload-zone label:focus-within{outline:2px solid var(--ink,#222);outline-offset:3px}
+.review-upload-zone span{font-size:.77rem;color:var(--muted,#777)}
+@media(max-width:700px){.review-upload-zone{justify-content:center;text-align:center}}
