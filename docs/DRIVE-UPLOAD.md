@@ -3,9 +3,13 @@
 ## Estado em 20/10/2026
 
 **IMPLEMENTADO; Picker e upload real >250 MiB VALIDADOS no Chrome DEV; aceite completo PARCIAL.**
-Não fazer merge nem anunciar upload validado com base em mocks. Publicação
-temporária de homologação em DEV autorizada pelo proprietário em 20/10/2026,
-sem merge, com reversão para master em caso de falha. PROD permanece fora do escopo.
+Não anunciar upload integralmente validado com base em mocks. Após a prova real,
+o proprietário autorizou expressamente o merge dos PRs para DEV em 20/10/2026.
+PR #52 integrada no commit `9652d981e5209d25ee6a7b0f4b9e3d90a2362e82`;
+[API oficial](https://github.com/EwertonMendes/roteiva-web/actions/runs/39477057568)
+e [Hosting oficial](https://github.com/EwertonMendes/roteiva-web/actions/runs/39477057527)
+publicados com validações e smoke aprovados. As pendências manuais abaixo não
+foram reclassificadas como aprovadas. PROD permanece fora do escopo.
 
 Auditoria: branch existente `feat/drive-resumable-upload`, HEAD original
 `556e467`; CI anterior verde. Incorporada a master `8f64876` para preservar as
@@ -173,7 +177,8 @@ Ações externas necessárias, sem inventar valores:
    Login/reativação devem seguir o fluxo normal autorizado do produto.
 6. Comprovar: autorizar pasta existente no Picker, conferir conexão A/B, executar
    vídeo >250 MiB com recuperação real e checar arquivo na pasta correta. Testar
-   revogação/reconexão e Safari/dispositivo físico. Só então retirar draft.
+   revogação/reconexão e Safari/dispositivo físico para completar a homologação.
+   O merge posterior foi autorizado pelo proprietário sem declarar esses aceites cumpridos.
 
 O login automatizado inicialmente retornou **Login cancelado**; o proprietário
 concluiu a entrada normal e confirmou o workspace aberto. Não houve impersonação
@@ -206,8 +211,9 @@ administrativa nem extração da sessão Firebase para o script de QA.
 **Pendências explícitas:** interrupção de rede real foi oferecida e o proprietário
 preferiu deixá-la manual/pendente. Retry/probe/retomada permanecem cobertos apenas
 pelos testes isolados. Google A/B remoto, revogação/reconexão, Safari e dispositivo
-móvel físico não foram homologados nesta rodada. Manter draft até aceite integral;
-**pronto para continuar testes controlados em DEV**, sem declarar conclusão total.
+móvel físico não foram homologados nesta rodada. O proprietário posteriormente
+autorizou merge para DEV preservando essas pendências; **publicado para continuar
+testes controlados em DEV**, sem declarar conclusão total.
 
 ## QA automatizado e prova real
 

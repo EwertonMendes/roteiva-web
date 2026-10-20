@@ -26,7 +26,12 @@ async function register(page:Page,email:string){
 async function logout(page:Page){
   if(await page.getByRole("button",{name:"Abrir menu",exact:true}).isVisible())
     await page.getByRole("button",{name:"Abrir menu",exact:true}).click();
-  await page.getByRole("button",{name:"Sair da conta",exact:true}).click();
+  // Logout renders the signed-out UI before cache cleanup replaces the document.
+  // Wait for that real navigation before starting another identity's login.
+  await Promise.all([
+    page.waitForEvent("load"),
+    page.getByRole("button",{name:"Sair da conta",exact:true}).click(),
+  ]);
   await expect(page.getByRole("button",{name:"Entrar com Google",exact:true})).toBeVisible();
 }
 async function loginExisting(page:Page,email:string){
@@ -91,7 +96,8 @@ test("isolated E2E: trial expiry locks UI and Firestore; retries and refresh can
   await setEntitlement(uid,{accessUntil:Timestamp.fromMillis(Date.now()-60000),unlimited:false});
   await expect(page.getByRole("heading",{name:"Seu período de acesso terminou."})).toBeVisible();
   await expect(page.locator(".app-shell")).toHaveCount(0);
-  await expect(page.getByRole("button",{name:"Excluir conta",exact:true})).toBeVisible();
+  await expect(page.getByRole("button",{name:"Excluir conta",exact:true})).toHaveCount(0);
+  await expect(page.getByText(/Excluir e recriar a conta não libera outro teste/)).toBeVisible();
 
   await withEmulator(async env=>{
     const authenticated=env.authenticatedContext(uid).firestore();

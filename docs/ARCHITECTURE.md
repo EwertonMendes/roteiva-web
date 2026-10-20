@@ -384,6 +384,8 @@ do cliente e desconexão bloqueia novas operações Worker.
 Worker Secret; origem JavaScript DEV existente conferida. Proprietário autorizou
 publicação temporária da branch no DEV sem merge, com migration aditiva0012 e
 reversão em caso de falha; nenhuma mudança nos gates permanentes de CI/CD.
+Depois da prova Chrome, o proprietário autorizou o merge: PR #52 integrada em
+`9652d98` e publicada no DEV pelos workflows oficiais de API e Hosting.
 Uma conexão com acesso ativo foi identificada sem alterar entitlement. Picker
 real autorizou a pasta exata; UI Chrome concluiu upload direto de 276.509.032 bytes,
 com parent/tamanho Google e tentativa completed/capability apagada no D1 conferidos.

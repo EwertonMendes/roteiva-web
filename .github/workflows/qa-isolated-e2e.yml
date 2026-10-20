@@ -5,7 +5,12 @@ on:
     paths:
       - 'tests/browser/access-isolated-e2e.spec.ts'
       - 'tests/browser/fixtures.ts'
+      - 'src/features/access/**'
+      - 'src/features/auth/**'
+      - 'src/features/settings/AccountDeletionAction.tsx'
       - 'api/src/access.ts'
+      - 'api/src/auth.ts'
+      - 'api/src/trial-identity.ts'
       - 'api/src/account-deletion.ts'
       - 'firestore.rules'
       - '.github/workflows/qa-isolated-e2e.yml'

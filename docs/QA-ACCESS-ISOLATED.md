@@ -6,7 +6,7 @@ A suíte de acesso testa **somente fixtures descartáveis** no Firebase Authenti
 
 A cobertura contempla:
 
-- **Expiração**: usuário novo e documentos privados reais no emulador, projeção vencida por privilégio de fixture, remoção da área privada da UI em sessão ativa, refresh/URL direta, falha de leitura das coleções e preservação do próprio perfil/status. O botão de reverificação não renova `trialEndsAt`.
+- **Expiração**: usuário novo e documentos privados reais no emulador, projeção vencida por privilégio de fixture, remoção da área privada da UI em sessão ativa, refresh/URL direta, falha de leitura das coleções e preservação do próprio perfil/status. O botão de reverificação não renova `trialEndsAt`. Conforme a PR #54, acesso expirado não oferece exclusão; a ação permanece somente nas Configurações do workspace ativo. A mensagem também impede apresentar exclusão/recadastro como renovação de trial.
 - **Isolamento A/B**: duas identidades Google do emulador cadastradas pelo navegador, registros próprios criados pela UI, login/logout independente, Firestore Security Rules impedindo leituras e exclusões cruzadas, e vencimento de A sem afetar B.
 - **Exclusão**: confirmação destrutiva real pela UI, POST interceptado, estado `deleting` e fence criados no Firestore Emulator, bloqueio de leitura/gravação do cliente, progresso exibido e conclusão simulada somente **após** limpar os documentos descartáveis via contexto administrativo do emulador. Esse teste verifica o contrato UI/status e gates; o apagamento da identidade Firebase e a saga D1/Cron são cobertos pelos testes isolados do Worker, não pelo fluxo de navegador.
 
@@ -26,6 +26,11 @@ pnpm test:firebase
 ```
 
 A última linha inicia e encerra os emuladores automaticamente, roda Firestore Rules e todos os testes Playwright. Falhas preservam traces/screenshots no artefato de CI por sete dias.
+
+Na integração com master de 20/10/2026, o helper de logout passou a aguardar o
+carregamento do documento após a limpeza do cache privado, antes de iniciar outra
+identidade. Isso elimina a corrida de navegações observada no cenário A/B mobile,
+sem sleeps, retries para ocultar falhas ou alteração do produto.
 
 ## Critérios de evidência
 
