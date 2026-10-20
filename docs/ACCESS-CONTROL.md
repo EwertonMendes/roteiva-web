@@ -33,3 +33,17 @@ O pipeline registra apenas nomes de migrations/esquema e contagens, nunca UID, e
 Rollback desta fase: retornar código Worker ao commit anterior pelo pipeline protegido, **manter `0007` e todos os dados**. Não executar DROP, não editar migration aplicada, não restaurar o D1 inteiro sobre gravações recentes. Antes de eventual recuperação de desastre, capturar um bookmark e avaliar o impacto de Time Travel com o proprietário. Rollback posterior não pode restaurar regras permissivas para contas suspensas: manter regras restritivas e corrigir infraestrutura/projeções.
 
 Referências: [migrations D1](https://developers.cloudflare.com/d1/reference/migrations/), [Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/), [limites Firestore](https://firebase.google.com/docs/firestore/quotas).
+
+## Fase 2 — provisionamento compatível (em preparação)
+
+A PR #43 foi mesclada em `8169177bcc32e158f9d53fb7f2f725d7ed4318a3`; [pipeline oficial](https://github.com/EwertonMendes/roteiva-web/actions/runs/39354281435) publicou `0007` com zero violações FK, três tabelas/dois índices/trigger e contagens anteriores/posteriores idênticas: uma conexão Drive, zero transações, jobs de exclusão e guards. Worker compatível versão `52e976a3-8306-41ca-a6e0-a12dd2a7be03` publicado com Cron preservado.
+
+Decisão tomada: `0008_access_rollout.sql` fixa o marco no relógio D1 e o fim da cortesia em marco + 30 dias. A elegibilidade usa `createTime` do documento Firestore, não campo enviado pelo cliente. `INSERT OR IGNORE` com ID determinístico preserva trial e cortesia mesmo após retries. Cron processa um perfil por minuto, com cursor durável; falhas não avançam cursor nem marcam conclusão. Após completar o inventário inicial, não varre continuamente usuários.
+
+`ACCESS_PROVISION_ON_DRIVE=true` permite somente provisionamento sob demanda pelo mesmo caminho verificado antes de autorizar Drive/OAuth; não permite acesso sem perfil, suspenso, expirado ou em exclusão. Ausente/false nega usuários não provisionados. Encerrar essa compatibilidade em entrega posterior após inventário e frontend confirmados. Exclusão de conta e leitura de status ficam fora da checagem comercial.
+
+A preparação de regras nesta fase só permite GET privado de `access/current`, sem escrita/listagem e sem mudar a autorização de negócio. A publicação restritiva continua em entrega separada. PATCH da projeção usa precondição de versão/criação, resolve D1 após ler a versão e falha sem sucesso em conflito. Repetir estado igual não escreve novamente.
+
+**Limite distribuído:** D1 e Firestore não têm transação conjunta. Nenhuma operação ADM existe aqui. A futura revogação/suspensão deve primeiro publicar negação no Firestore com precondição, depois alterar D1 e reconciliar; uma falha não pode ser declarada concluída nem revertida para concessão. Não editar concessões manualmente em D1 e presumir revogação imediata no Firestore. Testes de suspensão devem usar exclusivamente fixtures e confirmar ambos os sistemas. Antes de habilitar as regras finais, validar esse protocolo e concorrência; não usar CI como prova de homologação remota.
+
+Auditoria GitHub: `cloudflare-development` permite somente branch master; segredo Cloudflare já existe. `firebase-development` não possui gate de branch/reviewer configurado; os workflows atuais restringem deploy a master e SHA atual. Não foi alterada nenhuma proteção. Consulta à proteção clássica de master respondeu 404, sem afirmar inexistência de outros rulesets.

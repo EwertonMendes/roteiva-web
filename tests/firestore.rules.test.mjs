@@ -517,6 +517,20 @@ test("deletion marker blocks all client mutations while retaining per-owner isol
   await assertSucceeds(updateDoc(doc(bob,"users/bob/projects/2"),{name:"Unchanged isolation",revision:2,updatedAt:serverTimestamp()}));
 });
 
+test("access status is private, cannot be written or listed, and preparation preserves business access",async()=>{
+  const alice=dbFor('alice'),bob=dbFor('bob');
+  await env.withSecurityRulesDisabled(async context=>{
+    await setDoc(doc(context.firestore(),'users/alice/access/current'),{ownerUid:'alice',suspended:true});
+  });
+  await assertSucceeds(getDoc(doc(alice,'users/alice/access/current')));
+  await assertFails(getDoc(doc(bob,'users/alice/access/current')));
+  await assertFails(getDocs(collection(alice,'users/alice/access')));
+  await assertFails(setDoc(doc(alice,'users/alice/access/forged'),{unlimited:true}));
+  await assertFails(updateDoc(doc(alice,'users/alice/access/current'),{unlimited:true}));
+  await assertFails(deleteDoc(doc(alice,'users/alice/access/current')));
+  await assertSucceeds(getDoc(doc(alice,'users/alice/clients/1')));
+});
+
 test("residual JWT cannot recreate a deleted profile or remove the independent fence",async()=>{
   const alice=dbFor('alice'),bob=dbFor('bob');
   await env.withSecurityRulesDisabled(async admin=>{

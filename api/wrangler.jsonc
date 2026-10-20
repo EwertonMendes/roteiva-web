@@ -13,6 +13,7 @@
       "vars": {
         "ENVIRONMENT": "dev",
         "ACCOUNT_DELETION_ENABLED": "true",
+        "ACCESS_PROVISION_ON_DRIVE": "true",
         "FIREBASE_PROJECT_ID": "roteiva-web-dev",
         "FRONTEND_ORIGIN": "https://roteiva-web-dev.web.app",
         "OAUTH_REDIRECT_URI": "https://roteiva-api-dev.ewertonmendes9.workers.dev/oauth/drive/callback",

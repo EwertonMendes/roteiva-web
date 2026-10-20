@@ -12,6 +12,7 @@ export interface Env {
   TOKEN_KEYS?: string;
   TOKEN_KEY_VERSION: string;
   ACCOUNT_DELETION_ENABLED?: string;
+  ACCESS_PROVISION_ON_DRIVE?: string;
   FIREBASE_ADMIN_CREDENTIALS_JSON?: string;
 }
 export class ApiError extends Error {

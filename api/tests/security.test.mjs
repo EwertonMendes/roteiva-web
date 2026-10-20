@@ -107,6 +107,11 @@ test('OAuth first-party launch uses one-time ticket, PKCE and Lax callback cooki
  const {start,launch,callback}=await import('../src/oauth.ts');
  let inserted,used=false,insertCount=0;
  const DB={prepare:sql=>({bind:(...args)=>{
+   if(sql.startsWith('SELECT 1 FROM account_deletions'))return {first:async()=>null};
+   if(sql.startsWith('SELECT trial_started_at'))return {first:async()=>({
+     trial_started_at:Date.now(),trial_ends_at:Date.now()+604800000,suspended_at:null
+   })};
+   if(sql.startsWith('SELECT grant_kind')||sql.startsWith('SELECT status,paid_until'))return {all:async()=>({results:[]})};
    if(sql.startsWith('INSERT INTO oauth_transactions')) return {run:async()=>{inserted=args;insertCount++;return {meta:{changes:1}};}};
    if(sql.startsWith('UPDATE oauth_transactions')) return {first:async()=>{
      if(used || !inserted || args[2]!==inserted[6]) return null;
