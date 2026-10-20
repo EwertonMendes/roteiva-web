@@ -1,5 +1,5 @@
 import { ApiError, type Env } from './types.ts';
-import { reviewRouter } from './reviews.ts';
+import { reviewRouter,cleanupExpiredReviews } from './reviews.ts';
 import { identity,verifiedTrialPrincipal } from './auth.ts';
 import { callback, start, launch, enabled } from './oauth.ts';
 import { metadata, disconnect, about } from './drive.ts';
@@ -147,5 +147,6 @@ export default {fetch:handle, scheduled(_controller:ScheduledController,env:Env,
     await runPendingDeletions(env);
     try{await backfillAccess(env);}catch(error){console.error(JSON.stringify({event:'access_backfill_retry',code:error instanceof ApiError?error.code:'dependency_failure'}));}
     try{await cleanupUploads(env);}catch{console.error(JSON.stringify({event:'drive_upload_retention_retry'}));}
+    try{await cleanupExpiredReviews(env);}catch{console.error(JSON.stringify({event:'review_revocation_retry'}));}
   })());
 }};
