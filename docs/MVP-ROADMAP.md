@@ -462,3 +462,5 @@ Evidências e reversão: [ACCESS-CONTROL.md](ACCESS-CONTROL.md).
 
 - VALIDADO REMOTAMENTE: PR #43, migration 0007 e Worker compatível publicados pelo run 39354281435; zero violações FK e contagens preservadas (uma conexão Drive, demais tabelas operacionais vazias).
 - IMPLEMENTADO, PENDENTE PUBLICAÇÃO/HOMOLOGAÇÃO: Worker de provisionamento único, cortesia beta 30 dias com marco fixo, Cron idempotente e flag de provisionamento Drive sem bypass; leitura privada de status preparada nas regras, sem enforcement de negócio nesta fase. Testes de API incluem retries, datas, falha de projeção/conflito e cursor.
+
+- CAUSA REPRODUZIDA: redirect error não é suportado no runtime Workers; fetches de acesso/backfill corrigidos para manual, com teste que exige esse modo. Recuperação DEV pendente do pipeline oficial; não concluir apenas pelo CI.

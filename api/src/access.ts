@@ -52,7 +52,7 @@ async function verifiedProfile(env:Env,uid:string,token:string):Promise<number> 
   const url='https://firestore.googleapis.com/v1/projects/'+env.FIREBASE_PROJECT_ID+
     '/databases/(default)/documents/users/'+safeUid(uid);
   let response:Response;
-  try{response=await fetch(url,{redirect:'error',headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(12000)});}
+  try{response=await fetch(url,{redirect:'manual',headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(12000)});}
   catch{throw new ApiError(503,'access_provision_unavailable');}
   if(response.status===404)throw new ApiError(409,'registration_required');
   if(!response.ok)throw new ApiError(503,'access_provision_unavailable');
@@ -69,7 +69,7 @@ async function publish(env:Env,uid:string,token:string):Promise<AccessState> {
   // Only server credentials can write here. No public client write path exists.
   // Publishing the same effective state is idempotent and avoids unnecessary writes.
   let current:Response;
-  try{current=await fetch(url,{redirect:'error',headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(12000)});}
+  try{current=await fetch(url,{redirect:'manual',headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(12000)});}
   catch{throw new ApiError(503,'access_provision_unavailable');}
   if(current.status!==404&&!current.ok)throw new ApiError(503,'access_provision_unavailable');
   // Resolve after reading the projection version. A stale writer cannot replace
@@ -95,7 +95,7 @@ async function publish(env:Env,uid:string,token:string):Promise<AccessState> {
   };
   const mask=Object.keys(fields).map(field=>'updateMask.fieldPaths='+encodeURIComponent(field)).join('&');
   let result:Response;
-  try{result=await fetch(url+'?'+mask+'&'+precondition,{method:'PATCH',redirect:'error',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},
+  try{result=await fetch(url+'?'+mask+'&'+precondition,{method:'PATCH',redirect:'manual',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},
     body:JSON.stringify({fields}),signal:AbortSignal.timeout(12000)});}
   catch{throw new ApiError(503,'access_provision_unavailable');}
   if(!result.ok)throw new ApiError(503,'access_provision_unavailable');
