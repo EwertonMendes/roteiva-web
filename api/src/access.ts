@@ -132,7 +132,8 @@ export async function ensureAccess(env:Env,uid:string,adminBearer?:string,princi
 async function provisionAccess(env:Env,uid:string,created:number,token:string,allowTrial:boolean,profileVersion:string):Promise<AccessState> {
   await assertNotDeleting(env,uid);
   const now=Date.now();
-  const start=allowTrial?now:now-TRIAL_MS;
+  // A refused identity is expired even if another edge has a slightly older clock.
+  const start=allowTrial?now:0;
   await env.DB.prepare('INSERT OR IGNORE INTO access_accounts (owner_uid,trial_started_at,trial_ends_at,created_at,updated_at) VALUES (?,?,?,?,?)')
     .bind(uid,start,start+TRIAL_MS,now,now).run();
   const rollout=await env.DB.prepare('SELECT cutoff_at,beta_ends_at FROM access_rollout WHERE id=1')

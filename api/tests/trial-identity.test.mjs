@@ -123,7 +123,7 @@ test('backend provisions new same-email UID as expired after old account is eras
   const second=await (await ensureAccess(env,'B','mock-admin',principalB)).json();
   assert.equal(second.active,false);
   assert.equal(second.source,'none');
-  assert.ok(Date.parse(second.trialEndsAt)<=Date.now());
+  assert.equal(Date.parse(second.trialEndsAt),TRIAL_MS);
   assert.equal(s.sql.prepare('SELECT COUNT(*) n FROM access_accounts').get().n,1);
   await assert.rejects(()=>assertActiveAccess(env,'B'),e=>e.status===403);
   const prior=s.sql.prepare('SELECT trial_started_at,trial_ends_at FROM access_accounts WHERE owner_uid=?').get('B');
