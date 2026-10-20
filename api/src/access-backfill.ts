@@ -13,7 +13,7 @@ export async function backfillAccess(env:Env):Promise<void> {
  if(rollout.cursor)query.set('pageToken',rollout.cursor);
  const response=await fetch('https://firestore.googleapis.com/v1/projects/'+env.FIREBASE_PROJECT_ID+
    '/databases/(default)/documents/users?'+query,{redirect:'manual',headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(12000)});
- if(!response.ok)throw new ApiError(503,'access_backfill_unavailable');
+ if(!response.ok)throw new ApiError(503,'access_backfill_list_'+response.status);
  const data=await response.json() as {documents?:{name:string;fields?:{ownerUid?:{stringValue?:string};deletionState?:{stringValue?:string}}}[];nextPageToken?:string};
  for(const profile of data.documents||[]){
    const uid=profile.name.split('/').at(-1)||'';

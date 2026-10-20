@@ -55,7 +55,7 @@ async function verifiedProfile(env:Env,uid:string,token:string):Promise<number> 
   try{response=await fetch(url,{redirect:'manual',headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(12000)});}
   catch{throw new ApiError(503,'access_provision_unavailable');}
   if(response.status===404)throw new ApiError(409,'registration_required');
-  if(!response.ok)throw new ApiError(503,'access_provision_unavailable');
+  if(!response.ok)throw new ApiError(503,'access_profile_read_'+response.status);
   const record=await response.json() as {createTime?:string;fields?:{ownerUid?:{stringValue?:string};deletionState?:{stringValue?:string}}};
   if(record.fields?.ownerUid?.stringValue!==uid)throw new ApiError(403,'invalid_profile');
   if(record.fields?.deletionState?.stringValue==='deleting')throw new ApiError(409,'account_deleting');
@@ -71,7 +71,7 @@ async function publish(env:Env,uid:string,token:string):Promise<AccessState> {
   let current:Response;
   try{current=await fetch(url,{redirect:'manual',headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(12000)});}
   catch{throw new ApiError(503,'access_provision_unavailable');}
-  if(current.status!==404&&!current.ok)throw new ApiError(503,'access_provision_unavailable');
+  if(current.status!==404&&!current.ok)throw new ApiError(503,'access_projection_read_'+current.status);
   // Resolve after reading the projection version. A stale writer cannot replace
   // a newer projection because every PATCH is conditional on that version.
   const state=await activeState(env,uid);
@@ -98,7 +98,7 @@ async function publish(env:Env,uid:string,token:string):Promise<AccessState> {
   try{result=await fetch(url+'?'+mask+'&'+precondition,{method:'PATCH',redirect:'manual',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},
     body:JSON.stringify({fields}),signal:AbortSignal.timeout(12000)});}
   catch{throw new ApiError(503,'access_provision_unavailable');}
-  if(!result.ok)throw new ApiError(503,'access_provision_unavailable');
+  if(!result.ok)throw new ApiError(503,'access_projection_write_'+result.status);
   await assertNotDeleting(env,uid);
   return state;
 }

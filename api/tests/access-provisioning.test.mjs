@@ -4,6 +4,7 @@ import {generateKeyPair,exportPKCS8} from 'jose';
 import {database} from './helpers/database.mjs';
 import {ensureAccess,assertActiveAccess,TRIAL_MS} from '../src/access.ts';
 import {backfillAccess} from '../src/access-backfill.ts';
+import {adminToken} from '../src/firebase-admin.ts';
 
 const {privateKey}=await generateKeyPair('RS256',{extractable:true});
 const credentials={type:'service_account',project_id:'roteiva-web-dev',client_email:'synthetic@roteiva-web-dev.iam.gserviceaccount.com',private_key:await exportPKCS8(privateKey),token_uri:'https://oauth2.googleapis.com/token'};
@@ -87,4 +88,11 @@ test('failed backfill retains cursor and never announces completion',async t=>{
  await assert.rejects(()=>backfillAccess(s.env));
  const row=s.sql.prepare('SELECT * FROM access_rollout').get();
  assert.equal(row.completed_at,null);assert.equal(row.cursor,null);assert.equal(row.processed,0);
+});
+test('token diagnostics retain only allowlisted categories, never provider descriptions',async t=>{
+ const s=setup(t);
+ for(const category of ['invalid_grant','invalid_scope','arbitrary-secret']){
+   await assert.rejects(()=>adminToken(s.env,async()=>Response.json({error:category,error_description:'private-provider-data'},{status:400})),
+     e=>e.code===(category==='arbitrary-secret'?'admin_token_unavailable':'admin_token_'+category)&&!e.message.includes('private-provider-data'));
+ }
 });

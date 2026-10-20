@@ -51,3 +51,6 @@ Auditoria GitHub: `cloudflare-development` permite somente branch master; segred
 ### Causa confirmada da falha — runtime Cloudflare
 
 Reproduzido com workerd/Miniflare da versão instalada: Request com `redirect:error` lança TypeError antes de acessar a rede; Workers aceita somente follow/manual. Essa opção foi introduzida no endurecimento dos fetches administrativos da fase 2. Corrigido para `manual` em leitura de perfil, projeção e enumeração/PATCH: redirecionamentos não são seguidos e status inesperado continua falhando fechado. Nenhuma alteração de credencial/IAM é necessária. Mocks Node agora exigem manual. A recuperação remota ainda precisa ser confirmada após deploy. Referência: [Request Workers](https://developers.cloudflare.com/workers/runtime-apis/request/).
+## Falha encontrada na homologação da fase 2
+
+Worker publicado pelo run 39355067084, regras preparatórias pelo 39355067202; antes de liberar UI/regras restritivas, leitura real da Biblioteca falhou e o inventário ainda não tinha projeções. Não considerar CI como homologação. Correção de diagnóstico acrescenta somente evento/código/status categóricos, sem UID, URL, exception ou resposta de provedor. Frontend e regras restritivas permanecem retidos até identificar e resolver a dependência.
