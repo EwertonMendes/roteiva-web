@@ -201,8 +201,11 @@ async function createReview(request:Request,env:Env,uid:string):Promise<Response
   }),url:reviewLink(secret)}},{status:201});
 }
 async function ownerList(env:Env,uid:string,url:URL):Promise<Response>{
-  const rows=await env.DB.prepare('SELECT * FROM review_requests WHERE owner_uid=? ORDER BY updated_at DESC LIMIT 25 OFFSET ?')
-    .bind(uid,pages(url.searchParams)*25).all<Review>();
+  const search=inputText(url.searchParams.get('q')||'',80).toLowerCase();
+  const condition=['draft','pending','changes','approved','closed'].includes(url.searchParams.get('status')||'')
+    ?url.searchParams.get('status')!:'';
+  const rows=await env.DB.prepare("SELECT * FROM review_requests WHERE owner_uid=? AND (LOWER(client_name) LIKE ? OR LOWER(project_name) LIKE ? OR LOWER(title) LIKE ?) AND (?='' OR status=?) ORDER BY updated_at DESC LIMIT 25 OFFSET ?")
+    .bind(uid,'%'+search+'%','%'+search+'%','%'+search+'%',condition,condition,pages(url.searchParams)*25).all<Review>();
   return Response.json({reviews:rows.results.map(showReview),hasMore:rows.results.length===25});
 }
 function permissionUrl(fileId:string,permissionId?:string):URL {
@@ -249,6 +252,12 @@ async function grant(env:Env,r:Review,a:Asset,ownerToken:string):Promise<void>{
     p.type==='user'&&p.emailAddress?.toLowerCase()===r.recipient_email);
   if(a.grant_state==='unshared'&&match&&r.access_mode==='link')
     throw new ApiError(409,'review_existing_public_permission');
+  if(a.grant_state==='unshared'&&match&&r.access_mode==='google'){
+    // Pre-existing Google ACL belongs to the user, not Roteiva: never revoke it.
+    await env.DB.prepare("UPDATE review_assets SET grant_state='granted',permission_id=NULL WHERE review_id=? AND version=? AND file_id=? AND grant_state='unshared'")
+      .bind(r.id,a.version,a.file_id).run();
+    return;
+  }
   if(a.grant_state==='unshared'){
     const lock=await env.DB.prepare("UPDATE review_assets SET grant_state='granting' WHERE review_id=? AND version=? AND file_id=? AND grant_state='unshared'")
       .bind(r.id,a.version,a.file_id).run();
@@ -382,13 +391,15 @@ async function publicReview(request:Request,env:Env,action:'view'|'comment'|'dec
   const message=inputText(data.message||'',1500,decision==='changes');
   const ts=now();
   // Unique(review_id,version) makes double-click/replay unable to produce conflicting approvals.
+  // Conditional insert + transition within one D1 batch avoid phantom decisions on replay.
+  const eventId=crypto.randomUUID();
   const saved=await env.DB.batch([
-    env.DB.prepare("UPDATE review_requests SET status=?,updated_at=? WHERE id=? AND status='pending' AND current_version=?")
-      .bind(decision,ts,r.id,r.current_version),
-    env.DB.prepare("INSERT OR IGNORE INTO review_decisions(id,review_id,version,decision,author_name,author_email,message,created_at) VALUES(?,?,?,?,?,?,?,?)")
-      .bind(crypto.randomUUID(),r.id,r.current_version,decision,authorName,email||null,message,ts)
+    env.DB.prepare("INSERT OR IGNORE INTO review_decisions(id,review_id,version,decision,author_name,author_email,message,created_at) SELECT ?,?,?,?,?,?,?,? FROM review_requests WHERE id=? AND status='pending' AND current_version=?")
+      .bind(eventId,r.id,r.current_version,decision,authorName,email||null,message,ts,r.id,r.current_version),
+    env.DB.prepare("UPDATE review_requests SET status=?,updated_at=? WHERE id=? AND status='pending' AND current_version=? AND EXISTS(SELECT 1 FROM review_decisions WHERE id=?)")
+      .bind(decision,ts,r.id,r.current_version,eventId)
   ]);
-  if(saved[0].meta.changes!==1)throw new ApiError(409,'review_already_decided');
+  if(saved[0].meta.changes!==1||saved[1].meta.changes!==1)throw new ApiError(409,'review_already_decided');
   return Response.json({saved:true,status:decision});
 }
 export async function reviewRouter(request:Request,env:Env,url:URL):Promise<Response>{
