@@ -462,3 +462,5 @@ Evidências e reversão: [ACCESS-CONTROL.md](ACCESS-CONTROL.md).
 
 - VALIDADO REMOTAMENTE: PR #43, migration 0007 e Worker compatível publicados pelo run 39354281435; zero violações FK e contagens preservadas (uma conexão Drive, demais tabelas operacionais vazias).
 - IMPLEMENTADO, PENDENTE PUBLICAÇÃO/HOMOLOGAÇÃO: Worker de provisionamento único, cortesia beta 30 dias com marco fixo, Cron idempotente e flag de provisionamento Drive sem bypass; leitura privada de status preparada nas regras, sem enforcement de negócio nesta fase. Testes de API incluem retries, datas, falha de projeção/conflito e cursor.
+
+- IMPLEMENTADO NA FASE 3: AccessGate e estado em Configurações, cadastro informa sete dias, gestão mínima disponível ao expirar e gate de versão Worker no deploy Hosting. Testes unitários/TypeScript/builds locais aprovados; regressão desktop/mobile em execução. Publicação e homologação real ainda pendentes.

@@ -47,3 +47,9 @@ A preparação de regras nesta fase só permite GET privado de `access/current`,
 **Limite distribuído:** D1 e Firestore não têm transação conjunta. Nenhuma operação ADM existe aqui. A futura revogação/suspensão deve primeiro publicar negação no Firestore com precondição, depois alterar D1 e reconciliar; uma falha não pode ser declarada concluída nem revertida para concessão. Não editar concessões manualmente em D1 e presumir revogação imediata no Firestore. Testes de suspensão devem usar exclusivamente fixtures e confirmar ambos os sistemas. Antes de habilitar as regras finais, validar esse protocolo e concorrência; não usar CI como prova de homologação remota.
 
 Auditoria GitHub: `cloudflare-development` permite somente branch master; segredo Cloudflare já existe. `firebase-development` não possui gate de branch/reviewer configurado; os workflows atuais restringem deploy a master e SHA atual. Não foi alterada nenhuma proteção. Consulta à proteção clássica de master respondeu 404, sem afirmar inexistência de outros rulesets.
+
+## Fase 3 — frontend integrado
+
+A UI só monta o workspace após POST autenticado em `/access/ensure` e confirmação do status vindo do servidor Firestore; dados privados persistidos no browser não substituem essa confirmação. O relógio local orienta apenas a apresentação; Worker e regras decidem pelo horário do servidor. Estados expirado/suspenso ou falha mantêm saída, nova verificação e exclusão da própria conta disponíveis. Cadastro informa sete dias sem cartão/cobrança automática.
+
+O deploy do frontend exige health com header de versão do controle e rota de provisionamento retornando 401 sem identidade antes de autenticar/publicar Hosting. Esse gate evita publicar a UI antes do Worker, mas não substitui smoke autenticado nem homologação. Regras comerciais restritivas continuam em entrega posterior ao inventário completo. A demo local permanece sem autenticação/controle comercial.
