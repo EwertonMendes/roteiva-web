@@ -151,3 +151,10 @@ Decisão tomada a pedido do proprietário: após frase e checkbox, enviar a soli
 O provedor recebe `login_hint` do e-mail atual e deixa de forçar `prompt=select_account`; a dica orienta o Google, mas não impede a escolha de outra conta. A modal exibe o e-mail que será excluído. Firebase `reauthenticateWithPopup` rejeita outra identidade; a UI explica `auth/user-mismatch` sem enviar nova solicitação destrutiva. Há ainda comparação do UID corrente com o usuário que abriu a ação. O backend usa apenas o UID do JWT validado, nunca o e-mail exibido, o login_hint ou um UID enviado no corpo. Drive não participa da prova de login recente.
 
 Cobertura: login recente sem popup; 401 seguido de confirmação explícita; cancelamento sem nova submissão; conta Google diferente rejeitada e posterior confirmação com a conta correta, em desktop/mobile. API verifica JWT recém-emitido com login antigo: serve para leitura autenticada, mas é rejeitado para exclusão. CI e publicação são rastreados na PR desta alteração. Não executar exclusão real de outra conta para validar esse cenário.
+
+
+## Restrição de disponibilidade — decisão do proprietário em 20/10/2026
+
+A exclusão pode ser iniciada somente em Configurações → Zona de perigo, com acesso comercial ativo confirmado. Não oferecer a ação no cadastro, em acesso expirado/suspenso ou em falha de validação. O backend exige assertActiveAccess para novos jobs; não basta ocultar o botão. A ação compacta fora de Configurações foi retirada.
+
+Uma solicitação já aceita é mantida e pode ser repetida idempotentemente mesmo após expiração ou remoção do registro comercial. A leitura de status e o executor cron continuam funcionando; esta decisão não cancela operações nem remove os marcadores antifraude. A antiga tolerância ao início sem perfil/acesso não autoriza novos pedidos nesta política. Evidências: api/tests/deletion-access.test.mjs, testes existentes da saga e tests/browser/access.spec.ts (desktop/mobile).

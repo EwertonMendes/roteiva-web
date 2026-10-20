@@ -460,9 +460,73 @@ A cópia persistida é privada e potencialmente sensível em computadores compar
 - **CORRIGIDO E VALIDADO:** redirect error introduzido na fase 2 causava TypeError no runtime Workers e impedia provisionamento/Drive. PR #46 usa manual, reproduzido em workerd e confirmado pela recuperação real. Não houve mudança de credencial.
 - **VALIDADO AUTOMATICAMENTE:** 82 testes API, 27 unitários frontend, 30 Rules e 55 Playwright desktop/mobile; três skips previstos. TypeScript, builds e migrations locais até 0009 aprovados. CI não comprova os cenários remotos pendentes.
 - **PUBLICADO — PR #48, merge b0ae124, API 39358435356 e regras 39358435474:** regras comerciais finais e ACCESS_PROVISION_ON_DRIVE=false; sync_pending da migration 0009 impede republicação concorrente durante futuras alterações privilegiadas. Nenhuma interface ou rota ADM. Protocolo obrigatório e testes em ACCESS-CONTROL.md e access-provisioning.test.mjs.
-- **PARCIAL NA HOMOLOGAÇÃO REAL:** expiração, isolamento A/B e exclusão da conta descartável autorizada permanecem pendentes. Cadastro e segundo login Google já foram confirmados: trial exato de sete dias, sem concessão beta; recarga e login não alteraram prazo/updateTime da projeção. Enforcement publicado. Suspensão e reativação por cortesia confirmadas, com trial/projeto preservados e fence liberada; pedido de exclusão descartável aceito após autenticação recente manual, porém conclusão da saga ainda não verificada. Expiração/isolamento A/B remotos não concluídos.
+- **PARCIAL NA HOMOLOGAÇÃO REAL:** expiração e isolamento A/B remotos permanecem pendentes; a exclusão e o recadastro descartáveis foram posteriormente validados na PR #51. Cadastro e segundo login Google já foram confirmados: trial exato de sete dias, sem concessão beta; recarga e login não alteraram prazo/updateTime da projeção. Enforcement publicado. Suspensão e reativação por cortesia confirmadas, com trial/projeto preservados e fence liberada; pedido de exclusão descartável aceito após autenticação recente manual, com conclusão da saga e recadastro posteriormente confirmados na PR #51. Expiração/isolamento A/B remotos não concluídos.
 - **MEDIDO:** billing Firebase desabilitado; Monitoring em 20/10/2026 02:11 UTC indicou 209 leituras e seis escritas nas 24h anteriores. Métricas Cloudflare anteriores ao rollout registradas no runbook; repetir medição após regras finais, sem garantir consumo futuro.
 
 Evidências de deploy, commits, limites da comparação por contagens e reversão segura: [ACCESS-CONTROL.md](ACCESS-CONTROL.md). A PR #42 foi encerrada como substituída pelas entregas #43–#48; sua branch foi preservada.
 
-- **VALIDADO NO PIPELINE OFICIAL DA MASTER:** [QA 39358964120](https://github.com/EwertonMendes/roteiva-web/actions/runs/39358964120), commit b0ae124: 30 Rules + 55 Playwright aprovados, três skips previstos. Pedido real de exclusão descartável aceito após login manual recente; aguardar conclusão da saga antes de marcar homologação completa.
+
+
+- **VALIDADO NO PIPELINE OFICIAL DA MASTER:** [QA 39358964120](https://github.com/EwertonMendes/roteiva-web/actions/runs/39358964120), commit b0ae124: 30 Rules + 55 Playwright aprovados, três skips previstos. Pedido real de exclusão descartável aceito após login manual recente; conclusão da saga e proteção no recadastro posteriormente verificadas na PR #51.
+
+## Upload resumable para pastas vinculadas — PR #52 (20/10/2026)
+
+**Status: PARCIAL — Picker e upload >250 MiB reais validados no Chrome DEV; aceite completo pendente; PR draft.**
+
+- [x] Auditoria da implementação existente e dos checks; master com PRs #51/#53/#54 incorporada.
+- [x] JWT/Origin/entitlement/UID, vínculo e existência do projeto, ascendência real,
+  capacidade da pasta destino e autorização por app verificadas no backend.
+- [x] Migration 0012: tentativa por UID, file ID pré-gerado Google, capacidade cifrada,
+  confirmação vinculada e idempotente, TTL/limpeza e fence de reconexão.
+- [x] Google Picker oficial implementado via novo GIS token drive.file + openid,
+  include_granted_scopes=false, validação servidor de cliente/subject/escopos/validade.
+- [x] Fila permanece ao navegar no workspace, duas transferências, limite de 100,
+  progresso confirmado, probes após falhas, retomada explícita na mesma
+  sessão/página e cancelamento.
+- [x] Confirmação incerta pode repetir só a verificação, sem retransmitir arquivo;
+  invalidação seletiva e thumbnails privadas quando disponíveis.
+- [x] Testes API/SQLite/JWT sintético, cliente e E2E com provedores simulados ampliados.
+  Evidência final de checks na própria PR; não equivalem a homologação Google real.
+- [x] Script opt-in de prova real reproduzível: scripts/qa-drive-real.mjs, sem tokens em logs.
+- [x] Chave Roteiva Picker DEV criada, restrita à origem DEV, iframe oficial docs.google.com e somente Picker API;
+  secret GOOGLE_PICKER_API_KEY configurado no Worker DEV e inventário conferido.
+- [x] Conexão com acesso ativo identificada por consulta de estado D1, sem mudar trial/grant.
+- [x] Homologação temporária de branch no DEV autorizada pelo proprietário, sem merge:
+  migration0012 com integridade/contagens preservadas, Worker e Hosting publicados;
+  release anterior preservada para reversão. Prévia oficial Firebase também passou.
+- [x] Login normal concluído pelo proprietário; pasta QA vazia vinculada pelo produto;
+  GIS/Picker reais e autorização exata conferida pelo Worker.
+- [x] Upload real UI Chrome de 276.509.032 bytes direto ao Google, arquivo no parent
+  correto por leitura independente; uma tentativa D1 completed e capability apagada.
+  Worker remoto respondeu 204/401/403 conforme contrato. Sem trace HTTP individual.
+- [ ] Recuperação com interrupção real: proprietário preferiu deixar manual/pendente.
+  Cobertura de falhas/retomada isolada não substitui esse aceite.
+- [ ] QA Google A/B, revogação/reconexão, Safari e dispositivo móvel físico.
+- [ ] Revisão final, autorização de publicação de teste e homologação DEV; sem merge automático.
+
+F5/fechamento perde seleção e fila; beforeunload alerta. Nenhuma retomada entre
+sessões é prometida. Deploy temporário autorizado somente para homologação; PROD preservado.
+Configuração, limites, decisões e procedimento completo: [DRIVE-UPLOAD.md](DRIVE-UPLOAD.md).
+
+
+
+### Proteção de reutilização do trial — PR #51, auditoria de 20/10/2026
+
+**PUBLICADO e VALIDADO no DEV para o exploit de exclusão/recadastro.** Auditoria encontrou gravações parciais de HMAC, associação indevida de aliases recusados, ausência de proteção contra troca da chave e corrida entre publicação da projeção e exclusão. Corrigidos com D1 batch, HMAC do UID, propagação do titular conflitante, verificador persistente e commit Firestore atômico condicionado ao perfil. Migration 0011 aditiva preserva 0010 e dados existentes. Saga anterior sem marcador pausa antes de remover dados.
+
+- [x] Testes focados API/SQLite e integração binding D1 no workerd isolado; [QA completo oficial](https://github.com/EwertonMendes/roteiva-web/actions/runs/39458594416) aprovado no commit publicado: 30 Rules, 55 Playwright (três skips previstos) e saga integrada adicional. Nenhuma conta real excluída.
+- [x] Mensagem de cadastro condiciona sete dias à elegibilidade única; estado expirado explica exclusão/recadastro.
+- [x] Retenção técnica e runbook de recuperação/rotação documentados; nenhuma declaração de conformidade jurídica.
+- [x] CI do SHA final, secret DEV, inventário D1 e merge `6c5c377f5b0cbf4ccecd0902382210ef56c7d8ad` na [PR #51](https://github.com/EwertonMendes/roteiva-web/pull/51); migrations 0010/0011 e Worker pelo [pipeline oficial API](https://github.com/EwertonMendes/roteiva-web/actions/runs/39457463449), Hosting pelo [pipeline frontend](https://github.com/EwertonMendes/roteiva-web/actions/runs/39457463444), todos aprovados.
+- [x] Google descartável autorizado no Worker/Hosting publicado: primeiro cadastro com sete dias, F5/datas idênticas, logout/login real sem renovação, saga concluída preservando marcadores, recadastro com novo UID e trial recusado. Contas comerciais existentes preservadas; detalhes e limites no runbook.
+- [ ] Homologação remota com segunda identidade Google descartável distinta e nova concessão Drive real: não executadas nesta rodada; controles e falhas cobertos em isolamento.
+- [ ] Atualização dos advisories preexistentes nas dependências frontend/CLI: sete reportados, três altos, fora da correção antifraude.
+
+Evidência e distinção entre unitário, D1 isolado, browser/emuladores e DEV em [TRIAL-REUSE-PREVENTION.md](TRIAL-REUSE-PREVENTION.md).
+
+
+### Exclusão de conta restrita às Configurações — 20/10/2026
+
+**Decisão confirmada pelo proprietário; IMPLEMENTADO nesta alteração.** Retirar a exclusão de acesso expirado, suspensão e falha de validação; manter apenas a Zona de perigo de Configurações para acesso ativo. Novos pedidos no Worker usam os direitos D1 reais; preservar jobs já aceitos e status/cron. Nenhuma mudança de dados, grants, migrations ou segredo antifraude.
+
+Evidências: api/tests/deletion-access.test.mjs (negativa para conta sem provisionamento, expirada, suspensa ou sync_pending e retry idempotente), api/tests/integration/trial-e2e.mjs e tests/browser/access.spec.ts (disponível só em Configurações ativas, ausente nos estados bloqueados/erro em desktop/mobile). Publicação DEV acompanhada pela PR correspondente, pelos workflows oficiais.

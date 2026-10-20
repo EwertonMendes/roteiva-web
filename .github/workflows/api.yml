@@ -72,6 +72,10 @@ jobs:
           test "$(git ls-remote origin refs/heads/master | cut -f1)" = "$GITHUB_SHA" || {
             echo "Outdated SHA: skip stale DEV deploy"; exit 1;
           }
+      - name: Verify anti-replay Worker secret is configured
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: node scripts/check-trial-secret.mjs
       - name: Apply versioned migrations before Worker rollout
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

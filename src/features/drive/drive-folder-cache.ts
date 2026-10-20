@@ -22,3 +22,13 @@ export function setCachedFolder(key:string,folder:Omit<CachedFolder,"fetchedAt">
 export function clearDriveFolderCache(){
   entries.clear();
 }
+
+/** Invalidate only pages/search results for the exact account and target folder. */
+export function invalidateDriveFolderCache(uid:string,account:string,folder:string){
+  for(const key of entries.keys()){
+    try{
+      const parts=JSON.parse(key) as string[];
+      if(parts[0]===uid&&parts[1]===account&&parts[2]===folder)entries.delete(key);
+    }catch{entries.delete(key);}
+  }
+}

@@ -1,17 +1,24 @@
 name: QA regression (manual or nightly)
 on:
   workflow_dispatch:
+    inputs:
+      suite:
+        description: 'Regression scope'
+        type: choice
+        required: true
+        default: full
+        options: [full, drive]
   schedule:
     - cron: '20 7 * * *'
 permissions:
   contents: read
 concurrency:
-  group: qa-regression
+  group: qa-regression-${{ github.ref }}-${{ inputs.suite || 'full' }}
   cancel-in-progress: true
 jobs:
   regression:
     name: Full security and desktop/mobile browser regression
-    if: github.ref == 'refs/heads/master'
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -29,13 +36,20 @@ jobs:
           distribution: temurin
           java-version: '21'
       - run: pnpm install --frozen-lockfile
+      - run: npm ci --ignore-scripts --prefix api
       - name: Install browser and compile isolated emulator/demo modes
         run: |
           pnpm exec playwright install --with-deps chromium
           pnpm build:emulator
           pnpm build:demo
       - name: Run Firestore isolation and Chromium desktop/mobile suite
+        if: github.event_name != 'workflow_dispatch' || inputs.suite != 'drive'
         run: pnpm test:firebase
+      - name: Run isolated Drive browser scenarios
+        if: github.event_name == 'workflow_dispatch' && inputs.suite == 'drive'
+        run: pnpm exec firebase emulators:exec --project demo-roteiva --only auth,firestore "pnpm exec playwright test tests/browser/drive-folders.spec.ts"
+      - name: Backend saga with isolated D1 and Firebase emulators
+        run: pnpm test:trial:e2e
       - name: Archive failure context
         if: failure()
         uses: actions/upload-artifact@v4

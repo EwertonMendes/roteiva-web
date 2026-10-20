@@ -9,9 +9,11 @@ export interface Env {
   OAUTH_ENABLED: string;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
+  GOOGLE_PICKER_API_KEY?: string;
   TOKEN_KEYS?: string;
   TOKEN_KEY_VERSION: string;
   ACCOUNT_DELETION_ENABLED?: string;
+  TRIAL_IDENTITY_HMAC_KEY?: string;
   ACCESS_PROVISION_ON_DRIVE?: string;
   FIREBASE_ADMIN_CREDENTIALS_JSON?: string;
 }
