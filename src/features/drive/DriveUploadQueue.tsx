@@ -36,7 +36,7 @@ export function DriveUploadQueue({uploads,onCancel,onRetry,onDismiss}:{
             {upload.status==="verifying"?null:active.has(upload.status)
               ?<button type="button" onClick={()=>onCancel(upload.id)} title={"Cancelar envio de "+upload.name} aria-label={"Cancelar envio de "+upload.name}><X size={16}/></button>
               :<div className="rl-upload-actions">
-                {(upload.status==="failed"||upload.canVerify)&&<button type="button" onClick={()=>onRetry(upload.id)} title={upload.canVerify?'Verificar conclusão':'Tentar novamente'} aria-label={(upload.canVerify?'Verificar conclusão de ':'Tentar novamente ')+upload.name}><RotateCcw size={15}/></button>}
+                {(upload.status==="failed"||upload.canVerify||upload.canResume)&&<button type="button" onClick={()=>onRetry(upload.id)} title={upload.canVerify?'Verificar conclusão':upload.canResume?'Retomar envio':'Tentar novamente'} aria-label={(upload.canVerify?'Verificar conclusão de ':upload.canResume?'Retomar envio de ':'Tentar novamente ')+upload.name}><RotateCcw size={15}/></button>}
                 <button type="button" onClick={()=>onDismiss(upload.id)} title="Dispensar" aria-label={"Dispensar "+upload.name}><X size={15}/></button>
               </div>}
           </div>

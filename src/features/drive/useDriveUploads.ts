@@ -9,6 +9,7 @@ export type UploadEntry={
   status:"queued"|"starting"|"uploading"|"verifying"|"completed"|"failed"|"unconfirmed"|"cancelled";
   error?:string;
   canVerify?:boolean;
+  canResume?:boolean;
 };
 type Task={entry:UploadEntry;file:File|undefined;controller:AbortController;session?:UploadSession;uploaded?:UploadedFile};
 
@@ -40,21 +41,22 @@ export function useDriveUploads(
     try{
       if(!task.uploaded){
         if(!task.file)throw new Error('Selecione o arquivo novamente.');
-        update(task,{status:"starting",error:undefined,sent:0});
-        const session=await callbacks.current.create(task.file,task.entry.destination,task.entry.id,task.controller.signal);
+        const resume=Boolean(task.session);
+        update(task,{status:"starting",error:undefined,...(resume?{}:{sent:0})});
+        const session=task.session||await callbacks.current.create(task.file,task.entry.destination,task.entry.id,task.controller.signal);
         task.session=session;sessionStarted=true;
         if(task.controller.signal.aborted)throw new UploadFailure("cancelled","Envio cancelado.");
         update(task,{status:"uploading"});
         task.uploaded=await sendToDrive(task.file,session,task.controller.signal,bytes=>{
           update(task,{sent:Math.min(bytes,task.entry.size)});
-        });
+        },resume);
         task.file=undefined; // Release the browser's file handle as soon as bytes finish.
       }
       if(task.controller.signal.aborted)throw new UploadFailure("cancelled","Envio cancelado.");
       update(task,{status:"verifying",sent:task.entry.size});
       const verified=await callbacks.current.confirm(task.uploaded,task.entry.size,task.entry.destination,task.session!,task.controller.signal);
       if(task.controller.signal.aborted)throw new UploadFailure("cancelled","Envio cancelado.");
-      update(task,{status:"completed"});
+      update(task,{status:"completed",canVerify:false,canResume:false,error:undefined});
       task.session=undefined;task.uploaded=undefined;
       callbacks.current.completed(verified,task.entry.destination);
     }catch(error){
@@ -62,9 +64,12 @@ export function useDriveUploads(
         task.file=undefined;task.session=undefined;
         update(task,{status:"cancelled",error:sessionStarted?'Envio interrompido. Confira a pasta: o Google pode ter recebido o arquivo.':undefined});
       }else{
-        if(sessionStarted)task.file=undefined;
+        const canResume=sessionStarted&&Boolean(task.file)&&error instanceof UploadFailure&&
+          ['network','timeout','retries_exhausted'].includes(error.code);
+        if(sessionStarted&&!canResume)task.file=undefined;
         const message=error instanceof Error?error.message:"Não foi possível enviar o arquivo.";
-        update(task,{status:sessionStarted?"unconfirmed":"failed",canVerify:Boolean(task.uploaded),error:sessionStarted
+        update(task,{status:sessionStarted?"unconfirmed":"failed",canVerify:Boolean(task.uploaded),canResume,error:canResume
+          ?'Envio interrompido. Você pode retomá-lo enquanto esta página permanecer aberta. '+message:sessionStarted
           ?"Não foi possível confirmar o estado do arquivo no Google. Verifique a pasta antes de tentar outro envio. "+message
           :message});
       }
@@ -107,9 +112,9 @@ export function useDriveUploads(
   },[update]);
   const retry=useCallback((id:string)=>{
     const task=tasks.current.find(t=>t.entry.id===id);
-    if(!task||(task.entry.status!=="failed"&&!(task.entry.status==="unconfirmed"&&task.uploaded)))return;
+    if(!task||(task.entry.status!=="failed"&&!(task.entry.status==="unconfirmed"&&(task.uploaded||task.entry.canResume))))return;
     task.controller=new AbortController();
-    update(task,{status:"queued",sent:0,error:undefined});
+    update(task,{status:"queued",sent:task.entry.canResume?task.entry.sent:0,error:undefined});
     pumpRef.current();
   },[update]);
   const dismiss=useCallback((id:string)=>{
@@ -131,7 +136,7 @@ export function useDriveUploads(
   const cancelAll=useCallback((connectionId:string)=>{
     tasks.current.filter(t=>t.entry.destination.connectionId===connectionId).forEach(t=>{
       t.controller.abort();t.file=undefined;t.session=undefined;
-      t.uploaded=undefined;t.entry.canVerify=false;
+      t.uploaded=undefined;t.entry.canVerify=false;t.entry.canResume=false;
       if(['queued','failed','unconfirmed'].includes(t.entry.status))t.entry.status='cancelled';
     });publish();
   },[publish]);

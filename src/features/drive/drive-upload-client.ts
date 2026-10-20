@@ -86,7 +86,7 @@ function rejection(reply:Reply):UploadFailure|null {
 
 /** Bounded resumable chunking: query server state after uncertain writes, never guess bytes. */
 export async function sendToDrive(file:File,session:UploadSession,signal:AbortSignal,
-  onProgress:(bytes:number)=>void):Promise<UploadedFile>{
+  onProgress:(bytes:number)=>void,resume=false):Promise<UploadedFile>{
   if(!Number.isSafeInteger(file.size)||file.size<=0)throw new UploadFailure("empty_file","Não é possível enviar arquivos vazios.");
   const url=validSession(session.sessionUrl);
   const chunkSize=session.chunkSize;
@@ -94,7 +94,7 @@ export async function sendToDrive(file:File,session:UploadSession,signal:AbortSi
     throw new UploadFailure("invalid_session","O tamanho dos blocos de envio é inválido.");
   let offset=0;
   let failures=0;
-  let uncertain=false;
+  let uncertain=resume;
   while(offset<file.size) {
     if(signal.aborted)throw abortError();
     const end=Math.min(file.size,offset+chunkSize);
@@ -109,7 +109,7 @@ export async function sendToDrive(file:File,session:UploadSession,signal:AbortSi
       }
       if(result.status===308){
         const next=nextOffset(result,file.size);
-        if(next> end || next<offset)throw new UploadFailure('invalid_range','O Google retornou um progresso inconsistente.');
+        if((!uncertain&&next>end) || next<offset)throw new UploadFailure('invalid_range','O Google retornou um progresso inconsistente.');
         if(!uncertain && next===offset)throw new UploadFailure("invalid_range","O Google não confirmou o progresso do bloco.");
         const progressed=next>offset;
         offset=next;onProgress(offset);uncertain=false;

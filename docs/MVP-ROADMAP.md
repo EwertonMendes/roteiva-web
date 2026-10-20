@@ -481,7 +481,8 @@ Evidências de deploy, commits, limites da comparação por contagens e reversã
 - [x] Google Picker oficial implementado via novo GIS token drive.file + openid,
   include_granted_scopes=false, validação servidor de cliente/subject/escopos/validade.
 - [x] Fila permanece ao navegar no workspace, duas transferências, limite de 100,
-  progresso confirmado, status probes obrigatórios após falhas e cancelamento.
+  progresso confirmado, probes após falhas, retomada explícita na mesma
+  sessão/página e cancelamento.
 - [x] Confirmação incerta pode repetir só a verificação, sem retransmitir arquivo;
   invalidação seletiva e thumbnails privadas quando disponíveis.
 - [x] Testes API/SQLite/JWT sintético, cliente e E2E com provedores simulados ampliados.

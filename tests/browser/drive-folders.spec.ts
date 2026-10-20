@@ -421,3 +421,37 @@ test('simulated Picker contract handles refusal then authorizes the exact folder
     return {incremental:config.include_granted_scopes,scope:config.scope,account:config.login_hint};
   })).toEqual({incremental:false,scope:'openid https://www.googleapis.com/auth/drive.file',account:'google-studio'});
 });
+
+test('network recovery resumes the same session after a fresh remote probe without duplicating confirmed blocks',async({page},info)=>{
+  await mockDrive(page,()=>true);let outage=true,starts=0;
+  const external='https://www.googleapis.com/upload/drive/v3/files?upload_id=resume';
+  const ranges:string[]=[];
+  const file={id:'resumed_file_1234567',name:'Retomavel.mp4',mimeType:'video/mp4',size:'400000'};
+  await page.route(api+'/integrations/drive/'+connection+'/folders/'+folderId+'/uploads**',async route=>{
+    if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers:uploadCors});
+    const complete=new URL(route.request().url()).pathname.endsWith('/complete');
+    if(!complete)starts++;
+    return route.fulfill({status:200,headers:uploadCors,contentType:'application/json',body:JSON.stringify(complete?{file}:
+      {attemptId:route.request().postDataJSON().attemptId,sessionUrl:external,chunkSize:262144})});
+  });
+  await page.route(external,async route=>{
+    const headers={'Access-Control-Allow-Origin':cloud,'Access-Control-Allow-Methods':'PUT, OPTIONS',
+      'Access-Control-Allow-Headers':'Content-Type, Content-Range','Access-Control-Expose-Headers':'Range'};
+    if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
+    const range=route.request().headers()['content-range'];ranges.push(range);
+    if(range==='bytes 0-262143/400000'||(!outage&&range==='bytes */400000'))
+      return route.fulfill({status:308,headers:{...headers,Range:'bytes=0-262143'}});
+    if(outage)return route.abort('internetdisconnected');
+    return route.fulfill({status:201,headers,contentType:'application/json',body:JSON.stringify(file)});
+  });
+  const panel=await openUploadFolder(page,'drive-resume-'+info.project.name+'@example.com');
+  await panel.getByLabel('Selecionar arquivos para enviar').setInputFiles({name:file.name,mimeType:file.mimeType,buffer:Buffer.alloc(400000)});
+  const queue=page.getByLabel('Transferências para Google Drive');
+  const resume=queue.getByRole('button',{name:'Retomar envio de Retomavel.mp4'});
+  await expect(resume).toBeVisible();outage=false;
+  await resume.click();
+  await expect(queue.getByText('Arquivo enviado para Campanha de vídeos')).toBeVisible();
+  expect(starts).toBe(1);expect(ranges.filter(range=>range==='bytes 0-262143/400000')).toHaveLength(1);
+  expect(ranges.slice(-2)).toEqual(['bytes */400000','bytes 262144-399999/400000']);
+  await expect(queue.getByRole('button',{name:/Retomar envio|Verificar conclusão/})).toHaveCount(0);
+});

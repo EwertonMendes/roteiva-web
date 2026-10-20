@@ -103,7 +103,9 @@ PUT via fetch com Content-Range, credentials omitidas e redirects bloqueados;
 Após rede/timeout/429/5xx/403 de rate limit: backoff exponencial com jitter,
 no máximo quatro recuperações consecutivas sem progresso, e probes vazios antes
 de qualquer reenvio. Probes que falham **não liberam** nova escrita. 401,
-permissão, expiração e armazenamento têm mensagens específicas. Confirmação
+permissão, expiração e armazenamento têm mensagens específicas. Após esgotar retries
+de rede, **Retomar envio** preserva File/session somente em memória e consulta o
+estado remoto antes de escrever; usa o mesmo attemptId, sem nova criação. Confirmação
 incerta oferece **Verificar conclusão**, sem reenviar bytes. Cancelamento depois
 do início informa que um arquivo pode já ter sido recebido pelo Google.
 
@@ -207,11 +209,13 @@ Bytes de vídeo continuam fora do Worker; não foi introduzido proxy alternativo
 
 - API: **114/114** testes passaram, incluindo binding D1/workerd isolado;
   TypeScript, migrations locais até 0012 e bundle dry-run aprovados.
-- Frontend: **36/36** unitários, mais scripts de Agenda e Financeiro aprovados;
+- Frontend: **37/37** unitários, mais scripts de Agenda e Financeiro aprovados;
   TypeScript e builds Firebase/emulator/demo aprovados.
 - Firestore Rules: **30/30** testes A/B nos emuladores passaram.
 - QA Drive isolado: **15 aprovados, 3 skips previstos** por plataforma;
-  inclui contrato Picker simulado e transferência com fetch sem redirects.
+  inclui contrato Picker simulado e transferência com fetch sem redirects. Cenário
+  adicional de retomada explícita e regressão da confirmação executados em
+  desktop/mobile; evidência do conjunto final vinculada na PR.
 - Revisão visual da fila desktop/mobile em tema escuro identificou transparência
   sobre o conteúdo; fundo opaco corrigido e cenário de geometria/captura reexecutado.
 - Script real sem fixture: bloqueio seguro esperado; **nenhum upload Google real**.

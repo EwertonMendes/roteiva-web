@@ -58,6 +58,14 @@ test('lost final reply queries completion without uploading another file',async(
   });
 });
 
+test('explicit same-page resume probes before writing and accepts an offset beyond the first chunk',async()=>{
+  const size=900000;
+  await scenario([{status:308,range:'bytes=0-786431'},done(size)],async calls=>{
+    await sendToDrive(new File([new Uint8Array(size)],'Demo.mp4'),session,new AbortController().signal,()=>{},true);
+    assert.deepEqual(calls.map(c=>c.range),['bytes */900000','bytes 786432-899999/900000']);
+  });
+});
+
 test('empty remote state restarts the same session; 403 rate limiting retries with a probe',async()=>{
   await scenario([{status:403,text:JSON.stringify({error:{errors:[{reason:'userRateLimitExceeded'}]}})},
     {status:308},done(3)],async calls=>{
