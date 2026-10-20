@@ -380,8 +380,11 @@ Sem retomada após F5, polling de mídia ou reload global. Capability Google emi
 não tem revogação instantânea garantida; cancelamento bloqueia próximas operações
 do cliente e desconexão bloqueia novas operações Worker.
 
-**Bloqueado para homologação:** chave Picker ausente no projeto Drive DEV, sessão
-aberta com entitlement expirado e ausência de prova real navegador/Google para
-CORS e vídeo >250 MiB. Origem JavaScript DEV existente foi conferida. As decisões
+**Homologação real pendente:** chave Picker restrita criada e configurada como
+Worker Secret; origem JavaScript DEV existente conferida. Proprietário autorizou
+publicação temporária da branch no DEV sem merge, com migration aditiva0012 e
+reversão em caso de falha; nenhuma mudança nos gates permanentes de CI/CD.
+Uma conexão com acesso ativo foi identificada sem alterar entitlement. Ainda
+falta prova real navegador/Google para CORS e vídeo >250 MiB. As decisões
 acima estão implementadas e testadas com provedores simulados; não são prova de
 concessão Google real. Configuração e matriz: [DRIVE-UPLOAD.md](DRIVE-UPLOAD.md).

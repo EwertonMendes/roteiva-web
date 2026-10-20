@@ -488,15 +488,20 @@ Evidências de deploy, commits, limites da comparação por contagens e reversã
 - [x] Testes API/SQLite/JWT sintético, cliente e E2E com provedores simulados ampliados.
   Evidência final de checks na própria PR; não equivalem a homologação Google real.
 - [x] Script opt-in de prova real reproduzível: scripts/qa-drive-real.mjs, sem tokens em logs.
-- [ ] Chave Picker restrita: Console do projeto Drive DEV não tem chave de API;
-  cadastrar GOOGLE_PICKER_API_KEY no Worker DEV. Origem OAuth DEV já conferida.
-- [ ] Conta de teste com entitlement ativo: sessão DEV inspecionada estava expirada.
+- [x] Chave Roteiva Picker DEV criada, restrita à origem DEV e somente Picker API;
+  secret GOOGLE_PICKER_API_KEY configurado no Worker DEV e inventário conferido.
+- [x] Conexão com acesso ativo identificada por consulta de estado D1, sem mudar trial/grant.
+- [x] Homologação temporária de branch no DEV autorizada pelo proprietário, sem merge:
+  migration0012 com integridade/contagens preservadas, Worker e Hosting publicados;
+  release anterior preservada para reversão. Prévia oficial Firebase também passou.
 - [ ] PoC real CORS/preflight/PUT/308/Range/200–201, vídeo >250 MiB e recuperação.
+  Worker remoto já respondeu 204/401/403 conforme contrato; Google continua sem prova.
+  Login normal no browser retornou cancelado; aguardando entrada pelo proprietário.
 - [ ] QA Google A/B, revogação/reconexão, Safari e dispositivo móvel físico.
 - [ ] Revisão final, autorização de publicação de teste e homologação DEV; sem merge automático.
 
 F5/fechamento perde seleção e fila; beforeunload alerta. Nenhuma retomada entre
-sessões é prometida. Nenhum deploy foi realizado nesta revisão; PROD preservado.
+sessões é prometida. Deploy temporário autorizado somente para homologação; PROD preservado.
 Configuração, limites, decisões e procedimento completo: [DRIVE-UPLOAD.md](DRIVE-UPLOAD.md).
 
 

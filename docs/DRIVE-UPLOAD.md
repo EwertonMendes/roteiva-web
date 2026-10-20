@@ -3,8 +3,9 @@
 ## Estado em 20/10/2026
 
 **IMPLEMENTADO e em revisão; integração Google real BLOQUEADA para homologação.**
-Não fazer merge nem anunciar upload validado com base em mocks. Nenhum deploy
-foi realizado nesta revisão. PROD permanece fora do escopo.
+Não fazer merge nem anunciar upload validado com base em mocks. Publicação
+temporária de homologação em DEV autorizada pelo proprietário em 20/10/2026,
+sem merge, com reversão para master em caso de falha. PROD permanece fora do escopo.
 
 Auditoria: branch existente `feat/drive-resumable-upload`, HEAD original
 `556e467`; CI anterior verde. Incorporada a master `8f64876` para preservar as
@@ -122,38 +123,61 @@ Drive. D1 sozinho não restaura o File escolhido nem promete retomada após F5.
 
 ## Configuração externa e bloqueios observados
 
-Inspeção read-only do Console em 20/10/2026 confirmou:
+Inspeção do Console e configuração autorizada em 20/10/2026 confirmaram:
 
 - Projeto `roteiva-drive-dev`, número `479738001561` e cliente Web existente
   `479738001561-4gu97o42v4m8kiq1bga8ck3msmjp0me3.apps.googleusercontent.com`.
 - Origem JavaScript `https://roteiva-web-dev.web.app` já autorizada; callback
   `https://roteiva-api-dev.ewertonmendes9.workers.dev/oauth/drive/callback` preservado.
-- **Nenhuma chave de API** na página Credenciais desse projeto.
-- Sessão Roteiva aberta estava em **Acesso expirado**. Não se alterou entitlement,
-  não se extraiu token pessoal nem se usaram dados reais como fixtures.
+- Chave **Roteiva Picker DEV** criada com restrição de aplicativo Sites,
+  `https://roteiva-web-dev.web.app/*` e somente **Google Picker API**.
+  Restrição salva conferida no Console; valor não versionado.
+- Worker `roteiva-api-dev` contém o secret **GOOGLE_PICKER_API_KEY**, confirmado
+  por `wrangler secret list --env dev`. Temporário local fora do OneDrive apagado.
+- Consulta D1 somente de estado confirmou uma conexão com acesso ativo. A sessão
+  inicialmente aberta estava expirada; não se alterou entitlement para liberar QA.
 
 Ações externas necessárias, sem inventar valores:
 
-1. No [Console de credenciais](https://console.cloud.google.com/apis/credentials?project=roteiva-drive-dev),
-   criar chave para Google Picker com restrição de aplicativo **Sites**, referrer
+1. **CONCLUÍDO:** no [Console de credenciais](https://console.cloud.google.com/apis/credentials?project=roteiva-drive-dev),
+   chave Google Picker com restrição de aplicativo **Sites**, referrer
    `https://roteiva-web-dev.web.app/*`, e restrição de API **Google Picker API**.
    Conferir Google Picker API e Google Drive API habilitadas no mesmo projeto.
    Não reutilizar a chave Firebase de outro projeto, nem criar chave irrestrita.
-2. Guardar a chave restrita como Worker Secret `GOOGLE_PICKER_API_KEY` no Worker
+2. **CONCLUÍDO:** chave restrita como Worker Secret `GOOGLE_PICKER_API_KEY` no Worker
    **roteiva-api-dev**; pelo terminal confiável: `npx wrangler secret put GOOGLE_PICKER_API_KEY --env dev`
    dentro de `api/`. Não colar a chave no chat/repo. O Picker precisa recebê-la
    temporariamente como developerKey; restrição de domínio/API é a proteção.
 3. Manter OAuth consent screen em Testing, com as duas contas de teste autorizadas
    e escopos necessários já descritos. Não ampliar para `drive` irrestrito.
-4. Aplicar 0012 antes do Worker pelo pipeline oficial e publicar apenas em DEV
-   de teste quando a revisão autorizar. Hosting/Worker devem usar o mesmo contrato.
-   Esta PR não fez deploy, merge ou alteração em PROD.
+4. **HOMOLOGAÇÃO TEMPORÁRIA AUTORIZADA:** proprietário aprovou explicitamente a
+   exceção pontual ao gate master-only, sem alterar os workflows ou fazer merge.
+   Migration **0012 aplicada no D1 DEV**; contagens existentes preservadas,
+   `quick_check=ok` e nenhuma violação FK. Worker do código `42934b6` publicado
+   como versão `eafb4b25-8dd6-4d64-a5e0-7db05fbc60fe`, seguido do Hosting DEV;
+   smoke público e cache aprovados. Código master `8f64876` preservado para
+   reversão; release anterior do Hosting copiada para canal `pr52-before-qa`.
+   Credencial Wrangler renovada com único escopo adicional `workers_scripts:write`,
+   especificamente autorizado, após recusa do endpoint de deployments.
+   [Prévia oficial independente](https://github.com/EwertonMendes/roteiva-web/actions/runs/39471092108)
+   também passou, mas sua origem não está autorizada para integração Worker/Picker;
+   não ampliar CORS/OAuth para usá-la. Não houve merge nem alteração em PROD.
+   Smoke HTTP remoto da rota de upload: OPTIONS DEV=204 com origem exata,
+   POST sem JWT válido=401 e origem externa=403. Isso prova CORS do Worker,
+   **não** CORS do Google nem transferência real.
 5. Disponibilizar UID de teste com acesso ativo, conexão própria e pasta descartável
-   vinculada. A conta atualmente aberta não pode passar pelo gate de upload.
+   vinculada. Uma conexão com acesso ativo já foi identificada no DEV.
    Login/reativação devem seguir o fluxo normal autorizado do produto.
 6. Comprovar: autorizar pasta existente no Picker, conferir conexão A/B, executar
    vídeo >250 MiB com recuperação real e checar arquivo na pasta correta. Testar
    revogação/reconexão e Safari/dispositivo físico. Só então retirar draft.
+
+O login normal no frontend DEV retornou **Login cancelado** após a seleção
+automatizada da conta. Solicitada entrada normal pelo proprietário para continuar
+sem extrair tokens pessoais nem usar credencial administrativa para impersonação.
+Ainda não há arquivo enviado ao Google nem prova de autorização Picker real.
+Vídeo sintético de QA preparado fora do OneDrive: AVI válido, 1.200 frames/40s,
+276.509.032 bytes (>250 MiB), sem conteúdo pessoal; não versionado.
 
 ## QA automatizado e prova real
 
