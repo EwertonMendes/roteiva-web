@@ -75,10 +75,12 @@ test('verified provider identity requires signed Google email, recent login for 
     {...base,firebase:{sign_in_provider:'password',identities:{'google.com':['verified-sub']}}},
     {...base,firebase:{sign_in_provider:'google.com',identities:{}}},
     {...base,email:undefined}]){
-    await assert.rejects(()=>verifiedTrialPrincipal(await request(claims),env,undefined,keys),
+    const req=await request(claims);
+    await assert.rejects(()=>verifiedTrialPrincipal(req,env,undefined,keys),
       e=>e.status===401);
   }
-  await assert.rejects(()=>verifiedTrialPrincipal(await request(base,now-301),env,300,keys),e=>e.status===401);
+  const oldRequest=await request(base,now-301);
+  await assert.rejects(()=>verifiedTrialPrincipal(oldRequest,env,300,keys),e=>e.status===401);
 });
 test('backend provisions new same-email UID as expired after old account is erased',async t=>{
   const s=setup(t);
