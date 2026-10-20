@@ -450,3 +450,12 @@ A cópia persistida é privada e potencialmente sensível em computadores compar
 - **IMPLEMENTADO NO CÓDIGO, VALIDAR NO DEV:** lista/grade persistida como preferência visual, miniaturas imagens/vídeos/PDF quando `thumbnailLink` disponível, carregamento sob demanda, limite de requisições e fallback de ícones. Evidência: `DriveThumbnail.tsx`, `DriveLibraryUI.tsx` e CSS.
 - **IMPLEMENTADO NO CÓDIGO, VALIDAR NO DEV:** proxy de miniaturas privadas: identidade Firebase, conexão do usuário, escopo, URL Google permitida, tipo de imagem, tamanho máximo e sem original `alt=media`. Evidência: `api/src/thumbnails.ts`, `api/tests/thumbnails.test.mjs`.
 - **PENDENTE QA REAL:** vídeos e PDFs de conta Google conectada, permissões não compartilhadas, iframe em navegadores mobile e cópia de URL externa. Não confundir suíte de testes unitários com confirmação manual Google OAuth.
+
+## Controle de acesso SaaS — rollout DEV (19/10/2026)
+
+- IMPLEMENTADO nesta entrega: migração D1 aditiva com trial imutável, constraints/FK/índices e testes de preservação; pipeline oficial verifica esquema, integridade e contagens anteriores/posteriores.
+- VALIDADO por leitura externa: service account ativa, papel customizado mínimo e binding do segredo existente no Worker; health e Hosting 200. Não comprova emissão de token da chave instalada.
+- DECISÃO TOMADA: cortesia de 30 dias para contas existentes no marco fixo da migração, separada do trial; repetição não renova benefícios.
+- PENDENTE: publicação remota da migration, Worker compatível, frontend, inventário/provisionamento, enforcement e regras em entregas separadas, QA real desktop/mobile/Drive e medição Firestore. Não fazer merge integral da PR #42 antes desses gates.
+
+Evidências e reversão: [ACCESS-CONTROL.md](ACCESS-CONTROL.md).

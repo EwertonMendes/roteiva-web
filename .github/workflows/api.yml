@@ -75,8 +75,14 @@ jobs:
       - name: Apply versioned migrations before Worker rollout
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: npm run migrate:dev
-      - name: Publish Worker to DEV
+        run: |
+          node scripts/check-access-migration.mjs --before
+          npm run migrate:dev
+      - name: Verify additive access schema and existing row counts
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: node scripts/check-access-migration.mjs
+      - name: Publish compatible Worker to DEV
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: npm run deploy:dev

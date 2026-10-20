@@ -1,0 +1,36 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {DatabaseSync} from 'node:sqlite';
+import {readFileSync,readdirSync} from 'node:fs';
+
+test('access migration preserves prior rows, enforces seven-day immutable trial, grants and cascades',()=>{
+ const db=new DatabaseSync(':memory:');
+ db.exec('PRAGMA foreign_keys=ON');
+ const folder=new URL('../migrations/',import.meta.url);
+ for(const file of readdirSync(folder).filter(f=>f.endsWith('.sql')&&f<'0007').sort())db.exec(readFileSync(new URL(file,folder),'utf8'));
+ db.prepare("INSERT INTO drive_connections(id,owner_uid,google_account_id,google_email,encrypted_refresh_token,status,scopes,created_at,updated_at) VALUES('existing','A','google','qa@example.invalid','opaque','connected','drive.file',1,1)").run();
+ const before=db.prepare('SELECT * FROM drive_connections').all();
+ db.exec(readFileSync(new URL('0007_access.sql',folder),'utf8'));
+ assert.deepEqual(db.prepare('SELECT * FROM drive_connections').all(),before);
+ const account=db.prepare('INSERT INTO access_accounts(owner_uid,trial_started_at,trial_ends_at,created_at,updated_at) VALUES(?,?,?,?,?)');
+ account.run('A',1000,604801000,1000,1000);
+ assert.throws(()=>account.run('A',1000,604801000,1000,1000));
+ assert.throws(()=>account.run(null,1000,604801000,1000,1000));
+ assert.throws(()=>account.run('B',1000,604801001,1000,1000));
+ assert.throws(()=>db.exec('UPDATE access_accounts SET trial_started_at=2000,trial_ends_at=604802000'));
+ const grant=db.prepare('INSERT INTO access_grants VALUES(?,?,?,?,?,?,?,?)');
+ assert.throws(()=>grant.run('invalid','A','complimentary',1000,null,null,'test',1000));
+ assert.throws(()=>grant.run('invalid','A','complimentary',1000,1000,null,'test',1000));
+ assert.throws(()=>grant.run('orphan','B','lifetime',1000,null,null,'test',1000));
+ grant.run('beta-30-days','A','complimentary',1000,2592001000,null,'DEV beta migration',1000);
+ grant.run('lifetime','A','lifetime',1000,null,null,'test',1000);
+ assert.equal(db.prepare('SELECT trial_ends_at FROM access_accounts').get().trial_ends_at,604801000);
+ db.prepare("INSERT INTO access_subscriptions VALUES('sub','A','future','unique','monthly','active',1000,1000)").run();
+ assert.throws(()=>db.prepare("INSERT INTO access_subscriptions VALUES('other','A','future','unique','monthly','active',1000,1000)").run());
+ assert.equal(db.prepare('PRAGMA foreign_key_check').all().length,0);
+ db.prepare('DELETE FROM access_accounts WHERE owner_uid=?').run('A');
+ assert.equal(db.prepare('SELECT COUNT(*) AS n FROM access_grants').get().n,0);
+ assert.equal(db.prepare('SELECT COUNT(*) AS n FROM access_subscriptions').get().n,0);
+ assert.deepEqual(db.prepare('SELECT * FROM drive_connections').all(),before);
+ db.close();
+});

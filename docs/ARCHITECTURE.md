@@ -331,3 +331,7 @@ A Biblioteca usa Drive API somente para metadados e tokens OAuth restritos ao Wo
 O cliente mantém um LRU em memória para listas (24 entradas) por UID/conexão/pasta/busca, e cache de miniaturas com URL Blob temporária. Não há armazenamento persistente de mídias nem respostas sensíveis. O Worker emite tickets cifrados (AES-GCM com contexto de uso distinto dos tokens OAuth) para reutilizar o `thumbnailLink` obtido na listagem. Validar sempre JWT Firebase, dono da conexão, revisão e escopo; tickets expiram em 90 segundos. Nunca reutilizar entre usuários nem permitir URL de destino arbitrária. A rota legada faz consulta de metadados para compatibilidade.
 
 Limites separados para preflight, listagens e thumbs evitam que 27 miniaturas impeçam a navegação. Google Drive continua sendo fonte de verdade; o cache reduz latência percebida e revalida dados envelhecidos. Não há sincronização incremental, tabelas D1 adicionais nem uso de Firebase Storage.
+
+## Controle de acesso SaaS — infraestrutura DEV (19/10/2026)
+
+Decisão tomada: rollout em entregas compatíveis; a primeira publica somente a migração aditiva D1, sem alterar autorização ou regras. Trial imutável de sete dias; cortesia de beta de 30 dias em ledger separado para contas existentes, conforme decisão do proprietário. Credencial administrativa existente tem IAM suficiente; nenhuma ampliação autorizada ou necessária. Ver [controle de acesso](ACCESS-CONTROL.md) para sequência, risco de projeção distribuída e reversão. ADM será outra aplicação. Estado: PARCIAL, pendente publicação e homologação.
