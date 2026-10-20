@@ -15,7 +15,7 @@ function setup(t,{existing=true,failPatch=false,conflict=false,missing=false}={}
  const projection=new Map();let writes=0,requests=0;
  t.mock.method(globalThis,'fetch',async(url,options={})=>{
    requests++;
-   assert.notEqual(options.redirect,'follow');
+   assert.equal(options.redirect,'manual','Workers only supports manual/follow; administrative redirects must never be followed');
    if(url==='https://oauth2.googleapis.com/token')return Response.json({access_token:'synthetic-admin'});
    if(String(url).includes('/documents/users?'))return Response.json({documents:[{name:'projects/roteiva-web-dev/databases/(default)/documents/users/A',fields:{ownerUid:{stringValue:'A'}}}]});
    const path=new URL(url).pathname;
