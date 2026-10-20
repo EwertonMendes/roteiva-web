@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import DashboardClient from "./dashboard-client";
 import { SiteExperience } from "./site-experience";
 import { ReviewUnavailable } from "./review-unavailable";
+import { ReviewPortal } from "./features/reviews/ReviewPortal";
 import { isDemo } from "./lib/firebase";
 import { AuthProvider } from "./features/auth/AuthProvider";
 import { ProtectedRoute } from "./features/auth/ProtectedRoute";
@@ -29,9 +30,10 @@ class AppErrorBoundary extends Component<{children:ReactNode},{error:string}> {
   }
 }
 const review=window.location.pathname.replace(/\/+$/, "").endsWith("/review");
+const publicToken=/^\/review\/([A-Za-z0-9_-]{43})\/?$/.exec(window.location.pathname)?.[1];
 createRoot(document.getElementById("root")!).render(<React.StrictMode>
   <SiteExperience />
   <AppErrorBoundary>{isDemo ? review ? <ReviewUnavailable /> : <DashboardClient firstName="Visitante" email="demo@roteiva.local" /> :
-    <AuthProvider><ProtectedRoute><RegistrationGate><AccessGate>{review ? <ReviewUnavailable /> : <DriveTransfersProvider><FirebaseWorkspace /></DriveTransfersProvider>}</AccessGate></RegistrationGate></ProtectedRoute></AuthProvider>}
+    <AuthProvider>{publicToken ? <ReviewPortal token={publicToken}/> : <ProtectedRoute><RegistrationGate><AccessGate>{review ? <ReviewUnavailable /> : <DriveTransfersProvider><FirebaseWorkspace /></DriveTransfersProvider>}</AccessGate></RegistrationGate></ProtectedRoute>}</AuthProvider>}
   </AppErrorBoundary>
 </React.StrictMode>);
