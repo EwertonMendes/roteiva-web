@@ -355,3 +355,40 @@ Decisão tomada — fence distribuída: access_accounts.sync_pending, adicionada
 ## Exclusão somente em Configurações com acesso ativo — decisão de 20/10/2026
 
 Por solicitação do proprietário, remover a ação de todos os estados fora do workspace (expirado, suspenso, sem cadastro ou erro de validação). O único ponto de entrada da UI é a Zona de perigo de Configurações, sob AccessGate ativo. POST /account/deletion consulta os direitos reais no D1 antes de aceitar um novo job; ausência, expiração, suspensão ou sync_pending impedem a solicitação, sem executar mutações remotas. Status autenticado, cron e retries de jobs anteriormente aceitos continuam disponíveis para não interromper uma exclusão em andamento. Não altera marcadores antifraude, prazos ou concessões.
+
+## Upload e Google Picker — PR #52 (20/10/2026)
+
+**Decisão tomada, homologação real pendente:** manter OAuth confidencial amplo
+somente no Worker e usar novo GIS TokenClient no browser quando uma pasta existente
+precisar de autorização. `include_granted_scopes:false` solicita apenas drive.file
+mais openid para comprovar subject; não reduz token existente. Tokeninfo/OIDC
+comprovam cliente e conta da conexão antes de abrir Picker; ID escolhido é
+conferido e a permissão real é revalidada no backend. Sem escrita Drive irrestrita.
+
+**Decisão tomada:** attempts D1 mínimos com file ID pré-gerado pelo Google; a
+confirmação fica vinculada a UID/conexão/revisão/projeto/destino/metadados. Capability
+cifrada para recuperar resposta de início, TTL 24h e limpeza limitada no cron
+existente. Arquivos continuam exclusivamente navegador→Drive; nenhum byte em D1
+ou Firestore. A leitura REST do projeto impede usar link órfão; ascendência e
+canAddChildren são verificados na pasta de destino, não no breadcrumb.
+
+**Decisão tomada:** DriveTransfersProvider vive no workspace autorizado, preserva
+fila ao trocar telas e é desmontado no logout/bloqueio. Progresso por bytes
+confirmados, probes após incerteza e retry separado de confirmação. Só cache da
+pasta alvo é invalidado; o resultado pode incluir thumbnailTicket privado.
+Sem retomada após F5, polling de mídia ou reload global. Capability Google emitida
+não tem revogação instantânea garantida; cancelamento bloqueia próximas operações
+do cliente e desconexão bloqueia novas operações Worker.
+
+**Homologação real parcial:** chave Picker restrita criada e configurada como
+Worker Secret; origem JavaScript DEV existente conferida. Proprietário autorizou
+publicação temporária da branch no DEV sem merge, com migration aditiva0012 e
+reversão em caso de falha; nenhuma mudança nos gates permanentes de CI/CD.
+Uma conexão com acesso ativo foi identificada sem alterar entitlement. Picker
+real autorizou a pasta exata; UI Chrome concluiu upload direto de 276.509.032 bytes,
+com parent/tamanho Google e tentativa completed/capability apagada no D1 conferidos.
+Chave mantém somente Picker API e referrers DEV + docs.google.com (iframe oficial),
+inclusão expressamente autorizada. Recuperação com rede real ficou manual/pendente
+por preferência do proprietário; A/B remoto, revogação, Safari e dispositivo físico
+também pendentes. Não extrapolar o sucesso Chrome para esses aceites.
+Configuração e matriz: [DRIVE-UPLOAD.md](DRIVE-UPLOAD.md).

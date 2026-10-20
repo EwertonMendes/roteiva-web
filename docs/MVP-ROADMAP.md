@@ -465,7 +465,49 @@ A cópia persistida é privada e potencialmente sensível em computadores compar
 
 Evidências de deploy, commits, limites da comparação por contagens e reversão segura: [ACCESS-CONTROL.md](ACCESS-CONTROL.md). A PR #42 foi encerrada como substituída pelas entregas #43–#48; sua branch foi preservada.
 
+
+
 - **VALIDADO NO PIPELINE OFICIAL DA MASTER:** [QA 39358964120](https://github.com/EwertonMendes/roteiva-web/actions/runs/39358964120), commit b0ae124: 30 Rules + 55 Playwright aprovados, três skips previstos. Pedido real de exclusão descartável aceito após login manual recente; conclusão da saga e proteção no recadastro posteriormente verificadas na PR #51.
+
+## Upload resumable para pastas vinculadas — PR #52 (20/10/2026)
+
+**Status: PARCIAL — Picker e upload >250 MiB reais validados no Chrome DEV; aceite completo pendente; PR draft.**
+
+- [x] Auditoria da implementação existente e dos checks; master com PRs #51/#53/#54 incorporada.
+- [x] JWT/Origin/entitlement/UID, vínculo e existência do projeto, ascendência real,
+  capacidade da pasta destino e autorização por app verificadas no backend.
+- [x] Migration 0012: tentativa por UID, file ID pré-gerado Google, capacidade cifrada,
+  confirmação vinculada e idempotente, TTL/limpeza e fence de reconexão.
+- [x] Google Picker oficial implementado via novo GIS token drive.file + openid,
+  include_granted_scopes=false, validação servidor de cliente/subject/escopos/validade.
+- [x] Fila permanece ao navegar no workspace, duas transferências, limite de 100,
+  progresso confirmado, probes após falhas, retomada explícita na mesma
+  sessão/página e cancelamento.
+- [x] Confirmação incerta pode repetir só a verificação, sem retransmitir arquivo;
+  invalidação seletiva e thumbnails privadas quando disponíveis.
+- [x] Testes API/SQLite/JWT sintético, cliente e E2E com provedores simulados ampliados.
+  Evidência final de checks na própria PR; não equivalem a homologação Google real.
+- [x] Script opt-in de prova real reproduzível: scripts/qa-drive-real.mjs, sem tokens em logs.
+- [x] Chave Roteiva Picker DEV criada, restrita à origem DEV, iframe oficial docs.google.com e somente Picker API;
+  secret GOOGLE_PICKER_API_KEY configurado no Worker DEV e inventário conferido.
+- [x] Conexão com acesso ativo identificada por consulta de estado D1, sem mudar trial/grant.
+- [x] Homologação temporária de branch no DEV autorizada pelo proprietário, sem merge:
+  migration0012 com integridade/contagens preservadas, Worker e Hosting publicados;
+  release anterior preservada para reversão. Prévia oficial Firebase também passou.
+- [x] Login normal concluído pelo proprietário; pasta QA vazia vinculada pelo produto;
+  GIS/Picker reais e autorização exata conferida pelo Worker.
+- [x] Upload real UI Chrome de 276.509.032 bytes direto ao Google, arquivo no parent
+  correto por leitura independente; uma tentativa D1 completed e capability apagada.
+  Worker remoto respondeu 204/401/403 conforme contrato. Sem trace HTTP individual.
+- [ ] Recuperação com interrupção real: proprietário preferiu deixar manual/pendente.
+  Cobertura de falhas/retomada isolada não substitui esse aceite.
+- [ ] QA Google A/B, revogação/reconexão, Safari e dispositivo móvel físico.
+- [ ] Revisão final, autorização de publicação de teste e homologação DEV; sem merge automático.
+
+F5/fechamento perde seleção e fila; beforeunload alerta. Nenhuma retomada entre
+sessões é prometida. Deploy temporário autorizado somente para homologação; PROD preservado.
+Configuração, limites, decisões e procedimento completo: [DRIVE-UPLOAD.md](DRIVE-UPLOAD.md).
+
 
 
 ### Proteção de reutilização do trial — PR #51, auditoria de 20/10/2026

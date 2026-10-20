@@ -275,7 +275,7 @@ Console Cloudflare confirmou Free: 100.000 requests/dia, D1 10 bancos/5 GB de co
 
 Google Testing com drive.file normalmente emite refresh tokens que expiram em sete dias; não prometer validade permanente. In production elimina essa limitação específica, mas tokens continuam sujeitos a revogação, inatividade, limites e políticas de conta. Não publicar para contornar testes: revisar domínio, marca, homepage, privacidade/termos públicos, escopos mínimos, suporte, exclusão/retenção e verificação aplicável. drive.file é não confidencial na classificação Google; escopos restritos ampliam obrigações e podem exigir avaliação de segurança. Ver [expiração OAuth](https://developers.google.com/identity/protocols/oauth2#expiration) e [escopos Drive](https://developers.google.com/workspace/drive/api/guides/api-specific-auth).
 
-Picker requer futuramente chave de API **pública restrita a HTTP referrer DEV e somente Picker API**, appId do projeto e token curto adequado. A API está habilitada, mas a UI Picker e essa chave não foram criadas nesta fundação. Seleção de pasta não concede acesso recursivo aos arquivos existentes. Originais permanecem no Drive; biblioteca/associação de múltiplas pastas serão outra etapa.
+Na fundação, Picker e sua chave ainda estavam pendentes. A PR #52 implementa UI Picker e usa chave **restrita a HTTP referrer DEV e somente Picker API**, appId do projeto e token curto adequado. Em 20/10/2026 a chave foi criada e configurada no Worker DEV, com autorização explícita; a homologação Google real continua rastreada em [DRIVE-UPLOAD.md](DRIVE-UPLOAD.md). Seleção de pasta não concede acesso recursivo aos arquivos existentes. Originais permanecem no Drive.
 
 **QA obrigatório antes de habilitar a integração:** login real A/B, consentimento/revogação/renovação reais, arquivo autorizado pelo Picker, concorrência e cookies entre sites. Mocks de Google e JWTs sintéticos não contam como essas evidências. API REST não valida revogação Firebase imediatamente; documentar janela de expiração antes de piloto. Sem chave em VITE_*, sem refresh token devolvido ao cliente.
 
@@ -385,3 +385,29 @@ Usar `npm ci --ignore-scripts` em api, `npm run typecheck`, `npm test`, `npm run
 Pré-requisitos remotos: Worker Secret `TRIAL_IDENTITY_HMAC_KEY`, autorização Cloudflare D1 para inventário e migrations oficiais 0010/0011. Nenhuma chave deve ser lida nos logs. O verifier da chave no D1 bloqueia troca acidental. Código de provisionamento usa commit Firestore de perfil/projeção com precondições; falha concorrente deve ser repetida, sem modificar trial. Runbook em [TRIAL-REUSE-PREVENTION.md](TRIAL-REUSE-PREVENTION.md).
 
 O teste integrado `pnpm test:trial:e2e` exige dependências da API (`npm ci --ignore-scripts --prefix api`), Java 21 e emuladores locais. Executa as funções de backend com D1/workerd, Firestore/Auth emulados, assinante Google sintético e troca de token administrativo simulada. Cobre exclusão completa, falha temporária/retomada, UID novo recusado, controle independente e commit atrasado bloqueado. Incluído no QA oficial noturno/manual; não chama DEV.
+
+## Configuração e QA do upload Drive — PR #52
+
+Migration aditiva `api/migrations/0012_drive_uploads.sql` deve anteceder o Worker
+novo pelo pipeline API DEV. Não remove tabelas nem modifica arquivos no Drive.
+O cron existente limpa tentativas expiradas; rollback de código preserva a
+migration. Sem nova conta, banco, Storage ou infraestrutura PROD.
+
+`GOOGLE_PICKER_API_KEY` é configuração opcional até disponibilizar autorização de
+pastas. Deve ser Worker Secret restrito por referrer DEV e Google Picker API; não
+é o OAuth client secret nem a chave Firebase. Sem chave, o backend falha com
+picker_not_configured quando uma pasta precisa de Picker, preservando os vínculos.
+A origem JS do OAuth client existente já inclui https://roteiva-web-dev.web.app.
+Procedimento exato e evidência do Console em [DRIVE-UPLOAD.md](DRIVE-UPLOAD.md).
+
+QA Google real opt-in: `node scripts/qa-drive-real.mjs`, com fixture descartável e
+variáveis do runbook. Não habilitar tokens pessoais no CI público; nenhuma sessão
+resumable pode ir para traces/artefatos/logs. O script não apaga o vídeo enviado.
+QA isolado simulado: build:emulator + build:demo e workflow QA regression com
+suite=drive. Manter distinguido de CORS/308/Range e mídia real.
+
+Nesta revisão local foram reutilizadas dependências instaladas em checkout
+isolado. O PNPM tentou registrar/reinstalar dependências em área restrita; os
+mesmos binários Node/TypeScript/Vite/Playwright/Firebase foram executados diretamente
+ou via npm. Emuladores usam Java 21 e demo-roteiva; D1 usa SQLite/workerd local.
+Não houve instalação de serviços nem publicação DEV/PROD.

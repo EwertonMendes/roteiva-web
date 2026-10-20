@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {DriveThumbnail} from "./DriveThumbnail";
-import { ArrowLeft, Check, ChevronLeft, ChevronRight, Grid2X2, List, ExternalLink, File, FileAudio, FileImage, FileText, FileVideo, Folder, FolderOpen, Link2, LoaderCircle, Search, X, MoreHorizontal } from "lucide-react";
+import { ArrowLeft, Check, ChevronLeft, ChevronRight, Grid2X2, List, ExternalLink, File, FileAudio, FileImage, FileText, FileVideo, Folder, FolderOpen, Link2, LoaderCircle, Search, X, MoreHorizontal, Upload } from "lucide-react";
 
 export type DriveItem = {id:string;name:string;mimeType:string;size?:string;modifiedTime?:string;thumbnailLink?:string;thumbnailTicket?:string;webViewLink?:string};
 export type DriveTrail = {id:string;name:string};
@@ -175,6 +175,8 @@ type ExplorerProps={
   onNavigate:(id:string,path:DriveTrail[])=>void;
   onOpen:(file:DriveItem)=>void;
   onMore:()=>void;
+  onUploadFiles?:(files:File[])=>void;
+  uploadDisabled?:boolean;
 };
 type ViewMode="list"|"grid";
 const VIEW_KEY="roteiva-drive-view-v1";
@@ -182,8 +184,10 @@ function savedView():ViewMode{
   try{return window.localStorage.getItem(VIEW_KEY)==="grid"?"grid":"list";}catch{return "list";}
 }
 const noThumbnail=async (_:DriveItem):Promise<Blob|null>=>null;
-export function DriveFileExplorer({folderName,path,files,loading,hasMore,thumbnailScope="",getThumbnail=noThumbnail,searchResults,searchTerm,searchLoading=false,onSearchChange,onBack,onNavigate,onOpen,onMore}:ExplorerProps){
+export function DriveFileExplorer({folderName,path,files,loading,hasMore,thumbnailScope="",getThumbnail=noThumbnail,searchResults,searchTerm,searchLoading=false,onSearchChange,onBack,onNavigate,onOpen,onMore,onUploadFiles,uploadDisabled=false}:ExplorerProps){
   const [filter,setFilter]=useState("");
+  const [dragging,setDragging]=useState(false);
+  const uploadInput=useRef<HTMLInputElement>(null);
   const [view,setView]=useState<ViewMode>(savedView);
   useEffect(()=>setFilter(""),[path.map(item=>item.id).join("/")]);
   function changeView(next:ViewMode){
@@ -209,7 +213,13 @@ export function DriveFileExplorer({folderName,path,files,loading,hasMore,thumbna
       </details>
     </div>;
   };
-  return <section className="rl-content" aria-label="Arquivos da pasta">
+  const acceptsFiles=(event:React.DragEvent)=>Boolean(folderName&&onUploadFiles&&!uploadDisabled&&
+    Array.from(event.dataTransfer.types).includes("Files"));
+  return <section className="rl-content" aria-label="Arquivos da pasta" data-upload-dragging={dragging}
+    onDragOver={event=>{if(!acceptsFiles(event))return;event.preventDefault();event.dataTransfer.dropEffect="copy";setDragging(true);}}
+    onDragLeave={event=>{if(!event.currentTarget.contains(event.relatedTarget as Node))setDragging(false);}}
+    onDrop={event=>{setDragging(false);if(!acceptsFiles(event))return;event.preventDefault();onUploadFiles?.(Array.from(event.dataTransfer.files));}}> 
+    {dragging&&<div className="rl-drop-layer" aria-hidden="true"><Upload size={32}/><strong>Solte para enviar ao Google Drive</strong></div>}
     {folderName?<><header className="rl-content-head">
       <button type="button" className="rl-back" onClick={onBack} aria-label="Voltar para as pastas"><ArrowLeft size={18}/></button>
       <nav className="rl-breadcrumbs" aria-label="Caminho da pasta">{path.map((part,index)=><span key={part.id}>
@@ -219,7 +229,14 @@ export function DriveFileExplorer({folderName,path,files,loading,hasMore,thumbna
       <span className="rl-file-count">{files.length} {files.length===1?"item carregado":"itens carregados"}</span>
     </header>
     <div className="rl-content-tools">
-      <label className="rl-search"><Search size={16}/><input aria-label="Filtrar arquivos carregados" placeholder="Filtrar itens desta pasta" value={filter} onChange={e=>setFilter(e.target.value)}/>{filter&&<button type="button" onClick={()=>setFilter("")} aria-label="Limpar filtro"><X size={15}/></button>}</label>
+      <label className="rl-search"><Search size={16}/><input aria-label="Filtrar arquivos carregados" placeholder="Filtrar itens desta pasta" value={filter} onChange={e=>{setFilter(e.target.value);onSearchChange?.(e.target.value);}}/>{filter&&<button type="button" onClick={()=>setFilter("")} aria-label="Limpar filtro"><X size={15}/></button>}</label>
+      {onUploadFiles&&<>
+        <input className="rl-upload-input" ref={uploadInput} type="file" multiple aria-label="Selecionar arquivos para enviar" tabIndex={-1}
+          onChange={event=>{const chosen=Array.from(event.target.files||[]);event.target.value="";if(chosen.length)onUploadFiles(chosen);}}/>
+        <button className="rl-upload-button" aria-label="Enviar arquivos" type="button" disabled={uploadDisabled||loading} onClick={()=>uploadInput.current?.click()}>
+          <Upload size={16}/> <span>Enviar arquivos</span>
+        </button>
+      </>}
       <div className="rl-view-switch" role="group" aria-label="Modo de visualização">
         <button type="button" title="Visualização em lista" aria-label="Visualização em lista" aria-pressed={view==="list"} onClick={()=>changeView("list")}><List size={17}/></button>
         <button type="button" title="Visualização em grade" aria-label="Visualização em grade" aria-pressed={view==="grid"} onClick={()=>changeView("grid")}><Grid2X2 size={17}/></button>
