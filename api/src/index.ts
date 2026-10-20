@@ -4,6 +4,7 @@ import { callback, start, launch, enabled } from './oauth.ts';
 import { metadata, disconnect, about } from './drive.ts';
 import { listFolders, listFolderItems } from './folders.ts';
 import { thumbnail } from './thumbnails.ts';
+import { startUpload, completeUpload } from './uploads.ts';
 import { deletionStatus, requestDeletion, runPendingDeletions } from './account-deletion.ts';
 import { ensureAccess, assertActiveAccess } from './access.ts';
 import { backfillAccess } from './access-backfill.ts';
@@ -75,6 +76,16 @@ export async function handle(request: Request, env: Env): Promise<Response> {
       response=parts.length===5
         ? await listFolders(env,uid,parts[3],url.searchParams.get('parentId')||'root',url.searchParams.get('pageToken'))
         : await listFolderItems(env,uid,parts[3],parts[5],url.searchParams.get('pageToken'),fetch,url.searchParams.get('search'));
+    } else if (/^\/integrations\/drive\/[^/]+\/folders\/[^/]+\/uploads(?:\/complete)?$/.test(url.pathname) && request.method==='POST') {
+      enabled(env);
+      if(origin!==env.FRONTEND_ORIGIN)throw new ApiError(403,'origin_required');
+      const uid=await identity(request,env);
+      await assertActiveAccess(env,uid);
+      if(!(await env.API_RATE_LIMIT.limit({key:'dev:upload:'+uid})).success)throw new ApiError(429,'rate_limited');
+      const parts=url.pathname.split('/');
+      response=parts[7]==='complete'
+        ? await completeUpload(env,uid,parts[3],parts[5],request)
+        : await startUpload(env,uid,parts[3],parts[5],request);
     } else if (/^\/integrations\/drive\/[^/]+\/files\/[^/]+\/thumbnail$/.test(url.pathname) && request.method==='GET') {
       enabled(env);
       const uid=await identity(request,env);
