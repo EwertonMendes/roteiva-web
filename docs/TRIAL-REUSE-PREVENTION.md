@@ -2,7 +2,7 @@
 
 ## Contrato e implementação
 
-**IMPLEMENTADO na PR #51; publicação e homologação DEV ainda pendentes.** Sete dias por identidade elegível, sem renovação automática. A cortesia beta usa o marco fixo de 30 dias já existente; esta alteração não desloca seu prazo. Nenhum endpoint administrativo ou checkout é acrescentado.
+**PUBLICADO e VALIDADO no DEV para exclusão/recadastro da mesma identidade Google (20/10/2026).** Sete dias por identidade elegível, sem renovação automática. A cortesia beta usa o marco fixo de 30 dias já existente; esta alteração não desloca seu prazo. Nenhum endpoint administrativo ou checkout é acrescentado.
 
 O Worker verifica assinatura RS256, issuer, audience, expiração, emissão e autenticação do ID token Firebase. Exige Google como provedor, um único subject Google e e-mail verificado. Nome/e-mail do perfil e corpo da requisição não autorizam benefícios. Tokens forjados e claims inconsistentes falham fechados. Gmail pessoal normaliza caixa, pontos, +tags e googlemail.com; domínios corporativos/terceiros preservam pontos e +tags.
 
@@ -54,8 +54,22 @@ Testes API usam SQLite real, RSA/JWT e WebCrypto; dependências Google/Firestore
 
 - API: 98/98 testes aprovados, incluindo integração D1/workerd; TypeScript, migrations locais e bundle dry-run aprovados.
 - Frontend: TypeScript, agenda/financeiro e 27/27 testes Node aprovados; builds Firebase/demo/emulator aprovados.
-- Emuladores/Playwright: 30/30 testes Rules e 55 browser aprovados, três skips preexistentes. A suíte será repetida no HEAD final.
+- Emuladores/Playwright: 30/30 testes Rules e 55 browser aprovados, três skips preexistentes. A suíte foi repetida na versão final: mesmos resultados, sem falhas.
 - Saga integrada: backend real com D1/workerd e Firebase Auth/Firestore emulados passou; criação de conta, datas imutáveis, falha/retomada da exclusão, Auth/perfil/projeção ausentes, UID novo recusado, controle independente ativo e commit concorrente bloqueado. Assinante Google e troca de token sintéticos, sem alegação de OAuth real.
 - Cloudflare DEV: secret instalado em 20/10, nome/tipo conferidos e conteúdo publicado comparado antes/depois, idêntico. Nenhum valor persistido em arquivo, log ou GitHub.
-- D1 remoto antes do rollout: migrations 0001–0009, nenhuma exclusão pendente, nenhum objeto trial_identity, zero violações de FK. Bookmark Time Travel registrado na evidência operacional local antes das alterações. 0010 e 0011 ainda não aplicadas remotamente.
-- CI final, deploy oficial e teste Google/Worker DEV continuam pendentes até confirmação por evidência.
+- D1 remoto antes do rollout: migrations 0001–0009, nenhuma exclusão pendente, nenhum objeto trial_identity, zero violações de FK. Bookmark Time Travel registrado na evidência operacional local antes das alterações. 0010 e 0011 ainda não estavam aplicadas nesse inventário anterior ao rollout.
+- Esse inventário precede o merge; resultados da publicação e homologação são registrados abaixo.
+
+
+### Publicação oficial e smoke DEV (20/10/2026)
+
+[PR #51](https://github.com/EwertonMendes/roteiva-web/pull/51) integrada em `6c5c377f5b0cbf4ccecd0902382210ef56c7d8ad`, com árvore idêntica ao HEAD validado `18a2f2da7a48a31cdebdc592eddd572eb74154e0`. Pipelines [API/D1/Worker](https://github.com/EwertonMendes/roteiva-web/actions/runs/39457463449) e [Frontend/Hosting](https://github.com/EwertonMendes/roteiva-web/actions/runs/39457463444) aprovados. Worker version `6f4b25f0-722c-4946-9f8c-5c38ac268ba5`; 0010/0011 aplicadas, `quick_check=ok`, zero violações FK e contagens comerciais preservadas. Segredo verificado pelo gate oficial, sem exibir valor.
+
+Smoke remoto confirmou health 200, Hosting 200/copy atualizada e `/access/ensure` 401 para token ausente/inválido. Primeiro cadastro com Google descartável autorizado recebeu exatamente 604800000 ms e nenhuma cortesia beta. F5 preservou datas e updateTime; três marcadores e verificador gravados no D1. A exclusão foi concluída pelo cron, sem erros: Auth, perfil, subcoleções, projeção e registro comercial por UID ausentes, com os três marcadores mantidos. O mesmo Google recriou a conta com UID Firebase diferente; D1 e Firestore confirmaram `source=none`, trial vencido em data passada constante, nenhum grant beta e `suspended=false`. A interface exibiu acesso encerrado e explicou que excluir/recriar não libera outro teste. Retry de verificação e novo logout/login Google real mantiveram esse estado; a ledger passou de três para quatro marcadores, conservando os anteriores. Nenhuma conta real foi excluída para o teste.
+
+A auditoria npm da API reportou zero vulnerabilidades. A auditoria PNPM adicional identificou sete advisories preexistentes nas dependências Vite/Firebase de desenvolvimento/Node (três altos). Atualização e avaliação de exposição dessas ferramentas devem ocorrer em mudança própria; não são declarados corrigidos nesta PR. Os serviços CLI não são publicados pelo Hosting estático; essa observação não elimina o risco nas ferramentas locais. Nenhum check foi removido ou enfraquecido.
+
+
+**Limites da homologação remota:** o primeiro cadastro elegível e o segundo cadastro recusado foram comprovados com Google real e Worker publicado. Aliases, troca de e-mail/subject, concorrência, falhas de dependências, suspensão e controles independentes têm cobertura isolada; não se apresenta essa cobertura como múltiplas contas Google reais ou indisponibilidade induzida no DEV. O fixture remoto era vazio e sem conexão Drive: esta execução não prova revogação de um novo grant Drive real. A conexão preexistente e os grants beta foram preservados por contagens e pelas migrations aditivas.
+
+[QA completo oficial 39458594416](https://github.com/EwertonMendes/roteiva-web/actions/runs/39458594416) aprovado no commit publicado: 30 testes Rules e 55 browser aprovados, três skips previstos e teste integrado de saga D1/Firebase também aprovado. As falhas temporárias desse teste foram injetadas apenas no ambiente isolado.
