@@ -1,10 +1,11 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {generateKeyPair,exportJWK,createLocalJWKSet,SignJWT} from 'jose';
+import {generateKeyPair,exportJWK,exportPKCS8,createLocalJWKSet,SignJWT} from 'jose';
 import {database} from './helpers/database.mjs';
 import {retainTrialIdentity} from '../src/trial-identity.ts';
 import {verifiedTrialPrincipal} from '../src/auth.ts';
 import {ensureAccess,eraseAccess,TRIAL_MS,assertActiveAccess} from '../src/access.ts';
+import {requestDeletion} from '../src/account-deletion.ts';
 
 const trialKey=Buffer.from(new Uint8Array(32).fill(71)).toString('base64url');
 const identity=(uid,email='Example.User+first@gmail.com',googleSubject='google-subject-007')=>
@@ -120,4 +121,34 @@ test('backend provisions new same-email UID as expired after old account is eras
   const prior=s.sql.prepare('SELECT trial_started_at,trial_ends_at FROM access_accounts WHERE owner_uid=?').get('B');
   await ensureAccess(env,'B','mock-admin',principalB);
   assert.deepEqual(s.sql.prepare('SELECT trial_started_at,trial_ends_at FROM access_accounts WHERE owner_uid=?').get('B'),prior);
+});
+
+test('legacy beta account is claimed BEFORE accepting deletion even without a previous ensure',async t=>{
+  const s=setup(t);
+  const {privateKey}=await generateKeyPair('RS256',{extractable:true});
+  const env={...s.env,ACCOUNT_DELETION_ENABLED:'true',
+    FIREBASE_ADMIN_CREDENTIALS_JSON:JSON.stringify({
+      type:'service_account',project_id:'roteiva-web-dev',
+      client_email:'qa@roteiva-web-dev.iam.gserviceaccount.com',
+      private_key:await exportPKCS8(privateKey),token_uri:'https://oauth2.googleapis.com/token'
+    })};
+  const principal=identity('legacy-uid','previous-user@gmail.com','google-previous-uid');
+  const old=globalThis.fetch;
+  globalThis.fetch=async(url,options={})=>{
+    if(String(url)==='https://oauth2.googleapis.com/token')
+      return Response.json({access_token:'synthetic-admin-token'});
+    if(String(url).startsWith('https://firestore.googleapis.com/v1/')){
+      assert.equal(options.method,'PATCH');
+      return Response.json({name:'synthetic'});
+    }
+    throw Error('Unexpected external request');
+  };
+  t.after(()=>{globalThis.fetch=old;});
+  assert.equal(s.sql.prepare('SELECT COUNT(*) n FROM trial_identity_claims').get().n,0);
+  const request=new Request('https://worker.test/account/deletion',{method:'POST',
+    body:JSON.stringify({phrase:'EXCLUIR MINHA CONTA',acknowledged:true})});
+  const response=await requestDeletion(request,env,principal.uid,principal);
+  assert.equal(response.status,202);
+  assert.equal(s.sql.prepare('SELECT COUNT(*) n FROM trial_identity_claims').get().n,2);
+  assert.equal(await retainTrialIdentity(env,identity('new-uid','previous.user+again@googlemail.com','google-previous-uid')),false);
 });
