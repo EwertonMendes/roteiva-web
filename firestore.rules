@@ -15,7 +15,16 @@ service cloud.firestore {
       // once the backend has committed the deletion marker.
       return owner(uid) && !exists(/databases/$(database)/documents/accountDeletionFences/$(uid)) &&
         exists(/databases/$(database)/documents/users/$(uid)) &&
-        get(/databases/$(database)/documents/users/$(uid)).data.get('deletionState','active')=='active';
+        get(/databases/$(database)/documents/users/$(uid)).data.get('deletionState','active')=='active' &&
+        hasEntitlement(uid);
+    }
+    function hasEntitlement(uid) {
+      let path = /databases/$(database)/documents/users/$(uid)/access/current;
+      return exists(path) && get(path).data.get('ownerUid','')==uid &&
+        get(path).data.get('schemaVersion',0)==1 && get(path).data.get('suspended',true)==false &&
+        (get(path).data.get('unlimited',false)==true ||
+          (get(path).data.get('accessUntil',null) is timestamp &&
+           get(path).data.accessUntil>request.time));
     }
     function writable(uid) { return member(uid); }
     function text(v,min,max) { return v is string && v.size()>=min && v.size()<=max; }
@@ -194,11 +203,6 @@ service cloud.firestore {
          d.dataAcknowledgedAt==resource.data.dataAcknowledgedAt);
     }
     match /users/{uid} {
-      match /access/{id} {
-        // Preparation phase: private status only; business policy is unchanged.
-        allow get: if owner(uid) && id=='current';
-        allow list, create, update, delete: if false;
-      }
       allow read: if owner(uid);
       // New users must complete the registration form. Legacy users keep their original profile.
       allow create: if owner(uid) && !exists(/databases/$(database)/documents/accountDeletionFences/$(uid)) &&
@@ -214,6 +218,12 @@ service cloud.firestore {
         request.resource.data.photoURL==resource.data.photoURL &&
         updating(request.resource.data);
       allow delete: if false; // Account deletion requires a future explicit cleanup process.
+      match /access/{id} {
+        // Commercial rights are provisioned by the Worker service identity.
+        // Users may read their own status but can never grant themselves access.
+        allow get: if owner(uid) && id=='current';
+        allow list, create, update, delete: if false;
+      }
       match /clients/{id} {
         allow read: if member(uid);
         allow create: if writable(uid) && valid_clients(request.resource.data,uid,id) && creating(request.resource.data);

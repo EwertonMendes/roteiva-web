@@ -467,3 +467,5 @@ Evidências e reversão: [ACCESS-CONTROL.md](ACCESS-CONTROL.md).
 - PARCIAL/BLOQUEADO NA HOMOLOGAÇÃO: fase 2 publicada, porém Biblioteca real retornou erro e não havia projeções no primeiro inventário. Instrumentação categórica preparada; não publicar frontend/regras restritivas antes da correção e confirmação de cobertura.
 
 - QA AUTOMATIZADO DA UI: 53 testes Playwright aprovados inicialmente; dois casos de Agenda corrigidos por data civil e aprovados no rerun desktop/mobile, total combinado 55, três skips previstos. Repetir regressão completa após regras finais. Nenhuma equivalência com homologação Google/Drive real.
+
+- IMPLEMENTADO, NÃO PUBLICADO: regras comerciais finais fail-closed e encerramento do provisionamento implícito no Drive. Testes adicionais cobrem projeção ausente/corrompida, ownerUid incorreto, escrita/listagem negada e preservação de perfil/status. Gates remotos e regressão integral em andamento.

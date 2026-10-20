@@ -58,3 +58,9 @@ O deploy do frontend exige health com header de versão do controle e rota de pr
 Worker publicado pelo run 39355067084, regras preparatórias pelo 39355067202; antes de liberar UI/regras restritivas, leitura real da Biblioteca falhou e o inventário ainda não tinha projeções. Não considerar CI como homologação. Correção de diagnóstico acrescenta somente evento/código/status categóricos, sem UID, URL, exception ou resposta de provedor. Frontend e regras restritivas permanecem retidos até identificar e resolver a dependência.
 
 QA frontend desta fase: regressão inicial teve 53 aprovados, três skips por viewport e dois casos de Agenda com fixture UTC diferente da data civil do browser. Corrigida exclusivamente a data do teste; repetição focada desktop/mobile aprovou ambos (2/2). Resultado combinado: 55 cenários aprovados, mas a suíte completa ainda será repetida com as regras finais. Isso não valida Google/Drive remoto.
+
+## Fase final — enforcement (preparado, ainda não publicado)
+
+As regras finais exigem projeção com ownerUid do caminho, schemaVersion 1, suspensão falsa e prazo superior a request.time (ou concessão ilimitada). Ausência/corrupção nega operações de negócio. Status próprio e perfil permanecem legíveis; exclusão segue endpoint autenticado sem exigir acesso comercial. O cliente nunca escreve benefícios.
+
+A flag ACCESS_PROVISION_ON_DRIVE é false nesta entrega: somente contas provisionadas podem usar Drive/OAuth. Mesclar somente após os três perfis existentes estarem provisionados, backfill concluído, frontend integrado publicado e homologação não destrutiva da conta existente. A publicação de API e regras pode então ocorrer independentemente sem lacuna de provisionamento. Se qualquer condição faltar, manter esta entrega sem merge. Regras antigas não devem ser restauradas como rollback comercial; corrigir o estado/reverter somente código compatível, mantendo negações.
