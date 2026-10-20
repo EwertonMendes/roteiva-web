@@ -146,13 +146,15 @@ Modelo indicativo: `drive_connections(workspace_id, owner_uid, google_account_id
 
 Testar vídeos grandes (inclusive acima de 250 MB), rede instável, reenvio, retry, cancelamento, expiração de acesso, quotas, Safari e mobile. URLs de sessão são credenciais de capacidade e não devem ir para log ou persistência pública. Se o upload direto não passar na PoC, **revisar o projeto antes de anunciar o recurso**.
 
-## 10. Revisão e compartilhamento de mídia
+## 10. Revisão e compartilhamento de mídia — PR #55 (implementação em validação)
 
-**Recomendação para MVP, ainda não ratificada:** cliente autenticado com Google, convidado explicitamente para **uma entrega/versão**; acesso no Firestore + permissão real no Drive de acordo com a conta convidada. O cliente não ganha acesso a clientes, financeiro, projetos estranhos ou pasta raiz. Revogar convite **e** Drive ACL na mesma operação coordenada; tratar erros parciais e mostrar estado de revogação pendente quando necessário.
+A especificação operacional completa está em [REVIEWS-MVP.md](REVIEWS-MVP.md). A infraestrutura de arquivos continua sendo o Google Drive individual, sem proxy de vídeo pelo Worker. O Firestore guarda exclusivamente clientes/projetos/pastas privadas do proprietário; o D1 contém as solicitações e versões de aprovação, comentários/decisões e estado das concessões de permissão necessárias ao portal público.
 
-Fluxo: owner envia corte → vincula versão → convida revisor → revisor abre player/visualizador permitido pelo Google → comenta um timestamp **manual** → aprova ou solicita alterações → proprietário vê histórico e publica nova versão.
+A rota `/review/{capability}` não usa o ProtectedRoute: token aleatório de 256 bits, hash para busca e cópia cifrada por AES-GCM em D1. O próprio Worker valida links, expiração, comentários e decisões; não existe regra Firestore pública. Dois modos selecionáveis: convite por link (arquivos explicitamente autorizados com ACL `anyone/reader` no Drive) e convite por e-mail Google (claim `email_verified` e `google.com` verificados pelo backend e ACL individual). O modo restrito rejeita arquivos previamente públicos ou com permissão de domínio; não altera ACLs preexistentes concedidas pelo dono.
 
-**Não prometemos ainda** player próprio com seek, timecode automático sincronizado, iframe com controle total, streaming privado a partir do Drive ou links sem login. Testar capacidade de preview, formato, DRM/cookies/navegadores e políticas do Workspace. Comentários e decisões ficam no Firestore; vídeos no Drive. Links por token anônimos são **etapa futura** e exigem modelo específico de segurança/revogação.
+Projetos, clientes, vínculo de pastas e descendência do arquivo são verificados pelo backend, sem confiar em IDs vindos do navegador. A criação de permissão ocorre por arquivo e só publica a solicitação quando todos os compartilhamentos são confirmados. Versionamento preserva histórico, revoga a ACL da versão antiga e impede revisão durante mudanças parciais. Expiração, encerramento, desconexão e exclusão da conta devem coordenar as revogações antes de encerrar a credencial Google. Falha externa mantém estado pendente, sem simular sucesso.
+
+**Limite de garantia:** link público do Drive concede acesso de leitura direto pelo Google até remoção efetiva da ACL; links diretos, downloads anteriores e permissões externas criadas pelo dono não podem ser retroativamente desfeitos pelo portal. A identificação textual de um revisor sem login não é assinatura legal. Previews dependem de suporte/conta/cookies do Google, com fallback para abrir diretamente no Drive.
 
 ## 11. Assinaturas e autorização de planos
 
