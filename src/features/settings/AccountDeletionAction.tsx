@@ -108,7 +108,7 @@ export function AccountDeletionAction({compact=false}:{compact?:boolean}){
   return <div className={"account-delete"+(compact?" account-delete-compact":"")}>
     <div className="settings-privacy-row">
       <div><strong><Trash2 size={16}/> Excluir minha conta</strong>
-        {!compact&&<p>Exclusão permanente da conta e dos dados armazenados no Roteiva. Seus arquivos originais no Google Drive serão preservados.</p>}
+        {!compact&&<p>Exclusão permanente da conta e dos dados armazenados no Roteiva. Seus arquivos originais no Google Drive serão preservados. Um marcador pseudonimizado de uso do teste gratuito será mantido para impedir reutilização.</p>}
       </div>
       <button type="button" className="secondary-button" disabled={!ready||!available||!!progress} onClick={()=>{setError("");setText("");setChecked(false);setNeedsIdentityConfirmation(false);setOpened(true);}}>
         <Trash2 size={15}/> Excluir conta
@@ -121,7 +121,7 @@ export function AccountDeletionAction({compact=false}:{compact?:boolean}){
     {opened&&<div className="account-delete-overlay" onMouseDown={e=>{if(e.target===e.currentTarget)dismiss();}}>
       <div className="account-delete-dialog" ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="delete-title" aria-describedby="delete-desc" tabIndex={-1}>
         <header><div><AlertTriangle size={22}/><h2 id="delete-title">Excluir sua conta?</h2></div><button type="button" disabled={busy} onClick={dismiss} aria-label="Fechar"><X size={19}/></button></header>
-        <p id="delete-desc">Esta ação é <strong>permanente</strong>. Seu perfil, projetos, clientes, agenda, financeiro e demais informações no Roteiva serão eliminados. Não será possível recuperá-los.</p>
+        <p id="delete-desc">Esta ação é <strong>permanente</strong>. Seu perfil, projetos, clientes, agenda, financeiro e demais informações no Roteiva serão eliminados. Não será possível recuperá-los. Um marcador pseudonimizado da identidade utilizada no teste gratuito será preservado para evitar novas concessões gratuitas.</p>
         {user?.email&&<p>Você está excluindo a conta <strong>{user.email}</strong>.</p>}
         <div className="account-delete-preserve"><CheckCircle2 size={17}/><span>Os arquivos originais do seu Google Drive não serão apagados.</span></div>
         <p>Se precisar de uma cópia dos seus registros, cancele e exporte os dados antes de continuar.</p>
