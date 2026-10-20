@@ -4,7 +4,9 @@ import { callback, start, launch, enabled } from './oauth.ts';
 import { metadata, disconnect, about } from './drive.ts';
 import { listFolders, listFolderItems } from './folders.ts';
 import { thumbnail } from './thumbnails.ts';
-import { deletionStatus, requestDeletion, assertNotDeleting, runPendingDeletions } from './account-deletion.ts';
+import { deletionStatus, requestDeletion, runPendingDeletions } from './account-deletion.ts';
+import { ensureAccess, assertActiveAccess } from './access.ts';
+import { backfillAccess } from './access-backfill.ts';
 const headers = {
   'Cache-Control':'no-store', 'Referrer-Policy':'no-referrer',
   'X-Content-Type-Options':'nosniff', 'Content-Security-Policy':"default-src 'none'; frame-ancestors 'none'",
@@ -34,6 +36,7 @@ export async function handle(request: Request, env: Env): Promise<Response> {
     } else if (url.pathname === '/health' && request.method === 'GET') {
       await env.DB.prepare('SELECT 1 FROM d1_migrations LIMIT 1').first();
       response = Response.json({status:'ok',environment:'dev'});
+      response.headers.set('X-Roteiva-Access-Version','1');
     } else if (url.pathname === '/oauth/drive/launch' && request.method === 'GET') {
       response = await launch(request,env);
     } else if (url.pathname === '/oauth/drive/callback' && request.method === 'GET') {
@@ -46,22 +49,27 @@ export async function handle(request: Request, env: Env): Promise<Response> {
       const uid=await identity(request,env,300);
       if(!(await env.API_RATE_LIMIT.limit({key:'dev:delete:'+uid})).success)throw new ApiError(429,'rate_limited');
       response=await requestDeletion(request,env,uid);
+    } else if (url.pathname === '/access/ensure' && request.method === 'POST') {
+      if(origin!==env.FRONTEND_ORIGIN)throw new ApiError(403,'origin_required');
+      const uid=await identity(request,env);
+      if(!(await env.API_RATE_LIMIT.limit({key:'dev:access:'+uid})).success)throw new ApiError(429,'rate_limited');
+      response=await ensureAccess(env,uid);
     } else if (url.pathname === '/integrations/drive' && request.method === 'GET') {
       const uid = await identity(request,env);
-      await assertNotDeleting(env,uid);
+      await assertActiveAccess(env,uid);
       if (!(await env.API_RATE_LIMIT.limit({key:'dev:uid:'+uid})).success) throw new ApiError(429,'rate_limited');
       const rows = await env.DB.prepare('SELECT id,google_email,status,scopes,updated_at FROM drive_connections WHERE owner_uid=? ORDER BY created_at LIMIT 20').bind(uid).all();
       response = Response.json({connections:rows.results});
     } else if (url.pathname === '/oauth/drive/start' && request.method === 'POST') {
       if (origin !== env.FRONTEND_ORIGIN) throw new ApiError(403,'origin_required');
       const uid = await identity(request,env);
-      await assertNotDeleting(env,uid);
+      await assertActiveAccess(env,uid);
       if (!(await env.API_RATE_LIMIT.limit({key:'dev:uid:'+uid})).success) throw new ApiError(429,'rate_limited');
       response = await start(env,uid);
     } else if (/^\/integrations\/drive\/[^/]+\/folders(?:\/[^/]+\/items)?$/.test(url.pathname) && request.method==='GET') {
       enabled(env);
       const uid=await identity(request,env);
-      await assertNotDeleting(env,uid);
+      await assertActiveAccess(env,uid);
       if (!(await env.API_RATE_LIMIT.limit({key:'dev:uid:'+uid})).success) throw new ApiError(429,'rate_limited');
       const parts=url.pathname.split('/');
       response=parts.length===5
@@ -70,14 +78,14 @@ export async function handle(request: Request, env: Env): Promise<Response> {
     } else if (/^\/integrations\/drive\/[^/]+\/files\/[^/]+\/thumbnail$/.test(url.pathname) && request.method==='GET') {
       enabled(env);
       const uid=await identity(request,env);
-      await assertNotDeleting(env,uid);
+      await assertActiveAccess(env,uid);
       if (!(await env.API_THUMB_LIMIT.limit({key:'dev:uid:'+uid})).success) throw new ApiError(429,'rate_limited');
       const parts=url.pathname.split('/');
       response=await thumbnail(env,uid,parts[3],parts[5],url.searchParams.get('ticket'));
     } else if (/^\/integrations\/drive\/[^/]+\/(metadata|disconnect|about)$/.test(url.pathname)) {
       enabled(env);
       const uid = await identity(request,env);
-      await assertNotDeleting(env,uid);
+      await assertActiveAccess(env,uid);
       if (!(await env.API_RATE_LIMIT.limit({key:'dev:uid:'+uid})).success) throw new ApiError(429,'rate_limited');
       const parts = url.pathname.split('/');
       if (parts[4] === 'about' && request.method === 'GET') {
@@ -108,4 +116,9 @@ export async function handle(request: Request, env: Env): Promise<Response> {
   }
   return result;
 }
-export default {fetch:handle, scheduled(_controller:ScheduledController,env:Env,ctx:ExecutionContext){ctx.waitUntil(runPendingDeletions(env));}};
+export default {fetch:handle, scheduled(_controller:ScheduledController,env:Env,ctx:ExecutionContext){
+  ctx.waitUntil((async()=>{
+    await runPendingDeletions(env);
+    try{await backfillAccess(env);}catch{console.error(JSON.stringify({event:'access_backfill_retry'}));}
+  })());
+}};
