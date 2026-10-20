@@ -106,6 +106,7 @@ test('expiry maintenance closes drafts and denies the public token',async t=>{
   const f=fixture();t.after(f.close);
   const a=await inserted(f,{status:'draft',expires:Date.now()-1000});
   f.sql.prepare("UPDATE review_assets SET grant_state='unshared' WHERE review_id=?").run(a.id);
+  f.sql.prepare('UPDATE review_requests SET updated_at=? WHERE id=?').run(Date.now()-120000,a.id);
   await cleanupExpiredReviews(f.env);
   assert.equal(f.sql.prepare('SELECT status FROM review_requests WHERE id=?').get(a.id).status,'closed');
   await assert.rejects(()=>route(f,a.token),e=>e.status===404);
