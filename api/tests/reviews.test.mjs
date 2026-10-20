@@ -168,6 +168,8 @@ test('real HTTP: owner A can publish/revoke only linked Drive files, owner B can
         trashed:false,isAppAuthorized:true,parents:['root'],capabilities:{canShare:true}});
       if(u.pathname.endsWith('/files/'+file+'/permissions')){
         if(init.method==='POST'){
+          assert.equal(u.searchParams.has('sendNotificationEmail'),false,
+            'Google Drive forbids notification flag for anyone shares');
           const id='permission-'+(acl.size+1);
           acl.set(id,JSON.parse(init.body));
           return Response.json({id,type:'anyone',role:'reader'});
