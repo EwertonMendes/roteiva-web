@@ -439,3 +439,17 @@
 @media(prefers-reduced-motion:reduce) {
   .rl-upload-progress span {transition:none;}
 }
+
+
+/* The queue remains visible while navigating folders, without forcing page scroll. */
+.rl-upload-queue {position:fixed;z-index:95;right:24px;bottom:24px;
+  width:min(420px,calc(100vw - 32px));max-height:min(54dvh,420px);
+  box-shadow:0 14px 50px #0003;display:flex;flex-direction:column;margin-top:0;}
+.rl-upload-heading-actions {display:flex;align-items:center;gap:8px;}
+.rl-upload-heading-actions button {width:30px;height:30px;display:grid;place-items:center;
+  border:1px solid var(--rl-border);border-radius:8px;background:transparent;color:var(--rl-ink);}
+.rl-upload-items {min-height:0;max-height:calc(min(54dvh,420px) - 55px);}
+@media(max-width:680px) {
+  .rl-upload-queue {right:12px;bottom:calc(76px + env(safe-area-inset-bottom));width:calc(100vw - 24px);max-height:40dvh;}
+  .rl-upload-items {max-height:calc(40dvh - 54px);}
+}
