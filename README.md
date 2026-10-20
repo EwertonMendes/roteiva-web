@@ -98,3 +98,5 @@ O Roteiva mostra miniaturas fornecidas pelo Google Drive para mídia quando disp
 ### Google Drive mais rápido — DEV
 
 A Biblioteca reaproveita listagens recentes por sessão e busca nomes remotamente dentro da pasta, com paginação; miniaturas utilizam tickets autenticados de curta duração, evitando uma segunda consulta Google para cada arquivo. A fila prioriza imagens visíveis e conserva o cache em memória ao navegar entre telas. O conteúdo dos arquivos permanece no Drive e não é copiado para Firestore/D1.
+
+**Controle comercial (rollout DEV):** teste gratuito de sete dias, sem cartão ou cobrança automática, provisionado no backend. Contas beta anteriores à migração recebem cortesia separada de 30 dias. A publicação ocorre em fases; integração da UI, restrição definitiva das regras e homologação remota têm estados separados em [ACCESS-CONTROL.md](docs/ACCESS-CONTROL.md).

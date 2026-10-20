@@ -48,9 +48,18 @@ A preparação de regras nesta fase só permite GET privado de `access/current`,
 
 Auditoria GitHub: `cloudflare-development` permite somente branch master; segredo Cloudflare já existe. `firebase-development` não possui gate de branch/reviewer configurado; os workflows atuais restringem deploy a master e SHA atual. Não foi alterada nenhuma proteção. Consulta à proteção clássica de master respondeu 404, sem afirmar inexistência de outros rulesets.
 
+## Fase 3 — frontend integrado
+
+A UI só monta o workspace após POST autenticado em `/access/ensure` e confirmação do status vindo do servidor Firestore; dados privados persistidos no browser não substituem essa confirmação. O relógio local orienta apenas a apresentação; Worker e regras decidem pelo horário do servidor. Estados expirado/suspenso ou falha mantêm saída, nova verificação e exclusão da própria conta disponíveis. Cadastro informa sete dias sem cartão/cobrança automática.
+
+O deploy do frontend exige health com header de versão do controle e rota de provisionamento retornando 401 sem identidade antes de autenticar/publicar Hosting. Esse gate evita publicar a UI antes do Worker, mas não substitui smoke autenticado nem homologação. Regras comerciais restritivas continuam em entrega posterior ao inventário completo. A demo local permanece sem autenticação/controle comercial.
 ### Causa confirmada da falha — runtime Cloudflare
 
 Reproduzido com workerd/Miniflare da versão instalada: Request com `redirect:error` lança TypeError antes de acessar a rede; Workers aceita somente follow/manual. Essa opção foi introduzida no endurecimento dos fetches administrativos da fase 2. Corrigido para `manual` em leitura de perfil, projeção e enumeração/PATCH: redirecionamentos não são seguidos e status inesperado continua falhando fechado. Nenhuma alteração de credencial/IAM é necessária. Mocks Node agora exigem manual. A recuperação remota ainda precisa ser confirmada após deploy. Referência: [Request Workers](https://developers.cloudflare.com/workers/runtime-apis/request/).
 ## Falha encontrada na homologação da fase 2
 
 Worker publicado pelo run 39355067084, regras preparatórias pelo 39355067202; antes de liberar UI/regras restritivas, leitura real da Biblioteca falhou e o inventário ainda não tinha projeções. Não considerar CI como homologação. Correção de diagnóstico acrescenta somente evento/código/status categóricos, sem UID, URL, exception ou resposta de provedor. Frontend e regras restritivas permanecem retidos até identificar e resolver a dependência.
+
+QA frontend desta fase: regressão inicial teve 53 aprovados, três skips por viewport e dois casos de Agenda com fixture UTC diferente da data civil do browser. Corrigida exclusivamente a data do teste; repetição focada desktop/mobile aprovou ambos (2/2). Resultado combinado: 55 cenários aprovados, mas a suíte completa ainda será repetida com as regras finais. Isso não valida Google/Drive remoto.
+
+Recuperação real após PR #46: a conta existente recebeu projeção de cortesia e a Biblioteca voltou a listar quatro arquivos de uma pasta já vinculada, sem reconectar Drive ou alterar arquivos. O inventário agregado ainda está sendo acompanhado até cobrir os três perfis antes de encerrar a migração.

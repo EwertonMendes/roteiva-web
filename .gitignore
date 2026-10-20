@@ -3,6 +3,7 @@
 api/.access-migration-counts.json
 /dist/
 /dist-pages/
+/dist-demo/
 *.tsbuildinfo
 
 # Local development / system data

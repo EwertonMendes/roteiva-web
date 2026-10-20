@@ -105,6 +105,8 @@ jobs:
           test "$(git ls-remote origin refs/heads/master | cut -f1)" = "$GITHUB_SHA" || {
             echo "Outdated SHA: skip stale DEV deploy"; exit 1;
           }
+      - name: Require deployed access Worker before integrated frontend
+        run: node scripts/check-access-worker.mjs
       - uses: google-github-actions/auth@v3
         with:
           credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}

@@ -1,0 +1,11 @@
+.access-locked{display:flex;gap:14px;align-items:flex-start;padding:20px;border:1px solid var(--border,rgba(140,140,140,.25));border-radius:14px;background:rgba(120,120,120,.06);margin:16px 0}
+.access-locked svg{flex-shrink:0}
+.access-locked div{display:grid;gap:6px}
+.access-locked strong{font-weight:700}
+.access-locked span{line-height:1.55;font-size:.9rem;opacity:.8}
+.access-actions{display:grid;gap:9px;margin-bottom:20px}
+.access-actions .auth-primary{justify-content:center}
+.access-settings-detail{padding:16px 18px;display:grid;gap:5px;background:rgba(120,120,120,.06);border-radius:12px}
+.access-settings-detail span{font-size:.9rem;opacity:.8}
+.access-settings .settings-note{margin-top:16px}
+@media(max-width:640px){.access-locked{padding:14px}}

@@ -43,6 +43,11 @@ async function logout(page:Page) {
 }
 test("Google emulator session, CRUD, restoration, themes and separate users",async({page},info)=>{
   await page.goto(cloud+"/review");
+  // The calendar uses civil dates in the browser, not the UTC date of the runner.
+  const today=await page.evaluate(()=>{
+    const date=new Date();
+    return [date.getFullYear(),String(date.getMonth()+1).padStart(2,'0'),String(date.getDate()).padStart(2,'0')].join('-');
+  });
   await expect(page.getByRole("button",{name:"Entrar com Google"})).toBeVisible();
   await expect(page.locator(".app-shell")).toHaveCount(0);
   await page.goto(cloud);
@@ -75,13 +80,13 @@ test("Google emulator session, CRUD, restoration, themes and separate users",asy
   await expect(page.locator(".toast")).toContainText("Informe um valor válido");
   await expect(page.locator("form.finance-modal")).toBeVisible();
   await page.getByLabel("Valor do trabalho").fill("100,01");
-  await page.getByLabel("Previsão de recebimento",{exact:true}).fill(new Date().toISOString().slice(0,10));
+  await page.getByLabel("Previsão de recebimento",{exact:true}).fill(today);
   await page.locator("form.finance-modal").getByRole("button",{name:"Adicionar lançamento"}).click();await settled(page);
   await expect(page.locator(".finance-table")).toContainText("100,01");
   await navigate(page,"Calendário");
   await page.getByRole("button",{name:"Novo compromisso",exact:true}).click();
   await page.getByLabel("Título",{exact:true}).fill("Gravação Aurora");
-  await page.getByLabel("Data do trabalho",{exact:true}).fill(new Date().toISOString().slice(0,10));
+  await page.getByLabel("Data do trabalho",{exact:true}).fill(today);
   await page.getByLabel("Horário de término",{exact:true}).fill("10:00");
   await page.getByRole("button",{name:"Salvar compromisso"}).click();await settled(page);
   await page.getByRole("button",{name:"Ativar modo escuro",exact:true}).click();await settled(page);

@@ -102,9 +102,9 @@ export class FirestoreWorkspace {
         !["freelancer","studio","producer","other"].includes(profile.professionalType) ||
         !profile.acknowledgedDataUse) throw new Error("Confira o cadastro e confirme o uso dos dados antes de continuar.");
     const ref = doc(this.db, "users", this.uid);
-    const created=await runTransaction(this.db, async tx => {
+    await runTransaction(this.db, async tx => {
       const current = await tx.get(ref);
-      if (current.exists()) return false; // Never overwrite a legacy registration.
+      if (current.exists()) return; // Never overwrite a legacy registration.
       tx.set(ref, {
         displayName, email: profile.email, photoURL: profile.photoURL,
         studioName, professionalType: profile.professionalType,
@@ -113,9 +113,9 @@ export class FirestoreWorkspace {
         ownerUid: this.uid, schemaVersion: 1, revision: 1,
         createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
       });
-      return true;
     });
-    if (created) await bootstrapSync(this.db,this.uid,emptyNumbers());
+    // Access is provisioned on the server before mounting the workspace. The
+    // first authorized load uses actual collection counts for its sync stamp.
   }
   private async readCollection(name: Domain, source: "server" | "cache"): Promise<Map<string, Stored>> {
     const result = new Map<string, Stored>();
