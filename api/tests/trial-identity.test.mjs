@@ -155,6 +155,8 @@ test('legacy beta account is claimed BEFORE accepting deletion even without a pr
   assert.equal(s.sql.prepare('SELECT COUNT(*) n FROM trial_identity_claims').get().n,0);
   const request=new Request('https://worker.test/account/deletion',{method:'POST',
     body:JSON.stringify({phrase:'EXCLUIR MINHA CONTA',acknowledged:true})});
+  const stamp=Date.now();
+  s.sql.prepare('INSERT INTO access_accounts(owner_uid,trial_started_at,trial_ends_at,created_at,updated_at) VALUES(?,?,?,?,?)').run(principal.uid,stamp,stamp+TRIAL_MS,stamp,stamp);
   const response=await requestDeletion(request,env,principal.uid,principal);
   assert.equal(response.status,202);
   assert.equal(s.sql.prepare('SELECT COUNT(*) n FROM trial_identity_claims').get().n,3);

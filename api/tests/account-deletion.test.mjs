@@ -100,6 +100,7 @@ test("full deletion saga is resumable, verifies service calls and leaves another
  };
  t.after(()=>{globalThis.fetch=orig;});
  const req=new Request('https://example.test',{method:'POST',body:JSON.stringify({phrase:'EXCLUIR MINHA CONTA',acknowledged:true})});
+ db.sql.prepare('INSERT INTO access_accounts(owner_uid,trial_started_at,trial_ends_at,created_at,updated_at) VALUES(?,?,?,?,?)').run('user-A',stamp,stamp+604800000,stamp,stamp);
  const accepted=await requestDeletion(req,env,'user-A',principal('user-A'));
  assert.equal(accepted.status,202);
  assert.equal(db.sql.prepare('SELECT phase FROM account_deletions WHERE owner_uid=?').get('user-A').phase,'revoking');
@@ -136,6 +137,8 @@ test('failed admin lock preserves durable job and schedules retry without deleti
  t.after(()=>{globalThis.fetch=original;});
  const request=new Request('https://test.local',{method:'POST',
    body:JSON.stringify({phrase:'EXCLUIR MINHA CONTA',acknowledged:true})});
+ const accessStart=Date.now();
+ db.sql.prepare('INSERT INTO access_accounts(owner_uid,trial_started_at,trial_ends_at,created_at,updated_at) VALUES(?,?,?,?,?)').run('owner-a',accessStart,accessStart+604800000,accessStart,accessStart);
  const accepted=await requestDeletion(request,config,'owner-a',principal('owner-a'));
  assert.equal(accepted.status,202);
  assert.equal((await accepted.json()).status,'processing');
