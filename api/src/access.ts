@@ -115,8 +115,9 @@ export async function ensureAccess(env:Env,uid:string,adminBearer?:string,princi
     const rollout=await env.DB.prepare('SELECT cutoff_at FROM access_rollout WHERE id=1').first<{cutoff_at:number}>();
     if(!rollout||created>rollout.cutoff_at)throw new ApiError(503,'access_backfill_ineligible');
   }
+  if(!principal&&!adminBearer)throw new ApiError(503,'trial_identity_required');
+  if(principal&&principal.uid!==uid)throw new ApiError(401,'invalid_identity');
   const allowed=principal?await retainTrialIdentity(env,principal):true;
-  if(principal?.uid!==undefined&&principal.uid!==uid)throw new ApiError(401,'invalid_identity');
   return Response.json(await provisionAccess(env,uid,created,token,allowed));
 }
 async function provisionAccess(env:Env,uid:string,created:number,token:string,allowTrial:boolean):Promise<AccessState> {
