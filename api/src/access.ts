@@ -37,9 +37,10 @@ export function resolveAccess(account:Account,grants:Grant[],subscriptions:Subsc
     accessUntil:iso(until),unlimited,suspended,trialEndsAt:iso(account.trial_ends_at),trialDays:TRIAL_DAYS};
 }
 async function activeState(env:Env,uid:string,now=Date.now()):Promise<AccessState|null> {
-  const account=await env.DB.prepare('SELECT trial_started_at,trial_ends_at,suspended_at FROM access_accounts WHERE owner_uid=?')
-    .bind(uid).first<Account>();
+  const account=await env.DB.prepare('SELECT trial_started_at,trial_ends_at,suspended_at,sync_pending FROM access_accounts WHERE owner_uid=?')
+    .bind(uid).first<Account&{sync_pending:number}>();
   if(!account)return null;
+  if(account.sync_pending!==0)throw new ApiError(503,'access_sync_pending');
   const [g,s]=await Promise.all([
     env.DB.prepare('SELECT grant_kind,ends_at FROM access_grants WHERE owner_uid=? AND revoked_at IS NULL AND starts_at<=? AND (ends_at IS NULL OR ends_at>?)')
       .bind(uid,now,now).all<Grant>(),

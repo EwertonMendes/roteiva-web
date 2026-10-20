@@ -453,18 +453,14 @@ A cópia persistida é privada e potencialmente sensível em computadores compar
 
 ## Controle de acesso SaaS — rollout DEV (19/10/2026)
 
-- IMPLEMENTADO nesta entrega: migração D1 aditiva com trial imutável, constraints/FK/índices e testes de preservação; pipeline oficial verifica esquema, integridade e contagens anteriores/posteriores.
-- VALIDADO por leitura externa: service account ativa, papel customizado mínimo e binding do segredo existente no Worker; health e Hosting 200. Não comprova emissão de token da chave instalada.
-- DECISÃO TOMADA: cortesia de 30 dias para contas existentes no marco fixo da migração, separada do trial; repetição não renova benefícios.
-- PENDENTE: publicação remota da migration, Worker compatível, frontend, inventário/provisionamento, enforcement e regras em entregas separadas, QA real desktop/mobile/Drive e medição Firestore. Não fazer merge integral da PR #42 antes desses gates.
+- **VALIDADO REMOTAMENTE:** PRs #43–#46 publicaram migrations aditivas 0007/0008, Worker com provisionamento único e regras preparatórias de leitura de status. Contagens operacionais preservadas e zero violações FK no pipeline. A credencial instalada criou as três projeções, sem alteração IAM.
+- **DECISÃO TOMADA:** cortesia de 30 dias para contas existentes no marco fixo da migração, separada do trial imutável de sete dias; repetição não renova benefícios.
+- **VALIDADO REMOTAMENTE:** três perfis existentes, três cortesias com duração exata e três projeções válidas; backfill concluído e contagens de negócio iguais. Conta existente confirmou a cortesia e listagem de quatro arquivos Drive sem reconexão ou alteração de arquivos.
+- **PUBLICADO:** frontend integrado da PR #47 pelo run 39356744391. AccessGate aguarda provisionamento e snapshot do servidor; cadastro informa sete dias e estados bloqueados mantêm reverificação, saída e exclusão.
+- **CORRIGIDO E VALIDADO:** redirect error introduzido na fase 2 causava TypeError no runtime Workers e impedia provisionamento/Drive. PR #46 usa manual, reproduzido em workerd e confirmado pela recuperação real. Não houve mudança de credencial.
+- **VALIDADO AUTOMATICAMENTE:** 82 testes API, 27 unitários frontend, 30 Rules e 55 Playwright desktop/mobile; três skips previstos. TypeScript, builds e migrations locais até 0009 aprovados. CI não comprova os cenários remotos pendentes.
+- **IMPLEMENTADO, NÃO PUBLICADO — PR #48 EM RASCUNHO:** regras comerciais finais e ACCESS_PROVISION_ON_DRIVE=false; sync_pending da migration 0009 impede republicação concorrente durante futuras alterações privilegiadas. Nenhuma interface ou rota ADM. Protocolo obrigatório e testes em ACCESS-CONTROL.md e access-provisioning.test.mjs.
+- **PARCIAL NA HOMOLOGAÇÃO REAL:** expiração, suspensão/cortesia/reativação, isolamento A/B e exclusão da conta descartável autorizada permanecem pendentes. Cadastro e segundo login Google já foram confirmados: trial exato de sete dias, sem concessão beta; recarga e login não alteraram prazo/updateTime da projeção. O enforcement pode ser publicado para homologar os cenários de bloqueio/exclusão com as regras finais ativas.
+- **MEDIDO:** billing Firebase desabilitado; Monitoring em 20/10/2026 02:11 UTC indicou 209 leituras e seis escritas nas 24h anteriores. Métricas Cloudflare anteriores ao rollout registradas no runbook; repetir medição após regras finais, sem garantir consumo futuro.
 
-Evidências e reversão: [ACCESS-CONTROL.md](ACCESS-CONTROL.md).
-
-- VALIDADO REMOTAMENTE: PR #43, migration 0007 e Worker compatível publicados pelo run 39354281435; zero violações FK e contagens preservadas (uma conexão Drive, demais tabelas operacionais vazias).
-- IMPLEMENTADO, PENDENTE PUBLICAÇÃO/HOMOLOGAÇÃO: Worker de provisionamento único, cortesia beta 30 dias com marco fixo, Cron idempotente e flag de provisionamento Drive sem bypass; leitura privada de status preparada nas regras, sem enforcement de negócio nesta fase. Testes de API incluem retries, datas, falha de projeção/conflito e cursor.
-
-- IMPLEMENTADO NA FASE 3: AccessGate e estado em Configurações, cadastro informa sete dias, gestão mínima disponível ao expirar e gate de versão Worker no deploy Hosting. Testes unitários/TypeScript/builds locais aprovados; regressão desktop/mobile em execução. Publicação e homologação real ainda pendentes.
-- CAUSA REPRODUZIDA: redirect error não é suportado no runtime Workers; fetches de acesso/backfill corrigidos para manual, com teste que exige esse modo. Recuperação DEV pendente do pipeline oficial; não concluir apenas pelo CI.
-- PARCIAL/BLOQUEADO NA HOMOLOGAÇÃO: fase 2 publicada, porém Biblioteca real retornou erro e não havia projeções no primeiro inventário. Instrumentação categórica preparada; não publicar frontend/regras restritivas antes da correção e confirmação de cobertura.
-
-- QA AUTOMATIZADO DA UI: 53 testes Playwright aprovados inicialmente; dois casos de Agenda corrigidos por data civil e aprovados no rerun desktop/mobile, total combinado 55, três skips previstos. Repetir regressão completa após regras finais. Nenhuma equivalência com homologação Google/Drive real.
+Evidências de deploy, commits, limites da comparação por contagens e reversão segura: [ACCESS-CONTROL.md](ACCESS-CONTROL.md). A PR #42 não deve ser mesclada integralmente.

@@ -22,6 +22,16 @@ const fixtures={
 };
 const pathFor=(uid,name)=>"users/"+uid+"/"+name+"/"+(name==="preferences"?"ui":name==="activities"?"a1":"10");
 const dbFor=uid=>uid?env.authenticatedContext(uid).firestore():env.unauthenticatedContext().firestore();
+async function authorizeTestAccount(uid){
+  await env.withSecurityRulesDisabled(async context=>{
+    await setDoc(doc(context.firestore(),"users",uid,"access","current"),{
+      ownerUid:uid,schemaVersion:1,source:"trial",suspended:false,unlimited:false,
+      trialEndsAt:Timestamp.fromMillis(Date.now()+604800000),
+      accessUntil:Timestamp.fromMillis(Date.now()+604800000),
+      updatedAt:Timestamp.now()
+    });
+  });
+}
 before(async()=>{ env=await initializeTestEnvironment({projectId:"demo-roteiva",firestore:{host:"127.0.0.1",port:8080,rules:await readFile("firestore.rules","utf8")}}); });
 after(async()=>await env?.cleanup());
 beforeEach(async()=>{
@@ -31,6 +41,12 @@ beforeEach(async()=>{
     for (const uid of ["alice","bob"]) {
       const stamp={ownerUid:uid,schemaVersion:1,revision:1,createdAt:Timestamp.now(),updatedAt:Timestamp.now()};
       await setDoc(doc(db,"users",uid),{...profile,...stamp});
+      await setDoc(doc(db,"users",uid,"access","current"),{
+        ownerUid:uid,schemaVersion:1,source:"trial",suspended:false,unlimited:false,
+        trialEndsAt:Timestamp.fromMillis(Date.now()+604800000),
+        accessUntil:Timestamp.fromMillis(Date.now()+604800000),
+        updatedAt:Timestamp.now()
+      });
       await setDoc(doc(db,"users",uid,"clients","1"),{...client,id:1,...stamp});
       await setDoc(doc(db,"users",uid,"projects","2"),{...project,id:2,...stamp});
     }
@@ -123,6 +139,7 @@ test("studio profile changes: legacy compatibility, privacy and concurrent saves
 
   const modern=new FirestoreWorkspace(charlie,"charlie");
   await modern.registerProfile({...profile,studioName:"Studio A",professionalType:"freelancer",acknowledgedDataUse:true});
+  await authorizeTestAccount("charlie");
   const current=await modern.loadProfile();
   assert.equal(current.legacy,false);
   const next=await modern.saveProfile({displayName:"Alice Studio",studioName:"Studio B",professionalType:"producer"},current.revision);
@@ -153,6 +170,7 @@ test("repository: empty new account, CRUD, cents, refresh and conflict",async()=
   const db=dbFor("charlie"),a=new FirestoreWorkspace(db,"charlie");
   assert.equal(await a.profileExists(),false);
   await a.registerProfile({...profile,studioName:"Studio QA",professionalType:"freelancer",acknowledgedDataUse:true});
+  await authorizeTestAccount("charlie");
   assert.equal(await a.profileExists(),true);
   await a.registerProfile({...profile,studioName:"Outro estúdio",professionalType:"studio",acknowledgedDataUse:true});
   const existing=await getDoc(doc(db,"users/charlie"));
@@ -209,6 +227,7 @@ test("sync stamps are private, versioned and cannot be deleted", async () => {
 test("domain-scoped writes preserve untouched collections and their revisions",async()=>{
   const db=dbFor("charlie"), repository=new FirestoreWorkspace(db,"charlie");
   await repository.registerProfile({...profile,studioName:"Studio scoped",professionalType:"freelancer",acknowledgedDataUse:true});
+  await authorizeTestAccount("charlie");
   const workspace=emptyWorkspace();
   workspace.clients=[{...client,id:101,name:"Cliente preservado",monthlyFee:0,projects:0,active:0,deliveries:[]}];
   workspace.financeEntries=[{...fixtures.financeEntries,id:102,projectId:0,clientId:101,amount:25,date:"16/10/2026"}];
@@ -517,20 +536,6 @@ test("deletion marker blocks all client mutations while retaining per-owner isol
   await assertSucceeds(updateDoc(doc(bob,"users/bob/projects/2"),{name:"Unchanged isolation",revision:2,updatedAt:serverTimestamp()}));
 });
 
-test("access status is private, cannot be written or listed, and preparation preserves business access",async()=>{
-  const alice=dbFor('alice'),bob=dbFor('bob');
-  await env.withSecurityRulesDisabled(async context=>{
-    await setDoc(doc(context.firestore(),'users/alice/access/current'),{ownerUid:'alice',suspended:true});
-  });
-  await assertSucceeds(getDoc(doc(alice,'users/alice/access/current')));
-  await assertFails(getDoc(doc(bob,'users/alice/access/current')));
-  await assertFails(getDocs(collection(alice,'users/alice/access')));
-  await assertFails(setDoc(doc(alice,'users/alice/access/forged'),{unlimited:true}));
-  await assertFails(updateDoc(doc(alice,'users/alice/access/current'),{unlimited:true}));
-  await assertFails(deleteDoc(doc(alice,'users/alice/access/current')));
-  await assertSucceeds(getDoc(doc(alice,'users/alice/clients/1')));
-});
-
 test("residual JWT cannot recreate a deleted profile or remove the independent fence",async()=>{
   const alice=dbFor('alice'),bob=dbFor('bob');
   await env.withSecurityRulesDisabled(async admin=>{
@@ -548,4 +553,47 @@ test("residual JWT cannot recreate a deleted profile or remove the independent f
     await assertFails(setDoc(doc(db,'accountDeletionFences/alice'),{deleting:false}));
   }
   await assertSucceeds(getDoc(doc(bob,'users/bob/projects/2')));
+});
+
+test("commercial access cannot be forged and expires at server time",async()=>{
+  const alice=dbFor("alice"),bob=dbFor("bob");
+  const accessRef=doc(alice,"users/alice/access/current");
+  await assertSucceeds(getDoc(accessRef));
+  await assertFails(getDoc(doc(bob,"users/alice/access/current")));
+  await assertFails(updateDoc(accessRef,{unlimited:true}));
+  await assertFails(deleteDoc(accessRef));
+  await env.withSecurityRulesDisabled(async context=>{
+    await updateDoc(doc(context.firestore(),"users/alice/access/current"),{
+      accessUntil:Timestamp.fromMillis(Date.now()-1000),unlimited:false
+    });
+  });
+  await assertFails(getDoc(doc(alice,"users/alice/clients/1")));
+  await assertSucceeds(getDoc(doc(alice,"users/alice")));
+  await env.withSecurityRulesDisabled(async context=>{
+    await updateDoc(doc(context.firestore(),"users/alice/access/current"),{unlimited:true});
+  });
+  await assertSucceeds(getDoc(doc(alice,"users/alice/clients/1")));
+  await env.withSecurityRulesDisabled(async context=>{
+    await updateDoc(doc(context.firestore(),"users/alice/access/current"),{suspended:true});
+  });
+  await assertFails(getDoc(doc(alice,"users/alice/clients/1")));
+});
+
+test('missing or corrupt entitlement denies business access but retains own profile and status',async()=>{
+ const alice=dbFor('alice'),bob=dbFor('bob'),anon=dbFor();
+ const path='users/alice/access/current';
+ await assertFails(getDocs(collection(alice,'users/alice/access')));
+ await assertFails(setDoc(doc(alice,'users/alice/access/forged'),{unlimited:true}));
+ await assertFails(getDoc(doc(anon,path)));
+ await env.withSecurityRulesDisabled(async c=>{await deleteDoc(doc(c.firestore(),path));});
+ await assertFails(getDoc(doc(alice,'users/alice/clients/1')));
+ await assertSucceeds(getDoc(doc(alice,'users/alice')));
+ await env.withSecurityRulesDisabled(async c=>{await setDoc(doc(c.firestore(),path),{
+   ownerUid:'bob',schemaVersion:1,suspended:false,unlimited:true,source:'complimentary',
+   accessUntil:Timestamp.now(),trialEndsAt:Timestamp.now()
+ });});
+ await assertFails(getDoc(doc(alice,'users/alice/clients/1')));
+ await assertSucceeds(getDoc(doc(alice,path)));
+ await assertFails(updateDoc(doc(alice,path),{ownerUid:'alice'}));
+ await assertSucceeds(getDoc(doc(bob,'users/bob/clients/1')));
 });
