@@ -53,19 +53,30 @@ async function withEmulator<T>(work:(environment:Awaited<ReturnType<typeof initi
   finally{await environment.cleanup();}
 }
 async function uidFor(email:string):Promise<string>{
-  return withEmulator(async env=>env.withSecurityRulesDisabled(async context=>{
-    const accounts=await getDocs(query(collection(context.firestore(),"users"),where("email","==",email)));
-    expect(accounts.size).toBe(1);
-    return accounts.docs[0].id;
-  }));
+  return withEmulator(async env=>{
+    let uid="";
+    // withSecurityRulesDisabled returns void even if its callback returns a value.
+    await env.withSecurityRulesDisabled(async context=>{
+      const accounts=await getDocs(query(collection(context.firestore(),"users"),where("email","==",email)));
+      expect(accounts.size).toBe(1);
+      uid=accounts.docs[0].id;
+    });
+    if(!uid)throw new Error("Disposable identity not found in emulator");
+    return uid;
+  });
 }
 async function setEntitlement(uid:string,values:Record<string,unknown>){
   return withEmulator(async env=>env.withSecurityRulesDisabled(async context=>
     updateDoc(doc(context.firestore(),"users",uid,"access","current"),values)));
 }
 async function readEntitlement(uid:string){
-  return withEmulator(async env=>env.withSecurityRulesDisabled(async context=>
-    (await getDoc(doc(context.firestore(),"users",uid,"access","current"))).data()));
+  return withEmulator(async env=>{
+    let state:import("firebase/firestore").DocumentData|undefined;
+    await env.withSecurityRulesDisabled(async context=>{
+      state=(await getDoc(doc(context.firestore(),"users",uid,"access","current"))).data();
+    });
+    return state;
+  });
 }
 
 test("isolated E2E: trial expiry locks UI and Firestore; retries and refresh cannot renew it",async({page},info)=>{
