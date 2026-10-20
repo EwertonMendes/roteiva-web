@@ -32,9 +32,11 @@ export function useDriveUploads(
   },[publish]);
   const run=useCallback(async(task:Task)=>{
     let uploaded:UploadedFile|undefined;
+    let sessionStarted=false;
     try{
       update(task,{status:"starting",error:undefined,sent:0});
       const session=await callbacks.current.create(task.file,task.entry.destination);
+      sessionStarted=true;
       if(task.controller.signal.aborted)throw new UploadFailure("cancelled","Envio cancelado.");
       update(task,{status:"uploading"});
       uploaded=await sendToDrive(task.file,session,task.controller.signal,bytes=>{
@@ -51,8 +53,8 @@ export function useDriveUploads(
         update(task,{status:"cancelled",error:undefined});
       }else{
         const message=error instanceof Error?error.message:"Não foi possível enviar o arquivo.";
-        update(task,{status:uploaded?"unconfirmed":"failed",error:uploaded
-          ?"O Google recebeu o arquivo, mas a confirmação falhou. Atualize a pasta antes de tentar enviá-lo novamente."
+        update(task,{status:sessionStarted?"unconfirmed":"failed",error:sessionStarted
+          ?"Não foi possível confirmar o estado do arquivo no Google. Verifique a pasta antes de tentar outro envio. "+message
           :message});
       }
     }finally{
