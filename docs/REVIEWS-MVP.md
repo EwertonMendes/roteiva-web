@@ -21,7 +21,7 @@ A rota pública `/review/{capability}` funciona sem cadastro no Roteiva. O modo 
 
 ## Fluxo de uso
 
-1. Cadastre o cliente e um projeto vinculado. Na Biblioteca, conecte o Drive e vincule uma pasta ao projeto. Faça upload nessa pasta ou use arquivos existentes autorizados.
+1. Cadastre o cliente e um projeto vinculado. Na Biblioteca, conecte o Drive e vincule uma pasta ao projeto. Faça upload nessa pasta ou use arquivos existentes autorizados. O compositor também utiliza a fila de upload resumable já existente, com seletor local e arrastar/soltar, selecionando o material automaticamente quando o Google confirma a conclusão.
 2. Abra Aprovações ou use o atalho no projeto/cliente. Selecione cliente, projeto, modalidade de acesso, título, validade e arquivos.
 3. Clique em Gerar aprovação. A solicitação começa em rascunho, concede no Drive somente os arquivos escolhidos e, após confirmação, passa para Aguardando cliente. Se falhar, o rascunho fica recuperável.
 4. Compartilhe a URL por cópia, WhatsApp ou e-mail. O Roteiva prepara o texto; não afirma que a mensagem foi enviada.
