@@ -90,7 +90,7 @@ export function useDriveUploads(
 
   const cancel=useCallback((id:string)=>{
     const task=tasks.current.find(t=>t.entry.id===id);
-    if(!task||["completed","cancelled","unconfirmed"].includes(task.entry.status))return;
+    if(!task||["completed","cancelled","unconfirmed","verifying"].includes(task.entry.status))return;
     task.controller.abort();
     if(task.entry.status==="queued")update(task,{status:"cancelled"});
   },[update]);
