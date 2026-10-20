@@ -12,7 +12,7 @@ CREATE TABLE review_requests (
  message TEXT NOT NULL DEFAULT '',
  recipient_email TEXT NOT NULL DEFAULT '',
  access_mode TEXT NOT NULL CHECK(access_mode IN ('link','google')),
- status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft','publishing','pending','changes','approved','closing','closed')),
+ status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft','publishing','pending','changes','approved','replacing','closing','closed')),
  current_version INTEGER NOT NULL DEFAULT 1 CHECK(current_version>=1),
  expires_at INTEGER NOT NULL,
  token_hash TEXT NOT NULL UNIQUE,
