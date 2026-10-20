@@ -467,27 +467,37 @@ Evidências de deploy, commits, limites da comparação por contagens e reversã
 
 
 
+- **VALIDADO NO PIPELINE OFICIAL DA MASTER:** [QA 39358964120](https://github.com/EwertonMendes/roteiva-web/actions/runs/39358964120), commit b0ae124: 30 Rules + 55 Playwright aprovados, três skips previstos. Pedido real de exclusão descartável aceito após login manual recente; conclusão da saga e proteção no recadastro posteriormente verificadas na PR #51.
+
 ## Upload resumable para pastas vinculadas — PR #52 (20/10/2026)
 
-**Status: IMPLEMENTADO em PR draft, NÃO VALIDADO ponta-a-ponta com Google real.**
+**Status: PARCIAL — implementação ampliada; PR draft; Google real BLOQUEADO para homologação.**
 
-- [x] Worker valida Firebase ID token, entitlement, conexão por UID e vínculo
-  existente Firestore, além da descendência da pasta no Drive.
-- [x] Worker inicia sessão de upload sem receber conteúdo dos arquivos e
-  confirma metadados, pasta e tamanho no Google ao concluir.
-- [x] Explorador permite múltiplos arquivos e drag-and-drop com fila limitada,
-  progresso, cancelamento, recuperação limitada e estado de confirmação incerta.
-- [x] Invalidação seletiva de cache e atualização da listagem da pasta alvo.
-- [x] Testes de backend e cliente com provedores simulados; E2E desktop/mobile
-  simulado adicionado à regressão Playwright (resultado da execução a registrar).
-- [ ] PoC real CORS/PUT/308/Range e arquivo acima de 250 MB, Safari/mobile físico.
-- [ ] Google Picker com token apenas drive.file para permissão de escrita em
-  pastas preexistentes; configuração Google Cloud e validação A/B.
-- [ ] QA real da conta Google, revisão de segurança e merge/deploy DEV autorizado.
+- [x] Auditoria da implementação existente e dos checks; master com PRs #51/#53/#54 incorporada.
+- [x] JWT/Origin/entitlement/UID, vínculo e existência do projeto, ascendência real,
+  capacidade da pasta destino e autorização por app verificadas no backend.
+- [x] Migration 0012: tentativa por UID, file ID pré-gerado Google, capacidade cifrada,
+  confirmação vinculada e idempotente, TTL/limpeza e fence de reconexão.
+- [x] Google Picker oficial implementado via novo GIS token drive.file + openid,
+  include_granted_scopes=false, validação servidor de cliente/subject/escopos/validade.
+- [x] Fila permanece ao navegar no workspace, duas transferências, limite de 100,
+  progresso confirmado, status probes obrigatórios após falhas e cancelamento.
+- [x] Confirmação incerta pode repetir só a verificação, sem retransmitir arquivo;
+  invalidação seletiva e thumbnails privadas quando disponíveis.
+- [x] Testes API/SQLite/JWT sintético, cliente e E2E com provedores simulados ampliados.
+  Evidência final de checks na própria PR; não equivalem a homologação Google real.
+- [x] Script opt-in de prova real reproduzível: scripts/qa-drive-real.mjs, sem tokens em logs.
+- [ ] Chave Picker restrita: Console do projeto Drive DEV não tem chave de API;
+  cadastrar GOOGLE_PICKER_API_KEY no Worker DEV. Origem OAuth DEV já conferida.
+- [ ] Conta de teste com entitlement ativo: sessão DEV inspecionada estava expirada.
+- [ ] PoC real CORS/preflight/PUT/308/Range/200–201, vídeo >250 MiB e recuperação.
+- [ ] QA Google A/B, revogação/reconexão, Safari e dispositivo móvel físico.
+- [ ] Revisão final, autorização de publicação de teste e homologação DEV; sem merge automático.
 
-Não subir para master como recurso validado enquanto os itens bloqueantes não
-forem resolvidos. Detalhes e procedimentos: [DRIVE-UPLOAD.md](DRIVE-UPLOAD.md).
-- **VALIDADO NO PIPELINE OFICIAL DA MASTER:** [QA 39358964120](https://github.com/EwertonMendes/roteiva-web/actions/runs/39358964120), commit b0ae124: 30 Rules + 55 Playwright aprovados, três skips previstos. Pedido real de exclusão descartável aceito após login manual recente; conclusão da saga e proteção no recadastro posteriormente verificadas na PR #51.
+F5/fechamento perde seleção e fila; beforeunload alerta. Nenhuma retomada entre
+sessões é prometida. Nenhum deploy foi realizado nesta revisão; PROD preservado.
+Configuração, limites, decisões e procedimento completo: [DRIVE-UPLOAD.md](DRIVE-UPLOAD.md).
+
 
 
 ### Proteção de reutilização do trial — PR #51, auditoria de 20/10/2026

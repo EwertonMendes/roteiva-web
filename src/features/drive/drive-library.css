@@ -1,5 +1,5 @@
 /* Biblioteca 2.0 — isolated, theme-aware Drive explorer */
-.rl-library {
+.rl-library,.rl-transfer-layer {
   --rl-surface: var(--card, #fff);
   --rl-hover: var(--subtle, rgba(128,128,128,.09));
   --rl-border: var(--line, rgba(128,128,128,.16));
@@ -8,6 +8,13 @@
   color: var(--rl-ink);
   min-width: 0;
 }
+.rl-transfer-layer button {font:inherit;cursor:pointer;}
+.rl-transfer-layer button:focus-visible {outline:2px solid var(--rl-ink);outline-offset:2px;}
+.rl-upload-authorization {position:fixed;z-index:100;left:50%;top:90px;transform:translateX(-50%);
+  width:min(580px,calc(100vw - 24px));padding:16px;border:1px solid var(--rl-border);border-radius:13px;
+  background:var(--paper,#fff);box-shadow:0 14px 50px #0003;max-height:70dvh;overflow:auto;}
+.rl-upload-authorization .rl-status {flex-wrap:wrap;}
+.rl-upload-authorization .rl-status p {flex-basis:100%;}
 .rl-library button,.rl-library select,.rl-library input {font: inherit;}
 .rl-library button {cursor: pointer;}
 .rl-library button:disabled {cursor: not-allowed;opacity:.55;}
@@ -443,6 +450,7 @@
 
 /* The queue remains visible while navigating folders, without forcing page scroll. */
 .rl-upload-queue {position:fixed;z-index:95;right:24px;bottom:24px;
+  background:var(--paper,#fff);
   width:min(420px,calc(100vw - 32px));max-height:min(54dvh,420px);
   box-shadow:0 14px 50px #0003;display:flex;flex-direction:column;margin-top:0;}
 .rl-upload-heading-actions {display:flex;align-items:center;gap:8px;}

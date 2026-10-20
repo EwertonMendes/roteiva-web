@@ -8,13 +8,15 @@ export type UploadEntry={
   id:string;name:string;size:number;sent:number;destination:UploadDestination;
   status:"queued"|"starting"|"uploading"|"verifying"|"completed"|"failed"|"unconfirmed"|"cancelled";
   error?:string;
+  canVerify?:boolean;
 };
-type Task={entry:UploadEntry;file:File;controller:AbortController};
+type Task={entry:UploadEntry;file:File|undefined;controller:AbortController;session?:UploadSession;uploaded?:UploadedFile};
 
 export function useDriveUploads(
-  create:(file:File,destination:UploadDestination)=>Promise<UploadSession>,
-  confirm:(uploaded:UploadedFile,file:File,destination:UploadDestination)=>Promise<UploadedFile>,
+  create:(file:File,destination:UploadDestination,attemptId:string,signal:AbortSignal)=>Promise<UploadSession>,
+  confirm:(uploaded:UploadedFile,size:number,destination:UploadDestination,session:UploadSession,signal:AbortSignal)=>Promise<UploadedFile>,
   completed:(file:UploadedFile,destination:UploadDestination)=>void,
+  ownerUid:string,
 ){
   const [uploads,setUploads]=useState<UploadEntry[]>([]);
   const tasks=useRef<Task[]>([]);
@@ -34,29 +36,35 @@ export function useDriveUploads(
     if(!disposed.current&&(beforeStatus!==task.entry.status||beforePct!==afterPct||patch.error!==undefined||patch.sent===0))publish();
   },[publish]);
   const run=useCallback(async(task:Task)=>{
-    let uploaded:UploadedFile|undefined;
-    let sessionStarted=false;
+    let sessionStarted=Boolean(task.session);
     try{
-      update(task,{status:"starting",error:undefined,sent:0});
-      const session=await callbacks.current.create(task.file,task.entry.destination);
-      sessionStarted=true;
+      if(!task.uploaded){
+        if(!task.file)throw new Error('Selecione o arquivo novamente.');
+        update(task,{status:"starting",error:undefined,sent:0});
+        const session=await callbacks.current.create(task.file,task.entry.destination,task.entry.id,task.controller.signal);
+        task.session=session;sessionStarted=true;
+        if(task.controller.signal.aborted)throw new UploadFailure("cancelled","Envio cancelado.");
+        update(task,{status:"uploading"});
+        task.uploaded=await sendToDrive(task.file,session,task.controller.signal,bytes=>{
+          update(task,{sent:Math.min(bytes,task.entry.size)});
+        });
+        task.file=undefined; // Release the browser's file handle as soon as bytes finish.
+      }
       if(task.controller.signal.aborted)throw new UploadFailure("cancelled","Envio cancelado.");
-      update(task,{status:"uploading"});
-      uploaded=await sendToDrive(task.file,session,task.controller.signal,bytes=>{
-        update(task,{sent:Math.min(bytes,task.file.size)});
-      });
-      if(task.controller.signal.aborted)throw new UploadFailure("cancelled","Envio cancelado.");
-      update(task,{status:"verifying",sent:task.file.size});
-      const verified=await callbacks.current.confirm(uploaded,task.file,task.entry.destination);
+      update(task,{status:"verifying",sent:task.entry.size});
+      const verified=await callbacks.current.confirm(task.uploaded,task.entry.size,task.entry.destination,task.session!,task.controller.signal);
       if(task.controller.signal.aborted)throw new UploadFailure("cancelled","Envio cancelado.");
       update(task,{status:"completed"});
+      task.session=undefined;task.uploaded=undefined;
       callbacks.current.completed(verified,task.entry.destination);
     }catch(error){
       if(task.controller.signal.aborted){
-        update(task,{status:"cancelled",error:undefined});
+        task.file=undefined;task.session=undefined;
+        update(task,{status:"cancelled",error:sessionStarted?'Envio interrompido. Confira a pasta: o Google pode ter recebido o arquivo.':undefined});
       }else{
+        if(sessionStarted)task.file=undefined;
         const message=error instanceof Error?error.message:"Não foi possível enviar o arquivo.";
-        update(task,{status:sessionStarted?"unconfirmed":"failed",error:sessionStarted
+        update(task,{status:sessionStarted?"unconfirmed":"failed",canVerify:Boolean(task.uploaded),error:sessionStarted
           ?"Não foi possível confirmar o estado do arquivo no Google. Verifique a pasta antes de tentar outro envio. "+message
           :message});
       }
@@ -82,7 +90,7 @@ export function useDriveUploads(
   const enqueue=useCallback((files:File[],destination:UploadDestination)=>{
     if(disposed.current)return {added:0,rejected:files.length};
     const added=files.filter(file=>file.size>0 && Number.isSafeInteger(file.size)
-      && file.size<=5_000_000_000_000).map(file=>{
+      && file.size<=5_000_000_000_000).slice(0,Math.max(0,100-tasks.current.length)).map(file=>{
       const entry:UploadEntry={id:crypto.randomUUID(),name:file.name,size:file.size,
         sent:0,status:"queued",destination:{...destination}};
       return {entry,file,controller:new AbortController()};
@@ -95,11 +103,11 @@ export function useDriveUploads(
     const task=tasks.current.find(t=>t.entry.id===id);
     if(!task||["completed","cancelled","unconfirmed","verifying"].includes(task.entry.status))return;
     task.controller.abort();
-    if(task.entry.status==="queued")update(task,{status:"cancelled"});
+    if(task.entry.status==="queued"){task.file=undefined;update(task,{status:"cancelled"});}
   },[update]);
   const retry=useCallback((id:string)=>{
     const task=tasks.current.find(t=>t.entry.id===id);
-    if(!task||task.entry.status!=="failed")return;
+    if(!task||(task.entry.status!=="failed"&&!(task.entry.status==="unconfirmed"&&task.uploaded)))return;
     task.controller=new AbortController();
     update(task,{status:"queued",sent:0,error:undefined});
     pumpRef.current();
@@ -113,7 +121,19 @@ export function useDriveUploads(
 
   useEffect(()=>{
     disposed.current=false;
-    return ()=>{disposed.current=true;tasks.current.forEach(t=>t.controller.abort());};
-  },[]);
-  return {uploads,enqueue,cancel,retry,dismiss};
+    const warn=(event:BeforeUnloadEvent)=>{
+      if(tasks.current.some(t=>['queued','starting','uploading','verifying'].includes(t.entry.status))){event.preventDefault();event.returnValue='';}
+    };
+    window.addEventListener('beforeunload',warn);
+    return ()=>{disposed.current=true;tasks.current.forEach(t=>t.controller.abort());tasks.current=[];
+      window.removeEventListener('beforeunload',warn);};
+  },[ownerUid]);
+  const cancelAll=useCallback((connectionId:string)=>{
+    tasks.current.filter(t=>t.entry.destination.connectionId===connectionId).forEach(t=>{
+      t.controller.abort();t.file=undefined;t.session=undefined;
+      t.uploaded=undefined;t.entry.canVerify=false;
+      if(['queued','failed','unconfirmed'].includes(t.entry.status))t.entry.status='cancelled';
+    });publish();
+  },[publish]);
+  return {uploads,enqueue,cancel,retry,dismiss,cancelAll};
 }

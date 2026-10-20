@@ -1,5 +1,5 @@
-export type UploadSession = {sessionUrl:string;chunkSize:number};
-export type UploadedFile = {id:string;name:string;mimeType:string;size:string;webViewLink?:string};
+export type UploadSession = {attemptId:string;sessionUrl:string;chunkSize:number};
+export type UploadedFile = {id:string;name:string;mimeType:string;size:string;webViewLink?:string;thumbnailTicket?:string;modifiedTime?:string};
 type Reply = {status:number;range:string|null;text:string};
 
 const MAX_RETRIES=4;
@@ -15,7 +15,7 @@ export function validSession(value:string):string {
   try{url=new URL(value);}catch{throw new UploadFailure('invalid_session','O Google devolveu uma sessão inválida.');}
   if(url.protocol!=="https:"||!["www.googleapis.com","content.googleapis.com"].includes(url.hostname)||
      url.port||url.username||url.password||url.hash||
-     !url.pathname.startsWith("/upload/drive/v3/files")||!url.searchParams.has("upload_id"))
+     url.pathname!=="/upload/drive/v3/files"||!url.searchParams.get("upload_id"))
     throw new UploadFailure("invalid_session","O endereço do upload não é confiável.");
   return url.href;
 }
@@ -24,36 +24,22 @@ function abortError():Error {
   return new UploadFailure("cancelled","Envio cancelado.");
 }
 
-function request(url:string,file:File,start:number,end:number,statusQuery:boolean,
-  signal:AbortSignal,progress:(bytes:number)=>void):Promise<Reply> {
-  return new Promise((resolve,reject)=>{
-    if(signal.aborted){reject(abortError());return;}
-    const xhr=new XMLHttpRequest();
-    let settled=false;
-    const finish=(reply?:Reply,error?:Error)=>{
-      if(settled)return;
-      settled=true;
-      signal.removeEventListener("abort",abort);
-      if(error)reject(error);else resolve(reply!);
-    };
-    const abort=()=>{xhr.abort();finish(undefined,abortError());};
-    xhr.open("PUT",url,true);
-    xhr.timeout=90_000;
-    xhr.setRequestHeader("Content-Range",statusQuery
-      ?"bytes */"+file.size
-      :"bytes "+start+"-"+(end-1)+"/"+file.size);
-    if(!statusQuery)xhr.setRequestHeader("Content-Type",file.type||"application/octet-stream");
-    xhr.upload.onprogress=e=>{
-      if(e.lengthComputable&&!statusQuery)progress(Math.min(end,start+e.loaded));
-    };
-    xhr.onload=()=>finish({status:xhr.status,range:xhr.getResponseHeader("Range"),text:xhr.responseText||""});
-    xhr.onerror=()=>finish(undefined,new UploadFailure("network","Não foi possível alcançar o Google Drive. Confira a conexão e as permissões do navegador."));
-    xhr.ontimeout=()=>finish(undefined,new UploadFailure("timeout","O envio excedeu o tempo de resposta do Google Drive."));
-    xhr.onabort=()=>finish(undefined,abortError());
-    signal.addEventListener("abort",abort,{once:true});
-    if(signal.aborted){abort();return;}
-    xhr.send(statusQuery?null:file.slice(start,end));
-  });
+async function request(url:string,file:File,start:number,end:number,statusQuery:boolean,
+  signal:AbortSignal):Promise<Reply> {
+  if(signal.aborted)throw abortError();
+  try{
+    const response=await fetch(url,{method:'PUT',mode:'cors',credentials:'omit',redirect:'error',
+      referrerPolicy:'no-referrer',signal:AbortSignal.any([signal,AbortSignal.timeout(90_000)]),
+      headers:{'Content-Range':statusQuery?'bytes */'+file.size:'bytes '+start+'-'+(end-1)+'/'+file.size,
+        ...(statusQuery?{}:{'Content-Type':file.type||'application/octet-stream'})},
+      body:statusQuery?null:file.slice(start,end)});
+    return {status:response.status,range:response.headers.get('Range'),text:await response.text()};
+  }catch(error){
+    if(signal.aborted)throw abortError();
+    if(error instanceof Error&&error.name==='TimeoutError')
+      throw new UploadFailure('timeout','O envio excedeu o tempo de resposta do Google Drive.');
+    throw new UploadFailure('network','Não foi possível alcançar o Google Drive. Confira a conexão e as permissões do navegador.');
+  }
 }
 
 function parseUploaded(reply:Reply):UploadedFile {
@@ -81,10 +67,21 @@ function nextOffset(reply:Reply,size:number):number {
 function wait(ms:number,signal:AbortSignal):Promise<void>{
   return new Promise((resolve,reject)=>{
     if(signal.aborted){reject(abortError());return;}
-    const timer=window.setTimeout(()=>{signal.removeEventListener("abort",abort);resolve();},ms);
-    const abort=()=>{window.clearTimeout(timer);reject(abortError());};
+    const timer=globalThis.setTimeout(()=>{signal.removeEventListener("abort",abort);resolve();},ms);
+    const abort=()=>{globalThis.clearTimeout(timer);reject(abortError());};
     signal.addEventListener("abort",abort,{once:true});
   });
+}
+
+function rejection(reply:Reply):UploadFailure|null {
+  let reasons:string[]=[];
+  try{reasons=JSON.parse(reply.text)?.error?.errors?.map((entry:{reason:string})=>entry.reason)||[];}catch{/* no raw provider text */}
+  if(RETRYABLE.has(reply.status)||reasons.some(reason=>['rateLimitExceeded','userRateLimitExceeded'].includes(reason)))return null;
+  if(reply.status===507||reasons.includes('storageQuotaExceeded'))return new UploadFailure('storage_full','Seu Google Drive está sem espaço disponível.');
+  if(reply.status===401)return new UploadFailure('authorization_expired','A autorização do Google expirou. Reconecte sua conta.');
+  if(reply.status===404||reply.status===410)return new UploadFailure('session_expired','A sessão de envio expirou. Confira a pasta antes de iniciar outro envio.');
+  if(reply.status===403)return new UploadFailure('permission_denied','O Google recusou a permissão de envio. Confira o acesso à pasta.');
+  return new UploadFailure('google_rejected','O Google recusou o arquivo (HTTP '+reply.status+').');
 }
 
 /** Bounded resumable chunking: query server state after uncertain writes, never guess bytes. */
@@ -97,35 +94,36 @@ export async function sendToDrive(file:File,session:UploadSession,signal:AbortSi
     throw new UploadFailure("invalid_session","O tamanho dos blocos de envio é inválido.");
   let offset=0;
   let failures=0;
+  let uncertain=false;
   while(offset<file.size) {
     if(signal.aborted)throw abortError();
     const end=Math.min(file.size,offset+chunkSize);
     let result:Reply;
     try{
-      result=await request(url,file,offset,end,false,signal,onProgress);
+      // Once a write is uncertain, ONLY status probes may run until one succeeds.
+      result=await request(url,file,offset,end,uncertain,signal);
       if(result.status===200||result.status===201){
-        onProgress(file.size);
-        return parseUploaded(result);
+        const uploaded=parseUploaded(result);
+        if(uploaded.size!==String(file.size))throw new UploadFailure('invalid_response','O tamanho confirmado pelo Google não corresponde ao arquivo.');
+        onProgress(file.size);return uploaded;
       }
       if(result.status===308){
         const next=nextOffset(result,file.size);
-        if(next<=offset)throw new UploadFailure("invalid_range","O Google não confirmou o progresso do bloco.");
-        offset=next;onProgress(offset);failures=0;continue;
+        if(next> end || next<offset)throw new UploadFailure('invalid_range','O Google retornou um progresso inconsistente.');
+        if(!uncertain && next===offset)throw new UploadFailure("invalid_range","O Google não confirmou o progresso do bloco.");
+        const progressed=next>offset;
+        offset=next;onProgress(offset);uncertain=false;
+        if(progressed)failures=0;
+        continue;
       }
-      if(!RETRYABLE.has(result.status))throw new UploadFailure("google_rejected",
-        result.status===403?"O Google recusou a permissão de envio.":"O Google recusou o arquivo (HTTP "+result.status+").");
+      const error=rejection(result);if(error)throw error;
     }catch(error){
       if(signal.aborted)throw abortError();
       if(error instanceof UploadFailure && !["network","timeout"].includes(error.code))throw error;
     }
+    uncertain=true;
     if(++failures>MAX_RETRIES)throw new UploadFailure("retries_exhausted","O envio não pôde ser retomado após várias tentativas.");
     await wait(Math.min(500*2**(failures-1)+Math.random()*300,6500),signal);
-    let state:Reply;
-    try{state=await request(url,file,0,0,true,signal,()=>{});}
-    catch(error){if(signal.aborted)throw abortError();continue;}
-    if(state.status===200||state.status===201)return parseUploaded(state);
-    if(state.status===308){offset=nextOffset(state,file.size);onProgress(offset);continue;}
-    if(!RETRYABLE.has(state.status))throw new UploadFailure("google_rejected","O Google encerrou a sessão de envio.");
   }
   throw new UploadFailure("unconfirmed","O Google não confirmou o upload completo.");
 }

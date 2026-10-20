@@ -8,6 +8,7 @@ import { AuthProvider } from "./features/auth/AuthProvider";
 import { ProtectedRoute } from "./features/auth/ProtectedRoute";
 import { RegistrationGate } from "./features/auth/RegistrationGate";
 import { AccessGate } from "./features/access/AccessGate";
+import {DriveTransfersProvider} from "./features/drive/DriveTransfersProvider";
 import { FirebaseWorkspace } from "./features/workspace/FirebaseWorkspace";
 import "./globals.css";
 import "./responsive.css";
@@ -31,6 +32,6 @@ const review=window.location.pathname.replace(/\/+$/, "").endsWith("/review");
 createRoot(document.getElementById("root")!).render(<React.StrictMode>
   <SiteExperience />
   <AppErrorBoundary>{isDemo ? review ? <ReviewUnavailable /> : <DashboardClient firstName="Visitante" email="demo@roteiva.local" /> :
-    <AuthProvider><ProtectedRoute><RegistrationGate><AccessGate>{review ? <ReviewUnavailable /> : <FirebaseWorkspace />}</AccessGate></RegistrationGate></ProtectedRoute></AuthProvider>}
+    <AuthProvider><ProtectedRoute><RegistrationGate><AccessGate>{review ? <ReviewUnavailable /> : <DriveTransfersProvider><FirebaseWorkspace /></DriveTransfersProvider>}</AccessGate></RegistrationGate></ProtectedRoute></AuthProvider>}
   </AppErrorBoundary>
 </React.StrictMode>);

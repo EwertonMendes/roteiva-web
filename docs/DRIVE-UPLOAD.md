@@ -1,78 +1,220 @@
-# Upload Google Drive — implementação DEV
+# Upload Google Drive — PR #52
 
-## Estado e riscos
+## Estado em 20/10/2026
 
-Implementado em PR isolada da PR #51: autorização da pasta vinculada pelo Firestore REST
-(com o próprio Firebase ID Token), validação de descendência no Drive, abertura de
-sessão resumable pelo Worker, transferência direta via XHR do navegador para Google,
-progresso, fila de dois arquivos, cancelamento, retry limitado e confirmação
-autoritativa do arquivo no Drive. Nenhuma mídia atravessa Worker, D1 ou Firestore.
+**IMPLEMENTADO e em revisão; integração Google real BLOQUEADA para homologação.**
+Não fazer merge nem anunciar upload validado com base em mocks. Nenhum deploy
+foi realizado nesta revisão. PROD permanece fora do escopo.
 
-**Não considerar validado em Google real enquanto a PoC de CORS / drive.file /
-Google Picker não for concluída.** O browser precisa fazer PUT de blocos na URL
-da sessão Google, ler status 308 e header Range, receber resposta final JSON.
-Se a API Google não disponibilizar isso via CORS, não substituir por proxy de
-vídeo no Worker nem colocar OAuth token de leitura ampla no navegador.
+Auditoria: branch existente `feat/drive-resumable-upload`, HEAD original
+`556e467`; CI anterior verde. Incorporada a master `8f64876` para preservar as
+PRs #51/#53/#54. Checkout separado; mudanças locais de outro trabalho preservadas.
 
-O OAuth existente concede drive.file + drive.readonly. A listagem via
-drive.readonly **não concede escrita**. Em pasta já existente, drive.file pode
-recusar a criação com HTTP 403. O backend retorna erro explícito; **Google Picker
-oficial** com token somente drive.file é uma dependência para autorizar essas
-pastas e não deve ser contornado com scope drive irrestrito.
+Problemas corrigidos: confirmação aceitava arquivo existente sem uma tentativa;
+links de pastas podiam sobreviver à exclusão do projeto; capacidade de escrita
+não era verificada no destino quando subpasta; progresso contava bytes enviados
+pelo XHR antes de confirmação; probes de recuperação com falha podiam ser seguidos
+por reenvio; fila era desmontada ao sair da Biblioteca; faltava Google Picker.
 
-## Contratos DEV
+## Fluxo e contratos
 
-- POST /integrations/drive/:connectionId/folders/:folderId/uploads
-  - Body: projectId, linkedFolderId, name, size, mimeType
-  - Response: sessionUrl, chunkSize
-- POST /integrations/drive/:connectionId/folders/:folderId/uploads/complete
-  - Body: projectId, linkedFolderId, fileId, size
-  - Response: file (id, name, mimeType, size, webViewLink)
+Firebase Auth → Worker verifica JWT, Origin, entitlement D1 e rate limit → conexão
+por UID → vínculo e projeto via Firestore REST com o mesmo Firebase ID Token →
+ascendência real no Drive, pasta não excluída e `canAddChildren=true` → permissão
+por aplicativo (`isAppAuthorized`) → sessão Google → bytes navegador→Drive →
+confirmação autoritativa pelo Worker. Nenhum binário passa pelo Worker ou é
+armazenado no D1/Firestore/Storage.
 
-Ambos exigem Firebase ID token válido, entitlement ativo, Origin exata,
-rate limit por UID, conexão do próprio UID, documento driveFolders no Firestore
-autorizado pelas Rules e pasta de destino descendente da pasta vinculada. Nenhuma
-URL enviada pelo cliente é buscada pelo Worker. Google upload session Location
-tem HTTPS, host e path verificados antes de retornar ao navegador.
+Rotas sob `/integrations/drive/:connectionId/folders/:folderId/uploads`:
 
-A URL da sessão é **capability secret**: não registrar, salvar em localStorage,
-incluir em analytics ou compartilhar. Vive somente na memória. Uma sessão Google
-já emitida pode continuar aceitando bytes até expirar mesmo após logout/revogação:
-bloqueio de novas sessões não invalida instantaneamente uma capability já emitida.
+| Operação | Payload / retorno |
+|---|---|
+| POST base | `attemptId` UUID v4, `projectId`, `linkedFolderId`, `name`, `size`, `mimeType`; devolve `attemptId`, `sessionUrl`, `chunkSize` |
+| POST `/complete` | `attemptId`, `projectId`, `linkedFolderId`, `fileId`, `size`; devolve arquivo verificado e thumbnail ticket quando disponível |
+| POST `/authorize` | `projectId`, `linkedFolderId`; devolve `authorized:true` ou configuração pública mínima do Picker |
+| POST `/integrations/drive/:connectionId/picker/verify` | `accessToken` efêmero GIS; devolve `verified:true` após conferir cliente, identidade, escopos e validade |
 
-Tamanho de blocos: 8 MiB, múltiplo de 256 KiB. Limite por arquivo: 5 TB.
-Fila: dois uploads simultâneos. Não substitui arquivos pelo nome.
-Arquivos vazios são rejeitados. UI não persiste bytes do File nem promete retomar
-após refresh; retry é apenas com a mesma página aberta. Em confirmação incerta
-não reenvia automaticamente para evitar duplicatas.
+Todas as rotas exigem JWT válido, Origin DEV exata, entitlement ativo e rate limit.
+Tamanho de metadados limitado a 8 KiB **durante** a leitura do stream. Nomes,
+identificadores, inteiros e MIME são validados; conversão para tipos nativos Google
+não faz parte deste upload binário. Arquivos vazios são rejeitados; limite máximo
+5 TB, sujeito a limites reais/quota da conta Google.
 
-Ao confirmar no Google, invalida só o cache da pasta destino e atualiza a lista.
+## Tentativas e integridade
 
-## QA
+Migration aditiva `0012_drive_uploads.sql`: uma tentativa por `(owner_uid,id)`,
+conexão/revisão, projeto/raiz/destino, nome, MIME, tamanho e um ID de arquivo
+**pré-gerado pelo Google** (`files.generateIds`). A reserva precede o POST Google.
+A confirmação só aceita esse ID e os metadados autorizados, além de rever vínculo,
+ascendência, conexão e tamanho. Um arquivo arbitrário preexistente não satisfaz
+a tentativa. Confirmação repetida é idempotente.
 
-Automático sem Google real:
-- api/tests/uploads.test.mjs: vínculo, isolamento, descendência, 403,
-  metadados, rejeição de URL e confirmação de pasta/tamanho.
-- tests/drive-upload.test.mjs: host permitido, blocos, Range, upload sem bearer.
-- Pipelines existentes: testes, typecheck, regressão Playwright desktop/mobile.
+A capability URL é cifrada AES-GCM com AAD específico da tentativa/UID/conta/conexão
+no D1; permite recuperar a resposta de início perdida usando o mesmo attemptId.
+Não vai para Firestore, localStorage, URLs de navegação, analytics ou logs.
+TTL de aplicação: 24h; após confirmação o ciphertext é apagado. Cron existente
+remove até 100 registros expirados por execução. FK remove tentativas quando a
+conexão é excluída. Uma reserva cujo POST ficou incerto não emite outra criação.
+Reconexão/revisão diferente invalida a tentativa conservadoramente.
 
-Integração real obrigatória:
-1. Conta Google A e B; pasta vinculada pré-existente e pasta autorizada;
-   verificar drive.file e erro quando sem direito de escrita.
-2. Chromium, Firefox, Safari, Android/iOS reais; drop no desktop, botão mobile,
-   temas claro e escuro.
-3. Vídeo acima de 250 MB; conexão instável, 308 Range, retry e cancelamento.
-4. Login B não opera pasta de A. Assinatura expirada e conta em exclusão
-   não podem emitir nova sessão.
-5. CORS real: preflight PUT, Content-Range, 308, Range exposto, JSON final.
-6. Google Picker com token exclusivamente drive.file e conta Google correta.
-7. Smoke DEV, cache, previews, busca e suites E2E com evidências de execução.
+O host HTTPS e path Google são exatos, sem porta, credenciais, fragmento ou redirects
+automáticos. A autorização limita a ascendência a 32 níveis e tem orçamento de
+42 fetches externos, incluindo redirects, abaixo do teto Free de 50. O início inclui Origin DEV; isso é preparação para CORS e **não é
+prova de compatibilidade**. Uma capability Google já emitida pode aceitar bytes
+até expirar, mesmo após desconexão; não prometemos revogação instantânea dela.
+Novas operações Worker são negadas; o cliente interrompe pedidos no logout,
+desconexão, encerramento do workspace ou cancelamento.
 
-## Pendências deliberadas
+## Google Picker e menor privilégio
 
-- Não há migração D1: Drive é a fonte de verdade; fila não sobrevive ao F5.
-- Sem deploy PROD, escopo drive irrestrito ou nova service account.
-- Google Picker depende de configuração no Google Cloud (API key, APP ID)
-  e fluxo seguro de token drive.file. Deve ser implementado/validado antes do
-  lançamento externo caso as pastas existentes não aceitem gravação.
-- Não mergear automaticamente com compatibilidade real CORS ainda desconhecida.
+O OAuth confidencial existente (`drive.file + drive.readonly`) continua somente
+no backend, com refresh token cifrado. Seu bearer não é enviado ao browser.
+Quando `isAppAuthorized` já é verdadeiro, não se pede Picker novamente. Caso
+contrário, a fila oferece **Autorizar pasta no Google** e preserva os arquivos.
+
+GIS Token Model em gesto explícito solicita **novo** access token com
+`include_granted_scopes:false`, escopos `openid drive.file` e `login_hint` do
+subject da conexão. `openid` é necessário para identidade estável; não se pede
+email, profile, readonly ou escrita irrestrita. Não há tentativa de reduzir um
+token já emitido. Browser e Worker recusam escopos inesperados. Worker consulta
+`tokeninfo` por POST (credencial no body) e exige audience/authorized party do
+cliente configurado, validade mínima e o subject da conexão; usa OIDC UserInfo
+como fallback oficial se tokeninfo não incluir subject.
+
+Só depois dessa verificação o token chega ao Picker, com `setAppId` do mesmo
+projeto do OAuth client. O usuário deve selecionar a pasta exata; em seguida o
+Worker revalida a permissão real. Token, instância do Picker e callbacks ficam
+apenas em memória, com descarte, cancelamento e timeout. Cancelar/recusar não
+inicia upload; depois de autorizar, **Tentar novamente** usa o arquivo da fila.
+O popup nativo Google controla sua aparência; o aviso Roteiva segue claro/escuro,
+teclado e viewport móvel. Aparência do diálogo Google real ainda exige QA.
+
+## Transferências e experiência
+
+Fila global ao workspace, dois uploads simultâneos, até 100 entradas; destino
+copiado no enqueue. Navegar por pastas/projetos e outras telas não redireciona
+nem interrompe arquivos. Barra flutuante recolhível, nome/destino/status por
+arquivo e controles acessíveis. Blocos de 8 MiB, múltiplos de 256 KiB; `File.slice`
+evita materializar o vídeo inteiro em JavaScript. Handles liberados ao concluir,
+cancelar ou dispensar. Progresso conta somente bytes confirmados pelo Google.
+
+PUT via fetch com Content-Range, credentials omitidas e redirects bloqueados;
+308/Range define offset; 200/201 encerra transporte.
+Após rede/timeout/429/5xx/403 de rate limit: backoff exponencial com jitter,
+no máximo quatro recuperações consecutivas sem progresso, e probes vazios antes
+de qualquer reenvio. Probes que falham **não liberam** nova escrita. 401,
+permissão, expiração e armazenamento têm mensagens específicas. Confirmação
+incerta oferece **Verificar conclusão**, sem reenviar bytes. Cancelamento depois
+do início informa que um arquivo pode já ter sido recebido pelo Google.
+
+Somente cache da pasta destino (incluindo suas buscas/páginas) é invalidado.
+Arquivo verificado entra na lista/grade/busca local atual; miniatura usa ticket
+privado se Google já o fornecer. Processamento assíncrono de miniaturas no Google
+pode exigir nova abertura da pasta; não há polling de thumbnails ou reload global.
+Sem gravações Firestore no upload.
+
+F5/fechar aba perde fila e seleção dos arquivos; `beforeunload` alerta enquanto
+há trabalho. **Não há retomada entre sessões**: não guardamos Files nem capability
+no navegador. Antes de selecionar novamente após uma falha incerta, conferir o
+Drive. D1 sozinho não restaura o File escolhido nem promete retomada após F5.
+
+## Configuração externa e bloqueios observados
+
+Inspeção read-only do Console em 20/10/2026 confirmou:
+
+- Projeto `roteiva-drive-dev`, número `479738001561` e cliente Web existente
+  `479738001561-4gu97o42v4m8kiq1bga8ck3msmjp0me3.apps.googleusercontent.com`.
+- Origem JavaScript `https://roteiva-web-dev.web.app` já autorizada; callback
+  `https://roteiva-api-dev.ewertonmendes9.workers.dev/oauth/drive/callback` preservado.
+- **Nenhuma chave de API** na página Credenciais desse projeto.
+- Sessão Roteiva aberta estava em **Acesso expirado**. Não se alterou entitlement,
+  não se extraiu token pessoal nem se usaram dados reais como fixtures.
+
+Ações externas necessárias, sem inventar valores:
+
+1. No [Console de credenciais](https://console.cloud.google.com/apis/credentials?project=roteiva-drive-dev),
+   criar chave para Google Picker com restrição de aplicativo **Sites**, referrer
+   `https://roteiva-web-dev.web.app/*`, e restrição de API **Google Picker API**.
+   Conferir Google Picker API e Google Drive API habilitadas no mesmo projeto.
+   Não reutilizar a chave Firebase de outro projeto, nem criar chave irrestrita.
+2. Guardar a chave restrita como Worker Secret `GOOGLE_PICKER_API_KEY` no Worker
+   **roteiva-api-dev**; pelo terminal confiável: `npx wrangler secret put GOOGLE_PICKER_API_KEY --env dev`
+   dentro de `api/`. Não colar a chave no chat/repo. O Picker precisa recebê-la
+   temporariamente como developerKey; restrição de domínio/API é a proteção.
+3. Manter OAuth consent screen em Testing, com as duas contas de teste autorizadas
+   e escopos necessários já descritos. Não ampliar para `drive` irrestrito.
+4. Aplicar 0012 antes do Worker pelo pipeline oficial e publicar apenas em DEV
+   de teste quando a revisão autorizar. Hosting/Worker devem usar o mesmo contrato.
+   Esta PR não fez deploy, merge ou alteração em PROD.
+5. Disponibilizar UID de teste com acesso ativo, conexão própria e pasta descartável
+   vinculada. A conta atualmente aberta não pode passar pelo gate de upload.
+   Login/reativação devem seguir o fluxo normal autorizado do produto.
+6. Comprovar: autorizar pasta existente no Picker, conferir conexão A/B, executar
+   vídeo >250 MiB com recuperação real e checar arquivo na pasta correta. Testar
+   revogação/reconexão e Safari/dispositivo físico. Só então retirar draft.
+
+## QA automatizado e prova real
+
+- `api/tests/uploads.test.mjs`: Firestore/Google sintéticos, SQLite real, metadata,
+  vínculo/projeto, subpastas, permissões, sessão criptografada/idempotência,
+  expiração, confirmação inválida, reconexão, Picker/conta/cliente/escopos/quota.
+  Exercita também `handle` com Firebase JWT assinado sintético e JWKS simulado:
+  identidade inválida, Origin, entitlement ausente/suspensão e usuários A/B.
+- `tests/drive-upload.test.mjs`: ranges, bytes confirmados, falhas sucessivas de
+  status, confirmação perdida, quota, cancelamento e slicing de arquivo grande
+  **sintético**, sem alocar o conteúdo. Não é vídeo real de 301 MiB.
+- `tests/browser/drive-folders.spec.ts`: botão/drop, mobile/desktop, concorrência,
+  navegação, cancelamento, claro/escuro, lista/grade/filtro, confirmação sem
+  duplicação e contrato GIS/Picker simulado com recusa e recuperação.
+- `pnpm build:emulator && pnpm build:demo`; QA isolado:
+  `pnpm exec firebase emulators:exec --project demo-roteiva --only auth,firestore "pnpm exec playwright test tests/browser/drive-folders.spec.ts"`.
+  Emuladores usam projeto fictício; provedores Google são simulados.
+
+Prova real reproduzível: `node scripts/qa-drive-real.mjs`. O script bloqueia sem
+fixtures explícitas e não é executado no CI público. Usa Chromium sem perfil
+pessoal/tracing, abre a origem DEV e transfere um arquivo local via o **mesmo
+cliente de produção** transpilado. Exige estas variáveis no ambiente seguro:
+
+- `ROTEIVA_QA_FIREBASE_TOKEN`: ID Token atual do UID de teste ativo, nunca refresh token.
+- `ROTEIVA_QA_DRIVE_CONNECTION`, `ROTEIVA_QA_DRIVE_FOLDER`,
+  `ROTEIVA_QA_DRIVE_LINKED_FOLDER`, `ROTEIVA_QA_PROJECT_ID`: destino descartável previamente autorizado.
+- `ROTEIVA_QA_VIDEO_FILE`: caminho absoluto de vídeo de teste >250 MiB.
+- `ROTEIVA_QA_DISPOSABLE_FOLDER=yes`: reconhecimento de fixture descartável.
+- `ROTEIVA_QA_INTERRUPT=yes` opcional: descarta localmente um acknowledgement
+  **real** 308 para obrigar status query real, sem simular respostas Google.
+
+Saída contém apenas tamanho, progresso, contagens de status e verificação. Não
+registra identidade, nomes, tokens, IDs ou capability URLs. Arquivo é preservado
+na pasta de teste; não há exclusão automática. Expirar token/estado deve produzir
+falha, nunca sucesso presumido. A prova ainda **não foi executada com credenciais**:
+CORS/preflight/Range/200–201 e vídeo real permanecem não comprovados.
+
+## Referências oficiais consultadas
+
+- [Uploads e recuperação](https://developers.google.com/workspace/drive/api/guides/manage-uploads)
+- [Google Picker Web](https://developers.google.com/workspace/drive/picker/guides/web-picker)
+- [Escopos do Drive](https://developers.google.com/workspace/drive/api/guides/api-specific-auth)
+- [Recurso files e capacidades](https://developers.google.com/workspace/drive/api/reference/rest/v3/files)
+- [IDs pré-gerados](https://developers.google.com/workspace/drive/api/reference/rest/v3/files/generateIds)
+- [GIS TokenClient / include_granted_scopes](https://developers.google.com/identity/oauth2/web/reference/js-reference)
+- [OIDC / UserInfo](https://developers.google.com/identity/openid-connect/reference)
+- [Cloudflare Workers limits](https://developers.cloudflare.com/workers/platform/limits/)
+
+Limites documentados e exemplos oficiais não substituem observação no navegador.
+Bytes de vídeo continuam fora do Worker; não foi introduzido proxy alternativo.
+
+### Evidência local desta revisão
+
+- API: **114/114** testes passaram, incluindo binding D1/workerd isolado;
+  TypeScript, migrations locais até 0012 e bundle dry-run aprovados.
+- Frontend: **36/36** unitários, mais scripts de Agenda e Financeiro aprovados;
+  TypeScript e builds Firebase/emulator/demo aprovados.
+- Firestore Rules: **30/30** testes A/B nos emuladores passaram.
+- QA Drive isolado: **15 aprovados, 3 skips previstos** por plataforma;
+  inclui contrato Picker simulado e transferência com fetch sem redirects.
+- Revisão visual da fila desktop/mobile em tema escuro identificou transparência
+  sobre o conteúdo; fundo opaco corrigido e cenário de geometria/captura reexecutado.
+- Script real sem fixture: bloqueio seguro esperado; **nenhum upload Google real**.
+
+Os checks públicos do HEAD e QA manual no GitHub são vinculados na descrição da PR.
+Estas contagens locais não validam os itens Google reais ainda bloqueados.

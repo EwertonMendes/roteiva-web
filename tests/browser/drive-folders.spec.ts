@@ -254,7 +254,7 @@ test("upload uses file picker and drag-and-drop, confirms Drive and updates the 
     }
     seen.push({kind:"init",body:payload});
     return route.fulfill({status:200,headers:cors,contentType:"application/json",
-      body:JSON.stringify({sessionUrl:external,chunkSize:262144})});
+      body:JSON.stringify({attemptId:payload.attemptId,sessionUrl:external,chunkSize:262144})});
   });
   await page.route(/https:\/\/www\.googleapis\.com\/upload\/drive\/v3\/files\?/,async route=>{
     const cors={"Access-Control-Allow-Origin":cloud,"Access-Control-Allow-Methods":"PUT, OPTIONS",
@@ -278,7 +278,7 @@ test("upload uses file picker and drag-and-drop, confirms Drive and updates the 
   await panel.getByLabel("Selecionar arquivos para enviar").setInputFiles({
     name:"Novo arquivo.txt",mimeType:"text/plain",buffer:Buffer.from("abc")
   });
-  const queue=panel.getByLabel("Transferências para Google Drive");
+  const queue=page.getByLabel("Transferências para Google Drive");
   await expect(queue.getByText("Arquivo enviado para Campanha de vídeos")).toBeVisible();
   await expect(panel.locator(".rl-files .rl-file-open").filter({hasText:"Novo arquivo.txt"})).toBeVisible();
   expect(seen.filter(x=>x.kind==="init")).toHaveLength(1);
@@ -286,6 +286,7 @@ test("upload uses file picker and drag-and-drop, confirms Drive and updates the 
   const init=seen.find(x=>x.kind==="init")!.body as Record<string,unknown>;
   expect(init.linkedFolderId).toBe(folderId);
   expect(init.size).toBe(3);
+  expect((seen.find(x=>x.kind==='complete')!.body as Record<string,unknown>).attemptId).toBe(init.attemptId);
   if(info.project.name==="desktop"){
     await panel.locator(".rl-content").evaluate(element=>{
       const data=new DataTransfer();
@@ -296,4 +297,127 @@ test("upload uses file picker and drag-and-drop, confirms Drive and updates the 
     await expect(queue.getByText("Arrasto.txt")).toBeVisible();
     await expect(queue.getByText("Arquivo enviado para Campanha de vídeos")).toHaveCount(2);
   }
+});
+
+async function openUploadFolder(page:Page,email:string){
+  await signUp(page,email);await createProject(page);
+  await page.goto(cloud+'/biblioteca?driveE2E=1');
+  const panel=page.getByRole('region',{name:'Biblioteca Google Drive'});
+  await panel.getByRole('button',{name:'Vincular pasta',exact:true}).first().click();
+  const dialog=page.getByRole('dialog',{name:'Selecionar pastas do Google Drive'});
+  await dialog.getByLabel('Projeto para vincular pastas').selectOption({label:'Projeto Drive Teste'});
+  await dialog.getByRole('checkbox',{name:'Selecionar Campanha de vídeos'}).check();
+  await dialog.getByRole('button',{name:'Vincular 1 pasta'}).click();
+  await expect(panel.getByRole('button',{name:'Enviar arquivos'})).toBeVisible();return panel;
+}
+const uploadCors={'Access-Control-Allow-Origin':cloud,'Access-Control-Allow-Headers':'Authorization, Content-Type',
+  'Access-Control-Allow-Methods':'POST, OPTIONS'};
+
+test('queue limits concurrency, keeps its destination across workspace navigation and cancels queued files',async({page},info)=>{
+  await mockDrive(page,()=>true);
+  let release!:()=>void;const gate=new Promise<void>(resolve=>{release=resolve;});let started=0;
+  await page.route(api+'/integrations/drive/'+connection+'/folders/'+folderId+'/uploads',async route=>{
+    if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers:uploadCors});
+    started++;await gate;
+    await route.fulfill({status:403,headers:uploadCors,contentType:'application/json',body:JSON.stringify({error:{code:'drive_storage_full'}})}).catch(()=>{});
+  });
+  const panel=await openUploadFolder(page,'drive-queue-'+info.project.name+'@example.com');
+  await panel.getByLabel('Selecionar arquivos para enviar').setInputFiles(['one','two','three'].map(name=>({name:name+'.txt',mimeType:'text/plain',buffer:Buffer.from('abc')})));
+  const queue=page.getByLabel('Transferências para Google Drive');
+  await expect.poll(()=>started).toBe(2);
+  await expect(queue.getByText('Na fila')).toBeVisible();
+  await queue.getByRole('button',{name:'Cancelar envio de three.txt'}).click();
+  await expect(queue.getByText('Envio cancelado',{exact:true})).toBeVisible();
+  if(info.project.name==='mobile')await page.getByRole('button',{name:'Abrir menu',exact:true}).click();
+  await page.locator('.sidebar nav').getByRole('button',{name:/Projetos/}).click();
+  await expect(page.getByRole('heading',{name:'Projetos',exact:true})).toBeVisible();
+  await expect(queue.getByText('Destino: Campanha de vídeos')).toHaveCount(3);
+  await page.getByRole('button',{name:'Ativar modo escuro'}).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
+  await queue.getByRole('button',{name:'Recolher transferências'}).click();
+  await expect(queue.getByText('one.txt')).toHaveCount(0);
+  await queue.getByRole('button',{name:'Expandir transferências'}).click();
+  await expect(page.getByText('Modo escuro ativado',{exact:true})).toHaveCount(0);
+  const bounds=await queue.boundingBox();const viewport=page.viewportSize()!;
+  expect(bounds!.x).toBeGreaterThanOrEqual(0);expect(bounds!.x+bounds!.width).toBeLessThanOrEqual(viewport.width);
+  await page.screenshot({path:'test-results/drive-upload-dark-'+info.project.name+'.png'});
+  release();
+  await expect(queue.getByText('Seu Google Drive está sem espaço disponível para receber o arquivo.')).toHaveCount(2);
+  expect(started).toBe(2);
+});
+
+test('failed confirmation retries only verification and keeps list/grid and local search consistent',async({page},info)=>{
+  await mockDrive(page,()=>true);let starts=0,puts=0,confirms=0;
+  const external='https://www.googleapis.com/upload/drive/v3/files?upload_id=verify';
+  const file={id:'verified_file_1234567',name:'Final.mp4',mimeType:'video/mp4',size:'3'};
+  await page.route(api+'/integrations/drive/'+connection+'/folders/'+folderId+'/uploads**',async route=>{
+    if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers:uploadCors});
+    if(new URL(route.request().url()).pathname.endsWith('/complete')){
+      confirms++;
+      return route.fulfill({status:confirms===1?503:200,headers:uploadCors,contentType:'application/json',
+        body:JSON.stringify(confirms===1?{error:{code:'drive_upload_not_confirmed'}}:{file})});
+    }
+    starts++;return route.fulfill({status:200,headers:uploadCors,contentType:'application/json',
+      body:JSON.stringify({attemptId:route.request().postDataJSON().attemptId,sessionUrl:external,chunkSize:262144})});
+  });
+  await page.route(external,async route=>{
+    if(route.request().method()!=='OPTIONS')puts++;
+    return route.fulfill({status:route.request().method()==='OPTIONS'?204:201,
+      headers:{'Access-Control-Allow-Origin':cloud,'Access-Control-Allow-Methods':'PUT, OPTIONS',
+        'Access-Control-Allow-Headers':'Content-Type, Content-Range'},
+      ...(route.request().method()==='OPTIONS'?{}:{contentType:'application/json',body:JSON.stringify(file)})});
+  });
+  const panel=await openUploadFolder(page,'drive-verify-'+info.project.name+'@example.com');
+  await panel.getByLabel('Selecionar arquivos para enviar').setInputFiles({name:'Final.mp4',mimeType:'video/mp4',buffer:Buffer.from('abc')});
+  const queue=page.getByLabel('Transferências para Google Drive');
+  await expect(queue.getByRole('button',{name:'Verificar conclusão de Final.mp4'})).toBeVisible();
+  await queue.getByRole('button',{name:'Verificar conclusão de Final.mp4'}).click();
+  await expect(queue.getByText('Arquivo enviado para Campanha de vídeos')).toBeVisible();
+  expect(starts).toBe(1);expect(puts).toBe(1);expect(confirms).toBe(2);
+  await panel.getByRole('button',{name:'Visualização em grade'}).click();
+  await expect(panel.locator('.rl-files .rl-file-open').filter({hasText:'Final.mp4'})).toBeVisible();
+  await panel.getByRole('button',{name:'Visualização em lista'}).click();
+  await panel.getByLabel('Filtrar arquivos carregados').fill('F');
+  await expect(panel.locator('.rl-files .rl-file-open').filter({hasText:'Final.mp4'})).toBeVisible();
+});
+
+test('simulated Picker contract handles refusal then authorizes the exact folder using a new narrow GIS token',async({page},info)=>{
+  await mockDrive(page,()=>true);let granted=false,verifications=0;
+  const panel=await openUploadFolder(page,'drive-picker-'+info.project.name+'@example.com');
+  await page.route('https://accounts.google.com/gsi/client',route=>route.fulfill({contentType:'text/javascript',body:`
+    window.google=window.google||{};window.google.accounts={oauth2:{initTokenClient(config){
+      window.__pickerConfig=config;window.__consents=window.__consents||0;
+      return {requestAccessToken(){window.__consents++;queueMicrotask(()=>config.callback(window.__consents===1?{error:'access_denied'}:
+        {access_token:'synthetic-ephemeral-picker',scope:'openid https://www.googleapis.com/auth/drive.file',expires_in:300}));}};
+    }}};` }));
+  await page.route('https://apis.google.com/js/api.js',route=>route.fulfill({contentType:'text/javascript',body:`
+    window.gapi={load(name,options){window.google=window.google||{};
+      class View {setIncludeFolders(){return this;}setSelectFolderEnabled(){return this;}setMode(){return this;}}
+      class Builder {addView(){return this;}setOAuthToken(){return this;}setDeveloperKey(){return this;}setAppId(){return this;}
+        setOrigin(){return this;}setTitle(){return this;}setSize(){return this;}setCallback(fn){this.callback=fn;return this;}
+        build(){return {dispose(){},setVisible:()=>this.callback({action:'picked',docs:[{id:'${folderId}'}]})};}}
+      window.google.picker={DocsView:View,ViewId:{FOLDERS:'folders'},DocsViewMode:{LIST:'list'},PickerBuilder:Builder};options.callback();}};` }));
+  await page.route(api+'/integrations/drive/'+connection+'/picker/verify',async route=>{
+    if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers:uploadCors});
+    expect(route.request().postDataJSON().accessToken).toBe('synthetic-ephemeral-picker');verifications++;granted=true;
+    return route.fulfill({status:200,headers:uploadCors,contentType:'application/json',body:'{"verified":true}'});
+  });
+  await page.route(api+'/integrations/drive/'+connection+'/folders/'+folderId+'/uploads**',async route=>{
+    if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers:uploadCors});
+    const authorize=new URL(route.request().url()).pathname.endsWith('/authorize');
+    return route.fulfill({status:authorize?200:409,headers:uploadCors,contentType:'application/json',body:JSON.stringify(authorize?
+      granted?{authorized:true}:{authorized:false,clientId:'same-client',appId:'123456789',developerKey:'synthetic-key',accountId:'google-studio'}:
+      {error:{code:'drive_picker_required'}})});
+  });
+  await panel.getByLabel('Selecionar arquivos para enviar').setInputFiles({name:'Final.mp4',mimeType:'video/mp4',buffer:Buffer.from('abc')});
+  const notice=page.getByLabel('Autorização de envio');
+  await notice.getByRole('button',{name:'Autorizar pasta no Google'}).click();
+  await expect(notice.getByRole('alert')).toContainText('O Google não concedeu');
+  await notice.getByRole('button',{name:'Autorizar pasta no Google'}).click();
+  await expect(notice.getByText('Pasta autorizada. Use Tentar novamente nos arquivos da fila.')).toBeVisible();
+  expect(verifications).toBe(1);
+  expect(await page.evaluate(()=>{
+    const config=(window as unknown as {__pickerConfig:{include_granted_scopes:boolean;scope:string;login_hint:string}}).__pickerConfig;
+    return {incremental:config.include_granted_scopes,scope:config.scope,account:config.login_hint};
+  })).toEqual({incremental:false,scope:'openid https://www.googleapis.com/auth/drive.file',account:'google-studio'});
 });

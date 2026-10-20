@@ -385,3 +385,29 @@ Usar `npm ci --ignore-scripts` em api, `npm run typecheck`, `npm test`, `npm run
 Pré-requisitos remotos: Worker Secret `TRIAL_IDENTITY_HMAC_KEY`, autorização Cloudflare D1 para inventário e migrations oficiais 0010/0011. Nenhuma chave deve ser lida nos logs. O verifier da chave no D1 bloqueia troca acidental. Código de provisionamento usa commit Firestore de perfil/projeção com precondições; falha concorrente deve ser repetida, sem modificar trial. Runbook em [TRIAL-REUSE-PREVENTION.md](TRIAL-REUSE-PREVENTION.md).
 
 O teste integrado `pnpm test:trial:e2e` exige dependências da API (`npm ci --ignore-scripts --prefix api`), Java 21 e emuladores locais. Executa as funções de backend com D1/workerd, Firestore/Auth emulados, assinante Google sintético e troca de token administrativo simulada. Cobre exclusão completa, falha temporária/retomada, UID novo recusado, controle independente e commit atrasado bloqueado. Incluído no QA oficial noturno/manual; não chama DEV.
+
+## Configuração e QA do upload Drive — PR #52
+
+Migration aditiva `api/migrations/0012_drive_uploads.sql` deve anteceder o Worker
+novo pelo pipeline API DEV. Não remove tabelas nem modifica arquivos no Drive.
+O cron existente limpa tentativas expiradas; rollback de código preserva a
+migration. Sem nova conta, banco, Storage ou infraestrutura PROD.
+
+`GOOGLE_PICKER_API_KEY` é configuração opcional até disponibilizar autorização de
+pastas. Deve ser Worker Secret restrito por referrer DEV e Google Picker API; não
+é o OAuth client secret nem a chave Firebase. Sem chave, o backend falha com
+picker_not_configured quando uma pasta precisa de Picker, preservando os vínculos.
+A origem JS do OAuth client existente já inclui https://roteiva-web-dev.web.app.
+Procedimento exato e evidência do Console em [DRIVE-UPLOAD.md](DRIVE-UPLOAD.md).
+
+QA Google real opt-in: `node scripts/qa-drive-real.mjs`, com fixture descartável e
+variáveis do runbook. Não habilitar tokens pessoais no CI público; nenhuma sessão
+resumable pode ir para traces/artefatos/logs. O script não apaga o vídeo enviado.
+QA isolado simulado: build:emulator + build:demo e workflow QA regression com
+suite=drive. Manter distinguido de CORS/308/Range e mídia real.
+
+Nesta revisão local foram reutilizadas dependências instaladas em checkout
+isolado. O PNPM tentou registrar/reinstalar dependências em área restrita; os
+mesmos binários Node/TypeScript/Vite/Playwright/Firebase foram executados diretamente
+ou via npm. Emuladores usam Java 21 e demo-roteiva; D1 usa SQLite/workerd local.
+Não houve instalação de serviços nem publicação DEV/PROD.
