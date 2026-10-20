@@ -56,3 +56,5 @@ O deploy do frontend exige health com header de versão do controle e rota de pr
 ## Falha encontrada na homologação da fase 2
 
 Worker publicado pelo run 39355067084, regras preparatórias pelo 39355067202; antes de liberar UI/regras restritivas, leitura real da Biblioteca falhou e o inventário ainda não tinha projeções. Não considerar CI como homologação. Correção de diagnóstico acrescenta somente evento/código/status categóricos, sem UID, URL, exception ou resposta de provedor. Frontend e regras restritivas permanecem retidos até identificar e resolver a dependência.
+
+QA frontend desta fase: regressão inicial teve 53 aprovados, três skips por viewport e dois casos de Agenda com fixture UTC diferente da data civil do browser. Corrigida exclusivamente a data do teste; repetição focada desktop/mobile aprovou ambos (2/2). Resultado combinado: 55 cenários aprovados, mas a suíte completa ainda será repetida com as regras finais. Isso não valida Google/Drive remoto.
