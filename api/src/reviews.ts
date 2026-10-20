@@ -387,8 +387,10 @@ async function publicReview(request:Request,env:Env,action:'view'|'comment'|'dec
     const sec=data.seconds==null?null:Number(data.seconds);
     if(sec!==null&&(!Number.isSafeInteger(sec)||sec<0||sec>172800))
       throw new ApiError(400,'review_invalid_input');
-    await env.DB.prepare('INSERT INTO review_comments(id,review_id,version,file_id,author_name,author_email,body,seconds,created_at) VALUES(?,?,?,?,?,?,?,?,?)')
-      .bind(crypto.randomUUID(),r.id,r.current_version,fileId,authorName,email||null,body,sec,now()).run();
+    const saved=await env.DB.prepare("INSERT INTO review_comments(id,review_id,version,file_id,author_name,author_email,body,seconds,created_at) SELECT ?,?,?,?,?,?,?,?,? FROM review_requests WHERE id=? AND status='pending' AND current_version=? AND token_hash=? AND expires_at>?")
+      .bind(crypto.randomUUID(),r.id,r.current_version,fileId,authorName,email||null,body,sec,now(),
+        r.id,r.current_version,r.token_hash,now()).run();
+    if(saved.meta.changes!==1)throw new ApiError(409,'review_already_decided');
     return Response.json({saved:true});
   }
   const decision=data.decision;
@@ -399,10 +401,10 @@ async function publicReview(request:Request,env:Env,action:'view'|'comment'|'dec
   // Conditional insert + transition within one D1 batch avoid phantom decisions on replay.
   const eventId=crypto.randomUUID();
   const saved=await env.DB.batch([
-    env.DB.prepare("INSERT OR IGNORE INTO review_decisions(id,review_id,version,decision,author_name,author_email,message,created_at) SELECT ?,?,?,?,?,?,?,? FROM review_requests WHERE id=? AND status='pending' AND current_version=?")
-      .bind(eventId,r.id,r.current_version,decision,authorName,email||null,message,ts,r.id,r.current_version),
-    env.DB.prepare("UPDATE review_requests SET status=?,updated_at=? WHERE id=? AND status='pending' AND current_version=? AND EXISTS(SELECT 1 FROM review_decisions WHERE id=?)")
-      .bind(decision,ts,r.id,r.current_version,eventId)
+    env.DB.prepare("INSERT OR IGNORE INTO review_decisions(id,review_id,version,decision,author_name,author_email,message,created_at) SELECT ?,?,?,?,?,?,?,? FROM review_requests WHERE id=? AND status='pending' AND current_version=? AND token_hash=? AND expires_at>?")
+      .bind(eventId,r.id,r.current_version,decision,authorName,email||null,message,ts,r.id,r.current_version,r.token_hash,ts),
+    env.DB.prepare("UPDATE review_requests SET status=?,updated_at=? WHERE id=? AND status='pending' AND current_version=? AND token_hash=? AND expires_at>? AND EXISTS(SELECT 1 FROM review_decisions WHERE id=?)")
+      .bind(decision,ts,r.id,r.current_version,r.token_hash,ts,eventId)
   ]);
   if(saved[0].meta.changes!==1||saved[1].meta.changes!==1)throw new ApiError(409,'review_already_decided');
   return Response.json({saved:true,status:decision});
