@@ -55,7 +55,7 @@ A PR #43 foi mesclada em `8169177bcc32e158f9d53fb7f2f725d7ed4318a3`; [pipeline o
 
 Decisão tomada: `0008_access_rollout.sql` fixa o marco no relógio D1 e o fim da cortesia em marco + 30 dias. A elegibilidade usa `createTime` do documento Firestore, não campo enviado pelo cliente. `INSERT OR IGNORE` com ID determinístico preserva trial e cortesia mesmo após retries. Cron processa um perfil por minuto, com cursor durável; falhas não avançam cursor nem marcam conclusão. Após completar o inventário inicial, não varre continuamente usuários.
 
-**Configuração transitória histórica (já desativada em DEV):** `ACCESS_PROVISION_ON_DRIVE=true` permitia somente provisionamento sob demanda pelo mesmo caminho verificado antes de autorizar Drive/OAuth; não permite acesso sem perfil, suspenso, expirado ou em exclusão. Ausente/false nega usuários não provisionados. A compatibilidade foi **encerrada pela PR #48**, que publicou `ACCESS_PROVISION_ON_DRIVE=false`. Exclusão de conta e leitura de status ficam fora da checagem comercial.
+**Configuração transitória histórica (já desativada em DEV):** `ACCESS_PROVISION_ON_DRIVE=true` permitia somente provisionamento sob demanda pelo mesmo caminho verificado antes de autorizar Drive/OAuth; não permite acesso sem perfil, suspenso, expirado ou em exclusão. Ausente/false nega usuários não provisionados. A compatibilidade foi **encerrada pela PR #48**, que publicou `ACCESS_PROVISION_ON_DRIVE=false`. Leitura de status permanece fora da checagem comercial; por decisão de 20/10/2026, novos pedidos de exclusão exigem acesso ativo.
 
 A preparação de regras nessa fase só permitia GET privado de `access/current`, sem escrita/listagem e sem mudar a autorização de negócio. **As regras restritivas foram publicadas posteriormente pela PR #48**. PATCH da projeção usa precondição de versão/criação, resolve D1 após ler a versão e falha sem sucesso em conflito. Repetir estado igual não escreve novamente.
 
@@ -65,7 +65,7 @@ Auditoria GitHub: `cloudflare-development` permite somente branch master; segred
 
 ## Fase 3 — frontend integrado
 
-A UI só monta o workspace após POST autenticado em `/access/ensure` e confirmação do status vindo do servidor Firestore; dados privados persistidos no browser não substituem essa confirmação. O relógio local orienta apenas a apresentação; Worker e regras decidem pelo horário do servidor. Estados expirado/suspenso ou falha mantêm saída, nova verificação e exclusão da própria conta disponíveis. Cadastro informa sete dias sem cartão/cobrança automática.
+A UI só monta o workspace após POST autenticado em `/access/ensure` e confirmação do status vindo do servidor Firestore; dados privados persistidos no browser não substituem essa confirmação. O relógio local orienta apenas a apresentação; Worker e regras decidem pelo horário do servidor. Estados expirado/suspenso ou falha mantêm somente saída/troca de conta e nova verificação; não exibem exclusão. A exclusão fica somente em Configurações com acesso ativo. Cadastro informa sete dias sem cartão/cobrança automática.
 
 O deploy do frontend exige health com header de versão do controle e rota de provisionamento retornando 401 sem identidade antes de autenticar/publicar Hosting. Esse gate evita publicar a UI antes do Worker, mas não substitui smoke autenticado nem homologação. **As regras comerciais restritivas já foram publicadas no DEV pela PR #48**, após inventário completo. A demo local permanece sem autenticação/controle comercial.
 ### Causa confirmada da falha — runtime Cloudflare
@@ -79,7 +79,7 @@ QA frontend desta fase: regressão inicial teve 53 aprovados, três skips por vi
 
 ## Fase final — enforcement (publicado)
 
-As regras finais exigem projeção com ownerUid do caminho, schemaVersion 1, suspensão falsa e prazo superior a request.time (ou concessão ilimitada). Ausência/corrupção nega operações de negócio. Status próprio e perfil permanecem legíveis; exclusão segue endpoint autenticado sem exigir acesso comercial. O cliente nunca escreve benefícios.
+As regras finais exigem projeção com ownerUid do caminho, schemaVersion 1, suspensão falsa e prazo superior a request.time (ou concessão ilimitada). Ausência/corrupção nega operações de negócio. Status próprio e perfil permanecem legíveis; novos pedidos de exclusão seguem endpoint autenticado com acesso comercial ativo; o status e a continuidade de jobs já aceitos não dependem do prazo comercial. O cliente nunca escreve benefícios.
 
 A flag `ACCESS_PROVISION_ON_DRIVE=false` está publicada em DEV: somente contas provisionadas podem usar Drive/OAuth. **A PR #48 já foi mesclada**, após comprovar os três perfis existentes provisionados, backfill completo, frontend integrado e homologação não destrutiva da conta existente. Esses eram os gates antes do merge, não pendências atuais de publicação. Regras antigas não devem ser restauradas como rollback comercial; corrigir o estado/reverter somente código compatível, mantendo negações.
 

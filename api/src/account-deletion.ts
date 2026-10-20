@@ -2,7 +2,8 @@ import { ApiError, type Env } from './types.ts';
 import { adminToken, deletionConfigured, deleteIdentity, deleteFirestoreChunk, deleteRoot, deleteFence, lockAccount } from './firebase-admin.ts';
 import { decrypt, context } from './crypto.ts';
 import {revokeGuard} from './oauth-guard.ts';
-import {eraseAccess} from './access.ts';
+import {eraseAccess,assertActiveAccess} from './access.ts';
+import {retainTrialIdentity,assertTrialIdentityRetained,type TrialPrincipal} from './trial-identity.ts';
 
 type Phase='locking'|'revoking'|'firestore'|'identity'|'completed'|'manual_review';
 type Job={owner_uid:string;operation_id:string;phase:Phase;attempts:number;lease_id:string|null;lease_until:number;next_attempt_at:number};
@@ -19,15 +20,24 @@ export async function deletionStatus(env:Env,uid:string):Promise<Response>{
   return Response.json({available:deletionConfigured(env),operation:row?{id:row.operation_id,
     status:row.phase==='completed'?'completed':row.phase==='manual_review'?'manual_review':'processing'}:null});
 }
-export async function requestDeletion(request:Request,env:Env,uid:string):Promise<Response>{
+export async function requestDeletion(request:Request,env:Env,uid:string,principal?:TrialPrincipal):Promise<Response>{
   if(!deletionConfigured(env))throw new ApiError(503,'deletion_unavailable');
   let payload:unknown;
   try{payload=await request.json();}catch{throw new ApiError(400,'invalid_confirmation');}
   if(!payload||typeof payload!=='object'||Array.isArray(payload)||
     (payload as {phrase?:unknown}).phrase!==PHRASE ||
     (payload as {acknowledged?:unknown}).acknowledged!==true)throw new ApiError(400,'invalid_confirmation');
+  if(!principal)throw new ApiError(503,'trial_identity_required');
+  if(principal.uid!==uid)throw new ApiError(401,'invalid_identity');
+  // New requests require actual commercial access, never a client-side flag.
+  // Previously accepted jobs must remain resumable after expiry or data removal.
+  const existing=await env.DB.prepare('SELECT 1 FROM account_deletions WHERE owner_uid=?').bind(uid).first();
+  if(!existing)await assertActiveAccess(env,uid);
   // Before accepting an irreversible request, confirm admin credentials work.
   await adminToken(env);
+  // Existing beta accounts must also be claimed before their UID is deleted,
+  // even if they did not sign in after this protection was introduced.
+  await retainTrialIdentity(env,principal);
   const now=Date.now(),operationId=crypto.randomUUID();
   await env.DB.prepare("INSERT OR IGNORE INTO account_deletions (owner_uid,operation_id,phase,next_attempt_at,created_at,updated_at) VALUES (?,?,'locking',?,?,?)")
     .bind(uid,operationId,now,now,now).run();
@@ -78,6 +88,7 @@ async function revokeConnections(env:Env,uid:string):Promise<boolean>{
 }
 async function runPhase(env:Env,job:Job,lease:string):Promise<void>{
   const uid=job.owner_uid;
+  await assertTrialIdentityRetained(env,uid);
   if(job.phase==='locking'){
     const token=await adminToken(env);
     await lockAccount(env,uid,token);

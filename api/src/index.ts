@@ -1,5 +1,5 @@
 import { ApiError, type Env } from './types.ts';
-import { identity } from './auth.ts';
+import { identity,verifiedTrialPrincipal } from './auth.ts';
 import { callback, start, launch, enabled } from './oauth.ts';
 import { metadata, disconnect, about } from './drive.ts';
 import { listFolders, listFolderItems } from './folders.ts';
@@ -47,14 +47,14 @@ export async function handle(request: Request, env: Env): Promise<Response> {
       response=await deletionStatus(env,uid);
     } else if (url.pathname === '/account/deletion' && request.method === 'POST') {
       if(origin!==env.FRONTEND_ORIGIN)throw new ApiError(403,'origin_required');
-      const uid=await identity(request,env,300);
-      if(!(await env.API_RATE_LIMIT.limit({key:'dev:delete:'+uid})).success)throw new ApiError(429,'rate_limited');
-      response=await requestDeletion(request,env,uid);
+      const principal=await verifiedTrialPrincipal(request,env,300);
+      if(!(await env.API_RATE_LIMIT.limit({key:'dev:delete:'+principal.uid})).success)throw new ApiError(429,'rate_limited');
+      response=await requestDeletion(request,env,principal.uid,principal);
     } else if (url.pathname === '/access/ensure' && request.method === 'POST') {
       if(origin!==env.FRONTEND_ORIGIN)throw new ApiError(403,'origin_required');
-      const uid=await identity(request,env);
-      if(!(await env.API_RATE_LIMIT.limit({key:'dev:access:'+uid})).success)throw new ApiError(429,'rate_limited');
-      response=await ensureAccess(env,uid);
+      const principal=await verifiedTrialPrincipal(request,env);
+      if(!(await env.API_RATE_LIMIT.limit({key:'dev:access:'+principal.uid})).success)throw new ApiError(429,'rate_limited');
+      response=await ensureAccess(env,principal.uid,undefined,principal);
     } else if (url.pathname === '/integrations/drive' && request.method === 'GET') {
       const uid = await identity(request,env);
       await assertActiveAccess(env,uid);

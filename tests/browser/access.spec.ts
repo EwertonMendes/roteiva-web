@@ -32,16 +32,35 @@ async function changeAccess(email:string,changes:Record<string,unknown>){
 test('seven-day trial status, expiry, restore and suspension react without a reload',async({page},info)=>{
   const email='access-'+info.project.name+'@example.com';
   await signup(page,email);
+  await expect(page.getByRole('button',{name:'Excluir conta',exact:true})).toHaveCount(0);
   await page.goto(cloud+'/configuracoes');
   await expect(page.getByRole('heading',{name:'Seu acesso'})).toBeVisible();
   await expect(page.getByText('Período de teste gratuito',{exact:true})).toBeVisible();
   await expect(page.getByText(/Seu teste gratuito dura 7 dias/)).toBeVisible();
+  await expect(page.getByRole('button',{name:'Excluir conta',exact:true})).toBeVisible();
   await changeAccess(email,{accessUntil:Timestamp.fromMillis(Date.now()-60000),unlimited:false});
   await expect(page.getByRole('heading',{name:'Seu período de acesso terminou.'})).toBeVisible();
   await expect(page.locator('.app-shell')).toHaveCount(0);
-  await expect(page.getByRole('button',{name:'Excluir conta',exact:true})).toBeVisible();
+  await expect(page.getByText(/Excluir e recriar a conta não libera outro teste/)).toBeVisible();
+  await expect(page.getByRole('button',{name:'Excluir conta',exact:true})).toHaveCount(0);
+  await expect(page.getByText('Excluir minha conta',{exact:true})).toHaveCount(0);
   await changeAccess(email,{accessUntil:Timestamp.fromMillis(Date.now()+86400000),unlimited:false});
   await expect(page.locator('.app-shell')).toBeVisible();
+  await expect(page.getByRole('button',{name:'Excluir conta',exact:true})).toBeVisible();
   await changeAccess(email,{suspended:true});
   await expect(page.getByRole('heading',{name:'Acesso temporariamente suspenso.'})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Excluir conta',exact:true})).toHaveCount(0);
+});
+
+
+test('access validation errors never offer account deletion',async({page},info)=>{
+  await signup(page,'access-error-'+info.project.name+'@example.com');
+  await page.route('https://roteiva-api-dev.ewertonmendes9.workers.dev/access/ensure',async route=>{
+    const headers={'Access-Control-Allow-Origin':cloud,'Access-Control-Allow-Methods':'POST, OPTIONS','Access-Control-Allow-Headers':'Authorization, Content-Type'};
+    await route.fulfill(route.request().method()==='OPTIONS'?{status:204,headers}:{status:503,headers,contentType:'application/json',body:'{}'});
+  });
+  await page.reload();
+  await expect(page.getByRole('heading',{name:'Não conseguimos validar sua assinatura.'})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Excluir conta',exact:true})).toHaveCount(0);
+  await expect(page.getByText('Excluir minha conta',{exact:true})).toHaveCount(0);
 });
