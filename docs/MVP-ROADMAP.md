@@ -466,3 +466,16 @@ A cópia persistida é privada e potencialmente sensível em computadores compar
 Evidências de deploy, commits, limites da comparação por contagens e reversão segura: [ACCESS-CONTROL.md](ACCESS-CONTROL.md). A PR #42 foi encerrada como substituída pelas entregas #43–#48; sua branch foi preservada.
 
 - **VALIDADO NO PIPELINE OFICIAL DA MASTER:** [QA 39358964120](https://github.com/EwertonMendes/roteiva-web/actions/runs/39358964120), commit b0ae124: 30 Rules + 55 Playwright aprovados, três skips previstos. Pedido real de exclusão descartável aceito após login manual recente; aguardar conclusão da saga antes de marcar homologação completa.
+
+
+### Proteção de reutilização do trial — PR #51, auditoria de 20/10/2026
+
+**IMPLEMENTADO na branch; homologação/publicação DEV PENDENTES.** Auditoria encontrou gravações parciais de HMAC, associação indevida de aliases recusados, ausência de proteção contra troca da chave e corrida entre publicação da projeção e exclusão. Corrigidos com D1 batch, HMAC do UID, propagação do titular conflitante, verificador persistente e commit Firestore atômico condicionado ao perfil. Migration 0011 aditiva preserva 0010 e dados existentes. Saga anterior sem marcador pausa antes de remover dados.
+
+- [x] Testes focados API/SQLite e teste de integração binding D1 no workerd isolado; nenhuma conta real excluída.
+- [x] Mensagem de cadastro condiciona sete dias à elegibilidade única; estado expirado explica exclusão/recadastro.
+- [x] Retenção técnica e runbook de recuperação/rotação documentados; nenhuma declaração de conformidade jurídica.
+- [ ] CI do SHA final, secret DEV, inventário D1, merge e pipelines oficiais.
+- [ ] Google descartável autorizado no Worker/Hosting publicado: cadastro, login/F5, exclusão e UID novo, controle elegível distinto.
+
+Evidência e distinção entre unitário, D1 isolado, browser/emuladores e DEV em [TRIAL-REUSE-PREVENTION.md](TRIAL-REUSE-PREVENTION.md).

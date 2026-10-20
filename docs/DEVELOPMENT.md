@@ -376,3 +376,12 @@ Ativação final (**concluída na PR #48**): `ACCESS_PROVISION_ON_DRIVE=false` f
 Mutações privilegiadas futuras exigem sync_pending=1 antes de negar a projeção/alterar ledger; liberar somente após verificar D1 e Firestore. ensure/Drive negam a conta durante pendência. Não fazer UPDATE avulso de suspensão/concessão em conta real, nem remover grants para revogar. O app ADM continuará separado; esta entrega só fornece a fence de segurança e protocolo.
 
 Estado publicado: PR #48 aplicou 0009 e ACCESS_PROVISION_ON_DRIVE=false pelo run API 39358435356; regras finais pelo run 39358435474. Não reativar compatibilidade por falhas de autenticação do browser. Cadastro/login, suspensão e cortesia descartáveis confirmados; pedido de exclusão descartável **aceito após login manual recente**, porém conclusão da saga ainda não confirmada. Expiração e isolamento A/B remotos permanecem pendentes. Evidências e pendências em ACCESS-CONTROL.md.
+
+
+## Revisão antifraude — PR #51 (20/10/2026)
+
+Usar `npm ci --ignore-scripts` em api, `npm run typecheck`, `npm test`, `npm run migrate:local` (duas execuções para conferir idempotência) e `npm run build`. O teste D1 real usa Miniflare 5.20261012.1-beta com adaptador oficial `convertV4MiniflareOptions`, conforme lockfile do Wrangler; precisa de loopback local. A suíte continua no job API normal. Frontend: typecheck, testes, builds Firebase/demo/emulator e `pnpm test:firebase` com Java 21 e Chromium.
+
+Pré-requisitos remotos: Worker Secret `TRIAL_IDENTITY_HMAC_KEY`, autorização Cloudflare D1 para inventário e migrations oficiais 0010/0011. Nenhuma chave deve ser lida nos logs. O verifier da chave no D1 bloqueia troca acidental. Código de provisionamento usa commit Firestore de perfil/projeção com precondições; falha concorrente deve ser repetida, sem modificar trial. Runbook em [TRIAL-REUSE-PREVENTION.md](TRIAL-REUSE-PREVENTION.md).
+
+O teste integrado `pnpm test:trial:e2e` exige dependências da API (`npm ci --ignore-scripts --prefix api`), Java 21 e emuladores locais. Executa as funções de backend com D1/workerd, Firestore/Auth emulados, assinante Google sintético e troca de token administrativo simulada. Cobre exclusão completa, falha temporária/retomada, UID novo recusado, controle independente e commit atrasado bloqueado. Incluído no QA oficial noturno/manual; não chama DEV.

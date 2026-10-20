@@ -56,7 +56,7 @@ export function AccessGate({children}:{children:ReactNode}){
   if(!access)return <main className="studio-loading" role="status">Confirmando seu acesso ao Roteiva…</main>;
   if(access.suspended||(!access.unlimited&&access.accessUntil.getTime()<=now))return <AuthLayout
     section="ACESSO À CONTA" title={access.suspended?"Acesso temporariamente suspenso.":"Seu período de acesso terminou."}
-    description={access.suspended?"Seu espaço está protegido. Consulte o suporte do Roteiva para esclarecer a suspensão.":"Seu cadastro e seus projetos estão preservados. Você poderá continuar usando o Roteiva quando um novo período de acesso for ativado."}>
+    description={access.suspended?"Seu espaço está protegido. Consulte o suporte do Roteiva para esclarecer a suspensão.":"O teste gratuito é concedido uma única vez por identidade. Excluir e recriar a conta não libera outro teste. Seu cadastro e seus projetos estão preservados; você poderá continuar quando um novo período de acesso for ativado."}>
     <div className="access-locked">
       <ShieldAlert size={26}/><div><strong>{access.suspended?"Acesso suspenso":"Acesso expirado"}</strong>
         <span>Seus dados não foram excluídos. A contratação online ainda não está disponível nesta versão de testes.</span></div>

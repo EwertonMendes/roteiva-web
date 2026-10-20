@@ -100,3 +100,6 @@ O Roteiva mostra miniaturas fornecidas pelo Google Drive para mídia quando disp
 A Biblioteca reaproveita listagens recentes por sessão e busca nomes remotamente dentro da pasta, com paginação; miniaturas utilizam tickets autenticados de curta duração, evitando uma segunda consulta Google para cada arquivo. A fila prioriza imagens visíveis e conserva o cache em memória ao navegar entre telas. O conteúdo dos arquivos permanece no Drive e não é copiado para Firestore/D1.
 
 **Controle comercial (rollout DEV):** teste gratuito de sete dias, sem cartão ou cobrança automática, provisionado no backend. Contas beta anteriores à migração recebem cortesia separada de 30 dias. A publicação ocorre em fases; integração da UI, restrição definitiva das regras e homologação remota têm estados separados em [ACCESS-CONTROL.md](docs/ACCESS-CONTROL.md).
+
+
+**Teste gratuito único (PR #51, implementação em revisão):** sete dias por identidade Google/e-mail verificado elegível; excluir e recriar a conta não concede outro período. Marcadores HMAC pseudonimizados permanecem após a exclusão para essa finalidade. O prazo beta de 30 dias continua fixo. Publicação/homologação DEV rastreada no [roadmap](docs/MVP-ROADMAP.md), com detalhes e limites em [TRIAL-REUSE-PREVENTION.md](docs/TRIAL-REUSE-PREVENTION.md).

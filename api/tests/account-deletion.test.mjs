@@ -6,6 +6,9 @@ import {deletionConfigured,deleteFirestoreChunk,deleteIdentity} from '../src/fir
 import {advanceDeletion,assertNotDeleting,requestDeletion,runPendingDeletions,deletionStatus} from '../src/account-deletion.ts';
 import {beginExchange,rememberGrant,revokeGuard,finishExchange} from '../src/oauth-guard.ts';
 import {base64url} from '../src/crypto.ts';
+import {retainTrialIdentity} from '../src/trial-identity.ts';
+const trialKey=Buffer.alloc(32,39).toString('base64url');
+const principal=uid=>({uid,verifiedEmail:uid+'@example.com',googleSubject:'google-'+uid});
 const now=()=>Date.now();
 
 test('disabled-by-default deletion cannot accept an irreversible operation',async t=>{
@@ -41,7 +44,7 @@ test('real SQL lease accepts exactly one concurrent executor',async t=>{
 test('strict confirmation does not generate jobs from a wrong phrase',async t=>{
  const db=database();t.after(db.close);
  const {privateKey}=await generateKeyPair('RS256',{extractable:true});
- const env={DB:db.DB,ENVIRONMENT:'dev',FIREBASE_PROJECT_ID:'roteiva-web-dev',ACCOUNT_DELETION_ENABLED:'true',
+ const env={DB:db.DB,ENVIRONMENT:'dev',FIREBASE_PROJECT_ID:'roteiva-web-dev',ACCOUNT_DELETION_ENABLED:'true',TRIAL_IDENTITY_HMAC_KEY:trialKey,
  FIREBASE_ADMIN_CREDENTIALS_JSON:JSON.stringify({type:'service_account',project_id:'roteiva-web-dev',
    client_email:'test@roteiva-web-dev.iam.gserviceaccount.com',private_key:await exportPKCS8(privateKey),
    token_uri:'https://oauth2.googleapis.com/token'})};
@@ -79,7 +82,7 @@ test("full deletion saga is resumable, verifies service calls and leaves another
  db.sql.prepare("INSERT INTO drive_connections(id,owner_uid,google_account_id,google_email,status,scopes,created_at,updated_at) VALUES(?,?,?,?,'connected','readonly',?,?)")
   .run('account-B-connection','other-user','other-google','b@example.com',stamp,stamp);
  const env={DB:db.DB,ENVIRONMENT:'dev',FIREBASE_PROJECT_ID:'roteiva-web-dev',
-   ACCOUNT_DELETION_ENABLED:'true',
+   ACCOUNT_DELETION_ENABLED:'true',TRIAL_IDENTITY_HMAC_KEY:trialKey,
    FIREBASE_ADMIN_CREDENTIALS_JSON:JSON.stringify({type:'service_account',project_id:'roteiva-web-dev',
      client_email:'test@roteiva-web-dev.iam.gserviceaccount.com',private_key:await exportPKCS8(privateKey),
      token_uri:'https://oauth2.googleapis.com/token'})};
@@ -97,7 +100,7 @@ test("full deletion saga is resumable, verifies service calls and leaves another
  };
  t.after(()=>{globalThis.fetch=orig;});
  const req=new Request('https://example.test',{method:'POST',body:JSON.stringify({phrase:'EXCLUIR MINHA CONTA',acknowledged:true})});
- const accepted=await requestDeletion(req,env,'user-A');
+ const accepted=await requestDeletion(req,env,'user-A',principal('user-A'));
  assert.equal(accepted.status,202);
  assert.equal(db.sql.prepare('SELECT phase FROM account_deletions WHERE owner_uid=?').get('user-A').phase,'revoking');
  await assert.rejects(()=>assertNotDeleting(env,'user-A'),e=>e.code==='account_deleting');
@@ -120,7 +123,7 @@ test('failed admin lock preserves durable job and schedules retry without deleti
  const db=database();t.after(db.close);
  const account={type:'service_account',project_id:'roteiva-web-dev',client_email:'unit@roteiva-web-dev.iam.gserviceaccount.com',
  private_key:await exportPKCS8(privateKey),token_uri:'https://oauth2.googleapis.com/token'};
- const config={ENVIRONMENT:'dev',FIREBASE_PROJECT_ID:'roteiva-web-dev',ACCOUNT_DELETION_ENABLED:'true',
+ const config={ENVIRONMENT:'dev',FIREBASE_PROJECT_ID:'roteiva-web-dev',ACCOUNT_DELETION_ENABLED:'true',TRIAL_IDENTITY_HMAC_KEY:trialKey,
    FIREBASE_ADMIN_CREDENTIALS_JSON:JSON.stringify(account),DB:db.DB};
  const original=globalThis.fetch;
  let rootWrites=0,identityDeletes=0;
@@ -133,7 +136,7 @@ test('failed admin lock preserves durable job and schedules retry without deleti
  t.after(()=>{globalThis.fetch=original;});
  const request=new Request('https://test.local',{method:'POST',
    body:JSON.stringify({phrase:'EXCLUIR MINHA CONTA',acknowledged:true})});
- const accepted=await requestDeletion(request,config,'owner-a');
+ const accepted=await requestDeletion(request,config,'owner-a',principal('owner-a'));
  assert.equal(accepted.status,202);
  assert.equal((await accepted.json()).status,'processing');
  const job=db.sql.prepare('SELECT phase,attempts,next_attempt_at FROM account_deletions WHERE owner_uid=?').get('owner-a');
@@ -231,10 +234,12 @@ test('Firestore drains multiple document pages, missing parents and thousands of
 test('cron budgets one account per invocation and rotates after partial progress',async t=>{
  const db=database();t.after(db.close);
  const {privateKey}=await generateKeyPair('RS256',{extractable:true});
- const env={DB:db.DB,ENVIRONMENT:'dev',FIREBASE_PROJECT_ID:'roteiva-web-dev',ACCOUNT_DELETION_ENABLED:'true',
+ const env={DB:db.DB,ENVIRONMENT:'dev',FIREBASE_PROJECT_ID:'roteiva-web-dev',ACCOUNT_DELETION_ENABLED:'true',TRIAL_IDENTITY_HMAC_KEY:trialKey,
    FIREBASE_ADMIN_CREDENTIALS_JSON:JSON.stringify({type:'service_account',project_id:'roteiva-web-dev',
      client_email:'test@roteiva-web-dev.iam.gserviceaccount.com',private_key:await exportPKCS8(privateKey),
      token_uri:'https://oauth2.googleapis.com/token'})};
+ await retainTrialIdentity(env,principal('owner-A'));
+ await retainTrialIdentity(env,principal('owner-B'));
  const stamp=Date.now()-10000;
  for(const owner of ['owner-A','owner-B'])db.sql.prepare("INSERT INTO account_deletions(owner_uid,operation_id,phase,attempts,failed_phase,error_code,next_attempt_at,created_at,updated_at) VALUES(?,?,'firestore',3,'firestore','admin_service_unavailable',?,?,?)")
    .run(owner,'operation-'+owner,stamp,stamp,stamp);
@@ -274,7 +279,7 @@ test('last allowed request failure is not hidden as a cooperative yield',async()
 test('final profile failure preserves Auth and retries the identity phase',async t=>{
  const db=database();t.after(db.close);
  const {privateKey}=await generateKeyPair('RS256',{extractable:true});
- const env={DB:db.DB,ENVIRONMENT:'dev',FIREBASE_PROJECT_ID:'roteiva-web-dev',ACCOUNT_DELETION_ENABLED:'true',
+ const env={DB:db.DB,ENVIRONMENT:'dev',FIREBASE_PROJECT_ID:'roteiva-web-dev',ACCOUNT_DELETION_ENABLED:'true',TRIAL_IDENTITY_HMAC_KEY:trialKey,
    FIREBASE_ADMIN_CREDENTIALS_JSON:JSON.stringify({type:'service_account',project_id:'roteiva-web-dev',
      client_email:'test@roteiva-web-dev.iam.gserviceaccount.com',private_key:await exportPKCS8(privateKey),
      token_uri:'https://oauth2.googleapis.com/token'})};
@@ -288,6 +293,7 @@ test('final profile failure preserves Auth and retries the identity phase',async
    if(init.method==='DELETE')return Response.json({error:{status:'UNAVAILABLE'}},{status:503});
    return Response.json({collectionIds:[]});
  };
+ await retainTrialIdentity(env,principal('owner-A'));
  await advanceDeletion(env,'owner-A');
  assert.equal(identityCalls,0);
  const job=db.sql.prepare('SELECT phase,failed_phase,attempts FROM account_deletions').get();
@@ -297,13 +303,14 @@ test('final profile failure preserves Auth and retries the identity phase',async
 test('manual review retains failed stage, releases lease and cannot be retried automatically',async t=>{
  const db=database();t.after(db.close);
  const {privateKey}=await generateKeyPair('RS256',{extractable:true});
- const env={DB:db.DB,ENVIRONMENT:'dev',FIREBASE_PROJECT_ID:'roteiva-web-dev',ACCOUNT_DELETION_ENABLED:'true',
+ const env={DB:db.DB,ENVIRONMENT:'dev',FIREBASE_PROJECT_ID:'roteiva-web-dev',ACCOUNT_DELETION_ENABLED:'true',TRIAL_IDENTITY_HMAC_KEY:trialKey,
    FIREBASE_ADMIN_CREDENTIALS_JSON:JSON.stringify({type:'service_account',project_id:'roteiva-web-dev',client_email:'test@roteiva-web-dev.iam.gserviceaccount.com',
      private_key:await exportPKCS8(privateKey),token_uri:'https://oauth2.googleapis.com/token'})};
  const stamp=Date.now();
  db.sql.prepare("INSERT INTO account_deletions(owner_uid,operation_id,phase,attempts,next_attempt_at,created_at,updated_at) VALUES('owner-A','op-A','locking',9,?,?,?)").run(stamp,stamp,stamp);
  const original=globalThis.fetch;let calls=0;
  globalThis.fetch=async()=>{calls++;return Response.json({},{status:503});};t.after(()=>{globalThis.fetch=original;});
+ await retainTrialIdentity(env,principal('owner-A'));
  await advanceDeletion(env,'owner-A');
  const job=db.sql.prepare('SELECT phase,failed_phase,lease_id,attempts FROM account_deletions').get();
  assert.equal(job.phase,'manual_review');assert.equal(job.failed_phase,'locking');assert.equal(job.lease_id,null);assert.equal(job.attempts,10);
