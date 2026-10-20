@@ -32,7 +32,7 @@ export function DriveUploadQueue({uploads,onCancel,onRetry,onDismiss}:{
                 upload.status==="cancelled"?"Envio cancelado":
                 upload.error||"Falha no envio"}</small>
             </div>
-            {active.has(upload.status)&&upload.status!=="verifying"
+            {upload.status==="verifying"?null:active.has(upload.status)
               ?<button type="button" onClick={()=>onCancel(upload.id)} title={"Cancelar envio de "+upload.name} aria-label={"Cancelar envio de "+upload.name}><X size={16}/></button>
               :<div className="rl-upload-actions">
                 {upload.status==="failed"&&<button type="button" onClick={()=>onRetry(upload.id)} title="Tentar novamente" aria-label={"Tentar novamente "+upload.name}><RotateCcw size={15}/></button>}
