@@ -50,7 +50,7 @@ async function activeState(env:Env,uid:string,now=Date.now()):Promise<AccessStat
   ]);
   return resolveAccess(account,g.results,s.results,now);
 }
-async function verifiedProfile(env:Env,uid:string,token:string):Promise<number> {
+async function verifiedProfile(env:Env,uid:string,token:string):Promise<{created:number;version:string}> {
   const url='https://firestore.googleapis.com/v1/projects/'+env.FIREBASE_PROJECT_ID+
     '/databases/(default)/documents/users/'+safeUid(uid);
   let response:Response;
@@ -58,14 +58,14 @@ async function verifiedProfile(env:Env,uid:string,token:string):Promise<number> 
   catch{throw new ApiError(503,'access_provision_unavailable');}
   if(response.status===404)throw new ApiError(409,'registration_required');
   if(!response.ok)throw new ApiError(503,'access_profile_read_'+response.status);
-  const record=await response.json() as {createTime?:string;fields?:{ownerUid?:{stringValue?:string};deletionState?:{stringValue?:string}}};
+  const record=await response.json() as {createTime?:string;updateTime?:string;fields?:{ownerUid?:{stringValue?:string};deletionState?:{stringValue?:string}}};
   if(record.fields?.ownerUid?.stringValue!==uid)throw new ApiError(403,'invalid_profile');
   if(record.fields?.deletionState?.stringValue==='deleting')throw new ApiError(409,'account_deleting');
   const created=Date.parse(record.createTime||'');
-  if(!Number.isFinite(created))throw new ApiError(503,'invalid_profile');
-  return created;
+  if(!Number.isFinite(created)||!record.updateTime||!Number.isFinite(Date.parse(record.updateTime)))throw new ApiError(503,'invalid_profile');
+  return {created,version:record.updateTime};
 }
-async function publish(env:Env,uid:string,token:string):Promise<AccessState> {
+async function publish(env:Env,uid:string,token:string,profileVersion:string):Promise<AccessState> {
   const url='https://firestore.googleapis.com/v1/projects/'+env.FIREBASE_PROJECT_ID+
     '/databases/(default)/documents/users/'+safeUid(uid)+'/access/current';
   // Only server credentials can write here. No public client write path exists.
@@ -95,10 +95,19 @@ async function publish(env:Env,uid:string,token:string):Promise<AccessState> {
     unlimited:{booleanValue:state.unlimited},suspended:{booleanValue:state.suspended},
     updatedAt:{timestampValue:new Date().toISOString()}
   };
-  const mask=Object.keys(fields).map(field=>'updateMask.fieldPaths='+encodeURIComponent(field)).join('&');
+  // The parent profile and projection are committed atomically. A deletion
+  // lock/removal after verifiedProfile invalidates this precondition, so an
+  // in-flight provisioner cannot leave an orphan projection after deletion.
+  const root='projects/'+env.FIREBASE_PROJECT_ID+'/databases/(default)/documents/users/'+safeUid(uid);
+  const currentDocument=precondition==='currentDocument.exists=false'?{exists:false}:
+    {updateTime:decodeURIComponent(precondition.slice('currentDocument.updateTime='.length))};
   let result:Response;
-  try{result=await fetch(url+'?'+mask+'&'+precondition,{method:'PATCH',redirect:'manual',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},
-    body:JSON.stringify({fields}),signal:AbortSignal.timeout(12000)});}
+  try{result=await fetch('https://firestore.googleapis.com/v1/projects/'+env.FIREBASE_PROJECT_ID+'/databases/(default)/documents:commit',{
+    method:'POST',redirect:'manual',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},
+    body:JSON.stringify({writes:[
+      {update:{name:root,fields:{ownerUid:{stringValue:uid}}},updateMask:{fieldPaths:['ownerUid']},currentDocument:{updateTime:profileVersion}},
+      {update:{name:root+'/access/current',fields},updateMask:{fieldPaths:Object.keys(fields)},currentDocument}
+    ]}),signal:AbortSignal.timeout(12000)});}
   catch{throw new ApiError(503,'access_provision_unavailable');}
   if(!result.ok)throw new ApiError(503,'access_projection_write_'+result.status);
   await assertNotDeleting(env,uid);
@@ -108,7 +117,7 @@ export async function ensureAccess(env:Env,uid:string,adminBearer?:string,princi
   await assertNotDeleting(env,uid);
   // Prove registration before creating any trial. Firebase Auth alone is insufficient.
   const token=adminBearer||await adminToken(env);
-  const created=await verifiedProfile(env,uid,token);
+  const {created,version}=await verifiedProfile(env,uid,token);
   // The Cron backfills only accounts that predate the beta cutoff.
   // Customer-facing ensure always supplies a trusted Google principal.
   if(adminBearer&&!principal){
@@ -118,9 +127,9 @@ export async function ensureAccess(env:Env,uid:string,adminBearer?:string,princi
   if(!principal&&!adminBearer)throw new ApiError(503,'trial_identity_required');
   if(principal&&principal.uid!==uid)throw new ApiError(401,'invalid_identity');
   const allowed=principal?await retainTrialIdentity(env,principal):true;
-  return Response.json(await provisionAccess(env,uid,created,token,allowed));
+  return Response.json(await provisionAccess(env,uid,created,token,allowed,version));
 }
-async function provisionAccess(env:Env,uid:string,created:number,token:string,allowTrial:boolean):Promise<AccessState> {
+async function provisionAccess(env:Env,uid:string,created:number,token:string,allowTrial:boolean,profileVersion:string):Promise<AccessState> {
   await assertNotDeleting(env,uid);
   const now=Date.now();
   const start=allowTrial?now:now-TRIAL_MS;
@@ -133,7 +142,7 @@ async function provisionAccess(env:Env,uid:string,created:number,token:string,al
     await env.DB.prepare("INSERT OR IGNORE INTO access_grants(id,owner_uid,grant_kind,starts_at,ends_at,reason,created_at) VALUES(?,?,'complimentary',?,?,?,?)")
       .bind('dev-beta-30d:'+uid,uid,rollout.cutoff_at,rollout.beta_ends_at,'DEV existing-account migration: 30 days',now).run();
   }
-  return publish(env,uid,token);
+  return publish(env,uid,token,profileVersion);
 }
 export async function assertActiveAccess(env:Env,uid:string):Promise<void> {
   await assertNotDeleting(env,uid);

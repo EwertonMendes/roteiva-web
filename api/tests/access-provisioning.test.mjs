@@ -21,15 +21,19 @@ function setup(t,{existing=true,failPatch=false,conflict=false,missing=false}={}
    if(url==='https://oauth2.googleapis.com/token')return Response.json({access_token:'synthetic-admin'});
    if(String(url).includes('/documents/users?'))return Response.json({documents:[{name:'projects/roteiva-web-dev/databases/(default)/documents/users/A',fields:{ownerUid:{stringValue:'A'}}}]});
    const path=new URL(url).pathname;
-   if(path.endsWith('/users/A'))return missing?new Response('',{status:404}):Response.json({createTime:new Date(cutoff+(existing?-10000:10000)).toISOString(),fields:{ownerUid:{stringValue:'A'}}});
+   if(path.endsWith('/users/A'))return missing?new Response('',{status:404}):Response.json({createTime:new Date(cutoff+(existing?-10000:10000)).toISOString(),updateTime:'2026-10-19T00:00:00Z',fields:{ownerUid:{stringValue:'A'}}});
+   if(path.endsWith('/documents:commit')){
+     assert.equal(options.method,'POST');
+     if(failPatch)return new Response('',{status:503});
+     if(conflict)return new Response('',{status:409});
+     const body=JSON.parse(options.body);
+     assert.equal(body.writes.length,2);
+     assert.equal(body.writes[0].currentDocument.updateTime,'2026-10-19T00:00:00Z');
+     assert.deepEqual(body.writes[0].updateMask.fieldPaths,['ownerUid']);
+     assert.ok(body.writes[1].currentDocument);
+     const value=body.writes[1].update;value.updateTime=new Date().toISOString();projection.set('A',value);writes++;return Response.json({});
+   }
    if(path.endsWith('/users/A/access/current')){
-     if(options.method==='PATCH'){
-       if(failPatch)return new Response('',{status:503});
-       if(conflict)return new Response('',{status:409});
-       const q=new URL(url).searchParams;
-       assert.ok(q.has('currentDocument.exists')||q.has('currentDocument.updateTime'));
-       const value=JSON.parse(options.body);value.updateTime=new Date().toISOString();projection.set('A',value);writes++;return Response.json(value);
-     }
      return projection.has('A')?Response.json(projection.get('A')):new Response('',{status:404});
    }
    throw Error('Unexpected request');

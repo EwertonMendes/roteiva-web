@@ -3,7 +3,7 @@ import { adminToken, deletionConfigured, deleteIdentity, deleteFirestoreChunk, d
 import { decrypt, context } from './crypto.ts';
 import {revokeGuard} from './oauth-guard.ts';
 import {eraseAccess} from './access.ts';
-import {retainTrialIdentity,type TrialPrincipal} from './trial-identity.ts';
+import {retainTrialIdentity,assertTrialIdentityRetained,type TrialPrincipal} from './trial-identity.ts';
 
 type Phase='locking'|'revoking'|'firestore'|'identity'|'completed'|'manual_review';
 type Job={owner_uid:string;operation_id:string;phase:Phase;attempts:number;lease_id:string|null;lease_until:number;next_attempt_at:number};
@@ -31,7 +31,8 @@ export async function requestDeletion(request:Request,env:Env,uid:string,princip
   await adminToken(env);
   // Existing beta accounts must also be claimed before their UID is deleted,
   // even if they did not sign in after this protection was introduced.
-  if(principal){
+  if(!principal)throw new ApiError(503,'trial_identity_required');
+  {
     if(principal.uid!==uid)throw new ApiError(401,'invalid_identity');
     await retainTrialIdentity(env,principal);
   }
@@ -85,6 +86,7 @@ async function revokeConnections(env:Env,uid:string):Promise<boolean>{
 }
 async function runPhase(env:Env,job:Job,lease:string):Promise<void>{
   const uid=job.owner_uid;
+  await assertTrialIdentityRetained(env,uid);
   if(job.phase==='locking'){
     const token=await adminToken(env);
     await lockAccount(env,uid,token);

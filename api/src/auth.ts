@@ -34,14 +34,15 @@ export async function verifiedTrialPrincipal(request:Request,env:Env,maxAgeSecon
     const now=Math.floor(Date.now()/1000);
     if(typeof payload.sub!=='string'||!payload.sub||payload.sub.length>128||
        !/^[A-Za-z0-9_-]+$/.test(payload.sub)||
-       typeof payload.iat!=='number'||payload.iat>now+5||
-       typeof payload.auth_time!=='number'||payload.auth_time>now+5||
-       (maxAgeSeconds!==undefined&&now-payload.auth_time>maxAgeSeconds)||
+       !Number.isSafeInteger(payload.iat)||(payload.iat as number)<0||(payload.iat as number)>now+5||
+       !Number.isSafeInteger(payload.auth_time)||(payload.auth_time as number)<0||
+       (payload.auth_time as number)>(payload.iat as number)||
+       (maxAgeSeconds!==undefined&&now-(payload.auth_time as number)>maxAgeSeconds)||
        payload.email_verified!==true||typeof payload.email!=='string')
       throw new Error('invalid verified claims');
     const firebase=payload.firebase as {sign_in_provider?:unknown;identities?:{'google.com'?:unknown}}|undefined;
     const google=firebase?.identities?.['google.com'];
-    if(firebase?.sign_in_provider!=='google.com'||!Array.isArray(google)||
+    if(firebase?.sign_in_provider!=='google.com'||!Array.isArray(google)||google.length!==1||
        typeof google[0]!=='string'||!google[0]||google[0].length>300)
       throw new Error('google provider identity missing');
     return {uid:payload.sub,verifiedEmail:payload.email,googleSubject:google[0]};

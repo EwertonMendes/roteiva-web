@@ -29,7 +29,7 @@ test('first verified Google identity wins permanently; recreated UID and Gmail a
   assert.equal(await retainTrialIdentity(s.env,b),false);
   assert.equal(await retainTrialIdentity(s.env,b),false);
   const claims=s.sql.prepare('SELECT * FROM trial_identity_claims ORDER BY fingerprint').all();
-  assert.equal(claims.length,2);
+  assert.equal(claims.length,4);
   const raw=JSON.stringify(claims);
   for(const sensitive of ['uid-original','uid-after-deletion','gmail','googlemail','google-subject','example.user'])
     assert.ok(!raw.includes(sensitive),'identity ledger must not retain '+sensitive);
@@ -75,7 +75,9 @@ test('verified provider identity requires signed Google email, recent login for 
   for(const claims of [{...base,email_verified:false},{...base,email_verified:undefined},
     {...base,firebase:{sign_in_provider:'password',identities:{'google.com':['verified-sub']}}},
     {...base,firebase:{sign_in_provider:'google.com',identities:{}}},
-    {...base,email:undefined}]){
+    {...base,email:undefined},
+    {...base,firebase:{sign_in_provider:'google.com',identities:{'google.com':['one','two']}}},
+    {...base,auth_time:-1}, {...base,auth_time:now+1}, {...base,auth_time:now-0.5}]){
     const req=await request(claims);
     await assert.rejects(()=>verifiedTrialPrincipal(req,env,undefined,keys),
       e=>e.status===401);
@@ -92,11 +94,17 @@ test('backend provisions new same-email UID as expired after old account is eras
   globalThis.fetch=async(url,options={})=>{
     const target=String(url);
     assert.equal(options.redirect,'manual');
+    if(target.endsWith('/documents:commit')){
+      const write=JSON.parse(options.body).writes[1];
+      const uid=write.update.name.split('/').at(-3);
+      projected.set(uid,{fields:write.update.fields,updateTime:new Date().toISOString()});
+      return Response.json({});
+    }
     const match=target.match(/\/documents\/users\/(A|B)(?:\/access\/current)?/);
     if(!match)throw new Error('Unexpected mocked Firestore URL '+target);
     const uid=match[1];
     if(!target.includes('/access/current'))
-      return Response.json({createTime:new Date(created).toISOString(),fields:{ownerUid:{stringValue:uid}}});
+      return Response.json({createTime:new Date(created).toISOString(),updateTime:'2026-10-19T00:00:00Z',fields:{ownerUid:{stringValue:uid}}});
     if(options.method==='PATCH'){
       const value=JSON.parse(options.body);
       const entry={...value,updateTime:new Date().toISOString()};
@@ -149,6 +157,6 @@ test('legacy beta account is claimed BEFORE accepting deletion even without a pr
     body:JSON.stringify({phrase:'EXCLUIR MINHA CONTA',acknowledged:true})});
   const response=await requestDeletion(request,env,principal.uid,principal);
   assert.equal(response.status,202);
-  assert.equal(s.sql.prepare('SELECT COUNT(*) n FROM trial_identity_claims').get().n,2);
+  assert.equal(s.sql.prepare('SELECT COUNT(*) n FROM trial_identity_claims').get().n,3);
   assert.equal(await retainTrialIdentity(env,identity('new-uid','previous.user+again@googlemail.com','google-previous-uid')),false);
 });

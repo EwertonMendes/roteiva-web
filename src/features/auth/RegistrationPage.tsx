@@ -28,7 +28,7 @@ export function RegistrationPage({user,submitting,error,onSubmit,onExit}:{
       <div><strong>{user.email||"Conta Google"}</strong><span>Identidade confirmada pelo Google</span></div>
       <span className="auth-account-check" aria-label="Google conectado"><Check size={16}/></span>
     </div>
-    <p className="auth-invitation">Comece com <strong>7 dias de acesso gratuito</strong> a todas as ferramentas. Não precisa de cartão e nenhuma cobrança será feita automaticamente.</p>
+    <p className="auth-invitation">Novas identidades elegíveis recebem <strong>7 dias de acesso gratuito</strong> a todas as ferramentas, uma única vez. Não precisa de cartão e nenhuma cobrança será feita automaticamente.</p>
     <form className="register-form" onSubmit={submit} noValidate>
       <label className="auth-field" htmlFor="registration-name">
         <span>Como podemos chamar você? <b>*</b></span>
@@ -52,7 +52,7 @@ export function RegistrationPage({user,submitting,error,onSubmit,onExit}:{
         <input type="checkbox" name="dataAcknowledgement" checked={acknowledged} onChange={e=>setAcknowledged(e.target.checked)} required/>
         <span>Concordo com o uso dos meus dados para criar minha conta e organizar meu espaço no Roteiva. <b>*</b></span>
       </label>
-      <details className="auth-data-note"><summary><CircleHelp size={15}/> Como meus dados são usados?</summary><p>Seu nome, e-mail e foto do Google identificam sua conta. Os dados de clientes e projetos ficam no seu espaço privado. Para impedir testes gratuitos repetidos após a exclusão, preservamos um marcador criptográfico pseudonimizado da identidade Google/e-mail verificado, sem guardar o e-mail nesse marcador. A conexão com o Google Drive é opcional, e seus arquivos continuam na sua conta Google.</p></details>
+      <details className="auth-data-note"><summary><CircleHelp size={15}/> Como meus dados são usados?</summary><p>Seu nome, e-mail e foto do Google identificam sua conta. Os dados de clientes e projetos ficam no seu espaço privado. Para impedir testes gratuitos repetidos após a exclusão, preservamos um marcador criptográfico pseudonimizado da identidade Google/e-mail verificado, sem guardar o e-mail nesse marcador. Ele é mantido após a exclusão enquanto essa oferta existir, somente para prevenir sua reutilização. A conexão com o Google Drive é opcional, e seus arquivos continuam na sua conta Google.</p></details>
       {error&&<p className="auth-error" role="alert">{error}</p>}
       <button className="auth-primary" type="submit" disabled={!valid||submitting}>{submitting?"Criando seu espaço…":"Criar meu espaço de trabalho"}<ArrowRight size={17}/></button>
       <button className="auth-link" type="button" disabled={submitting} onClick={onExit}><ChevronLeft size={16}/> Sair sem criar conta</button>

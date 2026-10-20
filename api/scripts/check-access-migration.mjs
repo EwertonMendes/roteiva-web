@@ -22,7 +22,10 @@ assert.deepEqual(priorTotals,JSON.parse(readFileSync(snapshot,'utf8')),'Existing
 const migrations=query('SELECT name FROM d1_migrations ORDER BY id').map(r=>r.name);
 assert.ok(migrations.includes('0007_access.sql'),'access migration is not applied');
 assert.ok(migrations.includes('0010_trial_identity_claims.sql'),'trial identity migration is not applied');
-assert.equal(query("SELECT name FROM sqlite_master WHERE type='table' AND name='trial_identity_claims'").length,1,'trial identity ledger missing');
+assert.ok(migrations.includes('0011_trial_identity_atomic.sql'),'atomic trial migration is not applied');
+const trialSchema=query("SELECT name,type FROM sqlite_master WHERE name IN ('trial_identity_claims','trial_identity_claims_owner','trial_identity_claims_immutable','trial_identity_key','trial_identity_key_immutable','access_account_deletion_guard') ORDER BY name");
+assert.equal(trialSchema.length,6,'trial identity schema incomplete');
+assert.deepEqual(query('PRAGMA integrity_check').map(r=>r.integrity_check),['ok'],'database integrity failed');
 assert.equal(query('PRAGMA foreign_key_check').length,0,'foreign key integrity failed');
 const schema=query("SELECT name,type FROM sqlite_master WHERE name IN ('access_accounts','access_grants','access_subscriptions','access_grants_owner','access_subscriptions_owner','access_trial_immutable') ORDER BY name");
 assert.equal(schema.length,6,'access schema incomplete');

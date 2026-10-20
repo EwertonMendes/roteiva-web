@@ -46,20 +46,38 @@ export async function retainTrialIdentity(env:Env,principal:TrialPrincipal):Prom
   const owner=await fingerprint(key,'uid:'+principal.uid);
   const identifiers=[
     await fingerprint(key,'email:'+canonicalEmail(principal.verifiedEmail)),
-    await fingerprint(key,'google:'+principal.googleSubject)
+    await fingerprint(key,'google:'+principal.googleSubject),
+    owner
   ];
-  // INSERT OR IGNORE makes each identifier unique even under concurrent logins.
-  // Never replace ownership: stale/deleted accounts cannot regain trial rights.
+  const verifier=await fingerprint(key,'roteiva:trial-key-verifier:v1');
+  // D1 batch is one transaction. A rejected UID is permanently linked to a
+  // prior owner too: failure/retry with a changed email cannot become eligible.
+  // Unclaimed aliases inherit the conflicting owner, never the rejected UID.
   const now=Date.now();
-  for(const id of identifiers){
-    await env.DB.prepare('INSERT OR IGNORE INTO trial_identity_claims(fingerprint,first_owner_tag,claimed_at) VALUES(?,?,?)')
-      .bind(id,owner,now).run();
-  }
-  for(const id of identifiers){
-    const existing=await env.DB.prepare('SELECT first_owner_tag FROM trial_identity_claims WHERE fingerprint=?')
-      .bind(id).first<{first_owner_tag:string}>();
-    if(!existing)throw new ApiError(503,'trial_identity_unavailable');
-    if(existing.first_owner_tag!==owner)return false;
-  }
-  return true;
+  const results=await env.DB.batch([
+    env.DB.prepare('INSERT OR IGNORE INTO trial_identity_key(id,verifier) VALUES(1,?)').bind(verifier),
+    ...identifiers.map(id=>env.DB.prepare(`INSERT OR IGNORE INTO trial_identity_claims(fingerprint,first_owner_tag,claimed_at)
+      SELECT ?,COALESCE((SELECT first_owner_tag FROM trial_identity_claims
+        WHERE fingerprint IN (?,?,?) AND first_owner_tag<>? ORDER BY fingerprint LIMIT 1),?),?
+      WHERE EXISTS(SELECT 1 FROM trial_identity_key WHERE id=1 AND verifier=?)`)
+      .bind(id,...identifiers,owner,owner,now,verifier)),
+    env.DB.prepare('SELECT verifier FROM trial_identity_key WHERE id=1'),
+    env.DB.prepare('SELECT first_owner_tag FROM trial_identity_claims WHERE fingerprint IN (?,?,?)').bind(...identifiers)
+  ]);
+  const saved=results[4].results as {verifier:string}[];
+  if(saved[0]?.verifier!==verifier)throw new ApiError(503,'trial_identity_key_mismatch');
+  const claims=results[5].results as {first_owner_tag:string}[];
+  if(claims.length!==3)throw new ApiError(503,'trial_identity_unavailable');
+  return claims.every(claim=>claim.first_owner_tag===owner);
+}
+
+/** Legacy in-flight deletions must pause until a signed identity is retained. */
+export async function assertTrialIdentityRetained(env:Env,uid:string):Promise<void>{
+  const key=await hmacKey(env);
+  const owner=await fingerprint(key,'uid:'+uid);
+  const verifier=await fingerprint(key,'roteiva:trial-key-verifier:v1');
+  const row=await env.DB.prepare(`SELECT 1 FROM trial_identity_claims
+    WHERE fingerprint=? AND EXISTS(SELECT 1 FROM trial_identity_key WHERE id=1 AND verifier=?)`)
+    .bind(owner,verifier).first();
+  if(!row)throw new ApiError(503,'trial_identity_retention_required');
 }

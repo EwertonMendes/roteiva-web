@@ -29,6 +29,7 @@ jobs:
           distribution: temurin
           java-version: '21'
       - run: pnpm install --frozen-lockfile
+      - run: npm ci --ignore-scripts --prefix api
       - name: Install browser and compile isolated emulator/demo modes
         run: |
           pnpm exec playwright install --with-deps chromium
@@ -36,6 +37,8 @@ jobs:
           pnpm build:demo
       - name: Run Firestore isolation and Chromium desktop/mobile suite
         run: pnpm test:firebase
+      - name: Backend saga with isolated D1 and Firebase emulators
+        run: pnpm test:trial:e2e
       - name: Archive failure context
         if: failure()
         uses: actions/upload-artifact@v4
