@@ -454,7 +454,7 @@ export async function assertNoConnectionReviews(env:Env,uid:string,connectionId:
 }
 /** Expired capability links cease to work immediately; revoke Drive ACLs in bounded cron jobs. */
 export async function cleanupExpiredReviews(env:Env):Promise<void>{
-  const r=await env.DB.prepare("SELECT * FROM review_requests WHERE expires_at<=? AND status!='closed' ORDER BY expires_at LIMIT 1")
-    .bind(now()).first<Review>();
+  const r=await env.DB.prepare("SELECT * FROM review_requests WHERE expires_at<=? AND status!='closed' AND updated_at<? ORDER BY updated_at LIMIT 1")
+    .bind(now(),now()-60000).first<Review>();
   if(r)await close(env,r);
 }
