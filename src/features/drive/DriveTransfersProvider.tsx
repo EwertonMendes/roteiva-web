@@ -46,6 +46,7 @@ function DriveTransfersSession({children}:{children:ReactNode}){
 
   const completed=useCallback<Completion>((file,dest)=>{
     if(!user)return;
+    setResult('');
     invalidateDriveFolderCache(user.uid,dest.connectionId,dest.targetFolderId);
     subscribers.current.forEach(callback=>callback(file,dest));
   },[user]);

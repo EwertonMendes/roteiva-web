@@ -2,7 +2,7 @@
 
 ## Estado em 20/10/2026
 
-**IMPLEMENTADO e em revisão; integração Google real BLOQUEADA para homologação.**
+**IMPLEMENTADO; Picker e upload real >250 MiB VALIDADOS no Chrome DEV; aceite completo PARCIAL.**
 Não fazer merge nem anunciar upload validado com base em mocks. Publicação
 temporária de homologação em DEV autorizada pelo proprietário em 20/10/2026,
 sem merge, com reversão para master em caso de falha. PROD permanece fora do escopo.
@@ -130,7 +130,7 @@ Inspeção do Console e configuração autorizada em 20/10/2026 confirmaram:
 - Origem JavaScript `https://roteiva-web-dev.web.app` já autorizada; callback
   `https://roteiva-api-dev.ewertonmendes9.workers.dev/oauth/drive/callback` preservado.
 - Chave **Roteiva Picker DEV** criada com restrição de aplicativo Sites,
-  `https://roteiva-web-dev.web.app/*` e somente **Google Picker API**.
+  `https://roteiva-web-dev.web.app/*`, `https://docs.google.com/*` e somente **Google Picker API**.
   Restrição salva conferida no Console; valor não versionado.
 - Worker `roteiva-api-dev` contém o secret **GOOGLE_PICKER_API_KEY**, confirmado
   por `wrangler secret list --env dev`. Temporário local fora do OneDrive apagado.
@@ -141,7 +141,10 @@ Ações externas necessárias, sem inventar valores:
 
 1. **CONCLUÍDO:** no [Console de credenciais](https://console.cloud.google.com/apis/credentials?project=roteiva-drive-dev),
    chave Google Picker com restrição de aplicativo **Sites**, referrer
-   `https://roteiva-web-dev.web.app/*`, e restrição de API **Google Picker API**.
+   `https://roteiva-web-dev.web.app/*` e `https://docs.google.com/*`, e restrição de API **Google Picker API**.
+   O referrer docs.google.com é exigido pelo iframe oficial do Picker; sua inclusão
+   foi autorizada separadamente após a primeira abertura vazia. Não ampliar para
+   todos os sites ou para escrita OAuth irrestrita.
    Conferir Google Picker API e Google Drive API habilitadas no mesmo projeto.
    Não reutilizar a chave Firebase de outro projeto, nem criar chave irrestrita.
 2. **CONCLUÍDO:** chave restrita como Worker Secret `GOOGLE_PICKER_API_KEY` no Worker
@@ -172,12 +175,39 @@ Ações externas necessárias, sem inventar valores:
    vídeo >250 MiB com recuperação real e checar arquivo na pasta correta. Testar
    revogação/reconexão e Safari/dispositivo físico. Só então retirar draft.
 
-O login normal no frontend DEV retornou **Login cancelado** após a seleção
-automatizada da conta. Solicitada entrada normal pelo proprietário para continuar
-sem extrair tokens pessoais nem usar credencial administrativa para impersonação.
-Ainda não há arquivo enviado ao Google nem prova de autorização Picker real.
-Vídeo sintético de QA preparado fora do OneDrive: AVI válido, 1.200 frames/40s,
-276.509.032 bytes (>250 MiB), sem conteúdo pessoal; não versionado.
+O login automatizado inicialmente retornou **Login cancelado**; o proprietário
+concluiu a entrada normal e confirmou o workspace aberto. Não houve impersonação
+administrativa nem extração da sessão Firebase para o script de QA.
+
+### Prova real realizada no Chrome DEV — 20/10/2026, 18:25 UTC
+
+- Pasta de QA criada vazia no Drive da mesma conta e vinculada ao projeto de QA
+  pelo produto. Outras pastas vinculadas e seus arquivos foram preservados.
+- Seleção pelo botão **Enviar arquivos**: AVI sintético válido, 1.200 frames/40s,
+  **276.509.032 bytes** (>250 MiB), preparado fora do OneDrive, sem conteúdo pessoal.
+- A primeira tentativa pediu autorização; GIS emitiu token com os escopos mínimos,
+  Worker aceitou a verificação, Picker real listou a pasta e seleção exata foi
+  aceita. Worker confirmou a autorização antes da retomada da fila.
+- **Tentar novamente** enviou o arquivo diretamente navegador→Google pelo cliente
+  de produção, sem proxy. UI concluiu e exibiu o arquivo na pasta correta.
+- Leitura independente pelo conector Drive confirmou MIME `video/avi`, tamanho
+  **276509032** e parent igual à pasta descartável. D1 confirmou **uma** tentativa
+  `completed`, tamanho idêntico e `encrypted_session IS NULL`.
+- O cliente exige acknowledgements 308/Range para os blocos intermediários e
+  200/201 ao terminar; o sucesso ponta a ponta demonstra viabilidade do transporte
+  CORS nesse Chrome/origem. Não foi gravado trace de rede nem inventário individual
+  de headers/status Google. Não registrar URLs de iframe Picker: contêm token GIS.
+- Google Drive mostrou o vídeo ainda em processamento para reprodução; não houve
+  promessa de thumbnail imediata. Tamanho/parent/status foram conferidos; checksum
+  remoto não foi comparado. Conector de download limita a 256 MiB e recusou o AVI.
+- Corrigidos avisos que permaneciam após seleção válida/conclusão: erro de arquivo
+  rejeitado é limpo ao aceitar nova seleção; aviso de pasta autorizada sai no sucesso.
+
+**Pendências explícitas:** interrupção de rede real foi oferecida e o proprietário
+preferiu deixá-la manual/pendente. Retry/probe/retomada permanecem cobertos apenas
+pelos testes isolados. Google A/B remoto, revogação/reconexão, Safari e dispositivo
+móvel físico não foram homologados nesta rodada. Manter draft até aceite integral;
+**pronto para continuar testes controlados em DEV**, sem declarar conclusão total.
 
 ## QA automatizado e prova real
 
@@ -212,8 +242,9 @@ cliente de produção** transpilado. Exige estas variáveis no ambiente seguro:
 Saída contém apenas tamanho, progresso, contagens de status e verificação. Não
 registra identidade, nomes, tokens, IDs ou capability URLs. Arquivo é preservado
 na pasta de teste; não há exclusão automática. Expirar token/estado deve produzir
-falha, nunca sucesso presumido. A prova ainda **não foi executada com credenciais**:
-CORS/preflight/Range/200–201 e vídeo real permanecem não comprovados.
+falha, nunca sucesso presumido. O **script** não foi executado com credenciais;
+a prova real acima foi realizada pela UI publicada, com login normal. O modo de
+perda de acknowledgement do script continua pendente, sem ser classificado como aprovado.
 
 ## Referências oficiais consultadas
 
@@ -242,7 +273,8 @@ Bytes de vídeo continuam fora do Worker; não foi introduzido proxy alternativo
   desktop/mobile; evidência do conjunto final vinculada na PR.
 - Revisão visual da fila desktop/mobile em tema escuro identificou transparência
   sobre o conteúdo; fundo opaco corrigido e cenário de geometria/captura reexecutado.
-- Script real sem fixture: bloqueio seguro esperado; **nenhum upload Google real**.
+- Script real sem fixture: bloqueio seguro esperado. Separadamente, upload Google
+  real pela UI Chrome foi concluído e verificado conforme seção acima.
 
 Os checks públicos do HEAD e QA manual no GitHub são vinculados na descrição da PR.
 Estas contagens locais não validam os itens Google reais ainda bloqueados.

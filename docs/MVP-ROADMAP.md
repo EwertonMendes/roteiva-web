@@ -471,7 +471,7 @@ Evidências de deploy, commits, limites da comparação por contagens e reversã
 
 ## Upload resumable para pastas vinculadas — PR #52 (20/10/2026)
 
-**Status: PARCIAL — implementação ampliada; PR draft; Google real BLOQUEADO para homologação.**
+**Status: PARCIAL — Picker e upload >250 MiB reais validados no Chrome DEV; aceite completo pendente; PR draft.**
 
 - [x] Auditoria da implementação existente e dos checks; master com PRs #51/#53/#54 incorporada.
 - [x] JWT/Origin/entitlement/UID, vínculo e existência do projeto, ascendência real,
@@ -488,15 +488,19 @@ Evidências de deploy, commits, limites da comparação por contagens e reversã
 - [x] Testes API/SQLite/JWT sintético, cliente e E2E com provedores simulados ampliados.
   Evidência final de checks na própria PR; não equivalem a homologação Google real.
 - [x] Script opt-in de prova real reproduzível: scripts/qa-drive-real.mjs, sem tokens em logs.
-- [x] Chave Roteiva Picker DEV criada, restrita à origem DEV e somente Picker API;
+- [x] Chave Roteiva Picker DEV criada, restrita à origem DEV, iframe oficial docs.google.com e somente Picker API;
   secret GOOGLE_PICKER_API_KEY configurado no Worker DEV e inventário conferido.
 - [x] Conexão com acesso ativo identificada por consulta de estado D1, sem mudar trial/grant.
 - [x] Homologação temporária de branch no DEV autorizada pelo proprietário, sem merge:
   migration0012 com integridade/contagens preservadas, Worker e Hosting publicados;
   release anterior preservada para reversão. Prévia oficial Firebase também passou.
-- [ ] PoC real CORS/preflight/PUT/308/Range/200–201, vídeo >250 MiB e recuperação.
-  Worker remoto já respondeu 204/401/403 conforme contrato; Google continua sem prova.
-  Login normal no browser retornou cancelado; aguardando entrada pelo proprietário.
+- [x] Login normal concluído pelo proprietário; pasta QA vazia vinculada pelo produto;
+  GIS/Picker reais e autorização exata conferida pelo Worker.
+- [x] Upload real UI Chrome de 276.509.032 bytes direto ao Google, arquivo no parent
+  correto por leitura independente; uma tentativa D1 completed e capability apagada.
+  Worker remoto respondeu 204/401/403 conforme contrato. Sem trace HTTP individual.
+- [ ] Recuperação com interrupção real: proprietário preferiu deixar manual/pendente.
+  Cobertura de falhas/retomada isolada não substitui esse aceite.
 - [ ] QA Google A/B, revogação/reconexão, Safari e dispositivo móvel físico.
 - [ ] Revisão final, autorização de publicação de teste e homologação DEV; sem merge automático.
 

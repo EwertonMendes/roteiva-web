@@ -142,7 +142,7 @@ export function DriveConnectionPanel({
       projectId:viewing.projectId,folderName:viewPath.at(-1)?.name||viewing.folderName,
     };
     const {rejected}=uploads.enqueue(chosen,destination);
-    if(rejected)setError(rejected+" arquivo(s) não foram adicionados. Confira os tamanhos e o limite de 100 arquivos na fila.");
+    setError(rejected?rejected+" arquivo(s) não foram adicionados. Confira os tamanhos e o limite de 100 arquivos na fila.":"");
   }
 
   const refresh=useCallback(async()=>{

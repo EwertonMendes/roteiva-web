@@ -380,11 +380,15 @@ Sem retomada após F5, polling de mídia ou reload global. Capability Google emi
 não tem revogação instantânea garantida; cancelamento bloqueia próximas operações
 do cliente e desconexão bloqueia novas operações Worker.
 
-**Homologação real pendente:** chave Picker restrita criada e configurada como
+**Homologação real parcial:** chave Picker restrita criada e configurada como
 Worker Secret; origem JavaScript DEV existente conferida. Proprietário autorizou
 publicação temporária da branch no DEV sem merge, com migration aditiva0012 e
 reversão em caso de falha; nenhuma mudança nos gates permanentes de CI/CD.
-Uma conexão com acesso ativo foi identificada sem alterar entitlement. Ainda
-falta prova real navegador/Google para CORS e vídeo >250 MiB. As decisões
-acima estão implementadas e testadas com provedores simulados; não são prova de
-concessão Google real. Configuração e matriz: [DRIVE-UPLOAD.md](DRIVE-UPLOAD.md).
+Uma conexão com acesso ativo foi identificada sem alterar entitlement. Picker
+real autorizou a pasta exata; UI Chrome concluiu upload direto de 276.509.032 bytes,
+com parent/tamanho Google e tentativa completed/capability apagada no D1 conferidos.
+Chave mantém somente Picker API e referrers DEV + docs.google.com (iframe oficial),
+inclusão expressamente autorizada. Recuperação com rede real ficou manual/pendente
+por preferência do proprietário; A/B remoto, revogação, Safari e dispositivo físico
+também pendentes. Não extrapolar o sucesso Chrome para esses aceites.
+Configuração e matriz: [DRIVE-UPLOAD.md](DRIVE-UPLOAD.md).
