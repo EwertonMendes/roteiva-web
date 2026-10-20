@@ -5,6 +5,8 @@ import {useAuth} from "../auth/AuthProvider";
 import {useDriveApi} from "../drive/drive-api";
 import {readDriveLinks,type DriveFolderLink} from "../../data/drive-folder-links";
 import type {DriveItem} from "../drive/DriveLibraryUI";
+import {useDriveTransfers} from "../drive/DriveTransfersProvider";
+import type {UploadDestination} from "../drive/useDriveUploads";
 import "./reviews.css";
 
 type Status="draft"|"publishing"|"pending"|"changes"|"approved"|"replacing"|"closing"|"closed";
@@ -42,7 +44,7 @@ function ShareLinks({url,title}:{url:string;title:string}){
 export function ReviewsDashboard({clients,projects,studioName,onLibrary,startProjectId,startClientId}:{
   clients:Client[];projects:Project[];studioName:string;onLibrary:()=>void;startProjectId?:number;startClientId?:number
 }){
-  const {user}=useAuth(),call=useDriveApi();
+  const {user}=useAuth(),call=useDriveApi(),transfers=useDriveTransfers();
   const [rows,setRows]=useState<Review[]>([]);
   const [search,setSearch]=useState(""),[status,setStatus]=useState(""),[page,setPage]=useState(0);
   const [hasMore,setHasMore]=useState(false),[refresh,setRefresh]=useState(0);
@@ -96,6 +98,32 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
     setSelectedFolder(folder);setTrail([{id:folder.folderId,name:folder.folderName}]);
     void browse(folder,folder.folderId,[{id:folder.folderId,name:folder.folderName}]);
   };
+  const destination:UploadDestination|null=selectedFolder&&projectId?{
+    connectionId:selectedFolder.connectionId,linkedFolderId:selectedFolder.folderId,
+    targetFolderId:trail.at(-1)?.id||selectedFolder.folderId,
+    projectId,folderName:trail.at(-1)?.name||selectedFolder.folderName
+  }:null;
+  const uploadNew=(chosen:File[])=>{
+    if(!destination||!chosen.length)return;
+    const valid=chosen.filter(file=>file.type.startsWith("video/")||file.type.startsWith("image/")||
+      file.type.startsWith("audio/")||file.type==="application/pdf");
+    if(valid.length!==chosen.length){setFolderError("Envie apenas vídeo, imagem, áudio ou PDF.");return;}
+    if(valid.length+files.length>8){setFolderError("Selecione no máximo 8 materiais por aprovação.");return;}
+    const {rejected}=transfers.enqueue(valid,destination);
+    if(rejected)setFolderError(rejected+" arquivo(s) não foram adicionados à fila. Confira os limites do upload.");
+  };
+  useEffect(()=>transfers.subscribe((file,uploaded)=>{
+    if(!composer||!selectedFolder||uploaded.projectId!==projectId||
+       uploaded.connectionId!==selectedFolder.connectionId||
+       uploaded.linkedFolderId!==selectedFolder.folderId)return;
+    const target=trail.at(-1)?.id||selectedFolder.folderId;
+    if(uploaded.targetFolderId!==target)return;
+    if(!/^(video|image|audio)\//.test(file.mimeType)&&file.mimeType!=="application/pdf")return;
+    setFiles(old=>old.some(a=>a.fileId===file.id)||old.length>=8?old:
+      [...old,{fileId:file.id,name:file.name,mimeType:file.mimeType,
+        connectionId:uploaded.connectionId,linkedFolderId:uploaded.linkedFolderId}]);
+    void browse(selectedFolder,target,trail);
+  }),[transfers.subscribe,composer,selectedFolder,projectId,trail,browse]);
   const resetComposer=()=>{
     setComposer(false);setReplacement(null);setFiles([]);setTitle("");setMessage("");setSelectedFolder(null);
     setTrail([]);setItems([]);setError("");setFolderError("");
@@ -280,6 +308,19 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
             {selectedFolder&&<div className="review-breadcrumbs">{trail.map((node,i)=><button key={node.id}
               onClick={()=>void browse(selectedFolder,node.id,trail.slice(0,i+1))}>
                 {i>0&&<ChevronRight size={12}/>} {node.name}</button>)}</div>}
+            {destination&&<div className="review-upload-zone"
+              onDragOver={event=>{if(Array.from(event.dataTransfer.types).includes("Files"))event.preventDefault();}}
+              onDrop={event=>{if(!Array.from(event.dataTransfer.types).includes("Files"))return;
+                event.preventDefault();uploadNew(Array.from(event.dataTransfer.files));}}>
+              <label className="secondary-button">Adicionar arquivos do dispositivo
+                <input type="file" multiple accept="video/*,image/*,audio/*,application/pdf"
+                  onChange={event=>{uploadNew(Array.from(event.target.files||[]));event.target.value="";}}/></label>
+              <span>Ou arraste arquivos aqui. Envio direto ao seu Google Drive.</span>
+            </div>}
+            {destination&&transfers.uploads.filter(entry=>
+              entry.destination.projectId===projectId&&entry.destination.connectionId===destination.connectionId&&
+              ["queued","starting","uploading","verifying"].includes(entry.status)).length>0&&
+              <p className="reviews-muted" role="status">O envio está em andamento. Os arquivos serão selecionados automaticamente ao concluir.</p>}
             {folderError&&<p className="reviews-warning" role="alert">{folderError}</p>}
             <div className="review-files">
               {folderBusy&&<p role="status"><LoaderCircle size={16} className="rl-spin"/> Carregando arquivos…</p>}
@@ -297,7 +338,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
           {files.length>0&&<div className="reviews-selected"><h3>Selecionados</h3>
             {files.map(f=><div key={f.fileId}><Check size={14}/><span>{f.name}</span>
               <button onClick={()=>setFiles(x=>x.filter(a=>a.fileId!==f.fileId))} aria-label={"Remover "+f.name}><X size={15}/></button></div>)}</div>}
-          <p className="reviews-muted">Precisa enviar um arquivo novo? Utilize o upload da Biblioteca e depois selecione-o aqui.</p>
+          <p className="reviews-muted">Os envios usam a mesma fila segura da Biblioteca. Aguarde a confirmação do Google Drive antes de compartilhar.</p>
         </div>
         <footer><button className="secondary-button" onClick={resetComposer}>Cancelar</button>
           <button className="primary-button" disabled={working||!files.length||!projectId||!clientId||(!replacement&&!title.trim())||(!replacement&&mode==="google"&&!recipient.includes("@"))}
