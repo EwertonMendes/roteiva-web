@@ -513,7 +513,7 @@ Configuração, limites, decisões e procedimento completo: [DRIVE-UPLOAD.md](DR
 
 ### QA de acesso SaaS isolado — PR #50, integração de 20/10/2026
 
-**IMPLEMENTADO; integração com master/PR #52 em validação.** Seis cenários adicionais
+**IMPLEMENTADO e VALIDADO localmente (6/6 cenários) com master/PR #52.** Seis cenários adicionais
 desktop/mobile exercitam expiração, isolamento A/B e exclusão com provedores
 simulados em `demo-roteiva`, mais Rules e Worker/D1 isolados. Expectativa antiga de
 exclusão no acesso expirado foi corrigida para respeitar a PR #54; não se reintroduziu
