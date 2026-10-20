@@ -248,6 +248,11 @@ async function grant(env:Env,r:Review,a:Asset,ownerToken:string):Promise<void>{
   await checkedFile(env,r.owner_uid,ownerToken,r.project_id,sel);
   const row=await connection(env,r.owner_uid,a.connection_id);
   const existing=await permissions(env,row,a.file_id);
+  // An existing public/domain-wide ACL defeats the promise of Google-only review.
+  // Link mode may only reconcile a permission its own pending attempt created.
+  if(existing.some(p=>p.type==='anyone'||p.type==='domain')&&
+     (r.access_mode==='google'||a.grant_state==='unshared'))
+    throw new ApiError(409,'review_existing_public_permission');
   const match=existing.find(p=>r.access_mode==='link'?p.type==='anyone':
     p.type==='user'&&p.emailAddress?.toLowerCase()===r.recipient_email);
   if(a.grant_state==='unshared'&&match&&r.access_mode==='link')
