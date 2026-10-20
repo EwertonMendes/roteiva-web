@@ -11,6 +11,7 @@ import {
   LayoutGrid, UsersRound, Repeat2, ContactRound, type LucideIcon,
 } from "lucide-react";
 import { ProjectDetail, ClientDetail, TodayStudio, StudioReviews, WorkspaceTools, FinancePanel, projectTemplates } from "./studio-features";
+import {ReviewsDashboard} from "./features/reviews/ReviewsDashboard";
 import { validTimeRange, overlaps, eventRange, eventDuration } from "./studio-calendar";
 import { toISO as toISOAdded, parseMoney, splitInstallments } from "./studio-finance";
 import { FormEvent, useEffect, useLayoutEffect, useMemo, useState, useCallback } from "react";
@@ -102,6 +103,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
   const [dataReady, setDataReady] = useState(false);
   const [selectedProject, setSelectedProject] = useState<number | null>(initialBrowserRoute.projectId || null);
   const [selectedClient, setSelectedClient] = useState<number | null>(initialBrowserRoute.clientId || null);
+  const [reviewStart,setReviewStart]=useState<{clientId?:number;projectId?:number}|null>(null);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [eventDate, setEventDate] = useState("");
@@ -519,20 +521,20 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
           </div>
           {view === "settings" && <SettingsPage profile={profile} email={email} photoURL={photoURL} theme={theme} toggleTheme={toggleTheme} onSaveProfile={onSaveProfile} />}
           {view === "overview" && <><TodayStudio clients={clientList} projects={projects} entries={financeEntries} events={calendarEvents} activities={activities} onView={changeView} overviewMetrics={overviewMetrics} /><Overview projects={projects} setView={changeView} onOpenProject={openProject} /></>}
-          {view === "projects" && (selectedProject && projects.some(p => p.id === selectedProject) ? <ProjectDetail project={projects.find(p => p.id === selectedProject)!} clients={clientList} entries={financeEntries} assets={libraryAssets} events={calendarEvents} onSave={updateProject} onBack={() => changeView("projects")} onRevenue={addLinkedRevenue} onUpload={uploadAssets} onEvent={(p) => { openEvent(null, p.dueDate); }} uploading={uploading} /> : <ProjectsView projects={filtered.map(p => ({...p, files: libraryAssets.filter(a => a.projectId === p.id).length}))}
+          {view === "projects" && (selectedProject && projects.some(p => p.id === selectedProject) ? <ProjectDetail project={projects.find(p => p.id === selectedProject)!} clients={clientList} entries={financeEntries} assets={libraryAssets} events={calendarEvents} onSave={updateProject} onBack={() => changeView("projects")} onRevenue={addLinkedRevenue} onUpload={uploadAssets} onEvent={(p) => { openEvent(null, p.dueDate); }} uploading={uploading} onReview={()=>{setReviewStart({clientId:projects.find(p=>p.id===selectedProject)?.clientId,projectId:selectedProject||undefined});changeView("reviews");}} /> : <ProjectsView projects={filtered.map(p => ({...p, files: libraryAssets.filter(a => a.projectId === p.id).length}))}
                   statusFilter={statusFilter} setStatusFilter={(status)=>{
                     setStatusFilter(status);
                     onProjectStatus?.(status);
                   }} onOpen={openProject}
                   total={projectPage && !query.trim()?projectPage.total:undefined}
                   hasMore={!!projectPage?.hasMore&&!query.trim()} onMore={onMoreProjects} />)}
-          {view === "clients" && (selectedClient && clientList.some(c => c.id === selectedClient) ? <ClientDetail client={clientList.find(c => c.id === selectedClient)!} projects={projects} entries={financeEntries} onBack={() => changeView("clients")} onEdit={(client) => { setEditingClient(client); setClientModalOpen(true); }} onSave={saveClientPackage} onProject={openProject} /> : <ClientsView clients={clientList.filter(c => `${c.name} ${c.email} ${c.phone}`.toLowerCase().includes(query.toLowerCase())).map(c => ({...c, projects: projects.filter(p => p.clientId === c.id).length, active: projects.filter(p => p.clientId === c.id && p.status !== "Aprovado").length}))}
+          {view === "clients" && (selectedClient && clientList.some(c => c.id === selectedClient) ? <ClientDetail client={clientList.find(c => c.id === selectedClient)!} projects={projects} entries={financeEntries} onBack={() => changeView("clients")} onEdit={(client) => { setEditingClient(client); setClientModalOpen(true); }} onSave={saveClientPackage} onProject={openProject} onReview={()=>{setReviewStart({clientId:selectedClient||undefined});changeView("reviews");}} /> : <ClientsView clients={clientList.filter(c => `${c.name} ${c.email} ${c.phone}`.toLowerCase().includes(query.toLowerCase())).map(c => ({...c, projects: projects.filter(p => p.clientId === c.id).length, active: projects.filter(p => p.clientId === c.id && p.status !== "Aprovado").length}))}
                   onOpen={openClient} onAdd={() => {setEditingClient(null);setClientModalOpen(true);}}
                   totalCount={clientPage && !query.trim()?clientPage.total:undefined}
                   recurringCount={clientPage && !query.trim()?clientPage.recurring:undefined}
                   activeProjectsCount={clientPage && !query.trim()?projects.filter(p=>p.status!=="Aprovado" && !!p.clientId).length:undefined}
                   hasMore={!!clientPage?.hasMore&&!query.trim()} onMore={onMoreClients} />)}
-          {view === "reviews" && <StudioReviews />}
+          {view === "reviews" && (isDemo ? <StudioReviews /> : <ReviewsDashboard key={reviewStart?.projectId||reviewStart?.clientId||"reviews"} clients={clientList} projects={projects} studioName={workspaceName} onLibrary={()=>changeView("library")} startClientId={reviewStart?.clientId} startProjectId={reviewStart?.projectId} />)}
           {view === "finance" && <FinancePanel entries={financeEntries} clients={clientList} onPeriodChange={onFinancePeriodChange} serverBars={financeBars} onAdd={() => openFinanceModal()} onEdit={(entry) => openFinanceModal(entry)} onDelete={setDeletingFinanceEntry} />}
           {view === "calendar" && <CalendarView events={calendarEvents} onMonthChange={onCalendarMonthChange} onAdd={(date) => openEvent(null, date)} onEdit={(entry) => openEvent(entry)} onDelete={(entry) => { if (window.confirm(`Excluir o compromisso “${entry.title}”?`)) { commitCommands([{kind:"deleteEvent",id:entry.id}]); setCalendarEvents(current => current.filter(e => e.id !== entry.id)); logActivity(`Compromisso excluído: ${entry.title}`); } }} />}
           {view === "library" && <LibraryView assets={libraryAssets} query={query} onUpload={(files) => uploadAssets(files, Number(libraryProject) || undefined)} projects={projects} selectedProjectId={Number(libraryProject)||undefined} onSelectProject={setLibraryProject} onLinkedFolderCountChange={setLinkedFolderCount} />}
