@@ -462,3 +462,5 @@ Evidências e reversão: [ACCESS-CONTROL.md](ACCESS-CONTROL.md).
 
 - VALIDADO REMOTAMENTE: PR #43, migration 0007 e Worker compatível publicados pelo run 39354281435; zero violações FK e contagens preservadas (uma conexão Drive, demais tabelas operacionais vazias).
 - IMPLEMENTADO, PENDENTE PUBLICAÇÃO/HOMOLOGAÇÃO: Worker de provisionamento único, cortesia beta 30 dias com marco fixo, Cron idempotente e flag de provisionamento Drive sem bypass; leitura privada de status preparada nas regras, sem enforcement de negócio nesta fase. Testes de API incluem retries, datas, falha de projeção/conflito e cursor.
+
+- PARCIAL/BLOQUEADO NA HOMOLOGAÇÃO: fase 2 publicada, porém Biblioteca real retornou erro e não havia projeções no primeiro inventário. Instrumentação categórica preparada; não publicar frontend/regras restritivas antes da correção e confirmação de cobertura.

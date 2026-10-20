@@ -47,3 +47,7 @@ A preparação de regras nesta fase só permite GET privado de `access/current`,
 **Limite distribuído:** D1 e Firestore não têm transação conjunta. Nenhuma operação ADM existe aqui. A futura revogação/suspensão deve primeiro publicar negação no Firestore com precondição, depois alterar D1 e reconciliar; uma falha não pode ser declarada concluída nem revertida para concessão. Não editar concessões manualmente em D1 e presumir revogação imediata no Firestore. Testes de suspensão devem usar exclusivamente fixtures e confirmar ambos os sistemas. Antes de habilitar as regras finais, validar esse protocolo e concorrência; não usar CI como prova de homologação remota.
 
 Auditoria GitHub: `cloudflare-development` permite somente branch master; segredo Cloudflare já existe. `firebase-development` não possui gate de branch/reviewer configurado; os workflows atuais restringem deploy a master e SHA atual. Não foi alterada nenhuma proteção. Consulta à proteção clássica de master respondeu 404, sem afirmar inexistência de outros rulesets.
+
+## Falha encontrada na homologação da fase 2
+
+Worker publicado pelo run 39355067084, regras preparatórias pelo 39355067202; antes de liberar UI/regras restritivas, leitura real da Biblioteca falhou e o inventário ainda não tinha projeções. Não considerar CI como homologação. Correção de diagnóstico acrescenta somente evento/código/status categóricos, sem UID, URL, exception ou resposta de provedor. Frontend e regras restritivas permanecem retidos até identificar e resolver a dependência.
