@@ -55,12 +55,14 @@ test('new account receives exactly seven days, no beta grant',async t=>{
  assert.equal(state.source,'trial');
  assert.equal(s.sql.prepare('SELECT COUNT(*) AS n FROM access_grants').get().n,0);
 });
-test('Drive compatibility provisions missing account but never bypasses suspension or missing profile',async t=>{
+test('Drive cannot implicitly create trials and never bypasses suspension',async t=>{
  const s=setup(t);
  await assert.rejects(()=>assertActiveAccess(s.env,'A'),e=>e.status===403);
- await assertActiveAccess({...s.env,ACCESS_PROVISION_ON_DRIVE:'true'},'A');
- s.sql.prepare('UPDATE access_accounts SET suspended_at=? WHERE owner_uid=?').run(Date.now(),'A');
  await assert.rejects(()=>assertActiveAccess({...s.env,ACCESS_PROVISION_ON_DRIVE:'true'},'A'),e=>e.status===403);
+ await ensureAccess(s.env,'A',undefined,trialIdentity);
+ await assert.doesNotReject(()=>assertActiveAccess(s.env,'A'));
+ s.sql.prepare('UPDATE access_accounts SET suspended_at=? WHERE owner_uid=?').run(Date.now(),'A');
+ await assert.rejects(()=>assertActiveAccess(s.env,'A'),e=>e.status===403);
 });
 test('profile absence never creates a trial; failed projection cannot report success',async t=>{
  const s=setup(t,{missing:true});
