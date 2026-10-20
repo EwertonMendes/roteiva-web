@@ -2,7 +2,7 @@ import { ApiError, type Env } from './types.ts';
 import { adminToken, deletionConfigured, deleteIdentity, deleteFirestoreChunk, deleteRoot, deleteFence, lockAccount } from './firebase-admin.ts';
 import { decrypt, context } from './crypto.ts';
 import {revokeGuard} from './oauth-guard.ts';
-import {eraseAccess} from './access.ts';
+import {eraseAccess,assertActiveAccess} from './access.ts';
 import {retainTrialIdentity,assertTrialIdentityRetained,type TrialPrincipal} from './trial-identity.ts';
 
 type Phase='locking'|'revoking'|'firestore'|'identity'|'completed'|'manual_review';
@@ -27,15 +27,17 @@ export async function requestDeletion(request:Request,env:Env,uid:string,princip
   if(!payload||typeof payload!=='object'||Array.isArray(payload)||
     (payload as {phrase?:unknown}).phrase!==PHRASE ||
     (payload as {acknowledged?:unknown}).acknowledged!==true)throw new ApiError(400,'invalid_confirmation');
+  if(!principal)throw new ApiError(503,'trial_identity_required');
+  if(principal.uid!==uid)throw new ApiError(401,'invalid_identity');
+  // New requests require actual commercial access, never a client-side flag.
+  // Previously accepted jobs must remain resumable after expiry or data removal.
+  const existing=await env.DB.prepare('SELECT 1 FROM account_deletions WHERE owner_uid=?').bind(uid).first();
+  if(!existing)await assertActiveAccess(env,uid);
   // Before accepting an irreversible request, confirm admin credentials work.
   await adminToken(env);
   // Existing beta accounts must also be claimed before their UID is deleted,
   // even if they did not sign in after this protection was introduced.
-  if(!principal)throw new ApiError(503,'trial_identity_required');
-  {
-    if(principal.uid!==uid)throw new ApiError(401,'invalid_identity');
-    await retainTrialIdentity(env,principal);
-  }
+  await retainTrialIdentity(env,principal);
   const now=Date.now(),operationId=crypto.randomUUID();
   await env.DB.prepare("INSERT OR IGNORE INTO account_deletions (owner_uid,operation_id,phase,next_attempt_at,created_at,updated_at) VALUES (?,?,'locking',?,?,?)")
     .bind(uid,operationId,now,now,now).run();

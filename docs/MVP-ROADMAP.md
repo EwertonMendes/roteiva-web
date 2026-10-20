@@ -481,3 +481,10 @@ Evidências de deploy, commits, limites da comparação por contagens e reversã
 - [ ] Atualização dos advisories preexistentes nas dependências frontend/CLI: sete reportados, três altos, fora da correção antifraude.
 
 Evidência e distinção entre unitário, D1 isolado, browser/emuladores e DEV em [TRIAL-REUSE-PREVENTION.md](TRIAL-REUSE-PREVENTION.md).
+
+
+### Exclusão de conta restrita às Configurações — 20/10/2026
+
+**Decisão confirmada pelo proprietário; IMPLEMENTADO nesta alteração.** Retirar a exclusão de acesso expirado, suspensão e falha de validação; manter apenas a Zona de perigo de Configurações para acesso ativo. Novos pedidos no Worker usam os direitos D1 reais; preservar jobs já aceitos e status/cron. Nenhuma mudança de dados, grants, migrations ou segredo antifraude.
+
+Evidências: api/tests/deletion-access.test.mjs (negativa para conta sem provisionamento, expirada, suspensa ou sync_pending e retry idempotente), api/tests/integration/trial-e2e.mjs e tests/browser/access.spec.ts (disponível só em Configurações ativas, ausente nos estados bloqueados/erro em desktop/mobile). Publicação DEV acompanhada pela PR correspondente, pelos workflows oficiais.

@@ -82,6 +82,8 @@ test('isolated backend saga: first trial, retries, deletion, recreated UID denie
  const second=await (await ensureAccess(env,b,undefined,pb)).json();
  assert.equal(second.active,false);assert.equal(second.source,'none');
  await assert.rejects(()=>assertActiveAccess(env,b),e=>e.code==='access_expired');
+ await assert.rejects(()=>requestDeletion(confirmation(),env,b,pb),e=>e.code==='access_expired');
+ assert.equal((await DB.prepare('SELECT COUNT(*) n FROM account_deletions WHERE owner_uid=?').bind(b).first()).n,0);
  assert.equal((await (await ensureAccess(env,c,undefined,pc)).json()).active,true);
  // A profile lock between profile read and projection commit must abort both writes.
  const d=await signup('race-'+suffix+'@example.com'),pd=await principal(d,'race-'+suffix+'@example.com','google-race');
