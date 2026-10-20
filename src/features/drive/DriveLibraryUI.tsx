@@ -233,7 +233,7 @@ export function DriveFileExplorer({folderName,path,files,loading,hasMore,thumbna
       {onUploadFiles&&<>
         <input className="rl-upload-input" ref={uploadInput} type="file" multiple aria-label="Selecionar arquivos para enviar" tabIndex={-1}
           onChange={event=>{const chosen=Array.from(event.target.files||[]);event.target.value="";if(chosen.length)onUploadFiles(chosen);}}/>
-        <button className="rl-upload-button" type="button" disabled={uploadDisabled||loading} onClick={()=>uploadInput.current?.click()}>
+        <button className="rl-upload-button" aria-label="Enviar arquivos" type="button" disabled={uploadDisabled||loading} onClick={()=>uploadInput.current?.click()}>
           <Upload size={16}/> <span>Enviar arquivos</span>
         </button>
       </>}
