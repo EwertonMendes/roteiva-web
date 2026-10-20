@@ -2,7 +2,18 @@
 
 ## Estado em 19/10/2026
 
-**PARCIAL:** primeira entrega contém somente a migração aditiva D1 `0007_access.sql`, testes SQLite e verificação no pipeline oficial API DEV. Não ativa bloqueios comerciais nem publica frontend ou Security Rules da PR #42. Aplicação remota e homologação serão registradas após o workflow concluir.
+**PARCIAL — implantação e homologação distintas:** migrations `0007`/`0008`, Worker com provisionamento e frontend integrado foram publicados pelos pipelines oficiais. As três contas existentes receberam projeções válidas e cortesia fixa; o backfill terminou. A conta existente confirmou a cortesia e a listagem de quatro arquivos Drive sem reconexão ou alteração dos arquivos. A PR #48 permanece em rascunho: `0009`, encerramento da compatibilidade Drive e regras comerciais finais ainda não foram publicados. O cadastro Google da conta descartável autorizada aguarda autenticação manual pelo proprietário; não há evidência de homologação real de cadastro, expiração, suspensão, reativação ou exclusão dessa fixture.
+
+| Entrega | Evidência de publicação DEV |
+| --- | --- |
+| Infraestrutura, PR #43 | [API 39354281435](https://github.com/EwertonMendes/roteiva-web/actions/runs/39354281435), merge `8169177` |
+| Provisionamento, PR #44 | [API 39355067084](https://github.com/EwertonMendes/roteiva-web/actions/runs/39355067084), [regras preparatórias 39355067202](https://github.com/EwertonMendes/roteiva-web/actions/runs/39355067202), merge `f3efb63` |
+| Diagnóstico, PR #45 | [API 39355610134](https://github.com/EwertonMendes/roteiva-web/actions/runs/39355610134), merge `2d1bd62` |
+| Correção runtime, PR #46 | [API 39356216592](https://github.com/EwertonMendes/roteiva-web/actions/runs/39356216592), merge `5734a1a` |
+| Frontend, PR #47 | [Hosting 39356744391](https://github.com/EwertonMendes/roteiva-web/actions/runs/39356744391), merge `f45927d` |
+| Enforcement, PR #48 | [Rascunho com checks aprovados](https://github.com/EwertonMendes/roteiva-web/pull/48), sem deploy |
+
+Validação automatizada final: 82 testes API, 27 unitários frontend, 30 testes Rules e 55 Playwright desktop/mobile aprovados (três skips previstos); TypeScript, builds e migrations locais até `0009` aprovados. Essas evidências não substituem os cenários remotos pendentes. DEV: [aplicação](https://roteiva-web-dev.web.app). Não houve alteração PROD, cobrança, IAM ou proteções GitHub.
 
 Decisão tomada pelo proprietário: contas DEV existentes recebem cortesia finita de **30 dias a partir da migração**, separada do teste único de sete dias. Novos cadastros recebem somente o teste. O provisionamento deve usar um marco de migração fixo e identificador determinístico da concessão; repetir não reinicia os prazos. Nenhuma tela ou endpoint ADM pertence ao Roteiva.
 
@@ -20,9 +31,11 @@ O código restante da PR #42 não está liberado para merge integral. Aprovaçã
 
 Em 19/10/2026, a API Google confirmou a conta `account-deletion-dev@roteiva-web-dev.iam.gserviceaccount.com` ativa e exclusivamente vinculada ao papel `roteivaAccountDeletion`: `datastore.entities.create/get/list/update/delete` e `firebaseauth.users.delete`. Essas permissões bastam para ler perfil e criar/atualizar a projeção; não é necessário criar outra credencial ou ampliar IAM. IAM não limita esses documentos por UID: o backend deve fazê-lo.
 
-Bindings reais do Worker confirmaram `FIREBASE_ADMIN_CREDENTIALS_JSON` como `secret_text`, `ACCOUNT_DELETION_ENABLED=true`, projeto DEV, DB e ambos rate limiters. Conteúdo do segredo não foi lido. Isso confirma presença/configuração, **não funcionamento efetivo** da chave instalada; um provisionamento descartável deve comprová-lo. Health Worker e Hosting responderam 200. Sessão Wrangler renovada; o token local não possui escopo D1 (403), portanto migração remota deve usar o pipeline autorizado existente, sem criar token duplicado.
+Bindings reais do Worker confirmaram `FIREBASE_ADMIN_CREDENTIALS_JSON` como `secret_text`, `ACCOUNT_DELETION_ENABLED=true`, projeto DEV, DB e ambos rate limiters. Conteúdo do segredo não foi lido. Após a correção da PR #46, o Cron criou as três projeções, comprovando o funcionamento da credencial instalada para ler perfis e publicar acesso. Health Worker e Hosting responderam 200. Sessão Wrangler renovada; o token local não possui escopo D1 (403), portanto migração remota usa o pipeline autorizado existente, sem criar token duplicado.
 
 Console Cloudflare: 89/100.000 requisições Worker no dia; D1 aproximadamente 7 mil linhas lidas, 3 escritas e 98,3 kB nas últimas 24h no instante consultado. São métricas anteriores ao rollout, não estimativas de consumo do controle novo. Regras comerciais acrescentarão leitura da projeção; medir no Console Firebase, considerando cache de chamadas de regras.
+
+Consulta às APIs de billing/Monitoring em 20/10/2026 02:11 UTC: billing desabilitado e 209 leituras/6 escritas Firestore nas 24h anteriores. Métricas têm atraso e não comprovam consumo futuro ou custo das regras finais ainda não publicadas. Não somar métricas antigas e novas que representam as mesmas operações. Para comparação após ativação, repetir a mesma janela e observar requisições Worker; não ampliar plano por conveniência.
 
 ## Migração e reversão
 
@@ -34,7 +47,7 @@ Rollback desta fase: retornar código Worker ao commit anterior pelo pipeline pr
 
 Referências: [migrations D1](https://developers.cloudflare.com/d1/reference/migrations/), [Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/), [limites Firestore](https://firebase.google.com/docs/firestore/quotas).
 
-## Fase 2 — provisionamento compatível (em preparação)
+## Fase 2 — provisionamento compatível (publicado)
 
 A PR #43 foi mesclada em `8169177bcc32e158f9d53fb7f2f725d7ed4318a3`; [pipeline oficial](https://github.com/EwertonMendes/roteiva-web/actions/runs/39354281435) publicou `0007` com zero violações FK, três tabelas/dois índices/trigger e contagens anteriores/posteriores idênticas: uma conexão Drive, zero transações, jobs de exclusão e guards. Worker compatível versão `52e976a3-8306-41ca-a6e0-a12dd2a7be03` publicado com Cron preservado.
 
@@ -44,7 +57,7 @@ Decisão tomada: `0008_access_rollout.sql` fixa o marco no relógio D1 e o fim d
 
 A preparação de regras nesta fase só permite GET privado de `access/current`, sem escrita/listagem e sem mudar a autorização de negócio. A publicação restritiva continua em entrega separada. PATCH da projeção usa precondição de versão/criação, resolve D1 após ler a versão e falha sem sucesso em conflito. Repetir estado igual não escreve novamente.
 
-**Limite distribuído:** D1 e Firestore não têm transação conjunta. Nenhuma operação ADM existe aqui. A futura revogação/suspensão deve primeiro publicar negação no Firestore com precondição, depois alterar D1 e reconciliar; uma falha não pode ser declarada concluída nem revertida para concessão. Não editar concessões manualmente em D1 e presumir revogação imediata no Firestore. Testes de suspensão devem usar exclusivamente fixtures e confirmar ambos os sistemas. Antes de habilitar as regras finais, validar esse protocolo e concorrência; não usar CI como prova de homologação remota.
+**Limite distribuído:** D1 e Firestore não têm transação conjunta. Nenhuma operação ADM existe aqui. O protocolo obrigatório com `sync_pending` está descrito na fase final abaixo; negação Firestore isolada antes de alterar D1 é insuficiente contra provisionamento concorrente. Uma falha não pode ser declarada concluída nem revertida para concessão. Não editar concessões manualmente em D1 e presumir revogação imediata no Firestore. Testes de suspensão devem usar exclusivamente fixtures e confirmar ambos os sistemas; não usar CI como prova de homologação remota.
 
 Auditoria GitHub: `cloudflare-development` permite somente branch master; segredo Cloudflare já existe. `firebase-development` não possui gate de branch/reviewer configurado; os workflows atuais restringem deploy a master e SHA atual. Não foi alterada nenhuma proteção. Consulta à proteção clássica de master respondeu 404, sem afirmar inexistência de outros rulesets.
 
@@ -55,12 +68,12 @@ A UI só monta o workspace após POST autenticado em `/access/ensure` e confirma
 O deploy do frontend exige health com header de versão do controle e rota de provisionamento retornando 401 sem identidade antes de autenticar/publicar Hosting. Esse gate evita publicar a UI antes do Worker, mas não substitui smoke autenticado nem homologação. Regras comerciais restritivas continuam em entrega posterior ao inventário completo. A demo local permanece sem autenticação/controle comercial.
 ### Causa confirmada da falha — runtime Cloudflare
 
-Reproduzido com workerd/Miniflare da versão instalada: Request com `redirect:error` lança TypeError antes de acessar a rede; Workers aceita somente follow/manual. Essa opção foi introduzida no endurecimento dos fetches administrativos da fase 2. Corrigido para `manual` em leitura de perfil, projeção e enumeração/PATCH: redirecionamentos não são seguidos e status inesperado continua falhando fechado. Nenhuma alteração de credencial/IAM é necessária. Mocks Node agora exigem manual. A recuperação remota ainda precisa ser confirmada após deploy. Referência: [Request Workers](https://developers.cloudflare.com/workers/runtime-apis/request/).
-## Falha encontrada na homologação da fase 2
+Reproduzido com workerd/Miniflare da versão instalada: Request com `redirect:error` lança TypeError antes de acessar a rede; Workers aceita somente follow/manual. Essa opção foi introduzida no endurecimento dos fetches administrativos da fase 2. Corrigido para `manual` em leitura de perfil, projeção e enumeração/PATCH: redirecionamentos não são seguidos e status inesperado continua falhando fechado. Nenhuma alteração de credencial/IAM é necessária. Mocks Node agora exigem manual. A recuperação remota foi confirmada após deploy: três projeções e listagem Drive da conta existente, conforme estado no início deste documento. Referência: [Request Workers](https://developers.cloudflare.com/workers/runtime-apis/request/).
+## Histórico: falha encontrada na homologação da fase 2 (resolvida na PR #46)
 
-Worker publicado pelo run 39355067084, regras preparatórias pelo 39355067202; antes de liberar UI/regras restritivas, leitura real da Biblioteca falhou e o inventário ainda não tinha projeções. Não considerar CI como homologação. Correção de diagnóstico acrescenta somente evento/código/status categóricos, sem UID, URL, exception ou resposta de provedor. Frontend e regras restritivas permanecem retidos até identificar e resolver a dependência.
+Worker publicado pelo run 39355067084, regras preparatórias pelo 39355067202; antes de liberar UI/regras restritivas, leitura real da Biblioteca falhou e o inventário ainda não tinha projeções. Não considerar CI como homologação. Correção de diagnóstico acrescenta somente evento/código/status categóricos, sem UID, URL, exception ou resposta de provedor. Naquele momento, frontend e regras restritivas foram retidos até resolver a dependência. A UI já foi publicada após a recuperação; regras finais seguem o gate da PR #48.
 
-QA frontend desta fase: regressão inicial teve 53 aprovados, três skips por viewport e dois casos de Agenda com fixture UTC diferente da data civil do browser. Corrigida exclusivamente a data do teste; repetição focada desktop/mobile aprovou ambos (2/2). Resultado combinado: 55 cenários aprovados, mas a suíte completa ainda será repetida com as regras finais. Isso não valida Google/Drive remoto.
+QA frontend desta fase: regressão inicial teve 53 aprovados, três skips por viewport e dois casos de Agenda com fixture UTC diferente da data civil do browser. Corrigida exclusivamente a data do teste; repetição focada desktop/mobile aprovou ambos (2/2). Resultado combinado: 55 cenários aprovados, e a suíte completa foi posteriormente repetida com as regras finais (55 aprovados). Isso não valida Google/Drive remoto.
 
 ## Fase final — enforcement (preparado, ainda não publicado)
 
@@ -74,5 +87,5 @@ A flag ACCESS_PROVISION_ON_DRIVE é false nesta entrega: somente contas provisio
 
 A ordem segura substitui qualquer orientação simplificada de deny-first: (1) adquirir a fence D1 para o UID; (2) publicar negação no Firestore com precondição de versão, repetindo em conflito; (3) alterar os benefícios D1 enquanto a fence permanece; (4) publicar e verificar a projeção correspondente ao novo estado, com precondição; (5) liberar a fence somente após confirmar ambos. Falha preserva fence/negação e exige reconciliação; nunca declarar sucesso parcial. Isso impede ensure concorrente de desfazer a negação entre os dois sistemas. Não apagar grants históricos para revogar: preencher revoked_at, preservando o ID determinístico e trial.
 
-Homologação automatizada final: 30 Rules + 55 Playwright passaram integralmente (três skips esperados). D1 remoto confirmou três contas/três cortesias, durações exatas e backfill completed_at preenchido; Firestore confirmou três projeções válidas e contagens de negócio inalteradas. A ativação definitiva e QA descartável ainda aguardam a publicação da UI.
-Recuperação real após PR #46: a conta existente recebeu projeção de cortesia e a Biblioteca voltou a listar quatro arquivos de uma pasta já vinculada, sem reconectar Drive ou alterar arquivos. O inventário agregado ainda está sendo acompanhado até cobrir os três perfis antes de encerrar a migração.
+Homologação automatizada final: 30 Rules + 55 Playwright passaram integralmente (três skips esperados). D1 remoto confirmou três contas/três cortesias, durações exatas e backfill completed_at preenchido; Firestore confirmou três projeções válidas e contagens de negócio inalteradas. A UI foi publicada pela PR #47; a ativação definitiva permanece condicionada ao smoke descartável descrito no início.
+Recuperação real após PR #46: a conta existente recebeu projeção de cortesia e a Biblioteca voltou a listar quatro arquivos de uma pasta já vinculada, sem reconectar Drive ou alterar arquivos. A cobertura inicial terminou nos três perfis. A cortesia termina em `2026-11-19T01:44:48Z` para essa coorte, sem renovação em retries. A comparação usa contagens agregadas, não hashes integrais dos dados privados.
