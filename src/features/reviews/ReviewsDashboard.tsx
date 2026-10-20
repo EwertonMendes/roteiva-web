@@ -1,10 +1,12 @@
-import {useCallback,useEffect,useMemo,useState} from "react";
+import {useCallback,useEffect,useMemo,useRef,useState} from "react";
+import {createPortal} from "react-dom";
 import {Check,ChevronLeft,ChevronRight,Copy,ExternalLink,FileImage,FileText,FileVideo,Folder,Link2,LoaderCircle,MessageSquare,Plus,Search,Send,ShieldCheck,X} from "lucide-react";
 import type {Client,Project} from "../../domain/workspace";
 import {useAuth} from "../auth/AuthProvider";
 import {useDriveApi} from "../drive/drive-api";
 import {readDriveLinks,type DriveFolderLink} from "../../data/drive-folder-links";
 import type {DriveItem} from "../drive/DriveLibraryUI";
+import {useOverlayFocus} from "../drive/DriveLibraryUI";
 import {useDriveTransfers} from "../drive/DriveTransfersProvider";
 import type {UploadDestination} from "../drive/useDriveUploads";
 import "./reviews.css";
@@ -61,14 +63,23 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
   const [files,setFiles]=useState<Selection[]>([]);
   const [folderBusy,setFolderBusy]=useState(false),[nextToken,setNextToken]=useState<string|null>(null);
   const [folderError,setFolderError]=useState("");
+  const browseSequence=useRef(0),listSequence=useRef(0);
+  const dialogRef=useOverlayFocus(()=>{if(!working){if(composer)resetComposer();else setOpened(null);}},composer||!!opened,composer?'compose':'detail');
+  const pendingUploads=transfers.uploads.filter(entry=>entry.destination.projectId===projectId&&
+    !["completed","cancelled"].includes(entry.status));
+  useEffect(()=>{
+    transfers.setAuthorizationInline(composer);
+    return()=>transfers.setAuthorizationInline(false);
+  },[composer,transfers.setAuthorizationInline]);
 
   const loadList=useCallback(async()=>{
+    const sequence=++listSequence.current;
     setLoading(true);
     try{
       const result=await call<{reviews:Review[];hasMore:boolean}>("/reviews?"+new URLSearchParams({page:String(page),q:search,status}));
-      setRows(result.reviews);setHasMore(result.hasMore);
-    }catch(e){setError(e instanceof Error?e.message:"Não foi possível carregar as aprovações.");}
-    finally{setLoading(false);}
+      if(sequence===listSequence.current){setRows(result.reviews);setHasMore(result.hasMore);}
+    }catch(e){if(sequence===listSequence.current)setError(e instanceof Error?e.message:"Não foi possível carregar as aprovações.");}
+    finally{if(sequence===listSequence.current)setLoading(false);}
   },[call,page,refresh,search,status]);
   useEffect(()=>{void loadList();},[loadList]);
   useEffect(()=>{if(startProjectId){setProjectId(startProjectId);setClientId(startClientId||projects.find(p=>p.id===startProjectId)?.clientId||0);setComposer(true);}},
@@ -76,6 +87,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
   useEffect(()=>{if(startClientId&&!startProjectId){setClientId(startClientId);setComposer(true);}},[startClientId,startProjectId]);
   const relevantProjects=useMemo(()=>clientId?projects.filter(p=>p.clientId===clientId):projects,[clientId,projects]);
   useEffect(()=>{
+    browseSequence.current++;setSelectedFolder(null);setItems([]);setTrail([]);setNextToken(null);setFolderBusy(false);
     if(!user||!projectId||!composer){setLinks([]);return;}
     let alive=true;
     readDriveLinks(user.uid).then(result=>{
@@ -84,15 +96,18 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
     return()=>{alive=false;};
   },[user,projectId,composer]);
   const browse=useCallback(async(folder:DriveFolderLink,targetId:string,path:{id:string;name:string}[],append=false,pageKey?:string)=>{
+    const sequence=++browseSequence.current;
     setFolderBusy(true);setFolderError("");
+    if(!append){setItems([]);setNextToken(null);setTrail(path);}
     try{
       const params=pageKey?"?pageToken="+encodeURIComponent(pageKey):"";
       const response=await call<{files:DriveItem[];nextPageToken:string|null}>(
         "/integrations/drive/"+encodeURIComponent(folder.connectionId)+"/folders/"+encodeURIComponent(targetId)+"/items"+params);
-      setItems(old=>append?[...old,...response.files]:response.files);
+      if(sequence!==browseSequence.current)return;
+      setItems(old=>append?[...old,...response.files.filter(f=>!old.some(o=>o.id===f.id))]:response.files);
       setTrail(path);setNextToken(response.nextPageToken);
-    }catch(e){setFolderError(e instanceof Error?e.message:"Não foi possível abrir a pasta.");if(!append)setItems([]);}
-    finally{setFolderBusy(false);}
+    }catch(e){if(sequence===browseSequence.current){setFolderError(e instanceof Error?e.message:"Não foi possível abrir a pasta.");if(!append)setItems([]);}}
+    finally{if(sequence===browseSequence.current)setFolderBusy(false);}
   },[call]);
   const pickFolder=(folder:DriveFolderLink)=>{
     setSelectedFolder(folder);setTrail([{id:folder.folderId,name:folder.folderName}]);
@@ -108,23 +123,23 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
     const valid=chosen.filter(file=>file.type.startsWith("video/")||file.type.startsWith("image/")||
       file.type.startsWith("audio/")||file.type==="application/pdf");
     if(valid.length!==chosen.length){setFolderError("Envie apenas vídeo, imagem, áudio ou PDF.");return;}
-    if(valid.length+files.length>8){setFolderError("Selecione no máximo 8 materiais por aprovação.");return;}
+    if(valid.length+files.length+pendingUploads.length>8){setFolderError("Selecione no máximo 8 materiais por aprovação, incluindo os envios pendentes.");return;}
     const {rejected}=transfers.enqueue(valid,destination);
     if(rejected)setFolderError(rejected+" arquivo(s) não foram adicionados à fila. Confira os limites do upload.");
   };
   useEffect(()=>transfers.subscribe((file,uploaded)=>{
-    if(!composer||!selectedFolder||uploaded.projectId!==projectId||
-       uploaded.connectionId!==selectedFolder.connectionId||
-       uploaded.linkedFolderId!==selectedFolder.folderId)return;
-    const target=trail.at(-1)?.id||selectedFolder.folderId;
-    if(uploaded.targetFolderId!==target)return;
+    if(!composer||uploaded.projectId!==projectId)return;
     if(!/^(video|image|audio)\//.test(file.mimeType)&&file.mimeType!=="application/pdf")return;
     setFiles(old=>old.some(a=>a.fileId===file.id)||old.length>=8?old:
       [...old,{fileId:file.id,name:file.name,mimeType:file.mimeType,
         connectionId:uploaded.connectionId,linkedFolderId:uploaded.linkedFolderId}]);
-    void browse(selectedFolder,target,trail);
+    const target=trail.at(-1)?.id||selectedFolder?.folderId;
+    if(selectedFolder&&uploaded.connectionId===selectedFolder.connectionId&&uploaded.targetFolderId===target)
+      void browse(selectedFolder,target,trail);
   }),[transfers.subscribe,composer,selectedFolder,projectId,trail,browse]);
   const resetComposer=()=>{
+    if(working)return;
+    browseSequence.current++;
     setComposer(false);setReplacement(null);setFiles([]);setTitle("");setMessage("");setSelectedFolder(null);
     setTrail([]);setItems([]);setError("");setFolderError("");
   };
@@ -145,6 +160,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
     finally{setWorking(false);}
   };
   const submit=async()=>{
+    if(working||pendingUploads.length){setError("Conclua ou cancele os envios pendentes antes de compartilhar.");return;}
     if(!projectId||!clientId||!files.length) {setError("Escolha o cliente, projeto e pelo menos um arquivo.");return;}
     await run(async()=>{
       let publishWarning="";
@@ -166,7 +182,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
             (e instanceof Error?e.message:"");
         }
       }
-      resetComposer();
+      setComposer(false);setReplacement(null);setFiles([]);setSelectedFolder(null);setTrail([]);setItems([]);
       if(publishWarning)setError(publishWarning);
     });
   };
@@ -189,7 +205,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
     if(!selectedFolder)return;
     if(!supported(file))return;
     setFiles(old=>old.some(f=>f.fileId===file.id)?old.filter(f=>f.fileId!==file.id):
-      old.length>=8?old:[...old,{fileId:file.id,name:file.name,mimeType:file.mimeType,
+      old.length+pendingUploads.length>=8?old:[...old,{fileId:file.id,name:file.name,mimeType:file.mimeType,
         connectionId:selectedFolder.connectionId,linkedFolderId:selectedFolder.folderId}]);
   };
   return <div className="reviews-panel">
@@ -224,11 +240,11 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
       <button className="secondary-button" disabled={!hasMore||loading} onClick={()=>setPage(n=>n+1)}>Próxima</button>
     </div>
 
-    {opened&&!composer&&<div className="review-modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setOpened(null);}}>
+    {opened&&!composer&&createPortal(<div className="review-modal-backdrop" ref={dialogRef} tabIndex={-1} onMouseDown={e=>{if(e.target===e.currentTarget&&!working)setOpened(null);}}>
       <section role="dialog" aria-modal="true" aria-label="Detalhes da revisão" className="review-dialog">
         <header><div><span className="eyebrow">APROVAÇÃO · V{opened.review.version}</span><h2>{opened.review.title}</h2>
           <p>{opened.review.clientName} · {opened.review.projectName}</p></div>
-          <button className="review-icon" aria-label="Fechar" onClick={()=>setOpened(null)}><X size={20}/></button>
+          <button className="review-icon" aria-label="Fechar" disabled={working} onClick={()=>setOpened(null)}><X size={20}/></button>
         </header>
         <div className="review-dialog-body">
           <div className="reviews-detail-bar"><span className={"reviews-status status-"+opened.review.status}>{statusText[opened.review.status]}</span>
@@ -260,19 +276,20 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
           {opened.review.status==="changes"&&<button className="primary-button" onClick={beginRevision}>Enviar nova versão</button>}
           {opened.review.status==="replacing"&&<button className="primary-button" disabled={working} onClick={()=>void run(async()=>{await call("/reviews/"+opened.review.id+"/revise","POST",{assets:[]});await openDetail(opened.review.id);})}>Concluir troca de versão</button>}
           {opened.review.status==="closing"&&<button className="primary-button" disabled={working} onClick={()=>void mutate("close")}>Concluir revogação</button>}
-          {opened.review.status!=="closed"&&<button className="secondary-button" disabled={working} onClick={()=>void mutate("rotate")}>Renovar link</button>}
+          {["pending","changes","approved","draft"].includes(opened.review.status)&&<button className="secondary-button" disabled={working} onClick={()=>void mutate("rotate")}>Renovar link</button>}
           {opened.review.status!=="closed"&&<button className="secondary-button" disabled={working} onClick={()=>void mutate("close")}>Encerrar revisão</button>}
         </footer>
       </section>
-    </div>}
+    </div>,document.body)}
 
-    {composer&&<div className="review-modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)resetComposer();}}>
+    {composer&&createPortal(<div className="review-modal-backdrop" ref={dialogRef} tabIndex={-1} onMouseDown={e=>{if(e.target===e.currentTarget)resetComposer();}}>
       <section className="review-dialog" role="dialog" aria-modal="true" aria-label="Enviar materiais para aprovação">
         <header><div><span className="eyebrow">APROVAÇÕES / {replacement?"NOVA VERSÃO":"NOVA SOLICITAÇÃO"}</span>
           <h2>{replacement?"Selecione os novos arquivos":"Enviar para aprovação"}</h2>
           <p>Escolha os materiais que o cliente poderá revisar.</p></div>
-          <button className="review-icon" onClick={resetComposer} aria-label="Fechar"><X size={20}/></button></header>
+          <button className="review-icon" disabled={working} onClick={resetComposer} aria-label="Fechar"><X size={20}/></button></header>
         <div className="review-dialog-body">
+          {error&&<p className="reviews-warning" role="alert">{error}</p>}
           <div className="review-fields">
             <label>Cliente
               <select disabled={!!replacement} value={clientId} onChange={e=>{
@@ -317,10 +334,20 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
                   onChange={event=>{uploadNew(Array.from(event.target.files||[]));event.target.value="";}}/></label>
               <span>Ou arraste arquivos aqui. Envio direto ao seu Google Drive.</span>
             </div>}
+            {transfers.authorizationNotice}
             {destination&&transfers.uploads.filter(entry=>
               entry.destination.projectId===projectId&&entry.destination.connectionId===destination.connectionId&&
               ["queued","starting","uploading","verifying"].includes(entry.status)).length>0&&
               <p className="reviews-muted" role="status">O envio está em andamento. Os arquivos serão selecionados automaticamente ao concluir.</p>}
+            {pendingUploads.map(entry=><div className="review-pending-upload" key={entry.id}>
+              <span>{entry.name} · {Math.floor(100*entry.sent/entry.size)}%</span>
+              {entry.error&&<small role="alert">{entry.error}</small>}
+              {["queued","starting","uploading","verifying"].includes(entry.status)?
+                <button type="button" className="secondary-button" disabled={entry.status==="verifying"} onClick={()=>transfers.cancel(entry.id)}>Cancelar envio</button>:
+                <><button type="button" className="secondary-button" disabled={entry.status!=="failed"&&!entry.canVerify&&!entry.canResume}
+                  onClick={()=>transfers.retry(entry.id)}>Tentar novamente</button>
+                <button type="button" className="secondary-button" onClick={()=>transfers.dismiss(entry.id)}>Remover da aprovação</button></>}
+            </div>)}
             {folderError&&<p className="reviews-warning" role="alert">{folderError}</p>}
             <div className="review-files">
               {folderBusy&&<p role="status"><LoaderCircle size={16} className="rl-spin"/> Carregando arquivos…</p>}
@@ -341,9 +368,9 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
           <p className="reviews-muted">Os envios usam a mesma fila segura da Biblioteca. Aguarde a confirmação do Google Drive antes de compartilhar.</p>
         </div>
         <footer><button className="secondary-button" onClick={resetComposer}>Cancelar</button>
-          <button className="primary-button" disabled={working||!files.length||!projectId||!clientId||(!replacement&&!title.trim())||(!replacement&&mode==="google"&&!recipient.includes("@"))}
+          <button className="primary-button" disabled={working||pendingUploads.length>0||!files.length||!projectId||!clientId||(!replacement&&!title.trim())||(!replacement&&mode==="google"&&!recipient.includes("@"))}
             onClick={()=>void submit()}>{working?"Preparando…":replacement?"Enviar nova versão":"Gerar aprovação"} <Send size={16}/></button></footer>
       </section>
-    </div>}
+    </div>,document.body)}
   </div>;
 }

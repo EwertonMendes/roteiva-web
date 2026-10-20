@@ -24,11 +24,14 @@ function publicApi(page:import("@playwright/test").Page){
       result={review,assets,comments,decisions};
     }else if(path.endsWith("/comment")){
       const payload=request.postDataJSON() as {authorName:string;fileId:string;body:string;seconds:number|null};
+      expect(request.postDataJSON().version).toBe(review.version);
+      expect(payload.fileId).toBe(assets[0].fileId);expect(payload.body.trim()).not.toBe('');
       if(review.status!=="pending"){code=409;result={error:{code:"review_already_decided"}};}
       else{comments.push({id:String(comments.length+1),file_id:payload.fileId,author_name:payload.authorName,
         body:payload.body,seconds:payload.seconds,created_at:Date.now()});result={saved:true};}
     }else if(path.endsWith("/decide")){
       const payload=request.postDataJSON() as {authorName:string;decision:string;message:string};
+      expect(request.postDataJSON().version).toBe(review.version);expect(['approved','changes']).toContain(payload.decision);
       if(review.status!=="pending"){code=409;result={error:{code:"review_already_decided"}};}
       else{review.status=payload.decision;decisions.push({version:1,decision:payload.decision,
         author_name:payload.authorName,message:payload.message,created_at:Date.now()});
@@ -66,4 +69,22 @@ test("cliente explica ajustes antes da decisão e vê confirmação",async({page
   await page.getByPlaceholder("Seu nome").fill("Cliente B");
   await page.getByRole("button",{name:"Confirmar decisão"}).click();
   await expect(page.getByRole("heading",{name:"Feedback enviado"})).toBeVisible();
+});
+
+test('portal remove material anterior quando recarregamento é recusado e permite recuperar da falha de rede',async({page})=>{
+  await publicApi(page);
+  await page.goto(ROOT+'/review/'+TOKEN);
+  await expect(page.getByRole('heading',{name:'Corte institucional'})).toBeVisible();
+  await page.route(API+'/reviews/public',route=>route.abort('internetdisconnected'));
+  await page.reload();
+  await expect(page.getByRole('heading',{name:'Material indisponível'})).toBeVisible();
+  await expect(page.locator('iframe[title^="Prévia de"]')).toHaveCount(0);
+  await expect(page.getByText(/Sem conexão com o serviço/)).toBeVisible();
+  await page.unroute(API+'/reviews/public');
+  await page.getByRole('button',{name:'Tentar novamente'}).click();
+  await expect(page.getByRole('heading',{name:'Corte institucional'})).toBeVisible();
+  await page.getByRole('button',{name:'Aprovar material'}).click();
+  await expect(page.locator('body')).toHaveCSS('overflow','hidden');
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
 });

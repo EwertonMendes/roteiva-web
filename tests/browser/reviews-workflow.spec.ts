@@ -1,0 +1,185 @@
+import {test,expect,type Page} from './fixtures';
+import {initializeTestEnvironment} from '@firebase/rules-unit-testing';
+import {collection,doc,getDocs,query,setDoc,where,Timestamp} from 'firebase/firestore';
+const root='http://127.0.0.1:4173',api='https://roteiva-api-dev.ewertonmendes9.workers.dev';
+const connection='aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa',folder='REVIEW_FOLDER_12345';
+const file={fileId:'REVIEW_FILE_12345678',name:'Corte.mp4',mimeType:'video/mp4'};
+const second={fileId:'REVIEW_FILE_22345678',name:'Corte final.mp4',mimeType:'video/mp4'};
+const token='w'.repeat(43);
+
+async function prepare(page:Page,email:string){
+  await page.goto(root);
+  await page.getByRole('button',{name:'Criar conta',exact:true}).click();
+  const next=page.waitForEvent('popup');
+  await page.getByRole('button',{name:'Cadastrar com Google',exact:true}).click();
+  const popup=await next;await popup.waitForLoadState('load');
+  await popup.getByRole('button',{name:'Add new account',exact:true}).click();
+  await popup.locator('#email-input').fill(email);
+  await popup.locator('#display-name-input').fill('QA Aprovações');
+  await popup.locator('#sign-in').click();
+  await page.getByLabel('Como podemos chamar você?').fill('QA Aprovações');
+  await page.getByLabel('Concordo com o uso dos meus dados').check();
+  await page.getByRole('button',{name:'Criar meu espaço de trabalho'}).click();
+  await expect(page.locator('.app-shell')).toBeVisible();
+  await page.goto(root+'/clientes');
+  await page.getByRole('button',{name:'Novo cliente',exact:true}).click();
+  await page.getByLabel('Nome do cliente',{exact:true}).fill('Cliente Revisão');
+  await page.getByLabel('Contato principal',{exact:true}).fill('Cliente QA');
+  await page.getByRole('button',{name:'Salvar cliente'}).click();
+  await expect(page.getByText('Cliente Revisão',{exact:true})).toBeVisible();
+  await expect(page.locator('[aria-busy]').first()).toHaveAttribute('aria-busy','false');
+  await page.goto(root+'/projetos');
+  await page.locator('.heading-actions').getByRole('button',{name:'Criar projeto',exact:true}).click();
+  await page.getByLabel('Nome do projeto',{exact:true}).fill('Projeto Revisão');
+  await page.locator('form.project-modal select[name=clientId]').selectOption({label:'Cliente Revisão'});
+  await page.locator('form.project-modal').getByRole('button',{name:'Criar projeto',exact:true}).click();
+  await expect(page.locator('[aria-busy]').first()).toHaveAttribute('aria-busy','false');
+  const env=await initializeTestEnvironment({projectId:'demo-roteiva',firestore:{host:'127.0.0.1',port:8080}});
+  let projectId=0,clientId=0;
+  try{await env.withSecurityRulesDisabled(async context=>{
+    const db=context.firestore();
+    const users=await getDocs(query(collection(db,'users'),where('email','==',email)));
+    expect(users.size).toBe(1);const uid=users.docs[0].id;
+    const projects=await getDocs(collection(db,'users',uid,'projects'));
+    expect(projects.size).toBe(1);projectId=Number(projects.docs[0].id);clientId=projects.docs[0].data().clientId;
+    await setDoc(doc(db,'users',uid,'driveFolders',projectId+'_'+connection+'_'+folder),{
+      ownerUid:uid,schemaVersion:1,projectId,connectionId:connection,folderId:folder,
+      folderName:'Materiais autorizados',createdAt:Timestamp.now()});
+  });}finally{await env.cleanup();}
+  return {projectId,clientId};
+}
+
+test('profissional cria, cliente comenta/pede ajustes, V2 aprovada e encerramento bloqueia link',async({page,context},info)=>{
+  const {projectId,clientId}=await prepare(page,'reviews-cycle-'+info.project.name+'@example.com');
+  const review={id:'review-e2e',clientId,projectId,clientName:'Cliente Revisão',projectName:'Projeto Revisão',
+    studioName:'Estúdio QA',title:'',message:'',recipientEmail:'',mode:'link',status:'draft',version:1,
+    expiresAt:Date.now()+86400000,createdAt:Date.now(),updatedAt:Date.now(),url:root+'/review/'+token};
+  let created=false,selected=[file],createCalls=0,publishCalls=0,revisionCalls=0,closeCalls=0;
+  const uploaded={id:'UPLOADED_REVIEW_12345',name:'Envio.mp4',mimeType:'video/mp4',size:'300000'};
+  let uploadConfirmed=false,attemptId='',putCalls=0,releaseUpload!:()=>void;
+  const uploadGate=new Promise<void>(resolve=>{releaseUpload=resolve;});
+  await context.route('https://www.googleapis.com/upload/drive/v3/files?upload_id=reviews-e2e',async route=>{
+    const req=route.request(),headers={'Access-Control-Allow-Origin':root,
+      'Access-Control-Allow-Methods':'PUT,OPTIONS','Access-Control-Allow-Headers':'Content-Type,Content-Range',
+      'Access-Control-Expose-Headers':'Range'};
+    if(req.method()==='OPTIONS')return route.fulfill({status:204,headers});
+    expect(req.method()).toBe('PUT');putCalls++;
+    if(putCalls===1){
+      expect(req.headers()['content-range']).toBe('bytes 0-262143/300000');
+      expect(req.postDataBuffer()?.length).toBe(262144);await uploadGate;
+      return route.fulfill({status:308,headers:{...headers,Range:'bytes=0-262143'}});
+    }
+    expect(req.headers()['content-range']).toBe('bytes 262144-299999/300000');
+    expect(req.postDataBuffer()?.length).toBe(37856);
+    return route.fulfill({status:201,headers,contentType:'application/json',body:JSON.stringify(uploaded)});
+  });
+  const comments:Record<string,unknown>[]=[],decisions:Record<string,unknown>[]=[];
+  const detail=()=>({review,assets:selected.map(f=>({...f,version:review.version,grantState:'granted'})),comments,decisions});
+  await context.route(api+'/**',async route=>{
+    const req=route.request(),url=new URL(req.url()),path=url.pathname;
+    if(!path.startsWith('/reviews')&&!path.includes('/folders/'))return route.fallback();
+    const headers={'Access-Control-Allow-Origin':root,'Access-Control-Allow-Methods':'GET,POST,OPTIONS',
+      'Access-Control-Allow-Headers':'Authorization,Content-Type,X-Review-Token','Cache-Control':'no-store'};
+    const json=(body:unknown,status=200)=>route.fulfill({status,headers,contentType:'application/json',body:JSON.stringify(body)});
+    if(req.method()==='OPTIONS')return route.fulfill({status:204,headers});
+    if(path.startsWith('/reviews/public')){
+      expect(req.headers()['x-review-token']).toBe(token);
+      if(review.status==='closed')return json({error:{code:'review_not_found'}},404);
+      if(req.method()==='GET')return json({...detail(),assets:selected});
+      const body=req.postDataJSON();expect(body.version).toBe(review.version);expect(body.authorName).toBe('Cliente QA');
+      expect(review.status).toBe('pending');
+      if(path.endsWith('/comment')){
+        expect(selected.some(f=>f.fileId===body.fileId)).toBe(true);
+        expect(body.body).toBe('Aumentar legenda');expect(body.seconds).toBe(35);
+        comments.push({id:'comment-1',version:review.version,file_id:body.fileId,
+          author_name:body.authorName,body:body.body,seconds:body.seconds,created_at:Date.now()});
+      }else{
+        expect(['approved','changes']).toContain(body.decision);
+        if(body.decision==='changes')expect(body.message).toBe('Ajustar encerramento');
+        review.status=body.decision;decisions.push({version:review.version,decision:body.decision,
+          author_name:body.authorName,message:body.message,created_at:Date.now()});
+      }
+      return json({saved:true});
+    }
+    expect(req.headers().authorization).toMatch(/^Bearer /);
+    if(path.endsWith('/uploads')){
+      const body=req.postDataJSON();expect(body.projectId).toBe(projectId);expect(body.linkedFolderId).toBe(folder);
+      expect(body.name).toBe(uploaded.name);expect(body.size).toBe(300000);expect(body.mimeType).toBe('video/mp4');
+      attemptId=body.attemptId;expect(attemptId).toMatch(/^[a-f0-9-]{36}$/);
+      return json({attemptId,sessionUrl:'https://www.googleapis.com/upload/drive/v3/files?upload_id=reviews-e2e',chunkSize:262144});
+    }
+    if(path.endsWith('/uploads/complete')){
+      expect(req.postDataJSON()).toEqual({attemptId,projectId,linkedFolderId:folder,fileId:uploaded.id,size:300000});
+      expect(putCalls).toBe(2);uploadConfirmed=true;return json({file:uploaded});
+    }
+    if(path.endsWith('/items'))return json({files:[...([file,second].map(f=>({...f,id:f.fileId}))),
+      ...(uploadConfirmed?[uploaded]:[])],nextPageToken:null});
+    if(path==='/reviews'&&req.method()==='GET')return json({reviews:created?[review]:[],hasMore:false});
+    if(path==='/reviews'&&req.method()==='POST'){
+      const body=req.postDataJSON();expect(body.clientId).toBe(clientId);expect(body.projectId).toBe(projectId);
+      expect(uploadConfirmed).toBe(true);
+      expect(body.assets).toEqual([file.fileId,uploaded.id].map(fileId=>({fileId,connectionId:connection,linkedFolderId:folder})));
+      expect(body.mode).toBe('link');expect(body.expiresInDays).toBe(14);expect(body.title).toBe('Corte para revisão');
+      created=true;createCalls++;review.title=body.title;selected=[file,{...uploaded,fileId:uploaded.id}];return json({id:review.id},201);
+    }
+    if(path.endsWith('/publish')){expect(created).toBe(true);publishCalls++;review.status='pending';return json({review:detail()});}
+    if(path.endsWith('/revise')){
+      expect(review.status).toBe('changes');
+      expect(req.postDataJSON().assets).toEqual([{fileId:second.fileId,connectionId:connection,linkedFolderId:folder}]);
+      revisionCalls++;selected=[second];review.version=2;review.status='pending';return json({review:detail()});
+    }
+    if(path.endsWith('/close')){closeCalls++;review.status='closed';return json({closed:true});}
+    if(path==='/reviews/'+review.id)return json(detail());
+    throw new Error('Unexpected review request: '+path);
+  });
+  await page.goto(root+'/aprovacoes');
+  await page.getByRole('button',{name:'Nova aprovação',exact:true}).click();
+  const composer=page.getByRole('dialog',{name:'Enviar materiais para aprovação'});
+  await composer.getByRole('combobox',{name:'Cliente',exact:true}).selectOption({label:'Cliente Revisão'});
+  await composer.getByRole('combobox',{name:'Projeto',exact:true}).selectOption({label:'Projeto Revisão'});
+  await composer.getByLabel('Título da aprovação').fill('Corte para revisão');
+  await composer.getByRole('button',{name:'Materiais autorizados'}).click();
+  await composer.getByText('Corte.mp4',{exact:true}).click();
+  await composer.locator('input[type=file]').setInputFiles({name:uploaded.name,mimeType:'video/mp4',buffer:Buffer.alloc(300000)});
+  await expect(composer.getByRole('button',{name:'Gerar aprovação'})).toBeDisabled();
+  releaseUpload();
+  await expect(composer.getByRole('heading',{name:'Arquivos do Google Drive (2/8)'})).toBeVisible();
+  await expect(composer.getByRole('button',{name:'Gerar aprovação'})).toBeEnabled();
+  await composer.getByRole('button',{name:'Gerar aprovação'}).click();
+  await expect(page.getByLabel('Link da revisão')).toHaveValue(review.url);
+  await page.screenshot({path:info.outputPath('professional-review.png'),fullPage:true});
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.reload();await expect(page.getByText('Corte para revisão',{exact:true})).toBeVisible();
+  const guest=await context.newPage();await guest.goto(review.url);
+  await guest.getByPlaceholder('Como podemos chamar você?').fill('Cliente QA');
+  await guest.getByPlaceholder('O que você gostaria de comentar?').fill('Aumentar legenda');
+  await guest.getByPlaceholder('Ex.: 01:25').fill('00:35');
+  await guest.getByRole('button',{name:'Adicionar comentário'}).click();
+  await expect(guest.getByText('Aumentar legenda',{exact:true})).toBeVisible();
+  await guest.getByRole('button',{name:'Solicitar ajustes',exact:true}).click();
+  await guest.getByPlaceholder('Descreva os ajustes desejados…').fill('Ajustar encerramento');
+  await guest.getByRole('button',{name:'Confirmar decisão'}).click();
+  await expect(guest.getByRole('heading',{name:'Feedback enviado'})).toBeVisible();
+  await page.reload();await page.getByText('Corte para revisão',{exact:true}).click();
+  await expect(page.getByText('Ajustar encerramento',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Enviar nova versão',exact:true}).click();
+  await composer.getByRole('button',{name:'Materiais autorizados'}).click();
+  await composer.getByText('Corte final.mp4',{exact:true}).click();
+  await composer.getByRole('button',{name:'Enviar nova versão',exact:true}).click();
+  await expect(page.getByLabel('Link da revisão')).toBeVisible();
+  await guest.reload();await expect(guest.getByText('Versão 2',{exact:true})).toBeVisible();
+  await guest.getByPlaceholder('Como podemos chamar você?').fill('Cliente QA');
+  await guest.getByRole('button',{name:'Aprovar material'}).click();
+  await guest.getByRole('button',{name:'Confirmar decisão'}).click();
+  await expect(guest.getByRole('heading',{name:'Material aprovado'})).toBeVisible();
+  await guest.screenshot({path:info.outputPath('customer-approved-v2.png'),fullPage:true});
+  await page.keyboard.press('Escape');await page.reload();await page.getByText('Corte para revisão',{exact:true}).click();
+  await expect(page.getByText('Material aprovado · V2')).toBeVisible();
+  page.once('dialog',dialog=>dialog.accept());
+  await page.getByRole('button',{name:'Encerrar revisão',exact:true}).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await guest.reload();await expect(guest.getByRole('heading',{name:'Material indisponível'})).toBeVisible();
+  expect({createCalls,publishCalls,revisionCalls,closeCalls}).toEqual({createCalls:1,publishCalls:1,revisionCalls:1,closeCalls:1});
+  await guest.close();
+});

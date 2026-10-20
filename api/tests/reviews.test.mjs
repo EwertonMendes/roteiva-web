@@ -8,6 +8,7 @@ import {random,hash,encrypt,context,base64url} from '../src/crypto.ts';
 const BASE='https://roteiva-api-dev.ewertonmendes9.workers.dev';
 const account='aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa';
 const file='FILE_REVIEW_12345678';
+const pair=await generateKeyPair('RS256');
 function fixture(){
   const db=database({id:account,owner_uid:'alice',google_account_id:'google-alice',
     status:'connected',revision:1,encrypted_refresh_token:'encrypted',
@@ -30,7 +31,7 @@ function req(token,path='/reviews/public',method='GET',body={},auth){
   return new Request(BASE+path,{method,headers:{
     'X-Review-Token':token,...(auth?{Authorization:'Bearer '+auth}:{}),
     ...(method==='POST'?{'Content-Type':'application/json'}:{})
-  },...(method==='POST'?{body:JSON.stringify(body)}:{})});
+  },...(method==='POST'?{body:JSON.stringify({version:1,...body})}:{})});
 }
 async function route(f,token,path,method,body,auth){
   const request=req(token,path,method,body,auth);
@@ -114,7 +115,7 @@ test('expiry maintenance closes drafts and denies the public token',async t=>{
   await assert.rejects(()=>route(f,a.token),e=>e.status===404);
 });
 
-test('real HTTP: owner A can publish/revoke only linked Drive files, owner B cannot read or publish A assets',async t=>{
+async function integration(t){
   const f=fixture();t.after(f.close);
   const encrypted=await encrypt(f.env,'refresh',context(f.env,'alice','google-alice'));
   f.sql.prepare("UPDATE drive_connections SET encrypted_refresh_token=? WHERE owner_uid='alice'").run(encrypted);
@@ -122,10 +123,10 @@ test('real HTTP: owner A can publish/revoke only linked Drive files, owner B can
   for(const uid of ['alice','bob'])f.sql.prepare(
     'INSERT INTO access_accounts(owner_uid,trial_started_at,trial_ends_at,created_at,updated_at) VALUES(?,?,?,?,?)')
     .run(uid,timestamp,timestamp+604800000,timestamp,timestamp);
-  const pair=await generateKeyPair('RS256');
   const jwk=await exportJWK(pair.publicKey);jwk.kid='review-test';
   const issued=Math.floor(Date.now()/1000);
-  const jwt=async sub=>new SignJWT({auth_time:issued})
+  const jwt=async (sub,email)=>new SignJWT({auth_time:issued,...(email?{email,email_verified:true,
+    firebase:{sign_in_provider:'google.com',identities:{'google.com':['google-'+sub]}}}:{})})
     .setProtectedHeader({alg:'RS256',kid:'review-test'})
     .setAudience(f.env.FIREBASE_PROJECT_ID)
     .setIssuer('https://securetoken.google.com/'+f.env.FIREBASE_PROJECT_ID)
@@ -139,6 +140,7 @@ test('real HTTP: owner A can publish/revoke only linked Drive files, owner B can
     API_THUMB_LIMIT:{limit:async()=>({success:true})}};
   const acl=new Map();
   const calls=[];
+  const hooks={beforeGrant:null,deleteFails:false,lostGrant:false,outside:false};
   const previous=globalThis.fetch;
   globalThis.fetch=async(url,init={})=>{
     const u=new URL(String(url));calls.push({host:u.host,path:u.pathname,method:init.method||'GET'});
@@ -162,21 +164,26 @@ test('real HTTP: owner A can publish/revoke only linked Drive files, owner B can
       assert.equal(init.headers.Authorization,'Bearer short-lived');
       if(u.pathname.endsWith('/files/'+file))return Response.json({
         id:file,name:'Primeiro corte.mp4',mimeType:'video/mp4',
-        trashed:false,isAppAuthorized:true,parents:[folder],capabilities:{canShare:true}});
+        trashed:false,isAppAuthorized:true,parents:[hooks.outside?'OTHER_FOLDER_12345':folder],capabilities:{canShare:true}});
       if(u.pathname.endsWith('/files/'+folder))return Response.json({
         id:folder,name:'Projeto',mimeType:'application/vnd.google-apps.folder',
         trashed:false,isAppAuthorized:true,parents:['root'],capabilities:{canShare:true}});
+      if(u.pathname.endsWith('/files/OTHER_FOLDER_12345'))return Response.json({
+        id:'OTHER_FOLDER_12345',mimeType:'application/vnd.google-apps.folder',parents:[]});
       if(u.pathname.endsWith('/files/'+file+'/permissions')){
         if(init.method==='POST'){
-          assert.equal(u.searchParams.has('sendNotificationEmail'),false,
-            'Google Drive forbids notification flag for anyone shares');
+          const value=JSON.parse(init.body);
+          assert.equal(u.searchParams.has('sendNotificationEmail'),value.type==='user');
+          if(hooks.beforeGrant)await hooks.beforeGrant();
           const id='permission-'+(acl.size+1);
           acl.set(id,JSON.parse(init.body));
-          return Response.json({id,type:'anyone',role:'reader'});
+          if(hooks.lostGrant){hooks.lostGrant=false;throw new Error('lost response');}
+          return Response.json({id,...value});
         }
         return Response.json({permissions:[...acl].map(([id,p])=>({id,...p})),nextPageToken:undefined});
       }
       if(u.pathname.includes('/files/'+file+'/permissions/')&&init.method==='DELETE'){
+        if(hooks.deleteFails)return new Response(null,{status:503});
         acl.delete(u.pathname.split('/').at(-1));
         return new Response(null,{status:204});
       }
@@ -191,6 +198,10 @@ test('real HTTP: owner A can publish/revoke only linked Drive files, owner B can
       ...(payload?{body:JSON.stringify(payload)}:{})}),env);
   const payload={clientId:7,projectId:17,studioName:'Estudio',title:'Primeiro corte',message:'Avalie',
     mode:'link',expiresInDays:14,assets:[{fileId:file,connectionId:account,linkedFolderId:folder}]};
+  return {f,env,send,payload,alice,bob,jwt,acl,calls,hooks};
+}
+test('real HTTP: owner A can publish/revoke only linked Drive files, owner B cannot read or publish A assets',async t=>{
+  const {f,send,payload,alice,bob,acl,calls}=await integration(t);
   const denied=await send('POST','/reviews',bob,payload);
   assert.equal(denied.status,403);
   assert.equal(f.sql.prepare('SELECT COUNT(*) n FROM review_requests').get().n,0);
@@ -215,4 +226,134 @@ test('real HTTP: owner A can publish/revoke only linked Drive files, owner B can
   const row=f.sql.prepare("SELECT status FROM review_requests WHERE id=?").get(id);
   assert.equal(row.status,'closed');
   assert.equal(calls.filter(x=>x.path.includes('/permissions')&&x.method==='POST').length,1);
+});
+
+async function createAndPublish(x,overrides={}){
+  const created=await x.send('POST','/reviews',x.alice,{...x.payload,...overrides});
+  assert.equal(created.status,201);
+  const {id}=await created.json();
+  const published=await x.send('POST','/reviews/'+id+'/publish',x.alice);
+  return {id,published};
+}
+test('reject file outside authorized ancestry before persisting or granting',async t=>{
+  const x=await integration(t);x.hooks.outside=true;
+  const res=await x.send('POST','/reviews',x.alice,x.payload);
+  assert.equal(res.status,403);
+  assert.equal(x.f.sql.prepare('SELECT COUNT(*) n FROM review_requests').get().n,0);
+  assert.equal(x.acl.size,0);
+});
+test('restricted review verifies Google recipient and preserves their pre-existing ACL',async t=>{
+  const x=await integration(t);
+  x.acl.set('external-reader',{type:'user',role:'reader',emailAddress:'client@gmail.com'});
+  const {id,published}=await createAndPublish(x,{mode:'google',recipientEmail:'client@gmail.com'});
+  assert.equal(published.status,200);
+  const result=await published.json();const token=result.review.review.url.split('/').at(-1);
+  const correct=await x.jwt('recipient','client@gmail.com');
+  const wrong=await x.jwt('intruder','wrong@gmail.com');
+  assert.equal((await route(x.f,token,undefined,undefined,undefined,correct)).status,200);
+  await assert.rejects(()=>route(x.f,token,undefined,undefined,undefined,wrong),e=>e.status===403);
+  assert.equal((await x.send('POST','/reviews/'+id+'/close',x.alice)).status,200);
+  assert.equal(x.acl.has('external-reader'),true);
+  assert.equal(x.calls.filter(c=>c.method==='DELETE').length,0);
+});
+test('Google restricted grants are created and revoked; public/domain ACLs reject restriction',async t=>{
+  const x=await integration(t);
+  for(const type of ['anyone','domain','group','user']){
+    x.acl.set('external',{type,role:'reader',emailAddress:'other@gmail.com'});
+    const {id,published}=await createAndPublish(x,{mode:'google',recipientEmail:'client@gmail.com'});
+    assert.equal(published.status,409);
+    assert.equal((await x.send('POST','/reviews/'+id+'/close',x.alice)).status,200);
+    assert.equal(x.acl.has('external'),true);x.acl.clear();
+  }
+  const {id,published}=await createAndPublish(x,{mode:'google',recipientEmail:'client@gmail.com'});
+  assert.equal(published.status,200);
+  assert.deepEqual([...x.acl.values()],[{type:'user',role:'reader',emailAddress:'client@gmail.com'}]);
+  assert.equal((await x.send('POST','/reviews/'+id+'/close',x.alice)).status,200);
+  assert.equal(x.acl.size,0);
+});
+test('another review cannot adopt a pending grant; failed deletion stays closing until cron confirms',async t=>{
+  const x=await integration(t);x.hooks.lostGrant=true;
+  const first=await createAndPublish(x);
+  assert.equal(first.published.status,503);
+  assert.equal(x.acl.size,1);
+  const second=await createAndPublish(x);
+  assert.equal(second.published.status,409);
+  assert.equal((await second.published.json()).error.code,'review_file_in_use');
+  x.hooks.deleteFails=true;
+  assert.equal((await x.send('POST','/reviews/'+first.id+'/close',x.alice)).status,503);
+  assert.equal(x.f.sql.prepare('SELECT status FROM review_requests WHERE id=?').get(first.id).status,'closing');
+  x.hooks.deleteFails=false;
+  x.f.sql.prepare('UPDATE review_requests SET updated_at=0 WHERE id=?').run(first.id);
+  await cleanupExpiredReviews(x.env);
+  assert.equal(x.acl.size,0);
+  assert.equal(x.f.sql.prepare('SELECT status FROM review_requests WHERE id=?').get(first.id).status,'closed');
+  assert.equal((await x.send('POST','/reviews/'+second.id+'/publish',x.alice)).status,200);
+});
+test('simultaneous grant/close cannot declare closure before Google response; compensation can retry',async t=>{
+  const x=await integration(t);
+  let release,started;
+  const waiting=new Promise(resolve=>{release=resolve;});
+  const entered=new Promise(resolve=>{started=resolve;});
+  x.hooks.beforeGrant=async()=>{started();await waiting;};
+  const created=await x.send('POST','/reviews',x.alice,x.payload);const {id}=await created.json();
+  const publish=x.send('POST','/reviews/'+id+'/publish',x.alice);
+  await entered;
+  assert.equal((await x.send('POST','/reviews/'+id+'/publish',x.alice)).status,409);
+  assert.equal((await x.send('POST','/reviews/'+id+'/close',x.alice)).status,409);
+  assert.equal(x.f.sql.prepare('SELECT status FROM review_requests WHERE id=?').get(id).status,'closing');
+  x.hooks.deleteFails=true;release();
+  assert.equal((await publish).status,503);
+  assert.equal(x.acl.size,1);
+  assert.equal(x.f.sql.prepare('SELECT grant_state FROM review_assets WHERE review_id=?').get(id).grant_state,'revoking');
+  x.hooks.deleteFails=false;
+  assert.equal((await x.send('POST','/reviews/'+id+'/close',x.alice)).status,200);
+  assert.equal(x.acl.size,0);
+});
+test('lost grant response reconciles once, stale-version decisions are rejected and duplicate clicks remain atomic',async t=>{
+  const x=await integration(t);x.hooks.lostGrant=true;
+  const {id,published}=await createAndPublish(x);assert.equal(published.status,503);
+  const resumed=await x.send('POST','/reviews/'+id+'/publish',x.alice);assert.equal(resumed.status,200);
+  assert.equal(x.calls.filter(c=>c.method==='POST'&&c.path.endsWith('/permissions')).length,1);
+  const result=await resumed.json(),token=result.review.review.url.split('/').at(-1);
+  x.f.sql.prepare('UPDATE review_requests SET current_version=2 WHERE id=?').run(id);
+  x.f.sql.prepare('UPDATE review_assets SET version=2 WHERE review_id=?').run(id);
+  await assert.rejects(()=>route(x.f,token,'/reviews/public/decide','POST',
+    {authorName:'Client',decision:'approved',version:1}),e=>e.code==='review_version_changed');
+  const results=await Promise.allSettled([1,2].map(()=>route(x.f,token,'/reviews/public/decide','POST',
+    {authorName:'Client',decision:'approved',version:2})));
+  assert.equal(results.filter(r=>r.status==='fulfilled').length,1);
+  assert.equal(x.f.sql.prepare('SELECT COUNT(*) n FROM review_decisions').get().n,1);
+});
+
+test('concurrent replacement keeps one complete version, revokes prior ACL and retains decision history',async t=>{
+  const x=await integration(t);const {id,published}=await createAndPublish(x);
+  assert.equal(published.status,200);
+  const result=await published.json(),token=result.review.review.url.split('/').at(-1);
+  await route(x.f,token,'/reviews/public/decide','POST',{authorName:'Client',decision:'changes',message:'New cut'});
+  const results=await Promise.all([1,2].map(()=>x.send('POST','/reviews/'+id+'/revise',x.alice,{assets:x.payload.assets})));
+  assert.equal(results.filter(r=>r.status===200).length,1);
+  assert.equal(results.filter(r=>r.status===409).length,1);
+  assert.deepEqual(x.f.sql.prepare('SELECT version,grant_state FROM review_assets WHERE review_id=? ORDER BY version').all(id)
+    .map(r=>({...r})),[{version:1,grant_state:'revoked'},{version:2,grant_state:'granted'}]);
+  assert.equal(x.f.sql.prepare('SELECT COUNT(*) n FROM review_decisions WHERE review_id=?').get(id).n,1);
+  assert.equal(x.acl.size,1);
+  assert.equal((await (await route(x.f,token)).json()).review.version,2);
+  assert.equal((await x.send('POST','/reviews/'+id+'/close',x.alice)).status,200);
+  assert.equal(x.acl.size,0);
+  assert.equal(x.f.sql.prepare('SELECT COUNT(*) n FROM review_file_claims').get().n,0);
+});
+
+test('expiry revokes actual mocked ACL; owner deletion revokes before removing review records and credentials',async t=>{
+  const x=await integration(t);const first=await createAndPublish(x);
+  assert.equal(first.published.status,200);assert.equal(x.acl.size,1);
+  x.f.sql.prepare('UPDATE review_requests SET expires_at=0,updated_at=0 WHERE id=?').run(first.id);
+  await cleanupExpiredReviews(x.env);assert.equal(x.acl.size,0);
+  const second=await createAndPublish(x);assert.equal(second.published.status,200);
+  assert.equal(await closeOwnerReviews(x.env,'alice'),false);assert.equal(x.acl.size,0);
+  assert.equal(await closeOwnerReviews(x.env,'alice'),false);
+  assert.equal(await closeOwnerReviews(x.env,'alice'),true);
+  assert.equal(x.f.sql.prepare('SELECT COUNT(*) n FROM review_requests').get().n,0);
+  assert.equal(x.f.sql.prepare('SELECT COUNT(*) n FROM review_assets').get().n,0);
+  assert.equal(x.f.sql.prepare('SELECT COUNT(*) n FROM review_file_claims').get().n,0);
+  assert.equal(x.f.sql.prepare('SELECT COUNT(*) n FROM drive_connections').get().n,1);
 });

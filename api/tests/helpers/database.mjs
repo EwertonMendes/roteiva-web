@@ -9,6 +9,7 @@ export function database(...rows) {
   sql.exec(readFileSync(new URL('../../migrations/0011_trial_identity_atomic.sql',import.meta.url),'utf8'));
   sql.exec(readFileSync(new URL('../../migrations/0012_drive_uploads.sql',import.meta.url),'utf8'));
   sql.exec(readFileSync(new URL('../../migrations/0013_reviews.sql',import.meta.url),'utf8'));
+  sql.exec(readFileSync(new URL('../../migrations/0014_review_grant_coordination.sql',import.meta.url),'utf8'));
   for (const row of rows) {
     sql.prepare('INSERT INTO drive_connections(id,owner_uid,google_account_id,google_email,encrypted_refresh_token,status,scopes,revision,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)')
       .run(row.id,row.owner_uid,row.google_account_id,row.google_email||'test@example.com',

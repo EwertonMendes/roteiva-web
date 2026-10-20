@@ -1,6 +1,6 @@
 # Roteiva
 
-> **Aprovações:** o fluxo MVP está em desenvolvimento na [PR #55](https://github.com/EwertonMendes/roteiva-web/pull/55). Consulte [docs/REVIEWS-MVP.md](docs/REVIEWS-MVP.md) para arquitetura, segurança e aceite. Ainda não declarar homologado em DEV.
+> **Aprovações:** o fluxo MVP está implementado e passou pela regressão automatizada local na [PR #55](https://github.com/EwertonMendes/roteiva-web/pull/55), ainda draft. Consulte [docs/REVIEWS-MVP.md](docs/REVIEWS-MVP.md) para resultados, segurança e aceite. A integração de revisão ainda não foi publicada nem homologada com Google Drive real no DEV.
 
 **Gestão de produção audiovisual para freelancers e pequenos estúdios.**
 

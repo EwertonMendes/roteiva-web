@@ -25,10 +25,11 @@
 .reviews-warning button,.review-icon{border:0;background:transparent;color:inherit;cursor:pointer;padding:6px;display:grid;place-items:center;border-radius:9px}
 .reviews-warning button:hover,.review-icon:hover{background:var(--subtle,#eee)}
 .review-modal-backdrop{position:fixed;inset:0;display:grid;place-items:center;padding:20px;background:rgba(8,9,12,.64);z-index:1000;overscroll-behavior:contain}
-.review-dialog{width:min(760px,100%);max-height:min(92dvh,970px);display:flex;flex-direction:column;border-radius:21px;overflow:hidden;background:var(--card,#fff);color:var(--ink,#222);box-shadow:0 24px 75px rgba(0,0,0,.25)}
+.review-dialog{width:min(760px,100%);max-height:min(92dvh,970px);display:flex;flex-direction:column;border-radius:21px;overflow:hidden;background:var(--paper,#fff);color:var(--ink,#222);box-shadow:0 24px 75px rgba(0,0,0,.25)}
 .review-dialog>header{display:flex;justify-content:space-between;gap:18px;padding:24px 28px 20px;border-bottom:1px solid var(--line,#eee)}
 .review-dialog>header h2{margin:6px 0}.review-dialog>header p{margin:0;font-size:.88rem;color:var(--muted)}
-.review-dialog-body{overflow:auto;overscroll-behavior:contain;padding:24px 28px;flex:1;min-height:0;display:grid;align-content:start;gap:18px}
+.review-dialog-body{overflow:auto;overscroll-behavior:contain;padding:24px 28px;flex:1;min-height:0;display:grid;grid-auto-rows:max-content;align-content:start;gap:18px}
+.review-dialog>header,.review-dialog>footer{flex-shrink:0}
 .review-dialog-body h3{font-size:1rem;margin:8px 0 0;display:flex;align-items:center;gap:8px}
 .review-dialog-body h3 span{font-size:.8rem;color:var(--muted)}
 .review-dialog>footer{border-top:1px solid var(--line,#eee);padding:18px 28px;display:flex;justify-content:flex-end;flex-wrap:wrap;gap:10px}
@@ -127,3 +128,6 @@
 .review-upload-zone label:focus-within{outline:2px solid var(--ink,#222);outline-offset:3px}
 .review-upload-zone span{font-size:.77rem;color:var(--muted,#777)}
 @media(max-width:700px){.review-upload-zone{justify-content:center;text-align:center}}
+.review-pending-upload{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:.82rem}
+.review-pending-upload>span{flex:1;overflow-wrap:anywhere}.review-pending-upload>small{width:100%;color:var(--muted)}
+.review-upload-authorization{padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--subtle)}

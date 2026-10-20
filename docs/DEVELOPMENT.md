@@ -411,3 +411,9 @@ isolado. O PNPM tentou registrar/reinstalar dependências em área restrita; os
 mesmos binários Node/TypeScript/Vite/Playwright/Firebase foram executados diretamente
 ou via npm. Emuladores usam Java 21 e demo-roteiva; D1 usa SQLite/workerd local.
 Não houve instalação de serviços nem publicação DEV/PROD.
+
+## Homologação de Aprovações — PR #55
+
+Com dependências travadas instaladas: `npm test --prefix api`, `npm run typecheck --prefix api`, `npm run migrate:local --prefix api` (repetir: nenhuma pendência), `npm run build --prefix api`; frontend `pnpm test`, `pnpm typecheck`, builds Firebase/demo/emulator. Em Java 21, `pnpm exec firebase emulators:exec --project demo-roteiva --only auth,firestore "pnpm exec playwright test tests/browser/reviews"` executa o ciclo de aprovação nos dois projetos de browser. `pnpm test:firebase` executa também regras A/B e regressão geral. Loopback/workerd/emuladores podem exigir execução fora do sandbox; não trocar o projeto fictício por DEV para contornar falhas locais.
+
+Aplicar `0013_reviews.sql` e `0014_review_grant_coordination.sql` depois da 0012, antes do Worker novo. A 0014 interrompe se houver concessões históricas do mesmo file ID em versões/revisões diferentes: investigar e conciliar com o Drive; nunca remover ACL externa ou apagar dados para fazer passar. Claims/leases são internas ao D1. Checklist, distinção dos mocks, limites do preview e procedimento Google real em [REVIEWS-MVP.md](REVIEWS-MVP.md). O QA isolado passa a ser acionado também por mudanças em revisões/migrations/testes de revisão.

@@ -41,9 +41,57 @@ A rota pública `/review/{capability}` funciona sem cadastro no Roteiva. O modo 
 ## Checklist de aceite
 
 - [ ] Migrar D1 no DEV com verificação de integridade e preservar o estado anterior.
-- [ ] Validar API Worker e builds com CI.
-- [ ] Playwright desktop/mobile: cliente abre, comenta, aprova/solicita ajustes e reabre a página.
-- [ ] Cenários A/B: proprietário A não cria convite para arquivo, pasta, projeto ou cliente B.
+- [x] Validação local da API Worker, frontend, typechecks e builds; CI do SHA final deve ser conferido na PR.
+- [x] Playwright desktop/mobile: cliente abre, comenta, aprova/solicita ajustes e reabre a página (contratos simulados; Firestore/Auth emulados).
+- [x] Isolamento A/B com Firebase assinado/Google simulado na API e regras A/B nos emuladores; duas contas reais continuam pendentes.
 - [ ] Google real (duas contas): publicar link, modo Google específico, arquivo com permissão prévia, preview/fallback, nova versão, exclusão/expiração/desconexão e revogação ACL confirmada.
 - [ ] Sem credenciais reais/tokens em traces, logs, URL de API e artefatos.
 - [ ] PR revisada e somente então merge/deploy DEV; PROD está fora do escopo.
+
+## Auditoria adicional — 20/10/2026
+
+**IMPLEMENTADO e testado localmente; homologação Google remota continua pendente.** A execução anterior `39489418187` terminou com sucesso no SHA `20a2b38`. Havia somente a PR #55 aberta, sem conflito de merge com a master `650897a`, no início desta auditoria.
+
+Correções verificáveis:
+
+- Permissão de um arquivo não pode ser adotada por outra revisão ativa. Lease por arquivo impede duas concessões ou concessão/revogação simultâneas. Compensação que falha preserva o ID e o estado para retry; encerramentos incompletos são retomados pelo cron mesmo antes da expiração.
+- Uma aba com material antigo não aprova/comenta uma versão nova. IDs privados e e-mail do destinatário não são retornados ao convidado. ACLs de grupo/outros usuários também impedem a promessa de Google restrito.
+- Duas trocas de versão não misturam materiais no D1; somente a transição vencedora insere a versão seguinte.
+- Publicação aguarda os uploads e sua confirmação. Progresso, cancelamento e recuperação ficam acessíveis no compositor usando a fila existente. A conclusão seleciona o arquivo mesmo após navegar para outra subpasta.
+- Respostas antigas de pasta/listagem não substituem a navegação atual. O grid do modal preserva a altura da lista de arquivos e o fundo é opaco; anteriormente a lista colapsava e os arquivos não recebiam cliques. Diálogos reutilizam contenção de foco, Escape e bloqueio de scroll da Biblioteca.
+- Falha ao recarregar o portal remove a mídia anterior e apresenta recuperação, sem manter material de uma resposta que já foi recusada.
+
+Resultados locais finais nesta auditoria:
+
+| Verificação | Resultado |
+|---|---|
+| API completa (`npm test` em `api/`) | 129/129; inclui 15 testes de revisão, D1/workerd real local e regressão de OAuth/acesso/exclusão/upload |
+| Frontend (`pnpm test`) | 37/37, mais suítes de cálculo de agenda e financeiro aprovadas |
+| Security Rules (`pnpm test:firebase`) | 30/30 em Auth/Firestore fictícios |
+| Browser (`pnpm test:firebase`) | 81 aprovados, 3 ignorados por viewport, zero falhas; inclui 8 cenários de aprovação (4 por viewport) |
+| TypeScript | frontend e API aprovados |
+| Builds | Firebase, demo, emulator e bundle Worker dry-run aprovados |
+| D1 local | migrations 0001–0014 aprovadas; repetição sem pendências; constraints/rollback verificados no workerd |
+
+Os skips são testes desktop de múltiplas pastas/miniaturas no projeto mobile e o teste específico de picker mobile no projeto desktop; há casos correspondentes no viewport apropriado. As capturas `professional-review.png` e `customer-approved-v2.png` são produzidas pelo E2E em cada viewport. Traces e arquivos com credenciais reais nunca devem entrar no Git. Logs completos e capturas desta execução foram preservados localmente para o proprietário; a fonte reprodutível permanece nos testes e no workflow.
+
+Evidências automatizadas: `api/tests/reviews.test.mjs` cobre HTTP com Firebase assinado e Google simulado, isolamento A/B, Google autorizado/incorreto, ACL preexistente, grupos/domínio/terceiros, criação fora da pasta, resposta Google perdida, grant versus close com compensação falhando, retry pelo cron, publicação concorrente, troca de versão concorrente e decisão duplicada. `tests/browser/reviews-workflow.spec.ts` usa Auth/Firestore emulados e um contrato HTTP de revisão com estado e validação de todos os payloads; percorre criação de cliente/projeto, upload direto em dois blocos (308/Range), bloqueio até confirmação, comentário, ajustes, V2, aprovação e encerramento. `tests/browser/reviews.spec.ts` cobre aprovação direta, confirmação de ajustes e recuperação de rede. Esses testes **não** homologam o Google real.
+
+### Infraestrutura observada (somente leitura)
+
+Cloudflare DEV consultado em 20/10/2026: cron real `* * * * *` configurado; D1 tem migrations até `0012_drive_uploads.sql`; `PRAGMA foreign_key_check` remoto retornou zero violações. `0013`/`0014` foram aplicadas apenas no D1 local, com segunda execução sem migrações pendentes. A rotina de revisões ainda não está publicada no Worker DEV; cron configurado não comprova execução remota dessa rotina. Nenhum recurso DEV/PROD ou dado existente foi migrado nesta auditoria.
+
+O pipeline oficial da API exige master e SHA atual para deploy DEV. A PR permanece draft sem merge: não contornar esse gate com publicação manual da branch no Worker compartilhado. O preview Hosting oficial pode mostrar a UI, mas **não homologa o fluxo conectado**: a API atual ainda não contém `/reviews`, e a allowlist CORS aceita apenas a origem DEV principal. Isso precisa de uma decisão de ambiente para homologar a API antes do merge, ou aprovação humana para a etapa DEV prevista pelo projeto.
+
+### Procedimento de aceite Google real ainda necessário
+
+O proprietário autorizou e foi criada uma pasta nova descartável no seu Drive, com uma imagem PNG de teste, confirmadas por metadados da API (somente ACL de proprietário). Isso valida criação/upload pelo conector, **não** a integração de revisão do Roteiva. Referências exatas são entregues ao proprietário fora do repositório público.
+
+1. Disponibilizar Worker com código da PR e D1 isolado com migrations `0001`–`0014`, OAuth/segredos e origem Hosting compatíveis pelo pipeline aprovado. Não apontar preview para banco de produção nem remover dados DEV existentes. Para um novo ambiente, separar recursos e credenciais; não exportar tokens do D1 nem segredos do Worker.
+2. Na conta proprietária, vincular a pasta descartável a um projeto de teste e autorizá-la pelo Picker do Roteiva. Um arquivo criado por outro aplicativo pode ainda precisar de autorização `drive.file`.
+3. Criar aprovação modo link somente para o PNG de teste; conferir `permissions.list` do próprio arquivo antes/depois (`supportsAllDrives=true`, campos `id,type,role,emailAddress,permissionDetails`). Confirmar `anyone/reader`, abrir o portal sem sessão e testar preview/fallback.
+4. Encerrar, conferir remoção da ACL criada pelo Roteiva e recusar o token antigo. Repetir com vencimento controlado no ambiente **isolado**, observar execução do cron e confirmar remoção externa; não alterar validade em dados reais.
+5. Repetir com duas identidades Google distintas em modo restrito: destinatário correto entra; conta incorreta recebe recusa no backend. Conferir ACL `user/reader` e posterior remoção. Testar ACL externa preexistente sem apagá-la, herança/Shared Drives, restrição Workspace e falha temporária Google.
+6. Solicitar ajustes, publicar V2 e comprovar revogação de V1; repetir encerramento durante concessão, desconexão e exclusão usando **somente uma conta descartável**, nunca a conta pessoal do proprietário. Validar Safari e aparelho físico separadamente da viewport mobile Chromium.
+
+Não registrar ID Tokens, URLs de sessão resumable ou capacidades de convite em logs/traces públicos. Na falha de migração, manter código anterior e schema aditivo; inspecionar conflito/backup antes de tentar de novo. Não remover tabelas de revisão para voltar código: isso perderia a referência às ACLs que ainda precisam ser revogadas.

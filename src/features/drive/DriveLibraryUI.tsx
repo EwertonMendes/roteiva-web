@@ -46,11 +46,12 @@ export function readableFileType(mime:string){
 
 
 /** Keep overlays keyboard accessible and prevent the page behind them from scrolling. */
-function useOverlayFocus(onClose:()=>void) {
+export function useOverlayFocus(onClose:()=>void,enabled=true,overlayKey?:string) {
   const dialogRef=useRef<HTMLDivElement>(null);
   const closeRef=useRef(onClose);
   closeRef.current=onClose;
   useEffect(()=>{
+    if(!enabled)return;
     const previous=document.activeElement instanceof HTMLElement?document.activeElement:null;
     const oldOverflow=document.body.style.overflow;
     document.body.style.overflow="hidden";
@@ -60,7 +61,7 @@ function useOverlayFocus(onClose:()=>void) {
       if(event.key!=="Tab")return;
       const dialog=dialogRef.current;
       if(!dialog)return;
-      const focusable=[...dialog.querySelectorAll<HTMLElement>('button:not([disabled]),[href],input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])')]
+      const focusable=[...dialog.querySelectorAll<HTMLElement>('button:not([disabled]),[href],input:not([disabled]),textarea:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])')]
         .filter(el=>el.getClientRects().length>0);
       if(!focusable.length){event.preventDefault();dialog.focus();return;}
       const first=focusable[0],last=focusable[focusable.length-1];
@@ -69,7 +70,7 @@ function useOverlayFocus(onClose:()=>void) {
     }
     document.addEventListener("keydown",onKeyDown);
     return ()=>{document.removeEventListener("keydown",onKeyDown);document.body.style.overflow=oldOverflow;previous?.focus();};
-  },[]);
+  },[enabled,overlayKey]);
   return dialogRef;
 }
 

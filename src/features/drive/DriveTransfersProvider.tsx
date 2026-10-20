@@ -8,7 +8,8 @@ import {invalidateDriveFolderCache} from './drive-folder-cache';
 import type {UploadSession,UploadedFile} from './drive-upload-client';
 import './drive-library.css';
 type Completion=(file:UploadedFile,destination:UploadDestination)=>void;
-type Transfers=ReturnType<typeof useDriveUploads>&{subscribe:(callback:Completion)=>()=>void};
+type Transfers=ReturnType<typeof useDriveUploads>&{subscribe:(callback:Completion)=>()=>void;
+  authorizationNotice:ReactNode;setAuthorizationInline:(inline:boolean)=>void};
 const TransfersContext=createContext<Transfers|null>(null);
 export function useDriveTransfers(){const value=useContext(TransfersContext);if(!value)throw new Error('DriveTransfersProvider ausente.');return value;}
 export function DriveTransfersProvider({children}:{children:ReactNode}){
@@ -19,6 +20,7 @@ function DriveTransfersSession({children}:{children:ReactNode}){
   const {user}=useAuth();const call=useDriveApi();
   const [uploadGrant,setUploadGrant]=useState<{config:PickerConfig;destination:UploadDestination}|null>(null);
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[result,setResult]=useState('');
+  const [authorizationInline,setAuthorizationInline]=useState(false);
   const grantController=useRef<AbortController|null>(null);
   const subscribers=useRef(new Set<Completion>());
   const subscribe=useCallback((callback:Completion)=>{subscribers.current.add(callback);return ()=>{subscribers.current.delete(callback);};},[]);
@@ -69,17 +71,18 @@ function DriveTransfersSession({children}:{children:ReactNode}){
   }
 
   const cancelAll=useCallback((id:string)=>{uploads.cancelAll(id);grantController.current?.abort();setUploadGrant(null);setBusy(false);},[uploads.cancelAll]);
-  return <TransfersContext.Provider value={{...uploads,cancelAll,subscribe}}>{children}
-    <div className="rl-transfer-layer">
-      <DriveUploadQueue uploads={uploads.uploads} onCancel={uploads.cancel} onRetry={uploads.retry} onDismiss={uploads.dismiss}/>
-      {(uploadGrant||error||result)&&<aside className="rl-upload-authorization" aria-label="Autorização de envio">
+  const authorizationNotice=(uploadGrant||error||result)&&<aside className={authorizationInline?'review-upload-authorization':'rl-upload-authorization'} aria-label="Autorização de envio">
         {error&&<p role="alert">{error}</p>}{result&&<p role="status">{result}</p>}
     {uploadGrant&&<div className="rl-status" role="status"><p>O Google precisa autorizar envios para {uploadGrant.destination.folderName}.</p>
       <button type="button" className="secondary-button" disabled={busy} onClick={authorizeFolder}>Autorizar pasta no Google</button>
       <button type="button" className="secondary-button" disabled={busy} onClick={()=>setUploadGrant(null)}>Agora não</button></div>}
 
         {!busy&&<button type="button" className="secondary-button" onClick={()=>{setError('');setResult('');setUploadGrant(null);}}>Fechar aviso</button>}
-      </aside>}
+      </aside>;
+  return <TransfersContext.Provider value={{...uploads,cancelAll,subscribe,authorizationNotice,setAuthorizationInline}}>{children}
+    <div className="rl-transfer-layer">
+      <DriveUploadQueue uploads={uploads.uploads} onCancel={uploads.cancel} onRetry={uploads.retry} onDismiss={uploads.dismiss}/>
+      {!authorizationInline&&authorizationNotice}
     </div>
   </TransfersContext.Provider>;
 }

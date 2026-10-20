@@ -145,10 +145,12 @@ async function validatedAssets(env:Env,uid:string,token:string,projectId:number,
   }
   return result;
 }
-function insertAssets(env:Env,entries:Asset[]){
+function insertAssets(env:Env,entries:Asset[],transition?:string){
   return entries.map(a=>env.DB.prepare(
-    "INSERT INTO review_assets(review_id,version,file_id,connection_id,linked_folder_id,name,mime_type,grant_state) VALUES(?,?,?,?,?,?,?,'unshared')")
-    .bind(a.review_id,a.version,a.file_id,a.connection_id,a.linked_folder_id,a.name,a.mime_type));
+    "INSERT INTO review_assets(review_id,version,file_id,connection_id,linked_folder_id,name,mime_type,grant_state) SELECT ?,?,?,?,?,?,?,'unshared'"+
+    (transition?" WHERE EXISTS(SELECT 1 FROM review_requests WHERE id=? AND status='replacing' AND transition_id=?)":""))
+    .bind(a.review_id,a.version,a.file_id,a.connection_id,a.linked_folder_id,a.name,a.mime_type,
+      ...(transition?[a.review_id,transition]:[])));
 }
 async function tokenFor(env:Env,r:Review):Promise<string>{
   return decrypt(env,r.encrypted_token,tokenContext(env,r));
@@ -243,13 +245,49 @@ async function mutatePermission(env:Env,row:Connection,fileId:string,method:'POS
   return method==='DELETE'?{}:res.json() as Promise<Record<string,unknown>>;
 }
 async function grant(env:Env,r:Review,a:Asset,ownerToken:string):Promise<void>{
-  if(a.grant_state==='granted')return;
-  if(a.grant_state!=='unshared'&&a.grant_state!=='granting')
-    throw new ApiError(409,'review_grant_conflict');
   const sel={fileId:a.file_id,connectionId:a.connection_id,linkedFolderId:a.linked_folder_id};
   await checkedFile(env,r.owner_uid,ownerToken,r.project_id,sel);
+  return withAssetLease(env,r,a,async current=>grantLocked(env,r,current));
+}
+/** Serialize bounded Google ACL calls, including reconciliation after a lost response.
+ * A crashed call's lease outlives its token/Drive request timeouts. Keep the claim
+ * until DELETE succeeds; another invitation must never adopt this one's ACL.
+ */
+async function withAssetLease(env:Env,r:Review,a:Asset,job:(current:Asset)=>Promise<void>,revoking=false):Promise<void>{
+  const lease=crypto.randomUUID();
+  const locked=await env.DB.prepare('UPDATE review_assets SET lease_id=?,lease_until=? WHERE review_id=? AND version=? AND file_id=? AND lease_until<=?')
+    .bind(lease,now()+120000,r.id,a.version,a.file_id,now()).run();
+  if(locked.meta.changes!==1)throw new ApiError(409,'review_busy');
+  try{
+    const current=await env.DB.prepare('SELECT * FROM review_assets WHERE review_id=? AND version=? AND file_id=?')
+      .bind(r.id,a.version,a.file_id).first<Asset>();
+    if(!current)throw new ApiError(409,'review_busy');
+    if(revoking&&(current.grant_state==='unshared'||current.grant_state==='revoked')){
+      await job(current);return;
+    }
+    await env.DB.prepare('INSERT OR IGNORE INTO review_file_claims(file_id,review_id,version) VALUES(?,?,?)')
+      .bind(a.file_id,r.id,a.version).run();
+    const claim=await env.DB.prepare('SELECT review_id,version FROM review_file_claims WHERE file_id=?')
+      .bind(a.file_id).first<{review_id:string;version:number}>();
+    if(claim?.review_id!==r.id||claim.version!==a.version)throw new ApiError(409,'review_file_in_use');
+    await job(current);
+  }finally{
+    await env.DB.prepare('UPDATE review_assets SET lease_id=NULL,lease_until=0 WHERE review_id=? AND version=? AND file_id=? AND lease_id=?')
+      .bind(r.id,a.version,a.file_id,lease).run();
+  }
+}
+async function grantLocked(env:Env,r:Review,a:Asset):Promise<void>{
+  const active=await env.DB.prepare("SELECT 1 FROM review_requests WHERE id=? AND status='publishing' AND current_version=? AND expires_at>?")
+    .bind(r.id,a.version,now()).first();
+  if(!active)throw new ApiError(409,'review_busy');
+  if(a.grant_state==='granted')return;
+  if(a.grant_state!=='unshared'&&a.grant_state!=='granting')throw new ApiError(409,'review_grant_conflict');
   const row=await connection(env,r.owner_uid,a.connection_id);
   const existing=await permissions(env,row,a.file_id);
+  if(r.access_mode==='google'&&existing.some(p=>p.type==='group'||
+    (p.type==='user'&&p.role!=='owner'&&p.emailAddress?.toLowerCase()!==r.recipient_email&&
+      p.emailAddress?.toLowerCase()!==row.google_email?.toLowerCase())))
+    throw new ApiError(409,'review_existing_public_permission');
   // An existing public/domain-wide ACL defeats the promise of Google-only review.
   // Link mode may only reconcile a permission its own pending attempt created.
   if(existing.some(p=>p.type==='anyone'||p.type==='domain')&&
@@ -287,11 +325,28 @@ async function grant(env:Env,r:Review,a:Asset,ownerToken:string):Promise<void>{
   if(saved.meta.changes!==1){
     // Closing an invitation may race a Google grant. Compensate immediately:
     // a late ACL must never outlive a review whose state already closed.
+    // Persist the known ID before compensation. Failed DELETE remains recoverable
+    // by close/cron, and close cannot finish while this asset lease is held.
+    await env.DB.prepare("UPDATE review_assets SET grant_state='revoking',permission_id=? WHERE review_id=? AND version=? AND file_id=?")
+      .bind(id,r.id,a.version,a.file_id).run();
     if(id)await mutatePermission(env,row,a.file_id,'DELETE',undefined,id);
+    await env.DB.prepare("UPDATE review_assets SET grant_state='revoked',permission_id=NULL WHERE review_id=? AND version=? AND file_id=?")
+      .bind(r.id,a.version,a.file_id).run();
+    await releaseClaim(env,r,a);
     throw new ApiError(409,'review_busy');
   }
 }
 async function revokeAsset(env:Env,r:Review,a:Asset):Promise<void>{
+  return withAssetLease(env,r,a,async current=>{
+    await revokeLocked(env,r,current);
+    await releaseClaim(env,r,current);
+  },true);
+}
+async function releaseClaim(env:Env,r:Review,a:Asset):Promise<void>{
+  await env.DB.prepare('DELETE FROM review_file_claims WHERE file_id=? AND review_id=? AND version=?')
+    .bind(a.file_id,r.id,a.version).run();
+}
+async function revokeLocked(env:Env,r:Review,a:Asset):Promise<void>{
   if(a.grant_state==='revoked'||a.grant_state==='unshared')return;
   const row=await connection(env,r.owner_uid,a.connection_id);
   // Repair an unknown completion of a Google grant before closing.
@@ -310,14 +365,16 @@ async function publish(request:Request,env:Env,r:Review):Promise<Response>{
   if(!['draft','publishing'].includes(r.status))throw new ApiError(409,'review_invalid_state');
   if(r.expires_at<=now())throw new ApiError(410,'review_expired');
   const bearer=request.headers.get('Authorization')!.slice(7);
+  await verifyProject(env,r.owner_uid,bearer,r.project_id,r.client_id);
   // All grants complete before any public client sees the review.
   await env.DB.prepare("UPDATE review_requests SET status='publishing',updated_at=? WHERE id=? AND owner_uid=? AND status IN ('draft','publishing')")
     .bind(now(),r.id,r.owner_uid).run();
   const files=await assets(env,r.id,r.current_version);
   if(!files.length)throw new ApiError(409,'review_invalid_state');
   for(const file of files)await grant(env,r,file,bearer);
-  await env.DB.prepare("UPDATE review_requests SET status='pending',updated_at=? WHERE id=? AND owner_uid=? AND status='publishing'")
-    .bind(now(),r.id,r.owner_uid).run();
+  const published=await env.DB.prepare("UPDATE review_requests SET status='pending',updated_at=? WHERE id=? AND owner_uid=? AND status='publishing' AND current_version=? AND expires_at>? AND NOT EXISTS(SELECT 1 FROM review_assets WHERE review_id=? AND version=? AND grant_state!='granted')")
+    .bind(now(),r.id,r.owner_uid,r.current_version,now(),r.id,r.current_version).run();
+  if(published.meta.changes!==1)throw new ApiError(409,'review_busy');
   return Response.json({review:await detail(env,await stored(env,r.id,r.owner_uid))});
 }
 async function revise(request:Request,env:Env,r:Review):Promise<Response>{
@@ -326,10 +383,11 @@ async function revise(request:Request,env:Env,r:Review):Promise<Response>{
   const version=r.current_version+1;
   if(r.status==='changes'){
     const entries=await validatedAssets(env,r.owner_uid,bearer,r.project_id,selected(data?.assets),r.id,version);
+    const transition=crypto.randomUUID();
     const commands=[
-      env.DB.prepare("UPDATE review_requests SET status='replacing',updated_at=? WHERE id=? AND owner_uid=? AND status='changes'")
-        .bind(now(),r.id,r.owner_uid),
-      ...insertAssets(env,entries)
+      env.DB.prepare("UPDATE review_requests SET status='replacing',transition_id=?,updated_at=? WHERE id=? AND owner_uid=? AND status='changes' AND current_version=?")
+        .bind(transition,now(),r.id,r.owner_uid,r.current_version),
+      ...insertAssets(env,entries,transition)
     ];
     const results=await env.DB.batch(commands);
     if(results[0].meta.changes!==1)throw new ApiError(409,'review_busy');
@@ -356,8 +414,9 @@ async function rotate(env:Env,r:Review):Promise<Response>{
   if(!['pending','changes','approved','draft'].includes(r.status))
     throw new ApiError(409,'review_invalid_state');
   const secret=random(),encrypted=await encrypt(env,secret,tokenContext(env,r));
-  await env.DB.prepare('UPDATE review_requests SET token_hash=?,encrypted_token=?,updated_at=? WHERE id=? AND owner_uid=?')
-    .bind(await hash(secret),encrypted,now(),r.id,r.owner_uid).run();
+  const rotated=await env.DB.prepare("UPDATE review_requests SET token_hash=?,encrypted_token=?,updated_at=? WHERE id=? AND owner_uid=? AND token_hash=? AND status IN ('pending','changes','approved','draft') AND expires_at>?")
+    .bind(await hash(secret),encrypted,now(),r.id,r.owner_uid,r.token_hash,now()).run();
+  if(rotated.meta.changes!==1)throw new ApiError(409,'review_busy');
   return Response.json({url:reviewLink(secret)});
 }
 async function publicReview(request:Request,env:Env,action:'view'|'comment'|'decide'):Promise<Response>{
@@ -382,12 +441,15 @@ async function publicReview(request:Request,env:Env,action:'view'|'comment'|'dec
       env.DB.prepare('SELECT version,decision,author_name,message,created_at FROM review_decisions WHERE review_id=? ORDER BY created_at DESC LIMIT 40')
         .bind(r.id).all()
     ]);
-    return Response.json({review:showReview(r),assets:files.map(a=>({fileId:a.file_id,name:a.name,mimeType:a.mime_type})),
+    return Response.json({review:{title:r.title,message:r.message,studioName:r.studio_name,
+      status:r.status,version:r.current_version,expiresAt:r.expires_at,mode:r.access_mode},
+      assets:files.map(a=>({fileId:a.file_id,name:a.name,mimeType:a.mime_type})),
       comments:comments.results,decisions:decisions.results});
   }
   if(r.status!=='pending')throw new ApiError(409,'review_already_decided');
   const data=await uploadBody(request) as Record<string,unknown>|null;
   if(!data||typeof data!=='object'||Array.isArray(data))throw new ApiError(400,'review_invalid_input');
+  if(integer(data.version)!==r.current_version)throw new ApiError(409,'review_version_changed');
   const author=email||inputText(data.authorName,100,true);
   const authorName=email?inputText(data.authorName||email,100,true):author;
   if(action==='comment'){
@@ -465,7 +527,7 @@ export async function assertNoConnectionReviews(env:Env,uid:string,connectionId:
 }
 /** Expired capability links cease to work immediately; revoke Drive ACLs in bounded cron jobs. */
 export async function cleanupExpiredReviews(env:Env):Promise<void>{
-  const r=await env.DB.prepare("SELECT * FROM review_requests WHERE expires_at<=? AND status!='closed' AND updated_at<? ORDER BY updated_at LIMIT 1")
+  const r=await env.DB.prepare("SELECT * FROM review_requests WHERE (expires_at<=? OR status='closing') AND status!='closed' AND updated_at<? ORDER BY updated_at LIMIT 1")
     .bind(now(),now()-60000).first<Review>();
   if(r)await close(env,r);
 }

@@ -182,7 +182,8 @@
 - [x] História por versão, reenvio após ajustes, decisões únicas e exclusão/expiração com revogação coordenada.
 - [x] Isolamento por proprietário no backend, Hash/AES-GCM de convites e sem exposição pública do Firestore.
 - [ ] Testar publicações e revogações de ACL com duas contas reais Google.
-- [ ] Concluir testes automatizados, QA desktop/mobile e estados interrompidos.
+- [x] Testes automatizados locais: 129 API, 37 frontend, 30 regras e 81 E2E aprovados (3 variantes de viewport ignoradas por desenho); Google real/Safari/aparelho físico e pipelines do SHA final são aceites separados.
+- [x] Auditoria adicional da PR #55: claims/leases de ACL, compensação recuperável, fence de versão pública e transição D1; testes em `api/tests/reviews.test.mjs`. Ciclo completo desktop/mobile em `tests/browser/reviews-workflow.spec.ts`, incluindo upload resumable e encerramento; validação Google real continua separada em [REVIEWS-MVP.md](REVIEWS-MVP.md).
 - [ ] Deploy DEV e homologação por cliente real antes de habilitar como recurso comercial.
 
 **Fora do MVP:** player próprio com timeline, streaming pelo Worker, edição de imagens, assinatura legal, notificações automáticas e aprovação parcial por arquivo.

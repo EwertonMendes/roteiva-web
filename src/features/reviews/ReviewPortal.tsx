@@ -1,6 +1,7 @@
-import {useCallback,useEffect,useState} from "react";
+import {useCallback,useEffect,useRef,useState} from "react";
 import {ArrowLeft,CheckCircle2,ChevronLeft,ChevronRight,ExternalLink,FileAudio,FileImage,FileText,FileVideo,LoaderCircle,MessageSquare,Send,ShieldCheck,X} from "lucide-react";
 import {useAuth} from "../auth/AuthProvider";
+import {useOverlayFocus} from "../drive/DriveLibraryUI";
 import "../reviews/reviews.css";
 
 type Review={title:string;message:string;studioName:string;clientName:string;projectName:string;status:string;
@@ -17,6 +18,7 @@ const messages:Record<string,string>={
   review_recipient_denied:"Este link foi reservado para outra conta Google.",
   review_already_decided:"A decisão desta versão já foi registrada.",
   review_invalid_input:"Revise os dados preenchidos e tente novamente.",
+  review_version_changed:"Uma nova versão está disponível. Atualize a página e revise o material antes de responder.",
   rate_limited:"Muitas tentativas. Tente novamente em instantes."
 };
 const time=(secs:number|null)=>secs===null?"":Math.floor(secs/60)+":"+String(secs%60).padStart(2,"0");
@@ -39,13 +41,15 @@ export function ReviewPortal({token}:{token:string}){
   const [selected,setSelected]=useState(0),[name,setName]=useState(""),[body,setBody]=useState("");
   const [minutes,setMinutes]=useState(""),[busy,setBusy]=useState(false),[decision,setDecision]=useState<"approved"|"changes"|null>(null);
   const [decisionText,setDecisionText]=useState(""),[notice,setNotice]=useState("");
+  const loadedVersion=useRef(0);
+  const dialogRef=useOverlayFocus(()=>{if(!busy)setDecision(null);},!!decision);
   const request=useCallback(async<T,>(path:string,method:"GET"|"POST"="GET",payload?:unknown):Promise<T>=>{
     const auth=user?await user.getIdToken():null;
     const response=await fetch(API+path,{
       method,cache:"no-store",referrerPolicy:"no-referrer",
       headers:{"X-Review-Token":token,...(auth?{"Authorization":"Bearer "+auth}:{}),...(payload?{"Content-Type":"application/json"}:{})},
       ...(payload?{body:JSON.stringify(payload)}:{})
-    });
+    }).catch(()=>{throw new Error("Sem conexão com o serviço. Verifique sua internet e tente novamente.");});
     if(!response.ok){
       const json=await response.json().catch(()=>({})) as {error?:{code?:string}};
       const code=json.error?.code||"review_unavailable";
@@ -54,10 +58,12 @@ export function ReviewPortal({token}:{token:string}){
     return response.json() as Promise<T>;
   },[user,token]);
   const reload=useCallback(async()=>{
-    setLoading(true);setError("");
+    setLoading(true);setError("");setData(null);setNeedsGoogle(false);
     try{
       const value=await request<PublicData>("/reviews/public");
-      setData(value);setNeedsGoogle(false);
+      const versionChanged=loadedVersion.current!==value.review.version;
+      setData(value);setSelected(current=>versionChanged?0:Math.max(0,Math.min(current,value.assets.length-1)));
+      loadedVersion.current=value.review.version;setNeedsGoogle(false);
     }catch(e){
       const status=(e as {status?:number}).status;
       if(status===401||((e as {code?:string}).code==="review_recipient_denied")){
@@ -87,8 +93,8 @@ export function ReviewPortal({token}:{token:string}){
     setBusy(true);setNotice("");
     try{
       await request(kind==="comment"?"/reviews/public/comment":"/reviews/public/decide","POST",
-        kind==="comment"?{authorName:name.trim(),fileId:active?.fileId,body:body.trim(),seconds}:
-          {authorName:name.trim(),decision:status,message:decisionText.trim()});
+        kind==="comment"?{version:data?.review.version,authorName:name.trim(),fileId:active?.fileId,body:body.trim(),seconds}:
+          {version:data?.review.version,authorName:name.trim(),decision:status,message:decisionText.trim()});
       if(kind==="comment"){setBody("");setMinutes("");setNotice("Comentário registrado.");}
       else{setDecision(null);setDecisionText("");setNotice(status==="approved"?"Material aprovado com sucesso.":"Solicitação de ajustes registrada.");}
       await reload();
@@ -161,9 +167,9 @@ export function ReviewPortal({token}:{token:string}){
       </>}
     </div>
     <footer className="review-portal-footer">Revisão realizada através do <strong>Roteiva</strong></footer>
-    {decision&&<div className="review-modal-backdrop">
+    {decision&&<div className="review-modal-backdrop" ref={dialogRef} tabIndex={-1}>
       <section className="review-portal-confirm" role="dialog" aria-modal="true" aria-label="Confirmar decisão">
-        <button className="review-icon" aria-label="Fechar" onClick={()=>setDecision(null)}><X size={19}/></button>
+        <button className="review-icon" aria-label="Fechar" disabled={busy} onClick={()=>setDecision(null)}><X size={19}/></button>
         {decision==="approved"?<><CheckCircle2 size={31}/><h2>Confirmar aprovação?</h2>
           <p>Você confirma que revisou os materiais da versão {data?.review.version} e que estão aprovados?</p></>:
           <><MessageSquare size={31}/><h2>Quais ajustes são necessários?</h2>
