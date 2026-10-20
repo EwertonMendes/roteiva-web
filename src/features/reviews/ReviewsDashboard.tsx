@@ -71,6 +71,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
   useEffect(()=>{void loadList();},[loadList]);
   useEffect(()=>{if(startProjectId){setProjectId(startProjectId);setClientId(startClientId||projects.find(p=>p.id===startProjectId)?.clientId||0);setComposer(true);}},
     [startProjectId,startClientId,projects]);
+  useEffect(()=>{if(startClientId&&!startProjectId){setClientId(startClientId);setComposer(true);}},[startClientId,startProjectId]);
   const relevantProjects=useMemo(()=>clientId?projects.filter(p=>p.clientId===clientId):projects,[clientId,projects]);
   useEffect(()=>{
     if(!user||!projectId||!composer){setLinks([]);return;}
@@ -118,6 +119,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
   const submit=async()=>{
     if(!projectId||!clientId||!files.length) {setError("Escolha o cliente, projeto e pelo menos um arquivo.");return;}
     await run(async()=>{
+      let publishWarning="";
       const selections=files.map(f=>({fileId:f.fileId,linkedFolderId:f.linkedFolderId,connectionId:f.connectionId}));
       if(replacement){
         const result=await call<{review:Detail}>("/reviews/"+replacement+"/revise","POST",{assets:selections});
@@ -132,11 +134,12 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
           const published=await call<{review:Detail}>("/reviews/"+created.id+"/publish","POST");
           setOpened(published.review);
         }catch(e){
-          setError("Solicitação salva como rascunho, mas o compartilhamento não foi concluído. Abra o registro e tente novamente. "+
-            (e instanceof Error?e.message:""));
+          publishWarning="Solicitação salva como rascunho, mas o compartilhamento não foi concluído. Abra o registro e tente novamente. "+
+            (e instanceof Error?e.message:"");
         }
       }
       resetComposer();
+      if(publishWarning)setError(publishWarning);
     });
   };
   const beginRevision=()=>{
@@ -164,7 +167,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
   return <div className="reviews-panel">
     <div className="reviews-summary">
       {(["pending","changes","approved"] as const).map(s=><div key={s} className="reviews-stat">
-        <span>{statusText[s]}</span><strong>{rows.filter(r=>r.status===s).length}</strong>
+        <span>{statusText[s]} na página</span><strong>{rows.filter(r=>r.status===s).length}</strong>
       </div>)}
     </div>
     <div className="reviews-toolbar">
@@ -206,7 +209,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
           {opened.assets.map(a=><div className="review-asset" key={a.version+":"+a.fileId}>
             <AssetIcon mime={a.mimeType}/><span><strong>{a.name}</strong><small>Versão {a.version} · {a.grantState==="granted"?"Compartilhado":a.grantState==="revoked"?"Acesso revogado":"Não compartilhado"}</small></span>
           </div>)}
-          {opened.review.status!=="closed"&&<div className="reviews-link-box">
+          {["pending","changes","approved"].includes(opened.review.status)&&<div className="reviews-link-box">
             <span><Link2 size={15}/> Link de revisão</span>
             <input readOnly aria-label="Link da revisão" value={opened.review.url||""} onFocus={e=>e.currentTarget.select()}/>
             <ShareLinks url={opened.review.url||""} title={opened.review.title}/>
@@ -227,6 +230,8 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
           {["draft","publishing"].includes(opened.review.status)&&<button className="primary-button" disabled={working}
             onClick={()=>void mutate("publish")}>Ativar compartilhamento</button>}
           {opened.review.status==="changes"&&<button className="primary-button" onClick={beginRevision}>Enviar nova versão</button>}
+          {opened.review.status==="replacing"&&<button className="primary-button" disabled={working} onClick={()=>void run(async()=>{await call("/reviews/"+opened.review.id+"/revise","POST",{assets:[]});await openDetail(opened.review.id);})}>Concluir troca de versão</button>}
+          {opened.review.status==="closing"&&<button className="primary-button" disabled={working} onClick={()=>void mutate("close")}>Concluir revogação</button>}
           {opened.review.status!=="closed"&&<button className="secondary-button" disabled={working} onClick={()=>void mutate("rotate")}>Renovar link</button>}
           {opened.review.status!=="closed"&&<button className="secondary-button" disabled={working} onClick={()=>void mutate("close")}>Encerrar revisão</button>}
         </footer>
