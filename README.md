@@ -1,5 +1,7 @@
 # Roteiva
 
+> **Aprovações:** o fluxo MVP está em desenvolvimento na [PR #55](https://github.com/EwertonMendes/roteiva-web/pull/55). Consulte [docs/REVIEWS-MVP.md](docs/REVIEWS-MVP.md) para arquitetura, segurança e aceite. Ainda não declarar homologado em DEV.
+
 **Gestão de produção audiovisual para freelancers e pequenos estúdios.**
 
 Frontend único **React 19 + Vite 8 + TypeScript**. [DEV](https://roteiva-web-dev.web.app/) · demonstração local: `pnpm dev --mode demo`.
