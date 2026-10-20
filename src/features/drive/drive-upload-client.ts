@@ -6,7 +6,8 @@ const MAX_RETRIES=4;
 const RETRYABLE=new Set([408,429,500,502,503,504]);
 
 export class UploadFailure extends Error {
-  constructor(public code:string,message:string){super(message);}
+  public code:string;
+  constructor(code:string,message:string){super(message);this.code=code;}
 }
 
 export function validSession(value:string):string {
