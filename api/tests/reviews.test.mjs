@@ -62,7 +62,7 @@ test('comments are file-scoped, timecodes validated; only one decision per versi
   const wrong=req(a.token,'/reviews/public/comment','POST',{authorName:'Cliente',fileId:'FILE_WRONG_12345678',body:'Ajuste'});
   await assert.rejects(()=>reviewRouter(wrong,f.env,new URL(wrong.url)),e=>e.code==='review_invalid_input');
   await assert.rejects(()=>route(f,a.token,'/reviews/public/comment','POST',
-    {authorName:'Cliente',fileId:file,body:'Ajuste',seconds:Infinity}),e=>e.code==='review_invalid_input');
+    {authorName:'Cliente',fileId:file,body:'Ajuste',seconds:'invalid'}),e=>e.code==='review_invalid_input');
   const comment=await route(f,a.token,'/reviews/public/comment','POST',
     {authorName:'Cliente',fileId:file,body:'Aumentar legenda',seconds:42});
   assert.equal((await comment.json()).saved,true);
