@@ -129,9 +129,18 @@ export async function startUpload(env:Env,uid:string,connectionId:string,targetI
     await rejectCachedToken(env,row,token.version);
     throw new ApiError(409,'reconnect_required');
   }
-  if(response.status===403)throw new ApiError(403,'drive_upload_permission_missing');
-  if(response.status===429)throw new ApiError(429,'drive_rate_limited');
-  if(response.status!==200 && response.status!==201)throw new ApiError(502,'drive_upload_unavailable');
+  if(!response.ok){
+    // Drive returns several quota classes as HTTP 403; do not mistake them for missing OAuth grants.
+    const error=await response.json().catch(()=>null) as {error?:{errors?:Array<{reason?:string}>}}|null;
+    const reasons=error?.error?.errors?.map(item=>item.reason)||[];
+    if(response.status===429 || reasons.some(reason=>['rateLimitExceeded','userRateLimitExceeded','dailyLimitExceeded','quotaExceeded'].includes(reason||'')))
+      throw new ApiError(429,'drive_rate_limited');
+    if(response.status===507 || reasons.includes('storageQuotaExceeded'))
+      throw new ApiError(507,'drive_storage_full');
+    if(response.status===403)throw new ApiError(403,'drive_upload_permission_missing');
+    if(response.status===400 || response.status===413)throw new ApiError(400,'drive_upload_rejected');
+    throw new ApiError(502,'drive_upload_unavailable');
+  }
   const sessionUrl=uploadLocation(response.headers.get('Location'));
   // Capability URL: browser memory only; no HTTP caching, Firestore, D1 or logs.
   return Response.json({sessionUrl,chunkSize:CHUNK_SIZE},{headers:{'Cache-Control':'no-store'}});
