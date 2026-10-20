@@ -137,12 +137,9 @@ async function provisionAccess(env:Env,uid:string,created:number,token:string,al
 }
 export async function assertActiveAccess(env:Env,uid:string):Promise<void> {
   await assertNotDeleting(env,uid);
-  let state=await activeState(env,uid);
-  // Enroll through the verified path; never bypass an expired/suspended account.
-  if(!state&&env.ACCESS_PROVISION_ON_DRIVE==='true'){
-    await ensureAccess(env,uid);
-    state=await activeState(env,uid);
-  }
+  // No implicit enrollment via Drive/OAuth: access provisioning requires
+  // the signed Google principal supplied by POST /access/ensure.
+  const state=await activeState(env,uid);
   if(!state?.active)throw new ApiError(403,'access_expired');
 }
 /** Called by account deletion after Firestore children are gone, before deleting identity. */
