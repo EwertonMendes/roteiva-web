@@ -106,8 +106,8 @@ export async function startUpload(env:Env,uid:string,connectionId:string,targetI
   validId(targetId);
   const data=input(await body(request));
   const firebaseToken=request.headers.get('Authorization')?.replace(/^Bearer /,'')||'';
-  await linkedFolder(env,uid,firebaseToken,connectionId,data.projectId,data.linkedFolderId,fetcher);
   const row=await connection(env,uid,connectionId);
+  await linkedFolder(env,uid,firebaseToken,connectionId,data.projectId,data.linkedFolderId,fetcher);
   if(row.status!=='connected')throw new ApiError(409,'reconnect_required');
   if(!row.scopes.split(/\s+/).includes(DRIVE_SCOPE))throw new ApiError(409,'drive_upload_permission_missing');
   await destination(env,row,targetId,data.linkedFolderId,fetcher);
@@ -149,8 +149,8 @@ export async function completeUpload(env:Env,uid:string,connectionId:string,targ
      !Number.isSafeInteger(data.size)||data.size===undefined||data.size<1)
     throw new ApiError(400,'invalid_upload');
   const firebaseToken=request.headers.get('Authorization')?.replace(/^Bearer /,'')||'';
-  await linkedFolder(env,uid,firebaseToken,connectionId,data.projectId!,data.linkedFolderId,fetcher);
   const row=await connection(env,uid,connectionId);
+  await linkedFolder(env,uid,firebaseToken,connectionId,data.projectId!,data.linkedFolderId,fetcher);
   await destination(env,row,targetId,data.linkedFolderId,fetcher);
   const url=new URL('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(data.fileId));
   url.searchParams.set('fields','id,name,mimeType,size,parents,trashed,webViewLink');
