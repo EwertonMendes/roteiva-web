@@ -423,3 +423,33 @@ export async function reviewRouter(request:Request,env:Env,url:URL):Promise<Resp
   if(parts[3]==='rotate')return rotate(env,r);
   throw new ApiError(404,'not_found');
 }
+
+
+/**
+ * Close invitations before revoking OAuth: otherwise Drive "anyone" grants could
+ * outlive the owner's Roteiva account. One review per cron tick bounds requests.
+ */
+export async function closeOwnerReviews(env:Env,uid:string):Promise<boolean>{
+  const r=await env.DB.prepare("SELECT * FROM review_requests WHERE owner_uid=? AND status!='closed' ORDER BY updated_at LIMIT 1")
+    .bind(uid).first<Review>();
+  if(r){await close(env,r);return false;}
+  const old=await env.DB.prepare('SELECT id FROM review_requests WHERE owner_uid=? LIMIT 20')
+    .bind(uid).all<{id:string}>();
+  if(old.results.length){
+    await env.DB.batch(old.results.map(x=>env.DB.prepare('DELETE FROM review_requests WHERE owner_uid=? AND id=?').bind(uid,x.id)));
+    return false;
+  }
+  return true;
+}
+/** A disconnected Drive cannot retain a Roteiva-managed active invite. */
+export async function assertNoConnectionReviews(env:Env,uid:string,connectionId:string):Promise<void>{
+  const row=await env.DB.prepare("SELECT 1 FROM review_requests r JOIN review_assets a ON a.review_id=r.id WHERE r.owner_uid=? AND a.connection_id=? AND r.status!='closed' LIMIT 1")
+    .bind(uid,connectionId).first();
+  if(row)throw new ApiError(409,'review_close_before_disconnect');
+}
+/** Expired capability links cease to work immediately; revoke Drive ACLs in bounded cron jobs. */
+export async function cleanupExpiredReviews(env:Env):Promise<void>{
+  const r=await env.DB.prepare("SELECT * FROM review_requests WHERE expires_at<=? AND status!='closed' ORDER BY expires_at LIMIT 1")
+    .bind(now()).first<Review>();
+  if(r)await close(env,r);
+}
