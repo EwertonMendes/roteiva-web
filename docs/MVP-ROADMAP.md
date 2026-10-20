@@ -471,7 +471,7 @@ Evidências de deploy, commits, limites da comparação por contagens e reversã
 
 ## Upload resumable para pastas vinculadas — PR #52 (20/10/2026)
 
-**Status: PARCIAL — Picker e upload >250 MiB reais validados no Chrome DEV; aceite completo pendente; PR draft.**
+**Status: PUBLICADO no DEV; Picker e upload >250 MiB reais validados no Chrome; aceite completo PARCIAL. PR #52 mergeada por autorização expressa.**
 
 - [x] Auditoria da implementação existente e dos checks; master com PRs #51/#53/#54 incorporada.
 - [x] JWT/Origin/entitlement/UID, vínculo e existência do projeto, ascendência real,
@@ -502,11 +502,24 @@ Evidências de deploy, commits, limites da comparação por contagens e reversã
 - [ ] Recuperação com interrupção real: proprietário preferiu deixar manual/pendente.
   Cobertura de falhas/retomada isolada não substitui esse aceite.
 - [ ] QA Google A/B, revogação/reconexão, Safari e dispositivo móvel físico.
-- [ ] Revisão final, autorização de publicação de teste e homologação DEV; sem merge automático.
+- [x] Merge expressamente autorizado pelo proprietário, commit `9652d98`;
+  [API](https://github.com/EwertonMendes/roteiva-web/actions/runs/39477057568) e
+  [Hosting](https://github.com/EwertonMendes/roteiva-web/actions/runs/39477057527)
+  publicados pelos workflows oficiais, com validações e smoke aprovados.
 
 F5/fechamento perde seleção e fila; beforeunload alerta. Nenhuma retomada entre
-sessões é prometida. Deploy temporário autorizado somente para homologação; PROD preservado.
+sessões é prometida. Publicação DEV oficial após merge autorizado; PROD preservado.
 Configuração, limites, decisões e procedimento completo: [DRIVE-UPLOAD.md](DRIVE-UPLOAD.md).
+
+### QA de acesso SaaS isolado — PR #50, integração de 20/10/2026
+
+**IMPLEMENTADO e VALIDADO localmente (6/6 cenários) com master/PR #52.** Seis cenários adicionais
+desktop/mobile exercitam expiração, isolamento A/B e exclusão com provedores
+simulados em `demo-roteiva`, mais Rules e Worker/D1 isolados. Expectativa antiga de
+exclusão no acesso expirado foi corrigida para respeitar a PR #54; não se reintroduziu
+a ação na UI. Workflow sem secrets/deploy cobre também alterações de Auth/Access,
+antifraude e confirmação de exclusão. Resultados finais vinculados na PR #50.
+Limites, comandos e distinção de QA remoto em [QA-ACCESS-ISOLATED.md](QA-ACCESS-ISOLATED.md).
 
 
 
