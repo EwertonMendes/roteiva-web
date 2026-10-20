@@ -27,8 +27,11 @@ export function useDriveUploads(
     setUploads(tasks.current.map(t=>({...t.entry})));
   },[]);
   const update=useCallback((task:Task,patch:Partial<UploadEntry>)=>{
+    const beforeStatus=task.entry.status;
+    const beforePct=Math.floor(100*task.entry.sent/task.entry.size);
     Object.assign(task.entry,patch);
-    if(!disposed.current)publish();
+    const afterPct=Math.floor(100*task.entry.sent/task.entry.size);
+    if(!disposed.current&&(beforeStatus!==task.entry.status||beforePct!==afterPct||patch.error!==undefined||patch.sent===0))publish();
   },[publish]);
   const run=useCallback(async(task:Task)=>{
     let uploaded:UploadedFile|undefined;
