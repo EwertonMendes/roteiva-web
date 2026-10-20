@@ -89,6 +89,19 @@ test('failed backfill retains cursor and never announces completion',async t=>{
  const row=s.sql.prepare('SELECT * FROM access_rollout').get();
  assert.equal(row.completed_at,null);assert.equal(row.cursor,null);assert.equal(row.processed,0);
 });
+test('a pending privileged synchronization cannot re-publish or serve old rights',async t=>{
+ const s=setup(t);
+ await ensureAccess(s.env,'A');
+ const before=s.stats().writes;
+ s.sql.prepare('UPDATE access_accounts SET sync_pending=1 WHERE owner_uid=?').run('A');
+ await assert.rejects(()=>ensureAccess(s.env,'A'),e=>e.code==='access_sync_pending');
+ await assert.rejects(()=>assertActiveAccess({...s.env,ACCESS_PROVISION_ON_DRIVE:'true'},'A'),e=>e.code==='access_sync_pending');
+ assert.equal(s.stats().writes,before);
+ s.sql.prepare('UPDATE access_accounts SET suspended_at=?,sync_pending=0 WHERE owner_uid=?').run(Date.now(),'A');
+ await ensureAccess(s.env,'A');
+ assert.equal(s.projection.get('A').fields.suspended.booleanValue,true);
+ await assert.rejects(()=>assertActiveAccess(s.env,'A'),e=>e.status===403);
+});
 test('token diagnostics retain only allowlisted categories, never provider descriptions',async t=>{
  const s=setup(t);
  for(const category of ['invalid_grant','invalid_scope','arbitrary-secret']){

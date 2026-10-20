@@ -470,3 +470,7 @@ Evidências e reversão: [ACCESS-CONTROL.md](ACCESS-CONTROL.md).
 - QA AUTOMATIZADO DA UI: 53 testes Playwright aprovados inicialmente; dois casos de Agenda corrigidos por data civil e aprovados no rerun desktop/mobile, total combinado 55, três skips previstos. Repetir regressão completa após regras finais. Nenhuma equivalência com homologação Google/Drive real.
 
 - IMPLEMENTADO, NÃO PUBLICADO: regras comerciais finais fail-closed e encerramento do provisionamento implícito no Drive. Testes adicionais cobrem projeção ausente/corrompida, ownerUid incorreto, escrita/listagem negada e preservação de perfil/status. Gates remotos e regressão integral em andamento.
+
+- VALIDADO AUTOMATICAMENTE: 30 Rules e 55 Playwright, três skips previstos, suíte completa com regras finais preparadas.
+- VALIDADO REMOTAMENTE: três perfis existentes, três concessões beta com duração exata e três projeções válidas; backfill concluído, contagens de negócio iguais e Drive real recuperado.
+- IMPLEMENTADO, AGUARDANDO PUBLICAÇÃO: fence sync_pending da migration 0009 para impedir republicação concorrente durante futuras alterações privilegiadas; nenhum endpoint ADM. Protocolo e teste de falha fechada em ACCESS-CONTROL.md e access-provisioning.test.mjs.
