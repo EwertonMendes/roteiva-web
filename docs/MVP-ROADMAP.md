@@ -466,3 +466,25 @@ A cópia persistida é privada e potencialmente sensível em computadores compar
 Evidências de deploy, commits, limites da comparação por contagens e reversão segura: [ACCESS-CONTROL.md](ACCESS-CONTROL.md). A PR #42 foi encerrada como substituída pelas entregas #43–#48; sua branch foi preservada.
 
 - **VALIDADO NO PIPELINE OFICIAL DA MASTER:** [QA 39358964120](https://github.com/EwertonMendes/roteiva-web/actions/runs/39358964120), commit b0ae124: 30 Rules + 55 Playwright aprovados, três skips previstos. Pedido real de exclusão descartável aceito após login manual recente; aguardar conclusão da saga antes de marcar homologação completa.
+
+
+## Upload resumable para pastas vinculadas — PR #52 (20/10/2026)
+
+**Status: IMPLEMENTADO em PR draft, NÃO VALIDADO ponta-a-ponta com Google real.**
+
+- [x] Worker valida Firebase ID token, entitlement, conexão por UID e vínculo
+  existente Firestore, além da descendência da pasta no Drive.
+- [x] Worker inicia sessão de upload sem receber conteúdo dos arquivos e
+  confirma metadados, pasta e tamanho no Google ao concluir.
+- [x] Explorador permite múltiplos arquivos e drag-and-drop com fila limitada,
+  progresso, cancelamento, recuperação limitada e estado de confirmação incerta.
+- [x] Invalidação seletiva de cache e atualização da listagem da pasta alvo.
+- [x] Testes de backend e cliente com provedores simulados; E2E desktop/mobile
+  simulado adicionado à regressão Playwright (resultado da execução a registrar).
+- [ ] PoC real CORS/PUT/308/Range e arquivo acima de 250 MB, Safari/mobile físico.
+- [ ] Google Picker com token apenas drive.file para permissão de escrita em
+  pastas preexistentes; configuração Google Cloud e validação A/B.
+- [ ] QA real da conta Google, revisão de segurança e merge/deploy DEV autorizado.
+
+Não subir para master como recurso validado enquanto os itens bloqueantes não
+forem resolvidos. Detalhes e procedimentos: [DRIVE-UPLOAD.md](DRIVE-UPLOAD.md).
