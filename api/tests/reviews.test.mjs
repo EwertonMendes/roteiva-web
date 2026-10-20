@@ -132,7 +132,7 @@ test('real HTTP: owner A can publish/revoke only linked Drive files, owner B can
     .setSubject(sub).setIssuedAt(issued).setExpirationTime(issued+300).sign(pair.privateKey);
   const alice=await jwt('alice'),bob=await jwt('bob');
   const folder='PARENT_FOLDER_12345';
-  const env={...f.env,
+  const env={...f.env,GOOGLE_CLIENT_ID:'client-id-test',GOOGLE_CLIENT_SECRET:'client-secret-test',
     FRONTEND_ORIGIN:'https://roteiva-web-dev.web.app',
     OAUTH_REDIRECT_URI:'https://roteiva-api-dev.ewertonmendes9.workers.dev/oauth/drive/callback',
     API_RATE_LIMIT:{limit:async()=>({success:true})},
