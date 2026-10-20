@@ -464,3 +464,4 @@ Evidências e reversão: [ACCESS-CONTROL.md](ACCESS-CONTROL.md).
 - IMPLEMENTADO, PENDENTE PUBLICAÇÃO/HOMOLOGAÇÃO: Worker de provisionamento único, cortesia beta 30 dias com marco fixo, Cron idempotente e flag de provisionamento Drive sem bypass; leitura privada de status preparada nas regras, sem enforcement de negócio nesta fase. Testes de API incluem retries, datas, falha de projeção/conflito e cursor.
 
 - IMPLEMENTADO NA FASE 3: AccessGate e estado em Configurações, cadastro informa sete dias, gestão mínima disponível ao expirar e gate de versão Worker no deploy Hosting. Testes unitários/TypeScript/builds locais aprovados; regressão desktop/mobile em execução. Publicação e homologação real ainda pendentes.
+- PARCIAL/BLOQUEADO NA HOMOLOGAÇÃO: fase 2 publicada, porém Biblioteca real retornou erro e não havia projeções no primeiro inventário. Instrumentação categórica preparada; não publicar frontend/regras restritivas antes da correção e confirmação de cobertura.

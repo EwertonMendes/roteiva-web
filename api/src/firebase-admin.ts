@@ -41,7 +41,11 @@ export async function adminToken(env:Env,fetcher:typeof fetch=fetch):Promise<str
     body:new URLSearchParams({grant_type:'urn:ietf:params:oauth:grant-type:jwt-bearer',assertion}),
     signal:AbortSignal.timeout(10000)});}
   catch{throw new ApiError(503,'admin_token_unavailable');}
-  if(!response.ok)throw new ApiError(503,'admin_token_unavailable');
+  if(!response.ok){
+    const data=await response.json().catch(()=>({})) as {error?:string};
+    const category=['invalid_grant','invalid_scope','unauthorized_client'].includes(data.error||'')?data.error:'unavailable';
+    throw new ApiError(503,'admin_token_'+category);
+  }
   const data=await response.json() as {access_token?:string};
   if(!data.access_token)throw new ApiError(503,'admin_token_unavailable');
   return data.access_token;

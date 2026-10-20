@@ -101,6 +101,8 @@ export async function handle(request: Request, env: Env): Promise<Response> {
     }
   } catch (error) {
     const known = error instanceof ApiError;
+    if(known && (url.pathname==='/access/ensure'||error.code.startsWith('access_')||error.code.startsWith('admin_')))
+      console.error(JSON.stringify({event:'access_request_denied',code:error.code,status:error.status}));
     const status = known ? error.status : 503;
     response = Response.json({error:{code:known ? error.code : 'service_unavailable',requestId:id}},{status});
     // Only categorical events. Never emit Request, URL, exception, headers or provider bodies.
@@ -119,6 +121,6 @@ export async function handle(request: Request, env: Env): Promise<Response> {
 export default {fetch:handle, scheduled(_controller:ScheduledController,env:Env,ctx:ExecutionContext){
   ctx.waitUntil((async()=>{
     await runPendingDeletions(env);
-    try{await backfillAccess(env);}catch{console.error(JSON.stringify({event:'access_backfill_retry'}));}
+    try{await backfillAccess(env);}catch(error){console.error(JSON.stringify({event:'access_backfill_retry',code:error instanceof ApiError?error.code:'dependency_failure'}));}
   })());
 }};
