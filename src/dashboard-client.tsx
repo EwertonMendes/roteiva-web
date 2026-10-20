@@ -476,7 +476,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
         <nav>
           <small className="nav-label">ESPAÇO DE TRABALHO</small>
           {nav.map((item) => {
-            const count = item.id === "projects" ? (overviewMetrics?.projectCount ?? projectPage?.total ?? projects.length) : item.id === "reviews" ? (overviewMetrics?.projectStatuses?.["Em aprovação"] ?? projects.filter((project) => project.status === "Em aprovação").length) : undefined;
+            const count = item.id === "projects" ? (overviewMetrics?.projectCount ?? projectPage?.total ?? projects.length) : undefined;
             return <button key={item.id} className={view === item.id ? "active" : ""} onClick={() => changeView(item.id)}>
               <AnimatedNavIcon icon={item.icon} hoverIcon={item.hoverIcon} kind={item.id} /><span>{item.label}</span>{count !== undefined && <em>{count}</em>}
             </button>;
@@ -496,7 +496,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
         <header className="topbar">
           <button className="menu-button" onClick={() => setMobileOpen(true)} aria-label="Abrir menu" aria-expanded={mobileOpen}><Menu size={20} /></button>
           <button type="button" className="workspace-switch" onClick={()=>changeView("settings")} title="Abrir configurações do estúdio" aria-label="Abrir configurações do estúdio"><span className="sync-dot">R</span><b title={workspaceName}>{workspaceName}</b><ChevronDown size={14} /></button>
-          {view!=="library"&&<label className="global-search"><Search size={17} /><input value={query} onChange={(e) => {
+          {view!=="library"&&view!=="reviews"&&<label className="global-search"><Search size={17} /><input value={query} onChange={(e) => {
               const value=e.target.value;
               setQuery(value);
               if(value.trim() && view==="projects")onSearchProjects?.();
@@ -516,7 +516,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
                 : view === "finance" ? <button className="primary-button" onClick={() => openFinanceModal()}><Plus size={17} /> Nova receita</button>
                 : view === "calendar" ? <button className="primary-button" onClick={() => openEvent()}><Plus size={17} /> Novo compromisso</button>
                 : view === "library" ? (isDemo && import.meta.env.VITE_LIBRARY_REVIEW === "true" ? null : <><select aria-label="Projeto dos arquivos" value={libraryProject} onChange={e => setLibraryProject(e.target.value)}><option value="">Todos os projetos</option>{projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select><details className="rl-page-more"><summary aria-label="Mais ações da Biblioteca" title="Mais ações da Biblioteca"><MoreHorizontal size={18}/></summary><div className="rl-page-more-content"><WorkspaceTools workspace={workspace} loadWorkspace={onLoadWorkspace} status={isDemo?saveStatus:cloudStatus||""} onNotify={notify}/></div></details>{isDemo && <label className="primary-button upload-button"><Upload size={17} /> {uploading ? "Enviando…" : "Adicionar arquivos"}<input type="file" disabled multiple onChange={(event) => { uploadAssets(event.target.files, Number(libraryProject) || undefined); event.target.value = ""; }} /></label>}</>)
-                : <button className="primary-button" onClick={startProject}><Plus size={17} /> Criar projeto</button>}
+                : view === "reviews" ? null : <button className="primary-button" onClick={startProject}><Plus size={17} /> Criar projeto</button>}
             </div>
           </div>
           {view === "settings" && <SettingsPage profile={profile} email={email} photoURL={photoURL} theme={theme} toggleTheme={toggleTheme} onSaveProfile={onSaveProfile} />}
