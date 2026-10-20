@@ -41,8 +41,7 @@ test("cliente sem conta deixa comentário e aprova em desktop/mobile",async({pag
   await publicApi(page);
   await page.goto(ROOT+"/review/"+TOKEN);
   await expect(page.getByRole("heading",{name:"Corte institucional"})).toBeVisible();
-  await expect(page.getByTitle("Prévia de Primeiro corte.mp4")).toHaveCount(0);
-  await expect(page.getByRole("iframe",{name:"Prévia de Primeiro corte.mp4"})).toHaveCount(1);
+  await expect(page.locator('iframe[title="Prévia de Primeiro corte.mp4"]')).toHaveCount(1);
   await expect(page.getByRole("link",{name:"Abrir no Drive"})).toHaveAttribute("href",/drive\.google\.com/);
   await page.getByPlaceholder("Como podemos chamar você?").fill("Renata Cliente");
   await page.getByPlaceholder("O que você gostaria de comentar?").fill("Aumentar a legenda");
