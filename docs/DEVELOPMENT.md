@@ -362,3 +362,7 @@ O endpoint `GET /integrations/drive/:connectionId/files/:fileId/thumbnail` exige
 
 ### Correção de compatibilidade de miniaturas (19/10/2026)
 A listagem privada passou a retornar `thumbnailTicket` no lugar de `thumbnailLink`, mantendo este último apenas como fallback legado. O frontend deve verificar os dois formatos antes de iniciar o loading. Teste unitário do contrato com ticket somente, mais E2E desktop (PDF + imagem sem miniatura, token na query, loading, sucesso e fallback). Sem retornar a exibir links Google no DOM. A API existente permanece inalterada.
+
+## Migração do controle de acesso DEV
+
+O workflow API DEV executa `node scripts/check-access-migration.mjs --before`, `npm run migrate:dev` e `node scripts/check-access-migration.mjs` no diretório `api/`, com segredo Cloudflare do ambiente protegido. Não executar verificador remoto em branches. O snapshot local contém somente contagens e é ignorado pelo Git. Divergência interrompe deploy para investigação; manter migration aditiva aplicada. Não usar a conta de deploy Firebase para operações de dados. Sequência completa em [ACCESS-CONTROL.md](ACCESS-CONTROL.md).

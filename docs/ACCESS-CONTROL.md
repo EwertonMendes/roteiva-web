@@ -1,0 +1,35 @@
+# Controle de acesso SaaS — rollout DEV
+
+## Estado em 19/10/2026
+
+**PARCIAL:** primeira entrega contém somente a migração aditiva D1 `0007_access.sql`, testes SQLite e verificação no pipeline oficial API DEV. Não ativa bloqueios comerciais nem publica frontend ou Security Rules da PR #42. Aplicação remota e homologação serão registradas após o workflow concluir.
+
+Decisão tomada pelo proprietário: contas DEV existentes recebem cortesia finita de **30 dias a partir da migração**, separada do teste único de sete dias. Novos cadastros recebem somente o teste. O provisionamento deve usar um marco de migração fixo e identificador determinístico da concessão; repetir não reinicia os prazos. Nenhuma tela ou endpoint ADM pertence ao Roteiva.
+
+## Publicação em entregas compatíveis
+
+1. Merge desta entrega de infraestrutura na master; `API DEV` aplica migrations com o ambiente `cloudflare-development` protegido. Conferir contagens anteriores/posteriores, esquema, índices, trigger e `foreign_key_check` antes de publicar o Worker compatível. Sem substituição de banco.
+2. Entrega do Worker com provisionamento e compatibilidade temporária explicitamente limitada às contas anteriores ao marco; contas suspensas/expiradas já provisionadas nunca podem usar essa compatibilidade. Autenticação, propriedade, exclusão, Origin e rate limits continuam obrigatórios. Falhas de dependência negam operação.
+3. Publicar frontend integrado pelo pipeline oficial após confirmar Worker pronto. Provisionar todas as contas anteriores ao marco de forma idempotente, sem tocar documentos de negócio; verificar D1 e projeções Firestore.
+4. Encerrar compatibilidade do Worker somente após inventário sem lacunas e homologação real. Publicar regras restritivas em entrega separada, após essa verificação. Nunca incluir essas regras no merge inicial da PR #42.
+5. Homologar cadastro, login repetido, cortesia, expiração, suspensão/reativação, isolamento A/B, Drive e exclusão exclusivamente de fixtures descartáveis. CI/emuladores não comprovam essas operações no DEV.
+
+O código restante da PR #42 não está liberado para merge integral. Aprovação de ambiente/proteção precisa ser cumprida sem alteração de política. Somente master pode publicar.
+
+## Infraestrutura auditada
+
+Em 19/10/2026, a API Google confirmou a conta `account-deletion-dev@roteiva-web-dev.iam.gserviceaccount.com` ativa e exclusivamente vinculada ao papel `roteivaAccountDeletion`: `datastore.entities.create/get/list/update/delete` e `firebaseauth.users.delete`. Essas permissões bastam para ler perfil e criar/atualizar a projeção; não é necessário criar outra credencial ou ampliar IAM. IAM não limita esses documentos por UID: o backend deve fazê-lo.
+
+Bindings reais do Worker confirmaram `FIREBASE_ADMIN_CREDENTIALS_JSON` como `secret_text`, `ACCOUNT_DELETION_ENABLED=true`, projeto DEV, DB e ambos rate limiters. Conteúdo do segredo não foi lido. Isso confirma presença/configuração, **não funcionamento efetivo** da chave instalada; um provisionamento descartável deve comprová-lo. Health Worker e Hosting responderam 200. Sessão Wrangler renovada; o token local não possui escopo D1 (403), portanto migração remota deve usar o pipeline autorizado existente, sem criar token duplicado.
+
+Console Cloudflare: 89/100.000 requisições Worker no dia; D1 aproximadamente 7 mil linhas lidas, 3 escritas e 98,3 kB nas últimas 24h no instante consultado. São métricas anteriores ao rollout, não estimativas de consumo do controle novo. Regras comerciais acrescentarão leitura da projeção; medir no Console Firebase, considerando cache de chamadas de regras.
+
+## Migração e reversão
+
+`0007` somente cria três tabelas, dois índices e trigger. Trial dura exatamente 604.800.000 ms e datas/UID não podem mudar por UPDATE. Cortesia temporária exige fim não nulo e posterior ao início; concessões/assinaturas têm FK com cascata. Não remove nem altera tabelas OAuth/exclusão. Teste SQLite compara integralmente a conexão preexistente antes/depois e valida constraints/FK/cascata.
+
+O pipeline registra apenas nomes de migrations/esquema e contagens, nunca UID, email ou tokens. Se contagens mudarem por atividade concorrente, interromper e investigar antes de publicar; igualdade de contagens não comprova igualdade de conteúdo sozinha. A natureza aditiva da migration e teste de preservação complementam essa evidência.
+
+Rollback desta fase: retornar código Worker ao commit anterior pelo pipeline protegido, **manter `0007` e todos os dados**. Não executar DROP, não editar migration aplicada, não restaurar o D1 inteiro sobre gravações recentes. Antes de eventual recuperação de desastre, capturar um bookmark e avaliar o impacto de Time Travel com o proprietário. Rollback posterior não pode restaurar regras permissivas para contas suspensas: manter regras restritivas e corrigir infraestrutura/projeções.
+
+Referências: [migrations D1](https://developers.cloudflare.com/d1/reference/migrations/), [Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/), [limites Firestore](https://firebase.google.com/docs/firestore/quotas).

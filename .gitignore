@@ -1,5 +1,6 @@
 # Packages and generated assets
 /node_modules/
+api/.access-migration-counts.json
 /dist/
 /dist-pages/
 *.tsbuildinfo
