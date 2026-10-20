@@ -228,7 +228,9 @@ async function mutatePermission(env:Env,row:Connection,fileId:string,method:'POS
   const u=permissionUrl(fileId,permissionId);
   if(method==='POST'){
     u.searchParams.set('fields','id,type,role');
-    u.searchParams.set('sendNotificationEmail','false');
+    // Drive forbids sendNotificationEmail on anyone/domain permissions.
+    if(value?.type==='user'||value?.type==='group')
+      u.searchParams.set('sendNotificationEmail','false');
   }
   let res:Response;
   try{res=await fetch(u,{method,redirect:'manual',
