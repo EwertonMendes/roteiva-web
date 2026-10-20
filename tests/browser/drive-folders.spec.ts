@@ -233,3 +233,67 @@ test("grid cards keep media, names and menus inside separate non-overlapping tra
   await panel.getByRole("button",{name:"Visualização em grade"}).click();
   await expect(tiles).toHaveCount(13);
 });
+
+
+test("upload uses file picker and drag-and-drop, confirms Drive and updates the current folder",async({page},info)=>{
+  if(info.project.name==="mobile")await page.setViewportSize({width:390,height:844});
+  await mockDrive(page,()=>true);
+  const resource="uploaded_file_123456";
+  const external="https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&upload_id=e2e";
+  const seen:{kind:string;body?:unknown}[]=[];
+  await page.route(api+"/integrations/drive/"+connection+"/folders/"+folderId+"/uploads**",async route=>{
+    const endpoint=new URL(route.request().url());
+    const cors={"Access-Control-Allow-Origin":cloud,"Access-Control-Allow-Headers":"Authorization, Content-Type",
+      "Access-Control-Allow-Methods":"POST, OPTIONS"};
+    if(route.request().method()==="OPTIONS")return route.fulfill({status:204,headers:cors});
+    const payload=route.request().postDataJSON();
+    if(endpoint.pathname.endsWith("/complete")){
+      seen.push({kind:"complete",body:payload});
+      return route.fulfill({status:200,headers:cors,contentType:"application/json",
+        body:JSON.stringify({file:{id:resource,name:"Novo arquivo.txt",mimeType:"text/plain",size:"3"}})});
+    }
+    seen.push({kind:"init",body:payload});
+    return route.fulfill({status:200,headers:cors,contentType:"application/json",
+      body:JSON.stringify({sessionUrl:external,chunkSize:262144})});
+  });
+  await page.route(/https:\/\/www\.googleapis\.com\/upload\/drive\/v3\/files\?/,async route=>{
+    const cors={"Access-Control-Allow-Origin":cloud,"Access-Control-Allow-Methods":"PUT, OPTIONS",
+      "Access-Control-Allow-Headers":"Content-Type, Content-Range","Access-Control-Expose-Headers":"Range"};
+    if(route.request().method()==="OPTIONS")return route.fulfill({status:204,headers:cors});
+    expect(route.request().method()).toBe("PUT");
+    expect(route.request().headers()["authorization"]).toBeUndefined();
+    return route.fulfill({status:201,headers:cors,contentType:"application/json",
+      body:JSON.stringify({id:resource,name:"Novo arquivo.txt",mimeType:"text/plain",size:"3"})});
+  });
+  await signUp(page,"drive-upload-"+info.project.name+"@example.com");
+  await createProject(page);
+  await page.goto(cloud+"/biblioteca?driveE2E=1");
+  const panel=page.getByRole("region",{name:"Biblioteca Google Drive"});
+  await panel.getByRole("button",{name:"Vincular pasta",exact:true}).first().click();
+  const dialog=page.getByRole("dialog",{name:"Selecionar pastas do Google Drive"});
+  await dialog.getByLabel("Projeto para vincular pastas").selectOption({label:"Projeto Drive Teste"});
+  await dialog.getByRole("checkbox",{name:"Selecionar Campanha de vídeos"}).check();
+  await dialog.getByRole("button",{name:"Vincular 1 pasta"}).click();
+  await expect(panel.getByRole("button",{name:"Enviar arquivos"})).toBeVisible();
+  await panel.getByLabel("Selecionar arquivos para enviar").setInputFiles({
+    name:"Novo arquivo.txt",mimeType:"text/plain",buffer:Buffer.from("abc")
+  });
+  const queue=panel.getByLabel("Transferências para Google Drive");
+  await expect(queue.getByText("Arquivo enviado para Campanha de vídeos")).toBeVisible();
+  await expect(panel.getByRole("button",{name:/Novo arquivo.txt/})).toBeVisible();
+  expect(seen.filter(x=>x.kind==="init")).toHaveLength(1);
+  expect(seen.filter(x=>x.kind==="complete")).toHaveLength(1);
+  const init=seen.find(x=>x.kind==="init")!.body as Record<string,unknown>;
+  expect(init.linkedFolderId).toBe(folderId);
+  expect(init.size).toBe(3);
+  if(info.project.name==="desktop"){
+    await panel.locator(".rl-content").evaluate(element=>{
+      const data=new DataTransfer();
+      data.items.add(new File(["def"],"Arrasto.txt",{type:"text/plain"}));
+      element.dispatchEvent(new DragEvent("dragover",{bubbles:true,cancelable:true,dataTransfer:data}));
+      element.dispatchEvent(new DragEvent("drop",{bubbles:true,cancelable:true,dataTransfer:data}));
+    });
+    await expect(queue.getByText("Arrasto.txt")).toBeVisible();
+    await expect(queue.getByText("Arquivo enviado para Campanha de vídeos")).toHaveCount(2);
+  }
+});
