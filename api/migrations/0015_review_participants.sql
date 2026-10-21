@@ -73,3 +73,14 @@ CREATE TABLE review_link_uses (
  PRIMARY KEY(review_id,version,file_id)
 );
 CREATE INDEX review_link_uses_by_file ON review_link_uses(file_id);
+
+-- Persist which connected Google account owns each app-managed ACL so cleanup
+-- never relies on the closing review having share permissions on that file.
+ALTER TABLE review_google_acl ADD COLUMN owner_uid TEXT;
+UPDATE review_google_acl SET owner_uid=(
+ SELECT r.owner_uid FROM review_assets a
+ JOIN review_requests r ON r.id=a.review_id
+ WHERE a.file_id=review_google_acl.file_id AND r.access_mode='google'
+ AND LOWER(r.recipient_email)=review_google_acl.email
+ ORDER BY r.created_at ASC LIMIT 1
+) WHERE owner_uid IS NULL;
