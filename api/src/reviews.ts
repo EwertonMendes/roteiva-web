@@ -12,7 +12,7 @@ type Mode = 'link'|'google';
 type Review = {
   id:string;owner_uid:string;client_id:number;project_id:number;client_name:string;project_name:string;
   studio_name:string;title:string;message:string;recipient_email:string;access_mode:Mode;status:Status;
-  current_version:number;expires_at:number;token_hash:string;encrypted_token:string;transition_id:string|null;created_at:number;updated_at:number;
+  current_version:number;expires_at:number;token_hash:string;encrypted_token:string;transition_id?:string|null;created_at:number;updated_at:number;
 };
 type Asset = {review_id:string;version:number;file_id:string;connection_id:string;linked_folder_id:string;
   name:string;mime_type:string;permission_id:string|null;grant_state:'unshared'|'granting'|'granted'|'revoking'|'revoked'};
