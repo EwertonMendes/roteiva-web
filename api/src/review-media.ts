@@ -57,7 +57,26 @@ export async function streamReviewMedia(request:Request,env:Env,url:URL):Promise
     .bind(p.r,p.v,p.f).first<{file_id:string;connection_id:string;mime_type:string}>();
   if(!asset||!asset.mime_type.startsWith('video/'))throw new ApiError(404,'review_not_found');
   const range=request.headers.get('Range');
-  if(range&&(!/^bytes=(?:\d+-\d*|-\d+)$/.test(range)||range.length>55))throw new ApiError(416,'media_invalid_range');
+  // Single bounded chunks avoid turning a paused preview into a full large-file
+  // download through Workers. HTML5 players request more ranges as needed.
+  const chunk=8*1024*1024;
+  let upstreamRange:string|undefined;
+  if(range){
+    if(range.length>55)throw new ApiError(416,'media_invalid_range');
+    const parsed=/^bytes=(\d+)-(\d*)$/.exec(range);
+    const suffix=/^bytes=-(\d+)$/.exec(range);
+    if(parsed){
+      const start=Number(parsed[1]);
+      const requestedEnd=parsed[2]?Number(parsed[2]):start+chunk-1;
+      if(!Number.isSafeInteger(start)||!Number.isSafeInteger(requestedEnd)||requestedEnd<start)
+        throw new ApiError(416,'media_invalid_range');
+      upstreamRange='bytes='+start+'-'+Math.min(requestedEnd,start+chunk-1);
+    }else if(suffix){
+      const tail=Number(suffix[1]);
+      if(!Number.isSafeInteger(tail)||tail<1)throw new ApiError(416,'media_invalid_range');
+      upstreamRange='bytes=-'+Math.min(tail,chunk);
+    }else throw new ApiError(416,'media_invalid_range');
+  }else if(request.method==='GET')upstreamRange='bytes=0-'+(chunk-1);
   const row=await connection(env,r.owner_uid,asset.connection_id);
   const token=await accessCredential(env,row);
   const endpoint=new URL(GOOGLE+'/drive/v3/files/'+encodeURIComponent(asset.file_id));
@@ -66,7 +85,7 @@ export async function streamReviewMedia(request:Request,env:Env,url:URL):Promise
   let upstream:Response;
   try{
     upstream=await fetch(endpoint,{method:request.method,redirect:'manual',signal:AbortSignal.timeout(24000),
-      headers:{Authorization:'Bearer '+token.value,...(range?{'Range':range}:{})}});
+      headers:{Authorization:'Bearer '+token.value,...(upstreamRange?{'Range':upstreamRange}:{})}});
   }catch{throw new ApiError(502,'media_unavailable');}
   // No automatic redirects with OAuth bearer: a redirected response can leak
   // tokens to a non-Drive origin. Fall back to the Google Drive iframe instead.
@@ -77,7 +96,7 @@ export async function streamReviewMedia(request:Request,env:Env,url:URL):Promise
     if(status===401||status===403||status===404)throw new ApiError(404,'media_unavailable');
     throw new ApiError(status===416?416:502,'media_unavailable');
   }
-  if(range&&upstream.status!==206){await upstream.body?.cancel();throw new ApiError(502,'media_range_unsupported');}
+  if(upstreamRange&&upstream.status!==206){await upstream.body?.cancel();throw new ApiError(502,'media_range_unsupported');}
   const headers=new Headers({
     'Content-Type':asset.mime_type,
     'Cache-Control':'private, no-store',
