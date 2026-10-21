@@ -545,3 +545,9 @@ Evidência e distinção entre unitário, D1 isolado, browser/emuladores e DEV e
 **Decisão confirmada pelo proprietário; IMPLEMENTADO nesta alteração.** Retirar a exclusão de acesso expirado, suspensão e falha de validação; manter apenas a Zona de perigo de Configurações para acesso ativo. Novos pedidos no Worker usam os direitos D1 reais; preservar jobs já aceitos e status/cron. Nenhuma mudança de dados, grants, migrations ou segredo antifraude.
 
 Evidências: api/tests/deletion-access.test.mjs (negativa para conta sem provisionamento, expirada, suspensa ou sync_pending e retry idempotente), api/tests/integration/trial-e2e.mjs e tests/browser/access.spec.ts (disponível só em Configurações ativas, ausente nos estados bloqueados/erro em desktop/mobile). Publicação DEV acompanhada pela PR correspondente, pelos workflows oficiais.
+
+
+### Free Tier — otimização DEV (21/10/2026)
+
+- **IMPLEMENTADO EM BRANCH, PENDENTE DE HOMOLOGAÇÃO:** divisão Cron 1 min/15 min, debounce/cancelamento de busca remota de aprovações e streaming controlado de miniaturas com comprimento conhecido. Evidências: `api/src/index.ts`, `api/src/account-deletion.ts`, `api/src/thumbnail-stream.ts`, `src/features/reviews/ReviewsDashboard.tsx`, `api/tests/cron-contract.test.mjs`, `api/tests/thumbnail-stream.test.mjs`.
+- **PENDENTE:** testes de compilação e regressão, comparação de consumo real, investigação da CPU p99 e E2E autenticado do Google Drive/fluxo de aprovações em DEV. O estado de entrega só muda após evidências.
