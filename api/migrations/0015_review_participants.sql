@@ -61,3 +61,5 @@ DELETE FROM review_file_claims WHERE EXISTS(
 UPDATE review_assets SET permission_id=NULL WHERE grant_state='granted' AND EXISTS(
  SELECT 1 FROM review_requests r WHERE r.id=review_assets.review_id AND r.access_mode='google'
 );
+
+ALTER TABLE review_google_acl ADD COLUMN owner_review_id TEXT;
