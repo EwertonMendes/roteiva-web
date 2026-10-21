@@ -121,7 +121,13 @@ test("video input masks timestamps and prevents invalid submissions",async({page
   await expect(page.getByRole("button",{name:"Adicionar comentário"})).toBeEnabled();
 });
 test("image-only reviews hide all video timestamp controls",async({page})=>{
+  const received: Array<unknown>=[];
   await page.route(API+"/reviews/public**",async route=>{
+    if(route.request().url().endsWith("/comment")){
+      const body=route.request().postDataJSON();
+      received.push(body);
+      return route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({saved:true})});
+    }
     if(!route.request().url().endsWith("/public"))return route.fulfill({status:404,body:"{}"});
     const body={review:{title:"Avaliação da arte",message:"Confira a capa",studioName:"Studio",
       status:"pending",version:1,expiresAt:Date.now()+86400000,mode:"link"},
@@ -137,4 +143,6 @@ test("image-only reviews hide all video timestamp controls",async({page})=>{
   await page.getByPlaceholder("Como podemos chamar você?").fill("Cliente");
   await page.getByPlaceholder("O que você gostaria de comentar?").fill("A arte ficou boa.");
   await page.getByRole("button",{name:"Adicionar comentário"}).click();
+  await expect.poll(()=>received.length).toBe(1);
+  expect((received[0] as {seconds:unknown}).seconds).toBeNull();
 });
