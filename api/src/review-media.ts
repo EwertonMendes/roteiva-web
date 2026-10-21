@@ -3,7 +3,7 @@ import {connection} from './repository.ts';
 import {accessCredential} from './google.ts';
 import {base64url,decode} from './crypto.ts';
 
-type Ticket={r:string;f:string;v:number;e:number;k:string};
+type Ticket={r:string;f:string;v:number;e:number;k:string;h:string};
 const idPattern=/^[0-9a-f-]{36}$/i;
 const filePattern=/^[A-Za-z0-9_-]{10,200}$/;
 const encoder=new TextEncoder();
@@ -20,8 +20,8 @@ async function key(env:Env,version:string):Promise<CryptoKey>{
   if(raw.length!==32)throw new ApiError(503,'invalid_key');
   return crypto.subtle.importKey('raw',raw,{name:'HMAC',hash:'SHA-256'},false,['sign','verify']);
 }
-export async function mintReviewMediaTicket(env:Env,reviewId:string,fileId:string,version:number,expiry:number):Promise<string>{
-  const p:Ticket={r:reviewId,f:fileId,v:version,e:Math.min(expiry,Date.now()+MEDIA_MAX_AGE),k:env.TOKEN_KEY_VERSION};
+export async function mintReviewMediaTicket(env:Env,reviewId:string,fileId:string,version:number,expiry:number,inviteHash:string):Promise<string>{
+  const p:Ticket={r:reviewId,f:fileId,v:version,e:Math.min(expiry,Date.now()+MEDIA_MAX_AGE),k:env.TOKEN_KEY_VERSION,h:inviteHash};
   const payload=base64url(encoder.encode(JSON.stringify(p)));
   const mac=await crypto.subtle.sign('HMAC',await key(env,p.k),encoder.encode('roteiva/review-media/v1/'+payload));
   return payload+'.'+base64url(new Uint8Array(mac));
@@ -32,7 +32,7 @@ export async function verifyReviewMediaTicket(env:Env,token:string):Promise<Tick
   let p:Ticket;
   try{p=JSON.parse(decoder.decode(decode(part))) as Ticket;}catch{throw new ApiError(404,'review_not_found');}
   if(!p||typeof p!=='object'||!idPattern.test(p.r)||!filePattern.test(p.f)||
-     !Number.isSafeInteger(p.v)||p.v<1||typeof p.e!=='number'||!Number.isFinite(p.e)||
+     !Number.isSafeInteger(p.v)||p.v<1||typeof p.h!=='string'||!/^[A-Za-z0-9_-]{43}$/.test(p.h)||typeof p.e!=='number'||!Number.isFinite(p.e)||
      p.e<=Date.now()||p.e>Date.now()+MEDIA_MAX_AGE+5000||typeof p.k!=='string'||
      !/^[A-Za-z0-9_-]{1,50}$/.test(p.k))throw new ApiError(404,'review_not_found');
   let verified=false;
@@ -49,9 +49,9 @@ export async function verifyReviewMediaTicket(env:Env,token:string):Promise<Tick
 export async function streamReviewMedia(request:Request,env:Env,url:URL):Promise<Response>{
   if(request.method!=='GET'&&request.method!=='HEAD')throw new ApiError(405,'method_not_allowed');
   const p=await verifyReviewMediaTicket(env,url.searchParams.get('ticket')||'');
-  const r=await env.DB.prepare("SELECT id,owner_uid,status,current_version,expires_at FROM review_requests WHERE id=?")
-    .bind(p.r).first<{id:string;owner_uid:string;status:string;current_version:number;expires_at:number}>();
-  if(!r||r.expires_at<=Date.now()||r.current_version!==p.v||
+  const r=await env.DB.prepare("SELECT id,owner_uid,status,current_version,expires_at,token_hash FROM review_requests WHERE id=?")
+    .bind(p.r).first<{id:string;owner_uid:string;status:string;current_version:number;expires_at:number;token_hash:string}>();
+  if(!r||r.expires_at<=Date.now()||r.current_version!==p.v||r.token_hash!==p.h||
      !['pending','changes','approved'].includes(r.status))throw new ApiError(404,'review_not_found');
   const asset=await env.DB.prepare("SELECT file_id,connection_id,mime_type FROM review_assets WHERE review_id=? AND version=? AND file_id=? AND grant_state='granted'")
     .bind(p.r,p.v,p.f).first<{file_id:string;connection_id:string;mime_type:string}>();
