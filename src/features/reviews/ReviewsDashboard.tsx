@@ -441,7 +441,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
               </div>)}
             </div>
             {fileSearch.trim().length===1&&<p className="reviews-muted">Digite mais uma letra para pesquisar em todos os itens da pasta, não apenas os carregados.</p>}
-            {(searchActive?!!remote.page:!!nextToken)&&selectedFolder&&<button type="button" className="secondary-button"
+            {(fileSearch.trim().length>=2?(searchActive&&!!remote?.page):!!nextToken)&&selectedFolder&&<button type="button" className="secondary-button"
               disabled={folderBusy||searchBusy} onClick={()=>fileSearch.trim().length>=2?
                 void loadMoreSearch():void browse(selectedFolder,activeFolderId,trail,true,nextToken!)}>
               Carregar mais arquivos</button>}
