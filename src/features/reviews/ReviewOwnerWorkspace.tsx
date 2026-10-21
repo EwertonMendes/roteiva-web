@@ -164,7 +164,7 @@ export function ReviewOwnerWorkspace({detail,working,onClose,onRevise,onPublish,
             const decision=decisions.find(d=>d.version===v);
             return <section key={v} className="rowner-history-version">
               <div className="rowner-history-title"><strong>Versão {v}</strong><span>{decision?.decision==="changes"?"Ajustes solicitados":decision?.decision==="approved"?"Aprovada":"Sem decisão"}</span></div>
-              {decision&&<p className="rowner-history-decision">{decision.message||"Sem observações adicionais."}<small>{decision.author_name} · {longDate(decision.created_at)}</small></p>}
+              {decision&&<div className="rowner-history-decision"><p>{decision.message||"Sem observações adicionais."}</p><small>{decision.author_name} · {longDate(decision.created_at)}</small></div>}
               <p className="rowner-history-files">{oldAssets.map(a=>a.name).join(" · ")}</p>
               {oldComments.map(c=><div className="rowner-history-comment" key={c.id}>
                 <strong>{c.author_name}{c.seconds!==null?" · "+formatReviewTime(c.seconds):""}</strong>
