@@ -30,7 +30,7 @@
 .app-view-overview .topbar { display:contents; }
 .app-view-overview .topbar > :not(.font-lab) { display:none; }
 /* The existing temporary type lab is still reachable during DEV evaluation. */
-.app-view-overview .topbar > .font-lab { position:fixed; z-index:32; bottom:89px; left:28px; max-width:230px; background:#252526; border-color:#3e3e3f; }
+.app-view-overview .topbar > .font-lab { position:fixed; z-index:32; bottom:16px; right:18px; left:auto; max-width:230px; background:#252526; border-color:#3e3e3f; }
 .app-view-overview .page { max-width:none; padding:67px clamp(24px,2.4vw,44px) 80px; }
 .app-view-overview .page-heading { align-items:center; margin-bottom:30px; gap:24px; }
 .app-view-overview .page-heading > div > .eyebrow { display:none; }
@@ -118,7 +118,7 @@
   .app-view-overview .topbar { display:flex; }
   .app-view-overview .topbar > .menu-button { display:grid; }
   .app-view-overview .topbar > .workspace-switch,.app-view-overview .topbar > .global-search,.app-view-overview .topbar > .top-actions { display:flex; }
-  .app-view-overview .topbar > .font-lab { position:relative; bottom:auto; left:auto; z-index:auto; background:var(--card); border-color:var(--line); }
+  .app-view-overview .topbar > .font-lab { position:relative; bottom:auto; left:auto; right:auto; z-index:auto; background:var(--card); border-color:var(--line); }
   .app-view-overview .topbar .top-actions > .primary-button { display:none; }
   .app-view-overview .page { padding:32px 16px calc(115px + env(safe-area-inset-bottom)); }
   .app-view-overview .page-heading { align-items:flex-start; gap:20px; margin-bottom:26px; }
@@ -126,7 +126,7 @@
   .app-view-overview .page-heading p { font-size:1rem; }
   .app-view-overview .heading-actions { width:100%; justify-content:flex-start; flex-wrap:wrap; }
   .app-view-overview .heading-actions .workspace-tools { order:initial; width:auto; margin:0; }
-  .app-view-overview .heading-actions .workspace-tools .secondary-button,.app-view-overview .heading-actions > .primary-button { min-height:44px; padding:0 14px; font-size:.875rem; }
+  .app-view-overview .heading-actions .workspace-tools .secondary-button,.app-view-overview .heading-actions > .primary-button { min-height:44px; padding:0 14px; font-size:.9375rem; }
   .app-view-overview .panel.flow-overview { padding:24px 20px 0; border-radius:22px; }
   .app-view-overview .flow-overview-head h2 { font-size:1.5rem; }
   .app-view-overview .flow-numbers { grid-template-columns:repeat(2,minmax(0,1fr)); gap:24px 0; margin:28px 0; }
