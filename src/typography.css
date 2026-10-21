@@ -1,8 +1,7 @@
 /*
  * Roteiva typography system (DEV rollout).
  * All scale values use rem so user browser font preferences and zoom work.
- * Keep this layer AFTER legacy CSS and BEFORE/AFTER the temporary font lab:
- * the lab changes font-family only, never font-size.
+ * Ubuntu is the selected permanent local font; preserve relative sizing for accessibility.
  */
 :root {
   --type-caption: 0.8125rem;  /* 13px at user default 16px */
@@ -206,3 +205,28 @@ button, [role="button"] { touch-action: manipulation; }
   .app-shell .metric-grid,
   .app-shell .library-summary { grid-template-columns: minmax(0,1fr); }
 }
+
+/* Native select menus must remain readable on light and dark OS themes.
+   This is a permanent contrast rule, independent of the retired font test. */
+:root select:not([multiple]) {
+  color: var(--ink);
+  background-color: var(--card);
+  color-scheme: light;
+}
+:root select option,
+:root select optgroup {
+  color: #1b1b1b;
+  background-color: #fff;
+  font-family: var(--type-family);
+}
+:root[data-theme="dark"] select:not([multiple]) {
+  color: #f5f5f5;
+  background-color: #242424;
+  color-scheme: dark;
+}
+:root[data-theme="dark"] select option,
+:root[data-theme="dark"] select optgroup {
+  color: #f5f5f5;
+  background-color: #242424;
+}
+:root select:disabled { opacity: .65; }

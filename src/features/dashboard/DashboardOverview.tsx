@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CalendarDays, Eye, EyeOff } from "lucide-react";
+import { CalendarDays, ChevronRight, Eye, EyeOff } from "lucide-react";
 import { eventRange } from "../../studio-calendar";
 import { sumMoney } from "../../studio-finance";
 import type { Project, Client, FinanceEntry, CalendarEvent, View, Status } from "../../dashboard-client";
@@ -12,10 +12,10 @@ const civilToday = () => {
 type Summary = {clientCount?:number;receivableAmount?:number;cashBalance?:number;projectCount?:number;projectStatuses?:Record<Status,number>};
 type Props = {
   projects:Project[];clients:Client[];entries:FinanceEntry[];events:CalendarEvent[];
-  activities:{text:string;when:string}[];onView:(view:View)=>void;overviewMetrics?:Summary;
+  activities:{text:string;when:string}[];onView:(view:View)=>void;onOpenActivity:()=>void;overviewMetrics?:Summary;
 };
 
-export function TodayStudio({projects,clients,entries,events,activities,onView,overviewMetrics}:Props) {
+export function TodayStudio({projects,clients,entries,events,activities,onView,onOpenActivity,overviewMetrics}:Props) {
   const [showBalance,setShowBalance] = useState(true);
   const statuses = overviewMetrics?.projectStatuses;
   const projectCount = overviewMetrics?.projectCount ?? projects.length;
@@ -74,9 +74,8 @@ export function TodayStudio({projects,clients,entries,events,activities,onView,o
     <footer className="flow-next"><CalendarDays size={22} aria-hidden="true"/><div><span>Próximo compromisso</span>
       <p>{next ? <><b>{next.title}</b> · {next.date.split("-").reverse().join("/")} · {eventRange(next)}</> : "Sua agenda está livre. Adicione a próxima produção."}</p>
     </div><button className="secondary-button" type="button" onClick={() => onView("calendar")}>Ver agenda</button></footer>
-    <details className="studio-activity"><summary>Atividade recente <span>{activities.length}</span></summary>
-      {activities.length ? activities.slice(0,5).map((activity,index) => <p key={index}><time dateTime={activity.when}>{new Date(activity.when).toLocaleString("pt-BR")}</time>{activity.text}</p>)
-        : <p className="studio-empty">As próximas movimentações aparecerão aqui.</p>}
-    </details>
+    <button type="button" className="flow-recent-activity" onClick={onOpenActivity} aria-label={`Ver atividades recentes, ${activities.length} registradas`}>
+      <ChevronRight size={15} aria-hidden="true"/><span>Atividade recente</span><span className="flow-activity-count">{activities.length}</span>
+    </button>
   </section>;
 }
