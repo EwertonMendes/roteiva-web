@@ -173,19 +173,21 @@
 
 ## Fase 5 — Revisão segura e feedback de clientes
 
-**Prioridade P1.** Dependente da Fase 4.
+**Status: implementado na PR #55 e publicado no DEV existente; fluxos centrais homologados com Google real, aceite integral parcial por limitações documentadas.** Publicação antecipada autorizada pelo proprietário em 20/10/2026; não houve merge. Migrações 0013/0014 aplicadas com integridade e contagens preservadas; Worker/Hosting publicados, CI completo aprovado. Consulte [REVIEWS-MVP.md](REVIEWS-MVP.md).
 
-- [ ] Definir fluxo de convite autenticado com Google, por entrega e versão; validado com profissional real.
-- [ ] Vincular concessão de acesso no Firestore à permissão real do Google Drive para a conta revisora.
-- [ ] Exibir vídeo via visualizador/preview compatível; fallback para abrir no Drive se incorporação falhar.
-- [ ] Implementar comentários por timestamp manual, status da revisão e histórico de decisões.
-- [ ] Permitir solicitar alterações, aprovar e enviar nova versão mantendo rastreabilidade.
-- [ ] Revogar convite e acesso ao arquivo (Firestore + Drive), tratando falhas parciais.
-- [ ] Testar acesso indevido, expiração, reenvios, formatos não reproduzíveis e mobile.
+- [x] Central de aprovações com pesquisa por cliente/projeto/título, estados e paginação; atalhos de cliente/projeto.
+- [x] Seleção de até 8 arquivos existentes do Google Drive, com validação server-side de projeto, pasta e descendência.
+- [x] Links revogáveis e expiráveis com dois modos: link aberto e Google autorizado.
+- [x] Portal mobile: prévia/fallback, comentários, timestamp manual, aprovação e solicitação de ajustes.
+- [x] História por versão, reenvio após ajustes, decisões únicas e exclusão/expiração com revogação coordenada.
+- [x] Isolamento por proprietário no backend, Hash/AES-GCM de convites e sem exposição pública do Firestore.
+- [x] Publicação e revogação de ACL com duas identidades Google reais; conta incorreta recusada, destinatária autorizada e permissão removida pelo cron.
+- [x] Testes automatizados locais: 129 API, 37 frontend, 30 regras e 81 E2E aprovados (3 variantes de viewport ignoradas por desenho); Google real/Safari/aparelho físico e pipelines do SHA final são aceites separados.
+- [x] Auditoria adicional da PR #55: claims/leases de ACL, compensação recuperável, fence de versão pública e transição D1; testes em `api/tests/reviews.test.mjs`. Ciclo completo desktop/mobile em `tests/browser/reviews-workflow.spec.ts`, incluindo upload resumable e encerramento; homologação Google real agora confirma link, duas identidades, comentário/ajustes/V2/aprovação, ACL prévia, revogação, cron, desconexão e exclusão DEV concluída; limitações de Picker/dispositivos em [REVIEWS-MVP.md](REVIEWS-MVP.md).
+- [x] Deploy no DEV existente e homologação com fixtures/contas descartáveis autorizadas; exclusão de conta concluída com arquivos Drive preservados.
+- [ ] Resolver/retestar Google Picker para autorizar nova pasta e completar aceite em dispositivos/políticas externas aplicáveis antes do piloto comercial.
 
-**Aceite:** um profissional compartilha uma versão somente com cliente autorizado, cliente comenta e aprova, owner acompanha retorno e consegue revogar integralmente. **Estado:** PLANEJADO.
-
-**Fora do aceite do MVP:** player proprietário com timeline controlada, comentário automático no ponto pausado, revisão anônima por link, transcodificação e streaming próprio.
+**Fora do MVP:** player próprio com timeline, streaming pelo Worker, edição de imagens, assinatura legal, notificações automáticas e aprovação parcial por arquivo.
 
 ## Fase 6 — Pronto para piloto comercial
 

@@ -1,5 +1,7 @@
 # Roteiva
 
+> **Aprovações:** o fluxo MVP está implementado e passou pela regressão automatizada local na [PR #55](https://github.com/EwertonMendes/roteiva-web/pull/55), ainda draft. Consulte [docs/REVIEWS-MVP.md](docs/REVIEWS-MVP.md) para resultados, segurança e aceite. A integração foi publicada no DEV existente para homologação, por autorização do proprietário e sem merge; os fluxos centrais foram homologados com Google Drive real, com limitações de Picker/dispositivos explicitadas no documento.
+
 **Gestão de produção audiovisual para freelancers e pequenos estúdios.**
 
 Frontend único **React 19 + Vite 8 + TypeScript**. [DEV](https://roteiva-web-dev.web.app/) · demonstração local: `pnpm dev --mode demo`.

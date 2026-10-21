@@ -1,4 +1,5 @@
 import { ApiError, type Env } from './types.ts';
+import { reviewRouter,cleanupExpiredReviews } from './reviews.ts';
 import { identity,verifiedTrialPrincipal } from './auth.ts';
 import { callback, start, launch, enabled } from './oauth.ts';
 import { metadata, disconnect, about } from './drive.ts';
@@ -30,7 +31,7 @@ export async function handle(request: Request, env: Env): Promise<Response> {
       if (!origin) throw new ApiError(403,'origin_required');
       response = new Response(null,{status:204,headers:{
         'Access-Control-Allow-Methods':'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Max-Age':'3600',
+        'Access-Control-Allow-Headers':'Authorization, Content-Type, X-Review-Token','Access-Control-Max-Age':'3600',
       }});
     } else if (!(await (url.pathname.endsWith('/thumbnail') ? env.API_THUMB_LIMIT : env.API_RATE_LIMIT)
         .limit({key:'dev:ip:'+sourceIp.slice(0,64)})).success) {
@@ -56,6 +57,10 @@ export async function handle(request: Request, env: Env): Promise<Response> {
       const principal=await verifiedTrialPrincipal(request,env);
       if(!(await env.API_RATE_LIMIT.limit({key:'dev:access:'+principal.uid})).success)throw new ApiError(429,'rate_limited');
       response=await ensureAccess(env,principal.uid,undefined,principal);
+    } else if (url.pathname === '/reviews' || url.pathname.startsWith('/reviews/')) {
+      if (request.method === 'POST' && origin !== env.FRONTEND_ORIGIN) throw new ApiError(403,'origin_required');
+      if (!(await env.API_RATE_LIMIT.limit({key:'dev:reviews:'+sourceIp.slice(0,64)})).success) throw new ApiError(429,'rate_limited');
+      response = await reviewRouter(request,env,url);
     } else if (url.pathname === '/integrations/drive' && request.method === 'GET') {
       const uid = await identity(request,env);
       await assertActiveAccess(env,uid);
@@ -142,5 +147,6 @@ export default {fetch:handle, scheduled(_controller:ScheduledController,env:Env,
     await runPendingDeletions(env);
     try{await backfillAccess(env);}catch(error){console.error(JSON.stringify({event:'access_backfill_retry',code:error instanceof ApiError?error.code:'dependency_failure'}));}
     try{await cleanupUploads(env);}catch{console.error(JSON.stringify({event:'drive_upload_retention_retry'}));}
+    try{await cleanupExpiredReviews(env);}catch{console.error(JSON.stringify({event:'review_revocation_retry'}));}
   })());
 }};

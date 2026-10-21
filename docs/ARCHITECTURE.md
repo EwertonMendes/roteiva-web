@@ -146,13 +146,21 @@ Modelo indicativo: `drive_connections(workspace_id, owner_uid, google_account_id
 
 Testar vídeos grandes (inclusive acima de 250 MB), rede instável, reenvio, retry, cancelamento, expiração de acesso, quotas, Safari e mobile. URLs de sessão são credenciais de capacidade e não devem ir para log ou persistência pública. Se o upload direto não passar na PoC, **revisar o projeto antes de anunciar o recurso**.
 
-## 10. Revisão e compartilhamento de mídia
+## 10. Revisão e compartilhamento de mídia — PR #55 (implementação em validação)
 
-**Recomendação para MVP, ainda não ratificada:** cliente autenticado com Google, convidado explicitamente para **uma entrega/versão**; acesso no Firestore + permissão real no Drive de acordo com a conta convidada. O cliente não ganha acesso a clientes, financeiro, projetos estranhos ou pasta raiz. Revogar convite **e** Drive ACL na mesma operação coordenada; tratar erros parciais e mostrar estado de revogação pendente quando necessário.
+A especificação operacional completa está em [REVIEWS-MVP.md](REVIEWS-MVP.md). A infraestrutura de arquivos continua sendo o Google Drive individual, sem proxy de vídeo pelo Worker. O Firestore guarda exclusivamente clientes/projetos/pastas privadas do proprietário; o D1 contém as solicitações e versões de aprovação, comentários/decisões e estado das concessões de permissão necessárias ao portal público.
 
-Fluxo: owner envia corte → vincula versão → convida revisor → revisor abre player/visualizador permitido pelo Google → comenta um timestamp **manual** → aprova ou solicita alterações → proprietário vê histórico e publica nova versão.
+A rota `/review/{capability}` não usa o ProtectedRoute: token aleatório de 256 bits, hash para busca e cópia cifrada por AES-GCM em D1. O próprio Worker valida links, expiração, comentários e decisões; não existe regra Firestore pública. Dois modos selecionáveis: convite por link (arquivos explicitamente autorizados com ACL `anyone/reader` no Drive) e convite por e-mail Google (claim `email_verified` e `google.com` verificados pelo backend e ACL individual). O modo restrito rejeita arquivos previamente públicos ou com permissão de domínio; não altera ACLs preexistentes concedidas pelo dono.
 
-**Não prometemos ainda** player próprio com seek, timecode automático sincronizado, iframe com controle total, streaming privado a partir do Drive ou links sem login. Testar capacidade de preview, formato, DRM/cookies/navegadores e políticas do Workspace. Comentários e decisões ficam no Firestore; vídeos no Drive. Links por token anônimos são **etapa futura** e exigem modelo específico de segurança/revogação.
+Projetos, clientes, vínculo de pastas e descendência do arquivo são verificados pelo backend, sem confiar em IDs vindos do navegador. A criação de permissão ocorre por arquivo e só publica a solicitação quando todos os compartilhamentos são confirmados. Versionamento preserva histórico, revoga a ACL da versão antiga e impede revisão durante mudanças parciais. Expiração, encerramento, desconexão e exclusão da conta devem coordenar as revogações antes de encerrar a credencial Google. Falha externa mantém estado pendente, sem simular sucesso.
+
+**Limite de garantia:** link público do Drive concede acesso de leitura direto pelo Google até remoção efetiva da ACL; links diretos, downloads anteriores e permissões externas criadas pelo dono não podem ser retroativamente desfeitos pelo portal. A identificação textual de um revisor sem login não é assinatura legal. Previews dependem de suporte/conta/cookies do Google, com fallback para abrir diretamente no Drive.
+
+**Decisão tomada — coordenação de ACL (PR #55, 20/10/2026):** migration aditiva `0014_review_grant_coordination.sql` reserva cada Drive file ID globalmente para uma revisão/versão até revogação confirmada. Uma segunda revisão precisa aguardar ou usar outra cópia; isso evita adotar/revogar a ACL de outro convite, inclusive com conexões diferentes. Uma lease por arquivo de 120s serializa as chamadas Google limitadas por timeout, permitindo retomada após interrupção. Encerramento bloqueia o portal primeiro e não conclui enquanto uma concessão estiver em andamento; o ID conhecido é persistido antes da compensação, e falha no DELETE mantém estado recuperável. Cron também retoma `closing` antes do vencimento. A migração interrompe em caso de concessões históricas conflitantes; não resolver removendo permissões preexistentes.
+
+POSTs públicos exigem a versão efetivamente exibida ao cliente; a escrita ainda confere versão, token, validade e estado no D1. Respostas públicas omitem IDs de cliente/projeto e e-mail do destinatário. Nova versão usa identificador de transição para que só a operação vencedora insira os arquivos na mesma transação. Google restrito rejeita ACL de grupo ou de outra pessoa além do proprietário/conexão e destinatário, incluindo permissões herdadas retornadas pelo Drive. ACLs do destinatário preexistentes permanecem externas e não são removidas.
+
+A coordenação cobre operações do Roteiva. Edições simultâneas de ACL feitas diretamente no Google por outros aplicativos/usuários não participam da lease; exigem reauditoria, especialmente após resposta perdida. O Google [não suporta mutações concorrentes de permissão no mesmo arquivo](https://developers.google.com/workspace/drive/api/reference/rest/v3/permissions/create). Não prometer isolamento contra o proprietário alterar o Drive fora do produto.
 
 ## 11. Assinaturas e autorização de planos
 
@@ -394,3 +402,5 @@ inclusão expressamente autorizada. Recuperação com rede real ficou manual/pen
 por preferência do proprietário; A/B remoto, revogação, Safari e dispositivo físico
 também pendentes. Não extrapolar o sucesso Chrome para esses aceites.
 Configuração e matriz: [DRIVE-UPLOAD.md](DRIVE-UPLOAD.md).
+
+**Decisão operacional do proprietário — 20/10/2026:** homologar a PR #55 diretamente no DEV existente e em suas contas/dados descartáveis. Worker, D1 e Hosting receberam o código validado antes do merge, com os segredos OAuth existentes. Não criar ambiente ou credenciais de QA adicionais para esse aceite. Pipeline automático permanece limitado à master; detalhes verificáveis em [REVIEWS-MVP.md](REVIEWS-MVP.md).

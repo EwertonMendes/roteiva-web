@@ -6,6 +6,8 @@ import {hasDriveThumbnailSource} from "../src/features/drive/drive-thumbnail-sou
 const ui=readFileSync(new URL("../src/features/drive/DriveLibraryUI.tsx",import.meta.url),"utf8");
 const loader=readFileSync(new URL("../src/features/drive/DriveThumbnail.tsx",import.meta.url),"utf8");
 const parent=readFileSync(new URL("../src/features/drive/DriveConnectionPanel.tsx",import.meta.url),"utf8");
+const fetcher=readFileSync(new URL("../src/features/drive/useDriveThumbnailFetch.ts",import.meta.url),"utf8");
+const reviews=readFileSync(new URL("../src/features/reviews/ReviewsDashboard.tsx",import.meta.url),"utf8");
 test("list/grid mode is explicit and stored as a nonprivate local preference",()=>{
   assert.match(ui,/role="group" aria-label="Modo de visualização"/);
   assert.match(ui,/data-view=\{view\}/);
@@ -15,8 +17,10 @@ test("thumbnail binary is authenticated, lazy and never loaded from an untrusted
   assert.match(loader,/IntersectionObserver/);
   assert.match(loader,/MAX_CONCURRENT=6/);
   assert.match(loader,/MAX_CACHE=64/);
-  assert.match(parent,/\/files\/".encodeURIComponent\(file.id\)."\/thumbnail"/);
-  assert.match(parent,/getIdToken/);
+  assert.match(fetcher,/\/files\/".encodeURIComponent\(file.id\)."\/thumbnail"/);
+  assert.match(fetcher,/getIdToken/);
+  assert.match(parent,/useDriveThumbnailFetch/);
+  assert.match(reviews,/useDriveThumbnailFetch/);
   assert.doesNotMatch(ui,/<img[^>]*thumbnailLink/);
   assert.match(loader,/URL.revokeObjectURL/);
 });
@@ -41,7 +45,7 @@ test("fast Drive listing uses account-scoped in-memory cache and debounced remot
   assert.match(parent,/clearDriveFolderCache/);
   assert.ok(parent.includes("window.setTimeout(async()=>"));
   assert.match(ui,/searchResults/);
-  assert.match(parent,/thumbnailTicket/);
+  assert.match(fetcher,/thumbnailTicket/);
   assert.ok(loader.includes("promote(key)"));
 });
 
@@ -52,5 +56,5 @@ test("ticket-only Drive v3 responses trigger thumbnail requests, without raw thu
   assert.equal(hasDriveThumbnailSource({...item,thumbnailTicket:undefined,thumbnailLink:"https://lh3.googleusercontent.com/legacy"}),true);
   assert.equal(hasDriveThumbnailSource({...item,mimeType:"application/vnd.google-apps.folder"}),false);
   assert.ok(loader.includes("hasDriveThumbnailSource(item)"));
-  assert.ok(parent.includes("file.thumbnailTicket"));
+  assert.ok(fetcher.includes("file.thumbnailTicket"));
 });

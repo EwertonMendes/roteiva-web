@@ -3,6 +3,11 @@ on:
   pull_request:
     branches: [master]
     paths:
+      - 'src/features/reviews/**'
+      - 'api/src/reviews.ts'
+      - 'api/tests/reviews.test.mjs'
+      - 'api/migrations/**'
+      - 'tests/browser/reviews*.ts'
       - 'tests/browser/access-isolated-e2e.spec.ts'
       - 'tests/browser/fixtures.ts'
       - 'src/features/access/**'
