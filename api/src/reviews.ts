@@ -186,16 +186,20 @@ async function tokenFor(env:Env,r:Review):Promise<string>{
   return decrypt(env,r.encrypted_token,tokenContext(env,r));
 }
 async function detail(env:Env,r:Review){
-  const [files,comments,decisions,token]=await Promise.all([
+  const [files,comments,decisions,votes,people,token]=await Promise.all([
     assets(env,r.id),
     env.DB.prepare('SELECT * FROM review_comments WHERE review_id=? ORDER BY created_at DESC LIMIT 300')
       .bind(r.id).all(),
     env.DB.prepare('SELECT * FROM review_decisions WHERE review_id=? ORDER BY created_at DESC LIMIT 50')
-      .bind(r.id).all(),tokenFor(env,r)
+      .bind(r.id).all(),
+    env.DB.prepare('SELECT version,email,decision,author_name,message,created_at FROM review_votes WHERE review_id=? ORDER BY created_at DESC LIMIT 500')
+      .bind(r.id).all(),
+    participants(env,r.id),tokenFor(env,r)
   ]);
-  return {review:{...showReview(r),url:reviewLink(token)},participants:await participants(env,r.id),assets:files.map(a=>({
-    version:a.version,fileId:a.file_id,name:a.name,mimeType:a.mime_type,grantState:a.grant_state
-  })),comments:comments.results,decisions:decisions.results};
+  return {review:{...showReview(r),url:reviewLink(token)},participants:people,votes:votes.results,
+    assets:files.map(a=>({
+      version:a.version,fileId:a.file_id,name:a.name,mimeType:a.mime_type,grantState:a.grant_state
+    })),comments:comments.results,decisions:decisions.results};
 }
 function pages(n:URLSearchParams):number{
   return Math.min(50,Math.max(0,Number.parseInt(n.get('page')||'0',10)||0));
