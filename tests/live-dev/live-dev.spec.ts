@@ -20,7 +20,7 @@ async function authenticated(page:Page){
   if(!authFile||!email)throw new Error("Authenticated QA requires the dedicated QA state and QA_EXPECTED_EMAIL");
   await page.goto("/");
   await expect(page.locator(".app-shell")).toBeVisible({timeout:30000});
-  await expect(page.getByText(email,{exact:true})).toBeVisible({timeout:20000});
+  await expect(page.locator(".sidebar-profile small").filter({hasText:email})).toBeVisible({timeout:20000});
   await expect(page.getByRole("button",{name:"Sair da conta"})).toBeVisible();
 }
 async function qaFolder(page:Page){
@@ -54,7 +54,7 @@ test.describe("@public DEV publicado — sem autenticação",()=>{
       const response=await page.goto(pathname,{waitUntil:"domcontentloaded"});
       expect(response?.status()).toBe(200);
       await expect(page.getByRole("button",{name:"Entrar com Google"})).toBeVisible({timeout:20000});
-      expect(await page.locator("body").innerText()).not.toContain("Projeto do mal");
+      await expect(page.locator(".app-shell")).toHaveCount(0);
       expect(errors,pathname+" - erros de JS").toEqual([]);
     }
   });
@@ -73,7 +73,7 @@ test.describe("@auth Leitura real do estúdio QA",()=>{
     for(const path of validRoutes){
       await page.goto(path);
       await expect(page.locator(".app-shell")).toBeVisible();
-      await expect(page.getByText(email,{exact:true})).toBeVisible();
+      await expect(page.locator(".sidebar-profile small").filter({hasText:email})).toBeVisible();
       expect(new URL(page.url()).pathname).toBe(path);
       if(["/biblioteca","/aprovacoes","/projetos"].includes(path)){
         await page.reload();
