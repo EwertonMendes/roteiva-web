@@ -27,6 +27,8 @@ test("desktop overview fits viewport without page scrolling, even with projects"
   await page.getByRole("button",{name:"Criar projeto",exact:true}).click();
   await page.getByRole("textbox",{name:"Nome do projeto"}).fill("Projeto de verificação visual");
   await page.locator("form.project-modal").getByRole("button",{name:/Criar projeto/}).click();
+  await expect(page.locator("[aria-busy]").first()).toHaveAttribute("aria-busy","false");
+  await page.locator(".sidebar nav").getByRole("button",{name:"Visão geral"}).click();
   await expect(page.locator(".flow-overview")).toContainText("O ritmo do seu estúdio");
   await expect(page.locator(".flow-overview")).toContainText("1 projeto no total");
   for(const {width,height} of [
