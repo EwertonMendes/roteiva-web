@@ -102,18 +102,19 @@ export function ReviewPortal({token}:{token:string}){
   const isVideo=active?.mimeType.startsWith("video/")??false;
   const activeFileId=active?.fileId;
   const activeVersion=data?.review.version;
+  const privateGoogle=data?.review.mode==="google";
   useEffect(()=>{
     let alive=true;
     setMediaUrl("");setMediaFailure(false);setPlayhead(0);setDuration(null);
-    setMediaMode(isVideo?"loading":"drive");
-    if(!isVideo||!activeFileId||!activeVersion)return;
+    setMediaMode(isVideo&&!privateGoogle?"loading":"drive");
+    if(privateGoogle||!isVideo||!activeFileId||!activeVersion)return;
     void request<{url:string;expiresAt:number}>("/reviews/public/media-ticket","POST",
       {fileId:activeFileId,version:activeVersion}).then(ticket=>{
       if(alive&&ticket.url.startsWith(API+"/reviews/media?ticket=")){setMediaUrl(ticket.url);setMediaMode("native");}
       else if(alive){setMediaMode("drive");setMediaFailure(true);}
     }).catch(()=>{if(alive){setMediaMode("drive");setMediaFailure(true);}});
     return()=>{alive=false;};
-  },[activeFileId,activeVersion,isVideo,request]);
+  },[activeFileId,activeVersion,isVideo,privateGoogle,request]);
   const seconds=isVideo?parseReviewTime(minutes):null;
   const invalidTime=isVideo&&!validReviewSecond(seconds,mediaMode==="native"?duration:null);
   const switchFile=(index:number)=>{
