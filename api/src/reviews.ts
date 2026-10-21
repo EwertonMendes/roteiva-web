@@ -13,13 +13,15 @@ type Mode = 'link'|'google';
 type Review = {
   id:string;owner_uid:string;client_id:number;project_id:number;client_name:string;project_name:string;
   studio_name:string;title:string;message:string;recipient_email:string;access_mode:Mode;status:Status;
-  current_version:number;expires_at:number;token_hash:string;encrypted_token:string;transition_id?:string|null;created_at:number;updated_at:number;
+  current_version:number;expires_at:number;token_hash:string;encrypted_token:string;transition_id?:string|null;restrict_existing_public:number;created_at:number;updated_at:number;
 };
 type Asset = {review_id:string;version:number;file_id:string;connection_id:string;linked_folder_id:string;
   name:string;mime_type:string;permission_id:string|null;grant_state:'unshared'|'granting'|'granted'|'revoking'|'revoked'};
 type Selection = {fileId:string;connectionId:string;linkedFolderId:string};
 const ID=/^[A-Za-z0-9_-]{10,200}$/;
 const CONN=/^[A-Za-z0-9-]{36}$/;
+type Participant={email:string;role:'reviewer'|'viewer'};
+const EMAIL=/^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const UUID=/^[0-9a-f-]{36}$/i;
 const FRONT='https://roteiva-web-dev.web.app';
 const now=()=>Date.now();
@@ -38,6 +40,28 @@ const showReview=(r:Review)=>({
   studioName:r.studio_name,title:r.title,message:r.message,recipientEmail:r.recipient_email,mode:r.access_mode,
   status:r.status,version:r.current_version,expiresAt:r.expires_at,createdAt:r.created_at,updatedAt:r.updated_at
 });
+
+function parseParticipants(data:unknown,mode:Mode,legacyEmail:string):Participant[] {
+  if(mode==='link')return [];
+  const source=data===undefined?[{email:legacyEmail,role:'reviewer'}]:data;
+  if(!Array.isArray(source)||source.length<1||source.length>200)throw new ApiError(400,'review_invalid_participants');
+  const unique=new Set<string>();
+  const parsed=source.map(item=>{
+    if(!item||typeof item!=='object'||Array.isArray(item))throw new ApiError(400,'review_invalid_participants');
+    const entry=item as Record<string,unknown>;
+    const email=inputText(entry.email,200,true).toLowerCase(),role=entry.role;
+    if(!EMAIL.test(email)||(role!=='reviewer'&&role!=='viewer')||unique.has(email))
+      throw new ApiError(400,'review_invalid_participants');
+    unique.add(email);return {email,role};
+  });
+  if(!parsed.some(item=>item.role==='reviewer'))throw new ApiError(400,'review_reviewer_required');
+  return parsed;
+}
+async function participants(env:Env,id:string):Promise<Participant[]>{
+  const result=await env.DB.prepare('SELECT email,role FROM review_participants WHERE review_id=? ORDER BY role,email')
+    .bind(id).all<Participant>();
+  return result.results;
+}
 async function activeOwner(request:Request,env:Env):Promise<string>{
   const uid=await identity(request,env);
   await assertActiveAccess(env,uid);
@@ -169,7 +193,7 @@ async function detail(env:Env,r:Review){
     env.DB.prepare('SELECT * FROM review_decisions WHERE review_id=? ORDER BY created_at DESC LIMIT 50')
       .bind(r.id).all(),tokenFor(env,r)
   ]);
-  return {review:{...showReview(r),url:reviewLink(token)},assets:files.map(a=>({
+  return {review:{...showReview(r),url:reviewLink(token)},participants:await participants(env,r.id),assets:files.map(a=>({
     version:a.version,fileId:a.file_id,name:a.name,mimeType:a.mime_type,grantState:a.grant_state
   })),comments:comments.results,decisions:decisions.results};
 }
@@ -185,7 +209,8 @@ async function createReview(request:Request,env:Env,uid:string):Promise<Response
   const studio=inputText(data.studioName||'Estúdio',120,true);
   const mode:Mode=data.mode==='link'?'link':data.mode==='google'?'google':(()=>{throw new ApiError(400,'review_invalid_input');})();
   const email=inputText(data.recipientEmail||'',200).toLowerCase();
-  if(mode==='google'&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))throw new ApiError(400,'review_invalid_input');
+  const people=parseParticipants(data.participants,mode,email);
+  const restrict=mode==='google'&&data.restrictExistingPublic===true?1:0;
   const days=integer(data.expiresInDays);
   if(!days||days>30)throw new ApiError(400,'review_invalid_input');
   const list=selected(data.assets);
@@ -196,15 +221,16 @@ async function createReview(request:Request,env:Env,uid:string):Promise<Response
   const r={id,owner_uid:uid};
   const encrypted=await encrypt(env,secret,tokenContext(env,r));
   await env.DB.batch([
-    env.DB.prepare("INSERT INTO review_requests(id,owner_uid,client_id,project_id,client_name,project_name,studio_name,title,message,recipient_email,access_mode,status,current_version,expires_at,token_hash,encrypted_token,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,'draft',1,?,?,?,?,?)")
-      .bind(id,uid,clientId,projectId,metadata.clientName,metadata.projectName,studio,title,message,email,mode,
-        ts+days*86400000,await hash(secret),encrypted,ts,ts),
+    env.DB.prepare("INSERT INTO review_requests(id,owner_uid,client_id,project_id,client_name,project_name,studio_name,title,message,recipient_email,access_mode,status,current_version,expires_at,token_hash,encrypted_token,restrict_existing_public,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,'draft',1,?,?,?,?,?,?,?)")
+      .bind(id,uid,clientId,projectId,metadata.clientName,metadata.projectName,studio,title,message,people.find(p=>p.role==='reviewer')?.email||'',mode,
+        ts+days*86400000,await hash(secret),encrypted,restrict,ts,ts),
+    ...people.map(p=>env.DB.prepare("INSERT INTO review_participants(review_id,email,role) VALUES(?,?,?)").bind(id,p.email,p.role)),
     ...insertAssets(env,entries)
   ]);
   return Response.json({id,review:{...showReview({
     id,owner_uid:uid,client_id:clientId,project_id:projectId,client_name:metadata.clientName,
-    project_name:metadata.projectName,studio_name:studio,title,message,recipient_email:email,access_mode:mode,
-    status:'draft',current_version:1,expires_at:ts+days*86400000,token_hash:'',encrypted_token:encrypted,
+    project_name:metadata.projectName,studio_name:studio,title,message,recipient_email:people.find(p=>p.role==='reviewer')?.email||'',access_mode:mode,
+    restrict_existing_public:restrict,status:'draft',current_version:1,expires_at:ts+days*86400000,token_hash:'',encrypted_token:encrypted,
     created_at:ts,updated_at:ts
   }),url:reviewLink(secret)}},{status:201});
 }
