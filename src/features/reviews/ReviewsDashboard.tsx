@@ -221,8 +221,25 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
       let publishWarning="";
       const selections=files.map(f=>({fileId:f.fileId,linkedFolderId:f.linkedFolderId,connectionId:f.connectionId}));
       if(replacement){
-        const result=await call<{review:Detail}>("/reviews/"+replacement+"/revise","POST",{assets:selections});
-        setOpened(result.review);
+        const beforeVersion=opened?.review.version??0;
+        const endpoint="/reviews/"+replacement;
+        let result:Detail;
+        try{
+          result=(await call<{review:Detail}>(endpoint+"/revise","POST",{assets:selections})).review;
+        }catch(original){
+          // A request may have committed a version but lost its HTTP response.
+          // Check the authoritative server state before allowing a retry.
+          const latest=await call<Detail>(endpoint);
+          setOpened(latest);
+          if(latest.review.version>beforeVersion&&latest.review.status==="pending"){
+            result=latest;
+          }else if(["replacing","draft","publishing"].includes(latest.review.status)){
+            result=(await call<{review:Detail}>(endpoint+"/revise","POST",{assets:selections})).review;
+          }else{
+            throw original;
+          }
+        }
+        setOpened(result);
       }else{
         const created=await call<{id:string}>("/reviews","POST",{
           clientId,projectId,studioName,title,message,mode,recipientEmail:recipient,
@@ -242,9 +259,9 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
     });
   };
   const beginRevision=()=>{
-    if(!opened)return;
+    if(!opened||working)return;
     setClientId(opened.review.clientId);setProjectId(opened.review.projectId);setReplacement(opened.review.id);
-    setFiles([]);setComposer(true);
+    setFiles([]);setError("");setComposer(true);
   };
   const mutate=async(action:"publish"|"rotate"|"close")=>{
     if(!opened)return;
@@ -329,7 +346,13 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
           {["draft","publishing"].includes(opened.review.status)&&<button className="primary-button" disabled={working}
             onClick={()=>void mutate("publish")}>Ativar compartilhamento</button>}
           {opened.review.status==="changes"&&<button className="primary-button" onClick={beginRevision}>Enviar nova versão</button>}
-          {opened.review.status==="replacing"&&<button className="primary-button" disabled={working} onClick={()=>void run(async()=>{await call("/reviews/"+opened.review.id+"/revise","POST",{assets:[]});await openDetail(opened.review.id);})}>Concluir troca de versão</button>}
+          {opened.review.status==="replacing"&&(opened.assets.some(a=>a.version===opened.review.version+1)?
+            <button className="primary-button" disabled={working} onClick={()=>void run(async()=>{
+              const result=await call<{review:Detail}>("/reviews/"+opened.review.id+"/revise","POST",{assets:[]});
+              setOpened(result.review);
+            })}>Concluir troca de versão</button>:
+            <button className="primary-button" disabled={working} onClick={beginRevision}>
+              Selecionar arquivos para retomar versão</button>)}
           {opened.review.status==="closing"&&<button className="primary-button" disabled={working} onClick={()=>void mutate("close")}>Concluir revogação</button>}
           {["pending","changes","approved","draft"].includes(opened.review.status)&&<button className="secondary-button" disabled={working} onClick={()=>void mutate("rotate")}>Renovar link</button>}
           {opened.review.status!=="closed"&&<button className="secondary-button" disabled={working} onClick={()=>void mutate("close")}>Encerrar revisão</button>}
