@@ -59,7 +59,8 @@ test("temporary font lab: 10 remote choices + Ubuntu, on-demand switch, contrast
   }));
   expect(lightOption).toEqual({foreground:"rgb(27, 27, 27)",background:"rgb(255, 255, 255)"});
 
-  await page.getByRole("button",{name:"Ativar modo escuro"}).click();
+  if (info.project.name === "desktop") await page.getByRole("button",{name:"Alternar aparência"}).click();
+  else await page.getByRole("button",{name:"Ativar modo escuro"}).click();
   const darkOption=await select.locator('option[value="Manrope"]').evaluate(el=>({
     foreground:getComputedStyle(el).color,
     background:getComputedStyle(el).backgroundColor,

@@ -117,6 +117,12 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
   const storageKey = "roteiva-pages-demo-workspace-v1";
   const [activities, setActivities] = useState<Activity[]>([]);
   const [activityOpen, setActivityOpen] = useState(false);
+  useEffect(() => {
+    if (!activityOpen) return;
+    const handleEscape = (event: KeyboardEvent) => { if (event.key === "Escape") setActivityOpen(false); };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [activityOpen]);
   function commitCommands(commands:WorkspaceCommand[]){
     // The cloud is persisted only through explicit typed business commands.
     // The demo retains its independent localStorage snapshot.
@@ -489,7 +495,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
           <button className={view === "library" ? "active" : ""} onClick={() => changeView("library")}><AnimatedNavIcon icon={Grid2X2} hoverIcon={LibraryBig} kind="library" /><span>Biblioteca</span><em>{isDemo?libraryAssets.length:linkedFolderCount??"—"}</em></button>
           <button className={view === "settings" ? "active" : ""} onClick={() => changeView("settings")}><AnimatedNavIcon icon={Settings2} hoverIcon={UserRound} kind="settings" /><span>Configurações</span></button>
           <button type="button" className={activityOpen ? "active" : ""} onClick={() => setActivityOpen(open => !open)} aria-expanded={activityOpen} aria-controls="sidebar-activity-panel"><Bell size={19} /><span>Notificações</span>{activities.length > 0 && <em>{activities.length}</em>}</button>
-          <button type="button" onClick={toggleTheme} aria-label={theme === "light" ? "Ativar modo escuro" : "Ativar modo claro"}><Sun size={19} /><span>Aparência</span><span className="sidebar-appearance-switch" aria-hidden="true">{theme === "dark" ? <Moon size={14} /> : <Sun size={14} />}</span></button>
+          <button type="button" onClick={toggleTheme} aria-label="Alternar aparência"><Sun size={19} /><span>Aparência</span><span className="sidebar-appearance-switch" aria-hidden="true">{theme === "dark" ? <Moon size={14} /> : <Sun size={14} />}</span></button>
         </nav>
         {activityOpen && <section className="sidebar-activity-panel" id="sidebar-activity-panel" role="dialog" aria-label="Notificações e atividades">
           <header><strong>Notificações</strong><button type="button" aria-label="Fechar notificações" onClick={() => setActivityOpen(false)}><X size={18}/></button></header>
