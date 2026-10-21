@@ -5,6 +5,7 @@ import { driveFolderLinkId, linkDriveFolder, readDriveLinks, unlinkDriveFolder, 
 import type { Project } from "../../domain/workspace";
 import { DRIVE_FOLDER, DriveFileExplorer, DriveFolderPicker, DrivePreview, DriveUnlinkConfirm, driveFileUrl, isPreviewable, type DriveItem, type DriveTrail } from "./DriveLibraryUI";
 import {clearDriveThumbnailCache} from "./DriveThumbnail";
+import {useDriveThumbnailFetch} from "./useDriveThumbnailFetch";
 import {cacheKey,getCachedFolder,setCachedFolder,clearDriveFolderCache} from "./drive-folder-cache";
 import type {UploadDestination} from "./useDriveUploads";
 import {useDriveTransfers} from "./DriveTransfersProvider";
@@ -73,27 +74,7 @@ export function DriveConnectionPanel({
   const authorized=connected.filter(c=>c.scopes.split(/\s+/).includes(READ));
   const connection=authorized.find(c=>c.id===selectedAccount)||authorized[0];
   const relevant=selectedProjectId?links.filter(l=>l.projectId===selectedProjectId):links;
-  // Reuse short-lived list metadata (sealed ticket), never expose upstream Google URLs.
-  const getThumbnail=useCallback(async(file:DriveItem,signal?:AbortSignal,accountId?:string):Promise<Blob|null>=>{
-    if(!user||!accountId||(!file.thumbnailTicket&&!file.thumbnailLink))return null;
-    const base="/integrations/drive/"+encodeURIComponent(accountId)+"/files/"+encodeURIComponent(file.id)+"/thumbnail";
-    const load=async(useTicket:boolean,forceToken=false):Promise<Response>=>{
-      const token=await user.getIdToken(forceToken);
-      const path=useTicket&&file.thumbnailTicket?base+"?ticket="+encodeURIComponent(file.thumbnailTicket):base;
-      return fetch(API+path,{headers:{Authorization:"Bearer "+token},signal,cache:"no-store"});
-    };
-    try{
-      let response=await load(Boolean(file.thumbnailTicket));
-      if(response.status===401)response=await load(Boolean(file.thumbnailTicket),true);
-      // Expired link / rotated connection revision: authenticate and request fresh metadata.
-      if(file.thumbnailTicket&&(response.status===410||response.status===403))response=await load(false);
-      if(!response.ok)return null;
-      const type=(response.headers.get("Content-Type")||"").split(";")[0];
-      if(!type.startsWith("image/"))return null;
-      const blob=await response.blob();
-      return blob.size>0&&blob.size<=1024*1024?blob:null;
-    }catch{return null;}
-  },[user]);
+  const getThumbnail=useDriveThumbnailFetch();
 
   useEffect(()=>{
     if(!user?.uid || (ready&&!connection)){
