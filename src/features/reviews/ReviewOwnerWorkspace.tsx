@@ -62,7 +62,7 @@ export function ReviewOwnerWorkspace({detail,working,onClose,onRevise,onPublish,
   const currentAssets=useMemo(()=>assets.filter(a=>a.version===review.version),[assets,review.version]);
   const currentComments=useMemo(()=>comments.filter(c=>c.version===review.version),[comments,review.version]);
   const priorComments=comments.filter(c=>c.version<review.version);
-  const oldVersions=[...new Set(assets.map(a=>a.version).filter(v=>v<review.version))].sort((a,b)=>b-a);
+  const oldVersions=[...new Set([...assets.map(a=>a.version),...comments.map(c=>c.version),...decisions.map(d=>d.version)].filter(v=>v<review.version))].sort((a,b)=>b-a);
   const latestDecision=useMemo(()=>[...decisions].filter(d=>d.version===review.version).sort((a,b)=>b.created_at-a.created_at)[0], [decisions,review.version]);
   const featuredId=currentAssets.find(a=>currentComments.some(c=>c.file_id===a.fileId))?.fileId||currentAssets[0]?.fileId;
   const [selectedFile,setSelectedFile]=useState<string|undefined>(featuredId);
