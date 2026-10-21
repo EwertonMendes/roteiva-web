@@ -431,7 +431,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
                       checked={files.some(a=>a.fileId===f.id)} onChange={()=>addFile(f)}/>
                     {selectedFolder&&user&&<DriveThumbnail item={f} scope={user.uid+":"+selectedFolder.connectionId}
                       getThumbnail={getThumbnail}/>}
-                    <span className="review-picker-name" title={f.name}>{f.name}
+                    <span className="review-picker-name" title={f.name}><span>{f.name}</span>
                       <small>{supported(f)?readableFileType(f.mimeType):"Formato não aceito para aprovação"}</small></span>
                   </label>}
                 <a className="review-picker-external" href={f.mimeType==="application/vnd.google-apps.folder"?
