@@ -1,5 +1,5 @@
 import {useEffect,useMemo,useRef,useState} from "react";
-import {Check,CheckCircle2,ChevronRight,Clock3,Copy,ExternalLink,FileAudio,FileImage,FileText,
+import {CheckCircle2,ChevronRight,Clock3,Copy,ExternalLink,FileAudio,FileImage,FileText,
   FileVideo,History,Link2,LoaderCircle,MessageSquare,RotateCcw,Send,ShieldCheck,X} from "lucide-react";
 import {formatReviewTime} from "./review-timecode";
 import {fmt,statusText,type Asset,type Comment,type Detail} from "./review-model";
@@ -98,11 +98,11 @@ export function ReviewOwnerWorkspace({detail,working,onClose,onRevise,onPublish,
             <h3>{review.status==="changes"?"O cliente pediu alterações":review.status==="approved"?"Materiais aprovados":review.status==="pending"?"Aguardando a avaliação do cliente":"Acompanhe a revisão"}</h3>
             <p>{review.status==="changes"?"Confira o feedback abaixo e prepare a próxima versão.":review.status==="pending"?"Os arquivos estão disponíveis; veja os comentários e acompanhe a resposta.":review.status==="approved"?"O cliente concluiu esta versão. O histórico permanece disponível.":"Todas as versões e comentários estão organizados abaixo."}</p>
           </div>
-          {review.status==="changes"&&<button type="button" className="primary-button rowner-top-action" onClick={onRevise} disabled={working}>Enviar nova versão <ChevronRight size={17}/></button>}
+
         </div>
         {latestDecision&&<div className={"rowner-latest-decision "+(latestDecision.decision==="changes"?"is-changes":"is-approved")}>
           {latestDecision.decision==="changes"?<MessageSquare size={18}/>:<CheckCircle2 size={18}/>}
-          <div><strong>{latestDecision.decision==="changes"?"Pedido de ajustes":"Aprovação recebida"} · V{latestDecision.version}</strong>
+          <div><strong>{latestDecision.decision==="changes"?"Pedido de ajustes":"Material aprovado"} · V{latestDecision.version}</strong>
             <p>{latestDecision.message||"Sem observações adicionais."}</p>
             <small>{latestDecision.author_name} · {longDate(latestDecision.created_at)}</small>
           </div>
