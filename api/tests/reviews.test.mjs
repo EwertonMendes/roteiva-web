@@ -576,3 +576,14 @@ test('same file may be reviewed in parallel; public grant survives the first clo
   assert.equal((await x.send('POST','/reviews/'+second.id+'/close',x.alice)).status,200);
   assert.equal(x.acl.size,0);
 });
+
+test('Google-only review never issues an anonymous media streaming ticket',async t=>{
+  const x=await integration(t);
+  const {id,published}=await createAndPublish(x,{mode:'google',recipientEmail:'client@gmail.com'});
+  assert.equal(published.status,200);
+  const token=(await published.json()).review.review.url.split('/').at(-1);
+  const verified=await x.jwt('recipient','client@gmail.com');
+  await assert.rejects(()=>route(x.f,token,'/reviews/public/media-ticket','POST',
+    {fileId:file},verified),e=>e.code==='review_private_media_google_drive');
+  assert.equal((await x.send('POST','/reviews/'+id+'/close',x.alice)).status,200);
+});
