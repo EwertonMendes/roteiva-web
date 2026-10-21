@@ -346,7 +346,13 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
           {["draft","publishing"].includes(opened.review.status)&&<button className="primary-button" disabled={working}
             onClick={()=>void mutate("publish")}>Ativar compartilhamento</button>}
           {opened.review.status==="changes"&&<button className="primary-button" onClick={beginRevision}>Enviar nova versão</button>}
-          {opened.review.status==="replacing"&&<button className="primary-button" disabled={working} onClick={()=>void run(async()=>{await call("/reviews/"+opened.review.id+"/revise","POST",{assets:[]});await openDetail(opened.review.id);})}>Concluir troca de versão</button>}
+          {opened.review.status==="replacing"&&(opened.assets.some(a=>a.version===opened.review.version+1)?
+            <button className="primary-button" disabled={working} onClick={()=>void run(async()=>{
+              const result=await call<{review:Detail}>("/reviews/"+opened.review.id+"/revise","POST",{assets:[]});
+              setOpened(result.review);
+            })}>Concluir troca de versão</button>:
+            <button className="primary-button" disabled={working} onClick={beginRevision}>
+              Selecionar arquivos para retomar versão</button>)}
           {opened.review.status==="closing"&&<button className="primary-button" disabled={working} onClick={()=>void mutate("close")}>Concluir revogação</button>}
           {["pending","changes","approved","draft"].includes(opened.review.status)&&<button className="secondary-button" disabled={working} onClick={()=>void mutate("rotate")}>Renovar link</button>}
           {opened.review.status!=="closed"&&<button className="secondary-button" disabled={working} onClick={()=>void mutate("close")}>Encerrar revisão</button>}
