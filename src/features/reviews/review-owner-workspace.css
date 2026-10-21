@@ -111,6 +111,7 @@
 .rowner-history-title span{color:var(--muted);font-size:.74rem}
 .rowner-history-decision,.rowner-history-files{margin:0;line-height:1.55;overflow-wrap:anywhere;font-size:.8rem}
 .rowner-history-decision{display:grid;gap:5px}
+.rowner-history-decision p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
 .rowner-history-decision small,.rowner-history-files{font-size:.73rem;color:var(--muted)}
 .rowner-history-comment{display:grid;gap:5px;padding-top:11px;border-top:1px solid var(--line);font-size:.79rem}
 .rowner-history-comment small{color:var(--muted)}
