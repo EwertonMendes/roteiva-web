@@ -221,7 +221,7 @@ async function createReview(request:Request,env:Env,uid:string):Promise<Response
   const r={id,owner_uid:uid};
   const encrypted=await encrypt(env,secret,tokenContext(env,r));
   await env.DB.batch([
-    env.DB.prepare("INSERT INTO review_requests(id,owner_uid,client_id,project_id,client_name,project_name,studio_name,title,message,recipient_email,access_mode,status,current_version,expires_at,token_hash,encrypted_token,restrict_existing_public,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,'draft',1,?,?,?,?,?,?,?)")
+    env.DB.prepare("INSERT INTO review_requests(id,owner_uid,client_id,project_id,client_name,project_name,studio_name,title,message,recipient_email,access_mode,status,current_version,expires_at,token_hash,encrypted_token,restrict_existing_public,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,'draft',1,?,?,?,?,?,?)")
       .bind(id,uid,clientId,projectId,metadata.clientName,metadata.projectName,studio,title,message,people.find(p=>p.role==='reviewer')?.email||'',mode,
         ts+days*86400000,await hash(secret),encrypted,restrict,ts,ts),
     ...people.map(p=>env.DB.prepare("INSERT INTO review_participants(review_id,email,role) VALUES(?,?,?)").bind(id,p.email,p.role)),
