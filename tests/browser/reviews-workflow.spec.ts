@@ -4,7 +4,7 @@ import {collection,doc,getDocs,query,setDoc,where,Timestamp} from 'firebase/fire
 const root='http://127.0.0.1:4173',api='https://roteiva-api-dev.ewertonmendes9.workers.dev';
 const connection='aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa',folder='REVIEW_FOLDER_12345';
 const file={fileId:'REVIEW_FILE_12345678',name:'Corte.mp4',mimeType:'video/mp4'};
-const second={fileId:'REVIEW_FILE_22345678',name:'Corte final.mp4',mimeType:'video/mp4'};
+const second={fileId:'REVIEW_FILE_22345678',name:'Corte final.mp4',mimeType:'video/mp4',thumbnailTicket:'sealed-thumb-qa'};
 const token='w'.repeat(43);
 
 async function prepare(page:Page,email:string){
@@ -55,6 +55,7 @@ test('profissional cria, cliente comenta/pede ajustes, V2 aprovada e encerrament
     studioName:'Estúdio QA',title:'',message:'',recipientEmail:'',mode:'link',status:'draft',version:1,
     expiresAt:Date.now()+86400000,createdAt:Date.now(),updatedAt:Date.now(),url:root+'/review/'+token};
   let created=false,selected=[file],createCalls=0,publishCalls=0,revisionCalls=0,closeCalls=0;
+  const searchTerms:string[]=[];let thumbCalls=0;
   const uploaded={id:'UPLOADED_REVIEW_12345',name:'Envio.mp4',mimeType:'video/mp4',size:'300000'};
   let uploadConfirmed=false,attemptId='',putCalls=0,releaseUpload!:()=>void;
   const uploadGate=new Promise<void>(resolve=>{releaseUpload=resolve;});
@@ -77,11 +78,18 @@ test('profissional cria, cliente comenta/pede ajustes, V2 aprovada e encerrament
   const detail=()=>({review,assets:selected.map(f=>({...f,version:review.version,grantState:'granted'})),comments,decisions});
   await context.route(api+'/**',async route=>{
     const req=route.request(),url=new URL(req.url()),path=url.pathname;
-    if(!path.startsWith('/reviews')&&!path.includes('/folders/'))return route.fallback();
+    if(!path.startsWith('/reviews')&&!path.includes('/folders/')&&!path.endsWith('/thumbnail'))return route.fallback();
     const headers={'Access-Control-Allow-Origin':root,'Access-Control-Allow-Methods':'GET,POST,OPTIONS',
       'Access-Control-Allow-Headers':'Authorization,Content-Type,X-Review-Token','Cache-Control':'no-store'};
     const json=(body:unknown,status=200)=>route.fulfill({status,headers,contentType:'application/json',body:JSON.stringify(body)});
     if(req.method()==='OPTIONS')return route.fulfill({status:204,headers});
+    if(path.endsWith('/thumbnail')){
+      expect(req.headers().authorization).toMatch(/^Bearer /);
+      expect(url.searchParams.get('ticket')).toBe('sealed-thumb-qa');
+      thumbCalls++;
+      return route.fulfill({status:200,headers,contentType:'image/png',
+        body:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO2qFqsAAAAASUVORK5CYII=','base64')});
+    }
     if(path.startsWith('/reviews/public')){
       expect(req.headers()['x-review-token']).toBe(token);
       if(review.status==='closed')return json({error:{code:'review_not_found'}},404);
@@ -112,8 +120,12 @@ test('profissional cria, cliente comenta/pede ajustes, V2 aprovada e encerrament
       expect(req.postDataJSON()).toEqual({attemptId,projectId,linkedFolderId:folder,fileId:uploaded.id,size:300000});
       expect(putCalls).toBe(2);uploadConfirmed=true;return json({file:uploaded});
     }
-    if(path.endsWith('/items'))return json({files:[...([file,second].map(f=>({...f,id:f.fileId}))),
-      ...(uploadConfirmed?[uploaded]:[])],nextPageToken:null});
+    if(path.endsWith('/items')){
+      const term=url.searchParams.get('search');
+      if(term)searchTerms.push(term);
+      const all=[...([file,second].map(f=>({...f,id:f.fileId}))),...(uploadConfirmed?[uploaded]:[])];
+      return json({files:term?all.filter(f=>f.name.toLowerCase().includes(term.toLowerCase())):all,nextPageToken:null});
+    }
     if(path==='/reviews'&&req.method()==='GET')return json({reviews:created?[review]:[],hasMore:false});
     if(path==='/reviews'&&req.method()==='POST'){
       const body=req.postDataJSON();expect(body.clientId).toBe(clientId);expect(body.projectId).toBe(projectId);
@@ -139,6 +151,20 @@ test('profissional cria, cliente comenta/pede ajustes, V2 aprovada e encerrament
   await composer.getByRole('combobox',{name:'Projeto',exact:true}).selectOption({label:'Projeto Revisão'});
   await composer.getByLabel('Título da aprovação').fill('Corte para revisão');
   await composer.getByRole('button',{name:'Materiais autorizados'}).click();
+  await expect(composer.getByRole('link',{name:'Abrir pasta no Drive'})).toHaveAttribute(
+    'href','https://drive.google.com/drive/folders/'+folder);
+  await expect(composer.getByRole('link',{name:'Abrir Corte final.mp4 no Google Drive'}))
+    .toHaveAttribute('href',new RegExp('drive.google.com'));
+  const thumb=composer.locator('[data-mime="video/mp4"][data-thumbnail-state]').last();
+  await thumb.scrollIntoViewIfNeeded();
+  await expect(thumb).toHaveAttribute('data-thumbnail-state','loaded');
+  const driveSearch=composer.getByRole('searchbox',{name:'Buscar arquivos no Google Drive'});
+  await driveSearch.fill('Corte final');
+  await expect(composer.getByText('Corte final.mp4',{exact:true})).toBeVisible();
+  await expect(composer.getByText('Corte.mp4',{exact:true})).toHaveCount(0);
+  await expect.poll(()=>searchTerms.includes('Corte final')).toBe(true);
+  await driveSearch.fill('');
+  await expect(composer.getByText('Corte.mp4',{exact:true})).toBeVisible();
   await composer.getByText('Corte.mp4',{exact:true}).click();
   await composer.locator('input[type=file]').setInputFiles({name:uploaded.name,mimeType:'video/mp4',buffer:Buffer.alloc(300000)});
   await expect(composer.getByRole('button',{name:'Gerar aprovação'})).toBeDisabled();
@@ -180,6 +206,7 @@ test('profissional cria, cliente comenta/pede ajustes, V2 aprovada e encerrament
   await page.getByRole('button',{name:'Encerrar revisão',exact:true}).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await guest.reload();await expect(guest.getByRole('heading',{name:'Material indisponível'})).toBeVisible();
+  expect(thumbCalls).toBeGreaterThan(0);
   expect({createCalls,publishCalls,revisionCalls,closeCalls}).toEqual({createCalls:1,publishCalls:1,revisionCalls:1,closeCalls:1});
   await guest.close();
 });
