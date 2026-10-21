@@ -63,3 +63,13 @@ UPDATE review_assets SET permission_id=NULL WHERE grant_state='granted' AND EXIS
 );
 
 ALTER TABLE review_google_acl ADD COLUMN owner_review_id TEXT;
+
+-- Multiple separate approvals may select one Drive file concurrently.
+-- These references protect app-created "anyone" permissions until their last user closes.
+CREATE TABLE review_link_uses (
+ review_id TEXT NOT NULL REFERENCES review_requests(id) ON DELETE CASCADE,
+ version INTEGER NOT NULL,
+ file_id TEXT NOT NULL,
+ PRIMARY KEY(review_id,version,file_id)
+);
+CREATE INDEX review_link_uses_by_file ON review_link_uses(file_id);
