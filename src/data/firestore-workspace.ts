@@ -578,27 +578,34 @@ export class FirestoreWorkspace {
    * A failed aggregation aborts the overview instead of reporting fake zeros.
    */
   async overviewMetrics(projects?:WorkspaceData["projects"]):
-    Promise<{clientCount:number;receivableAmount:number;projectCount:number;projectStatuses:Record<Status,number>}> {
+    Promise<{clientCount:number;receivableAmount:number;cashBalance:number;projectCount:number;projectStatuses:Record<Status,number>}> {
     const statuses:Status[]=["Em produção","Em aprovação","Ajustes","Aprovado"];
     // Reuse a verified complete small page. Empty accounts should not spend
     // four aggregation queries to discover that every project bucket is zero.
     const pageComplete=!!projects && this.stamp?.counts.projects===projects.length;
     try {
-    const [clients,receivable,...counts]=await Promise.all([
+    const [clients,receivable,receivedIncome,paidExpenses,...counts]=await Promise.all([
       getCountFromServer(collection(this.db,"users",this.uid,"clients")),
       getAggregateFromServer(query(collection(this.db,"users",this.uid,"financeEntries"),
         where("kind","==","income"),where("status","==","A receber")),
         {amountCents:sum("amountCents")}),
+      getAggregateFromServer(query(collection(this.db,"users",this.uid,"financeEntries"),
+        where("kind","==","income"),where("status","==","Recebido")),
+        {amountCents:sum("amountCents")}),
+      getAggregateFromServer(query(collection(this.db,"users",this.uid,"financeEntries"),
+        where("kind","==","expense"),where("status","==","Recebido")),
+        {amountCents:sum("amountCents")}),
       ...(pageComplete?[]:statuses.map(status=>getCountFromServer(query(
         collection(this.db,"users",this.uid,"projects"),where("status","==",status))))),
     ]);
-    for(let i=0;i<2+counts.length;i++)trackAggregation(this.uid);
+    for(let i=0;i<4+counts.length;i++)trackAggregation(this.uid);
     const projectStatuses=Object.fromEntries(statuses.map((name,i)=>[
       name,pageComplete ? projects!.filter(project=>project.status===name).length
         : counts[i].data().count,
     ])) as Record<Status,number>;
     return {clientCount:clients.data().count,
       receivableAmount:(receivable.data().amountCents ?? 0)/100,
+      cashBalance:((receivedIncome.data().amountCents ?? 0) - (paidExpenses.data().amountCents ?? 0))/100,
       projectCount:Object.values(projectStatuses).reduce((sum,value)=>sum+value,0),
       projectStatuses};
     }catch(error) {
@@ -613,6 +620,10 @@ export class FirestoreWorkspace {
         clientCount:data.clients.length,
         receivableAmount:data.financeEntries.filter(e=>e.kind!=="expense"&&e.status==="A receber")
           .reduce((sum,e)=>sum+Math.round(e.amount*100),0)/100,
+        cashBalance:(data.financeEntries.filter(entry=>entry.kind!=="expense"&&entry.status==="Recebido")
+          .reduce((total,entry)=>total+Math.round(entry.amount*100),0)
+          -data.financeEntries.filter(entry=>entry.kind==="expense"&&entry.status==="Recebido")
+          .reduce((total,entry)=>total+Math.round(entry.amount*100),0))/100,
         projectCount:data.projects.length,projectStatuses,
       };
     }

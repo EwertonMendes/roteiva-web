@@ -10,8 +10,9 @@ import {
   FileVideo, FileAudio, FileText, HardDrive, ChevronLeft, Settings2,
   LayoutGrid, UsersRound, Repeat2, ContactRound, type LucideIcon,
 } from "lucide-react";
-import { ProjectDetail, ClientDetail, TodayStudio, StudioReviews, WorkspaceTools, FinancePanel, projectTemplates } from "./studio-features";
+import { ProjectDetail, ClientDetail, StudioReviews, WorkspaceTools, FinancePanel, projectTemplates } from "./studio-features";
 import {ReviewsDashboard} from "./features/reviews/ReviewsDashboard";
+import { TodayStudio } from "./features/dashboard/DashboardOverview";
 import { validTimeRange, overlaps, eventRange, eventDuration } from "./studio-calendar";
 import { toISO as toISOAdded, parseMoney, splitInstallments } from "./studio-finance";
 import { FormEvent, useEffect, useLayoutEffect, useMemo, useState, useCallback } from "react";
@@ -66,7 +67,7 @@ type DashboardProps = {
   onThemeChange?:(theme:"light"|"dark")=>void;
   onLoadWorkspace?:()=>Promise<WorkspaceData>; onRouteChange?:(route:WorkspaceRoute)=>void;
   onCommands?:(commands:readonly WorkspaceCommand[])=>void;
-  overviewMetrics?:{clientCount?:number;receivableAmount?:number;projectCount?:number;projectStatuses?:Record<Status,number>}; projectPage?:{total:number;hasMore:boolean;status:string};
+  overviewMetrics?:{clientCount?:number;receivableAmount?:number;cashBalance?:number;projectCount?:number;projectStatuses?:Record<Status,number>}; projectPage?:{total:number;hasMore:boolean;status:string};
   onMoreProjects?:()=>void;onProjectStatus?:(status:Status|"Todos")=>void;
   onSearchProjects?:()=>void; clientPage?:{total:number;recurring:number;hasMore:boolean};
   onFinancePeriodChange?:(year:number,month:number,clientId?:number)=>void;
@@ -115,6 +116,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
   const [uploading, setUploading] = useState(false);
   const storageKey = "roteiva-pages-demo-workspace-v1";
   const [activities, setActivities] = useState<Activity[]>([]);
+  const [activityOpen, setActivityOpen] = useState(false);
   function commitCommands(commands:WorkspaceCommand[]){
     // The cloud is persisted only through explicit typed business commands.
     // The demo retains its independent localStorage snapshot.
@@ -418,6 +420,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
 
   function startProject(){if(!isDemo&&view!=="projects")changeView("projects");setModalOpen(true);}
   function changeView(next:View) {
+    setActivityOpen(false);
     navigateRoute({view:next});
     if(next==="projects"&&query.trim())onSearchProjects?.();
     if(next==="clients"&&query.trim())onSearchClients?.();
@@ -467,7 +470,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
   if (!dataReady) return <main className="studio-loading" role="status">Carregando seu estúdio…</main>;
 
   return (
-    <div className="app-shell" inert={saving || undefined}>
+    <div className={`app-shell app-view-${view}`} inert={saving || undefined}>
       <aside className={`sidebar ${mobileOpen ? "mobile-open" : ""}`}>
         <div className="brand-lockup">
           <img src={`${import.meta.env.BASE_URL}${theme === "light" ? "roteiva-logo-black.png" : "roteiva-logo-white.png"}`} alt="Roteiva" />
@@ -485,7 +488,14 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
           <button className={view === "calendar" ? "active" : ""} onClick={() => changeView("calendar")}><AnimatedNavIcon icon={CalendarDays} hoverIcon={CalendarCheck2} kind="calendar" /><span>Calendário</span><em>{eventCount ?? calendarEvents.length}</em></button>
           <button className={view === "library" ? "active" : ""} onClick={() => changeView("library")}><AnimatedNavIcon icon={Grid2X2} hoverIcon={LibraryBig} kind="library" /><span>Biblioteca</span><em>{isDemo?libraryAssets.length:linkedFolderCount??"—"}</em></button>
           <button className={view === "settings" ? "active" : ""} onClick={() => changeView("settings")}><AnimatedNavIcon icon={Settings2} hoverIcon={UserRound} kind="settings" /><span>Configurações</span></button>
+          <button type="button" className={activityOpen ? "active" : ""} onClick={() => setActivityOpen(open => !open)} aria-expanded={activityOpen} aria-controls="sidebar-activity-panel"><Bell size={19} /><span>Notificações</span>{activities.length > 0 && <em>{activities.length}</em>}</button>
+          <button type="button" onClick={toggleTheme} aria-label={theme === "light" ? "Ativar modo escuro" : "Ativar modo claro"}><Sun size={19} /><span>Aparência</span><span className="sidebar-appearance-switch" aria-hidden="true">{theme === "dark" ? <Moon size={14} /> : <Sun size={14} />}</span></button>
         </nav>
+        {activityOpen && <section className="sidebar-activity-panel" id="sidebar-activity-panel" role="dialog" aria-label="Notificações e atividades">
+          <header><strong>Notificações</strong><button type="button" aria-label="Fechar notificações" onClick={() => setActivityOpen(false)}><X size={18}/></button></header>
+          <p className="sidebar-activity-subtitle">Últimas atividades do seu espaço</p>
+          {activities.length ? <ul>{activities.slice(0,15).map((activity,index) => <li key={activity.id || index}><span>{activity.text}</span><time dateTime={activity.when}>{new Date(activity.when).toLocaleString("pt-BR")}</time></li>)}</ul> : <p className="sidebar-activity-empty">Nenhuma atividade registrada ainda.</p>}
+        </section>}
         <div className="sidebar-profile">
           {photoURL ? <img className="profile-photo" src={photoURL} alt="Foto do usuário" referrerPolicy="no-referrer" /> : <span>{firstName.slice(0, 2).toUpperCase()}</span>}<div><b>{firstName}</b><small>{email}</small></div>{onLogout ? <button className="icon-button" onClick={signOut} aria-label="Sair da conta" title="Sair da conta">↪</button> : <MoreHorizontal size={18} />}
         </div>
@@ -507,7 +517,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
         </header>
 
         <section className="page">
-          {isDemo ? <div className="pages-demo-notice" role="note"><b>Modo demonstração</b><span>Explore o Roteiva com dados salvos apenas neste navegador. Entre na sua conta para trabalhar com seus próprios projetos.</span></div> : view!=="library" ? <div className="cloud-banner" role="status"><b>Seu espaço</b><span>{cloudStatus}</span></div> : null}
+          {isDemo ? <div className="pages-demo-notice" role="note"><b>Modo demonstração</b><span>Explore o Roteiva com dados salvos apenas neste navegador. Entre na sua conta para trabalhar com seus próprios projetos.</span></div> : view!=="library" && view!=="overview" ? <div className="cloud-banner" role="status"><b>Seu espaço</b><span>{cloudStatus}</span></div> : null}
           <div className="page-heading">
             <div><span className="eyebrow">ROTEIVA / {view === "overview" ? "PAINEL" : pageTitles[view][0].toUpperCase()}</span><h1>{pageTitles[view][0]}</h1><p>{pageTitles[view][1]}</p></div>
             <div className="heading-actions">
@@ -520,7 +530,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
             </div>
           </div>
           {view === "settings" && <SettingsPage profile={profile} email={email} photoURL={photoURL} theme={theme} toggleTheme={toggleTheme} onSaveProfile={onSaveProfile} />}
-          {view === "overview" && <><TodayStudio clients={clientList} projects={projects} entries={financeEntries} events={calendarEvents} activities={activities} onView={changeView} overviewMetrics={overviewMetrics} /><Overview projects={projects} setView={changeView} onOpenProject={openProject} /></>}
+          {view === "overview" && <><TodayStudio clients={clientList} projects={projects} entries={financeEntries} events={calendarEvents} activities={activities} onView={changeView} overviewMetrics={overviewMetrics} />{(overviewMetrics?.projectCount ?? projects.length) > 0 && <Overview projects={projects} setView={changeView} onOpenProject={openProject} />}</>}
           {view === "projects" && (selectedProject && projects.some(p => p.id === selectedProject) ? <ProjectDetail project={projects.find(p => p.id === selectedProject)!} clients={clientList} entries={financeEntries} assets={libraryAssets} events={calendarEvents} onSave={updateProject} onBack={() => changeView("projects")} onRevenue={addLinkedRevenue} onUpload={uploadAssets} onEvent={(p) => { openEvent(null, p.dueDate); }} uploading={uploading} onReview={()=>{setReviewStart({clientId:projects.find(p=>p.id===selectedProject)?.clientId,projectId:selectedProject||undefined});changeView("reviews");}} /> : <ProjectsView projects={filtered.map(p => ({...p, files: libraryAssets.filter(a => a.projectId === p.id).length}))}
                   statusFilter={statusFilter} setStatusFilter={(status)=>{
                     setStatusFilter(status);

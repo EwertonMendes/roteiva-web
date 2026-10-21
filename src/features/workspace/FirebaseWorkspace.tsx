@@ -325,6 +325,10 @@ export function FirebaseWorkspace() {
     const months=touchesFinance && financePeriod && financeBars && Number.isInteger(year)
       ? repository.affectedFinanceMonths(commands,year) : undefined;
     const changed=await repository.applyCommands(commands);
+    if(changed && commands.some(command=>["saveFinance","deleteFinance","saveProject","deleteProject","saveClient","deleteClient"].includes(command.kind))){
+      const updated=await retryFirestoreRead(()=>repository.overviewMetrics());
+      setOverviewMetrics(updated);
+    }
     if(changed && months && financeBars?.key===year+"-"+(clientId||"")){
       const bars=await repository.financeYearBars(year,clientId,months);
       setFinanceBars({key:year+"-"+(clientId||""),bars});
@@ -373,6 +377,7 @@ export function FirebaseWorkspace() {
         overviewMetrics={overviewMetrics ? {
           clientCount:repository.hasLoaded(["clients"])?undefined:overviewMetrics.clientCount,
           receivableAmount:repository.hasLoaded(["financeEntries"])?undefined:overviewMetrics.receivableAmount,
+          cashBalance:repository.hasLoaded(["financeEntries"])?undefined:overviewMetrics.cashBalance,
           projectCount:repository.hasLoaded(["projects"])?undefined:overviewMetrics.projectCount,
           projectStatuses:repository.hasLoaded(["projects"])?undefined:overviewMetrics.projectStatuses,
         } : undefined} cloudStatus={status} saving={saving} onLogout={()=>void logout()} />
