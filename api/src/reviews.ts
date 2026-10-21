@@ -496,9 +496,12 @@ async function publicReview(request:Request,env:Env,action:'view'|'comment'|'dec
   const authorName=email?inputText(data.authorName||email,100,true):author;
   if(action==='comment'){
     const fileId=inputText(data.fileId,200,true),body=inputText(data.body,1500,true);
-    if(!files.some(a=>a.file_id===fileId))throw new ApiError(400,'review_invalid_input');
-    const sec=data.seconds==null?null:Number(data.seconds);
-    if(sec!==null&&(!Number.isSafeInteger(sec)||sec<0||sec>172800))
+    const chosen=files.find(a=>a.file_id===fileId);
+    if(!chosen)throw new ApiError(400,'review_invalid_input');
+    if(data.seconds!=null&&typeof data.seconds!=='number')throw new ApiError(400,'review_invalid_input');
+    const sec=data.seconds==null?null:data.seconds;
+    if(sec!==null&&(!Number.isSafeInteger(sec)||sec<0||sec>172800||
+       !chosen.mime_type.startsWith('video/')))
       throw new ApiError(400,'review_invalid_input');
     const saved=await env.DB.prepare("INSERT INTO review_comments(id,review_id,version,file_id,author_name,author_email,body,seconds,created_at) SELECT ?,?,?,?,?,?,?,?,? FROM review_requests WHERE id=? AND status='pending' AND current_version=? AND token_hash=? AND expires_at>?")
       .bind(crypto.randomUUID(),r.id,r.current_version,fileId,authorName,email||null,body,sec,now(),
