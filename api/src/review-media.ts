@@ -18,7 +18,7 @@ async function key(env:Env,version:string):Promise<CryptoKey>{
   if(!material)throw new ApiError(503,'key_unavailable');
   const raw=decode(material);
   if(raw.length!==32)throw new ApiError(503,'invalid_key');
-  return crypto.subtle.importKey('raw',raw,'HMAC',false,['sign','verify']);
+  return crypto.subtle.importKey('raw',raw,{name:'HMAC',hash:'SHA-256'},false,['sign','verify']);
 }
 export async function mintReviewMediaTicket(env:Env,reviewId:string,fileId:string,version:number,expiry:number):Promise<string>{
   const p:Ticket={r:reviewId,f:fileId,v:version,e:Math.min(expiry,Date.now()+MEDIA_MAX_AGE),k:env.TOKEN_KEY_VERSION};
