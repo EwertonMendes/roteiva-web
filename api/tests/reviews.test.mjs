@@ -140,7 +140,8 @@ async function integration(t){
     API_THUMB_LIMIT:{limit:async()=>({success:true})}};
   const acl=new Map();
   const calls=[];
-  const hooks={beforeGrant:null,deleteFails:false,lostGrant:false,outside:false};
+  const hooks={beforeGrant:null,deleteFails:false,lostGrant:false,outside:false,
+    publicFolder:false,unauthorized:false,disableInheritance:false};
   const previous=globalThis.fetch;
   globalThis.fetch=async(url,init={})=>{
     const u=new URL(String(url));calls.push({host:u.host,path:u.pathname,method:init.method||'GET'});
@@ -164,12 +165,17 @@ async function integration(t){
       assert.equal(init.headers.Authorization,'Bearer short-lived');
       if(u.pathname.endsWith('/files/'+file))return Response.json({
         id:file,name:'Primeiro corte.mp4',mimeType:'video/mp4',
-        trashed:false,isAppAuthorized:true,parents:[hooks.outside?'OTHER_FOLDER_12345':folder],capabilities:{canShare:true}});
+        trashed:false,isAppAuthorized:!hooks.unauthorized,inheritedPermissionsDisabled:hooks.disableInheritance,
+        parents:[hooks.outside?'OTHER_FOLDER_12345':folder],capabilities:{canShare:!hooks.unauthorized}});
       if(u.pathname.endsWith('/files/'+folder))return Response.json({
         id:folder,name:'Projeto',mimeType:'application/vnd.google-apps.folder',
         trashed:false,isAppAuthorized:true,parents:['root'],capabilities:{canShare:true}});
       if(u.pathname.endsWith('/files/OTHER_FOLDER_12345'))return Response.json({
         id:'OTHER_FOLDER_12345',mimeType:'application/vnd.google-apps.folder',parents:[]});
+      if(u.pathname.endsWith('/files/'+folder+'/permissions')){
+        return Response.json({permissions:hooks.publicFolder?[
+          {id:'folder-share',type:'anyone',role:'reader',permissionDetails:[{inherited:false}]}]:[]});
+      }
       if(u.pathname.endsWith('/files/'+file+'/permissions')){
         if(init.method==='POST'){
           const value=JSON.parse(init.body);
@@ -241,6 +247,38 @@ test('reject file outside authorized ancestry before persisting or granting',asy
   assert.equal(res.status,403);
   assert.equal(x.f.sql.prepare('SELECT COUNT(*) n FROM review_requests').get().n,0);
   assert.equal(x.acl.size,0);
+});
+test('public linked folder grants inherited reader access without modifying owner ACL',async t=>{
+  const x=await integration(t);x.hooks.publicFolder=true;x.hooks.unauthorized=true;
+  const {id,published}=await createAndPublish(x);
+  assert.equal(published.status,200);
+  const record=x.f.sql.prepare('SELECT grant_state,permission_id FROM review_assets WHERE review_id=?').get(id);
+  assert.equal(record.grant_state,'granted');
+  assert.equal(record.permission_id,null);
+  assert.equal(x.calls.filter(c=>c.method==='POST'&&c.path.endsWith('/permissions')).length,0);
+  assert.equal((await x.send('POST','/reviews/'+id+'/close',x.alice)).status,200);
+  assert.equal(x.calls.filter(c=>c.method==='DELETE'&&c.path.includes('/permissions/')).length,0);
+});
+test('file already shared by owner is accepted and never revoked by Roteiva',async t=>{
+  const x=await integration(t);x.hooks.unauthorized=true;
+  x.acl.set('owner-public',{type:'anyone',role:'reader'});
+  const {id,published}=await createAndPublish(x);
+  assert.equal(published.status,200);
+  assert.equal((await x.send('POST','/reviews/'+id+'/close',x.alice)).status,200);
+  assert.equal(x.acl.has('owner-public'),true);
+  assert.equal(x.calls.filter(c=>c.method==='DELETE'||c.method==='POST'&&c.path.includes('/permissions')).length,0);
+});
+test('Google-only rejects public parent; private inaccessible file requires explicit Picker grant',async t=>{
+  const x=await integration(t);x.hooks.publicFolder=true;x.hooks.unauthorized=true;
+  const {id,published}=await createAndPublish(x,{mode:'google',recipientEmail:'client@gmail.com'});
+  assert.equal(published.status,409);
+  assert.equal((await published.json()).error.code,'review_existing_public_permission');
+  assert.equal((await x.send('POST','/reviews/'+id+'/close',x.alice)).status,200);
+  x.hooks.publicFolder=false;
+  const second=await createAndPublish(x);
+  assert.equal(second.published.status,409);
+  assert.equal((await second.published.json()).error.code,'review_drive_file_authorization_required');
+  assert.equal(x.calls.filter(c=>c.method==='POST'&&c.path.endsWith('/permissions')).length,0);
 });
 test('restricted review verifies Google recipient and preserves their pre-existing ACL',async t=>{
   const x=await integration(t);
