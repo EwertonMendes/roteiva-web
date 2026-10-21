@@ -53,7 +53,7 @@ test("Google emulator session, CRUD, restoration, themes and separate users",asy
   await page.goto(cloud);
   const email="alice-"+info.project.name+"@example.com";
   await login(page,email);
-  await expect(page.getByRole("heading",{name:"Seu espaço está pronto"})).toBeVisible();
+  await expect(page.getByRole("heading",{name:"O ritmo do seu estúdio"})).toBeVisible();
   await navigate(page,"Clientes");
   await page.getByRole("button",{name:"Novo cliente",exact:true}).click();
   await page.getByLabel("Nome do cliente",{exact:true}).fill("Estúdio Aurora");
@@ -83,6 +83,12 @@ test("Google emulator session, CRUD, restoration, themes and separate users",asy
   await page.getByLabel("Previsão de recebimento",{exact:true}).fill(today);
   await page.locator("form.finance-modal").getByRole("button",{name:"Adicionar lançamento"}).click();await settled(page);
   await expect(page.locator(".finance-table")).toContainText("100,01");
+  await navigate(page,"Visão geral");
+  await expect(page.locator(".flow-finance-amount")).toContainText("R$ 100,01");
+  await page.getByRole("button",{name:"Ocultar valores financeiros"}).click();
+  await expect(page.locator(".flow-finance-amount")).not.toContainText("100,01");
+  await page.getByRole("button",{name:"Mostrar valores financeiros"}).click();
+  await expect(page.locator(".flow-finance-amount")).toContainText("R$ 100,01");
   await navigate(page,"Calendário");
   await page.getByRole("button",{name:"Novo compromisso",exact:true}).click();
   await page.getByLabel("Título",{exact:true}).fill("Gravação Aurora");
@@ -109,7 +115,7 @@ test("Google emulator session, CRUD, restoration, themes and separate users",asy
   await expect(page.locator(".app-shell")).toBeVisible();await settled(page);
   await logout(page);
   await login(page,"bob-"+info.project.name+"@example.com");
-  await expect(page.getByRole("heading",{name:"Seu espaço está pronto"})).toBeVisible();
+  await expect(page.getByRole("heading",{name:"O ritmo do seu estúdio"})).toBeVisible();
   await navigate(page,"Clientes");await expect(page.getByText("Estúdio Aurora",{exact:true})).toHaveCount(0);
   await logout(page);await login(page,email,true);
   await navigate(page,"Clientes");await expect(page.getByText("Estúdio Aurora",{exact:true})).toBeVisible();

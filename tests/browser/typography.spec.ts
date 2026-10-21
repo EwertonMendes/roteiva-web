@@ -35,7 +35,7 @@ test("typographic scale remains readable and temporary family switching never sh
   });
   await enterWorkspace(page,"legibility-"+info.project.name+"@example.com");
   const paragraph=await fontSize(page,".page-heading p");
-  const caption=await fontSize(page,".page .eyebrow");
+  const caption=await fontSize(page,".flow-overview-head .eyebrow");
   const heading=await fontSize(page,".page-heading h1");
   const button=await fontSize(page,".page .primary-button");
   expect(paragraph).toBeGreaterThanOrEqual(16);
@@ -46,7 +46,7 @@ test("typographic scale remains readable and temporary family switching never sh
   await selector.selectOption("Manrope");
   await expect.poll(()=>page.evaluate(()=>document.documentElement.style.getPropertyValue("--temporary-roteiva-font"))).toContain("Manrope");
   expect(await fontSize(page,".page-heading p")).toBeCloseTo(paragraph,1);
-  expect(await fontSize(page,".page .eyebrow")).toBeCloseTo(caption,1);
+  expect(await fontSize(page,".flow-overview-head .eyebrow")).toBeCloseTo(caption,1);
   await selector.selectOption("Ubuntu");
   expect(await fontSize(page,".page-heading p")).toBeCloseTo(paragraph,1);
 });
