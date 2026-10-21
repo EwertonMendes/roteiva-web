@@ -1,0 +1,112 @@
+name: QA Real DEV (manual only)
+on:
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: "Real DEV scenario: public smoke, authenticated read-only, or full QA write with cleanup"
+        type: choice
+        required: true
+        default: smoke
+        options:
+          - smoke
+          - authenticated
+          - full
+permissions:
+  contents: read
+concurrency:
+  group: qa-real-dev-live
+  cancel-in-progress: false
+
+jobs:
+  public_real:
+    name: Real published DEV - public browser/API
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Test real published DEV (no emulators; no API mocks)
+        run: pnpm exec playwright test --config playwright.real-dev.config.ts --grep '@public'
+      - name: Archive public-only QA failure screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-real-dev-public-failure
+          path: test-results/real-dev/
+          retention-days: 2
+          if-no-files-found: ignore
+
+  authenticated_real:
+    name: Real published DEV - dedicated QA account
+    needs: public_real
+    if: github.ref == 'refs/heads/master' && inputs.suite != 'smoke'
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    environment: firebase-development
+    env:
+      QA_EXPECTED_EMAIL: ${{ vars.QA_EXPECTED_EMAIL }}
+      QA_DRIVE_FOLDER_NAME: ${{ vars.QA_DRIVE_FOLDER_NAME }}
+      QA_STORAGE_STATE_B64: ${{ secrets.QA_STORAGE_STATE_B64 }}
+      QA_GOOGLE_CLIENT_ID: ${{ vars.QA_GOOGLE_CLIENT_ID }}
+      QA_GOOGLE_CLIENT_SECRET: ${{ secrets.QA_GOOGLE_CLIENT_SECRET }}
+      QA_DRIVE_REFRESH_TOKEN: ${{ secrets.QA_DRIVE_REFRESH_TOKEN }}
+      QA_RUN_UPLOAD: ${{ inputs.suite == 'full' && 'true' || 'false' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - name: Require dedicated QA account credentials before running
+        run: |
+          test -n "$QA_STORAGE_STATE_B64" || { echo "BLOCKED: QA_STORAGE_STATE_B64 missing from firebase-development"; exit 1; }
+          test -n "$QA_EXPECTED_EMAIL" || { echo "BLOCKED: QA_EXPECTED_EMAIL missing"; exit 1; }
+          case "$QA_DRIVE_FOLDER_NAME" in "Roteiva QA"*) ;; *) echo "BLOCKED: QA folder must begin with Roteiva QA"; exit 1;; esac
+          if [ "$QA_RUN_UPLOAD" = true ]; then
+            test -n "$QA_GOOGLE_CLIENT_ID" && test -n "$QA_GOOGLE_CLIENT_SECRET" && test -n "$QA_DRIVE_REFRESH_TOKEN" || {
+              echo "BLOCKED: QA Google Drive cleanup credentials are required for destructive live tests"; exit 1;
+            }
+          fi
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Restore isolated Google QA session from encrypted GitHub secret
+        env:
+          QA_STORAGE_STATE_FILE: ${{ runner.temp }}/roteiva-qa-state.json
+        run: |
+          umask 077
+          printf '%s' "$QA_STORAGE_STATE_B64" | base64 --decode > "$QA_STORAGE_STATE_FILE"
+          node -e 'const fs=require("fs");const s=JSON.parse(fs.readFileSync(process.env.QA_STORAGE_STATE_FILE));if(!Array.isArray(s.origins)||!s.origins.some(o=>o.origin==="https://roteiva-web-dev.web.app"))process.exit(2)'
+      - name: Authenticated browser regression against real DEV (no emulator or mocks)
+        env:
+          QA_STORAGE_STATE_FILE: ${{ runner.temp }}/roteiva-qa-state.json
+        run: |
+          if [ "$QA_RUN_UPLOAD" = "true" ]; then
+            pnpm exec playwright test --config playwright.real-dev.config.ts --grep '@auth|@write'
+          else
+            pnpm exec playwright test --config playwright.real-dev.config.ts --grep '@auth'
+          fi
+      - name: Remove credential-bearing local state
+        if: always()
+        run: rm -f "${{ runner.temp }}/roteiva-qa-state.json"
+      - name: Archive screenshots from isolated QA account only (never auth trace/state)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-real-dev-auth-failure
+          path: test-results/real-dev/
+          retention-days: 1
+          if-no-files-found: ignore
