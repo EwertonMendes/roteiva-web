@@ -181,10 +181,11 @@
 - [x] Portal mobile: prévia/fallback, comentários, timestamp manual, aprovação e solicitação de ajustes.
 - [x] História por versão, reenvio após ajustes, decisões únicas e exclusão/expiração com revogação coordenada.
 - [x] Isolamento por proprietário no backend, Hash/AES-GCM de convites e sem exposição pública do Firestore.
-- [ ] Testar publicações e revogações de ACL com duas contas reais Google.
+- [x] Publicação e revogação de ACL com duas identidades Google reais; conta incorreta recusada, destinatária autorizada e permissão removida pelo cron.
 - [x] Testes automatizados locais: 129 API, 37 frontend, 30 regras e 81 E2E aprovados (3 variantes de viewport ignoradas por desenho); Google real/Safari/aparelho físico e pipelines do SHA final são aceites separados.
 - [x] Auditoria adicional da PR #55: claims/leases de ACL, compensação recuperável, fence de versão pública e transição D1; testes em `api/tests/reviews.test.mjs`. Ciclo completo desktop/mobile em `tests/browser/reviews-workflow.spec.ts`, incluindo upload resumable e encerramento; homologação Google real agora confirma link, duas identidades, comentário/ajustes/V2/aprovação, ACL prévia, revogação, cron, desconexão e exclusão DEV concluída; limitações de Picker/dispositivos em [REVIEWS-MVP.md](REVIEWS-MVP.md).
-- [ ] Deploy DEV e homologação por cliente real antes de habilitar como recurso comercial.
+- [x] Deploy no DEV existente e homologação com fixtures/contas descartáveis autorizadas; exclusão de conta concluída com arquivos Drive preservados.
+- [ ] Resolver/retestar Google Picker para autorizar nova pasta e completar aceite em dispositivos/políticas externas aplicáveis antes do piloto comercial.
 
 **Fora do MVP:** player próprio com timeline, streaming pelo Worker, edição de imagens, assinatura legal, notificações automáticas e aprovação parcial por arquivo.
 
