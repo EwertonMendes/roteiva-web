@@ -5,8 +5,10 @@ import type {Client,Project} from "../../domain/workspace";
 import {useAuth} from "../auth/AuthProvider";
 import {useDriveApi} from "../drive/drive-api";
 import {readDriveLinks,type DriveFolderLink} from "../../data/drive-folder-links";
-import type {DriveItem} from "../drive/DriveLibraryUI";
-import {useOverlayFocus} from "../drive/DriveLibraryUI";
+import {driveFileUrl,readableFileType,type DriveItem,useOverlayFocus} from "../drive/DriveLibraryUI";
+import {DriveThumbnail} from "../drive/DriveThumbnail";
+import {useDriveThumbnailFetch} from "../drive/useDriveThumbnailFetch";
+import {cacheKey,getCachedFolder,setCachedFolder} from "../drive/drive-folder-cache";
 import {useDriveTransfers} from "../drive/DriveTransfersProvider";
 import type {UploadDestination} from "../drive/useDriveUploads";
 import "./reviews.css";
@@ -47,6 +49,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
   clients:Client[];projects:Project[];studioName:string;onLibrary:()=>void;startProjectId?:number;startClientId?:number
 }){
   const {user}=useAuth(),call=useDriveApi(),transfers=useDriveTransfers();
+  const getThumbnail=useDriveThumbnailFetch();
   const [rows,setRows]=useState<Review[]>([]);
   const [search,setSearch]=useState(""),[status,setStatus]=useState(""),[page,setPage]=useState(0);
   const [hasMore,setHasMore]=useState(false),[refresh,setRefresh]=useState(0);
@@ -63,6 +66,10 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
   const [files,setFiles]=useState<Selection[]>([]);
   const [folderBusy,setFolderBusy]=useState(false),[nextToken,setNextToken]=useState<string|null>(null);
   const [folderError,setFolderError]=useState("");
+  const [fileSearch,setFileSearch]=useState("");
+  const [remote,setRemote]=useState<{term:string;folderId:string;files:DriveItem[];page:string|null}|null>(null);
+  const [searchBusy,setSearchBusy]=useState(false);
+  const searchSequence=useRef(0);
   const browseSequence=useRef(0),listSequence=useRef(0);
   const dialogRef=useOverlayFocus(()=>{if(!working){if(composer)resetComposer();else setOpened(null);}},composer||!!opened,composer?'compose':'detail');
   const pendingUploads=transfers.uploads.filter(entry=>entry.destination.projectId===projectId&&
@@ -87,7 +94,8 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
   useEffect(()=>{if(startClientId&&!startProjectId){setClientId(startClientId);setComposer(true);}},[startClientId,startProjectId]);
   const relevantProjects=useMemo(()=>clientId?projects.filter(p=>p.clientId===clientId):projects,[clientId,projects]);
   useEffect(()=>{
-    browseSequence.current++;setSelectedFolder(null);setItems([]);setTrail([]);setNextToken(null);setFolderBusy(false);
+    browseSequence.current++;searchSequence.current++;setFileSearch("");setRemote(null);setSearchBusy(false);
+    setSelectedFolder(null);setItems([]);setTrail([]);setNextToken(null);setFolderBusy(false);
     if(!user||!projectId||!composer){setLinks([]);return;}
     let alive=true;
     readDriveLinks(user.uid).then(result=>{
@@ -98,7 +106,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
   const browse=useCallback(async(folder:DriveFolderLink,targetId:string,path:{id:string;name:string}[],append=false,pageKey?:string)=>{
     const sequence=++browseSequence.current;
     setFolderBusy(true);setFolderError("");
-    if(!append){setItems([]);setNextToken(null);setTrail(path);}
+    if(!append){++searchSequence.current;setFileSearch("");setRemote(null);setSearchBusy(false);setItems([]);setNextToken(null);setTrail(path);}
     try{
       const params=pageKey?"?pageToken="+encodeURIComponent(pageKey):"";
       const response=await call<{files:DriveItem[];nextPageToken:string|null}>(
@@ -112,6 +120,53 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
   const pickFolder=(folder:DriveFolderLink)=>{
     setSelectedFolder(folder);setTrail([{id:folder.folderId,name:folder.folderName}]);
     void browse(folder,folder.folderId,[{id:folder.folderId,name:folder.folderName}]);
+  };
+  const activeFolderId=trail.at(-1)?.id||selectedFolder?.folderId||"";
+  useEffect(()=>{
+    const seq=++searchSequence.current;
+    const term=fileSearch.trim(),folderId=activeFolderId,folder=selectedFolder;
+    setRemote(null);setSearchBusy(false);
+    if(!user||!folder||!folderId||term.length<2)return;
+    const timer=window.setTimeout(async()=>{
+      const key=cacheKey(user.uid,folder.connectionId,folderId,term);
+      const cached=getCachedFolder(key);
+      if(cached){
+        if(seq===searchSequence.current)setRemote({term,folderId,files:cached.files,page:cached.nextPageToken});
+        if(Date.now()-cached.fetchedAt<30_000)return;
+      }
+      if(seq===searchSequence.current)setSearchBusy(true);
+      try{
+        const params=new URLSearchParams({search:term});
+        const result=await call<{files:DriveItem[];nextPageToken:string|null}>(
+          "/integrations/drive/"+encodeURIComponent(folder.connectionId)+"/folders/"+
+          encodeURIComponent(folderId)+"/items?"+params);
+        if(seq!==searchSequence.current)return;
+        setCachedFolder(key,{files:result.files,nextPageToken:result.nextPageToken});
+        setRemote({term,folderId,files:result.files,page:result.nextPageToken});
+      }catch(e){if(seq===searchSequence.current)setFolderError(e instanceof Error?e.message:"Falha na busca de arquivos.");}
+      finally{if(seq===searchSequence.current)setSearchBusy(false);}
+    },300);
+    return()=>window.clearTimeout(timer);
+  },[fileSearch,activeFolderId,selectedFolder,user?.uid,call]);
+  const searchActive=fileSearch.trim().length>=2&&remote?.term===fileSearch.trim()&&remote.folderId===activeFolderId;
+  const displayedItems=(searchActive?remote.files:items).filter(item=>
+    item.name.toLocaleLowerCase("pt-BR").includes(fileSearch.trim().toLocaleLowerCase("pt-BR")));
+  const loadMoreSearch=async()=>{
+    if(!selectedFolder||!remote?.page||searchBusy||!searchActive)return;
+    const current=remote,seq=searchSequence.current;
+    setSearchBusy(true);
+    try{
+      const params=new URLSearchParams({search:current.term,pageToken:current.page});
+      const result=await call<{files:DriveItem[];nextPageToken:string|null}>(
+        "/integrations/drive/"+encodeURIComponent(selectedFolder.connectionId)+"/folders/"+
+        encodeURIComponent(current.folderId)+"/items?"+params);
+      if(seq!==searchSequence.current)return;
+      const files=[...current.files,...result.files.filter(item=>!current.files.some(old=>old.id===item.id))];
+      setRemote({...current,files,page:result.nextPageToken});
+      if(user)setCachedFolder(cacheKey(user.uid,selectedFolder.connectionId,current.folderId,current.term),
+        {files,nextPageToken:result.nextPageToken});
+    }catch(e){if(seq===searchSequence.current)setFolderError(e instanceof Error?e.message:"Falha ao carregar a busca.");}
+    finally{if(seq===searchSequence.current)setSearchBusy(false);}
   };
   const destination:UploadDestination|null=selectedFolder&&projectId?{
     connectionId:selectedFolder.connectionId,linkedFolderId:selectedFolder.folderId,
@@ -139,7 +194,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
   }),[transfers.subscribe,composer,selectedFolder,projectId,trail,browse]);
   const resetComposer=()=>{
     if(working)return;
-    browseSequence.current++;
+    browseSequence.current++;searchSequence.current++;
     setComposer(false);setReplacement(null);setFiles([]);setTitle("");setMessage("");setSelectedFolder(null);
     setTrail([]);setItems([]);setError("");setFolderError("");
   };
@@ -325,6 +380,17 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
             {selectedFolder&&<div className="review-breadcrumbs">{trail.map((node,i)=><button key={node.id}
               onClick={()=>void browse(selectedFolder,node.id,trail.slice(0,i+1))}>
                 {i>0&&<ChevronRight size={12}/>} {node.name}</button>)}</div>}
+            {selectedFolder&&<div className="review-file-tools">
+              <label className="review-drive-search"><Search size={16}/>
+                <input type="search" aria-label="Buscar arquivos no Google Drive"
+                  placeholder="Buscar arquivos nesta pasta" value={fileSearch}
+                  onChange={e=>setFileSearch(e.target.value)}/>
+                {fileSearch&&<button type="button" aria-label="Limpar busca" onClick={()=>setFileSearch("")}><X size={14}/></button>}
+              </label>
+              <a className="review-drive-external" target="_blank" rel="noopener noreferrer"
+                href={"https://drive.google.com/drive/folders/"+encodeURIComponent(activeFolderId)}>
+                <ExternalLink size={15}/> Abrir pasta no Drive</a>
+            </div>}
             {destination&&<div className="review-upload-zone"
               onDragOver={event=>{if(Array.from(event.dataTransfer.types).includes("Files"))event.preventDefault();}}
               onDrop={event=>{if(!Array.from(event.dataTransfer.types).includes("Files"))return;
@@ -349,18 +415,36 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
                 <button type="button" className="secondary-button" onClick={()=>transfers.dismiss(entry.id)}>Remover da aprovação</button></>}
             </div>)}
             {folderError&&<p className="reviews-warning" role="alert">{folderError}</p>}
-            <div className="review-files">
-              {folderBusy&&<p role="status"><LoaderCircle size={16} className="rl-spin"/> Carregando arquivos…</p>}
-              {!folderBusy&&selectedFolder&&!items.length&&<p className="reviews-muted">Esta pasta está vazia.</p>}
-              {items.map(f=>f.mimeType==="application/vnd.google-apps.folder"?
-                <button type="button" key={f.id} onClick={()=>{if(selectedFolder)void browse(selectedFolder,f.id,[...trail,{id:f.id,name:f.name}]);}}>
-                  <Folder size={18}/><span>{f.name}</span><ChevronRight size={15}/></button>:
-                <label key={f.id} className={!supported(f)?"unsupported":""}><input type="checkbox" disabled={!supported(f)}
-                  checked={files.some(a=>a.fileId===f.id)} onChange={()=>addFile(f)}/>
-                  <AssetIcon mime={f.mimeType}/><span>{f.name}</span></label>)}
+            <div className="review-files" aria-label="Arquivos disponíveis">
+              {folderBusy&&!items.length&&<p role="status"><LoaderCircle size={16} className="rl-spin"/> Carregando arquivos…</p>}
+              {searchBusy&&<p className="reviews-muted" role="status"><LoaderCircle size={15} className="rl-spin"/> Buscando arquivos no Google Drive…</p>}
+              {!folderBusy&&!searchBusy&&selectedFolder&&!displayedItems.length&&
+                <p className="reviews-muted">{fileSearch?"Nenhum arquivo encontrado nesta pasta.":"Esta pasta está vazia."}</p>}
+              {displayedItems.map(f=><div className="review-picker-row" key={f.id}>
+                {f.mimeType==="application/vnd.google-apps.folder"?
+                  <button type="button" className="review-picker-main" onClick={()=>{
+                    if(selectedFolder)void browse(selectedFolder,f.id,[...trail,{id:f.id,name:f.name}]);}}>
+                    <Folder size={19}/><span className="review-picker-name">{f.name}<small>Subpasta</small></span><ChevronRight size={16}/>
+                  </button>:
+                  <label className={"review-picker-main"+(!supported(f)?" unsupported":"")}>
+                    <input type="checkbox" disabled={!supported(f)} aria-label={"Selecionar "+f.name}
+                      checked={files.some(a=>a.fileId===f.id)} onChange={()=>addFile(f)}/>
+                    {selectedFolder&&user&&<DriveThumbnail item={f} scope={user.uid+":"+selectedFolder.connectionId}
+                      getThumbnail={getThumbnail}/>}
+                    <span className="review-picker-name" title={f.name}>{f.name}
+                      <small>{supported(f)?readableFileType(f.mimeType):"Formato não aceito para aprovação"}</small></span>
+                  </label>}
+                <a className="review-picker-external" href={f.mimeType==="application/vnd.google-apps.folder"?
+                  "https://drive.google.com/drive/folders/"+encodeURIComponent(f.id):driveFileUrl(f)}
+                  target="_blank" rel="noopener noreferrer" aria-label={"Abrir "+f.name+" no Google Drive"}
+                  title="Abrir no Google Drive"><ExternalLink size={16}/></a>
+              </div>)}
             </div>
-            {nextToken&&selectedFolder&&<button type="button" className="secondary-button" disabled={folderBusy}
-              onClick={()=>void browse(selectedFolder,trail[trail.length-1].id,trail,true,nextToken)}>Carregar mais arquivos</button>}
+            {fileSearch.trim().length===1&&<p className="reviews-muted">Digite mais uma letra para pesquisar em todos os itens da pasta, não apenas os carregados.</p>}
+            {(searchActive?!!remote.page:!!nextToken)&&selectedFolder&&<button type="button" className="secondary-button"
+              disabled={folderBusy||searchBusy} onClick={()=>fileSearch.trim().length>=2?
+                void loadMoreSearch():void browse(selectedFolder,activeFolderId,trail,true,nextToken!)}>
+              Carregar mais arquivos</button>}
           </>}
           {files.length>0&&<div className="reviews-selected"><h3>Selecionados</h3>
             {files.map(f=><div key={f.fileId}><Check size={14}/><span>{f.name}</span>
