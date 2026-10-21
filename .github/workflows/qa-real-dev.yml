@@ -46,6 +46,40 @@ jobs:
           retention-days: 2
           if-no-files-found: ignore
 
+
+  infrastructure_real:
+    name: Real Cloudflare DEV - D1 SQL plans and Worker
+    needs: public_real
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    environment: cloudflare-development
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+      - run: npm ci --ignore-scripts
+      - name: Check fixed DEV bindings before touching remote D1
+        env:
+          ACCOUNT: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          DATABASE: ${{ vars.CLOUDFLARE_D1_DATABASE_ID }}
+        run: |
+          test "$ACCOUNT" = "b3855f9c192541a01a45b2dae7b6a7f8"
+          test "$DATABASE" = "302adc88-76b2-4827-bb16-99662fa0408b"
+      - name: Real read-only D1 EXPLAIN and published Worker HTTP
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          WRANGLER_SEND_METRICS: 'false'
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo "BLOCKED: protected Cloudflare DEV token unavailable"; exit 1; }
+          node scripts/qa-free-tier-live.mjs
+
   authenticated_real:
     name: Real published DEV - dedicated QA account
     needs: public_real
