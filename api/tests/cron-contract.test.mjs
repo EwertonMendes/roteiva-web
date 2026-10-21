@@ -53,3 +53,14 @@ test('unknown Cron schedule fails closed without touching D1',async()=>{
   try{await run('30 5 * * *',env);}finally{console.error=original;}
   assert.equal(sql.length,0);
 });
+
+test('idle D1 polling would fall by over 50 percent based on actual SQL statements',async()=>{
+  const frequent=environment(),routine=environment();
+  await run('* * * * *',frequent.env);
+  await run('*/15 * * * *',routine.env);
+  const before=1440*(frequent.sql.length+routine.sql.length);
+  const after=1440*frequent.sql.length+96*routine.sql.length;
+  console.log(JSON.stringify({check:'cron_idle_d1_estimate',oldPerDay:before,newPerDay:after,
+    savedPerDay:before-after,percentReduction:+((1-after/before)*100).toFixed(1)}));
+  assert.ok(after<before*0.5,'idle D1 queries should drop by at least half');
+});
