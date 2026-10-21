@@ -56,6 +56,7 @@ export const messages:Record<string,string> = {
   review_project_denied:"O cliente ou projeto não está mais disponível para esta aprovação.",
   review_folder_denied:"A pasta não está mais vinculada a este projeto.",
   review_file_denied:"O arquivo não está autorizado para compartilhamento nesta pasta. Confira o Drive.",
+  review_drive_file_authorization_required:"Este arquivo é privado e ainda não foi autorizado para compartilhamento pelo aplicativo. Selecione-o pelo Google Picker na Biblioteca ou envie-o diretamente pela plataforma.",
   review_drive_grant_required:"Reconecte o Google Drive com permissão de gerenciamento dos arquivos selecionados.",
   review_drive_share_denied:"O Google Drive não permitiu compartilhar este arquivo. Verifique as políticas e permissões da conta.",
   review_drive_unavailable:"O Google Drive não conseguiu concluir o compartilhamento agora. Tente novamente.",
