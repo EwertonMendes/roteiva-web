@@ -23,7 +23,8 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
   const {user}=useAuth(),call=useDriveApi(),transfers=useDriveTransfers();
   const getThumbnail=useDriveThumbnailFetch();
   const [rows,setRows]=useState<Review[]>([]);
-  const [search,setSearch]=useState(""),[status,setStatus]=useState(""),[page,setPage]=useState(0);
+  const [search,setSearch]=useState(""),[debouncedSearch,setDebouncedSearch]=useState("");
+  const [status,setStatus]=useState(""),[page,setPage]=useState(0);
   const [hasMore,setHasMore]=useState(false),[refresh,setRefresh]=useState(0);
   const [loading,setLoading]=useState(true),[working,setWorking]=useState(false),[error,setError]=useState("");
   const [opened,setOpened]=useState<Detail|null>(null);
@@ -51,16 +52,24 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
     return()=>transfers.setAuthorizationInline(false);
   },[composer,transfers.setAuthorizationInline]);
 
-  const loadList=useCallback(async()=>{
+  useEffect(()=>{
+    const timer=window.setTimeout(()=>setDebouncedSearch(search.trim()),300);
+    return()=>window.clearTimeout(timer);
+  },[search]);
+  const loadList=useCallback(async(signal?:AbortSignal)=>{
     const sequence=++listSequence.current;
     setLoading(true);
     try{
-      const result=await call<{reviews:Review[];hasMore:boolean}>("/reviews?"+new URLSearchParams({page:String(page),q:search,status}));
+      const result=await call<{reviews:Review[];hasMore:boolean}>("/reviews?"+new URLSearchParams({page:String(page),q:debouncedSearch,status}),"GET",undefined,signal);
       if(sequence===listSequence.current){setRows(result.reviews);setHasMore(result.hasMore);}
-    }catch(e){if(sequence===listSequence.current)setError(e instanceof Error?e.message:"Não foi possível carregar as aprovações.");}
-    finally{if(sequence===listSequence.current)setLoading(false);}
-  },[call,page,refresh,search,status]);
-  useEffect(()=>{void loadList();},[loadList]);
+    }catch(e){if(!signal?.aborted&&sequence===listSequence.current)setError(e instanceof Error?e.message:"Não foi possível carregar as aprovações.");}
+    finally{if(!signal?.aborted&&sequence===listSequence.current)setLoading(false);}
+  },[call,page,refresh,debouncedSearch,status]);
+  useEffect(()=>{
+    const controller=new AbortController();
+    void loadList(controller.signal);
+    return()=>controller.abort();
+  },[loadList]);
   useEffect(()=>{if(startProjectId){setProjectId(startProjectId);setClientId(startClientId||projects.find(p=>p.id===startProjectId)?.clientId||0);setComposer(true);}},
     [startProjectId,startClientId,projects]);
   useEffect(()=>{if(startClientId&&!startProjectId){setClientId(startClientId);setComposer(true);}},[startClientId,startProjectId]);
