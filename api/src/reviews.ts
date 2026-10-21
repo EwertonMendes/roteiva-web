@@ -46,13 +46,13 @@ function parseParticipants(data:unknown,mode:Mode,legacyEmail:string):Participan
   const source=data===undefined?[{email:legacyEmail,role:'reviewer'}]:data;
   if(!Array.isArray(source)||source.length<1||source.length>200)throw new ApiError(400,'review_invalid_participants');
   const unique=new Set<string>();
-  const parsed=source.map(item=>{
+  const parsed:Participant[]=source.map((item):Participant=>{
     if(!item||typeof item!=='object'||Array.isArray(item))throw new ApiError(400,'review_invalid_participants');
     const entry=item as Record<string,unknown>;
     const email=inputText(entry.email,200,true).toLowerCase(),role=entry.role;
     if(!EMAIL.test(email)||(role!=='reviewer'&&role!=='viewer')||unique.has(email))
       throw new ApiError(400,'review_invalid_participants');
-    unique.add(email);return {email,role};
+    unique.add(email);return {email,role:role as Participant['role']};
   });
   if(!parsed.some(item=>item.role==='reviewer'))throw new ApiError(400,'review_reviewer_required');
   return parsed;
@@ -473,32 +473,17 @@ async function grantLocked(env:Env,r:Review,a:Asset,validation:CheckedAsset):Pro
     }
   }
   const publiclyReadable=directPublic||inheritedPublic;
-  if(r.access_mode==='google'&&existing.some(p=>p.type==='group'||
-    (p.type==='user'&&p.role!=='owner'&&p.emailAddress?.toLowerCase()!==r.recipient_email&&
-      p.emailAddress?.toLowerCase()!==row.google_email?.toLowerCase())))
-    throw new ApiError(409,'review_existing_public_permission');
-  // Google-only mode must never promise confidentiality for public ancestry.
-  if(r.access_mode==='google'&&(publiclyReadable||existing.some(p=>p.type==='domain')))
-    throw new ApiError(409,'review_existing_public_permission');
   if(r.access_mode==='link'&&a.grant_state==='unshared'&&publiclyReadable){
     const saved=await env.DB.prepare("UPDATE review_assets SET grant_state='granted',permission_id=NULL WHERE review_id=? AND version=? AND file_id=? AND grant_state='unshared' AND EXISTS(SELECT 1 FROM review_requests WHERE id=? AND status='publishing')")
       .bind(r.id,a.version,a.file_id,r.id).run();
     if(saved.meta.changes!==1)throw new ApiError(409,'review_busy');
     return;
   }
-  const match=existing.find(p=>r.access_mode==='link'?p.type==='anyone':
-    p.type==='user'&&p.emailAddress?.toLowerCase()===r.recipient_email);
-  if(a.grant_state==='granting'&&inheritedPublic&&!match&&r.access_mode==='link'){
+  const match=existing.find(p=>p.type==='anyone');
+  if(a.grant_state==='granting'&&inheritedPublic&&!match){
     // While awaiting Drive, the owner made the containing folder public.
     // Reuse the owner's access rather than creating a redundant file ACL.
     const saved=await env.DB.prepare("UPDATE review_assets SET grant_state='granted',permission_id=NULL WHERE review_id=? AND version=? AND file_id=? AND grant_state='granting' AND EXISTS(SELECT 1 FROM review_requests WHERE id=? AND status='publishing')")
-      .bind(r.id,a.version,a.file_id,r.id).run();
-    if(saved.meta.changes!==1)throw new ApiError(409,'review_busy');
-    return;
-  }
-  if(a.grant_state==='unshared'&&match&&r.access_mode==='google'){
-    // Pre-existing Google ACL belongs to the user, not Roteiva: never revoke it.
-    const saved=await env.DB.prepare("UPDATE review_assets SET grant_state='granted',permission_id=NULL WHERE review_id=? AND version=? AND file_id=? AND grant_state='unshared' AND EXISTS(SELECT 1 FROM review_requests WHERE id=? AND status='publishing')")
       .bind(r.id,a.version,a.file_id,r.id).run();
     if(saved.meta.changes!==1)throw new ApiError(409,'review_busy');
     return;
@@ -514,11 +499,10 @@ async function grantLocked(env:Env,r:Review,a:Asset,validation:CheckedAsset):Pro
   // In the authenticated mode, a pre-existing user ACL is never considered ours.
   let id:string|null=null;
   if(match){
-    if(a.grant_state==='granting' || r.access_mode==='link')id=match.id;
+    id=match.id;
   } else {
     const created=await mutatePermission(env,row,a.file_id,'POST',
-      r.access_mode==='link'?{type:'anyone',role:'reader'}:
-        {type:'user',role:'reader',emailAddress:r.recipient_email});
+      {type:'anyone',role:'reader'});
     if(typeof created.id!=='string'||!created.id)throw new ApiError(503,'review_drive_unavailable');
     id=created.id;
   }
