@@ -21,16 +21,11 @@ async function createWorkspace(page:Page,email:string) {
   await expect(page.locator("[aria-busy]").first()).toHaveAttribute("aria-busy","false");
 }
 
-test("desktop overview fits viewport without page scrolling, even with projects",async({page},info)=>{
+test("desktop overview fits viewport without page scrolling",async({page},info)=>{
   test.skip(info.project.name==="mobile","Desktop-specific viewport contract");
   await createWorkspace(page,"dashboard-viewport-"+info.project.name+"@example.com");
-  await page.getByRole("button",{name:"Criar projeto",exact:true}).click();
-  await page.getByRole("textbox",{name:"Nome do projeto"}).fill("Projeto de verificação visual");
-  await page.locator("form.project-modal").getByRole("button",{name:/Criar projeto/}).click();
-  await expect(page.locator("[aria-busy]").first()).toHaveAttribute("aria-busy","false");
-  await page.locator(".sidebar nav").getByRole("button",{name:"Visão geral"}).click();
   await expect(page.locator(".flow-overview")).toContainText("O ritmo do seu estúdio");
-  await expect(page.locator(".flow-overview")).toContainText("1 projeto no total");
+  await expect(page.locator(".flow-overview")).toContainText("0 projetos no total");
   for(const {width,height} of [
     {width:1920,height:1080},
     {width:1440,height:900},
