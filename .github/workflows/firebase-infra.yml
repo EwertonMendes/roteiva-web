@@ -21,6 +21,12 @@ on:
       - 'firebase.json'
       - '.github/workflows/firebase-infra.yml'
   workflow_dispatch:
+    inputs:
+      deploy_review_dev:
+        description: 'Deploy PR 55 branch to existing DEV (requires deliberate opt-in)'
+        required: true
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -51,7 +57,7 @@ jobs:
   deploy:
     name: Deploy Firestore rules and indexes DEV
     needs: validate
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/master') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/feat/reviews-mvp' && inputs.deploy_review_dev == true)
     runs-on: ubuntu-latest
     timeout-minutes: 4
     environment: firebase-development
@@ -74,7 +80,12 @@ jobs:
           CONFIGURED_PROJECT: ${{ vars.FIREBASE_PROJECT_ID }}
         run: |
           test "$CONFIGURED_PROJECT" = "roteiva-web-dev"
-          test "$(git ls-remote origin refs/heads/master | cut -f1)" = "$GITHUB_SHA" || {
+          TARGET_REF=master
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            test "$GITHUB_REF" = "refs/heads/feat/reviews-mvp" || exit 1
+            TARGET_REF=feat/reviews-mvp
+          fi
+          test "$(git ls-remote origin "refs/heads/$TARGET_REF" | cut -f1)" = "$GITHUB_SHA" || {
             echo "Outdated SHA: skip stale DEV deploy"; exit 1;
           }
       - uses: google-github-actions/auth@v3
