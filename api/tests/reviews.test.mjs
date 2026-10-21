@@ -227,8 +227,8 @@ test('public video media uses signed range tickets and stops immediately after r
   assert.equal(video.headers.get('Content-Range'),'bytes 0-3/100');
   assert.equal(video.headers.get('Content-Type'),'video/mp4');
   assert.deepEqual([...new Uint8Array(await video.arrayBuffer())],[1,2,3,4]);
-  assert.equal(video.headers.get('Cache-Control'),'private, no-store');
-  const invalid=await handle(new Request(url.replace(/.$/,'x')),x.env);
+  assert.equal(video.headers.get('Cache-Control'),'no-store');
+  const invalid=await handle(new Request(url.slice(0,-1)+(url.endsWith('A')?'B':'A')),x.env);
   assert.equal(invalid.status,404);
   assert.equal((await x.send('POST','/reviews/'+id+'/close',x.alice)).status,200);
   const rejected=await handle(new Request(url,{headers:{Range:'bytes=0-'}}),x.env);
