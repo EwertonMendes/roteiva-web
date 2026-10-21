@@ -7,7 +7,7 @@ import { listFolders, listFolderItems } from './folders.ts';
 import { thumbnail } from './thumbnails.ts';
 import { startUpload, completeUpload, authorizeUploadFolder, cleanupUploads } from './uploads.ts';
 import { verifyPickerToken } from './picker.ts';
-import { deletionStatus, requestDeletion, runPendingDeletions } from './account-deletion.ts';
+import { deletionStatus, requestDeletion, runPendingDeletions, runDeletionMaintenance } from './account-deletion.ts';
 import { ensureAccess, assertActiveAccess } from './access.ts';
 import { backfillAccess } from './access-backfill.ts';
 const headers = {
@@ -142,11 +142,18 @@ export async function handle(request: Request, env: Env): Promise<Response> {
   }
   return result;
 }
-export default {fetch:handle, scheduled(_controller:ScheduledController,env:Env,ctx:ExecutionContext){
+export default {fetch:handle, scheduled(controller:ScheduledController,env:Env,ctx:ExecutionContext){
+  // Revocations and deletion progress are security-critical: retain the one-minute cadence.
   ctx.waitUntil((async()=>{
-    await runPendingDeletions(env);
-    try{await backfillAccess(env);}catch(error){console.error(JSON.stringify({event:'access_backfill_retry',code:error instanceof ApiError?error.code:'dependency_failure'}));}
-    try{await cleanupUploads(env);}catch{console.error(JSON.stringify({event:'drive_upload_retention_retry'}));}
-    try{await cleanupExpiredReviews(env);}catch{console.error(JSON.stringify({event:'review_revocation_retry'}));}
+    if(controller.cron==='* * * * *'){
+      await runPendingDeletions(env);
+      try{await cleanupExpiredReviews(env);}catch{console.error(JSON.stringify({event:'review_revocation_retry'}));}
+    }else if(controller.cron==='*/15 * * * *'){
+      try{await runDeletionMaintenance(env);}catch{console.error(JSON.stringify({event:'deletion_maintenance_retry'}));}
+      try{await backfillAccess(env);}catch(error){console.error(JSON.stringify({event:'access_backfill_retry',code:error instanceof ApiError?error.code:'dependency_failure'}));}
+      try{await cleanupUploads(env);}catch{console.error(JSON.stringify({event:'drive_upload_retention_retry'}));}
+    }else{
+      console.error(JSON.stringify({event:'unexpected_cron_trigger'}));
+    }
   })());
 }};
