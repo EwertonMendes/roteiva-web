@@ -363,6 +363,66 @@ test('lost grant response reconciles once, stale-version decisions are rejected 
   assert.equal(x.f.sql.prepare('SELECT COUNT(*) n FROM review_decisions').get().n,1);
 });
 
+test('review may cycle through unlimited requested versions without invalid state',async t=>{
+  const x=await integration(t);
+  const {id,published}=await createAndPublish(x);
+  assert.equal(published.status,200);
+  const token=(await published.json()).review.review.url.split('/').at(-1);
+  for(let n=2;n<=6;n++){
+    const changes=await route(x.f,token,'/reviews/public/decide','POST',
+      {version:n-1,authorName:'Client',decision:'changes',message:'Another revision'});
+    assert.equal(changes.status,200,'request changes on version '+(n-1));
+    const response=await x.send('POST','/reviews/'+id+'/revise',x.alice,{assets:x.payload.assets});
+    assert.equal(response.status,200,'publish version '+n);
+    const content=await response.json();
+    assert.equal(content.review.review.version,n);
+    assert.equal(content.review.review.status,'pending');
+    assert.equal((await (await route(x.f,token)).json()).review.version,n);
+    assert.equal(x.f.sql.prepare("SELECT COUNT(*) n FROM review_assets WHERE review_id=? AND grant_state='granted'").get(id).n,1);
+    assert.equal(x.acl.size,1);
+  }
+  const approved=await route(x.f,token,'/reviews/public/decide','POST',
+    {version:6,authorName:'Client',decision:'approved'});
+  assert.equal(approved.status,200);
+  assert.equal(x.f.sql.prepare("SELECT COUNT(*) n FROM review_decisions WHERE review_id=?").get(id).n,6);
+  assert.equal((await x.send('POST','/reviews/'+id+'/close',x.alice)).status,200);
+  assert.equal(x.acl.size,0);
+});
+test('revision resumes an incomplete replacing state without losing the original selection',async t=>{
+  const x=await integration(t);
+  const {id,published}=await createAndPublish(x);
+  assert.equal(published.status,200);
+  const token=(await published.json()).review.review.url.split('/').at(-1);
+  assert.equal((await route(x.f,token,'/reviews/public/decide','POST',
+    {authorName:'Client',decision:'changes',message:'Try again'})).status,200);
+  x.f.sql.prepare("UPDATE review_requests SET status='replacing',transition_id=? WHERE id=?")
+    .run('recovery-fence',id);
+  assert.equal(x.f.sql.prepare('SELECT COUNT(*) n FROM review_assets WHERE review_id=? AND version=2').get(id).n,0);
+  const fixed=await x.send('POST','/reviews/'+id+'/revise',x.alice,{assets:x.payload.assets});
+  assert.equal(fixed.status,200);
+  const state=await fixed.json();
+  assert.equal(state.review.review.version,2);
+  assert.equal(state.review.review.status,'pending');
+  assert.equal(x.f.sql.prepare('SELECT COUNT(*) n FROM review_assets WHERE review_id=? AND version=2').get(id).n,1);
+  assert.equal(x.f.sql.prepare('SELECT transition_id FROM review_requests WHERE id=?').get(id).transition_id,null);
+});
+test('revision resumes a committed version switch and only publishes it once',async t=>{
+  const x=await integration(t);
+  const {id,published}=await createAndPublish(x);
+  assert.equal(published.status,200);
+  const token=(await published.json()).review.review.url.split('/').at(-1);
+  assert.equal((await route(x.f,token,'/reviews/public/decide','POST',
+    {authorName:'Client',decision:'changes',message:'Fix design'})).status,200);
+  const first=await x.send('POST','/reviews/'+id+'/revise',x.alice,{assets:x.payload.assets});
+  assert.equal(first.status,200);
+  x.f.sql.prepare("UPDATE review_requests SET status='draft' WHERE id=?").run(id);
+  x.f.sql.prepare("UPDATE review_assets SET grant_state='unshared',permission_id=NULL WHERE review_id=? AND version=2").run(id);
+  x.acl.clear();
+  x.f.sql.prepare('DELETE FROM review_file_claims').run();
+  const resumed=await x.send('POST','/reviews/'+id+'/revise',x.alice,{assets:[]});
+  assert.equal(resumed.status,200);
+  assert.equal((await resumed.json()).review.review.version,2);
+});
 test('concurrent replacement keeps one complete version, revokes prior ACL and retains decision history',async t=>{
   const x=await integration(t);const {id,published}=await createAndPublish(x);
   assert.equal(published.status,200);
