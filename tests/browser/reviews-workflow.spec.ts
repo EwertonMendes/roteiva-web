@@ -94,6 +94,13 @@ test('profissional cria, cliente comenta/pede ajustes, V2 aprovada e encerrament
       expect(req.headers()['x-review-token']).toBe(token);
       if(review.status==='closed')return json({error:{code:'review_not_found'}},404);
       if(req.method()==='GET')return json({...detail(),assets:selected});
+      // HTML5 streaming is optional: this account's selected Drive file doesn't
+      // permit alt=media. The real portal must fall back to Drive preview while
+      // keeping manual timecodes and all customer review actions available.
+      if(path.endsWith('/media-ticket')){
+        expect(req.postDataJSON().version).toBe(review.version);
+        return json({error:{code:'media_unavailable'}},409);
+      }
       const body=req.postDataJSON();expect(body.version).toBe(review.version);expect(body.authorName).toBe('Cliente QA');
       expect(review.status).toBe('pending');
       if(path.endsWith('/comment')){
