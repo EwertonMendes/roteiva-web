@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  BadgeDollarSign, Bell, CalendarCheck2, CalendarDays, Check, ChevronDown,
+  BadgeDollarSign, History, CalendarCheck2, CalendarDays, Check, ChevronDown,
   ChevronRight, CirclePause, CirclePlay, Clock3, Command, Film, Folder, FolderOpen,
   Grid2X2, LayoutDashboard, LibraryBig, ListFilter, Menu, PanelsTopLeft,
   ArrowUpRight, Building2, Moon, UserRound,
@@ -13,6 +13,7 @@ import {
 import { ProjectDetail, ClientDetail, StudioReviews, WorkspaceTools, FinancePanel, projectTemplates } from "./studio-features";
 import {ReviewsDashboard} from "./features/reviews/ReviewsDashboard";
 import { TodayStudio } from "./features/dashboard/DashboardOverview";
+import { ActivityHistoryDrawer } from "./features/dashboard/ActivityHistory";
 import { validTimeRange, overlaps, eventRange, eventDuration } from "./studio-calendar";
 import { toISO as toISOAdded, parseMoney, splitInstallments } from "./studio-finance";
 import { FormEvent, useEffect, useLayoutEffect, useMemo, useState, useCallback } from "react";
@@ -116,12 +117,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
   const storageKey = "roteiva-pages-demo-workspace-v1";
   const [activities, setActivities] = useState<Activity[]>([]);
   const [activityOpen, setActivityOpen] = useState(false);
-  useEffect(() => {
-    if (!activityOpen) return;
-    const handleEscape = (event: KeyboardEvent) => { if (event.key === "Escape") setActivityOpen(false); };
-    window.addEventListener("keydown", handleEscape);
-    return () => window.removeEventListener("keydown", handleEscape);
-  }, [activityOpen]);
+
   function commitCommands(commands:WorkspaceCommand[]){
     // The cloud is persisted only through explicit typed business commands.
     // The demo retains its independent localStorage snapshot.
@@ -493,19 +489,16 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
           <button className={view === "calendar" ? "active" : ""} onClick={() => changeView("calendar")}><AnimatedNavIcon icon={CalendarDays} hoverIcon={CalendarCheck2} kind="calendar" /><span>Calendário</span><em>{eventCount ?? calendarEvents.length}</em></button>
           <button className={view === "library" ? "active" : ""} onClick={() => changeView("library")}><AnimatedNavIcon icon={Grid2X2} hoverIcon={LibraryBig} kind="library" /><span>Biblioteca</span><em>{isDemo?libraryAssets.length:linkedFolderCount??"—"}</em></button>
           <button className={view === "settings" ? "active" : ""} onClick={() => changeView("settings")}><AnimatedNavIcon icon={Settings2} hoverIcon={UserRound} kind="settings" /><span>Configurações</span></button>
-          <button type="button" className={activityOpen ? "active" : ""} onClick={() => setActivityOpen(open => !open)} aria-expanded={activityOpen} aria-controls="sidebar-activity-panel"><Bell size={19} /><span>Notificações</span>{activities.length > 0 && <em>{activities.length}</em>}</button>
+          <button type="button" className={activityOpen ? "active" : ""} onClick={() => { setMobileOpen(false); setActivityOpen(true); }} aria-expanded={activityOpen} aria-controls="activity-history-drawer"><History size={19} /><span>Atividades</span></button>
           <button type="button" onClick={toggleTheme} aria-label="Alternar aparência"><Sun size={19} /><span>Aparência</span><span className="sidebar-appearance-switch" aria-hidden="true">{theme === "dark" ? <Moon size={14} /> : <Sun size={14} />}</span></button>
         </nav>
-        {activityOpen && <section className="sidebar-activity-panel" id="sidebar-activity-panel" role="dialog" aria-label="Notificações e atividades">
-          <header><strong>Notificações</strong><button type="button" aria-label="Fechar notificações" onClick={() => setActivityOpen(false)}><X size={18}/></button></header>
-          <p className="sidebar-activity-subtitle">Últimas atividades do seu espaço</p>
-          {activities.length ? <ul>{activities.slice(0,15).map((activity,index) => <li key={activity.id || index}><span>{activity.text}</span><time dateTime={activity.when}>{new Date(activity.when).toLocaleString("pt-BR")}</time></li>)}</ul> : <p className="sidebar-activity-empty">Nenhuma atividade registrada ainda.</p>}
-        </section>}
+
         <div className="sidebar-profile">
           {photoURL ? <img className="profile-photo" src={photoURL} alt="Foto do usuário" referrerPolicy="no-referrer" /> : <span>{firstName.slice(0, 2).toUpperCase()}</span>}<div><b>{firstName}</b><small>{email}</small></div>{onLogout ? <button className="icon-button" onClick={signOut} aria-label="Sair da conta" title="Sair da conta">↪</button> : <MoreHorizontal size={18} />}
         </div>
       </aside>
       {mobileOpen && <button className="mobile-scrim" aria-label="Fechar menu" onClick={() => setMobileOpen(false)} />}
+      {activityOpen && <ActivityHistoryDrawer activities={activities} onClose={() => setActivityOpen(false)}/>}
 
       <main className="main">
         <header className="topbar">
@@ -517,7 +510,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
               if(value.trim() && view==="projects")onSearchProjects?.();
               if(value.trim() && view==="clients")onSearchClients?.();
             }} placeholder="Buscar projetos e clientes" /><kbd><Command size={11} /> K</kbd></label>}
-          <div className="top-actions"><button className="icon-button" title="Ver atividades" aria-label="Ver atividades" onClick={() => { changeView("overview"); notify(activities[0]?.text || "Nenhuma atividade ainda"); }}><Bell size={18} /></button><button className="icon-button theme-toggle" onClick={toggleTheme} aria-label={theme === "light" ? "Ativar modo escuro" : "Ativar modo claro"} title={theme === "light" ? "Modo escuro" : "Modo claro"}>{theme === "light" ? <Moon size={18} /> : <Sun size={18} />}</button><button className="primary-button" onClick={startProject}><Plus size={17} /> Novo projeto</button></div>
+          <div className="top-actions"><button className="icon-button" title="Ver atividades" aria-label="Ver atividades" onClick={() => { setMobileOpen(false);setActivityOpen(true); }}><History size={18} /></button><button className="icon-button theme-toggle" onClick={toggleTheme} aria-label={theme === "light" ? "Ativar modo escuro" : "Ativar modo claro"} title={theme === "light" ? "Modo escuro" : "Modo claro"}>{theme === "light" ? <Moon size={18} /> : <Sun size={18} />}</button><button className="primary-button" onClick={startProject}><Plus size={17} /> Novo projeto</button></div>
         </header>
 
         <section className="page">

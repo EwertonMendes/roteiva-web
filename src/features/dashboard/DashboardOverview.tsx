@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { CalendarDays, ChevronRight, Eye, EyeOff } from "lucide-react";
+import { CalendarDays, Eye, EyeOff } from "lucide-react";
+import { PROJECT_STATUS_ICONS } from "../ui/project-status";
+import { ActivityPreview } from "./ActivityHistory";
 import { eventRange } from "../../studio-calendar";
 import { sumMoney } from "../../studio-finance";
 import type { Project, Client, FinanceEntry, CalendarEvent, View, Status } from "../../dashboard-client";
@@ -69,13 +71,11 @@ export function TodayStudio({projects,clients,entries,events,activities,onView,o
       <div className={`flow-track ${projectCount ? "" : "is-empty"}`} role="img" aria-label={phases.map(phase => `${phase.label}: ${phase.count}`).join(", ")}>
         {phases.filter(phase => phase.count > 0).map(phase => <i key={phase.status} style={{width:`${phase.count / Math.max(1,projectCount)*100}%`,background:phase.color}}/>)}
       </div>
-      <div className="flow-legend">{phases.map(phase => <span key={phase.status}><i style={{background:phase.color}}/>{phase.label}<b>{phase.count}</b></span>)}</div>
+      <div className="flow-legend">{phases.map(phase => { const StatusIcon=PROJECT_STATUS_ICONS[phase.status as Status]; return <span key={phase.status} style={{color:phase.color}}><StatusIcon size={17} strokeWidth={2} aria-hidden="true"/><span>{phase.label}</span><b>{phase.count}</b></span>; })}</div>
     </div>
     <footer className="flow-next"><CalendarDays size={22} aria-hidden="true"/><div><span>Próximo compromisso</span>
       <p>{next ? <><b>{next.title}</b> · {next.date.split("-").reverse().join("/")} · {eventRange(next)}</> : "Sua agenda está livre. Adicione a próxima produção."}</p>
     </div><button className="secondary-button" type="button" onClick={() => onView("calendar")}>Ver agenda</button></footer>
-    <button type="button" className="flow-recent-activity" onClick={onOpenActivity} aria-label={`Ver atividades recentes, ${activities.length} registradas`}>
-      <ChevronRight size={15} aria-hidden="true"/><span>Atividade recente</span><span className="flow-activity-count">{activities.length}</span>
-    </button>
+    <ActivityPreview activities={activities} onOpen={onOpenActivity}/>
   </section>;
 }

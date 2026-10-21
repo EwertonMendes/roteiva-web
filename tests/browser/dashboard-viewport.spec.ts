@@ -44,7 +44,7 @@ test("desktop overview fits viewport without page scrolling",async({page},info)=
         docWidth:document.documentElement.scrollWidth,
         card:el(".flow-overview"),
         heading:el(".page-heading"),
-        activity:el(".flow-recent-activity"),
+        activity:el(".flow-activity-preview"),
         sidebar:el(".sidebar"),
         profile:el(".sidebar-profile"),
       };
@@ -58,10 +58,11 @@ test("desktop overview fits viewport without page scrolling",async({page},info)=
     expect(sizes.profile.bottom,`profile at ${width}x${height}`).toBeLessThanOrEqual(sizes.viewportHeight+1);
     expect(sizes.heading.bottom,`heading precedes card at ${width}x${height}`).toBeLessThan(sizes.card.top+1);
   }
-  await page.locator(".flow-recent-activity").click();
-  await expect(page.locator("#sidebar-activity-panel")).toBeVisible();
+  await page.getByRole("button",{name:"Ver histórico completo"}).click();
+  await expect(page.getByRole("dialog",{name:"Histórico de atividades"})).toBeVisible();
+  await expect(page.getByRole("button",{name:"Todas"})).toHaveAttribute("aria-pressed","true");
   await page.keyboard.press("Escape");
-  await expect(page.locator("#sidebar-activity-panel")).toHaveCount(0);
+  await expect(page.getByRole("dialog",{name:"Histórico de atividades"})).toHaveCount(0);
 });
 
 test("mobile overview remains naturally scrollable and uses Ubuntu",async({page},info)=>{
