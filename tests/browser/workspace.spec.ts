@@ -83,6 +83,12 @@ test("Google emulator session, CRUD, restoration, themes and separate users",asy
   await page.getByLabel("Previsão de recebimento",{exact:true}).fill(today);
   await page.locator("form.finance-modal").getByRole("button",{name:"Adicionar lançamento"}).click();await settled(page);
   await expect(page.locator(".finance-table")).toContainText("100,01");
+  await navigate(page,"Visão geral");
+  await expect(page.locator(".flow-finance-amount")).toContainText("R$ 100,01");
+  await page.getByRole("button",{name:"Ocultar valores financeiros"}).click();
+  await expect(page.locator(".flow-finance-amount")).not.toContainText("100,01");
+  await page.getByRole("button",{name:"Mostrar valores financeiros"}).click();
+  await expect(page.locator(".flow-finance-amount")).toContainText("R$ 100,01");
   await navigate(page,"Calendário");
   await page.getByRole("button",{name:"Novo compromisso",exact:true}).click();
   await page.getByLabel("Título",{exact:true}).fill("Gravação Aurora");
