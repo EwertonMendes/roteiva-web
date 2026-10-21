@@ -28,4 +28,11 @@ test("video timestamp validity respects media duration and server limit",()=>{
   assert.equal(formatReviewTime(85.9),"1:25");
   assert.equal(formatReviewTime(-12),"0:00");
 });
-\ntest("one-click capture pauses the real media element and uses the integer playback second",()=>{\n  let paused=0;const video={currentTime:85.92,pause(){paused++;}};\n  assert.equal(captureReviewPlayback(video),85);\n  assert.equal(paused,1);\n  assert.equal(captureReviewPlayback({...video,currentTime:Number.NaN}),null);\n  assert.equal(paused,1);\n});\n
+
+test("one-click capture pauses the real media element and uses the integer playback second",()=>{
+  let paused=0;const video={currentTime:85.92,pause(){paused++;}};
+  assert.equal(captureReviewPlayback(video),85);
+  assert.equal(paused,1);
+  assert.equal(captureReviewPlayback({...video,currentTime:Number.NaN}),null);
+  assert.equal(paused,1);
+});
