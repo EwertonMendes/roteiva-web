@@ -20,7 +20,6 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   validate:
-    if: github.event_name != 'workflow_dispatch'
     name: Validate Worker and D1
     runs-on: ubuntu-latest
     timeout-minutes: 3
@@ -102,39 +101,3 @@ jobs:
           const denied=await fetch(base+'/integrations/drive',{headers:{Authorization:'Bearer invalid'}});
           assert.equal(denied.status,401);
           NODE
-
-  one_shot_live_qa:
-    # Temporary job; removed after real-network verification. No emulators or secrets.
-    name: One-shot public real DEV QA (temporary)
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/perf/free-tier-worker-d1-20261021'
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: api/package-lock.json
-      - name: Install Worker dependencies
-        working-directory: api
-        run: npm ci --ignore-scripts
-      - name: Typecheck, bundle and pure contracts (no emulators)
-        working-directory: api
-        run: |
-          npm run typecheck
-          npm run build
-          node --experimental-strip-types --test tests/cron-contract.test.mjs tests/thumbnail-stream.test.mjs
-      - name: Real DEV public HTTP smoke
-        working-directory: api
-        run: node scripts/qa-free-tier-live.mjs
-      - name: Frontend install and typecheck
-        run: |
-          corepack enable
-          pnpm install --frozen-lockfile
-          pnpm run typecheck
-          pnpm build
-      - name: Temporary real Chromium E2E (anonymous, no emulators)
-        run: |
-          pnpm exec playwright install chromium
-          node scripts/qa-free-tier-public-e2e.mjs
