@@ -50,6 +50,18 @@ test('only a matching unexpired capability reveals one review and selected files
   f.sql.prepare("UPDATE review_requests SET expires_at=?,status='closed' WHERE id=?").run(Date.now()+100000,a.id);
   await assert.rejects(()=>route(f,a.token),e=>e.status===404);
 });
+test('comments reject numeric strings and timestamps on images at the API boundary',async t=>{
+  const f=fixture();t.after(f.close);
+  const a=await inserted(f);
+  await assert.rejects(()=>route(f,a.token,'/reviews/public/comment','POST',
+    {authorName:'Cliente',fileId:file,body:'Tempo inválido',seconds:'85'}),e=>e.status===400);
+  f.sql.prepare('UPDATE review_assets SET mime_type=? WHERE review_id=?').run('image/png',a.id);
+  await assert.rejects(()=>route(f,a.token,'/reviews/public/comment','POST',
+    {authorName:'Cliente',fileId:file,body:'Imagem sem tempo',seconds:85}),e=>e.status===400);
+  const valid=await route(f,a.token,'/reviews/public/comment','POST',
+    {authorName:'Cliente',fileId:file,body:'Imagem aprovada',seconds:null});
+  assert.equal((await valid.json()).saved,true);
+});
 test('Google-restricted link requires verified recipient even if the URL leaks',async t=>{
   const f=fixture();t.after(f.close);
   const a=await inserted(f,{mode:'google'});
