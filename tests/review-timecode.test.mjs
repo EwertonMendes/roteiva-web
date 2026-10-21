@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {formatReviewTime,maskReviewTime,parseReviewTime,validReviewSecond,MAX_REVIEW_SECOND} from "../src/features/reviews/review-timecode.ts";
+import {captureReviewPlayback,formatReviewTime,maskReviewTime,parseReviewTime,validReviewSecond,MAX_REVIEW_SECOND} from "../src/features/reviews/review-timecode.ts";
 test("video timestamp mask strips letters and limits digits",()=>{
   assert.equal(maskReviewTime("01:25"),"01:25");
   assert.equal(maskReviewTime("0125"),"01:25");
@@ -28,3 +28,4 @@ test("video timestamp validity respects media duration and server limit",()=>{
   assert.equal(formatReviewTime(85.9),"1:25");
   assert.equal(formatReviewTime(-12),"0:00");
 });
+\ntest("one-click capture pauses the real media element and uses the integer playback second",()=>{\n  let paused=0;const video={currentTime:85.92,pause(){paused++;}};\n  assert.equal(captureReviewPlayback(video),85);\n  assert.equal(paused,1);\n  assert.equal(captureReviewPlayback({...video,currentTime:Number.NaN}),null);\n  assert.equal(paused,1);\n});\n
