@@ -36,3 +36,37 @@ jobs:
           WRANGLER_SEND_METRICS: 'false'
           WRANGLER_WRITE_LOGS: 'false'
         run: node scripts/qa-free-tier-live.mjs
+      - name: Install frontend dependencies and Chromium
+        working-directory: .
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile
+          pnpm exec playwright install --with-deps chromium
+      - name: Public real Chromium E2E after deploy (no emulators)
+        working-directory: .
+        run: |
+          node --input-type=module <<'NODE'
+          import {chromium} from '@playwright/test';
+          import assert from 'node:assert/strict';
+          const root='https://roteiva-web-dev.web.app';
+          const browser=await chromium.launch({headless:true});
+          try{
+            for(const viewport of [{width:1366,height:768},{width:390,height:844}]){
+              const page=await browser.newPage({viewport});
+              const errors=[];
+              page.on('pageerror',error=>errors.push(error.message));
+              for(const route of ['/', '/aprovacoes', '/biblioteca','/projetos']){
+                const response=await page.goto(root+route,{waitUntil:'domcontentloaded',timeout:30000});
+                assert.equal(response?.status(),200,route);
+                const app=page.locator('#root');
+                await app.waitFor({state:'visible',timeout:15000});
+                await page.waitForTimeout(600);
+                const visible=(await app.innerText()).trim();
+                assert.ok(visible.length>20,'SPA rendered: '+route);
+                assert.equal(errors.length,0,JSON.stringify(errors));
+                console.log(JSON.stringify({check:'public_live_e2e',route,viewport:viewport.width,characters:visible.length,errors:errors.length}));
+              }
+              await page.close();
+            }
+          }finally{await browser.close();}
+          NODE
