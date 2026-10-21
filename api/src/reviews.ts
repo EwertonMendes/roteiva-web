@@ -13,7 +13,7 @@ type Mode = 'link'|'google';
 type Review = {
   id:string;owner_uid:string;client_id:number;project_id:number;client_name:string;project_name:string;
   studio_name:string;title:string;message:string;recipient_email:string;access_mode:Mode;status:Status;
-  current_version:number;expires_at:number;token_hash:string;encrypted_token:string;created_at:number;updated_at:number;
+  current_version:number;expires_at:number;token_hash:string;encrypted_token:string;transition_id?:string|null;created_at:number;updated_at:number;
 };
 type Asset = {review_id:string;version:number;file_id:string;connection_id:string;linked_folder_id:string;
   name:string;mime_type:string;permission_id:string|null;grant_state:'unshared'|'granting'|'granted'|'revoking'|'revoked'};
@@ -411,6 +411,16 @@ async function publish(request:Request,env:Env,r:Review):Promise<Response>{
 async function revise(request:Request,env:Env,r:Review):Promise<Response>{
   const bearer=request.headers.get('Authorization')!.slice(7);
   const data=await uploadBody(request) as {assets?:unknown}|null;
+  if(r.expires_at<=now())throw new ApiError(410,'review_expired');
+  // A previous request may have committed the version switch but lost the HTTP
+  // response before publish completed. Retrying must finish THAT version,
+  // never increment it again or strand the editor on review_invalid_state.
+  if((r.status==='draft'||r.status==='publishing')&&r.current_version>1){
+    const decision=await env.DB.prepare("SELECT 1 FROM review_decisions WHERE review_id=? AND version=? AND decision='changes'")
+      .bind(r.id,r.current_version-1).first();
+    if(decision)return publish(request,env,r);
+  }
+  if(r.status!=='changes'&&r.status!=='replacing')throw new ApiError(409,'review_invalid_state');
   const version=r.current_version+1;
   if(r.status==='changes'){
     const entries=await validatedAssets(env,r.owner_uid,bearer,r.project_id,selected(data?.assets),r.id,version);
@@ -422,14 +432,31 @@ async function revise(request:Request,env:Env,r:Review):Promise<Response>{
     ];
     const results=await env.DB.batch(commands);
     if(results[0].meta.changes!==1)throw new ApiError(409,'review_busy');
-  }else if(r.status!=='replacing')throw new ApiError(409,'review_invalid_state');
-  const next=await assets(env,r.id,version);
-  if(!next.length)throw new ApiError(409,'review_invalid_state');
-  // Status 'replacing' blocks the public portal throughout the revocation.
+  }
+  let next=await assets(env,r.id,version);
+  // Recovery for existing DEV rows stuck in 'replacing' with no new assets:
+  // preserve the old version, reuse the stored transition fence and validate
+  // the newly selected files against the original client's project.
+  if(!next.length&&r.status==='replacing'){
+    const entries=await validatedAssets(env,r.owner_uid,bearer,r.project_id,selected(data?.assets),r.id,version);
+    const current=await stored(env,r.id,r.owner_uid);
+    if(current.status!=='replacing'||current.current_version!==r.current_version||!current.transition_id)
+      throw new ApiError(409,'review_busy');
+    await env.DB.batch(insertAssets(env,entries,current.transition_id));
+    next=await assets(env,r.id,version);
+  }
+  if(!next.length)throw new ApiError(409,'review_revision_recovery_required');
+  // During 'replacing' the public link is blocked. Revoke only Roteiva-owned
+  // ACLs; resume safely after transient Google failures or network retries.
   for(const old of await assets(env,r.id,r.current_version))await revokeAsset(env,r,old);
-  const changed=await env.DB.prepare("UPDATE review_requests SET current_version=?,status='draft',updated_at=? WHERE id=? AND owner_uid=? AND current_version=? AND status='replacing'")
-    .bind(version,now(),r.id,r.owner_uid,r.current_version).run();
-  if(changed.meta.changes!==1)throw new ApiError(409,'review_busy');
+  const changed=await env.DB.prepare("UPDATE review_requests SET current_version=?,status='draft',transition_id=NULL,updated_at=? WHERE id=? AND owner_uid=? AND current_version=? AND status='replacing' AND NOT EXISTS(SELECT 1 FROM review_assets WHERE review_id=? AND version=? AND grant_state NOT IN ('revoked','unshared'))")
+    .bind(version,now(),r.id,r.owner_uid,r.current_version,r.id,r.current_version).run();
+  if(changed.meta.changes!==1){
+    const current=await stored(env,r.id,r.owner_uid);
+    if(['draft','publishing'].includes(current.status)&&current.current_version===version)
+      return publish(request,env,current);
+    throw new ApiError(409,'review_busy');
+  }
   return publish(request,env,await stored(env,r.id,r.owner_uid));
 }
 async function close(env:Env,r:Review):Promise<Response>{
