@@ -14,7 +14,20 @@ const headers = {
   'Cache-Control':'no-store', 'Referrer-Policy':'no-referrer',
   'X-Content-Type-Options':'nosniff', 'Content-Security-Policy':"default-src 'none'; frame-ancestors 'none'",
 };
+/** Route categories are intentionally static: never log tokens, file IDs or URL params. */
+function operationName(path:string):string{
+  if(path.endsWith('/thumbnail')||path==='/reviews/media')return 'thumbnail_or_media';
+  if(path.startsWith('/reviews'))return 'reviews';
+  if(path.includes('/uploads/'))return 'drive_upload';
+  if(path.startsWith('/integrations/drive'))return 'drive_metadata';
+  if(path.startsWith('/oauth/'))return 'oauth';
+  if(path.startsWith('/account/'))return 'account';
+  if(path.startsWith('/access/'))return 'access';
+  if(path==='/health')return 'health';
+  return 'other';
+}
 export async function handle(request: Request, env: Env): Promise<Response> {
+  const began=performance.now();
   const id = crypto.randomUUID();
   const url = new URL(request.url);
   const origin = request.headers.get('Origin');
@@ -139,6 +152,14 @@ export async function handle(request: Request, env: Env): Promise<Response> {
   if (origin === env.FRONTEND_ORIGIN) {
     result.headers.set('Access-Control-Allow-Origin',origin);
     result.headers.set('Access-Control-Allow-Credentials','true');
+  }
+  // Wall-clock duration is not CPU time; compare against Cloudflare CPU percentiles.
+  // Do not log raw URLs, headers, request/response bodies or identities.
+  const elapsed=Math.round(performance.now()-began);
+  if(result.status>=500||elapsed>=2000||Math.random()<0.05){
+    console.info(JSON.stringify({event:'api_operation',operation:operationName(url.pathname),
+      method:request.method,status:result.status,wallMs:elapsed,
+      ...(result.status>=500?{requestId:id}:{})}));
   }
   return result;
 }
