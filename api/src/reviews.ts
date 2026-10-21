@@ -348,9 +348,9 @@ async function withAssetLease(env:Env,r:Review,a:Asset,job:(current:Asset)=>Prom
         const referenced=await env.DB.prepare("INSERT OR IGNORE INTO review_link_uses(review_id,version,file_id) SELECT ?,?,? WHERE EXISTS(SELECT 1 FROM review_requests r JOIN review_assets a ON a.review_id=r.id AND a.version=? AND a.file_id=? WHERE r.id=? AND r.status IN ('pending','changes','approved','publishing') AND a.grant_state='granted' AND a.permission_id IS NOT NULL)")
           .bind(r.id,a.version,a.file_id,claim.version,a.file_id,claim.review_id).run();
         if(referenced.meta.changes!==1){
-          await env.DB.prepare("UPDATE review_assets SET grant_state='unshared',permission_id=NULL WHERE review_id=? AND version=? AND file_id=? AND permission_id IS NULL")
-            .bind(r.id,a.version,a.file_id).run();
-          throw new ApiError(409,'review_busy');
+          const retained=await env.DB.prepare("SELECT 1 FROM review_link_uses WHERE review_id=? AND version=? AND file_id=?")
+            .bind(r.id,a.version,a.file_id).first();
+          if(!retained)throw new ApiError(409,'review_busy');
         }
         return;
       }
@@ -380,6 +380,14 @@ async function grantGoogle(env:Env,r:Review,a:Asset,validation:CheckedAsset):Pro
   if(a.grant_state!=='unshared'&&a.grant_state!=='granting')throw new ApiError(409,'review_grant_conflict');
   const row=await connection(env,r.owner_uid,a.connection_id);
   let existing=await permissions(env,row,a.file_id);
+  // Check inherited access before modifying *any* direct user ACL.
+  if(validation.inheritsPublic){
+    for(const parent of validation.ancestors){
+      const list=await permissions(env,row,parent);
+      if(list.some(p=>p.type==='anyone'||p.type==='domain'||p.type==='group'))
+        throw new ApiError(409,'review_inherited_public_permission');
+    }
+  }
   const directPublic=existing.filter(p=>p.type==='anyone');
   if(directPublic.length&&r.restrict_existing_public===1){
     // Explicit opt-in: changing these public ACLs affects *all* Drive links.
@@ -392,13 +400,6 @@ async function grantGoogle(env:Env,r:Review,a:Asset,validation:CheckedAsset):Pro
   }
   if(existing.some(p=>p.type==='anyone'||p.type==='domain'||p.type==='group'))
     throw new ApiError(409,'review_existing_public_permission');
-  if(validation.inheritsPublic){
-    for(const parent of validation.ancestors){
-      const list=await permissions(env,row,parent);
-      if(list.some(p=>p.type==='anyone'||p.type==='domain'||p.type==='group'))
-        throw new ApiError(409,'review_inherited_public_permission');
-    }
-  }
   const people=await participants(env,r.id);
   if(!people.length||!people.some(p=>p.role==='reviewer'))throw new ApiError(409,'review_reviewer_required');
   if(a.grant_state==='unshared'){
