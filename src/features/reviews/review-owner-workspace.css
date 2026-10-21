@@ -155,3 +155,11 @@
 }
 @media(max-width:375px){.rowner-footer-actions{flex-wrap:wrap}.rowner-footer-actions button{flex:1}}
 @media(prefers-reduced-motion:reduce){.rowner-file{transition:none}}
+
+
+.rowner-participants { margin:14px 0; padding:17px 20px; border:1px solid var(--line); border-radius:16px; background:var(--card); }
+.rowner-participants h3 { font-size:1rem; margin:0 0 11px; }
+.rowner-participants > div { display:flex; flex-wrap:wrap; gap:8px; }
+.rowner-participant { display:flex; flex-direction:column; gap:3px; min-width:0; max-width:100%; padding:9px 12px; border:1px solid var(--line); border-radius:10px; }
+.rowner-participant strong { font-size:.83rem; overflow-wrap:anywhere; }
+.rowner-participant small { font-size:.76rem; color:var(--muted); }
