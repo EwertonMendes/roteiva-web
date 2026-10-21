@@ -69,8 +69,9 @@ export function ReviewPortal({token}:{token:string}){
     }
     return response.json() as Promise<T>;
   },[user,token]);
-  const reload=useCallback(async()=>{
-    setLoading(true);setError("");setData(null);setNeedsGoogle(false);
+  const reload=useCallback(async(preserve=false)=>{
+    if(!preserve){setLoading(true);setData(null);}
+    setError("");setNeedsGoogle(false);
     try{
       const value=await request<PublicData>("/reviews/public");
       const changed=loadedVersion.current!==value.review.version;
@@ -78,6 +79,7 @@ export function ReviewPortal({token}:{token:string}){
       if(changed){setMinutes("");setBody("");}
       loadedVersion.current=value.review.version;
     }catch(e){
+      setData(null);
       const status=(e as {status?:number}).status;
       if(status===401||((e as {code?:string}).code==="review_recipient_denied")){
         setNeedsGoogle(true);
@@ -142,7 +144,7 @@ export function ReviewPortal({token}:{token:string}){
           {version:data?.review.version,authorName:name.trim(),decision:status,message:decisionText.trim()});
       if(kind==="comment"){setBody("");setMinutes("");setNotice("Comentário registrado com sucesso.");}
       else{setDecision(null);setDecisionText("");setNotice(status==="approved"?"Material aprovado com sucesso.":"Solicitação de ajustes registrada.");}
-      await reload();
+      await reload(true);
     }catch(e){setNotice(e instanceof Error?e.message:"Não foi possível registrar sua resposta.");}
     finally{setBusy(false);}
   };
