@@ -297,6 +297,7 @@ async function withAssetLease(env:Env,r:Review,a:Asset,job:(current:Asset)=>Prom
     if(revoking&&(current.grant_state==='unshared'||current.grant_state==='revoked')){
       await job(current);return;
     }
+    if(r.access_mode==='google'){await job(current);return;}
     await env.DB.prepare('INSERT OR IGNORE INTO review_file_claims(file_id,review_id,version) VALUES(?,?,?)')
       .bind(a.file_id,r.id,a.version).run();
     const claim=await env.DB.prepare('SELECT review_id,version FROM review_file_claims WHERE file_id=?')
@@ -309,7 +310,124 @@ async function withAssetLease(env:Env,r:Review,a:Asset,job:(current:Asset)=>Prom
   }
 }
 type CheckedAsset=Awaited<ReturnType<typeof checkedFile>>;
+
+type GoogleAcl={file_id:string;email:string;connection_id:string;permission_id:string|null;managed:number;state:'granting'|'ready'|'revoking';updated_at:number;owner_review_id:string|null};
+async function sharedGoogleAcl(env:Env,fileId:string,email:string):Promise<GoogleAcl|null>{
+  return env.DB.prepare('SELECT * FROM review_google_acl WHERE file_id=? AND email=?')
+    .bind(fileId,email).first<GoogleAcl>();
+}
+async function grantGoogle(env:Env,r:Review,a:Asset,validation:CheckedAsset):Promise<void>{
+  const active=await env.DB.prepare("SELECT 1 FROM review_requests WHERE id=? AND status='publishing' AND current_version=? AND expires_at>?")
+    .bind(r.id,a.version,now()).first();
+  if(!active)throw new ApiError(409,'review_busy');
+  if(a.grant_state==='granted')return;
+  if(a.grant_state!=='unshared'&&a.grant_state!=='granting')throw new ApiError(409,'review_grant_conflict');
+  const row=await connection(env,r.owner_uid,a.connection_id);
+  let existing=await permissions(env,row,a.file_id);
+  const directPublic=existing.filter(p=>p.type==='anyone');
+  if(directPublic.length&&r.restrict_existing_public===1){
+    // Explicit opt-in: changing these public ACLs affects *all* Drive links.
+    // Never delete an ACL that belongs to another active Roteiva invitation.
+    const shared=await env.DB.prepare("SELECT 1 FROM review_file_claims WHERE file_id=? AND review_id!=?")
+      .bind(a.file_id,r.id).first();
+    if(shared)throw new ApiError(409,'review_file_in_use');
+    for(const p of directPublic)await mutatePermission(env,row,a.file_id,'DELETE',undefined,p.id);
+    existing=await permissions(env,row,a.file_id);
+  }
+  if(existing.some(p=>p.type==='anyone'||p.type==='domain'||p.type==='group'))
+    throw new ApiError(409,'review_existing_public_permission');
+  if(validation.inheritsPublic){
+    for(const parent of validation.ancestors){
+      const list=await permissions(env,row,parent);
+      if(list.some(p=>p.type==='anyone'||p.type==='domain'||p.type==='group'))
+        throw new ApiError(409,'review_inherited_public_permission');
+    }
+  }
+  const people=await participants(env,r.id);
+  if(!people.length||!people.some(p=>p.role==='reviewer'))throw new ApiError(409,'review_reviewer_required');
+  if(a.grant_state==='unshared'){
+    const started=await env.DB.prepare("UPDATE review_assets SET grant_state='granting' WHERE review_id=? AND version=? AND file_id=? AND grant_state='unshared'")
+      .bind(r.id,a.version,a.file_id).run();
+    if(started.meta.changes!==1)throw new ApiError(409,'review_busy');
+  }
+  for(const person of people){
+    let match=existing.find(p=>p.type==='user'&&p.emailAddress?.toLowerCase()===person.email);
+    await env.DB.prepare("INSERT OR IGNORE INTO review_google_acl(file_id,email,connection_id,permission_id,managed,state,updated_at,owner_review_id) VALUES(?,?,?,?,?,?,?,?)")
+      .bind(a.file_id,person.email,a.connection_id,match?.id||null,match?0:1,match?'ready':'granting',now(),r.id).run();
+    let acl=await sharedGoogleAcl(env,a.file_id,person.email);
+    if(!acl)throw new ApiError(503,'review_drive_unavailable');
+    if(acl.state==='revoking')throw new ApiError(409,'review_busy');
+    if(acl.state==='granting'&&acl.owner_review_id!==r.id){
+      if(acl.updated_at>now()-120000)throw new ApiError(409,'review_busy');
+      const takeover=await env.DB.prepare("UPDATE review_google_acl SET owner_review_id=?,updated_at=? WHERE file_id=? AND email=? AND state='granting' AND updated_at<=?")
+        .bind(r.id,now(),a.file_id,person.email,now()-120000).run();
+      if(takeover.meta.changes!==1)throw new ApiError(409,'review_busy');
+      acl=(await sharedGoogleAcl(env,a.file_id,person.email))!;
+    }
+    if(!match&&acl.state==='ready'){
+      const updated=await env.DB.prepare("UPDATE review_google_acl SET state='granting',managed=1,permission_id=NULL,owner_review_id=?,updated_at=? WHERE file_id=? AND email=? AND state='ready'")
+        .bind(r.id,now(),a.file_id,person.email).run();
+      if(updated.meta.changes!==1)throw new ApiError(409,'review_busy');
+      acl=(await sharedGoogleAcl(env,a.file_id,person.email))!;
+    }
+    if(acl.state==='granting'){
+      if(!match){
+        if(!validation.appAuthorized||!validation.canShare||
+          !row.scopes.split(/\s+/).includes(DRIVE_SCOPE))
+          throw new ApiError(409,'review_drive_file_authorization_required');
+        const created=await mutatePermission(env,row,a.file_id,'POST',
+          {type:'user',role:'reader',emailAddress:person.email});
+        if(typeof created.id!=='string'||!created.id)throw new ApiError(503,'review_drive_unavailable');
+        match={id:created.id,type:'user',role:'reader',emailAddress:person.email};
+        existing.push(match);
+      }
+      await env.DB.prepare("UPDATE review_google_acl SET state='ready',permission_id=?,updated_at=? WHERE file_id=? AND email=? AND state='granting' AND owner_review_id=?")
+        .bind(match.id,now(),a.file_id,person.email,r.id).run();
+    }
+    await env.DB.prepare("INSERT OR REPLACE INTO review_google_uses(review_id,version,file_id,email,state) VALUES(?,?,?,?,'active')")
+      .bind(r.id,a.version,a.file_id,person.email).run();
+  }
+  const done=await env.DB.prepare("UPDATE review_assets SET grant_state='granted',permission_id=NULL WHERE review_id=? AND version=? AND file_id=? AND grant_state='granting' AND EXISTS(SELECT 1 FROM review_requests WHERE id=? AND status='publishing' AND current_version=?)")
+    .bind(r.id,a.version,a.file_id,r.id,a.version).run();
+  if(done.meta.changes!==1)throw new ApiError(409,'review_busy');
+}
+async function revokeGoogle(env:Env,r:Review,a:Asset):Promise<void>{
+  // Include incomplete grants that committed their ACL but did not finish their use row.
+  const people=await participants(env,r.id);
+  const row=await connection(env,r.owner_uid,a.connection_id);
+  for(const person of people){
+    await env.DB.prepare("UPDATE review_google_uses SET state='revoked' WHERE review_id=? AND version=? AND file_id=? AND email=?")
+      .bind(r.id,a.version,a.file_id,person.email).run();
+    const acl=await sharedGoogleAcl(env,a.file_id,person.email);
+    if(!acl)continue;
+    const inUse=await env.DB.prepare("SELECT 1 FROM review_google_uses WHERE file_id=? AND email=? AND state='active' LIMIT 1")
+      .bind(a.file_id,person.email).first();
+    if(inUse)continue;
+    if(!acl.managed){
+      await env.DB.prepare("DELETE FROM review_google_acl WHERE file_id=? AND email=? AND managed=0")
+        .bind(a.file_id,person.email).run();
+      continue;
+    }
+    if(acl.state!=='revoking'){
+      const claimed=await env.DB.prepare("UPDATE review_google_acl SET state='revoking',updated_at=? WHERE file_id=? AND email=? AND state IN ('ready','granting') AND NOT EXISTS(SELECT 1 FROM review_google_uses WHERE file_id=? AND email=? AND state='active')")
+        .bind(now(),a.file_id,person.email,a.file_id,person.email).run();
+      if(claimed.meta.changes!==1)throw new ApiError(409,'review_busy');
+    }
+    let id=acl.permission_id;
+    if(!id){
+      const list=await permissions(env,row,a.file_id);
+      id=list.find(p=>p.type==='user'&&p.emailAddress?.toLowerCase()===person.email)?.id||null;
+    }
+    if(id)await mutatePermission(env,row,a.file_id,'DELETE',undefined,id);
+    await env.DB.prepare("DELETE FROM review_google_acl WHERE file_id=? AND email=? AND state='revoking'")
+      .bind(a.file_id,person.email).run();
+  }
+  await env.DB.prepare("UPDATE review_assets SET grant_state='revoked',permission_id=NULL WHERE review_id=? AND version=? AND file_id=?")
+    .bind(r.id,a.version,a.file_id).run();
+}
+
 async function grantLocked(env:Env,r:Review,a:Asset,validation:CheckedAsset):Promise<void>{
+  if(r.access_mode==='google')return grantGoogle(env,r,a,validation);
   const active=await env.DB.prepare("SELECT 1 FROM review_requests WHERE id=? AND status='publishing' AND current_version=? AND expires_at>?")
     .bind(r.id,a.version,now()).first();
   if(!active)throw new ApiError(409,'review_busy');
@@ -400,11 +518,13 @@ async function revokeAsset(env:Env,r:Review,a:Asset):Promise<void>{
   },true);
 }
 async function releaseClaim(env:Env,r:Review,a:Asset):Promise<void>{
+  if(r.access_mode==='google')return;
   await env.DB.prepare('DELETE FROM review_file_claims WHERE file_id=? AND review_id=? AND version=?')
     .bind(a.file_id,r.id,a.version).run();
 }
 async function revokeLocked(env:Env,r:Review,a:Asset):Promise<void>{
   if(a.grant_state==='revoked'||a.grant_state==='unshared')return;
+  if(r.access_mode==='google')return revokeGoogle(env,r,a);
   const row=await connection(env,r.owner_uid,a.connection_id);
   // Repair an unknown completion of a Google grant before closing.
   if(a.grant_state==='granting'){
