@@ -20,6 +20,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   validate:
+    if: github.event_name != 'workflow_dispatch'
     name: Validate Worker and D1
     runs-on: ubuntu-latest
     timeout-minutes: 3
@@ -101,3 +102,59 @@ jobs:
           const denied=await fetch(base+'/integrations/drive',{headers:{Authorization:'Bearer invalid'}});
           assert.equal(denied.status,401);
           NODE
+
+  one_shot_live_qa:
+    # Temporary job, removed after the one-shot DEV verification. No emulators.
+    name: One-shot real DEV QA (temporary)
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/perf/free-tier-worker-d1-20261021'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: cloudflare-development
+    concurrency:
+      group: api-worker-dev
+      cancel-in-progress: false
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+      - name: Guard DEV and master consistency
+        env:
+          ACCOUNT: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          DATABASE: ${{ vars.CLOUDFLARE_D1_DATABASE_ID }}
+        run: |
+          test "$ACCOUNT" = "b3855f9c192541a01a45b2dae7b6a7f8"
+          test "$DATABASE" = "302adc88-76b2-4827-bb16-99662fa0408b"
+          test "$(git ls-remote origin refs/heads/master | cut -f1)" = "da71c680d04749c4d94cc7efec531f9018d67099"
+      - run: npm ci --ignore-scripts
+      - name: Typecheck, bundle and pure contracts (no emulators)
+        run: |
+          npm run typecheck
+          npm run build
+          node --experimental-strip-types --test tests/cron-contract.test.mjs tests/thumbnail-stream.test.mjs
+      - name: Baseline real D1 and HTTP
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: node scripts/qa-free-tier-live.mjs
+      - name: Publish optimized Worker to existing DEV
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npm run deploy:dev
+      - name: Smoke real D1 and HTTP after deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: node scripts/qa-free-tier-live.mjs
+      - name: Roll back DEV Worker to master on failed rollout
+        if: failure()
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          git fetch origin master
+          git checkout origin/master -- api
+          npm ci --ignore-scripts
+          npm run deploy:dev
