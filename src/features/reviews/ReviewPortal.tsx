@@ -8,7 +8,8 @@ import "../reviews/reviews.css";
 import "./review-portal-v2.css";
 
 type Review={title:string;message:string;studioName:string;clientName:string;projectName:string;status:string;
-  version:number;expiresAt:number;mode:"link"|"google"};
+  version:number;expiresAt:number;mode:"link"|"google";
+  role?:"reviewer"|"viewer";myVote?:"approved"|"changes"|null;approvalsReceived?:number;approvalsRequired?:number};
 type Asset={fileId:string;name:string;mimeType:string};
 type Comment={id:string;file_id:string;author_name:string;body:string;seconds:number|null;created_at:number};
 type Decision={version:number;decision:string;author_name:string;message:string;created_at:number};
@@ -19,7 +20,8 @@ const messages:Record<string,string>={
   review_not_found:"Este link não existe mais ou foi revogado.",
   review_expired:"O prazo de acesso a este material terminou. Solicite um novo link ao profissional.",
   review_not_ready:"Este material ainda não está disponível para revisão.",
-  review_recipient_denied:"Este link foi reservado para outra conta Google.",
+  review_recipient_denied:"Sua conta Google não está na lista de participantes desta revisão.",
+  review_viewer_read_only:"Sua conta tem permissão de leitura, sem autorização para comentar ou decidir.",
   review_already_decided:"A decisão desta versão já foi registrada.",
   review_invalid_input:"Revise os dados preenchidos e tente novamente.",
   review_version_changed:"Uma nova versão está disponível. Atualize a página e revise o material antes de responder.",
@@ -100,18 +102,19 @@ export function ReviewPortal({token}:{token:string}){
   const isVideo=active?.mimeType.startsWith("video/")??false;
   const activeFileId=active?.fileId;
   const activeVersion=data?.review.version;
+  const privateGoogle=data?.review.mode==="google";
   useEffect(()=>{
     let alive=true;
     setMediaUrl("");setMediaFailure(false);setPlayhead(0);setDuration(null);
-    setMediaMode(isVideo?"loading":"drive");
-    if(!isVideo||!activeFileId||!activeVersion)return;
+    setMediaMode(isVideo&&!privateGoogle?"loading":"drive");
+    if(privateGoogle||!isVideo||!activeFileId||!activeVersion)return;
     void request<{url:string;expiresAt:number}>("/reviews/public/media-ticket","POST",
       {fileId:activeFileId,version:activeVersion}).then(ticket=>{
       if(alive&&ticket.url.startsWith(API+"/reviews/media?ticket=")){setMediaUrl(ticket.url);setMediaMode("native");}
       else if(alive){setMediaMode("drive");setMediaFailure(true);}
     }).catch(()=>{if(alive){setMediaMode("drive");setMediaFailure(true);}});
     return()=>{alive=false;};
-  },[activeFileId,activeVersion,isVideo,request]);
+  },[activeFileId,activeVersion,isVideo,privateGoogle,request]);
   const seconds=isVideo?parseReviewTime(minutes):null;
   const invalidTime=isVideo&&!validReviewSecond(seconds,mediaMode==="native"?duration:null);
   const switchFile=(index:number)=>{
@@ -149,7 +152,9 @@ export function ReviewPortal({token}:{token:string}){
     finally{setBusy(false);}
   };
   const comments=data?.comments.filter(c=>c.file_id===activeFileId)||[];
-  const done=data?.review.status!=="pending";
+  const isReader=data?.review.role==="viewer";
+  const alreadyVoted=Boolean(data?.review.myVote);
+  const done=data?.review.status!=="pending"||alreadyVoted;
   return <main className="review-portal" data-theme={theme}>
     <header className="review-portal-header">
       <a href="/" aria-label="Ir para Roteiva"><img src={theme==="dark"?"/roteiva-logo-white.png":"/roteiva-logo-black.png"} alt="Roteiva"/></a>
@@ -242,7 +247,7 @@ export function ReviewPortal({token}:{token:string}){
                 <p>{c.body}</p>
               </article>)}
             </div>
-            {!done&&<div className="review-portal-commentform">
+            {!done&&!isReader&&<div className="review-portal-commentform">
               <label>Seu nome<input maxLength={100} value={name} placeholder="Como podemos chamar você?"
                 onChange={e=>setName(e.target.value)}/></label>
               {isVideo&&<div className="review-video-time-field">
@@ -266,10 +271,13 @@ export function ReviewPortal({token}:{token:string}){
             </div>}
           </section>
         </div>
-        {data.review.status==="pending"?<section className="review-portal-decision">
+        {data.review.status==="pending"&&!isReader&&!alreadyVoted?<section className="review-portal-decision">
           <div className="review-decision-copy"><span className="review-decision-label">ETAPA FINAL</span>
             <h2>Tudo pronto para decidir?</h2>
-            <p>Confira os materiais. Você pode aprovar ou pedir alterações.</p></div>
+            <p>Confira os materiais. Você pode aprovar ou pedir alterações.</p>
+            {data.review.mode==="google"&&<p className="review-approval-progress">
+              {data.review.approvalsReceived||0} de {data.review.approvalsRequired||1} revisores aprovaram.
+            </p>}</div>
           <div className="review-portal-buttons">
             <button type="button" className="review-action-secondary" onClick={()=>setDecision("changes")}>
               <MessageSquare size={17}/> Solicitar ajustes</button>
@@ -277,8 +285,14 @@ export function ReviewPortal({token}:{token:string}){
               <CheckCircle2 size={18}/> Aprovar material</button>
           </div>
         </section>:<section className="review-portal-done"><CheckCircle2 size={24}/>
-          <div><h2>{data.review.status==="approved"?"Material aprovado":"Feedback enviado"}</h2>
-            <p>{data.review.status==="approved"?"Sua aprovação foi registrada. Obrigado!":"O profissional recebeu seu pedido de alterações. Aguarde uma nova versão."}</p></div></section>}
+          <div><h2>{isReader?"Acompanhamento somente leitura":data.review.status==="approved"?"Material aprovado":data.review.status==="pending"?"Sua decisão foi registrada":"Feedback enviado"}</h2>
+            <p>{isReader?"Você pode acompanhar os materiais, comentários e o estado da revisão, sem enviar decisões.":
+              data.review.status==="pending"?"Aguardando a resposta dos demais revisores.":
+              data.review.status==="approved"?"A versão foi aprovada. Obrigado!":
+              "O profissional recebeu o pedido de alterações. Aguarde uma nova versão."}</p>
+            {data.review.mode==="google"&&<p className="review-approval-progress">
+              {data.review.approvalsReceived||0} de {data.review.approvalsRequired||1} revisores aprovaram.
+            </p>}</div></section>}
         {notice&&<p role="status" className="review-portal-notice">{notice}</p>}
       </>}
     </div>

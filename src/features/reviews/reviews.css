@@ -166,3 +166,15 @@
   .review-drive-search{width:100%;min-width:0;flex:auto}
   .review-drive-external{justify-content:center}
   .review-picker-main>.rl-file-icon{flex-basis:44px;width:44px;height:40px}}
+
+
+/* Named Google participants: clear role separation and explicit Drive ACL consent. */
+.review-participants-config { grid-column:1 / -1; padding:16px; border:1px solid var(--line); border-radius:16px; background:var(--card); display:grid; gap:12px; }
+.review-participants-config h3 { margin:0; font-size:1rem; }
+.review-participants-config > p { margin:0; line-height:1.55; }
+.review-participants-config label:not(.review-permission-optin) { display:grid; gap:7px; font-size:.875rem; font-weight:600; }
+.review-participants-config textarea { width:100%; min-height:76px; resize:vertical; border:1px solid var(--line); border-radius:12px; background:var(--bg); color:var(--ink); padding:12px; font:inherit; line-height:1.6; }
+.review-participants-config textarea:focus-visible { outline:2px solid var(--accent, #76a9ff); outline-offset:2px; }
+.review-permission-optin { display:flex; align-items:flex-start; gap:11px; cursor:pointer; padding:13px; border:1px solid var(--line); border-radius:12px; background:var(--bg); line-height:1.5; }
+.review-permission-optin input { margin:4px 0 0; flex-shrink:0; accent-color:var(--accent,#74a4ff); }
+.review-permission-optin span { font-size:.875rem; font-weight:500; }

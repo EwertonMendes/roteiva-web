@@ -32,6 +32,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
   const [clientId,setClientId]=useState(startClientId||0),[projectId,setProjectId]=useState(startProjectId||0);
   const [title,setTitle]=useState(""),[message,setMessage]=useState("");
   const [mode,setMode]=useState<Mode>("link"),[recipient,setRecipient]=useState("");
+  const [viewers,setViewers]=useState(""),[restrictPublic,setRestrictPublic]=useState(false);
   const [days,setDays]=useState(14),[links,setLinks]=useState<DriveFolderLink[]>([]);
   const [selectedFolder,setSelectedFolder]=useState<DriveFolderLink|null>(null);
   const [trail,setTrail]=useState<{id:string;name:string}[]>([]);
@@ -176,11 +177,11 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
   const resetComposer=()=>{
     if(working)return;
     browseSequence.current++;searchSequence.current++;
-    setComposer(false);setReplacement(null);setFiles([]);setTitle("");setMessage("");setSelectedFolder(null);
+    setComposer(false);setReplacement(null);setFiles([]);setTitle("");setMessage("");setSelectedFolder(null);setViewers("");setRestrictPublic(false);
     setTrail([]);setItems([]);setError("");setFolderError("");
   };
   const newReview=()=>{
-    setClientId(0);setProjectId(0);setRecipient("");setTitle("");setMessage("");setFiles([]);setMode("link");
+    setClientId(0);setProjectId(0);setRecipient("");setViewers("");setRestrictPublic(false);setTitle("");setMessage("");setFiles([]);setMode("link");
     setReplacement(null);setComposer(true);setOpened(null);setError("");
   };
   const openDetail=async(id:string)=>{
@@ -222,8 +223,16 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
         }
         setOpened(result);
       }else{
+        const splitEmails=(raw:string)=>raw.split(/[\n,;]+/).map(v=>v.trim().toLowerCase()).filter(Boolean);
+        const reviewers=mode==="google"?splitEmails(recipient):[];
+        const readers=mode==="google"?splitEmails(viewers):[];
+        if(mode==="google"&&(!reviewers.length||new Set([...reviewers,...readers]).size!==reviewers.length+readers.length)){
+          throw new Error("Informe ao menos um revisor Google e não repita e-mails entre revisores e leitores.");
+        }
+        const participants=[...reviewers.map(email=>({email,role:"reviewer"})),...readers.map(email=>({email,role:"viewer"}))];
         const created=await call<{id:string}>("/reviews","POST",{
-          clientId,projectId,studioName,title,message,mode,recipientEmail:recipient,
+          clientId,projectId,studioName,title,message,mode,recipientEmail:reviewers[0]||"",
+          participants,restrictExistingPublic:restrictPublic,
           expiresInDays:days,assets:selections
         });
         setOpened(await call<Detail>("/reviews/"+created.id));
@@ -334,8 +343,24 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
                 <option value="link">Qualquer pessoa com o link</option><option value="google">Somente Google autorizado</option>
               </select></label>
               {mode==="link"?<p className="reviews-info">Os arquivos selecionados poderão ser vistos por quem tiver o link. Se o arquivo ou a pasta já estiver público no Google Drive, essa permissão continuará mesmo depois de encerrar a aprovação. Não utilize com informações confidenciais.</p>:
-                <label>E-mail Google autorizado<input type="email" required value={recipient} maxLength={200}
-                  onChange={e=>setRecipient(e.target.value)} placeholder="cliente@gmail.com"/></label>}
+                <div className="review-participants-config">
+                  <h3>Participantes Google</h3>
+                  <p className="reviews-muted">Cada pessoa precisará entrar com sua própria conta Google autorizada. Adicione os e-mails separados por vírgula ou em linhas diferentes.</p>
+                  <label>Revisores · podem comentar, aprovar ou solicitar ajustes
+                    <textarea required rows={3} value={recipient} onChange={e=>setRecipient(e.target.value)}
+                      placeholder={"revisor1@gmail.com\nrevisor2@gmail.com"}/>
+                  </label>
+                  <label>Leitores · podem visualizar materiais, comentários e decisões
+                    <textarea rows={3} value={viewers} onChange={e=>setViewers(e.target.value)}
+                      placeholder={"diretoria@gmail.com\nobservador@gmail.com"}/>
+                  </label>
+                  <p className="reviews-info">A aprovação só fica concluída depois que todos os revisores aprovarem. Um pedido de ajustes devolve a versão ao estúdio. Leitores nunca podem enviar comentários ou decisões.</p>
+                  <label className="review-permission-optin">
+                    <input type="checkbox" checked={restrictPublic} onChange={e=>setRestrictPublic(e.target.checked)}/>
+                    <span>Também restringir arquivos que já estão públicos: remover a permissão direta “Qualquer pessoa com o link” no Google Drive. Isso pode afetar outros links compartilhados.</span>
+                  </label>
+                  <p className="reviews-muted">Para garantir acesso restrito, pastas ancestrais também precisam estar configuradas como Restritas no Drive. O Roteiva nunca remove permissões herdadas automaticamente.</p>
+                </div>}
               <label>Validade<select value={days} onChange={e=>setDays(Number(e.target.value))}>
                 <option value={7}>7 dias</option><option value={14}>14 dias</option><option value={30}>30 dias</option>
               </select></label>

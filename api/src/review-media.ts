@@ -49,9 +49,9 @@ export async function verifyReviewMediaTicket(env:Env,token:string):Promise<Tick
 export async function streamReviewMedia(request:Request,env:Env,url:URL):Promise<Response>{
   if(request.method!=='GET'&&request.method!=='HEAD')throw new ApiError(405,'method_not_allowed');
   const p=await verifyReviewMediaTicket(env,url.searchParams.get('ticket')||'');
-  const r=await env.DB.prepare("SELECT id,owner_uid,status,current_version,expires_at,token_hash FROM review_requests WHERE id=?")
-    .bind(p.r).first<{id:string;owner_uid:string;status:string;current_version:number;expires_at:number;token_hash:string}>();
-  if(!r||r.expires_at<=Date.now()||r.current_version!==p.v||r.token_hash!==p.h||
+  const r=await env.DB.prepare("SELECT id,owner_uid,status,current_version,expires_at,token_hash,access_mode FROM review_requests WHERE id=?")
+    .bind(p.r).first<{id:string;owner_uid:string;status:string;current_version:number;expires_at:number;token_hash:string;access_mode:string}>();
+  if(!r||r.access_mode==='google'||r.expires_at<=Date.now()||r.current_version!==p.v||r.token_hash!==p.h||
      !['pending','changes','approved'].includes(r.status))throw new ApiError(404,'review_not_found');
   const asset=await env.DB.prepare("SELECT file_id,connection_id,mime_type FROM review_assets WHERE review_id=? AND version=? AND file_id=? AND grant_state='granted'")
     .bind(p.r,p.v,p.f).first<{file_id:string;connection_id:string;mime_type:string}>();

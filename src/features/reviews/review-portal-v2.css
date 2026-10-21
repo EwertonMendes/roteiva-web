@@ -200,3 +200,6 @@
   .review-portal,.review-theme-button,.review-portal-assets button,
   .review-portal :is(.review-action-primary,.review-action-secondary){transition:none}
 }
+
+
+.review-approval-progress { margin:10px 0 0; font-size:.84rem; color:var(--muted); }

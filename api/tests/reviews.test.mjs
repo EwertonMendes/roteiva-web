@@ -315,7 +315,7 @@ test('Google-only rejects public parent; private inaccessible file requires expl
   const x=await integration(t);x.hooks.publicFolder=true;x.hooks.unauthorized=true;
   const {id,published}=await createAndPublish(x,{mode:'google',recipientEmail:'client@gmail.com'});
   assert.equal(published.status,409);
-  assert.equal((await published.json()).error.code,'review_existing_public_permission');
+  assert.equal((await published.json()).error.code,'review_inherited_public_permission');
   assert.equal((await x.send('POST','/reviews/'+id+'/close',x.alice)).status,200);
   x.hooks.publicFolder=false;
   const second=await createAndPublish(x);
@@ -339,7 +339,7 @@ test('restricted review verifies Google recipient and preserves their pre-existi
 });
 test('Google restricted grants are created and revoked; public/domain ACLs reject restriction',async t=>{
   const x=await integration(t);
-  for(const type of ['anyone','domain','group','user']){
+  for(const type of ['anyone','domain','group']){
     x.acl.set('external',{type,role:'reader',emailAddress:'other@gmail.com'});
     const {id,published}=await createAndPublish(x,{mode:'google',recipientEmail:'client@gmail.com'});
     assert.equal(published.status,409);
@@ -497,4 +497,93 @@ test('expiry revokes actual mocked ACL; owner deletion revokes before removing r
   assert.equal(x.f.sql.prepare('SELECT COUNT(*) n FROM review_assets').get().n,0);
   assert.equal(x.f.sql.prepare('SELECT COUNT(*) n FROM review_file_claims').get().n,0);
   assert.equal(x.f.sql.prepare('SELECT COUNT(*) n FROM drive_connections').get().n,1);
+});
+
+test('Google participants have verified roles and all reviewers must approve',async t=>{
+  const x=await integration(t);
+  const participants=[
+    {email:'first@gmail.com',role:'reviewer'},
+    {email:'second@gmail.com',role:'reviewer'},
+    {email:'observer@gmail.com',role:'viewer'}
+  ];
+  const {id,published}=await createAndPublish(x,{mode:'google',recipientEmail:'first@gmail.com',participants});
+  assert.equal(published.status,200);
+  assert.equal(x.acl.size,3);
+  const token=(await published.json()).review.review.url.split('/').at(-1);
+  const first=await x.jwt('first','first@gmail.com');
+  const second=await x.jwt('second','second@gmail.com');
+  const observer=await x.jwt('observer','observer@gmail.com');
+  const outsider=await x.jwt('outsider','outsider@gmail.com');
+  await assert.rejects(()=>route(x.f,token,undefined,undefined,undefined,outsider),e=>e.status===403);
+  const visible=await (await route(x.f,token,undefined,undefined,undefined,observer)).json();
+  assert.equal(visible.review.role,'viewer');
+  assert.equal(visible.assets.length,1);
+  await assert.rejects(()=>route(x.f,token,'/reviews/public/comment','POST',
+    {fileId:file,authorName:'Observer',body:'Illegal comment'},observer),e=>e.code==='review_viewer_read_only');
+  await assert.rejects(()=>route(x.f,token,'/reviews/public/decide','POST',
+    {authorName:'Observer',decision:'approved'},observer),e=>e.code==='review_viewer_read_only');
+  assert.equal((await route(x.f,token,'/reviews/public/comment','POST',
+    {fileId:file,authorName:'First',body:'Looks good'},first)).status,200);
+  const vote=await route(x.f,token,'/reviews/public/decide','POST',
+    {authorName:'First',decision:'approved'},first);
+  assert.equal((await vote.json()).status,'pending');
+  assert.equal(x.f.sql.prepare('SELECT status FROM review_requests WHERE id=?').get(id).status,'pending');
+  assert.equal((await (await route(x.f,token,undefined,undefined,undefined,first)).json()).review.myVote,'approved');
+  await assert.rejects(()=>route(x.f,token,'/reviews/public/decide','POST',
+    {authorName:'First',decision:'approved'},first),e=>e.status===409);
+  const final=await route(x.f,token,'/reviews/public/decide','POST',
+    {authorName:'Second',decision:'approved'},second);
+  assert.equal((await final.json()).status,'approved');
+  assert.equal(x.f.sql.prepare('SELECT COUNT(*) n FROM review_votes WHERE review_id=?').get(id).n,2);
+  assert.equal(x.f.sql.prepare('SELECT status FROM review_requests WHERE id=?').get(id).status,'approved');
+  assert.equal((await x.send('POST','/reviews/'+id+'/close',x.alice)).status,200);
+  assert.equal(x.acl.size,0);
+});
+test('Google reader ACLs are shared safely across independent active approvals',async t=>{
+  const x=await integration(t);
+  const p={mode:'google',recipientEmail:'first@gmail.com',participants:[
+    {email:'first@gmail.com',role:'reviewer'},{email:'observer@gmail.com',role:'viewer'}
+  ]};
+  const one=await createAndPublish(x,p),two=await createAndPublish(x,p);
+  assert.equal(one.published.status,200);
+  assert.equal(two.published.status,200);
+  assert.equal(x.acl.size,2,'one Drive permission per unique Google identity');
+  assert.equal((await x.send('POST','/reviews/'+one.id+'/close',x.alice)).status,200);
+  assert.equal(x.acl.size,2,'other approval still references each ACL');
+  assert.equal((await x.send('POST','/reviews/'+two.id+'/close',x.alice)).status,200);
+  assert.equal(x.acl.size,0);
+});
+test('owner explicitly restricts a directly public Drive file without removing other readers',async t=>{
+  const x=await integration(t);
+  x.acl.set('owner-public',{type:'anyone',role:'reader'});
+  x.acl.set('owner-reader',{type:'user',role:'reader',emailAddress:'other@gmail.com'});
+  const options={mode:'google',recipientEmail:'first@gmail.com',restrictExistingPublic:true};
+  const {id,published}=await createAndPublish(x,options);
+  assert.equal(published.status,200);
+  assert.equal(x.acl.has('owner-public'),false);
+  assert.equal(x.acl.has('owner-reader'),true);
+  assert.equal((await x.send('POST','/reviews/'+id+'/close',x.alice)).status,200);
+  assert.equal(x.acl.has('owner-reader'),true);
+});
+test('same file may be reviewed in parallel; public grant survives the first close',async t=>{
+  const x=await integration(t);
+  const first=await createAndPublish(x),second=await createAndPublish(x);
+  assert.equal(first.published.status,200);
+  assert.equal(second.published.status,200);
+  assert.equal(x.acl.size,1);
+  assert.equal((await x.send('POST','/reviews/'+first.id+'/close',x.alice)).status,200);
+  assert.equal(x.acl.size,1,'shared link permission cannot be deleted early');
+  assert.equal((await x.send('POST','/reviews/'+second.id+'/close',x.alice)).status,200);
+  assert.equal(x.acl.size,0);
+});
+
+test('Google-only review never issues an anonymous media streaming ticket',async t=>{
+  const x=await integration(t);
+  const {id,published}=await createAndPublish(x,{mode:'google',recipientEmail:'client@gmail.com'});
+  assert.equal(published.status,200);
+  const token=(await published.json()).review.review.url.split('/').at(-1);
+  const verified=await x.jwt('recipient','client@gmail.com');
+  await assert.rejects(()=>route(x.f,token,'/reviews/public/media-ticket','POST',
+    {fileId:file},verified),e=>e.code==='review_private_media_google_drive');
+  assert.equal((await x.send('POST','/reviews/'+id+'/close',x.alice)).status,200);
 });
