@@ -1,6 +1,6 @@
 import {useCallback,useEffect,useMemo,useRef,useState} from "react";
 import {createPortal} from "react-dom";
-import {Check,ChevronLeft,ChevronRight,Copy,ExternalLink,FileImage,FileText,FileVideo,Folder,Link2,LoaderCircle,MessageSquare,Plus,Search,Send,ShieldCheck,X} from "lucide-react";
+import {Check,ChevronLeft,ChevronRight,ExternalLink,Folder,LoaderCircle,Plus,Search,Send,ShieldCheck,X} from "lucide-react";
 import type {Client,Project} from "../../domain/workspace";
 import {useAuth} from "../auth/AuthProvider";
 import {useDriveApi} from "../drive/drive-api";
@@ -12,39 +12,11 @@ import {cacheKey,getCachedFolder,setCachedFolder} from "../drive/drive-folder-ca
 import {useDriveTransfers} from "../drive/DriveTransfersProvider";
 import type {UploadDestination} from "../drive/useDriveUploads";
 import "./reviews.css";
+import {ReviewOwnerWorkspace} from "./ReviewOwnerWorkspace";
+import {statusText,type Mode,type Review,type Detail} from "./review-model";
 
-type Status="draft"|"publishing"|"pending"|"changes"|"approved"|"replacing"|"closing"|"closed";
-type Mode="link"|"google";
-type Review={id:string;clientId:number;projectId:number;clientName:string;projectName:string;studioName:string;title:string;message:string;recipientEmail:string;mode:Mode;status:Status;version:number;expiresAt:number;createdAt:number;updatedAt:number;url?:string};
-type Asset={version:number;fileId:string;name:string;mimeType:string;grantState:string};
-type Comment={id:string;version:number;file_id:string;author_name:string;body:string;seconds:number|null;created_at:number};
-type Decision={version:number;decision:"approved"|"changes";author_name:string;message:string;created_at:number};
-type Detail={review:Review;assets:Asset[];comments:Comment[];decisions:Decision[]};
 type Selection={fileId:string;connectionId:string;linkedFolderId:string;name:string;mimeType:string};
-const statusText:Record<Status,string>={
-  draft:"Rascunho",publishing:"Preparando compartilhamento",pending:"Aguardando cliente",
-  changes:"Ajustes solicitados",approved:"Aprovado",replacing:"Preparando nova versão",
-  closing:"Revogação pendente",closed:"Encerrado"
-};
-const fmt=(time:number)=>new Date(time).toLocaleDateString("pt-BR",{day:"2-digit",month:"short",year:"numeric"});
 const supported=(file:DriveItem)=>/^(video|image|audio)\//.test(file.mimeType)||file.mimeType==="application/pdf";
-function AssetIcon({mime}:{mime:string}){
-  if(mime.startsWith("image/"))return <FileImage size={18}/>;
-  if(mime.startsWith("video/"))return <FileVideo size={18}/>;
-  return <FileText size={18}/>;
-}
-function ShareLinks({url,title}:{url:string;title:string}){
-  const text="Olá! Seu material está disponível para revisão: "+title+"\n"+url;
-  const [copied,setCopied]=useState(false);
-  return <div className="review-share">
-    <button type="button" className="secondary-button" onClick={async()=>{
-      try{await navigator.clipboard.writeText(url);setCopied(true);}
-      catch{window.prompt("Copie o link:",url);}
-    }}><Copy size={16}/>{copied?"Link copiado":"Copiar link"}</button>
-    <a className="secondary-button" href={"https://wa.me/?text="+encodeURIComponent(text)} target="_blank" rel="noreferrer">WhatsApp <ExternalLink size={14}/></a>
-    <a className="secondary-button" href={"mailto:?subject="+encodeURIComponent("Material para aprovação · "+title)+"&body="+encodeURIComponent(text)}>E-mail <Send size={14}/></a>
-  </div>;
-}
 export function ReviewsDashboard({clients,projects,studioName,onLibrary,startProjectId,startClientId}:{
   clients:Client[];projects:Project[];studioName:string;onLibrary:()=>void;startProjectId?:number;startClientId?:number
 }){
@@ -313,50 +285,18 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
     </div>
 
     {opened&&!composer&&createPortal(<div className="review-modal-backdrop" ref={dialogRef} tabIndex={-1} onMouseDown={e=>{if(e.target===e.currentTarget&&!working)setOpened(null);}}>
-      <section role="dialog" aria-modal="true" aria-label="Detalhes da revisão" className="review-dialog">
-        <header><div><span className="eyebrow">APROVAÇÃO · V{opened.review.version}</span><h2>{opened.review.title}</h2>
-          <p>{opened.review.clientName} · {opened.review.projectName}</p></div>
-          <button className="review-icon" aria-label="Fechar" disabled={working} onClick={()=>setOpened(null)}><X size={20}/></button>
-        </header>
-        <div className="review-dialog-body">
-          <div className="reviews-detail-bar"><span className={"reviews-status status-"+opened.review.status}>{statusText[opened.review.status]}</span>
-            <small>Válido até {fmt(opened.review.expiresAt)}</small></div>
-          <h3>Materiais</h3>
-          {opened.assets.map(a=><div className="review-asset" key={a.version+":"+a.fileId}>
-            <AssetIcon mime={a.mimeType}/><span><strong>{a.name}</strong><small>Versão {a.version} · {a.grantState==="granted"?"Compartilhado":a.grantState==="revoked"?"Acesso revogado":"Não compartilhado"}</small></span>
-          </div>)}
-          {["pending","changes","approved"].includes(opened.review.status)&&<div className="reviews-link-box">
-            <span><Link2 size={15}/> Link de revisão</span>
-            <input readOnly aria-label="Link da revisão" value={opened.review.url||""} onFocus={e=>e.currentTarget.select()}/>
-            <ShareLinks url={opened.review.url||""} title={opened.review.title}/>
-            <small>O portal mostra somente os materiais selecionados. Permissões que já existiam no Google Drive não são alteradas nem revogadas pelo Roteiva. Prazo até {fmt(opened.review.expiresAt)}.</small>
-          </div>}
-          <h3><MessageSquare size={17}/> Comentários e decisões</h3>
-          {!opened.comments.length&&!opened.decisions.length&&<p className="reviews-muted">Ainda não há feedback do cliente.</p>}
-          {opened.decisions.map((d,i)=><div className="review-feedback" key={"d"+i}>
-            <strong>{d.decision==="approved"?"Material aprovado":"Ajustes solicitados"} · V{d.version}</strong><small>{d.author_name} · {fmt(d.created_at)}</small>
-            {d.message&&<p>{d.message}</p>}
-          </div>)}
-          {opened.comments.map(c=><div className="review-feedback" key={c.id}>
-            <strong>{c.author_name} · V{c.version}{c.seconds!==null?" · "+Math.floor(c.seconds/60)+":"+String(c.seconds%60).padStart(2,"0"):""}</strong>
-            <small>{fmt(c.created_at)}</small><p>{c.body}</p>
-          </div>)}
-        </div>
-        <footer>
-          {["draft","publishing"].includes(opened.review.status)&&<button className="primary-button" disabled={working}
-            onClick={()=>void mutate("publish")}>Ativar compartilhamento</button>}
-          {opened.review.status==="changes"&&<button className="primary-button" onClick={beginRevision}>Enviar nova versão</button>}
-          {opened.review.status==="replacing"&&(opened.assets.some(a=>a.version===opened.review.version+1)?
-            <button className="primary-button" disabled={working} onClick={()=>void run(async()=>{
+      <section role="dialog" aria-modal="true" aria-label="Detalhes da revisão" className="review-dialog rowner-dialog">
+        <ReviewOwnerWorkspace key={opened.review.id} detail={opened} working={working}
+          onClose={()=>setOpened(null)} onRevise={beginRevision} onPublish={()=>void mutate("publish")}
+          onRotate={()=>void mutate("rotate")} onEnd={()=>void mutate("close")}
+          onCompleteClose={()=>void mutate("close")}
+          onResume={withFiles=>{
+            if(withFiles){beginRevision();return;}
+            void run(async()=>{
               const result=await call<{review:Detail}>("/reviews/"+opened.review.id+"/revise","POST",{assets:[]});
               setOpened(result.review);
-            })}>Concluir troca de versão</button>:
-            <button className="primary-button" disabled={working} onClick={beginRevision}>
-              Selecionar arquivos para retomar versão</button>)}
-          {opened.review.status==="closing"&&<button className="primary-button" disabled={working} onClick={()=>void mutate("close")}>Concluir revogação</button>}
-          {["pending","changes","approved","draft"].includes(opened.review.status)&&<button className="secondary-button" disabled={working} onClick={()=>void mutate("rotate")}>Renovar link</button>}
-          {opened.review.status!=="closed"&&<button className="secondary-button" disabled={working} onClick={()=>void mutate("close")}>Encerrar revisão</button>}
-        </footer>
+            });
+          }}/>
       </section>
     </div>,document.body)}
 
