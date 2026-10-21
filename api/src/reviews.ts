@@ -58,7 +58,7 @@ async function assets(env:Env,id:string,version?:number):Promise<Asset[]>{
 }
 async function driveFile(env:Env,row:Connection,id:string):Promise<Record<string,unknown>>{
   const url=new URL('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(id));
-  url.searchParams.set('fields','id,name,mimeType,trashed,parents,isAppAuthorized,capabilities(canShare)');
+  url.searchParams.set('fields','id,name,mimeType,trashed,parents,isAppAuthorized,inheritedPermissionsDisabled,capabilities(canShare)');
   url.searchParams.set('supportsAllDrives','true');
   return driveJson(env,row,url);
 }
@@ -95,30 +95,35 @@ async function verifyFolder(env:Env,uid:string,token:string,projectId:number,s:S
     throw new ApiError(403,'review_folder_denied');
 }
 async function checkedFile(env:Env,uid:string,token:string,projectId:number,s:Selection):
-  Promise<{name:string;mimeType:string}>{
+  Promise<{name:string;mimeType:string;appAuthorized:boolean;canShare:boolean;ancestors:string[];inheritsPublic:boolean}>{
   if(!ID.test(s.fileId)||!ID.test(s.linkedFolderId)||!CONN.test(s.connectionId))
     throw new ApiError(400,'review_invalid_input');
   await verifyFolder(env,uid,token,projectId,s);
   const row=await connection(env,uid,s.connectionId);
-  if(!row.scopes.split(/\s+/).includes(DRIVE_SCOPE))throw new ApiError(409,'review_drive_grant_required');
   const item=await driveFile(env,row,s.fileId);
-  if(item.id!==s.fileId||item.trashed===true||item.isAppAuthorized!==true||
-     (item.capabilities as {canShare?:boolean}|undefined)?.canShare!==true ||
+  if(item.id!==s.fileId||item.trashed===true||
      typeof item.name!=='string'||typeof item.mimeType!=='string'||
      !(/^(video|image|audio)\//.test(item.mimeType)||item.mimeType==='application/pdf'))
     throw new ApiError(403,'review_file_denied');
   let parents=item.parents;
+  const ancestors:string[]=[];
+  let inheritsPublic=item.inheritedPermissionsDisabled!==true;
   const seen=new Set<string>([s.fileId]);
   for(let i=0;i<24;i++){
     if(!Array.isArray(parents)||parents.length!==1||typeof parents[0]!=='string')
       throw new ApiError(403,'review_file_denied');
     const parent=parents[0];
-    if(parent===s.linkedFolderId)return {name:inputText(item.name,255,true),mimeType:item.mimeType};
+    ancestors.push(parent);
+    if(parent===s.linkedFolderId)return {name:inputText(item.name,255,true),mimeType:item.mimeType,
+      appAuthorized:item.isAppAuthorized===true,
+      canShare:(item.capabilities as {canShare?:boolean}|undefined)?.canShare===true,
+      ancestors,inheritsPublic};
     if(!ID.test(parent)||seen.has(parent))throw new ApiError(403,'review_file_denied');
     seen.add(parent);
     const next=await driveFile(env,row,parent);
     if(next.trashed===true||next.mimeType!=='application/vnd.google-apps.folder')
       throw new ApiError(403,'review_file_denied');
+    if(next.inheritedPermissionsDisabled===true)inheritsPublic=false;
     parents=next.parents;
   }
   throw new ApiError(403,'review_file_denied');
@@ -246,8 +251,8 @@ async function mutatePermission(env:Env,row:Connection,fileId:string,method:'POS
 }
 async function grant(env:Env,r:Review,a:Asset,ownerToken:string):Promise<void>{
   const sel={fileId:a.file_id,connectionId:a.connection_id,linkedFolderId:a.linked_folder_id};
-  await checkedFile(env,r.owner_uid,ownerToken,r.project_id,sel);
-  return withAssetLease(env,r,a,async current=>grantLocked(env,r,current));
+  const validation=await checkedFile(env,r.owner_uid,ownerToken,r.project_id,sel);
+  return withAssetLease(env,r,a,async current=>grantLocked(env,r,current,validation));
 }
 /** Serialize bounded Google ACL calls, including reconciliation after a lost response.
  * A crashed call's lease outlives its token/Drive request timeouts. Keep the claim
@@ -276,7 +281,8 @@ async function withAssetLease(env:Env,r:Review,a:Asset,job:(current:Asset)=>Prom
       .bind(r.id,a.version,a.file_id,lease).run();
   }
 }
-async function grantLocked(env:Env,r:Review,a:Asset):Promise<void>{
+type CheckedAsset=Awaited<ReturnType<typeof checkedFile>>;
+async function grantLocked(env:Env,r:Review,a:Asset,validation:CheckedAsset):Promise<void>{
   const active=await env.DB.prepare("SELECT 1 FROM review_requests WHERE id=? AND status='publishing' AND current_version=? AND expires_at>?")
     .bind(r.id,a.version,now()).first();
   if(!active)throw new ApiError(409,'review_busy');
@@ -284,19 +290,40 @@ async function grantLocked(env:Env,r:Review,a:Asset):Promise<void>{
   if(a.grant_state!=='unshared'&&a.grant_state!=='granting')throw new ApiError(409,'review_grant_conflict');
   const row=await connection(env,r.owner_uid,a.connection_id);
   const existing=await permissions(env,row,a.file_id);
+  // A file can be readable through a public folder without having a direct
+  // ACL. Never mutate or claim ownership of a user-created folder permission.
+  const directPublic=existing.some(p=>p.type==='anyone');
+  let inheritedPublic=false;
+  if(validation.inheritsPublic && !directPublic){
+    for(const parent of validation.ancestors){
+      const inherited=await permissions(env,row,parent);
+      if(inherited.some(p=>p.type==='anyone')){inheritedPublic=true;break;}
+    }
+  }
+  const publiclyReadable=directPublic||inheritedPublic;
   if(r.access_mode==='google'&&existing.some(p=>p.type==='group'||
     (p.type==='user'&&p.role!=='owner'&&p.emailAddress?.toLowerCase()!==r.recipient_email&&
       p.emailAddress?.toLowerCase()!==row.google_email?.toLowerCase())))
     throw new ApiError(409,'review_existing_public_permission');
-  // An existing public/domain-wide ACL defeats the promise of Google-only review.
-  // Link mode may only reconcile a permission its own pending attempt created.
-  if(existing.some(p=>p.type==='anyone'||p.type==='domain')&&
-     (r.access_mode==='google'||a.grant_state==='unshared'))
+  // Google-only mode must never promise confidentiality for public ancestry.
+  if(r.access_mode==='google'&&(publiclyReadable||existing.some(p=>p.type==='domain')))
     throw new ApiError(409,'review_existing_public_permission');
+  if(r.access_mode==='link'&&a.grant_state==='unshared'&&publiclyReadable){
+    const saved=await env.DB.prepare("UPDATE review_assets SET grant_state='granted',permission_id=NULL WHERE review_id=? AND version=? AND file_id=? AND grant_state='unshared' AND EXISTS(SELECT 1 FROM review_requests WHERE id=? AND status='publishing')")
+      .bind(r.id,a.version,a.file_id,r.id).run();
+    if(saved.meta.changes!==1)throw new ApiError(409,'review_busy');
+    return;
+  }
   const match=existing.find(p=>r.access_mode==='link'?p.type==='anyone':
     p.type==='user'&&p.emailAddress?.toLowerCase()===r.recipient_email);
-  if(a.grant_state==='unshared'&&match&&r.access_mode==='link')
-    throw new ApiError(409,'review_existing_public_permission');
+  if(a.grant_state==='granting'&&inheritedPublic&&!match&&r.access_mode==='link'){
+    // While awaiting Drive, the owner made the containing folder public.
+    // Reuse the owner's access rather than creating a redundant file ACL.
+    const saved=await env.DB.prepare("UPDATE review_assets SET grant_state='granted',permission_id=NULL WHERE review_id=? AND version=? AND file_id=? AND grant_state='granting' AND EXISTS(SELECT 1 FROM review_requests WHERE id=? AND status='publishing')")
+      .bind(r.id,a.version,a.file_id,r.id).run();
+    if(saved.meta.changes!==1)throw new ApiError(409,'review_busy');
+    return;
+  }
   if(a.grant_state==='unshared'&&match&&r.access_mode==='google'){
     // Pre-existing Google ACL belongs to the user, not Roteiva: never revoke it.
     const saved=await env.DB.prepare("UPDATE review_assets SET grant_state='granted',permission_id=NULL WHERE review_id=? AND version=? AND file_id=? AND grant_state='unshared' AND EXISTS(SELECT 1 FROM review_requests WHERE id=? AND status='publishing')")
@@ -304,6 +331,9 @@ async function grantLocked(env:Env,r:Review,a:Asset):Promise<void>{
     if(saved.meta.changes!==1)throw new ApiError(409,'review_busy');
     return;
   }
+  if(!match&&(!validation.appAuthorized||!validation.canShare||
+      !row.scopes.split(/\s+/).includes(DRIVE_SCOPE)))
+    throw new ApiError(409,'review_drive_file_authorization_required');
   if(a.grant_state==='unshared'){
     const lock=await env.DB.prepare("UPDATE review_assets SET grant_state='granting' WHERE review_id=? AND version=? AND file_id=? AND grant_state='unshared' AND EXISTS(SELECT 1 FROM review_requests WHERE id=? AND status='publishing')")
       .bind(r.id,a.version,a.file_id,r.id).run();
