@@ -419,3 +419,14 @@ Com dependências travadas instaladas: `npm test --prefix api`, `npm run typeche
 Aplicar `0013_reviews.sql` e `0014_review_grant_coordination.sql` depois da 0012, antes do Worker novo. A 0014 interrompe se houver concessões históricas do mesmo file ID em versões/revisões diferentes: investigar e conciliar com o Drive; nunca remover ACL externa ou apagar dados para fazer passar. Claims/leases são internas ao D1. Checklist, distinção dos mocks, limites do preview e procedimento Google real em [REVIEWS-MVP.md](REVIEWS-MVP.md). O QA isolado passa a ser acionado também por mudanças em revisões/migrations/testes de revisão.
 
 Homologação da PR #55 em 20/10/2026: o proprietário autorizou publicação antecipada da branch no DEV existente (Worker, D1 e Hosting), sem merge. Foram usados `check-trial-secret.mjs`, `check-access-migration.mjs --before`, `npm run migrate:dev`, verificação pós-migração e `npm run deploy:dev` em `api/`; frontend com `pnpm build`, verificação estática, `check-access-worker.mjs`, deploy Hosting exclusivo e verificação de cache. Não foram criados ambiente ou credenciais alternativos. Evidência e resultados reais em [REVIEWS-MVP.md](REVIEWS-MVP.md).
+
+
+### Consumo Cloudflare Free — 21/10/2026 (homologação)
+
+O Worker usa dois Cron Triggers: `* * * * *` avança exclusões e revoga concessões OAuth pendentes e revisões expiradas; `*/15 * * * *` executa retenção, monitoramento agregado, backfill (se pendente) e limpeza de uploads. Não adiar o cron de revogação urgente.
+
+A busca de aprovações aguarda 300 ms sem digitação e aborta pedidos obsoletos; o backend preserva filtros por proprietário. Miniaturas com `Content-Length` conhecido e sem compressão fazem streaming com checagem de tamanho, enquanto o fluxo desconhecido continua com validação total em memória.
+
+Testes de contrato sem emuladores: `cd api && node --experimental-strip-types --test tests/cron-contract.test.mjs tests/thumbnail-stream.test.mjs`. O comando verifica contratos, não Google Drive real ou Firebase Auth.
+
+A aceitação requer comparação de Cloudflare/D1 com janelas equivalentes, observação do p95/p99 de CPU, smoke do Worker DEV e E2E autenticado de upload/revisão/miniaturas. Não coletar tokens, URLs privadas ou dados de usuários em logs ou artefatos.
