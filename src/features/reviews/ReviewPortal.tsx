@@ -3,7 +3,7 @@ import {Check,CheckCircle2,Clock3,ExternalLink,FileAudio,FileImage,FileText,File
   LoaderCircle,MessageSquare,Moon,Pause,Play,Send,ShieldCheck,Sun,Video,X} from "lucide-react";
 import {useAuth} from "../auth/AuthProvider";
 import {useOverlayFocus} from "../drive/DriveLibraryUI";
-import {formatReviewTime,maskReviewTime,parseReviewTime,validReviewSecond} from "./review-timecode";
+import {captureReviewPlayback,formatReviewTime,maskReviewTime,parseReviewTime,validReviewSecond} from "./review-timecode";
 import "../reviews/reviews.css";
 import "./review-portal-v2.css";
 
@@ -119,9 +119,9 @@ export function ReviewPortal({token}:{token:string}){
     setSelected(index);setBody("");setMinutes("");setNotice("");
   };
   const markNow=()=>{
-    if(!isVideo||mediaMode!=="native"||!videoRef.current||!Number.isFinite(videoRef.current.currentTime))return;
-    videoRef.current.pause();
-    const value=Math.max(0,Math.floor(videoRef.current.currentTime));
+    if(!isVideo||mediaMode!=="native")return;
+    const value=captureReviewPlayback(videoRef.current);
+    if(value===null)return;
     setMinutes(formatReviewTime(value));setNotice("Instante "+formatReviewTime(value)+" marcado. Agora escreva seu comentário.");
     commentRef.current?.focus();
   };
