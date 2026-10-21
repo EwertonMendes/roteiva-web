@@ -116,9 +116,18 @@ export function ReviewOwnerWorkspace({detail,working,onClose,onRevise,onPublish,
       {review.mode==="google"&&detail.participants&&detail.participants.length>0&&
         <section className="rowner-participants" aria-label="Participantes autorizados">
           <h3>Contas Google autorizadas</h3>
-          <div>{detail.participants.map(participant=><span className="rowner-participant" key={participant.email}>
-            <strong>{participant.email}</strong><small>{participant.role==="reviewer"?"Revisor · pode decidir":"Leitor · somente leitura"}</small>
-          </span>)}</div>
+          <p>{detail.participants.filter(p=>p.role==="reviewer"&&detail.votes?.some(v=>v.email===p.email&&v.version===review.version&&v.decision==="approved")).length}
+            {" de "}{detail.participants.filter(p=>p.role==="reviewer").length} revisores aprovaram esta versão.</p>
+          <div>{detail.participants.map(participant=>{
+            const vote=detail.votes?.find(v=>v.email===participant.email&&v.version===review.version);
+            return <span className="rowner-participant" key={participant.email}>
+              <strong>{participant.email}</strong>
+              <small>{participant.role==="viewer"?"Leitor · somente leitura":
+                vote?.decision==="approved"?"Revisor · aprovou":
+                vote?.decision==="changes"?"Revisor · solicitou ajustes":
+                "Revisor · aguardando resposta"}</small>
+            </span>;
+          })}</div>
         </section>}
       {showMaterials&&<div className="rowner-workspace">
         <section className="rowner-materials" aria-label="Materiais da versão atual">
