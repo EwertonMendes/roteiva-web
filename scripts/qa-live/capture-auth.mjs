@@ -22,7 +22,7 @@ try{
   console.log('Faça login somente com a conta Google QA e complete o cadastro/acesso do Roteiva.');
   await prompt.question('Depois de entrar no estúdio QA, pressione Enter para verificar e guardar a sessão.');
   await page.locator('.app-shell').waitFor({state:'visible',timeout:20000});
-  await page.locator('.sidebar-profile small').getByText(expected,{exact:true}).waitFor({state:'visible',timeout:20000});
+  await page.locator('.sidebar-profile small').filter({hasText:expected}).waitFor({state:'visible',timeout:20000});
   await page.context().storageState({path:filename,indexedDB:true});
   await chmod(filename,0o600);
   console.log('Sessão privada criada fora do repositório: '+filename);
