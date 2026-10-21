@@ -21,3 +21,10 @@ export function validReviewSecond(value:number|null,duration:number|null):boolea
   return value===null||(Number.isInteger(value)&&value>=0&&value<=MAX_REVIEW_SECOND&&
     (duration===null||value<=Math.floor(duration)));
 }
+
+/** Capture an actual HTML5 playhead, pausing before composing feedback. */
+export function captureReviewPlayback(video:Pick<HTMLVideoElement,"currentTime"|"pause">|null):number|null{
+  if(!video||!Number.isFinite(video.currentTime)||video.currentTime<0)return null;
+  video.pause();
+  return Math.min(MAX_REVIEW_SECOND,Math.floor(video.currentTime));
+}
