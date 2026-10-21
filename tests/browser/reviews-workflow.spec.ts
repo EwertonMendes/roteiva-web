@@ -219,7 +219,7 @@ test('profissional cria, cliente comenta/pede ajustes, V2 aprovada e encerrament
   await expect(page.getByText('Material aprovado · V2')).toBeVisible();
   const approvedDetail=page.getByRole('dialog',{name:'Detalhes da revisão'});
   await expect(approvedDetail.getByRole('heading',{name:'Materiais · V2'})).toBeVisible();
-  await expect(approvedDetail.getByText('Aumentar legenda',{exact:true})).toHaveCount(0);
+  await expect(approvedDetail.getByText('Aumentar legenda',{exact:true})).toBeHidden();
   await approvedDetail.getByText('Histórico das versões anteriores').click();
   await expect(approvedDetail.getByText('Ajustar encerramento',{exact:true})).toBeVisible();
   await expect(approvedDetail.getByText('Aumentar legenda',{exact:true})).toBeVisible();
