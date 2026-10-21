@@ -484,7 +484,7 @@ async function publicReview(request:Request,env:Env,action:'view'|'comment'|'dec
     const fileId=inputText(body.fileId,200,true);
     const chosen=files.find(a=>a.file_id===fileId&&a.mime_type.startsWith('video/'));
     if(!chosen)throw new ApiError(404,'review_not_found');
-    const ticket=await mintReviewMediaTicket(env,r.id,fileId,r.current_version,r.expires_at);
+    const ticket=await mintReviewMediaTicket(env,r.id,fileId,r.current_version,r.expires_at,r.token_hash);
     return Response.json({url:'https://roteiva-api-dev.ewertonmendes9.workers.dev/reviews/media?ticket='+ticket,
       expiresAt:Math.min(r.expires_at,now()+12*60*1000)});
   }
