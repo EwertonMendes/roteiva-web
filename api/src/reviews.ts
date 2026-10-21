@@ -6,6 +6,7 @@ import { DRIVE_SCOPE, accessCredential } from './google.ts';
 import { driveJson } from './drive-client.ts';
 import { random, hash, encrypt, decrypt, context } from './crypto.ts';
 import { uploadBody } from './uploads.ts';
+import {mintReviewMediaTicket,streamReviewMedia} from './review-media.ts';
 
 type Status = 'draft'|'publishing'|'pending'|'changes'|'approved'|'replacing'|'closing'|'closed';
 type Mode = 'link'|'google';
@@ -476,7 +477,7 @@ async function rotate(env:Env,r:Review):Promise<Response>{
   if(rotated.meta.changes!==1)throw new ApiError(409,'review_busy');
   return Response.json({url:reviewLink(secret)});
 }
-async function publicReview(request:Request,env:Env,action:'view'|'comment'|'decide'):Promise<Response>{
+async function publicReview(request:Request,env:Env,action:'view'|'comment'|'decide'|'media'):Promise<Response>{
   const token=request.headers.get('X-Review-Token')||'';
   if(!/^[A-Za-z0-9_-]{43}$/.test(token))throw new ApiError(404,'review_not_found');
   const r=await env.DB.prepare('SELECT * FROM review_requests WHERE token_hash=?').bind(await hash(token)).first<Review>();
@@ -503,6 +504,17 @@ async function publicReview(request:Request,env:Env,action:'view'|'comment'|'dec
       assets:files.map(a=>({fileId:a.file_id,name:a.name,mimeType:a.mime_type})),
       comments:comments.results,decisions:decisions.results});
   }
+  if(action==='media'){
+    const body=await uploadBody(request) as Record<string,unknown>|null;
+    if(!body||typeof body!=='object'||Array.isArray(body)||integer(body.version)!==r.current_version)
+      throw new ApiError(409,'review_version_changed');
+    const fileId=inputText(body.fileId,200,true);
+    const chosen=files.find(a=>a.file_id===fileId&&a.mime_type.startsWith('video/'));
+    if(!chosen)throw new ApiError(404,'review_not_found');
+    const ticket=await mintReviewMediaTicket(env,r.id,fileId,r.current_version,r.expires_at,r.token_hash);
+    return Response.json({url:'https://roteiva-api-dev.ewertonmendes9.workers.dev/reviews/media?ticket='+ticket,
+      expiresAt:Math.min(r.expires_at,now()+12*60*1000)});
+  }
   if(r.status!=='pending')throw new ApiError(409,'review_already_decided');
   const data=await uploadBody(request) as Record<string,unknown>|null;
   if(!data||typeof data!=='object'||Array.isArray(data))throw new ApiError(400,'review_invalid_input');
@@ -511,9 +523,12 @@ async function publicReview(request:Request,env:Env,action:'view'|'comment'|'dec
   const authorName=email?inputText(data.authorName||email,100,true):author;
   if(action==='comment'){
     const fileId=inputText(data.fileId,200,true),body=inputText(data.body,1500,true);
-    if(!files.some(a=>a.file_id===fileId))throw new ApiError(400,'review_invalid_input');
-    const sec=data.seconds==null?null:Number(data.seconds);
-    if(sec!==null&&(!Number.isSafeInteger(sec)||sec<0||sec>172800))
+    const chosen=files.find(a=>a.file_id===fileId);
+    if(!chosen)throw new ApiError(400,'review_invalid_input');
+    if(data.seconds!=null&&typeof data.seconds!=='number')throw new ApiError(400,'review_invalid_input');
+    const sec=data.seconds==null?null:data.seconds;
+    if(sec!==null&&(!Number.isSafeInteger(sec)||sec<0||sec>172800||
+       !chosen.mime_type.startsWith('video/')))
       throw new ApiError(400,'review_invalid_input');
     const saved=await env.DB.prepare("INSERT INTO review_comments(id,review_id,version,file_id,author_name,author_email,body,seconds,created_at) SELECT ?,?,?,?,?,?,?,?,? FROM review_requests WHERE id=? AND status='pending' AND current_version=? AND token_hash=? AND expires_at>?")
       .bind(crypto.randomUUID(),r.id,r.current_version,fileId,authorName,email||null,body,sec,now(),
@@ -539,10 +554,11 @@ async function publicReview(request:Request,env:Env,action:'view'|'comment'|'dec
 }
 export async function reviewRouter(request:Request,env:Env,url:URL):Promise<Response>{
   const path=url.pathname;
-  if(path==='/reviews/public' || path==='/reviews/public/comment' || path==='/reviews/public/decide'){
+  if(path==='/reviews/media')return streamReviewMedia(request,env,url);
+  if(path==='/reviews/public' || path==='/reviews/public/comment' || path==='/reviews/public/decide'||path==='/reviews/public/media-ticket'){
     if(!['GET','POST'].includes(request.method))throw new ApiError(405,'method_not_allowed');
     if((path==='/reviews/public')!==(request.method==='GET'))throw new ApiError(405,'method_not_allowed');
-    return publicReview(request,env,path.endsWith('/comment')?'comment':path.endsWith('/decide')?'decide':'view');
+    return publicReview(request,env,path.endsWith('/comment')?'comment':path.endsWith('/decide')?'decide':path.endsWith('/media-ticket')?'media':'view');
   }
   const uid=await activeOwner(request,env);
   if(path==='/reviews'&&request.method==='GET')return ownerList(env,uid,url);

@@ -17,7 +17,7 @@ A rota pública `/review/{capability}` funciona sem cadastro no Roteiva. O modo 
 - Estados internos `publishing`, `replacing` e `closing` recusam acessos públicos durante operações parciais. Permissões bem-sucedidas são registradas por arquivo; tentativas posteriores conciliam o estado. Decisões são únicas por versão.
 - Acesso do dono exige assinatura válida no backend; acesso do revisor restrito exige e-mail Google verificado; o modo link usa token de capacidade com expiração e limite de taxa.
 - Cron limpa convites expirados gradualmente; ao desconectar Drive, primeiro é preciso encerrar convites ativos. Na exclusão de conta, revoga convites antes de invalidar OAuth, com processamento limitado por execução.
-- Este recurso **não concede** acesso administrativo, não altera regras Firestore privadas, não usa proxy para vídeos, não cria buckets e não altera os fluxos de upload.
+- Este recurso **não concede** acesso administrativo, não altera regras Firestore privadas, usa relay de vídeo **somente na revisão, sob demanda e por intervalos limitados**, não cria buckets e não altera os fluxos de upload.
 
 ## Fluxo de uso
 
@@ -31,7 +31,7 @@ A rota pública `/review/{capability}` funciona sem cadastro no Roteiva. O modo 
 
 ## Recuperação e limitações intencionais
 
-- Sem notificações automáticas, streaming próprio, anotações gráficas, aprovação parcial por arquivo, inbox do cliente, assinatura legal ou player próprio.
+- Sem notificações automáticas, anotações gráficas, aprovação parcial por arquivo, inbox do cliente ou assinatura legal. A reprodução HTML5 nativa usa pequenos intervalos Google Drive retransmitidos pelo Worker para oferecer comentário no instante atual; se o Drive não fornecer mídia com suporte a Range, a UI retorna para o iframe Google.
 - Arquivos do tipo Google Docs e outros formatos nativos não integram o seletor deste MVP.
 - Se a pessoa trocou o Google Drive de conta, removeu permissões manualmente, eliminou um arquivo ou ficou sem acesso à API, mostrar erro recuperável; não presumir que o arquivo foi compartilhado/revogado.
 - Na modalidade Google, um navegador que bloqueia cookies de terceiros pode não reproduzir a prévia em iframe: use Abrir no Drive com a conta autorizada.
@@ -129,3 +129,14 @@ Limitações explícitas: o Picker de autorização da nova pasta abriu iframe v
 - Índices de soma `amountCents` declarados no `firestore.indexes.json` para agregações por status/período. **No fluxo normal, um PR apenas valida; os índices DEV só são implantados pelo workflow de infraestrutura depois do merge na master.** Erros `failed-precondition` do Firestore dependem de criação/conclusão dos índices no projeto de destino.
 - Avisos de `runtime.lastError` de extensões Chrome ou `frame-ancestors` em páginas externas do Google não são exceções do JavaScript Roteiva e não podem ser eliminados por desabilitar CSP de terceiros. O portal possui fallback Abrir no Drive.
 - Testes de regressão abrangem ACL pública em pasta/arquivo, preservação após encerramento, restrição Google, miniaturas autenticadas, pesquisa remota e links diretos. A validação com Drive real deve confirmar a semântica do Google antes de homologar.
+
+## Evolução do portal do cliente — PR #56
+
+- Tema claro/escuro independente de autenticação, de acordo com sistema na primeira visita e opção persistida apenas no navegador do revisor.
+- Layout reorganizado com prévia, seleção de arquivos, histórico, comentários e decisão; responsividade e foco acessível em modais.
+- Campo de tempo **exclusivo para arquivos de vídeo**, opcional, com máscara numérica e validação de segundos `00..59`, limite do serviço `0..172800` e duração conhecida do vídeo.
+- Player HTML5 usa endpoint `POST /reviews/public/media-ticket` autenticado pelo convite e identidade Google, quando aplicável. Retorna assinatura HMAC SHA-256 com até 12 minutos de validade, limitada a `review_id/file_id/version/expires_at`. O frontend nunca recebe OAuth do proprietário; `GET /reviews/media` confere status/versão e vínculo do arquivo em D1 em **cada solicitação Range** e obtém credencial do proprietário apenas no Worker.
+- O relay só transmite vídeos explicitamente autorizados com tipo `video/*`, em intervalos de no máximo 8 MiB, sem cache e sem redirecionamento automático de Bearer. Não alterar acesso permanente, escopos OAuth, regras Firestore ou armazenamento de vídeo.
+- Se a API Google não aceitar leitura de conteúdo/ranges, o player usa o iframe do Drive; como iframes de terceiros não expõem `currentTime`, o cliente informa o minuto manualmente com máscara e recebe a explicação correta. Não afirmar que conseguimos capturar o instante em iframe.
+- No player nativo, os controles **Usar tempo atual** e **Marcar este instante e comentar** pausam o vídeo, inserem o `currentTime` verdadeiro e focam o comentário. Um clique em um timestamp salvo reposiciona o player quando disponível.
+- **Homologação necessária no DEV com Drive real:** vídeo MP4 com/sem `isAppAuthorized`, Range HTTP 206 e `Content-Range`, navegação longa, seek mobile, limite por IP, tempo de expiração do ticket, navegador Safari, acesso Google restrito, alternativa iframe e consumo de banda do Worker. Documentar limitação operacional de quotas/egress.

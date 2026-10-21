@@ -33,7 +33,7 @@ export async function handle(request: Request, env: Env): Promise<Response> {
         'Access-Control-Allow-Methods':'GET, POST, OPTIONS',
         'Access-Control-Allow-Headers':'Authorization, Content-Type, X-Review-Token','Access-Control-Max-Age':'3600',
       }});
-    } else if (!(await (url.pathname.endsWith('/thumbnail') ? env.API_THUMB_LIMIT : env.API_RATE_LIMIT)
+    } else if (!(await ((url.pathname.endsWith('/thumbnail')||url.pathname==='/reviews/media') ? env.API_THUMB_LIMIT : env.API_RATE_LIMIT)
         .limit({key:'dev:ip:'+sourceIp.slice(0,64)})).success) {
       throw new ApiError(429,'rate_limited');
     } else if (url.pathname === '/health' && request.method === 'GET') {

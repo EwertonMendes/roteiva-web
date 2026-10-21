@@ -50,6 +50,18 @@ test('only a matching unexpired capability reveals one review and selected files
   f.sql.prepare("UPDATE review_requests SET expires_at=?,status='closed' WHERE id=?").run(Date.now()+100000,a.id);
   await assert.rejects(()=>route(f,a.token),e=>e.status===404);
 });
+test('comments reject numeric strings and timestamps on images at the API boundary',async t=>{
+  const f=fixture();t.after(f.close);
+  const a=await inserted(f);
+  await assert.rejects(()=>route(f,a.token,'/reviews/public/comment','POST',
+    {authorName:'Cliente',fileId:file,body:'Tempo inválido',seconds:'85'}),e=>e.status===400);
+  f.sql.prepare('UPDATE review_assets SET mime_type=? WHERE review_id=?').run('image/png',a.id);
+  await assert.rejects(()=>route(f,a.token,'/reviews/public/comment','POST',
+    {authorName:'Cliente',fileId:file,body:'Imagem sem tempo',seconds:85}),e=>e.status===400);
+  const valid=await route(f,a.token,'/reviews/public/comment','POST',
+    {authorName:'Cliente',fileId:file,body:'Imagem aprovada',seconds:null});
+  assert.equal((await valid.json()).saved,true);
+});
 test('Google-restricted link requires verified recipient even if the URL leaks',async t=>{
   const f=fixture();t.after(f.close);
   const a=await inserted(f,{mode:'google'});
@@ -163,6 +175,12 @@ async function integration(t){
       return Response.json({access_token:'short-lived',token_type:'Bearer',expires_in:3600});
     if(u.host==='www.googleapis.com'){
       assert.equal(init.headers.Authorization,'Bearer short-lived');
+      if(u.pathname.endsWith('/files/'+file)&&u.searchParams.get('alt')==='media'){
+        assert.match(init.headers.Range||'',/^bytes=0-\d+$/);
+        return new Response(new Uint8Array([1,2,3,4]),{status:206,headers:{
+          'Content-Type':'video/mp4','Content-Range':'bytes 0-3/100',
+          'Content-Length':'4','Accept-Ranges':'bytes'}});
+      }
       if(u.pathname.endsWith('/files/'+file))return Response.json({
         id:file,name:'Primeiro corte.mp4',mimeType:'video/mp4',
         trashed:false,isAppAuthorized:!hooks.unauthorized,inheritedPermissionsDisabled:hooks.disableInheritance,
@@ -206,6 +224,31 @@ async function integration(t){
     mode:'link',expiresInDays:14,assets:[{fileId:file,connectionId:account,linkedFolderId:folder}]};
   return {f,env,send,payload,alice,bob,jwt,acl,calls,hooks};
 }
+test('public video media uses signed range tickets and stops immediately after review closure',async t=>{
+  const x=await integration(t);
+  const {id,published}=await createAndPublish(x);
+  assert.equal(published.status,200);
+  const result=await published.json();
+  const access=result.review.review.url.split('/').at(-1);
+  const issued=await route(x.f,access,'/reviews/public/media-ticket','POST',{fileId:file});
+  assert.equal(issued.status,200);
+  const {url}=await issued.json();
+  assert.match(url,/\/reviews\/media\?ticket=/);
+  const video=await handle(new Request(url,{headers:{Range:'bytes=0-'}}),x.env);
+  assert.equal(video.status,206);
+  assert.equal(video.headers.get('Content-Range'),'bytes 0-3/100');
+  assert.equal(video.headers.get('Content-Type'),'video/mp4');
+  assert.deepEqual([...new Uint8Array(await video.arrayBuffer())],[1,2,3,4]);
+  assert.equal(video.headers.get('Cache-Control'),'no-store');
+  assert.equal((await x.send('POST','/reviews/'+id+'/rotate',x.alice)).status,200);
+  assert.equal((await handle(new Request(url),x.env)).status,404);
+  const invalid=await handle(new Request(url.slice(0,-1)+(url.endsWith('A')?'B':'A')),x.env);
+  assert.equal(invalid.status,404);
+  assert.equal((await x.send('POST','/reviews/'+id+'/close',x.alice)).status,200);
+  const rejected=await handle(new Request(url,{headers:{Range:'bytes=0-'}}),x.env);
+  assert.equal(rejected.status,404);
+});
+
 test('real HTTP: owner A can publish/revoke only linked Drive files, owner B cannot read or publish A assets',async t=>{
   const {f,send,payload,alice,bob,acl,calls}=await integration(t);
   const denied=await send('POST','/reviews',bob,payload);
