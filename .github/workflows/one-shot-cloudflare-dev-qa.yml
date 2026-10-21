@@ -1,0 +1,38 @@
+name: One-shot Cloudflare DEV Verification
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: roteiva-one-shot-cloudflare-qa
+  cancel-in-progress: false
+jobs:
+  verify:
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    environment: cloudflare-development
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+      - run: npm ci --ignore-scripts
+      - name: Verify protected DEV bindings
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_D1_DATABASE_ID: ${{ vars.CLOUDFLARE_D1_DATABASE_ID }}
+        run: |
+          test "$CLOUDFLARE_ACCOUNT_ID" = "b3855f9c192541a01a45b2dae7b6a7f8"
+          test "$CLOUDFLARE_D1_DATABASE_ID" = "302adc88-76b2-4827-bb16-99662fa0408b"
+      - name: Real remote D1 EXPLAIN and real HTTP checks (read-only; no emulators)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          WRANGLER_SEND_METRICS: 'false'
+          WRANGLER_WRITE_LOGS: 'false'
+        run: node scripts/qa-free-tier-live.mjs
