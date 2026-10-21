@@ -31,3 +31,33 @@ CREATE TABLE review_google_uses (
  PRIMARY KEY(review_id,version,file_id,email)
 );
 CREATE INDEX review_google_uses_live ON review_google_uses(file_id,email,state);
+
+ALTER TABLE review_requests ADD COLUMN restrict_existing_public INTEGER NOT NULL DEFAULT 0 CHECK(restrict_existing_public IN (0,1));
+CREATE TABLE review_votes (
+ review_id TEXT NOT NULL REFERENCES review_requests(id) ON DELETE CASCADE,
+ version INTEGER NOT NULL,
+ email TEXT NOT NULL,
+ decision TEXT NOT NULL CHECK(decision IN ('approved','changes')),
+ author_name TEXT NOT NULL,
+ message TEXT NOT NULL DEFAULT '',
+ created_at INTEGER NOT NULL,
+ PRIMARY KEY(review_id,version,email)
+);
+CREATE INDEX review_votes_lookup ON review_votes(review_id,version);
+-- Existing in-progress Google reviews already hold ACLs. Import their usage and
+-- retain exact pre-existing/managed ownership before sharing files across reviews.
+INSERT OR IGNORE INTO review_google_uses(review_id,version,file_id,email,state)
+ SELECT a.review_id,a.version,a.file_id,LOWER(r.recipient_email),'active'
+ FROM review_assets a JOIN review_requests r ON r.id=a.review_id
+ WHERE r.access_mode='google' AND r.recipient_email!='' AND a.grant_state='granted';
+INSERT OR IGNORE INTO review_google_acl(file_id,email,connection_id,permission_id,managed,state,updated_at)
+ SELECT a.file_id,LOWER(r.recipient_email),a.connection_id,a.permission_id,
+ CASE WHEN a.permission_id IS NULL THEN 0 ELSE 1 END,'ready',r.updated_at
+ FROM review_assets a JOIN review_requests r ON r.id=a.review_id
+ WHERE r.access_mode='google' AND r.recipient_email!='' AND a.grant_state='granted';
+DELETE FROM review_file_claims WHERE EXISTS(
+ SELECT 1 FROM review_requests r WHERE r.id=review_file_claims.review_id AND r.access_mode='google'
+);
+UPDATE review_assets SET permission_id=NULL WHERE grant_state='granted' AND EXISTS(
+ SELECT 1 FROM review_requests r WHERE r.id=review_assets.review_id AND r.access_mode='google'
+);
