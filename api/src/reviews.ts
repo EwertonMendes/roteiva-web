@@ -300,10 +300,37 @@ async function withAssetLease(env:Env,r:Review,a:Asset,job:(current:Asset)=>Prom
     if(r.access_mode==='google'){await job(current);return;}
     await env.DB.prepare('INSERT OR IGNORE INTO review_file_claims(file_id,review_id,version) VALUES(?,?,?)')
       .bind(a.file_id,r.id,a.version).run();
-    const claim=await env.DB.prepare('SELECT review_id,version FROM review_file_claims WHERE file_id=?')
+    let claim=await env.DB.prepare('SELECT review_id,version FROM review_file_claims WHERE file_id=?')
       .bind(a.file_id).first<{review_id:string;version:number}>();
+    if(claim&&(claim.review_id!==r.id||claim.version!==a.version)){
+      const holder=await env.DB.prepare("SELECT a.grant_state,a.permission_id,r.status FROM review_assets a JOIN review_requests r ON r.id=a.review_id WHERE a.review_id=? AND a.version=? AND a.file_id=?")
+        .bind(claim.review_id,claim.version,a.file_id).first<{grant_state:string;permission_id:string|null;status:string}>();
+      if(holder?.grant_state==='granted'&&holder.permission_id===null){
+        // Earlier invitation reused a pre-existing public ACL: nobody owns it.
+        await env.DB.prepare('DELETE FROM review_file_claims WHERE file_id=? AND review_id=? AND version=?')
+          .bind(a.file_id,claim.review_id,claim.version).run();
+        await env.DB.prepare('INSERT OR IGNORE INTO review_file_claims(file_id,review_id,version) VALUES(?,?,?)')
+          .bind(a.file_id,r.id,a.version).run();
+        claim=await env.DB.prepare('SELECT review_id,version FROM review_file_claims WHERE file_id=?')
+          .bind(a.file_id).first<{review_id:string;version:number}>();
+      }else if(r.access_mode==='link'&&holder?.grant_state==='granted'&&holder.permission_id&&
+        ['pending','changes','approved','publishing'].includes(holder.status)){
+        await job(current);
+        const referenced=await env.DB.prepare("INSERT OR IGNORE INTO review_link_uses(review_id,version,file_id) SELECT ?,?,? WHERE EXISTS(SELECT 1 FROM review_requests r JOIN review_assets a ON a.review_id=r.id AND a.version=? AND a.file_id=? WHERE r.id=? AND r.status IN ('pending','changes','approved','publishing') AND a.grant_state='granted' AND a.permission_id IS NOT NULL)")
+          .bind(r.id,a.version,a.file_id,claim.version,a.file_id,claim.review_id).run();
+        if(referenced.meta.changes!==1){
+          await env.DB.prepare("UPDATE review_assets SET grant_state='unshared',permission_id=NULL WHERE review_id=? AND version=? AND file_id=? AND permission_id IS NULL")
+            .bind(r.id,a.version,a.file_id).run();
+          throw new ApiError(409,'review_busy');
+        }
+        return;
+      }
+    }
     if(claim?.review_id!==r.id||claim.version!==a.version)throw new ApiError(409,'review_file_in_use');
     await job(current);
+    const after=await env.DB.prepare('SELECT grant_state,permission_id FROM review_assets WHERE review_id=? AND version=? AND file_id=?')
+      .bind(r.id,a.version,a.file_id).first<{grant_state:string;permission_id:string|null}>();
+    if(after?.grant_state==='granted'&&after.permission_id===null)await releaseClaim(env,r,a);
   }finally{
     await env.DB.prepare('UPDATE review_assets SET lease_id=NULL,lease_until=0 WHERE review_id=? AND version=? AND file_id=? AND lease_id=?')
       .bind(r.id,a.version,a.file_id,lease).run();
@@ -525,6 +552,28 @@ async function releaseClaim(env:Env,r:Review,a:Asset):Promise<void>{
 async function revokeLocked(env:Env,r:Review,a:Asset):Promise<void>{
   if(a.grant_state==='revoked'||a.grant_state==='unshared')return;
   if(r.access_mode==='google')return revokeGoogle(env,r,a);
+  if(a.permission_id&&r.access_mode==='link'){
+    // Transfer ownership rather than deleting an ACL while another review
+    // still uses that same file. The current review's claim is moved atomically.
+    const used=await env.DB.prepare("SELECT u.review_id,u.version FROM review_link_uses u JOIN review_requests r ON r.id=u.review_id JOIN review_assets a ON a.review_id=u.review_id AND a.version=u.version AND a.file_id=u.file_id WHERE u.file_id=? AND r.status IN ('publishing','pending','changes','approved') AND a.grant_state='granted' ORDER BY r.created_at LIMIT 1")
+      .bind(a.file_id).first<{review_id:string;version:number}>();
+    if(used){
+      const batch=await env.DB.batch([
+        env.DB.prepare("UPDATE review_file_claims SET review_id=?,version=? WHERE file_id=? AND review_id=? AND version=?")
+          .bind(used.review_id,used.version,a.file_id,r.id,a.version),
+        env.DB.prepare("UPDATE review_assets SET permission_id=? WHERE review_id=? AND version=? AND file_id=? AND grant_state='granted' AND permission_id IS NULL")
+          .bind(a.permission_id,used.review_id,used.version,a.file_id),
+        env.DB.prepare("DELETE FROM review_link_uses WHERE review_id=? AND version=? AND file_id=?")
+          .bind(used.review_id,used.version,a.file_id),
+        env.DB.prepare("UPDATE review_assets SET grant_state='revoked',permission_id=NULL WHERE review_id=? AND version=? AND file_id=?")
+          .bind(r.id,a.version,a.file_id)
+      ]);
+      if(batch[0].meta.changes!==1||batch[1].meta.changes!==1)throw new ApiError(409,'review_busy');
+      return;
+    }
+  }
+  await env.DB.prepare('DELETE FROM review_link_uses WHERE review_id=? AND version=? AND file_id=?')
+    .bind(r.id,a.version,a.file_id).run();
   const row=await connection(env,r.owner_uid,a.connection_id);
   // Repair an unknown completion of a Google grant before closing.
   if(a.grant_state==='granting'){
