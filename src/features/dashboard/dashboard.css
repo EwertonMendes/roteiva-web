@@ -207,19 +207,6 @@
     text-overflow: ellipsis;
     max-width: 100%;
   }
-    width: calc(100% + 2 * clamp(20px, 2.6vw, 36px));
-    margin: 0 calc(-1 * clamp(20px, 2.6vw, 36px));
-    padding: clamp(11px, 1.7dvh, 19px) clamp(20px, 2.6vw, 36px);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    border: 0;
-    border-top: 1px solid #363638;
-    background: transparent;
-    color: #b5b5b8;
-    text-align: left;
-    font-size: .9375rem;
-  }
   .app-shell .sidebar { padding-top: clamp(12px, 2.6dvh, 24px); padding-bottom: clamp(10px, 1.75dvh, 16px); }
   .app-shell .sidebar .brand-lockup { height: clamp(44px, 7dvh, 64px); }
   .app-shell .sidebar nav {
@@ -229,12 +216,7 @@
   .app-shell .sidebar nav > button { min-height: clamp(34px, 5.5dvh, 47px); }
   .app-shell .sidebar .nav-label.second { margin-top: clamp(8px, 1.5dvh, 24px); }
   .app-shell .sidebar-profile { padding-top: clamp(7px, 1.4dvh, 14px); }
-    color: #626267;
-    border-top-color: #e4e4e5;
-  }
-    color: #161616;
-    background: #f5f5f6;
-  }
+
 }
 @media (min-width: 821px) and (max-width: 1120px) {
   .app-view-overview .page-heading { gap: 10px; }
@@ -257,18 +239,6 @@
   .app-view-overview .topbar > .workspace-switch,
   .app-view-overview .topbar > .global-search,
   .app-view-overview .topbar > .top-actions { display: flex; }
-    width: calc(100% + 40px);
-    margin: 0 -20px;
-    padding: 18px 20px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    border: 0;
-    border-top: 1px solid var(--line);
-    background: transparent;
-    color: var(--muted);
-    text-align: left;
-  }
 }
 
 /* Activity history: meaningful preview within the dashboard, full detail in a fixed drawer. */
