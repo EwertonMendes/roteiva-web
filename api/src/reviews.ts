@@ -367,7 +367,7 @@ async function withAssetLease(env:Env,r:Review,a:Asset,job:(current:Asset)=>Prom
 }
 type CheckedAsset=Awaited<ReturnType<typeof checkedFile>>;
 
-type GoogleAcl={file_id:string;email:string;connection_id:string;permission_id:string|null;managed:number;state:'granting'|'ready'|'revoking';updated_at:number;owner_review_id:string|null};
+type GoogleAcl={file_id:string;email:string;connection_id:string;permission_id:string|null;managed:number;state:'granting'|'ready'|'revoking';updated_at:number;owner_review_id:string|null;owner_uid:string|null};
 async function sharedGoogleAcl(env:Env,fileId:string,email:string):Promise<GoogleAcl|null>{
   return env.DB.prepare('SELECT * FROM review_google_acl WHERE file_id=? AND email=?')
     .bind(fileId,email).first<GoogleAcl>();
@@ -408,8 +408,8 @@ async function grantGoogle(env:Env,r:Review,a:Asset,validation:CheckedAsset):Pro
   }
   for(const person of people){
     let match=existing.find(p=>p.type==='user'&&p.emailAddress?.toLowerCase()===person.email);
-    await env.DB.prepare("INSERT OR IGNORE INTO review_google_acl(file_id,email,connection_id,permission_id,managed,state,updated_at,owner_review_id) VALUES(?,?,?,?,?,?,?,?)")
-      .bind(a.file_id,person.email,a.connection_id,match?.id||null,match?0:1,match?'ready':'granting',now(),r.id).run();
+    await env.DB.prepare("INSERT OR IGNORE INTO review_google_acl(file_id,email,connection_id,permission_id,managed,state,updated_at,owner_review_id,owner_uid) VALUES(?,?,?,?,?,?,?,?,?)")
+      .bind(a.file_id,person.email,a.connection_id,match?.id||null,match?0:1,match?'ready':'granting',now(),r.id,r.owner_uid).run();
     let acl=await sharedGoogleAcl(env,a.file_id,person.email);
     if(!acl)throw new ApiError(503,'review_drive_unavailable');
     if(acl.state==='revoking')throw new ApiError(409,'review_busy');
@@ -474,7 +474,10 @@ async function revokeGoogle(env:Env,r:Review,a:Asset):Promise<void>{
       const list=await permissions(env,row,a.file_id);
       id=list.find(p=>p.type==='user'&&p.emailAddress?.toLowerCase()===person.email)?.id||null;
     }
-    if(id)await mutatePermission(env,row,a.file_id,'DELETE',undefined,id);
+    if(id){
+      const authorized=acl.owner_uid?await connection(env,acl.owner_uid,acl.connection_id):row;
+      await mutatePermission(env,authorized,a.file_id,'DELETE',undefined,id);
+    }
     await env.DB.prepare("DELETE FROM review_google_acl WHERE file_id=? AND email=? AND state='revoking'")
       .bind(a.file_id,person.email).run();
   }
