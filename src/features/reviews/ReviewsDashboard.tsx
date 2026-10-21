@@ -312,7 +312,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
             <span><Link2 size={15}/> Link de revisão</span>
             <input readOnly aria-label="Link da revisão" value={opened.review.url||""} onFocus={e=>e.currentTarget.select()}/>
             <ShareLinks url={opened.review.url||""} title={opened.review.title}/>
-            <small>O link dá acesso somente aos materiais selecionados, conforme a modalidade escolhida. Prazo até {fmt(opened.review.expiresAt)}.</small>
+            <small>O portal mostra somente os materiais selecionados. Permissões que já existiam no Google Drive não são alteradas nem revogadas pelo Roteiva. Prazo até {fmt(opened.review.expiresAt)}.</small>
           </div>}
           <h3><MessageSquare size={17}/> Comentários e decisões</h3>
           {!opened.comments.length&&!opened.decisions.length&&<p className="reviews-muted">Ainda não há feedback do cliente.</p>}
@@ -361,7 +361,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
               <label>Tipo de acesso<select value={mode} onChange={e=>setMode(e.target.value as Mode)}>
                 <option value="link">Qualquer pessoa com o link</option><option value="google">Somente Google autorizado</option>
               </select></label>
-              {mode==="link"?<p className="reviews-info">Os arquivos selecionados receberão permissão de visualização por link no Google Drive. Não utilize com informações confidenciais.</p>:
+              {mode==="link"?<p className="reviews-info">Os arquivos selecionados poderão ser vistos por quem tiver o link. Se o arquivo ou a pasta já estiver público no Google Drive, essa permissão continuará mesmo depois de encerrar a aprovação. Não utilize com informações confidenciais.</p>:
                 <label>E-mail Google autorizado<input type="email" required value={recipient} maxLength={200}
                   onChange={e=>setRecipient(e.target.value)} placeholder="cliente@gmail.com"/></label>}
               <label>Validade<select value={days} onChange={e=>setDays(Number(e.target.value))}>
