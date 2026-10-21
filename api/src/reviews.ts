@@ -200,8 +200,29 @@ async function detail(env:Env,r:Review){
 function pages(n:URLSearchParams):number{
   return Math.min(50,Math.max(0,Number.parseInt(n.get('page')||'0',10)||0));
 }
+/** Review invitations can include many named Google accounts; cap request bytes
+ * independently from the smaller upload metadata limit without reading unbounded input. */
+async function reviewCreateBody(request:Request):Promise<unknown>{
+  const max=64*1024;
+  if(Number(request.headers.get('Content-Length')||0)>max)throw new ApiError(413,'review_invalid_participants');
+  const reader=request.body?.getReader();
+  const chunks:Uint8Array[]=[];let length=0;
+  if(reader)try{
+    while(true){
+      const {done,value}=await reader.read();
+      if(done)break;
+      length+=value.byteLength;
+      if(length>max){await reader.cancel();throw new ApiError(413,'review_invalid_participants');}
+      chunks.push(value);
+    }
+  }finally{reader.releaseLock();}
+  const bytes=new Uint8Array(length);let offset=0;
+  for(const part of chunks){bytes.set(part,offset);offset+=part.byteLength;}
+  try{return JSON.parse(new TextDecoder().decode(bytes)) as unknown;}
+  catch{throw new ApiError(400,'review_invalid_input');}
+}
 async function createReview(request:Request,env:Env,uid:string):Promise<Response>{
-  const data=await uploadBody(request) as Record<string,unknown>;
+  const data=await reviewCreateBody(request) as Record<string,unknown>;
   if(!data||typeof data!=='object'||Array.isArray(data))throw new ApiError(400,'review_invalid_input');
   const projectId=integer(data.projectId),clientId=integer(data.clientId);
   if(!projectId||!clientId)throw new ApiError(400,'review_invalid_input');
@@ -249,12 +270,20 @@ function permissionUrl(fileId:string,permissionId?:string):URL {
   return u;
 }
 async function permissions(env:Env,row:Connection,fileId:string){
-  const u=permissionUrl(fileId);
-  u.searchParams.set('fields','nextPageToken,permissions(id,type,role,emailAddress,allowFileDiscovery)');
-  u.searchParams.set('pageSize','100');
-  const res=await driveJson(env,row,u);
-  if(res.nextPageToken)throw new ApiError(409,'review_permission_list_too_large');
-  return (Array.isArray(res.permissions)?res.permissions:[]) as {id:string;type:string;role:string;emailAddress?:string}[];
+  const all:{id:string;type:string;role:string;emailAddress?:string}[]=[];
+  let cursor:string|undefined;
+  for(let i=0;i<20;i++){
+    const u=permissionUrl(fileId);
+    u.searchParams.set('fields','nextPageToken,permissions(id,type,role,emailAddress,allowFileDiscovery)');
+    u.searchParams.set('pageSize','100');
+    if(cursor)u.searchParams.set('pageToken',cursor);
+    const res=await driveJson(env,row,u);
+    if(Array.isArray(res.permissions))all.push(...res.permissions as typeof all);
+    if(typeof res.nextPageToken!=='string'||!res.nextPageToken)return all;
+    if(res.nextPageToken===cursor)throw new ApiError(409,'review_permission_list_too_large');
+    cursor=res.nextPageToken;
+  }
+  throw new ApiError(409,'review_permission_list_too_large');
 }
 async function mutatePermission(env:Env,row:Connection,fileId:string,method:'POST'|'DELETE',
   value?:Record<string,string>,permissionId?:string):Promise<Record<string,unknown>>{
