@@ -630,23 +630,37 @@ async function publicReview(request:Request,env:Env,action:'view'|'comment'|'dec
   if(!r||r.status==='closed'||r.status==='closing')throw new ApiError(404,'review_not_found');
   if(r.expires_at<=now())throw new ApiError(410,'review_expired');
   if(!['pending','changes','approved'].includes(r.status))throw new ApiError(409,'review_not_ready');
-  let email='';
+  let email='',role:'reviewer'|'viewer'='reviewer';
   if(r.access_mode==='google'){
     const principal=await verifiedTrialPrincipal(request,env);
     email=principal.verifiedEmail.toLowerCase();
-    if(email!==r.recipient_email)throw new ApiError(403,'review_recipient_denied');
+    const participant=await env.DB.prepare('SELECT role FROM review_participants WHERE review_id=? AND email=?')
+      .bind(r.id,email).first<{role:'reviewer'|'viewer'}>();
+    if(!participant)throw new ApiError(403,'review_recipient_denied');
+    role=participant.role;
+    if((action==='comment'||action==='decide')&&role!=='reviewer')
+      throw new ApiError(403,'review_viewer_read_only');
   }
   const files=await assets(env,r.id,r.current_version);
   if(files.some(a=>a.grant_state!=='granted'))throw new ApiError(409,'review_not_ready');
   if(action==='view'){
-    const [comments,decisions]=await Promise.all([
+    const [comments,decisions,votes,myVote]=await Promise.all([
       env.DB.prepare('SELECT id,version,file_id,author_name,body,seconds,created_at FROM review_comments WHERE review_id=? AND version=? ORDER BY created_at DESC LIMIT 200')
         .bind(r.id,r.current_version).all(),
       env.DB.prepare('SELECT version,decision,author_name,message,created_at FROM review_decisions WHERE review_id=? ORDER BY created_at DESC LIMIT 40')
-        .bind(r.id).all()
+        .bind(r.id).all(),
+      env.DB.prepare("SELECT COUNT(*) AS count FROM review_votes WHERE review_id=? AND version=? AND decision='approved'")
+        .bind(r.id,r.current_version).first<{count:number}>(),
+      email?env.DB.prepare('SELECT decision FROM review_votes WHERE review_id=? AND version=? AND email=?')
+        .bind(r.id,r.current_version,email).first<{decision:string}>():Promise.resolve(null)
     ]);
+    const total=r.access_mode==='google'?
+      await env.DB.prepare("SELECT COUNT(*) AS count FROM review_participants WHERE review_id=? AND role='reviewer'")
+        .bind(r.id).first<{count:number}>():null;
     return Response.json({review:{title:r.title,message:r.message,studioName:r.studio_name,
-      status:r.status,version:r.current_version,expiresAt:r.expires_at,mode:r.access_mode},
+      status:r.status,version:r.current_version,expiresAt:r.expires_at,mode:r.access_mode,
+      role:r.access_mode==='google'?role:'reviewer',myVote:myVote?.decision||null,
+      approvalsReceived:votes?.count||0,approvalsRequired:total?.count||1},
       assets:files.map(a=>({fileId:a.file_id,name:a.name,mimeType:a.mime_type})),
       comments:comments.results,decisions:decisions.results});
   }
@@ -686,6 +700,27 @@ async function publicReview(request:Request,env:Env,action:'view'|'comment'|'dec
   if(decision!=='approved'&&decision!=='changes')throw new ApiError(400,'review_invalid_input');
   const message=inputText(data.message||'',1500,decision==='changes');
   const ts=now();
+  if(r.access_mode==='google'){
+    const eventId=crypto.randomUUID();
+    const vote=await env.DB.prepare("INSERT OR IGNORE INTO review_votes(review_id,version,email,decision,author_name,message,created_at) SELECT ?,?,?,?,?,?,? FROM review_requests WHERE id=? AND status='pending' AND current_version=? AND token_hash=? AND expires_at>?")
+      .bind(r.id,r.current_version,email,decision,authorName,message,ts,r.id,r.current_version,r.token_hash,ts).run();
+    if(vote.meta.changes!==1)throw new ApiError(409,'review_already_decided');
+    // One request for changes ends the round immediately. Otherwise every
+    // registered reviewer must explicitly approve before the owner sees Approved.
+    const complete=decision==='changes'||!(await env.DB.prepare(
+      "SELECT 1 FROM review_participants p WHERE p.review_id=? AND p.role='reviewer' AND NOT EXISTS(SELECT 1 FROM review_votes v WHERE v.review_id=p.review_id AND v.version=? AND v.email=p.email AND v.decision='approved') LIMIT 1"
+    ).bind(r.id,r.current_version).first());
+    if(complete){
+      const saved=await env.DB.batch([
+        env.DB.prepare("INSERT OR IGNORE INTO review_decisions(id,review_id,version,decision,author_name,author_email,message,created_at) SELECT ?,?,?,?,?,?,?,? FROM review_requests WHERE id=? AND status='pending' AND current_version=? AND token_hash=?")
+          .bind(eventId,r.id,r.current_version,decision,authorName,email,message,ts,r.id,r.current_version,r.token_hash),
+        env.DB.prepare("UPDATE review_requests SET status=?,updated_at=? WHERE id=? AND status='pending' AND current_version=? AND token_hash=? AND EXISTS(SELECT 1 FROM review_decisions WHERE id=?)")
+          .bind(decision,ts,r.id,r.current_version,r.token_hash,eventId)
+      ]);
+      if(saved[0].meta.changes!==1||saved[1].meta.changes!==1)throw new ApiError(409,'review_busy');
+    }
+    return Response.json({saved:true,status:complete?decision:'pending'});
+  }
   // Unique(review_id,version) makes double-click/replay unable to produce conflicting approvals.
   // Conditional insert + transition within one D1 batch avoid phantom decisions on replay.
   const eventId=crypto.randomUUID();
