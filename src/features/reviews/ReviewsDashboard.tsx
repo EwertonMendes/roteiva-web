@@ -156,7 +156,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
     const current=remote,seq=searchSequence.current;
     setSearchBusy(true);
     try{
-      const params=new URLSearchParams({search:current.term,pageToken:current.page});
+      const params=new URLSearchParams({search:current.term,pageToken:current.page!});
       const result=await call<{files:DriveItem[];nextPageToken:string|null}>(
         "/integrations/drive/"+encodeURIComponent(selectedFolder.connectionId)+"/folders/"+
         encodeURIComponent(current.folderId)+"/items?"+params);
