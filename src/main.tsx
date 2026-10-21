@@ -18,7 +18,6 @@ import "./site-experience.css";
 import "./demo.css";
 import "./features/auth/auth.css";
 import "./features/settings/settings.css";
-import "./features/typography/font-lab.css";
 import "./typography.css";
 import "./features/ui/semantic-icons.css";
 import "./features/dashboard/dashboard.css";

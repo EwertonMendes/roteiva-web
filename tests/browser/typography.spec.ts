@@ -27,13 +27,9 @@ async function fontSize(page:Page,selector:string){
   return target.evaluate(node=>parseFloat(getComputedStyle(node).fontSize));
 }
 
-test("typographic scale remains readable and temporary family switching never shrinks text",async({page},info)=>{
-  await page.route(/^https:\/\/fonts\.googleapis\.com\/css2\?/,async route=>{
-    const name=(new URL(route.request().url()).searchParams.get("family")||"Manrope").split(":")[0].replace(/\+/g," ");
-    return route.fulfill({status:200,contentType:"text/css",
-      body:`@font-face{font-family:"${name}";font-weight:400 700;src:url("${app}/fonts/ubuntu/Ubuntu-Regular.ttf") format("truetype")}`});
-  });
+test("Ubuntu remains the only app font and typography stays readable",async({page},info)=>{
   await enterWorkspace(page,"legibility-"+info.project.name+"@example.com");
+  await expect(page.getByRole("combobox",{name:"Fonte para testar no Roteiva"})).toHaveCount(0);
   const paragraph=await fontSize(page,".page-heading p");
   const caption=await fontSize(page,".flow-overview-head .eyebrow");
   const heading=await fontSize(page,".page-heading h1");
@@ -42,13 +38,11 @@ test("typographic scale remains readable and temporary family switching never sh
   expect(caption).toBeGreaterThanOrEqual(13);
   expect(heading).toBeGreaterThanOrEqual(28);
   expect(button).toBeGreaterThanOrEqual(15);
-  const selector=page.getByRole("combobox",{name:"Fonte para testar no Roteiva"});
-  await selector.selectOption("Manrope");
-  await expect.poll(()=>page.evaluate(()=>document.documentElement.style.getPropertyValue("--temporary-roteiva-font"))).toContain("Manrope");
-  expect(await fontSize(page,".page-heading p")).toBeCloseTo(paragraph,1);
-  expect(await fontSize(page,".flow-overview-head .eyebrow")).toBeCloseTo(caption,1);
-  await selector.selectOption("Ubuntu");
-  expect(await fontSize(page,".page-heading p")).toBeCloseTo(paragraph,1);
+  const family=await page.locator(".app-shell").evaluate(node=>getComputedStyle(node).fontFamily);
+  expect(family).toContain("Ubuntu");
+  await page.goto(app+"/projetos");
+  await expect(page.locator(".app-shell")).toBeVisible();
+  expect(await page.locator(".app-shell").evaluate(node=>getComputedStyle(node).fontFamily)).toContain("Ubuntu");
 });
 
 test("mobile layout remains navigable with enlarged content and respects user font scale",async({page},info)=>{
@@ -63,7 +57,7 @@ test("mobile layout remains navigable with enlarged content and respects user fo
   }
   await page.evaluate(()=>{document.documentElement.style.fontSize="125%";});
   await expect.poll(()=>fontSize(page,".page-heading p")).toBeGreaterThanOrEqual(19);
-  await expect(page.getByRole("combobox",{name:"Fonte para testar no Roteiva"})).toBeVisible();
+  await expect(page.getByRole("combobox",{name:"Fonte para testar no Roteiva"})).toHaveCount(0);
   const overflow=await page.evaluate(()=>({
     width:document.documentElement.clientWidth,
     scroll:document.documentElement.scrollWidth,

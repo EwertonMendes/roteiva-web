@@ -24,7 +24,6 @@ import { IconLabel } from "./features/ui/IconLabel";
 import { PROJECT_STATUS_ICONS, PROJECT_STATUS_LABELS } from "./features/ui/project-status";
 import { DriveConnectionPanel } from "./features/drive/DriveConnectionPanel";
 import { LibraryReviewDemo } from "./features/drive/LibraryReviewDemo";
-import { TypographyLab, TEMPORARY_FONT_LAB_ENABLED } from "./features/typography/TypographyLab";
 import type { RoteivaProfile, ProfileChanges } from "./data/firestore-workspace";
 import type { WorkspaceCommand } from "./data/firestore-commands";
 import type { FirestoreUsage } from "./data/firestore-usage";
@@ -518,7 +517,6 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
               if(value.trim() && view==="projects")onSearchProjects?.();
               if(value.trim() && view==="clients")onSearchClients?.();
             }} placeholder="Buscar projetos e clientes" /><kbd><Command size={11} /> K</kbd></label>}
-          {TEMPORARY_FONT_LAB_ENABLED && !isDemo && <TypographyLab />}
           <div className="top-actions"><button className="icon-button" title="Ver atividades" aria-label="Ver atividades" onClick={() => { changeView("overview"); notify(activities[0]?.text || "Nenhuma atividade ainda"); }}><Bell size={18} /></button><button className="icon-button theme-toggle" onClick={toggleTheme} aria-label={theme === "light" ? "Ativar modo escuro" : "Ativar modo claro"} title={theme === "light" ? "Modo escuro" : "Modo claro"}>{theme === "light" ? <Moon size={18} /> : <Sun size={18} />}</button><button className="primary-button" onClick={startProject}><Plus size={17} /> Novo projeto</button></div>
         </header>
 
@@ -536,7 +534,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
             </div>
           </div>
           {view === "settings" && <SettingsPage profile={profile} email={email} photoURL={photoURL} theme={theme} toggleTheme={toggleTheme} onSaveProfile={onSaveProfile} />}
-          {view === "overview" && <><TodayStudio clients={clientList} projects={projects} entries={financeEntries} events={calendarEvents} activities={activities} onView={changeView} overviewMetrics={overviewMetrics} />{(overviewMetrics?.projectCount ?? projects.length) > 0 && <Overview projects={projects} setView={changeView} onOpenProject={openProject} />}</>}
+          {view === "overview" && <TodayStudio clients={clientList} projects={projects} entries={financeEntries} events={calendarEvents} activities={activities} onView={changeView} onOpenActivity={() => setActivityOpen(true)} overviewMetrics={overviewMetrics} />}
           {view === "projects" && (selectedProject && projects.some(p => p.id === selectedProject) ? <ProjectDetail project={projects.find(p => p.id === selectedProject)!} clients={clientList} entries={financeEntries} assets={libraryAssets} events={calendarEvents} onSave={updateProject} onBack={() => changeView("projects")} onRevenue={addLinkedRevenue} onUpload={uploadAssets} onEvent={(p) => { openEvent(null, p.dueDate); }} uploading={uploading} onReview={()=>{setReviewStart({clientId:projects.find(p=>p.id===selectedProject)?.clientId,projectId:selectedProject||undefined});changeView("reviews");}} /> : <ProjectsView projects={filtered.map(p => ({...p, files: libraryAssets.filter(a => a.projectId === p.id).length}))}
                   statusFilter={statusFilter} setStatusFilter={(status)=>{
                     setStatusFilter(status);
