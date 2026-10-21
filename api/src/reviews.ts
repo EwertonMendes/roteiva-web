@@ -730,6 +730,9 @@ async function publicReview(request:Request,env:Env,action:'view'|'comment'|'dec
       comments:comments.results,decisions:decisions.results});
   }
   if(action==='media'){
+    // HTML5 <video> cannot send Firebase authorization on byte-range requests.
+    // Private Google reviews therefore use Drive's authenticated preview.
+    if(r.access_mode==='google')throw new ApiError(403,'review_private_media_google_drive');
     const body=await uploadBody(request) as Record<string,unknown>|null;
     if(!body||typeof body!=='object'||Array.isArray(body)||integer(body.version)!==r.current_version)
       throw new ApiError(409,'review_version_changed');
