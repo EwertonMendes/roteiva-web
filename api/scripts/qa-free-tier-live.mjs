@@ -28,7 +28,9 @@ async function http(path,expected){
   console.log(JSON.stringify({check:'worker_http',route:path,status:response.status,wallMs:Math.round(performance.now()-start)}));
   await response.body?.cancel();
 }
-for(const [label,sql] of queries)d1(label,sql);
+if(process.env.CLOUDFLARE_API_TOKEN){
+  for(const [label,sql] of queries)d1(label,sql);
+}else console.log(JSON.stringify({check:'d1_remote',status:'blocked_without_protected_environment'}));
 await http('/health',200);
 await http('/integrations/drive',401);
 await http('/reviews',401);
