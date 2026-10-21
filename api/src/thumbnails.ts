@@ -1,3 +1,4 @@
+import {streamBoundedThumbnail} from './thumbnail-stream.ts';
 import {ApiError,type Env} from './types.ts';
 import {connection} from './repository.ts';
 import {DRIVE_READ_SCOPE,accessCredential} from './google.ts';
@@ -88,6 +89,11 @@ export async function thumbnail(env:Env,uid:string,connectionId:string,fileId:st
   if(!IMAGE_TYPES.has(mime)||(length>MAX_BYTES&&length>0)){
     await response.body?.cancel();throw new ApiError(502,'thumbnail_unavailable');
   }
+  const streamed=streamBoundedThumbnail(response,mime,MAX_BYTES,bytes=>{
+    console.info(JSON.stringify({event:'drive_thumbnail',durationMs:Date.now()-started,
+      mode:ticket?'ticket':'fallback',bytes,delivery:'stream'}));
+  });
+  if(streamed)return streamed;
   const reader=response.body?.getReader();
   if(!reader)throw new ApiError(502,'thumbnail_unavailable');
   const chunks:Uint8Array[]=[];let total=0;
@@ -106,7 +112,7 @@ export async function thumbnail(env:Env,uid:string,connectionId:string,fileId:st
   if(total===0)throw new ApiError(404,'thumbnail_unavailable');
   const bytes=new Uint8Array(total);let position=0;
   for(const chunk of chunks){bytes.set(chunk,position);position+=chunk.length;}
-  console.info(JSON.stringify({event:'drive_thumbnail',durationMs:Date.now()-started,mode:ticket?'ticket':'fallback',bytes:total}));
+  console.info(JSON.stringify({event:'drive_thumbnail',durationMs:Date.now()-started,mode:ticket?'ticket':'fallback',bytes:total,delivery:'buffer'}));
   return new Response(bytes,{status:200,headers:{
     'Content-Type':mime,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'
   }});

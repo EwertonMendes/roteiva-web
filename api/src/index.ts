@@ -7,14 +7,27 @@ import { listFolders, listFolderItems } from './folders.ts';
 import { thumbnail } from './thumbnails.ts';
 import { startUpload, completeUpload, authorizeUploadFolder, cleanupUploads } from './uploads.ts';
 import { verifyPickerToken } from './picker.ts';
-import { deletionStatus, requestDeletion, runPendingDeletions } from './account-deletion.ts';
+import { deletionStatus, requestDeletion, runPendingDeletions, runDeletionMaintenance } from './account-deletion.ts';
 import { ensureAccess, assertActiveAccess } from './access.ts';
 import { backfillAccess } from './access-backfill.ts';
 const headers = {
   'Cache-Control':'no-store', 'Referrer-Policy':'no-referrer',
   'X-Content-Type-Options':'nosniff', 'Content-Security-Policy':"default-src 'none'; frame-ancestors 'none'",
 };
+/** Route categories are intentionally static: never log tokens, file IDs or URL params. */
+function operationName(path:string):string{
+  if(path.endsWith('/thumbnail')||path==='/reviews/media')return 'thumbnail_or_media';
+  if(path.startsWith('/reviews'))return 'reviews';
+  if(path.includes('/uploads/'))return 'drive_upload';
+  if(path.startsWith('/integrations/drive'))return 'drive_metadata';
+  if(path.startsWith('/oauth/'))return 'oauth';
+  if(path.startsWith('/account/'))return 'account';
+  if(path.startsWith('/access/'))return 'access';
+  if(path==='/health')return 'health';
+  return 'other';
+}
 export async function handle(request: Request, env: Env): Promise<Response> {
+  const began=performance.now();
   const id = crypto.randomUUID();
   const url = new URL(request.url);
   const origin = request.headers.get('Origin');
@@ -140,13 +153,28 @@ export async function handle(request: Request, env: Env): Promise<Response> {
     result.headers.set('Access-Control-Allow-Origin',origin);
     result.headers.set('Access-Control-Allow-Credentials','true');
   }
+  // Wall-clock duration is not CPU time; compare against Cloudflare CPU percentiles.
+  // Do not log raw URLs, headers, request/response bodies or identities.
+  const elapsed=Math.round(performance.now()-began);
+  if(result.status>=500||elapsed>=2000||Math.random()<0.05){
+    console.info(JSON.stringify({event:'api_operation',operation:operationName(url.pathname),
+      method:request.method,status:result.status,wallMs:elapsed,
+      ...(result.status>=500?{requestId:id}:{})}));
+  }
   return result;
 }
-export default {fetch:handle, scheduled(_controller:ScheduledController,env:Env,ctx:ExecutionContext){
+export default {fetch:handle, scheduled(controller:ScheduledController,env:Env,ctx:ExecutionContext){
+  // Revocations and deletion progress are security-critical: retain the one-minute cadence.
   ctx.waitUntil((async()=>{
-    await runPendingDeletions(env);
-    try{await backfillAccess(env);}catch(error){console.error(JSON.stringify({event:'access_backfill_retry',code:error instanceof ApiError?error.code:'dependency_failure'}));}
-    try{await cleanupUploads(env);}catch{console.error(JSON.stringify({event:'drive_upload_retention_retry'}));}
-    try{await cleanupExpiredReviews(env);}catch{console.error(JSON.stringify({event:'review_revocation_retry'}));}
+    if(controller.cron==='* * * * *'){
+      await runPendingDeletions(env);
+      try{await cleanupExpiredReviews(env);}catch{console.error(JSON.stringify({event:'review_revocation_retry'}));}
+    }else if(controller.cron==='*/15 * * * *'){
+      try{await runDeletionMaintenance(env);}catch{console.error(JSON.stringify({event:'deletion_maintenance_retry'}));}
+      try{await backfillAccess(env);}catch(error){console.error(JSON.stringify({event:'access_backfill_retry',code:error instanceof ApiError?error.code:'dependency_failure'}));}
+      try{await cleanupUploads(env);}catch{console.error(JSON.stringify({event:'drive_upload_retention_retry'}));}
+    }else{
+      console.error(JSON.stringify({event:'unexpected_cron_trigger'}));
+    }
   })());
 }};

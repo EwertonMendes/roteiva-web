@@ -165,6 +165,14 @@ export async function runPendingDeletions(env:Env):Promise<void>{
       console.error(JSON.stringify({event:'account_deletion_scheduler_failure'}));
     }
   }
+}
+
+/** Aggregated alarms and retention do not need to run every minute.
+ * Revocation and ongoing account deletion remain in runPendingDeletions.
+ */
+export async function runDeletionMaintenance(env:Env):Promise<void>{
+  if(!deletionConfigured(env))return;
+  const now=Date.now();
   // A stalled deletion must not be invisible to operations. This log contains
   // only an aggregate count, never account identifiers or personal data.
   const review=await env.DB.prepare("SELECT COUNT(*) AS total FROM account_deletions WHERE phase='manual_review'")
