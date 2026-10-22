@@ -1,6 +1,6 @@
 import {useCallback,useEffect,useMemo,useRef,useState} from "react";
 import {createPortal} from "react-dom";
-import {Check,ChevronLeft,ChevronRight,ExternalLink,Folder,LoaderCircle,Plus,Search,Send,ShieldCheck,X} from "lucide-react";
+import {AlertTriangle,Check,ChevronLeft,ChevronRight,ExternalLink,Folder,LoaderCircle,Plus,Search,Send,ShieldCheck,X} from "lucide-react";
 import type {Client,Project} from "../../domain/workspace";
 import {useAuth} from "../auth/AuthProvider";
 import {useDriveApi} from "../drive/drive-api";
@@ -17,6 +17,8 @@ import {statusText,type Mode,type Review,type Detail} from "./review-model";
 
 type Selection={fileId:string;connectionId:string;linkedFolderId:string;name:string;mimeType:string};
 const supported=(file:DriveItem)=>/^(video|image|audio)\//.test(file.mimeType)||file.mimeType==="application/pdf";
+const splitEmails=(raw:string)=>raw.split(/[\n,;]+/).map(v=>v.trim().toLowerCase()).filter(Boolean);
+const validEmail=(value:string)=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 export function ReviewsDashboard({clients,projects,studioName,onLibrary,startProjectId,startClientId}:{
   clients:Client[];projects:Project[];studioName:string;onLibrary:()=>void;startProjectId?:number;startClientId?:number
 }){
@@ -29,12 +31,15 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
   const [loading,setLoading]=useState(true),[working,setWorking]=useState(false),[error,setError]=useState("");
   const [opened,setOpened]=useState<Detail|null>(null);
   const [composer,setComposer]=useState(false),[replacement,setReplacement]=useState<string|null>(null);
+  const [composerStep,setComposerStep]=useState<"details"|"materials">("details");
+  const composerBodyRef=useRef<HTMLDivElement>(null);
   const [clientId,setClientId]=useState(startClientId||0),[projectId,setProjectId]=useState(startProjectId||0);
   const [title,setTitle]=useState(""),[message,setMessage]=useState("");
   const [mode,setMode]=useState<Mode>("link"),[recipient,setRecipient]=useState("");
   const [viewers,setViewers]=useState(""),[restrictPublic,setRestrictPublic]=useState(false);
   const [shareDirect,setShareDirect]=useState(false);
   const [days,setDays]=useState(14),[links,setLinks]=useState<DriveFolderLink[]>([]);
+  const [linksLoading,setLinksLoading]=useState(false);
   const [selectedFolder,setSelectedFolder]=useState<DriveFolderLink|null>(null);
   const [trail,setTrail]=useState<{id:string;name:string}[]>([]);
   const [items,setItems]=useState<DriveItem[]>([]);
@@ -78,12 +83,14 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
   const relevantProjects=useMemo(()=>clientId?projects.filter(p=>p.clientId===clientId):projects,[clientId,projects]);
   useEffect(()=>{
     browseSequence.current++;searchSequence.current++;setFileSearch("");setRemote(null);setSearchBusy(false);
-    setSelectedFolder(null);setItems([]);setTrail([]);setNextToken(null);setFolderBusy(false);
-    if(!user||!projectId||!composer){setLinks([]);return;}
+    setSelectedFolder(null);setItems([]);setTrail([]);setNextToken(null);setFolderBusy(false);setFolderError("");setLinks([]);
+    if(!user||!projectId||!composer){setLinksLoading(false);return;}
+    setLinksLoading(true);
     let alive=true;
     readDriveLinks(user.uid).then(result=>{
       if(alive)setLinks(result.filter(l=>l.projectId===projectId));
-    }).catch(()=>{if(alive)setFolderError("Não foi possível ler as pastas vinculadas.");});
+    }).catch(()=>{if(alive)setFolderError("Não foi possível ler as pastas vinculadas.");})
+      .finally(()=>{if(alive)setLinksLoading(false);});
     return()=>{alive=false;};
   },[user,projectId,composer]);
   const browse=useCallback(async(folder:DriveFolderLink,targetId:string,path:{id:string;name:string}[],append=false,pageKey?:string)=>{
@@ -104,6 +111,12 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
     setSelectedFolder(folder);setTrail([{id:folder.folderId,name:folder.folderName}]);
     void browse(folder,folder.folderId,[{id:folder.folderId,name:folder.folderName}]);
   };
+  useEffect(()=>{
+    if(!composer||!projectId||(!replacement&&composerStep!=="materials")||!links.length||selectedFolder)return;
+    const folder=links[0];
+    setSelectedFolder(folder);
+    void browse(folder,folder.folderId,[{id:folder.folderId,name:folder.folderName}]);
+  },[browse,composer,composerStep,links,projectId,replacement,selectedFolder]);
   const activeFolderId=trail.at(-1)?.id||selectedFolder?.folderId||"";
   useEffect(()=>{
     const seq=++searchSequence.current;
@@ -178,12 +191,12 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
   const resetComposer=()=>{
     if(working)return;
     browseSequence.current++;searchSequence.current++;
-    setComposer(false);setReplacement(null);setFiles([]);setTitle("");setMessage("");setSelectedFolder(null);setViewers("");setRestrictPublic(false);setShareDirect(false);
+    setComposer(false);setReplacement(null);setComposerStep("details");setFiles([]);setTitle("");setMessage("");setSelectedFolder(null);setViewers("");setRestrictPublic(false);setShareDirect(false);
     setTrail([]);setItems([]);setError("");setFolderError("");
   };
   const newReview=()=>{
     setClientId(0);setProjectId(0);setRecipient("");setViewers("");setRestrictPublic(false);setShareDirect(false);setTitle("");setMessage("");setFiles([]);setMode("link");
-    setReplacement(null);setComposer(true);setOpened(null);setError("");
+    setReplacement(null);setComposerStep("details");setComposer(true);setOpened(null);setError("");setFolderError("");
   };
   const openDetail=async(id:string)=>{
     setWorking(true);setError("");
@@ -200,6 +213,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
   const submit=async()=>{
     if(working||pendingUploads.length){setError("Conclua ou cancele os envios pendentes antes de compartilhar.");return;}
     if(!projectId||!clientId||!files.length) {setError("Escolha o cliente, projeto e pelo menos um arquivo.");return;}
+    if(!replacement&&missingDetails.length){setComposerStep("details");setError(missingDetails[0]);return;}
     await run(async()=>{
       let publishWarning="";
       const selections=files.map(f=>({fileId:f.fileId,linkedFolderId:f.linkedFolderId,connectionId:f.connectionId}));
@@ -224,7 +238,6 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
         }
         setOpened(result);
       }else{
-        const splitEmails=(raw:string)=>raw.split(/[\n,;]+/).map(v=>v.trim().toLowerCase()).filter(Boolean);
         const reviewers=mode==="google"?splitEmails(recipient):[];
         const readers=mode==="google"?splitEmails(viewers):[];
         if(mode==="google"&&(!reviewers.length||new Set([...reviewers,...readers]).size!==reviewers.length+readers.length)){
@@ -233,7 +246,8 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
         const participants=[...reviewers.map(email=>({email,role:"reviewer"})),...readers.map(email=>({email,role:"viewer"}))];
         const created=await call<{id:string}>("/reviews","POST",{
           clientId,projectId,studioName,title,message,mode,recipientEmail:reviewers[0]||"",
-          participants,driveShareEnabled:shareDirect,restrictExistingPublic:restrictPublic,
+          participants,driveShareEnabled:mode==="google"&&shareDirect,
+          restrictExistingPublic:mode==="google"&&shareDirect&&restrictPublic,
           expiresInDays:days,assets:selections
         });
         setOpened(await call<Detail>("/reviews/"+created.id));
@@ -252,7 +266,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
   const beginRevision=()=>{
     if(!opened||working)return;
     setClientId(opened.review.clientId);setProjectId(opened.review.projectId);setReplacement(opened.review.id);
-    setFiles([]);setError("");setComposer(true);
+    setFiles([]);setError("");setComposerStep("materials");setComposer(true);
   };
   const mutate=async(action:"publish"|"rotate"|"close")=>{
     if(!opened)return;
@@ -264,6 +278,29 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
     });
   };
   const chosenClient=clients.find(c=>c.id===clientId);
+  const chosenProject=projects.find(p=>p.id===projectId);
+  const reviewEmails=mode==="google"?splitEmails(recipient):[];
+  const readerEmails=mode==="google"?splitEmails(viewers):[];
+  const allEmails=[...reviewEmails,...readerEmails];
+  const participantIssue=mode!=="google"?"":!reviewEmails.length?
+    "Adicione pelo menos um e-mail de revisor.":allEmails.some(email=>!validEmail(email))?
+    "Corrija os e-mails inválidos dos participantes.":new Set(allEmails).size!==allEmails.length?
+    "Cada e-mail deve aparecer apenas uma vez entre revisores e leitores.":"";
+  const missingDetails=[
+    ...(!clientId?["Selecione um cliente."]:[]),
+    ...(!projectId?["Selecione um projeto."]:[]),
+    ...(!title.trim()?["Informe o título da aprovação."]:[]),
+    ...(participantIssue?[participantIssue]:[])
+  ];
+  const goToMaterials=()=>{
+    if(missingDetails.length){
+      setError(missingDetails[0]);
+      composerBodyRef.current?.scrollTo({top:0,behavior:"smooth"});
+      return;
+    }
+    setError("");setComposerStep("materials");
+    composerBodyRef.current?.scrollTo({top:0});
+  };
   const addFile=(file:DriveItem)=>{
     if(!selectedFolder)return;
     if(!supported(file))return;
