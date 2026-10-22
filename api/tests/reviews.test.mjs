@@ -406,6 +406,17 @@ test('restricted review verifies Google recipient and preserves their pre-existi
   assert.equal(x.acl.has('external-reader'),true);
   assert.equal(x.calls.filter(c=>c.method==='DELETE').length,0);
 });
+test('inherited public ACL must never be deleted even when direct-public cleanup was requested',async t=>{
+  const x=await integration(t);x.hooks.unauthorized=true;
+  x.acl.set('parent-inherited',{type:'anyone',role:'reader',permissionDetails:[{inherited:true}]});
+  const {id,published}=await createAndPublish(x,{
+    mode:'google',recipientEmail:'client@gmail.com',driveShareEnabled:true,restrictExistingPublic:true});
+  assert.equal(published.status,200);
+  assert.equal(x.acl.has('parent-inherited'),true);
+  assert.equal(x.calls.filter(c=>c.method==='DELETE'&&c.path.includes('/permissions/')).length,0);
+  assert.equal((await x.send('POST','/reviews/'+id+'/close',x.alice)).status,200);
+  assert.equal(x.acl.has('parent-inherited'),true);
+});
 test('Google-restricted portal preserves public, group and domain Drive permissions',async t=>{
   const x=await integration(t);
   for(const type of ['anyone','domain','group']){
