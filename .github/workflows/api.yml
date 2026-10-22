@@ -22,7 +22,7 @@ jobs:
   validate:
     name: Validate Worker and D1
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 8
     defaults:
       run:
         working-directory: api
@@ -33,10 +33,13 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: api/package-lock.json
-      - run: npm ci --ignore-scripts
+      - name: Install locked dependencies (cached first, bounded registry fallback)
+        run: |
+          npm ci --ignore-scripts --offline --no-audit --no-fund ||
+          npm ci --ignore-scripts --prefer-offline --no-audit --no-fund --fetch-retries=1 --fetch-timeout=20000
       - name: Tests, typecheck, migrations and bundle
         run: |
-          npm audit --audit-level=high
+          node scripts/ci-security-audit.mjs
           npm run typecheck
           npm test
           npm run migrate:local
@@ -46,7 +49,7 @@ jobs:
     needs: validate
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 8
     environment: cloudflare-development
     concurrency:
       group: api-worker-dev
@@ -61,7 +64,10 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: api/package-lock.json
-      - run: npm ci --ignore-scripts
+      - name: Install locked dependencies (cached first, bounded registry fallback)
+        run: |
+          npm ci --ignore-scripts --offline --no-audit --no-fund ||
+          npm ci --ignore-scripts --prefer-offline --no-audit --no-fund --fetch-retries=1 --fetch-timeout=20000
       - name: Guard DEV bindings and current SHA
         env:
           ACCOUNT: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
