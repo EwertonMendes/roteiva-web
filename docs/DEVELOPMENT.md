@@ -6,6 +6,8 @@
 
 O preview temporário de PR é separado e pode falhar no login por não estar autorizado no Firebase Auth. Para testar com OAuth real, usar o Hosting principal `https://roteiva-web-dev.web.app` **somente após** publicação manual bem-sucedida. Uma publicação futura automática da master poderá substituir a versão em homologação. Registrar sempre SHA, link do workflow e resultado no roadmap. A operação de homologação não faz merge.
 
+**Execução comprovada do PR #85 (22/10/2026):** [Frontend DEV workflow_dispatch #39859426623](https://github.com/EwertonMendes/roteiva-web/actions/runs/39859426623) aprovado com SHA `3e4127e`. Foram validados `pnpm test`, `pnpm typecheck`, `pnpm build` e contrato estático; `check-access-worker.mjs` confirmou o Worker DEV; `firebase deploy --only hosting --project roteiva-web-dev` publicou em `https://roteiva-web-dev.web.app` e `verify-hosting-cache.mjs` verificou cache/rotas. Nenhuma alteração em banco ou API e nenhum merge. O login Google de uma conta real permanece para homologação pelo proprietário.
+
 
 ## Homologação dos detalhes do projeto — 22/10/2026
 
