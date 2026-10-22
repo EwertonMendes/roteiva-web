@@ -10,6 +10,12 @@
 
 Esta é a fonte de verdade sobre **como o sistema deverá funcionar**. O acompanhamento do que já foi entregue fica no [roadmap](MVP-ROADMAP.md); instruções operacionais em [desenvolvimento](DEVELOPMENT.md). Mudanças de arquitetura e decisões novas devem atualizar este arquivo **no mesmo PR**, conforme [AGENTS.md](../AGENTS.md).
 
+## Contrato de componentes de formulário — seleção reutilizável (22/10/2026)
+
+**Decisão tomada (PR #85):** componentes de seleção simples do frontend utilizam `src/features/ui/AppSelect.tsx` e `AppSelect.css`, em vez de delegarem a lista interna ao `<select>` do sistema operacional. O componente recebe `<option>` como dados declarativos, suporta `value`/`onValueChange(string)` ou `defaultValue`; quando `name` é informado, um input oculto espelha o valor para leitura por `FormData`, sem emitir eventos sintéticos falsos. Os IDs, enums e números convertidos no domínio continuam responsabilidade de cada tela.
+
+A lista acessível é montada via portal no `body` para escapar do recorte em painéis e modais, mas o foco de teclado fica no trigger; `aria-controls`, `aria-activedescendant`, `role=listbox` e `role=option` expressam a seleção. Escape/Tab, rolagem, resize e redução de movimento são tratados na camada de UI. Cores e estados ficam no design system, não nas páginas. Não há nova dependência de terceiros, persistência, permissão, regra Firestore, acesso Drive ou mudança de API. Em futuros formulários que demandem validação HTML nativa `required`, assegurar validação semântica explícita antes de depender desse atributo.
+
 ## 1. Objetivo e princípios
 
 O Roteiva é um SaaS para profissionais audiovisuais que precisam gerir clientes, produções, prazos, receitas/despesas, arquivos, versões e revisões.
