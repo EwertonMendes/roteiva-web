@@ -200,6 +200,7 @@ export function AppSelect({
       {options.map((option, index) => <div
         id={`${menuId}-option-${index}`} role="option" key={`${option.value}-${index}`}
         aria-selected={option.value === current} aria-disabled={option.disabled || undefined}
+        data-value={option.value}
         className="rt-select-option" data-active={index === active || undefined}
         data-selected={option.value === current || undefined}
         title={option.text}
