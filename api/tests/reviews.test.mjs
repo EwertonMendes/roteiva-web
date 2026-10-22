@@ -43,6 +43,9 @@ test('only a matching unexpired capability reveals one review and selected files
   const result=await (await route(f,a.token)).json();
   assert.equal(result.review.title,'Corte 01');
   assert.deepEqual(result.assets.map(x=>x.fileId),[file]);
+  assert.match(result.mediaTickets[file].url,/\/reviews\/media\?ticket=/);
+  assert.ok(result.mediaTickets[file].expiresAt>Date.now());
+  assert.ok(result.mediaTickets[file].expiresAt<=Date.now()+12*60*1000);
   assert.equal(JSON.stringify(result).includes(b.token),false);
   await assert.rejects(()=>route(f,random()),e=>e.status===404);
   f.sql.prepare("UPDATE review_requests SET expires_at=0 WHERE id=?").run(a.id);

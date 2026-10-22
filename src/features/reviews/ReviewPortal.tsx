@@ -4,6 +4,7 @@ import {Check,CheckCircle2,Clock3,ExternalLink,FileAudio,FileImage,FileText,File
 import {useAuth} from "../auth/AuthProvider";
 import {useOverlayFocus} from "../drive/DriveLibraryUI";
 import {ReviewImageViewer} from "./ReviewImageViewer";
+import {ReviewMediaSessionCache,type MediaTicket} from "./review-media-cache";
 import {captureReviewPlayback,formatReviewTime,maskReviewTime,parseReviewTime,validReviewSecond} from "./review-timecode";
 import "../reviews/reviews.css";
 import "./review-portal-v2.css";
@@ -14,7 +15,7 @@ type Review={title:string;message:string;studioName:string;clientName:string;pro
 type Asset={fileId:string;name:string;mimeType:string};
 type Comment={id:string;file_id:string;author_name:string;body:string;seconds:number|null;created_at:number};
 type Decision={version:number;decision:string;author_name:string;message:string;created_at:number};
-type PublicData={review:Review;assets:Asset[];comments:Comment[];decisions:Decision[]};
+type PublicData={review:Review;assets:Asset[];comments:Comment[];decisions:Decision[];mediaTickets?:Record<string,MediaTicket>};
 type Mode="light"|"dark";
 const API="https://roteiva-api-dev.ewertonmendes9.workers.dev";
 const messages:Record<string,string>={
@@ -54,6 +55,10 @@ export function ReviewPortal({token}:{token:string}){
   const [mediaUrl,setMediaUrl]=useState(""),[mediaMode,setMediaMode]=useState<"loading"|"ready"|"error">("loading");
   const [previewError,setPreviewError]=useState("");
   const [previewRetry,setPreviewRetry]=useState(0);
+  const [mediaKey,setMediaKey]=useState("");
+  const cache=useRef<ReviewMediaSessionCache|null>(null);
+  if(!cache.current)cache.current=new ReviewMediaSessionCache();
+  const mediaCache=cache.current;
   const [playhead,setPlayhead]=useState(0),[duration,setDuration]=useState<number|null>(null);
   const [videoExpanded,setVideoExpanded]=useState(false);
   const loadedVersion=useRef(0),videoRef=useRef<HTMLVideoElement>(null),commentRef=useRef<HTMLTextAreaElement>(null);
@@ -81,6 +86,10 @@ export function ReviewPortal({token}:{token:string}){
     try{
       const value=await request<PublicData>("/reviews/public");
       const changed=loadedVersion.current!==value.review.version;
+      if(changed)mediaCache.clear();
+      for(const [fileId,ticket] of Object.entries(value.mediaTickets||{})){
+        mediaCache.rememberTicket(value.review.version+":"+fileId,ticket);
+      }
       setData(value);setSelected(current=>changed?0:Math.max(0,Math.min(current,value.assets.length-1)));
       if(changed){setMinutes("");setBody("");}
       loadedVersion.current=value.review.version;
@@ -92,8 +101,9 @@ export function ReviewPortal({token}:{token:string}){
         setError(e instanceof Error&&status!==401?e.message:"Entre com a conta Google autorizada para visualizar.");
       }else setError(e instanceof Error?e.message:"Não foi possível carregar.");
     }finally{setLoading(false);}
-  },[request]);
+  },[request,mediaCache]);
   useEffect(()=>{if(!authLoading)void reload();},[authLoading,reload]);
+  useEffect(()=>()=>mediaCache.clear(),[mediaCache,token,user?.uid]);
   useEffect(()=>{
     const robots=document.createElement("meta");robots.name="robots";robots.content="noindex, nofollow, noarchive";
     const ref=document.createElement("meta");ref.name="referrer";ref.content="no-referrer";
@@ -107,6 +117,10 @@ export function ReviewPortal({token}:{token:string}){
   const activeFileId=active?.fileId;
   const activeVersion=data?.review.version;
   const activeMime=active?.mimeType;
+  const cacheKey=activeFileId&&activeVersion?activeVersion+":"+activeFileId:"";
+  const inMemoryImage=activeMime?.startsWith("image/")&&cacheKey?mediaCache.get(cacheKey):null;
+  const previewMode=inMemoryImage?"ready":mediaKey===cacheKey?mediaMode:"loading";
+  const previewUrl=inMemoryImage||(mediaKey===cacheKey?mediaUrl:"");
   useEffect(()=>{
     let alive=true;
     let renewal:ReturnType<typeof setTimeout>|undefined;
@@ -116,33 +130,38 @@ export function ReviewPortal({token}:{token:string}){
         playbackResume.current={at:videoRef.current.currentTime,playing:!videoRef.current.paused};
       }
       try{
-        const ticket=await request<{url:string;expiresAt:number}>("/reviews/public/media-ticket","POST",
-          {fileId:activeFileId,version:activeVersion});
-        if(!alive)return;
+        const ticket=await mediaCache.ticket(cacheKey,()=>request<MediaTicket>("/reviews/public/media-ticket","POST",
+          {fileId:activeFileId,version:activeVersion}));
         if(!ticket.url.startsWith(API+"/reviews/media?ticket="))
           throw new Error("Endereço de mídia inválido.");
-        setMediaUrl(ticket.url);setMediaMode("ready");setPreviewError("");
+        const url=activeMime?.startsWith("image/")?
+          await mediaCache.image(cacheKey,ticket.url,activeMime):ticket.url;
+        if(!alive)return;
+        setMediaUrl(url);setMediaMode("ready");setPreviewError("");
         if(isVideo){
           const delay=Math.max(30000,Math.min(9*60000,ticket.expiresAt-Date.now()-120000));
           renewal=setTimeout(()=>void issue(true),delay);
         }
       }catch(e){
         if(!alive)return;
-        // Keep an already playing video visible after a transient renewal failure.
         if(!refresh){setMediaMode("error");setPreviewError(e instanceof Error?e.message:"Não foi possível carregar.");}
         else renewal=setTimeout(()=>void issue(true),30000);
       }
     };
-    setMediaMode("loading");setMediaUrl("");setPreviewError("");setPlayhead(0);setDuration(null);
+    setMediaKey(cacheKey);setPreviewError("");setPlayhead(0);setDuration(null);
     setVideoExpanded(false);playbackResume.current={at:0,playing:false};
     if(activeFileId&&activeVersion&&activeMime){
       const supported=/^(image|video|audio)\//.test(activeMime)||activeMime==="application/pdf";
-      if(!supported){setMediaMode("error");setPreviewError(messages.review_media_unsupported);}
-      else void issue();
+      if(!supported){setMediaUrl("");setMediaMode("error");setPreviewError(messages.review_media_unsupported);}
+      else{
+        const existing=activeMime.startsWith("image/")?mediaCache.get(cacheKey):null;
+        if(existing){setMediaUrl(existing);setMediaMode("ready");}
+        else{setMediaMode("loading");setMediaUrl("");void issue();}
+      }
     }
     return()=>{alive=false;if(renewal)clearTimeout(renewal);};
-  },[activeFileId,activeVersion,activeMime,isVideo,request,previewRetry]);
-  const playableVideo=isVideo&&mediaMode==="ready";
+  },[activeFileId,activeVersion,activeMime,isVideo,request,previewRetry,mediaCache,cacheKey]);
+  const playableVideo=isVideo&&previewMode==="ready";
   useEffect(()=>{
     if(!videoExpanded)return;
     const prev=document.body.style.overflow;
@@ -231,12 +250,12 @@ export function ReviewPortal({token}:{token:string}){
                 (active?.mimeType.startsWith("image/")?" is-image":"")+
                 (playableVideo?" is-playable-video":"")+
                 (videoExpanded?" is-video-expanded":"")}>
-                {mediaMode==="loading"&&<div className="review-media-state review-private-preview-state" role="status">
+                {previewMode==="loading"&&<div className="review-media-state review-private-preview-state" role="status">
                   <LoaderCircle className="rl-spin" size={25}/>
                   "Preparando visualização segura…"
                 </div>}
                 {playableVideo&&<video ref={videoRef} key={activeFileId}
-                  controls playsInline preload="metadata" src={mediaUrl} aria-label={"Reproduzir "+active?.name}
+                  controls playsInline preload="metadata" src={previewUrl} aria-label={"Reproduzir "+active?.name}
                   onTimeUpdate={e=>setPlayhead(e.currentTarget.currentTime)}
                   onLoadedMetadata={e=>{
                     const player=e.currentTarget;
@@ -251,16 +270,16 @@ export function ReviewPortal({token}:{token:string}){
                   title={videoExpanded?"Fechar vídeo ampliado":"Ampliar vídeo"}
                   aria-label={videoExpanded?"Fechar vídeo ampliado":"Ampliar vídeo"}
                   onClick={()=>setVideoExpanded(v=>!v)}>{videoExpanded?"Fechar tela cheia":"Ampliar vídeo"}</button>}
-                {active&&mediaMode==="ready"&&!isVideo&&active.mimeType.startsWith("image/")&&
-                  <ReviewImageViewer key={active.fileId} src={mediaUrl} name={active.name}
+                {active&&previewMode==="ready"&&!isVideo&&active.mimeType.startsWith("image/")&&
+                  <ReviewImageViewer key={active.fileId} src={previewUrl} name={active.name}
                     onError={()=>{setPreviewError("O navegador não conseguiu exibir esta imagem. Peça ao profissional uma versão compatível.");setMediaMode("error");}}/>}
-                {active&&mediaMode==="ready"&&active.mimeType==="application/pdf"&&
-                  <iframe className="review-private-preview-pdf" src={mediaUrl}
+                {active&&previewMode==="ready"&&active.mimeType==="application/pdf"&&
+                  <iframe className="review-private-preview-pdf" src={previewUrl}
                     title={"Prévia PDF de "+active.name} sandbox="allow-scripts allow-downloads"/>}
-                {active&&mediaMode==="ready"&&active.mimeType.startsWith("audio/")&&
-                  <div className="review-private-preview-audio"><FileAudio size={32}/><audio controls src={mediaUrl}
+                {active&&previewMode==="ready"&&active.mimeType.startsWith("audio/")&&
+                  <div className="review-private-preview-audio"><FileAudio size={32}/><audio controls src={previewUrl}
                     onError={()=>{setPreviewError("Este áudio não pôde ser reproduzido. Peça ao profissional uma versão compatível.");setMediaMode("error");}}/></div>}
-                {mediaMode==="error"&&<div className="review-private-preview-error" role="alert">
+                {previewMode==="error"&&<div className="review-private-preview-error" role="alert">
                   <FileImage size={26}/><strong>Não foi possível mostrar a prévia</strong>
                   <p>{previewError}</p>
                   <button type="button" onClick={()=>setPreviewRetry(n=>n+1)}>Tentar novamente</button>
@@ -269,8 +288,8 @@ export function ReviewPortal({token}:{token:string}){
               </div>
               <div className="review-portal-stage-footer">
                 <div><strong>{active?.name}</strong><small>{playableVideo?"Player com marcação de instantes":"Visualização segura no Roteiva"}</small></div>
-                {active&&active.mimeType==="application/pdf"&&mediaMode==="ready"&&
-                  <a href={mediaUrl} target="_blank" rel="noopener noreferrer">
+                {active&&active.mimeType==="application/pdf"&&previewMode==="ready"&&
+                  <a href={previewUrl} target="_blank" rel="noopener noreferrer">
                     <ExternalLink size={15}/> Abrir PDF em outra aba</a>}
                 {active&&data.review.driveShareEnabled&&<a href={reviewFileURL(active.fileId)} target="_blank" rel="noreferrer">
                   <ExternalLink size={15}/> Abrir no Drive</a>}
