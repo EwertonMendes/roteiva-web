@@ -9,7 +9,7 @@ async function register(page:Page,email:string){
  await page.locator('.heading-actions').getByRole('button',{name:'Criar projeto',exact:true}).click();await page.getByLabel('Nome do projeto',{exact:true}).fill('Campanha com capa');await page.locator('form.project-modal').getByRole('button',{name:'Criar projeto',exact:true}).click();await expect(page.locator('form.project-modal')).toHaveCount(0);await expect(page.locator('[aria-busy]').first()).toHaveAttribute('aria-busy','false');await page.goto(base+'/projetos');await expect(page.locator('.pc-card')).toHaveCount(1);
 }
 test('project covers require Drive, persist crop, cancel safely and support removal',async({page},info)=>{
- const connectionId='aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa';let connected=false;
+ const connectionId='aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa';let activeConnectionId=connectionId;let connected=false;
  let png=Buffer.alloc(0);
  await page.route('https://roteiva-api-dev.ewertonmendes9.workers.dev/integrations/drive**',async route=>{
   const path=new URL(route.request().url()).pathname;
@@ -17,7 +17,7 @@ test('project covers require Drive, persist crop, cancel safely and support remo
   if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
   if(path.endsWith('/cover'))return route.fulfill({status:200,headers,contentType:'image/png',body:png});
   if(path.endsWith('/cover-images'))return route.fulfill({headers,json:{files:[{id:'photo_123456789',name:'Campanha.png',mimeType:'image/png'}],nextPageToken:null}});
-  return route.fulfill({headers,json:{connections:connected?[{id:connectionId,google_email:'qa@example.com',status:'connected',scopes:'https://www.googleapis.com/auth/drive.readonly'}]:[]}});
+  return route.fulfill({headers,json:{connections:connected?[{id:activeConnectionId,google_email:'qa@example.com',status:'connected',scopes:'https://www.googleapis.com/auth/drive.readonly'}]:[]}});
  });
  await register(page,'cover-'+info.project.name+'@example.com');
  await expect(page.getByRole('button',{name:'Adicionar capa',exact:true})).toHaveCount(0);await expect(page.locator('.pc-photo')).toHaveCount(0);
@@ -32,6 +32,7 @@ test('project covers require Drive, persist crop, cancel safely and support remo
  await page.screenshot({path:info.outputPath('cover-editor.png')});await page.getByRole('button',{name:'Salvar capa',exact:true}).click();await expect(page.locator('.pc-photo img')).toBeVisible();await expect(page.locator('[aria-busy="true"]')).toHaveCount(0);await expect(page.getByText('Alteração preparada · confira a confirmação na nuvem',{exact:true})).toHaveCount(0);await page.screenshot({path:info.outputPath('projects-cover.png'),fullPage:true});
  await page.reload();await page.getByRole('button',{name:'Editar capa',exact:true}).click();await expect(zoom).toHaveValue('1.5');await expect(page.getByRole('slider',{name:'Posição horizontal'})).toHaveValue('25');await expect(page.getByRole('slider',{name:'Posição vertical'})).toHaveValue('75');
  await zoom.fill('2');await page.getByRole('button',{name:'Cancelar',exact:true}).click();await page.getByRole('button',{name:'Editar capa',exact:true}).click();await expect(zoom).toHaveValue('1.5');
+ await page.getByRole('button',{name:'Cancelar',exact:true}).click();activeConnectionId='bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb';await page.reload();await expect(page.locator('.pc-photo')).toHaveCount(0);await page.getByRole('button',{name:'Editar capa',exact:true}).click();await expect(page.getByRole('heading',{name:'Escolha uma imagem',exact:true})).toBeVisible();await page.getByRole('button',{name:'Campanha.png',exact:true}).click();await expect(page.locator('.pc-editor-preview img')).toBeVisible();await page.getByRole('button',{name:'Salvar capa',exact:true}).click();await expect(page.locator('[aria-busy="true"]')).toHaveCount(0);await page.getByRole('button',{name:'Editar capa',exact:true}).click();
  await page.getByRole('button',{name:'Remover capa',exact:true}).click();await expect(page.locator('.pc-photo')).toHaveCount(0);await expect(page.getByRole('button',{name:'Adicionar capa',exact:true})).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth)).toBeLessThanOrEqual(2);
 });

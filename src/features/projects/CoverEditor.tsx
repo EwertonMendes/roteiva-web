@@ -11,9 +11,10 @@ type Page={files:DriveItem[];nextPageToken:string|null;incompleteSearch?:boolean
 export function CoverEditor({project,onClose,onSave}:{project:Project;onClose:()=>void;onSave:(cover:ProjectCover|undefined)=>void}){
  const context=useDriveCovers()!;const call=useDriveApi();const getThumbnail=useDriveThumbnailFetch();
  const dialog=useRef<HTMLDialogElement>(null);
- const [account,setAccount]=useState(project.cover?.connectionId||context.connections[0]?.id||'');
+ const existingConnection=context.connections.some(c=>c.id===project.cover?.connectionId);
+ const [account,setAccount]=useState(existingConnection?project.cover!.connectionId:context.connections[0]?.id||'');
  const [cover,setCover]=useState<ProjectCover|undefined>(project.cover);
- const [choosing,setChoosing]=useState(!project.cover);
+ const [choosing,setChoosing]=useState(!project.cover||!existingConnection);
  const [search,setSearch]=useState('');const [term,setTerm]=useState('');
  const [page,setPage]=useState<Page>({files:[],nextPageToken:null});const [busy,setBusy]=useState(false),[error,setError]=useState('');
  const [moreToken,setMoreToken]=useState('');const [retry,setRetry]=useState(0);const {src,error:imageError}=useCoverImage(cover);
