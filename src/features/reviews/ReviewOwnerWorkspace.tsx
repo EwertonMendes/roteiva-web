@@ -115,7 +115,10 @@ export function ReviewOwnerWorkspace({detail,working,onClose,onRevise,onPublish,
       </section>
       {review.mode==="google"&&detail.participants&&detail.participants.length>0&&
         <section className="rowner-participants" aria-label="Participantes autorizados">
-          <h3>Contas Google autorizadas</h3>
+          <h3>Participantes autorizados</h3>
+          <p>{review.driveShareEnabled
+            ?"Estes participantes também receberam permissão de leitura diretamente no Google Drive."
+            :"Acesso restrito ao portal Roteiva. Nenhuma permissão adicional foi criada no Google Drive."}</p>
           <p>{detail.participants.filter(p=>p.role==="reviewer"&&detail.votes?.some(v=>v.email===p.email&&v.version===review.version&&v.decision==="approved")).length}
             {" de "}{detail.participants.filter(p=>p.role==="reviewer").length} revisores aprovaram esta versão.</p>
           <div>{detail.participants.map(participant=>{
