@@ -20,7 +20,11 @@ export interface Env {
 export class ApiError extends Error {
   status: number;
   code: string;
-  constructor(status: number, code: string) { super(code); this.status=status; this.code=code; }
+  // Safe, owner-scoped diagnostic added only after a selected review asset fails.
+  asset?: { fileId: string; fileName?: string };
+  constructor(status: number, code: string, asset?: { fileId: string; fileName?: string }) {
+    super(code); this.status=status; this.code=code; this.asset=asset;
+  }
 }
 export interface Connection {
   id: string;
