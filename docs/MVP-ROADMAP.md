@@ -1,5 +1,9 @@
 # Roadmap vivo — Roteiva MVP
 
+## Cursor personalizado sobre selects e modais — 22/10/2026
+
+**IMPLEMENTADO na PR #85; aceite visual do proprietário em DEV pendente.** O cursor decorativo do Roteiva foi mantido, recebeu prioridade de camada superior aos popovers do `AppSelect` e portal para o diálogo nativo ativo, evitando desaparecer atrás do menu ou da top layer. `pointer-events:none` preserva os cliques; campos de texto, vídeos e o editor de capas com `data-native-cursor` continuam usando o cursor do sistema, bem como dispositivos touch e preferência por movimento reduzido. Teste em `tests/browser/cursor-layer.spec.ts` valida dropdown, seleção com clique, posicionamento no modal e retorno à página; integrações e dados não mudam. Após CI e QA, publicar apenas Hosting no DEV principal para validação.
+
 ## Select acessível e reutilizável — 22/10/2026
 
 **VALIDADO AUTOMATICAMENTE E PUBLICADO NO HOSTING DEV PRINCIPAL em 22/10/2026 pela PR [#85](https://github.com/EwertonMendes/roteiva-web/pull/85), com homologação visual/autenticação Google real ainda pendente.** Sem merge; o frontend de master não é alterado. Componente `src/features/ui/AppSelect.tsx` e `AppSelect.css`, migrados filtros financeiros, formulários de projeto/receita/agenda, Biblioteca/Drive, aprovações e Configurações. Menus de opções seguem os temas e não dependem da aparência nativa do sistema.
