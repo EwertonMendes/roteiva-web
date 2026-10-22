@@ -85,7 +85,7 @@ export function AppSelect({
     if (disabled) setOpen(false);
   }, [disabled]);
 
-  // The floating list lives at document level so panels and dialogs cannot clip it.
+  // Portal to the active native dialog (top layer) when present; otherwise body.\n  // Keeping the popup inside a native dialog ensures it is visible above its backdrop.
   useLayoutEffect(() => {
     if (!open) return;
     const align = () => {
@@ -209,6 +209,6 @@ export function AppSelect({
         onMouseDown={event => event.preventDefault()}
         onClick={() => commit(index)}
       ><span className="rt-select-option-label">{option.label}</span>{option.value === current && <Check size={16} aria-hidden="true" className="rt-select-check"/>}</div>)}
-    </div>, document.body)}
+    </div>, triggerRef.current?.closest("dialog[open]") ?? document.body)}
   </div>;
 }
