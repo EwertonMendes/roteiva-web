@@ -435,10 +435,25 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
               </select></label>
             </>}
             {chosenClient&&!relevantProjects.length&&<p className="reviews-muted">Este cliente ainda não possui projetos vinculados.</p>}
-          </div>
-          <h3>Arquivos do Google Drive <span>({files.length}/8)</span></h3>
+          </div>}
+           {(replacement||composerStep==="materials")&&<>
+           {!replacement&&<div className="review-composer-context">
+             <div>
+               <small>{chosenClient?.name} · {chosenProject?.name}</small>
+               <strong>{title}</strong>
+               <span>{mode==="google"?"Somente participantes com Google":"Acesso por link"} · {days} dias</span>
+             </div>
+             <button type="button" className="secondary-button" onClick={()=>{setComposerStep("details");setError("");composerBodyRef.current?.scrollTo({top:0});}}>
+               Editar configuração
+             </button>
+           </div>}
+           <div className="review-materials-heading">
+             <h3>Arquivos do Google Drive <span>({files.length}/8)</span></h3>
+             <p>Escolha pelo menos um arquivo. Você pode selecionar até 8 imagens, vídeos, áudios ou PDFs.</p>
+           </div>
           {!projectId?<p className="reviews-muted">Selecione um projeto para explorar os arquivos vinculados.</p>:
-          !links.length?<div className="reviews-empty"><Folder size={26}/><p>Este projeto ainda não possui pastas vinculadas.</p>
+           linksLoading?<p className="reviews-muted" role="status"><LoaderCircle size={16} className="rl-spin"/> Carregando pastas do projeto…</p>:
+           !links.length?<div className="reviews-empty"><Folder size={26}/><p>Este projeto ainda não possui pastas vinculadas.</p>
             <button className="secondary-button" onClick={()=>{resetComposer();onLibrary();}}>Vincular pasta na Biblioteca</button></div>:
           <>
             <div className="review-folder-tabs">{links.map(l=><button type="button" key={l.id} className={selectedFolder?.id===l.id?"active":""}
@@ -516,10 +531,31 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
             {files.map(f=><div key={f.fileId}><Check size={14}/><span>{f.name}</span>
               <button onClick={()=>setFiles(x=>x.filter(a=>a.fileId!==f.fileId))} aria-label={"Remover "+f.name}><X size={15}/></button></div>)}</div>}
           <p className="reviews-muted">Os envios usam a mesma fila segura da Biblioteca. Aguarde a confirmação do Google Drive antes de compartilhar.</p>
-        </div>
-        <footer><button className="secondary-button" onClick={resetComposer}>Cancelar</button>
-          <button className="primary-button" disabled={working||pendingUploads.length>0||!files.length||!projectId||!clientId||(!replacement&&!title.trim())||(!replacement&&mode==="google"&&!recipient.includes("@"))}
-            onClick={()=>void submit()}>{working?"Preparando…":replacement?"Enviar nova versão":"Gerar aprovação"} <Send size={16}/></button></footer>
+           </>}
+         </div>
+        <footer className="review-composer-footer">
+           <div className="review-composer-footnote" role="status">
+             {replacement?
+               (pendingUploads.length?"Aguarde a conclusão dos envios.":files.length?"Nova versão pronta para enviar.":"Selecione pelo menos um arquivo para esta versão."):
+               composerStep==="details"?
+                 (missingDetails.length?missingDetails[0]:"Configuração pronta. Avance para selecionar arquivos."):
+                 pendingUploads.length?"Aguarde a conclusão dos envios ao Drive.":
+                 files.length?`${files.length} material(is) selecionado(s) · pronto para gerar.`:"Selecione pelo menos um arquivo para gerar a aprovação."}
+           </div>
+           <div className="review-composer-actions">
+             {!replacement&&composerStep==="materials"?
+               <button className="secondary-button" disabled={working} onClick={()=>{setComposerStep("details");setError("");composerBodyRef.current?.scrollTo({top:0});}}>
+                 <ChevronLeft size={16}/> Voltar
+               </button>:
+               <button className="secondary-button" disabled={working} onClick={resetComposer}>Cancelar</button>}
+             {!replacement&&composerStep==="details"?
+               <button className="primary-button" disabled={working} onClick={goToMaterials}>
+                 Selecionar materiais <ChevronRight size={16}/>
+               </button>:
+               <button className="primary-button" disabled={working||pendingUploads.length>0||!files.length}
+                 onClick={()=>void submit()}>{working?"Preparando…":replacement?"Enviar nova versão":"Gerar aprovação"} <Send size={16}/></button>}
+           </div>
+         </footer>
       </section>
     </div>,document.body)}
   </div>;
