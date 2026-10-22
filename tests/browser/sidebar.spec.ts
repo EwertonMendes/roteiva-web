@@ -18,9 +18,11 @@ test('sidebar unifies routes, preserves the brand colors and moves appearance in
  await page.getByRole('button',{name:'Opções da conta',exact:true}).click();await page.getByRole('button',{name:'Ativar modo escuro',exact:true}).click();
  await expect(page.locator('html')).toHaveAttribute('data-theme','dark');await expect(logo).toHaveAttribute('src','/roteiva-logo-white.png');expect(await logo.evaluate(el=>getComputedStyle(el).filter)).toBe('none');
  await expect(menu).toBeVisible();await expect(page.getByRole('button',{name:'Ativar modo claro',exact:true})).toBeFocused();
+ await expect(page.locator('.toast')).toHaveCount(0);
  await page.screenshot({path:info.outputPath('sidebar-dark.png')});
  await page.getByRole('button',{name:'Ativar modo claro',exact:true}).click();await expect(menu).toBeVisible();
  await expect(page.locator('html')).toHaveAttribute('data-theme','light');
+ await expect(page.locator('.toast')).toHaveCount(0);
  await sidebar.getByText('ESPAÇO DE TRABALHO',{exact:true}).click();await expect(menu).toHaveCount(0);
  if(info.project.name==='mobile')await page.getByRole('button',{name:'Fechar menu',exact:true}).first().click();
  await page.getByRole('button',{name:'Ver histórico completo'}).click();await expect(page.getByRole('dialog',{name:'Histórico de atividades'})).toBeVisible();await page.keyboard.press('Escape');

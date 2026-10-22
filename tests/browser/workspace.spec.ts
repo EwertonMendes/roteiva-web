@@ -113,6 +113,14 @@ test("Google emulator session, CRUD, restoration, themes and separate users",asy
   if(info.project.name==="mobile")await page.getByRole("button",{name:"Abrir menu",exact:true}).click();
   await page.getByRole("button",{name:"Opções da conta",exact:true}).click();
   await page.getByRole("button",{name:"Ativar modo escuro",exact:true}).click();await settled(page);
+  const accountMenu=page.getByRole("group",{name:"Opções da conta",exact:true});
+  await expect(accountMenu).toBeVisible();
+  await expect(page.getByRole("button",{name:"Ativar modo claro",exact:true})).toBeFocused();
+  await expect(page.locator(".toast")).toHaveCount(0);
+  await page.getByRole("button",{name:"Ativar modo claro",exact:true}).click();await settled(page);
+  await expect(accountMenu).toBeVisible();await expect(page.locator("html")).toHaveAttribute("data-theme","light");
+  await page.getByRole("button",{name:"Ativar modo escuro",exact:true}).click();await settled(page);
+  await expect(accountMenu).toBeVisible();await expect(page.locator(".toast")).toHaveCount(0);
   await page.reload();await expect(page.locator(".app-shell")).toBeVisible();await settled(page);
   await expect(page.locator("html")).toHaveAttribute("data-theme","dark");
   await navigate(page,"Financeiro");

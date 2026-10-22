@@ -28,6 +28,7 @@ export function FirebaseWorkspace() {
   const [error,setError]=useState("");
   const [failedWrite,setFailedWrite]=useState(false);
   const [saving,setSaving]=useState(false);
+  const [blockingWrites,setBlockingWrites]=useState(false);
   const [status,setStatus]=useState("Dados na nuvem");
   const [version,setVersion]=useState(0);
   const [remoteChanges,setRemoteChanges]=useState(false);
@@ -36,6 +37,7 @@ export function FirebaseWorkspace() {
   const scopeRequest=useRef(0);
   const queue=useRef(Promise.resolve());
   const pending=useRef(0);
+  const pendingBlocking=useRef(0);
   const failed=useRef(false);
   const automaticAttempts=useRef(0);
   useEffect(()=>{
@@ -306,8 +308,9 @@ export function FirebaseWorkspace() {
     window.addEventListener("beforeunload",warn);
     return ()=>window.removeEventListener("beforeunload",warn);
   },[saving]);
-  const enqueue=useCallback((operation:()=>Promise<unknown>)=>{
+  const enqueue=useCallback((operation:()=>Promise<unknown>,{blocksInteraction=true}={})=>{
     pending.current++;
+    if(blocksInteraction){pendingBlocking.current++;setBlockingWrites(true);}
     setSaving(true); setStatus("Salvando na nuvem…");
     queue.current=queue.current.then(async()=>{
       if (failed.current) return;
@@ -315,9 +318,14 @@ export function FirebaseWorkspace() {
       setStatus("Salvo na nuvem");
     }).catch(reason=>{
       failed.current=true;setFailedWrite(true);setError(dataErrorMessage(reason));setStatus("Alterações não confirmadas");
-    }).finally(()=>{pending.current--;if(!pending.current)setSaving(false);});
+    }).finally(()=>{
+      pending.current--;if(!pending.current)setSaving(false);
+      if(blocksInteraction){pendingBlocking.current--;if(!pendingBlocking.current)setBlockingWrites(false);}
+    });
   },[]);
-  const saveTheme=useCallback((theme:"light"|"dark")=>enqueue(()=>repository.saveTheme(theme)),[repository,enqueue]);
+  // Theme changes share the write queue and error handling, but must not make
+  // the focused account menu inert while the preference is being persisted.
+  const saveTheme=useCallback((theme:"light"|"dark")=>enqueue(()=>repository.saveTheme(theme),{blocksInteraction:false}),[repository,enqueue]);
   const executeCommands=useCallback((commands:readonly WorkspaceCommand[])=>enqueue(async()=>{
     const parsed=financePeriod?.split("-")||[];
     const year=Number(parsed[0]),clientId=Number(parsed[2])||undefined;
@@ -336,7 +344,7 @@ export function FirebaseWorkspace() {
   }),[repository,enqueue,financePeriod,financeBars]);
   if (!user) return null;
   return <>
-    {saving && <div className="cloud-operation" role="status">Salvando na nuvem…</div>}
+    {blockingWrites && <div className="cloud-operation" role="status">Salvando na nuvem…</div>}
     {authError && <p className="cloud-banner" role="alert">{authError}</p>}
     {remoteChanges && !error && <section className="cloud-recovery" role="status">
       <h2>Há alterações em outro dispositivo</h2>
@@ -380,7 +388,7 @@ export function FirebaseWorkspace() {
           cashBalance:repository.hasLoaded(["financeEntries"])?undefined:overviewMetrics.cashBalance,
           projectCount:repository.hasLoaded(["projects"])?undefined:overviewMetrics.projectCount,
           projectStatuses:repository.hasLoaded(["projects"])?undefined:overviewMetrics.projectStatuses,
-        } : undefined} cloudStatus={status} saving={saving} onLogout={()=>void logout()} />
+        } : undefined} cloudStatus={status} saving={blockingWrites} onLogout={()=>void logout()} />
     </div>}
   </>;
 }
