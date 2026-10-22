@@ -2,10 +2,12 @@
 
 ## Restrição de download direto nas páginas de aprovação — 22/10/2026
 
-**IMPLEMENTADO no PR [#86](https://github.com/EwertonMendes/roteiva-web/pull/86), aguardando homologação DEV:** comportamento existente de revisão não deve mudar visualmente. Retirados atalhos de download/abertura original de PDF na própria página, permissão de download do `iframe`, controles nativos de download e menu contextual dos materiais. Worker recusa navegação direta comum ao ticket e mantém validação de acesso por token/revisão e participante Google. Testes de navegador e de backend cobrem as restrições. O recurso não cria ACLs Drive nem altera permissões existentes.
+**IMPLEMENTADO no PR [#86](https://github.com/EwertonMendes/roteiva-web/pull/86). Frontend publicado em DEV para homologação; Worker validado em CI, porém não publicado (ambiente protegido permite somente master).** comportamento existente de revisão não deve mudar visualmente. Retirados atalhos de download/abertura original de PDF na própria página, permissão de download do `iframe`, controles nativos de download e menu contextual dos materiais. Worker recusa navegação direta comum ao ticket e mantém validação de acesso por token/revisão e participante Google. Testes de navegador e de backend cobrem as restrições. O recurso não cria ACLs Drive nem altera permissões existentes.
 
 - [ ] Executar testes de imagem/PDF/vídeo no Chromium desktop/mobile e unitários de segurança do Worker.
-- [ ] Publicar em DEV, sem merge, somente após validação e homologar o visualizador.
+- [x] Publicar apenas frontend em DEV principal, sem merge, após CI verde.
+- [ ] Publicar Worker DEV somente após merge aprovado na master, devido ao bloqueio de branch imposto pelo ambiente protegido do GitHub. Sem alterações em D1 ou Worker neste PR antes disso.
+- [ ] Homologar a experiência real do visualizador após release completo.
 - [ ] **Fase necessária para não entregar cópias do arquivo original:** serviço de prévias derivadas para vídeo/imagem/áudio/PDF com limitação de resolução/qualidade, opcional identificação visual, original privado exclusivamente no Drive. Estudar custo e compatibilidade antes de implementar. Mesmo derivados podem ser capturados pelo receptor. Não declarar "impede F12": tecnicamente impossível no navegador.
 
 
