@@ -1,11 +1,8 @@
 # Desenvolvimento e deploy — Roteiva
 
-## Homologação manual do Worker da PR de restrição de prévias (22/10/2026)
+## Proteção de prévias — deploy do Worker (22/10/2026)
 
-O workflow `.github/workflows/api.yml` permite publicar manualmente no DEV, mediante `workflow_dispatch` e `ref` de branch do próprio repositório, **somente** quando existe PR aberto, com base em master e SHA idêntico ao HEAD. O guard confirma Cloudflare Account/D1 DEV e bloqueia mudanças de migrations, bindings Wrangler ou dependências na promoção manual. Testes, typecheck, migration local e bundle continuam obrigatórios. Apenas em deploys da `master` executa migrations remotas; branches manuais não podem alterar a estrutura do banco. Os checks existentes de schema, secrets, health e acesso sem autenticação continuam. A proteção de branch do environment `cloudflare-development` permanece soberana: se não permitir deploys de PR, a execução será bloqueada, sem contornar controles.
-
-O frontend continua publicado apenas via Hosting DEV, em workflow independente. Não publicar Worker de branch sem concluir testes; não aplicar migrations remotas nem manipular registros da revisão. Se o Worker DEV não puder ser promovido manualmente, o fluxo deve ser reportado como parcial até integração aprovada na `master`.
-
+O workflow `.github/workflows/api.yml` e o ambiente `cloudflare-development` restringem o deploy do Worker à branch `master`. A validação em PR executa testes, typecheck e build, mas não publica código. A tentativa de promoção manual do PR #86 foi negada pela proteção do ambiente antes de executar a publicação. O guard manual experimental foi revertido; nenhum Worker DEV ou dado D1 foi alterado por ela. Publicação futura do código de mídia depende de merge aprovado e do pipeline normal da master, seguido de smoke tests.
 
 ## Homologação manual de um PR no Hosting DEV (22/10/2026)
 
