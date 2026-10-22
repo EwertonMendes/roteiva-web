@@ -154,10 +154,23 @@ test('profissional cria, cliente comenta/pede ajustes, V2 aprovada e encerrament
   await page.goto(root+'/aprovacoes');
   await page.getByRole('button',{name:'Nova aprovação',exact:true}).click();
   const composer=page.getByRole('dialog',{name:'Enviar materiais para aprovação'});
+  await expect(composer.getByText('Selecione um cliente.',{exact:true})).toBeVisible();
+  await composer.getByRole('button',{name:'Selecionar materiais'}).click();
+  await expect(composer.getByRole('alert')).toContainText('Selecione um cliente.');
   await composer.getByRole('combobox',{name:'Cliente',exact:true}).selectOption({label:'Cliente Revisão'});
   await composer.getByRole('combobox',{name:'Projeto',exact:true}).selectOption({label:'Projeto Revisão'});
   await composer.getByLabel('Título da aprovação').fill('Corte para revisão');
-  await composer.getByRole('button',{name:'Materiais autorizados'}).click();
+  await composer.getByRole('combobox',{name:'Tipo de acesso'}).selectOption('google');
+  const directAccess=composer.getByRole('checkbox',{name:/Permitir abrir também pelo Google Drive/});
+  await expect(directAccess).not.toBeChecked();
+  await directAccess.check();
+  const removePublic=composer.getByRole('checkbox',{name:/Remover acesso público existente no Drive/});
+  await expect(removePublic).toBeVisible();
+  await expect(removePublic).not.toBeChecked();
+  await composer.getByRole('combobox',{name:'Tipo de acesso'}).selectOption('link');
+  await expect(removePublic).toHaveCount(0);
+  await composer.getByRole('button',{name:'Selecionar materiais'}).click();
+  await expect(composer.locator('.review-folder-tabs button.active')).toHaveText('Materiais autorizados');
   await expect(composer.getByRole('link',{name:'Abrir pasta no Drive'})).toHaveAttribute(
     'href','https://drive.google.com/drive/folders/'+folder);
   await expect(composer.getByRole('link',{name:'Abrir Corte final.mp4 no Google Drive'}))
@@ -205,7 +218,7 @@ test('profissional cria, cliente comenta/pede ajustes, V2 aprovada e encerrament
   await expect(ownerDetail.locator('iframe[title="Prévia de Corte.mp4"]')).toHaveCount(1);
   await page.screenshot({path:info.outputPath('professional-contextual-feedback.png'),fullPage:true});
   await page.getByRole('button',{name:'Enviar nova versão',exact:true}).click();
-  await composer.getByRole('button',{name:'Materiais autorizados'}).click();
+  await expect(composer.locator('.review-folder-tabs button.active')).toHaveText('Materiais autorizados');
   await composer.getByText('Corte final.mp4',{exact:true}).click();
   await composer.getByRole('button',{name:'Enviar nova versão',exact:true}).click();
   await expect(page.getByLabel('Link da revisão')).toBeVisible();

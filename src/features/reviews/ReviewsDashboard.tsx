@@ -1,6 +1,6 @@
 import {useCallback,useEffect,useMemo,useRef,useState} from "react";
 import {createPortal} from "react-dom";
-import {Check,ChevronLeft,ChevronRight,ExternalLink,Folder,LoaderCircle,Plus,Search,Send,ShieldCheck,X} from "lucide-react";
+import {AlertTriangle,Check,ChevronLeft,ChevronRight,ExternalLink,Folder,LoaderCircle,Plus,Search,Send,ShieldCheck,X} from "lucide-react";
 import type {Client,Project} from "../../domain/workspace";
 import {useAuth} from "../auth/AuthProvider";
 import {useDriveApi} from "../drive/drive-api";
@@ -17,6 +17,8 @@ import {statusText,type Mode,type Review,type Detail} from "./review-model";
 
 type Selection={fileId:string;connectionId:string;linkedFolderId:string;name:string;mimeType:string};
 const supported=(file:DriveItem)=>/^(video|image|audio)\//.test(file.mimeType)||file.mimeType==="application/pdf";
+const splitEmails=(raw:string)=>raw.split(/[\n,;]+/).map(v=>v.trim().toLowerCase()).filter(Boolean);
+const validEmail=(value:string)=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 export function ReviewsDashboard({clients,projects,studioName,onLibrary,startProjectId,startClientId}:{
   clients:Client[];projects:Project[];studioName:string;onLibrary:()=>void;startProjectId?:number;startClientId?:number
 }){
@@ -29,12 +31,15 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
   const [loading,setLoading]=useState(true),[working,setWorking]=useState(false),[error,setError]=useState("");
   const [opened,setOpened]=useState<Detail|null>(null);
   const [composer,setComposer]=useState(false),[replacement,setReplacement]=useState<string|null>(null);
+  const [composerStep,setComposerStep]=useState<"details"|"materials">("details");
+  const composerBodyRef=useRef<HTMLDivElement>(null);
   const [clientId,setClientId]=useState(startClientId||0),[projectId,setProjectId]=useState(startProjectId||0);
   const [title,setTitle]=useState(""),[message,setMessage]=useState("");
   const [mode,setMode]=useState<Mode>("link"),[recipient,setRecipient]=useState("");
   const [viewers,setViewers]=useState(""),[restrictPublic,setRestrictPublic]=useState(false);
   const [shareDirect,setShareDirect]=useState(false);
   const [days,setDays]=useState(14),[links,setLinks]=useState<DriveFolderLink[]>([]);
+  const [linksLoading,setLinksLoading]=useState(false);
   const [selectedFolder,setSelectedFolder]=useState<DriveFolderLink|null>(null);
   const [trail,setTrail]=useState<{id:string;name:string}[]>([]);
   const [items,setItems]=useState<DriveItem[]>([]);
@@ -78,12 +83,14 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
   const relevantProjects=useMemo(()=>clientId?projects.filter(p=>p.clientId===clientId):projects,[clientId,projects]);
   useEffect(()=>{
     browseSequence.current++;searchSequence.current++;setFileSearch("");setRemote(null);setSearchBusy(false);
-    setSelectedFolder(null);setItems([]);setTrail([]);setNextToken(null);setFolderBusy(false);
-    if(!user||!projectId||!composer){setLinks([]);return;}
+    setSelectedFolder(null);setItems([]);setTrail([]);setNextToken(null);setFolderBusy(false);setFolderError("");setLinks([]);
+    if(!user||!projectId||!composer){setLinksLoading(false);return;}
+    setLinksLoading(true);
     let alive=true;
     readDriveLinks(user.uid).then(result=>{
       if(alive)setLinks(result.filter(l=>l.projectId===projectId));
-    }).catch(()=>{if(alive)setFolderError("Não foi possível ler as pastas vinculadas.");});
+    }).catch(()=>{if(alive)setFolderError("Não foi possível ler as pastas vinculadas.");})
+      .finally(()=>{if(alive)setLinksLoading(false);});
     return()=>{alive=false;};
   },[user,projectId,composer]);
   const browse=useCallback(async(folder:DriveFolderLink,targetId:string,path:{id:string;name:string}[],append=false,pageKey?:string)=>{
@@ -104,6 +111,12 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
     setSelectedFolder(folder);setTrail([{id:folder.folderId,name:folder.folderName}]);
     void browse(folder,folder.folderId,[{id:folder.folderId,name:folder.folderName}]);
   };
+  useEffect(()=>{
+    if(!composer||!projectId||(!replacement&&composerStep!=="materials")||!links.length||selectedFolder)return;
+    const folder=links[0];
+    setSelectedFolder(folder);
+    void browse(folder,folder.folderId,[{id:folder.folderId,name:folder.folderName}]);
+  },[browse,composer,composerStep,links,projectId,replacement,selectedFolder]);
   const activeFolderId=trail.at(-1)?.id||selectedFolder?.folderId||"";
   useEffect(()=>{
     const seq=++searchSequence.current;
@@ -178,12 +191,12 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
   const resetComposer=()=>{
     if(working)return;
     browseSequence.current++;searchSequence.current++;
-    setComposer(false);setReplacement(null);setFiles([]);setTitle("");setMessage("");setSelectedFolder(null);setViewers("");setRestrictPublic(false);setShareDirect(false);
+    setComposer(false);setReplacement(null);setComposerStep("details");setFiles([]);setTitle("");setMessage("");setSelectedFolder(null);setViewers("");setRestrictPublic(false);setShareDirect(false);
     setTrail([]);setItems([]);setError("");setFolderError("");
   };
   const newReview=()=>{
     setClientId(0);setProjectId(0);setRecipient("");setViewers("");setRestrictPublic(false);setShareDirect(false);setTitle("");setMessage("");setFiles([]);setMode("link");
-    setReplacement(null);setComposer(true);setOpened(null);setError("");
+    setReplacement(null);setComposerStep("details");setComposer(true);setOpened(null);setError("");setFolderError("");
   };
   const openDetail=async(id:string)=>{
     setWorking(true);setError("");
@@ -200,6 +213,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
   const submit=async()=>{
     if(working||pendingUploads.length){setError("Conclua ou cancele os envios pendentes antes de compartilhar.");return;}
     if(!projectId||!clientId||!files.length) {setError("Escolha o cliente, projeto e pelo menos um arquivo.");return;}
+    if(!replacement&&missingDetails.length){setComposerStep("details");setError(missingDetails[0]);return;}
     await run(async()=>{
       let publishWarning="";
       const selections=files.map(f=>({fileId:f.fileId,linkedFolderId:f.linkedFolderId,connectionId:f.connectionId}));
@@ -224,7 +238,6 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
         }
         setOpened(result);
       }else{
-        const splitEmails=(raw:string)=>raw.split(/[\n,;]+/).map(v=>v.trim().toLowerCase()).filter(Boolean);
         const reviewers=mode==="google"?splitEmails(recipient):[];
         const readers=mode==="google"?splitEmails(viewers):[];
         if(mode==="google"&&(!reviewers.length||new Set([...reviewers,...readers]).size!==reviewers.length+readers.length)){
@@ -233,7 +246,8 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
         const participants=[...reviewers.map(email=>({email,role:"reviewer"})),...readers.map(email=>({email,role:"viewer"}))];
         const created=await call<{id:string}>("/reviews","POST",{
           clientId,projectId,studioName,title,message,mode,recipientEmail:reviewers[0]||"",
-          participants,driveShareEnabled:shareDirect,restrictExistingPublic:restrictPublic,
+          participants,driveShareEnabled:mode==="google"&&shareDirect,
+          restrictExistingPublic:mode==="google"&&shareDirect&&restrictPublic,
           expiresInDays:days,assets:selections
         });
         setOpened(await call<Detail>("/reviews/"+created.id));
@@ -252,7 +266,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
   const beginRevision=()=>{
     if(!opened||working)return;
     setClientId(opened.review.clientId);setProjectId(opened.review.projectId);setReplacement(opened.review.id);
-    setFiles([]);setError("");setComposer(true);
+    setFiles([]);setError("");setComposerStep("materials");setComposer(true);
   };
   const mutate=async(action:"publish"|"rotate"|"close")=>{
     if(!opened)return;
@@ -264,6 +278,29 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
     });
   };
   const chosenClient=clients.find(c=>c.id===clientId);
+  const chosenProject=projects.find(p=>p.id===projectId);
+  const reviewEmails=mode==="google"?splitEmails(recipient):[];
+  const readerEmails=mode==="google"?splitEmails(viewers):[];
+  const allEmails=[...reviewEmails,...readerEmails];
+  const participantIssue=mode!=="google"?"":!reviewEmails.length?
+    "Adicione pelo menos um e-mail de revisor.":allEmails.some(email=>!validEmail(email))?
+    "Corrija os e-mails inválidos dos participantes.":new Set(allEmails).size!==allEmails.length?
+    "Cada e-mail deve aparecer apenas uma vez entre revisores e leitores.":"";
+  const missingDetails=[
+    ...(!clientId?["Selecione um cliente."]:[]),
+    ...(!projectId?["Selecione um projeto."]:[]),
+    ...(!title.trim()?["Informe o título da aprovação."]:[]),
+    ...(participantIssue?[participantIssue]:[])
+  ];
+  const goToMaterials=()=>{
+    if(missingDetails.length){
+      setError(missingDetails[0]);
+      composerBodyRef.current?.scrollTo({top:0,behavior:"smooth"});
+      return;
+    }
+    setError("");setComposerStep("materials");
+    composerBodyRef.current?.scrollTo({top:0});
+  };
   const addFile=(file:DriveItem)=>{
     if(!selectedFolder)return;
     if(!supported(file))return;
@@ -320,14 +357,28 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
     </div>,document.body)}
 
     {composer&&createPortal(<div className="review-modal-backdrop" ref={dialogRef} tabIndex={-1} onMouseDown={e=>{if(e.target===e.currentTarget)resetComposer();}}>
-      <section className="review-dialog" role="dialog" aria-modal="true" aria-label="Enviar materiais para aprovação">
+      <section className="review-dialog review-composer-dialog" role="dialog" aria-modal="true" aria-label="Enviar materiais para aprovação">
         <header><div><span className="eyebrow">APROVAÇÕES / {replacement?"NOVA VERSÃO":"NOVA SOLICITAÇÃO"}</span>
           <h2>{replacement?"Selecione os novos arquivos":"Enviar para aprovação"}</h2>
-          <p>Escolha os materiais que o cliente poderá revisar.</p></div>
+          <p>{replacement?"Escolha os arquivos da nova versão.":"Configure o acesso e selecione os materiais, sem perder o contexto."}</p></div>
           <button className="review-icon" disabled={working} onClick={resetComposer} aria-label="Fechar"><X size={20}/></button></header>
-        <div className="review-dialog-body">
+        {!replacement&&<div className="review-composer-steps" aria-label="Etapas da nova aprovação">
+          <span className={"review-composer-step"+(composerStep==="details"?" active":" complete")}>
+            <span className="review-step-number">{composerStep==="materials"?<Check size={14}/>:1}</span>
+            <span>Configuração</span>
+          </span>
+          <span className="review-step-connector" aria-hidden="true"/>
+          <span className={"review-composer-step"+(composerStep==="materials"?" active":"")}>
+            <span className="review-step-number">2</span><span>Selecionar materiais</span>
+          </span>
+        </div>}
+        <div className="review-dialog-body" ref={composerBodyRef}>
+          {!replacement&&composerStep==="details"&&<div className="review-composer-intro">
+            <h3>Quem vai revisar?</h3>
+            <p>Comece pelo cliente e projeto, depois defina como os participantes entrarão na aprovação.</p>
+          </div>}
           {error&&<p className="reviews-warning" role="alert">{error}</p>}
-          <div className="review-fields">
+          {(replacement||composerStep==="details")&&<div className="review-fields">
             <label>Cliente
               <select disabled={!!replacement} value={clientId} onChange={e=>{
                 const id=Number(e.target.value);setClientId(id);setProjectId(0);setFiles([]);setSelectedFolder(null);
@@ -340,10 +391,10 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
             {!replacement&&<>
               <label>Título da aprovação<input maxLength={180} required value={title} onChange={e=>setTitle(e.target.value)} placeholder="Ex.: Primeiro corte da campanha"/></label>
               <label>Mensagem (opcional)<textarea maxLength={1500} rows={2} value={message} onChange={e=>setMessage(e.target.value)} placeholder="O que o cliente deve avaliar?"/></label>
-              <label>Tipo de acesso<select value={mode} onChange={e=>setMode(e.target.value as Mode)}>
-                <option value="link">Qualquer pessoa com o link</option><option value="google">Somente Google autorizado</option>
+              <label>Tipo de acesso<select value={mode} onChange={e=>{setMode(e.target.value as Mode);setShareDirect(false);setRestrictPublic(false);}}>
+                <option value="link">Acesso por link de aprovação</option><option value="google">Acesso restrito com conta Google</option>
               </select></label>
-              {mode==="link"?<p className="reviews-info">Quem tiver o link da aprovação poderá abrir os materiais dentro do Roteiva. O sistema não publica o arquivo no Drive. Permissões públicas que já existem no Google Drive não serão alteradas.</p>:
+              {mode==="link"?<p className="reviews-info">Quem receber o link poderá revisar os materiais pelo Roteiva, sem precisar entrar com Google. O Roteiva cria apenas o acesso necessário para exibir os materiais; permissões públicas existentes no Drive não são alteradas.</p>:
                 <div className="review-participants-config">
                   <h3>Participantes Google</h3>
                   <p className="reviews-muted">Cada pessoa precisará entrar com sua própria conta Google autorizada. Adicione os e-mails separados por vírgula ou em linhas diferentes.</p>
@@ -356,26 +407,53 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
                       placeholder={"diretoria@gmail.com\nobservador@gmail.com"}/>
                   </label>
                   <p className="reviews-info">A aprovação só fica concluída depois que todos os revisores aprovarem. Um pedido de ajustes devolve a versão ao estúdio. Leitores nunca podem enviar comentários ou decisões.</p>
-                  <label className="review-permission-optin">
+                  <div className="review-share-heading">
+                    <h4>Permissões no Google Drive</h4>
+                    <p>Estas opções são adicionais ao acesso pelo Roteiva. Desativadas, não concedem acesso direto aos arquivos no Drive.</p>
+                  </div>
+                  <label className="review-sharing-option">
+                    <span className="review-sharing-copy">
+                      <strong>Permitir abrir também pelo Google Drive</strong>
+                      <small>Concede acesso de <b>Leitor</b> aos e-mails informados. No Roteiva, revisores continuam podendo aprovar e leitores apenas visualizar.</small>
+                    </span>
                     <input type="checkbox" checked={shareDirect}
                       onChange={e=>{setShareDirect(e.target.checked);if(!e.target.checked)setRestrictPublic(false);}}/>
-                    <span>Também conceder acesso direto no Google Drive a estes participantes. O Roteiva configura automaticamente permissão Leitor por conta, mantendo os papéis de revisor/leitor no portal.</span>
+                    <span className="review-sharing-switch" aria-hidden="true"/>
                   </label>
-                  {shareDirect&&<label className="review-permission-optin">
+                  {shareDirect&&<label className="review-sharing-option review-sharing-option-danger">
+                    <span className="review-sharing-copy">
+                      <strong><AlertTriangle size={16} aria-hidden="true"/> Remover acesso público existente no Drive</strong>
+                      <small>Remove permissões públicas diretas dos arquivos compartilhados. <b>Links antigos podem parar de funcionar.</b> Permissões herdadas de pastas não são modificadas.</small>
+                    </span>
                     <input type="checkbox" checked={restrictPublic} onChange={e=>setRestrictPublic(e.target.checked)}/>
-                    <span>Remover permissão pública direta já existente no Drive. Atenção: pode invalidar outros links compartilhados.</span>
+                    <span className="review-sharing-switch" aria-hidden="true"/>
                   </label>}
-                  <p className="reviews-muted">No modo padrão, participantes acessam pelo Roteiva sem receber permissões adicionais no Drive. Para garantir que o arquivo original também seja privado, revise permissões já existentes no Drive. Permissões herdadas de pastas não são modificadas pelo Roteiva.</p>
+                  <p className="review-sharing-footnote">Acesso direto pelo Drive é opcional. Para arquivos privados, confira também permissões já existentes nas pastas do seu Google Drive.</p>
                 </div>}
               <label>Validade<select value={days} onChange={e=>setDays(Number(e.target.value))}>
                 <option value={7}>7 dias</option><option value={14}>14 dias</option><option value={30}>30 dias</option>
               </select></label>
             </>}
             {chosenClient&&!relevantProjects.length&&<p className="reviews-muted">Este cliente ainda não possui projetos vinculados.</p>}
-          </div>
-          <h3>Arquivos do Google Drive <span>({files.length}/8)</span></h3>
+          </div>}
+           {(replacement||composerStep==="materials")&&<>
+           {!replacement&&<div className="review-composer-context">
+             <div>
+               <small>{chosenClient?.name} · {chosenProject?.name}</small>
+               <strong>{title}</strong>
+               <span>{mode==="google"?"Somente participantes com Google":"Acesso por link"} · {days} dias</span>
+             </div>
+             <button type="button" className="secondary-button" onClick={()=>{setComposerStep("details");setError("");composerBodyRef.current?.scrollTo({top:0});}}>
+               Editar configuração
+             </button>
+           </div>}
+           <div className="review-materials-heading">
+             <h3>Arquivos do Google Drive <span>({files.length}/8)</span></h3>
+             <p>Escolha pelo menos um arquivo. Você pode selecionar até 8 imagens, vídeos, áudios ou PDFs.</p>
+           </div>
           {!projectId?<p className="reviews-muted">Selecione um projeto para explorar os arquivos vinculados.</p>:
-          !links.length?<div className="reviews-empty"><Folder size={26}/><p>Este projeto ainda não possui pastas vinculadas.</p>
+           linksLoading?<p className="reviews-muted" role="status"><LoaderCircle size={16} className="rl-spin"/> Carregando pastas do projeto…</p>:
+           !links.length?<div className="reviews-empty"><Folder size={26}/><p>Este projeto ainda não possui pastas vinculadas.</p>
             <button className="secondary-button" onClick={()=>{resetComposer();onLibrary();}}>Vincular pasta na Biblioteca</button></div>:
           <>
             <div className="review-folder-tabs">{links.map(l=><button type="button" key={l.id} className={selectedFolder?.id===l.id?"active":""}
@@ -453,10 +531,31 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
             {files.map(f=><div key={f.fileId}><Check size={14}/><span>{f.name}</span>
               <button onClick={()=>setFiles(x=>x.filter(a=>a.fileId!==f.fileId))} aria-label={"Remover "+f.name}><X size={15}/></button></div>)}</div>}
           <p className="reviews-muted">Os envios usam a mesma fila segura da Biblioteca. Aguarde a confirmação do Google Drive antes de compartilhar.</p>
-        </div>
-        <footer><button className="secondary-button" onClick={resetComposer}>Cancelar</button>
-          <button className="primary-button" disabled={working||pendingUploads.length>0||!files.length||!projectId||!clientId||(!replacement&&!title.trim())||(!replacement&&mode==="google"&&!recipient.includes("@"))}
-            onClick={()=>void submit()}>{working?"Preparando…":replacement?"Enviar nova versão":"Gerar aprovação"} <Send size={16}/></button></footer>
+           </>}
+         </div>
+        <footer className="review-composer-footer">
+           <div className="review-composer-footnote" role="status">
+             {replacement?
+               (pendingUploads.length?"Aguarde a conclusão dos envios.":files.length?"Nova versão pronta para enviar.":"Selecione pelo menos um arquivo para esta versão."):
+               composerStep==="details"?
+                 (missingDetails.length?missingDetails[0]:"Configuração pronta. Avance para selecionar arquivos."):
+                 pendingUploads.length?"Aguarde a conclusão dos envios ao Drive.":
+                 files.length?`${files.length} material(is) selecionado(s) · pronto para gerar.`:"Selecione pelo menos um arquivo para gerar a aprovação."}
+           </div>
+           <div className="review-composer-actions">
+             {!replacement&&composerStep==="materials"?
+               <button className="secondary-button" disabled={working} onClick={()=>{setComposerStep("details");setError("");composerBodyRef.current?.scrollTo({top:0});}}>
+                 <ChevronLeft size={16}/> Voltar
+               </button>:
+               <button className="secondary-button" disabled={working} onClick={resetComposer}>Cancelar</button>}
+             {!replacement&&composerStep==="details"?
+               <button className="primary-button" disabled={working} onClick={goToMaterials}>
+                 Selecionar materiais <ChevronRight size={16}/>
+               </button>:
+               <button className="primary-button" disabled={working||pendingUploads.length>0||!files.length}
+                 onClick={()=>void submit()}>{working?"Preparando…":replacement?"Enviar nova versão":"Gerar aprovação"} <Send size={16}/></button>}
+           </div>
+         </footer>
       </section>
     </div>,document.body)}
   </div>;
