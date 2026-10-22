@@ -93,6 +93,7 @@ test("sidebar logo always loads from site root on nested Firebase routes and in 
   await expect(logo).toHaveAttribute("src",/^\/roteiva-logo-(black|white)\.png$/);
   await expect.poll(()=>logo.evaluate((img:HTMLImageElement)=>img.complete && img.naturalWidth>0)).toBe(true);
   if(info.project.name==="desktop"){
+    await page.getByRole("button",{name:"Opções da conta",exact:true}).click();
     await page.getByRole("button",{name:"Ativar modo escuro"}).click();
     await expect(logo).toHaveAttribute("src","/roteiva-logo-white.png");
     await expect.poll(()=>logo.evaluate((img:HTMLImageElement)=>img.complete && img.naturalWidth>0)).toBe(true);

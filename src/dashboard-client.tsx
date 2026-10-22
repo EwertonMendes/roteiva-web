@@ -1,12 +1,13 @@
+import {SidebarAccountMenu} from "./features/ui/SidebarAccountMenu";
 import {ProjectsView} from "./features/projects/ProjectsView";
 "use client";
 
 import {
-  BadgeDollarSign, History, CalendarCheck2, CalendarDays, Check, ChevronDown,
+  BadgeDollarSign, CalendarCheck2, CalendarDays, Check, ChevronDown,
   ChevronRight, CirclePause, CirclePlay, Clock3, Film, Folder, FolderOpen,
   Grid2X2, LayoutDashboard, LibraryBig, ListFilter, Menu, PanelsTopLeft,
-  ArrowUpRight, Building2, Moon, UserRound,
-  MoreHorizontal, Pencil, Plus, ReceiptText, Search, Sun, Trash2,
+  ArrowUpRight, Building2, UserRound,
+  MoreHorizontal, Pencil, Plus, ReceiptText, Search, Trash2,
   UserRoundPlus, Users, WalletCards, X, Upload, Image as ImageIcon,
   FileVideo, FileAudio, FileText, HardDrive, ChevronLeft, Settings2,
   UsersRound, Repeat2, ContactRound, type LucideIcon,
@@ -292,434 +293,176 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     const contact = String(form.get("contact") || "Contato não informado").trim();
     const email = String(form.get("email") || "").trim();
     const phone = String(form.get("phone") || "").trim();
-    const type = String(form.get("type") || "Avulso") as ClientType;
-    const since = new Date().toLocaleDateString("pt-BR", { month: "short", year: "numeric" }).replace(" de ", " ").replace(".", "");
-    const monthlyDeliverables = Math.max(0, Number(form.get("monthlyDeliverables")) || 0);
-    const monthlyFee = Math.max(0, parseMoney(String(form.get("monthlyFee") || "0")) || 0);
-    const packageTitle = String(form.get("packageTitle") || "").trim();
-    const updated: Client = { deliveries: editingClient?.deliveries || [], id: editingClient?.id || newId(), name, contact, email, phone, projects: editingClient?.projects || 0, active: 0, color: type === "Recorrente" ? "violet" : "blue", initials: name.slice(0, 2).toUpperCase(), type, since: editingClient?.since || since, monthlyDeliverables, monthlyFee, packageTitle };
-    setClientList(current => editingClient ? current.map(c => c.id === updated.id ? updated : c) : [updated, ...current]);
-    if (editingClient) {
-      setProjects(current => current.map(p => p.clientId === updated.id ? {...p, client: name} : p));
-      setFinanceEntries(current => current.map(e => e.clientId === updated.id ? {...e, client: name} : e));
-    }
-    const commands:WorkspaceCommand[]=[{kind:"saveClient",client:updated}];
-    if(editingClient && editingClient.name!==name){
-      commands.push(...projects.filter(p=>p.clientId===updated.id).map(project=>({
-        kind:"saveProject" as const,project:{...project,client:name},
-      })));
-      commands.push(...financeEntries.filter(e=>e.clientId===updated.id).map(entry=>({
-        kind:"saveFinance" as const,entry:{...entry,client:name},
-      })));
-    }
-    if(!editingClient)onClientCreated?.(updated);
-    commitCommands(commands);
-    setClientModalOpen(false); setEditingClient(null);
-    logActivity(`Cliente ${editingClient ? "atualizado" : "cadastrado"}: ${name}`);
-    notifyChange("Cliente salvo com sucesso");
+    const type = String(form.g…16118 tokens truncated…    min-height: 0;
+    overflow: clip;
   }
-
-  function addFinanceEntry(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const project = String(form.get("project") || "").trim() || projects.find(p => p.id === Number(form.get("projectId")))?.name || "Receita avulsa";
-    const clientId = Number(form.get("clientId") || 0) || projects.find(p => p.id === Number(form.get("projectId")))?.clientId || undefined;
-    const linkedClient = clientList.find((client) => client.id === clientId);
-    const client = linkedClient?.name || "Sem cliente vinculado";
-    const amountRaw = String(form.get("amount") || "0").trim();
-    const amount = parseMoney(amountRaw);
-    const status = String(form.get("status") || "A receber") as FinanceEntry["status"];
-    const dateValue = String(form.get("date") || "");
-    const entryDate = dateValue ? new Date(`${dateValue}T12:00:00`) : new Date();
-    if (!Number.isFinite(entryDate.getTime()) || !Number.isFinite(amount) || amount <= 0) return notify("Informe um valor válido");
-    const projectId = Number(form.get("projectId")) || undefined;
-    const kind = form.get("kind") === "expense" ? "expense" : "income";
-    const updatedEntry: FinanceEntry = { projectId, kind, id: editingFinanceEntry?.id || newId(), project, client, clientId, amount, date: entryDate.toLocaleDateString("pt-BR"), status };
-    if (editingFinanceEntry) {
-      setFinanceEntries((current) => current.map((entry) => entry.id === editingFinanceEntry.id ? updatedEntry : entry));
-      commitCommands([{kind:"saveFinance",entry:updatedEntry}]);
-    } else {
-      const count = Math.max(1, Math.min(24, Number(form.get("installments")) || 1));
-      if (Math.round(amount * 100) < count) return notify("Valor insuficiente para dividir em parcelas");
-      const parts: FinanceEntry[] = splitInstallments(amount, count, entryDate).map((part,i) => ({...updatedEntry, id: newId(), project: count > 1 ? `${project} · ${i+1}/${count}` : project, ...part, status: i === 0 ? status : "A receber"}));
-      setFinanceEntries((current) => [...parts, ...current]);
-      commitCommands(parts.map(entry=>({kind:"saveFinance",entry})));
-    }
-    logActivity(`${kind === "expense" ? "Despesa" : "Receita"} ${editingFinanceEntry ? "atualizada" : "registrada"}: ${project}`);
-    setFinanceModalOpen(false);
-    setEditingFinanceEntry(null);
-    notifyChange(editingFinanceEntry ? "Lançamento atualizado com sucesso" : kind === "expense" ? "Custo registrado no financeiro" : linkedClient ? `Receita vinculada a ${linkedClient.name}` : "Receita adicionada sem cliente vinculado");
+  .app-view-overview .page {
+    height: 100%;
+    min-height: 0;
+    max-height: 100%;
+    overflow: clip;
+    display: flex;
+    flex-direction: column;
+    gap: clamp(10px, 1.75dvh, 24px);
+    padding: clamp(12px, 2.5dvh, 32px) clamp(18px, 2.4vw, 44px);
   }
-
-  function openFinanceModal(entry: FinanceEntry | null = null) {
-    setEditingFinanceEntry(entry); setFinanceKind(entry?.kind || "income");
-    setFinanceModalOpen(true);
+  .app-view-overview .page-heading {
+    flex: 0 0 auto;
+    min-height: 0;
+    margin-bottom: 0;
   }
-
-  function closeFinanceModal() {
-    setFinanceModalOpen(false);
-    setEditingFinanceEntry(null);
+  .app-view-overview .page-heading h1 {
+    font-size: clamp(2rem, min(3.8vw, 6dvh), 3.65rem);
   }
-
-  function deleteFinanceEntry() {
-    if (!deletingFinanceEntry) return;
-    commitCommands([{kind:"deleteFinance",id:deletingFinanceEntry.id}]);
-    setFinanceEntries((current) => current.filter((entry) => entry.id !== deletingFinanceEntry.id));
-    logActivity(`Lançamento excluído: ${deletingFinanceEntry.project}`);
-    setDeletingFinanceEntry(null);
-    notifyChange("Receita excluída e indicadores atualizados");
+  .app-view-overview .heading-actions .workspace-tools .secondary-button,
+  .app-view-overview .heading-actions > .primary-button {
+    min-height: clamp(40px, 5.7dvh, 54px);
   }
-
-  function addCalendarEvent(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const title = String(form.get("title") || "Novo compromisso").trim();
-    const date = String(form.get("date") || "");
-    const time = String(form.get("time") || "09:00");
-    const endTime = String(form.get("endTime") || "");
-    if (!validTimeRange(time,endTime)) { setEventError("O término precisa ser depois do início, no mesmo dia."); return; }
-    const type = String(form.get("type") || "Produção") as CalendarEvent["type"];
-    const client = String(form.get("client") || "Interno").trim();
-    if (!date) return notify("Escolha a data do compromisso");
-    const entry: CalendarEvent = { autoDeadline:editingEvent?.autoDeadline && type === "Entrega", id: editingEvent?.id || newId(), title, date, time, endTime, type, client, projectId: Number(form.get("projectId")) || undefined };
-    commitCommands([{kind:"saveEvent",event:entry}]);
-    setCalendarEvents(current => (editingEvent ? current.map(e => e.id === entry.id ? entry : e) : [...current, entry]).sort((a,b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`)));
-    if (entry.autoDeadline && entry.projectId) {
-      const linked=projects.find(p=>p.id===entry.projectId);
-      if(linked){
-        const modified:Project={...linked,dueDate:date,
-          due:new Date(`${date}T12:00:00`).toLocaleDateString("pt-BR",{day:"2-digit",month:"short"})};
-        setProjects(current=>current.map(p=>p.id===modified.id?modified:p));
-        commitCommands([{kind:"saveProject",project:modified}]);
-      }
-    }
-    logActivity(`Compromisso salvo: ${title}`); setEditingEvent(null);
-    setEventModalOpen(false);
-    changeView("calendar");
-    notifyChange("Compromisso adicionado ao calendário");
+  .app-view-overview .panel.flow-overview {
+    flex: 1 1 auto;
+    min-height: 0;
+    margin: 0;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+    padding: clamp(14px, 2.5dvh, 34px) clamp(20px, 2.6vw, 36px) 0;
   }
-
-  function uploadAssets(_files: FileList | null, _projectId?: number) {
-    notify("Envio de arquivos ficará disponível após a integração com Google Drive.");
+  .app-view-overview .flow-overview-head h2 {
+    font-size: clamp(1.4rem, min(2vw, 3.4dvh), 2.15rem);
   }
-
-  function applyRoute(next:WorkspaceRoute) {
-    setView(next.view);
-    setSelectedProject(next.view==="projects" ? next.projectId || null : null);
-    setSelectedClient(next.view==="clients" ? next.clientId || null : null);
-    setMobileOpen(false);
+  .app-view-overview .flow-numbers {
+    align-self: stretch;
+    align-content: center;
+    min-height: 0;
+    margin: clamp(8px, 2dvh, 28px) 0;
   }
-
-  function navigateRoute(next:WorkspaceRoute,{replace=false}:{replace?:boolean}={}) {
-    const target=hrefForWorkspaceRoute(next,routeEnvironment);
-    if(window.location.pathname+window.location.hash!==target) {
-      window.history[replace?"replaceState":"pushState"](null,"",target);
-    }
-    applyRoute(next);
-    onRouteChange?.(next);
-    window.scrollTo({top:0,behavior:"auto"});
+  .app-view-overview .flow-numbers > button { gap: clamp(4px, 1dvh, 10px); }
+  .app-view-overview .flow-numbers strong { font-size: clamp(1.85rem, min(3vw, 5.6dvh), 3.2rem); }
+  .app-view-overview .flow-numbers .flow-money { font-size: clamp(1.65rem, min(2.7vw, 5dvh), 3rem); }
+  .app-view-overview .flow-progress { padding: clamp(10px, 1.75dvh, 28px) 0; }
+  .app-view-overview .flow-progress-title { margin-bottom: clamp(6px, 1.4dvh, 15px); }
+  .app-view-overview .flow-legend { margin-top: clamp(7px, 1.4dvh, 18px); }
+  .app-view-overview .flow-next {
+    min-height: 0;
+    padding: clamp(9px, 1.9dvh, 20px) 0;
   }
-
-  function startProject(){if(!isDemo&&view!=="projects")changeView("projects");setModalOpen(true);}
-  function changeView(next:View) {
-    setActivityOpen(false);
-    navigateRoute({view:next});
-    if(next==="projects"&&query.trim())onSearchProjects?.();
-    if(next==="clients"&&query.trim())onSearchClients?.();
+  .app-view-overview .flow-next p {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
   }
-  function openProject(id:number) { navigateRoute({view:"projects",projectId:id}); }
-  function openClient(id:number) { navigateRoute({view:"clients",clientId:id}); }
-  function signOut() {
-    // Do not leave a previous account's private record URL in a shared browser.
-    window.history.replaceState(null,"",hrefForWorkspaceRoute({view:"overview"},routeEnvironment));
-    onLogout?.();
+  .app-shell .sidebar { padding-top: clamp(12px, 2.6dvh, 24px); padding-bottom: clamp(10px, 1.75dvh, 16px); }
+  .app-shell .sidebar .brand-lockup { height: clamp(44px, 7dvh, 64px); }
+  .app-shell .sidebar nav {
+    margin-top: clamp(9px, 2dvh, 28px);
+    gap: clamp(1px, .45dvh, 5px);
   }
+  .app-shell .sidebar nav > button { min-height: clamp(34px, 5.5dvh, 47px); }
+  .app-shell .sidebar-profile { padding-top: clamp(7px, 1.4dvh, 14px); }
 
-  useEffect(()=>{
-    const onNavigation=()=>{
-      const next=routeFromLocation(window.location,routeEnvironment);
-      applyRoute(next);
-      onRouteChange?.(next);
-      window.scrollTo({top:0,behavior:"auto"});
-    };
-    window.addEventListener("popstate",onNavigation);
-    if(routeEnvironment.useHash)window.addEventListener("hashchange",onNavigation);
-    return ()=>{
-      window.removeEventListener("popstate",onNavigation);
-      if(routeEnvironment.useHash)window.removeEventListener("hashchange",onNavigation);
-    };
-  },[onRouteChange]);
-
-  // Direct links must not display another user's records or leave a broken detail URL.
-  useEffect(()=>{
-    if(!dataReady)return;
-    const route=routeFromLocation(window.location,routeEnvironment);
-    if(route.projectId && (isDemo||canValidateProjectLink) && !projects.some(p=>p.id===route.projectId))navigateRoute({view:"projects"},{replace:true});
-    if(route.clientId && (isDemo||canValidateClientLink) && !clientList.some(c=>c.id===route.clientId))navigateRoute({view:"clients"},{replace:true});
-  },[dataReady,projects,clientList,canValidateProjectLink,canValidateClientLink]);
-
-  const pageTitles: Record<View, [string, string]> = {
-    overview: [`Olá, ${firstName}.`, "Aqui está o ritmo da sua produção hoje."],
-    projects: ["Projetos", "Acompanhe cada entrega, do briefing à aprovação."],
-    clients: ["Clientes", "Relacionamentos, projetos e acessos em um só lugar."],
-    reviews: ["Sala de aprovação", "Feedback claro, versões organizadas e decisões registradas."],
-    finance: ["Gestão financeira", "Faturamento, recebimentos e visão mensal do seu estúdio."],
-    calendar: ["Calendário", "Prazos, gravações, reuniões e entregas em uma única agenda."],
-    library: ["Biblioteca", "Centralize arquivos, versões e materiais de todos os projetos."],
-    settings: ["Configurações", "Sua identidade profissional, estúdio e preferências."],
-  };
-
-  if (!dataReady) return <main className="studio-loading" role="status">Carregando seu estúdio…</main>;
-
-  return (
-    <div className={`app-shell app-view-${view}`} inert={saving || undefined}>
-      <aside className={`sidebar ${mobileOpen ? "mobile-open" : ""}`}>
-        <div className="brand-lockup">
-          <img src={`${import.meta.env.BASE_URL}${theme === "light" ? "roteiva-logo-black.png" : "roteiva-logo-white.png"}`} alt="Roteiva" />
-          <button className="mobile-close" onClick={() => setMobileOpen(false)} aria-label="Fechar menu"><X size={18} /></button>
-        </div>
-        <nav>
-          <small className="nav-label">ESPAÇO DE TRABALHO</small>
-          {nav.map((item) => {
-            const count = item.id === "projects" ? (overviewMetrics?.projectCount ?? projectPage?.total ?? projects.length) : undefined;
-            return <button key={item.id} className={view === item.id ? "active" : ""} onClick={() => changeView(item.id)}>
-              <AnimatedNavIcon icon={item.icon} hoverIcon={item.hoverIcon} kind={item.id} /><span>{item.label}</span>{count !== undefined && <em>{count}</em>}
-            </button>;
-          })}
-          <small className="nav-label second">FERRAMENTAS</small>
-          <button className={view === "calendar" ? "active" : ""} onClick={() => changeView("calendar")}><AnimatedNavIcon icon={CalendarDays} hoverIcon={CalendarCheck2} kind="calendar" /><span>Calendário</span><em>{eventCount ?? calendarEvents.length}</em></button>
-          <button className={view === "library" ? "active" : ""} onClick={() => changeView("library")}><AnimatedNavIcon icon={Grid2X2} hoverIcon={LibraryBig} kind="library" /><span>Biblioteca</span><em>{isDemo?libraryAssets.length:linkedFolderCount??"—"}</em></button>
-          <button className={view === "settings" ? "active" : ""} onClick={() => changeView("settings")}><AnimatedNavIcon icon={Settings2} hoverIcon={UserRound} kind="settings" /><span>Configurações</span></button>
-          <button type="button" className={activityOpen ? "active" : ""} onClick={() => { setMobileOpen(false); setActivityOpen(true); }} aria-expanded={activityOpen} aria-controls="activity-history-drawer"><History size={19} /><span>Atividades</span></button>
-          <button type="button" onClick={toggleTheme} aria-label="Alternar aparência"><Sun size={19} /><span>Aparência</span><span className="sidebar-appearance-switch" aria-hidden="true">{theme === "dark" ? <Moon size={14} /> : <Sun size={14} />}</span></button>
-        </nav>
-
-        <div className="sidebar-profile">
-          {photoURL ? <img className="profile-photo" src={photoURL} alt="Foto do usuário" referrerPolicy="no-referrer" /> : <span>{firstName.slice(0, 2).toUpperCase()}</span>}<div><b>{firstName}</b><small>{email}</small></div>{onLogout ? <button className="icon-button" onClick={signOut} aria-label="Sair da conta" title="Sair da conta">↪</button> : <MoreHorizontal size={18} />}
-        </div>
-      </aside>
-      {mobileOpen && <button className="mobile-scrim" aria-label="Fechar menu" onClick={() => setMobileOpen(false)} />}
-      {activityOpen && <ActivityHistoryDrawer activities={activities} onClose={() => setActivityOpen(false)}/>}
-
-      <main className="main">
-        <section className="page">
-          {isDemo ? <div className="pages-demo-notice" role="note"><b>Modo demonstração</b><span>Explore o Roteiva com dados salvos apenas neste navegador. Entre na sua conta para trabalhar com seus próprios projetos.</span></div> : null}
-          <button type="button" className="menu-button page-menu-button" onClick={() => setMobileOpen(true)} aria-label="Abrir menu" aria-expanded={mobileOpen}><Menu size={20} /></button>
-          <div className="page-heading">
-            <div><span className="eyebrow">ROTEIVA / {view === "overview" ? "PAINEL" : pageTitles[view][0].toUpperCase()}</span><h1>{pageTitles[view][0]}</h1><p>{pageTitles[view][1]}</p></div>
-            <div className="heading-actions">
-              {view !== "settings" && view !== "library" && <WorkspaceTools workspace={workspace} loadWorkspace={onLoadWorkspace} status={isDemo ? saveStatus : cloudStatus || ""} onNotify={notify} />}
-              {view === "settings" ? null : view === "clients" ? <button className="primary-button" onClick={() => { setEditingClient(null); setClientModalOpen(true); }}><UserRoundPlus size={17} /> Novo cliente</button>
-                : view === "finance" ? <button className="primary-button" onClick={() => openFinanceModal()}><Plus size={17} /> Nova receita</button>
-                : view === "calendar" ? <button className="primary-button" onClick={() => openEvent()}><Plus size={17} /> Novo compromisso</button>
-                : view === "library" ? (isDemo && import.meta.env.VITE_LIBRARY_REVIEW === "true" ? null : <><select aria-label="Projeto dos arquivos" value={libraryProject} onChange={e => setLibraryProject(e.target.value)}><option value="">Todos os projetos</option>{projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select><details className="rl-page-more"><summary aria-label="Mais ações da Biblioteca" title="Mais ações da Biblioteca"><MoreHorizontal size={18}/></summary><div className="rl-page-more-content"><WorkspaceTools workspace={workspace} loadWorkspace={onLoadWorkspace} status={isDemo?saveStatus:cloudStatus||""} onNotify={notify}/></div></details>{isDemo && <label className="primary-button upload-button"><Upload size={17} /> {uploading ? "Enviando…" : "Adicionar arquivos"}<input type="file" disabled multiple onChange={(event) => { uploadAssets(event.target.files, Number(libraryProject) || undefined); event.target.value = ""; }} /></label>}</>)
-                : view === "reviews" ? null : <button className="primary-button" onClick={startProject}><Plus size={17} /> Criar projeto</button>}
-            </div>
-          </div>
-          {((view === "projects" && !selectedProject) || (view === "clients" && !selectedClient)) && <label className="page-search"><Search size={17}/><input aria-label={view === "projects" ? "Buscar projetos" : "Buscar clientes"} value={query} onChange={e => { const value=e.target.value; setQuery(value); if(value.trim()){ if(view === "projects")onSearchProjects?.(); else onSearchClients?.(); } }} placeholder={view === "projects" ? "Buscar projetos" : "Buscar clientes"}/></label>}
-          {view === "settings" && <SettingsPage profile={profile} email={email} photoURL={photoURL} theme={theme} toggleTheme={toggleTheme} onSaveProfile={onSaveProfile} />}
-          {view === "overview" && <TodayStudio clients={clientList} projects={projects} entries={financeEntries} events={calendarEvents} activities={activities} onView={changeView} onOpenActivity={() => setActivityOpen(true)} overviewMetrics={overviewMetrics} />}
-          {view === "projects" && (selectedProject && projects.some(p => p.id === selectedProject) ? <ProjectDetail project={projects.find(p => p.id === selectedProject)!} clients={clientList} entries={financeEntries} assets={libraryAssets} events={calendarEvents} onSave={updateProject} onBack={() => changeView("projects")} onRevenue={addLinkedRevenue} onUpload={uploadAssets} onEvent={(p) => { openEvent(null, p.dueDate); }} uploading={uploading} onReview={()=>{setReviewStart({clientId:projects.find(p=>p.id===selectedProject)?.clientId,projectId:selectedProject||undefined});changeView("reviews");}} /> : <ProjectsView projects={filtered.map(p => ({...p, files: libraryAssets.filter(a => a.projectId === p.id).length}))}
-                  onSaveCover={(id,cover)=>{const project=projects.find(p=>p.id===id);if(project)updateProject({...project,cover});}} statusFilter={statusFilter} setStatusFilter={(status)=>{
-                    setStatusFilter(status);
-                    onProjectStatus?.(status);
-                  }} onOpen={openProject}
-                  total={projectPage && !query.trim()?projectPage.total:undefined}
-                  hasMore={!!projectPage?.hasMore&&!query.trim()} onMore={onMoreProjects} />)}
-          {view === "clients" && (selectedClient && clientList.some(c => c.id === selectedClient) ? <ClientDetail client={clientList.find(c => c.id === selectedClient)!} projects={projects} entries={financeEntries} onBack={() => changeView("clients")} onEdit={(client) => { setEditingClient(client); setClientModalOpen(true); }} onSave={saveClientPackage} onProject={openProject} onReview={()=>{setReviewStart({clientId:selectedClient||undefined});changeView("reviews");}} /> : <ClientsView clients={clientList.filter(c => `${c.name} ${c.email} ${c.phone}`.toLowerCase().includes(query.toLowerCase())).map(c => ({...c, projects: projects.filter(p => p.clientId === c.id).length, active: projects.filter(p => p.clientId === c.id && p.status !== "Aprovado").length}))}
-                  onOpen={openClient} onAdd={() => {setEditingClient(null);setClientModalOpen(true);}}
-                  totalCount={clientPage && !query.trim()?clientPage.total:undefined}
-                  recurringCount={clientPage && !query.trim()?clientPage.recurring:undefined}
-                  activeProjectsCount={clientPage && !query.trim()?projects.filter(p=>p.status!=="Aprovado" && !!p.clientId).length:undefined}
-                  hasMore={!!clientPage?.hasMore&&!query.trim()} onMore={onMoreClients} />)}
-          {view === "reviews" && (isDemo ? <StudioReviews /> : <ReviewsDashboard key={reviewStart?.projectId||reviewStart?.clientId||"reviews"} clients={clientList} projects={projects} studioName={workspaceName} onLibrary={()=>changeView("library")} startClientId={reviewStart?.clientId} startProjectId={reviewStart?.projectId} />)}
-          {view === "finance" && <FinancePanel entries={financeEntries} clients={clientList} onPeriodChange={onFinancePeriodChange} serverBars={financeBars} onAdd={() => openFinanceModal()} onEdit={(entry) => openFinanceModal(entry)} onDelete={setDeletingFinanceEntry} />}
-          {view === "calendar" && <CalendarView events={calendarEvents} onMonthChange={onCalendarMonthChange} onAdd={(date) => openEvent(null, date)} onEdit={(entry) => openEvent(entry)} onDelete={(entry) => { if (window.confirm(`Excluir o compromisso “${entry.title}”?`)) { commitCommands([{kind:"deleteEvent",id:entry.id}]); setCalendarEvents(current => current.filter(e => e.id !== entry.id)); logActivity(`Compromisso excluído: ${entry.title}`); } }} />}
-          {view === "library" && <LibraryView assets={libraryAssets} query={query} onUpload={(files) => uploadAssets(files, Number(libraryProject) || undefined)} projects={projects} selectedProjectId={Number(libraryProject)||undefined} onSelectProject={setLibraryProject} onLinkedFolderCountChange={setLinkedFolderCount} />}
-        </section>
-      </main>
-
-      {modalOpen && (
-        <div className="modal-backdrop" onMouseDown={() => setModalOpen(false)}>
-          <form className="project-modal" onSubmit={addProject} onMouseDown={(event) => event.stopPropagation()}>
-            <div className="modal-head"><div><span>NOVO PROJETO</span><h2>Comece uma nova produção</h2><p>Defina o essencial agora. A equipe completa os detalhes depois.</p></div><button type="button" onClick={() => setModalOpen(false)}><X size={19} /></button></div>
-            <label>Nome do projeto<input name="name" required autoFocus placeholder="Ex.: Campanha Primavera 2027" /></label>
-            <div className="form-grid"><label>Cliente cadastrado<select name="clientId"><option value="">Sem cliente vinculado</option>{[...clientList].sort((a,b) => a.name.localeCompare(b.name, "pt-BR")).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label><label>Prazo<input name="due" type="date" /></label></div>
-            <label>Modelo de produção<select name="template">{Object.keys(projectTemplates).map(t => <option key={t}>{t}</option>)}</select></label><label>Descrição<textarea name="description" placeholder="Objetivo, formatos e contexto da produção…" /></label>
-            <div className="modal-actions"><button type="button" className="secondary-button" onClick={() => setModalOpen(false)}>Cancelar</button><button className="primary-button" type="submit">Criar projeto <ChevronRight size={16} /></button></div>
-          </form>
-        </div>
-      )}
-      {clientModalOpen && (
-        <div className="modal-backdrop" onMouseDown={() => setClientModalOpen(false)}>
-          <form key={editingClient?.id || "new-client"} className="project-modal" onSubmit={addClient} onMouseDown={(event) => event.stopPropagation()}>
-            <div className="modal-head"><div><span>{editingClient ? "EDITAR CLIENTE" : "NOVO CLIENTE"}</span><h2>{editingClient ? "Atualize o cadastro" : "Cadastre um relacionamento"}</h2><p>Defina o perfil para acompanhar recorrência e histórico de trabalhos.</p></div><button type="button" onClick={() => setClientModalOpen(false)}><X size={19} /></button></div>
-            <label>Nome do cliente<input name="name" required autoFocus defaultValue={editingClient?.name} placeholder="Ex.: Estúdio Aurora" /></label>
-            <div className="form-grid"><label>Contato principal<input name="contact" defaultValue={editingClient?.contact} required placeholder="Nome do contato" /></label><label>Telefone<input name="phone" defaultValue={editingClient?.phone} type="tel" inputMode="tel" placeholder="(11) 99999-9999" /></label></div>
-            <label>E-mail<input name="email" defaultValue={editingClient?.email} type="email" placeholder="contato@empresa.com" /></label>
-            <fieldset className="client-type-field"><legend>Tipo de relacionamento</legend><label><input type="radio" name="type" value="Recorrente" defaultChecked={!editingClient || editingClient.type === "Recorrente"} /><span><Building2 size={18} /><b>Recorrente</b><small>Cliente com trabalhos contínuos</small></span></label><label><input type="radio" name="type" value="Avulso" defaultChecked={editingClient?.type === "Avulso"} /><span><ReceiptText size={18} /><b>Avulso</b><small>Um trabalho ou projeto pontual</small></span></label></fieldset>
-            <label>Pacote mensal (opcional)<input name="packageTitle" defaultValue={editingClient?.packageTitle} placeholder="Ex.: Conteúdo para redes sociais" /></label><div className="form-grid"><label>Entregas por mês<input name="monthlyDeliverables" type="number" min="0" defaultValue={editingClient?.monthlyDeliverables || ""} /></label><label>Valor mensal combinado<input name="monthlyFee" inputMode="decimal" defaultValue={editingClient?.monthlyFee || ""} placeholder="0,00" /></label></div>
-            <div className="modal-actions"><button type="button" className="secondary-button" onClick={() => setClientModalOpen(false)}>Cancelar</button><button className="primary-button" type="submit">Salvar cliente <ChevronRight size={16} /></button></div>
-          </form>
-        </div>
-      )}
-      {financeModalOpen && (
-        <div className="modal-backdrop" onMouseDown={closeFinanceModal}>
-          <form key={editingFinanceEntry?.id || "new-revenue"} className="project-modal finance-modal" onSubmit={addFinanceEntry} onMouseDown={(event) => event.stopPropagation()}>
-            <div className="modal-head"><div><span>{editingFinanceEntry ? "EDITAR LANÇAMENTO" : "NOVO LANÇAMENTO"}</span><h2>{editingFinanceEntry ? "Atualize o lançamento" : "Registre uma entrada ou custo"}</h2><p>{editingFinanceEntry ? "Revise os dados e salve para atualizar os indicadores financeiros." : "Escolha a data para registrar a entrada ou o custo no mês correspondente."}</p></div><button type="button" onClick={closeFinanceModal}><X size={19} /></button></div>
-            <label>Tipo de lançamento<select name="kind" value={financeKind} onChange={e => setFinanceKind(e.target.value as "income" | "expense")}><option value="income">Receita</option><option value="expense">Despesa / custo de produção</option></select></label><label>Projeto vinculado<select name="projectId" defaultValue={editingFinanceEntry?.projectId || selectedProject || ""}><option value="">Sem projeto vinculado</option>{projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label><label>Trabalho ou projeto <small className="field-hint">Opcional</small><input name="project" autoFocus defaultValue={editingFinanceEntry?.project === "Receita avulsa" ? "" : editingFinanceEntry?.project || ""} placeholder="Ex.: Filme institucional — Corte final" /></label>
-            <div className="form-grid"><label>Cliente cadastrado<select name="clientId" defaultValue={editingFinanceEntry?.clientId || projects.find(p => p.id === selectedProject)?.clientId || ""}><option value="">Sem cliente vinculado</option>{[...clientList].sort((a, b) => a.name.localeCompare(b.name, "pt-BR")).map((client) => <option key={client.id} value={client.id}>{client.name} · {client.type}</option>)}</select><small className="field-hint">{clientList.length ? `${clientList.length} ${clientList.length === 1 ? "cliente disponível" : "clientes disponíveis"}` : "Cadastre clientes para vinculá-los às receitas"}</small></label><label>Valor do trabalho<div className="money-input"><span>R$</span><input name="amount" required inputMode="decimal" defaultValue={editingFinanceEntry?.amount || ""} placeholder="0,00" /></div></label></div>
-            <div className="form-grid"><label>{financeKind === "expense" ? "Vencimento do pagamento" : "Previsão de recebimento"}<input name="date" type="date" defaultValue={editingFinanceEntry ? editingFinanceEntry.date.split("/").reverse().join("-") : ""} /></label><label>Situação<select name="status" defaultValue={editingFinanceEntry?.status || "A receber"}><option value="Recebido">{financeKind === "expense" ? "Pago" : "Recebido"}</option><option value="A receber">{financeKind === "expense" ? "A pagar" : "A receber"}</option></select></label></div>
-            <label>Parcelamento<select name="installments" defaultValue="1" disabled={!!editingFinanceEntry}>{[1,2,3,4,5,6,10,12,24].map(n => <option key={n} value={n}>{n === 1 ? "Pagamento único" : `${n} parcelas mensais (dividir o valor total)`}</option>)}</select><small className="field-hint">Ao parcelar, o valor informado é dividido entre os meses. Cada parcela pode ser editada depois.</small></label><div className="modal-actions"><button type="button" className="secondary-button" onClick={closeFinanceModal}>Cancelar</button><button className="primary-button" type="submit">{editingFinanceEntry ? "Salvar alterações" : "Adicionar lançamento"} <ArrowUpRight size={16} /></button></div>
-          </form>
-        </div>
-      )}
-      {deletingFinanceEntry && (
-        <div className="modal-backdrop" onMouseDown={() => setDeletingFinanceEntry(null)}>
-          <section className="project-modal delete-revenue-modal" role="dialog" aria-modal="true" aria-labelledby="delete-revenue-title" onMouseDown={(event) => event.stopPropagation()}>
-            <span className="delete-revenue-icon"><Trash2 size={22} /></span>
-            <div><span className="eyebrow">EXCLUIR LANÇAMENTO</span><h2 id="delete-revenue-title">Remover este lançamento?</h2><p><b>{deletingFinanceEntry.project}</b>, no valor de <b>{formatCurrency(deletingFinanceEntry.amount)}</b>, será removido do financeiro e dos indicadores do mês.</p></div>
-            <div className="modal-actions"><button type="button" className="secondary-button" onClick={() => setDeletingFinanceEntry(null)}>Manter lançamento</button><button type="button" className="danger-button" onClick={deleteFinanceEntry}>Excluir lançamento <Trash2 size={15} /></button></div>
-          </section>
-        </div>
-      )}
-      {eventModalOpen && (
-        <div className="modal-backdrop" onMouseDown={() => setEventModalOpen(false)}>
-          <form key={editingEvent?.id || eventDate || "new-event"} className="project-modal calendar-event-modal" role="dialog" aria-modal="true" aria-labelledby="event-title" onSubmit={addCalendarEvent} onMouseDown={(event) => event.stopPropagation()}>
-            <div className="modal-head"><div><span>{editingEvent ? "EDITAR COMPROMISSO" : "NOVO COMPROMISSO"}</span><h2 id="event-title">{editingEvent ? "Atualize sua agenda" : "Reserve um horário"}</h2><p>Defina o intervalo de cada trabalho e visualize sua disponibilidade.</p></div><button type="button" onClick={() => setEventModalOpen(false)}><X size={19} /></button></div>
-            <label>Título<input name="title" defaultValue={editingEvent?.title} required autoFocus placeholder="Ex.: Gravação externa — campanha verão" /></label>
-            <label>Data do trabalho<input name="date" type="date" required defaultValue={eventDraft.date} onInput={e=>{const value=e.currentTarget.value;setEventDraft(d=>({...d,date:value}));setEventError("");}} /></label>
-            <div className="form-grid time-range-fields"><label>Horário de início<input name="time" type="time" required defaultValue={eventDraft.time} onInput={e=>{const value=e.currentTarget.value;setEventDraft(d=>({...d,time:value}));setEventError("");}} /></label><label>Horário de término<input name="endTime" type="time" required defaultValue={eventDraft.endTime} onInput={e=>{const value=e.currentTarget.value;setEventDraft(d=>({...d,endTime:value}));setEventError("");}} /></label></div>
-            {eventError && <p className="event-form-error" role="alert">{eventError}</p>}
-            {validTimeRange(eventDraft.time,eventDraft.endTime) && <div className={`event-availability ${overlappingEvents.length ? "has-overlap" : ""}`} role="status"><Clock3 size={16}/><div><b>{eventDuration(eventDraft)} de duração{overlappingEvents.length ? " · atenção ao horário" : " · horário disponível"}</b><span>{overlappingEvents.length ? `Coincide com: ${overlappingEvents.map(e=>`${e.title} (${eventRange(e)})`).join("; ")}. Você pode salvar se os trabalhos forem simultâneos.` : "Nenhum outro compromisso com duração definida neste intervalo."}</span></div></div>}
-            <div className="form-grid"><label>Tipo<select name="type" defaultValue={editingEvent?.type || "Produção"}><option>Produção</option><option>Entrega</option><option>Reunião</option><option>Aprovação</option></select></label><label>Cliente<input name="client" defaultValue={editingEvent?.client} placeholder="Nome do cliente ou Interno" /></label></div>
-            <label>Projeto vinculado<select name="projectId" defaultValue={editingEvent?.projectId || selectedProject || ""}><option value="">Sem projeto</option>{projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
-            <div className="modal-actions"><button type="button" className="secondary-button" onClick={() => setEventModalOpen(false)}>Cancelar</button><button className="primary-button" type="submit">Salvar compromisso <CalendarDays size={16} /></button></div>
-          </form>
-        </div>
-      )}
-      <nav className="mobile-bottom-nav" aria-label="Navegação no celular">
-        <button className={view === "overview" ? "active" : ""} aria-current={view === "overview" ? "page" : undefined} onClick={()=>changeView("overview")}><LayoutDashboard size={20}/><span>Início</span></button>
-        <button className={view === "projects" ? "active" : ""} aria-current={view === "projects" ? "page" : undefined} onClick={()=>changeView("projects")}><Folder size={20}/><span>Projetos</span></button>
-        <button className={view === "calendar" ? "active" : ""} aria-current={view === "calendar" ? "page" : undefined} onClick={()=>changeView("calendar")}><CalendarDays size={20}/><span>Agenda</span></button>
-        <button className={view === "finance" ? "active" : ""} aria-current={view === "finance" ? "page" : undefined} onClick={()=>changeView("finance")}><WalletCards size={20}/><span>Financeiro</span></button>
-        <button className={["clients","reviews","library"].includes(view) ? "active" : ""} aria-label="Mais opções de navegação" onClick={()=>setMobileOpen(true)}><Menu size={20}/><span>Mais</span></button>
-      </nav>
-      {toast && <div className="toast"><Check size={16} /> {toast}</div>}
-    </div>
-  );
+}
+@media (min-width: 821px) and (max-width: 1120px) {
+  .app-view-overview .page-heading { gap: 10px; }
+  .app-view-overview .flow-numbers { gap: clamp(8px, 1.8dvh, 20px) 0; }
+  .app-view-overview .flow-numbers strong { font-size: clamp(1.75rem, 4.5dvh, 2.6rem); }
+}
+@media (min-width: 821px) and (max-height: 680px) {
+  .app-view-overview .page { gap: 8px; padding-top: 10px; padding-bottom: 10px; }
+  .app-view-overview .page-heading h1 { font-size: clamp(1.75rem, 5dvh, 2.5rem); margin-bottom: 2px; }
+  .app-view-overview .page-heading p { font-size: .9375rem; }
+  .app-view-overview .flow-overview-head .eyebrow { font-size: .8125rem; }
+  .app-view-overview .flow-numbers { margin: 7px 0; }
+  .app-view-overview .flow-progress { padding: 8px 0; }
+  .app-view-overview .flow-legend { margin-top: 6px; }
+  .app-view-overview .flow-next { padding: 8px 0; }
 }
 
-function Overview({ projects, setView, onOpenProject }: { projects: Project[]; setView: (view: View) => void; onOpenProject:(id:number)=>void }) {
-  return <>
-    <div className="dashboard-grid">
-      <div className="panel projects-panel">
-        <div className="panel-head"><div><span>EM ANDAMENTO</span><h2>Projetos recentes</h2></div><button onClick={() => setView("projects")}>Ver todos <ChevronRight size={15} /></button></div>
-        <div className="project-list">{projects.slice(0, 4).map((project) => <ProjectRow project={project} key={project.id} onOpen={() => onOpenProject(project.id)} />)}{!projects.length && <div className="empty-state compact"><FolderOpen size={27} /><h3>Seu espaço está pronto</h3><p>Crie o primeiro projeto para começar a organizar sua produção.</p><button className="primary-button" onClick={() => setView("projects")}>Começar agora</button></div>}</div>
-      </div>
 
-    </div>
-
-  </>;
+/* Activity history: meaningful preview within the dashboard, full detail in a fixed drawer. */
+.flow-activity-preview {
+  border-top:1px solid #363638;
+  padding:clamp(10px,1.7dvh,18px) 0 clamp(12px,1.8dvh,18px);
+  min-width:0;
 }
-
-function ProjectRow({ project, onOpen }: { project: Project; onOpen: () => void }) {
-  return <button className="project-row" onClick={onOpen}>
-    <BrandAvatar initials={project.initials} color={project.color} /><div className="project-name"><b>{project.name}</b><small>{project.client} · {project.files} arquivos</small></div>
-    <StatusBadge status={project.status} /><div className="progress-cell"><span><i style={{ width: `${project.progress}%` }} /></span><small>{project.progress}%</small></div>
-    <div className="due-cell"><small>Prazo</small><b>{project.due}</b></div><ChevronRight size={16} />
-  </button>;
+.flow-activity-header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; }
+.flow-activity-header > span { display:inline-flex; align-items:center; gap:9px; font-size:.98rem; font-weight:600; }
+.flow-activity-header > span svg { color:#aaa; }
+.flow-activity-open { border:0; background:transparent; color:#d8d8da; padding:7px 0 7px 8px; font-size:.875rem; font-weight:600; cursor:pointer; text-align:right; }
+.flow-activity-open:hover { color:white; }
+.flow-activity-empty { margin:6px 0 0; font-size:.875rem; color:#aaa; }
+.flow-activity-rows { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.activity-history-item { display:flex; align-items:flex-start; min-width:0; gap:12px; padding:14px 0; border-bottom:1px solid #323234; }
+.activity-history-item.is-compact { padding:6px 0; border-bottom:0; align-items:center; }
+.activity-kind-icon { flex:0 0 38px; width:38px; height:38px; display:grid; place-items:center; border-radius:11px; background:rgba(160,160,170,.12); color:#bbb; }
+.activity-kind-projects { color:#63a4ff; background:rgba(52,141,244,.12); }
+.activity-kind-finance { color:#50d6a2; background:rgba(32,205,99,.1); }
+.activity-kind-clients { color:#c5a0ff; background:rgba(128,86,238,.14); }
+.activity-kind-calendar { color:#ffbf67; background:rgba(244,174,57,.13); }
+.activity-history-copy { flex:1; min-width:0; display:flex; flex-direction:column; gap:3px; }
+.activity-history-copy strong { font-weight:600; color:#f4f4f5; font-size:.875rem; line-height:1.3; }
+.activity-history-copy span { color:#adadb2; font-size:.8125rem; line-height:1.35; overflow-wrap:anywhere; }
+.activity-history-item.is-compact .activity-history-copy strong,
+.activity-history-item.is-compact .activity-history-copy span { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.activity-history-item time { color:#a3a3a9; flex:0 0 auto; font-size:.75rem; font-variant-numeric:tabular-nums; line-height:1.5; }
+.activity-history-overlay { position:fixed; inset:0; z-index:90; display:flex; justify-content:flex-end; }
+.activity-history-backdrop { position:absolute; inset:0; width:100%; height:100%; border:0; background:rgba(0,0,0,.55); backdrop-filter:blur(3px); cursor:default; }
+.activity-history-drawer { position:relative; width:min(440px,100vw); height:100dvh; background:#19191b; border-left:1px solid #36363a; color:#f5f5f6; box-shadow:-22px 0 65px #0006; display:flex; flex-direction:column; min-width:0; }
+.activity-drawer-heading { flex:0 0 auto; display:flex; justify-content:space-between; gap:18px; align-items:flex-start; padding:30px 26px 19px; }
+.activity-drawer-heading h2 { margin:0; font-size:1.4rem; line-height:1.2; font-weight:700; letter-spacing:-.025em; }
+.activity-drawer-heading p { margin:8px 0 0; color:#adadb4; font-size:.9rem; line-height:1.5; }
+.activity-drawer-close { display:grid; place-items:center; flex:0 0 40px; width:40px; height:40px; border-radius:11px; border:1px solid #414145; background:#2a2a2e; color:inherit; }
+.activity-drawer-filters { display:flex; gap:7px; flex-wrap:wrap; padding:0 26px 18px; border-bottom:1px solid #343438; }
+.activity-drawer-filters button { border:1px solid #404045; border-radius:999px; padding:7px 12px; color:#bfc0c5; background:#232326; font-size:.875rem; font-weight:550; }
+.activity-drawer-filters button.selected { background:#f1f1f2; color:#171719; border-color:#f1f1f2; }
+.activity-drawer-content { flex:1 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; scrollbar-color:#54545a transparent; padding:12px 26px 26px; }
+.activity-history-group h3 { color:#a7a7b0; margin:24px 0 10px; font-size:.8125rem; font-weight:600; }
+.activity-history-group:first-child h3 { margin-top:8px; }
+.activity-history-group .activity-history-item:last-child { border-bottom:0; }
+.activity-drawer-empty { display:flex; align-items:center; flex-direction:column; gap:11px; text-align:center; padding:50px 15px; color:#bbb; }
+.activity-drawer-empty strong { color:#f5f5f6; font-size:1rem; }
+.activity-drawer-empty p { margin:0; font-size:.875rem; max-width:300px; }
+.activity-history-drawer button:focus-visible,.flow-activity-open:focus-visible { outline:2px solid #80b7ff; outline-offset:3px; }
+:root:not([data-theme="dark"]) .flow-activity-preview { border-color:#e4e4e5; }
+:root:not([data-theme="dark"]) .flow-activity-header > span { color:#1f2023; }
+:root:not([data-theme="dark"]) .flow-activity-header > span svg,
+:root:not([data-theme="dark"]) .flow-activity-empty { color:#666; }
+:root:not([data-theme="dark"]) .flow-activity-open { color:#343437; }
+:root:not([data-theme="dark"]) .flow-activity-open:hover { color:#000; }
+:root:not([data-theme="dark"]) .activity-history-drawer { background:#fff; color:#191919; border-color:#e1e1e4; box-shadow:-22px 0 65px #0002; }
+:root:not([data-theme="dark"]) .activity-drawer-heading p,
+:root:not([data-theme="dark"]) .activity-history-copy span,
+:root:not([data-theme="dark"]) .activity-history-item time,
+:root:not([data-theme="dark"]) .activity-history-group h3 { color:#666872; }
+:root:not([data-theme="dark"]) .activity-history-copy strong,
+:root:not([data-theme="dark"]) .activity-drawer-empty strong { color:#1a1a1c; }
+:root:not([data-theme="dark"]) .activity-drawer-close,
+:root:not([data-theme="dark"]) .activity-drawer-filters button { background:#f4f4f5; color:#303035; border-color:#dfdfe2; }
+:root:not([data-theme="dark"]) .activity-drawer-filters button.selected { background:#202024; color:white; border-color:#202024; }
+:root:not([data-theme="dark"]) .activity-drawer-filters,
+:root:not([data-theme="dark"]) .activity-history-item { border-color:#e8e8e9; }
+:root:not([data-theme="dark"]) .activity-drawer-empty { color:#666; }
+:root:not([data-theme="dark"]) .app-view-overview .flow-legend > span > span { color:#626267; }
+@media(min-width:821px) and (max-height:740px) {
+  .app-view-overview .flow-activity-rows > :nth-child(n+2) { display:none; }
+  .app-view-overview .flow-activity-preview { padding:8px 0 9px; }
+  .app-view-overview .flow-activity-header { margin-bottom:3px; }
 }
-
-function ClientsView({ clients, onOpen, onAdd,totalCount,recurringCount,activeProjectsCount,hasMore,onMore }: {
-  clients:Client[];onOpen:(id:number)=>void;onAdd:()=>void;
-  totalCount?:number;recurringCount?:number;activeProjectsCount?:number;
-  hasMore?:boolean;onMore?:()=>void;
-}) {
-  const recurring = recurringCount ?? clients.filter(client=>client.type==="Recorrente").length;
-  const total = totalCount ?? clients.length;
-  const activeProjects = activeProjectsCount ?? clients.reduce((n,client)=>n+client.active,0);
-  return <div className="panel full-panel client-panel">
-    <div className="client-summary"><div><span className="client-summary-label"><IconLabel icon={UsersRound} size={18}>CLIENTES CADASTRADOS</IconLabel></span><strong>{total}</strong><small>{activeProjects} {activeProjects === 1 ? "projeto em produção" : "projetos em produção"}</small></div><div><span className="client-summary-label"><IconLabel icon={Repeat2} size={18}>CLIENTES RECORRENTES</IconLabel></span><strong>{recurring}</strong><small className="positive">{Math.round(recurring / Math.max(1, total) * 100)}% da carteira</small></div><div><span className="client-summary-label"><IconLabel icon={UserRound} size={18}>CLIENTES AVULSOS</IconLabel></span><strong>{total - recurring}</strong><small>Trabalhos pontuais</small></div></div>
-    <div className="client-toolbar"><div><b><IconLabel icon={ContactRound}>Carteira de clientes</IconLabel></b><small>{total>clients.length?`${clients.length} de ${total} carregados · `:""}Classifique cada relacionamento para entender melhor sua receita.</small></div><button className="secondary-button" onClick={onAdd}><UserRoundPlus size={15} /> Adicionar cliente</button></div>
-    <div className="client-list-head"><span>Cliente</span><span>Relacionamento</span><span>Contato</span><span>Projetos</span><span>Desde</span><span /></div>
-    <div className="client-list">{clients.map((client) => <button key={client.id} onClick={() => onOpen(client.id)}><div><BrandAvatar initials={client.initials} color={client.color} /><b>{client.name}</b></div><span><i className={`client-type ${client.type === "Recorrente" ? "recurring" : "one-off"}`}>{client.type === "Recorrente" ? <><Building2 size={12} /> Recorrente</> : <><ReceiptText size={12} /> Avulso</>}</i></span><span className="client-contact-meta"><b>{client.contact}</b><small>{client.phone || client.email || "Sem telefone ou e-mail"}</small>{client.phone && client.email && <small>{client.email}</small>}</span><span>{client.projects}</span><span>{client.since}</span><ChevronRight size={16} /></button>)}{!clients.length && <div className="empty-state"><Users size={30} /><h3>Nenhum cliente cadastrado</h3><p>Adicione o primeiro cliente e defina se o relacionamento é recorrente ou avulso.</p><button className="primary-button" onClick={onAdd}>Adicionar primeiro cliente</button></div>}</div>{hasMore&&<div className="modal-actions"><button type="button" className="secondary-button" onClick={onMore}>Carregar mais clientes <ChevronDown size={16}/></button></div>}
-  </div>;
+@media(max-width:820px) {
+  .app-view-overview .flow-activity-preview { margin:0 -20px; padding:18px 20px; }
+  .app-view-overview .flow-activity-rows { grid-template-columns:1fr; gap:5px; }
+  .activity-history-drawer { width:min(440px,100vw); }
+  .activity-drawer-heading { padding:24px 19px 17px; }
+  .activity-drawer-filters { padding:0 19px 16px; }
+  .activity-drawer-content { padding:12px 19px max(26px,env(safe-area-inset-bottom)); }
 }
-
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+@media(max-width:430px) {
+  .activity-drawer-heading h2 { font-size:1.25rem; }
+  .app-view-overview .flow-activity-header { align-items:flex-start; }
+  .app-view-overview .flow-activity-open { font-size:.8125rem; }
+  .activity-history-item { gap:9px; }
+  .activity-kind-icon { flex-basis:34px; width:34px; height:34px; }
 }
-
-const calendarMonthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
-const weekNames = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
-
-function dateKey(year: number, month: number, day: number) {
-  const date = new Date(year, month, day);
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+@media(prefers-reduced-motion:no-preference) {
+  .activity-history-drawer { animation:activity-drawer-enter .18s ease-out both; }
+  @keyframes activity-drawer-enter { from {transform:translateX(22px);opacity:.7;} to {transform:translateX(0);opacity:1;} }
 }
-
-function CalendarView({ events, onAdd, onEdit, onDelete, onMonthChange }: { events: CalendarEvent[]; onAdd: (date: string) => void; onEdit: (entry: CalendarEvent) => void; onDelete: (entry: CalendarEvent) => void;onMonthChange?:(year:number,month:number)=>void }) {
-  const now = new Date();
-  const today = dateKey(now.getFullYear(), now.getMonth(), now.getDate());
-  const [cursor, setCursor] = useState(new Date(now.getFullYear(), now.getMonth(), 1));
-  const [selectedDate, setSelectedDate] = useState(today);
-  const year = cursor.getFullYear();
-  const month = cursor.getMonth();
-  useEffect(()=>onMonthChange?.(year,month),[year,month,onMonthChange]);
-  const firstWeekday = new Date(year, month, 1).getDay();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const previousDays = new Date(year, month, 0).getDate();
-  const cells = Array.from({ length: 42 }, (_, index) => {
-    const raw = index - firstWeekday + 1;
-    if (raw < 1) return { day: previousDays + raw, current: false, key: dateKey(year, month - 1, previousDays + raw) };
-    if (raw > daysInMonth) return { day: raw - daysInMonth, current: false, key: dateKey(year, month + 1, raw - daysInMonth) };
-    return { day: raw, current: true, key: dateKey(year, month, raw) };
-  });
-  const selectedEvents = events.filter((event) => event.date === selectedDate).sort((a, b) => a.time.localeCompare(b.time));
-  const upcoming = events.filter((event) => event.date >= selectedDate).sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`)).slice(0, 4);
-
-  return <div className="calendar-layout">
-    <section className="panel calendar-panel">
-      <div className="calendar-toolbar"><div><button aria-label="Mês anterior" onClick={() => setCursor(new Date(year, month - 1, 1))}><ChevronLeft size={17} /></button><button aria-label="Próximo mês" onClick={() => setCursor(new Date(year, month + 1, 1))}><ChevronRight size={17} /></button></div><h2>{calendarMonthNames[month]} <span>{year}</span></h2><button className="secondary-button" onClick={() => { const current = new Date(); setCursor(new Date(current.getFullYear(), current.getMonth(), 1)); setSelectedDate(dateKey(current.getFullYear(), current.getMonth(), current.getDate())); }}>Hoje</button></div>
-      <div className="calendar-week">{weekNames.map((name) => <span key={name}>{name}</span>)}</div>
-      <div className="calendar-grid">{cells.map((cell) => {
-        const dayEvents = events.filter((event) => event.date === cell.key);
-        return <button key={cell.key} className={`${cell.current ? "" : "outside"} ${selectedDate === cell.key ? "selected" : ""}`} onClick={() => { setSelectedDate(cell.key); if (!cell.current) setCursor(new Date(`${cell.key}T12:00:00`)); }}><b>{cell.day}</b><div>{dayEvents.slice(0, 2).map((event) => <span className={`event-chip ${event.type.toLowerCase().replace("ã", "a")}`} key={event.id}><i />{event.time}{event.endTime ? `–${event.endTime}` : ""} {event.title}</span>)}{dayEvents.length > 2 && <small>+{dayEvents.length - 2} compromissos</small>}</div></button>;
-      })}</div>
-    </section>
-    <aside className="panel agenda-panel">
-      <div className="panel-head"><div><span>AGENDA DO DIA</span><h2>{new Date(`${selectedDate}T12:00:00`).toLocaleDateString("pt-BR", { day: "2-digit", month: "long" })}</h2></div><button aria-label="Adicionar compromisso neste dia" onClick={() => onAdd(selectedDate)}><Plus size={17} /></button></div>
-      <div className="day-agenda">{selectedEvents.length ? selectedEvents.map((event) => <article key={event.id}><time><b>{event.time}</b><span>{event.endTime || "Sem término"}</span></time><div><i className={event.type.toLowerCase().replace("ã", "a")} /><b>{event.title}</b><small>{event.client} · {event.type}{eventDuration(event) ? ` · ${eventDuration(event)}` : ""}</small>{selectedEvents.some(other=>overlaps(event,other)) && <span className="overlap-label">Horário sobreposto</span>}<span className="revenue-actions"><button aria-label={`Editar ${event.title}`} onClick={() => onEdit(event)}><Pencil size={15}/></button><button aria-label={`Excluir ${event.title}`} onClick={() => onDelete(event)}><Trash2 size={15}/></button></span></div></article>) : <div className="agenda-empty"><CalendarDays size={28} /><b>Dia livre</b><span>Nenhum compromisso nesta data.</span><button onClick={() => onAdd(selectedDate)}>Adicionar compromisso</button></div>}</div>
-      <div className="upcoming-list"><span>PRÓXIMOS COMPROMISSOS</span>{upcoming.map((event) => <article key={event.id}><div><b>{new Date(`${event.date}T12:00:00`).getDate()}</b><small>{monthLabels[new Date(`${event.date}T12:00:00`).getMonth()]}</small></div><p><b>{event.title}</b><small>{eventRange(event)} · {event.client}</small></p></article>)}</div>
-    </aside>
-  </div>;
-}
-
-function assetIcon(kind: AssetKind) {
-  return kind === "Vídeo" ? FileVideo : kind === "Imagem" ? ImageIcon : kind === "Áudio" ? FileAudio : FileText;
-}
-
-function LibraryView({ assets, query, onUpload, projects, selectedProjectId, onSelectProject, onLinkedFolderCountChange }: { assets: LibraryAsset[]; query: string; onUpload: (files: FileList | null) => void; projects: readonly Project[]; selectedProjectId?:number; onSelectProject:(id:string)=>void; onLinkedFolderCountChange?:(count:number)=>void }) {
-  const [kind, setKind] = useState<AssetKind | "Todos">("Todos");
-  const [layout, setLayout] = useState<"grid" | "list">("grid");
-  const [sort, setSort] = useState("recent");
-  const filteredAssets = assets.filter((asset) => (kind === "Todos" || asset.kind === kind) && `${asset.name} ${asset.project}`.toLowerCase().includes(query.toLowerCase())).sort((a,b) => sort === "name" ? a.name.localeCompare(b.name, "pt-BR") : b.id - a.id);
-  const totalMb = assets.reduce((total, asset) => total + Number(asset.size.replace(",", ".").replace(/[^0-9.]/g, "")) * (asset.size.includes("KB") ? .001 : 1), 0);
-  const kinds: (AssetKind | "Todos")[] = ["Todos", "Vídeo", "Imagem", "Áudio", "Documento"];
-
-  if (isDemo && import.meta.env.VITE_LIBRARY_REVIEW === "true") return <LibraryReviewDemo />;
-  return <div className="library-layout">
-    {!isDemo && (!useEmulators || (import.meta.env.MODE === "emulator" && new URLSearchParams(window.location.search).get("driveE2E") === "1")) && <DriveConnectionPanel projects={projects} selectedProjectId={selectedProjectId} onSelectProject={onSelectProject} onLinkedFolderCountChange={onLinkedFolderCountChange} />}
-    {(isDemo || assets.length>0) && <>
-    <div className="library-summary"><article><span><HardDrive size={18} /></span><div><small>ARQUIVOS</small><b>{assets.length}</b></div></article><article><span><Film size={18} /></span><div><small>ARMAZENAMENTO</small><b>{totalMb >= 1024 ? `${(totalMb / 1024).toFixed(1)} GB` : `${Math.round(totalMb)} MB`}</b></div></article><article><span><CalendarDays size={18} /></span><div><small>ADICIONADOS ESTE MÊS</small><b>{assets.filter(a => toISOAdded(a.addedAt).slice(0,7) === new Date().toLocaleDateString("en-CA").slice(0,7)).length}</b></div></article></div>
-    <section className="panel library-panel">
-      <div className="library-toolbar"><div className="filter-pills">{kinds.map((item) => <button key={item} className={kind === item ? "active" : ""} onClick={() => setKind(item)}>{item}</button>)}</div><div><select aria-label="Ordenar arquivos" value={sort} onChange={e => setSort(e.target.value)}><option value="recent">Mais recentes</option><option value="name">Nome A–Z</option></select><button className={`view-button ${layout === "grid" ? "active" : ""}`} onClick={() => setLayout("grid")}><Grid2X2 size={16} /></button><button className={`view-button ${layout === "list" ? "active" : ""}`} onClick={() => setLayout("list")}><ListFilter size={16} /></button></div></div>
-      <div className={`asset-collection ${layout}`}>{filteredAssets.map((asset) => { const Icon = assetIcon(asset.kind); return <article className="asset-card" key={asset.id}><div className={`asset-preview ${asset.color}`} style={asset.kind === "Imagem" && asset.url ? { backgroundImage: `url(${asset.url})` } : undefined}><Icon size={30} /><span>{asset.kind.toUpperCase()}</span></div><div className="asset-copy"><Icon size={17} /><div><b title={asset.name}>{asset.url ? <a href={asset.url} target="_blank" rel="noreferrer">{asset.name}</a> : asset.name}</b><small>{asset.project} · V{asset.version || 1}</small></div><span>{asset.size}</span><time>{asset.addedAt}</time><span>{asset.url ? <a href={`${asset.url}&download=1`} className="secondary-button" download>Baixar</a> : <small>Reenvie o arquivo</small>}</span></div></article>; })}</div>
-      {!filteredAssets.length && <div className="library-empty"><FolderOpen size={34} /><h3>Nenhum arquivo encontrado</h3><p>Altere o filtro ou adicione novos materiais à biblioteca.</p></div>}
-      <label className="library-drop"><Upload size={22} /><b>Clique para enviar arquivos</b><span>Vídeo, áudio, imagens, PDFs e documentos</span><input type="file" multiple onChange={(event) => { onUpload(event.target.files); event.target.value = ""; }} /></label>
-    </section>
-    </>}
-  </div>;
-}
-

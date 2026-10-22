@@ -26,7 +26,7 @@ test('project covers require Drive, persist crop, cancel safely and support remo
  await register(page,'cover-'+info.project.name+'@example.com');
  await expect(page.getByRole('button',{name:'Adicionar capa',exact:true})).toHaveCount(0);await expect(page.locator('.pc-photo')).toHaveCount(0);
  png=Buffer.from(await page.evaluate(()=>{const c=document.createElement('canvas');c.width=1200;c.height=800;const ctx=c.getContext('2d')!;const g=ctx.createLinearGradient(0,0,1200,800);g.addColorStop(0,'#08527d');g.addColorStop(.5,'#d88229');g.addColorStop(1,'#18182c');ctx.fillStyle=g;ctx.fillRect(0,0,1200,800);ctx.fillStyle='#ffffff30';for(let x=50;x<1200;x+=100)ctx.fillRect(x,100,20,600);return c.toDataURL('image/png').split(',')[1];}),'base64');
- connected=true;await page.reload();if(info.project.name==='desktop')await page.locator('.sidebar nav').getByRole('button',{name:'Alternar aparência',exact:true}).click();await page.getByRole('button',{name:'Adicionar capa',exact:true}).click();
+ connected=true;await page.reload();if(info.project.name==='desktop'){await page.getByRole('button',{name:'Opções da conta',exact:true}).click();await page.getByRole('button',{name:'Ativar modo escuro',exact:true}).click();}await page.getByRole('button',{name:'Adicionar capa',exact:true}).click();
  const modal=page.locator('.pc-dialog');
  const initialBounds=(await modal.boundingBox())!;
  async function stableModal(){const bounds=(await modal.boundingBox())!;for(const key of ['x','y','width','height'] as const)expect(Math.abs(bounds[key]-initialBounds[key])).toBeLessThanOrEqual(1);}
