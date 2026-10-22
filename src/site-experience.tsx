@@ -69,7 +69,7 @@ export function SiteExperience() {
     function move(event: PointerEvent) {
       if (!enabled || event.pointerType === "touch") { hide(); return; }
       const target = event.target instanceof Element ? event.target : null;
-      if (!target || target.closest('input:not([type="checkbox"]):not([type="radio"]), textarea, select, video, iframe, [contenteditable="true"], [data-native-cursor]')) { hide(); return; }
+      if (!target || target.closest('dialog, input:not([type="checkbox"]):not([type="radio"]), textarea, select, video, iframe, [contenteditable="true"], [data-native-cursor]')) { hide(); return; }
       x = event.clientX; y = event.clientY;
       if (!visible) { currentX = x; currentY = y; }
       visible = true;

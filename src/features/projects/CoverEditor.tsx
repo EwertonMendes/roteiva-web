@@ -1,5 +1,5 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
-import {ArrowLeft,Check,LoaderCircle,RotateCcw,Search,Trash2,X} from 'lucide-react';
+import {ArrowLeft,Check,LoaderCircle,ChevronDown,Search,Trash2,X} from 'lucide-react';
 import type {Project,ProjectCover} from '../../domain/workspace';
 import {useDriveApi} from '../drive/drive-api';
 import type {DriveItem} from '../drive/DriveLibraryUI';
@@ -31,7 +31,7 @@ export function CoverEditor({project,onClose,onSave}:{project:Project;onClose:()
   return ()=>controller.abort();
  },[account,canRead,choosing,term,moreToken,call,retry]);
  function select(file:DriveItem){setCover({connectionId:account,fileId:file.id,name:file.name,x:50,y:50,zoom:1});setChoosing(false);}
- return <dialog ref={dialog} className="pc-dialog" aria-labelledby="pc-editor-title" onCancel={e=>{e.preventDefault();onClose();}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+ return <dialog data-native-cursor ref={dialog} className="pc-dialog" aria-labelledby="pc-editor-title" onCancel={e=>{e.preventDefault();onClose();}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
   <header><div><span className="eyebrow">CAPA DO PROJETO</span><h2 id="pc-editor-title">{choosing?'Escolha uma imagem':'Encontre o melhor enquadramento'}</h2><p>{project.name}</p></div><button className="icon-button" type="button" onClick={onClose} aria-label="Fechar editor de capa"><X size={20}/></button></header>
   <div className="pc-editor-body">
    {choosing?<>
@@ -42,14 +42,12 @@ export function CoverEditor({project,onClose,onSave}:{project:Project;onClose:()
      <div className="pc-image-grid" aria-busy={busy}>{page.files.map(file=><button type="button" key={file.id} onClick={()=>select(file)} title={file.name}><DriveThumbnail item={file} scope={context.uid+':'+account} getThumbnail={thumbnail}/><span>{file.name}</span></button>)}</div>
      {busy?<p role="status" className="pc-loading"><LoaderCircle size={20} className="pc-spin"/>Carregando imagens…</p>:!page.files.length&&!error?<p className="pc-empty">Nenhuma imagem encontrada. Tente outro nome ou confira os formatos e tamanhos.</p>:null}
      {page.incompleteSearch&&<p role="status">O Drive retornou resultados parciais. Refine a busca pelo nome.</p>}
-     {page.nextPageToken&&<button className="secondary-button" type="button" disabled={busy} onClick={()=>setMoreToken(page.nextPageToken!)}>Carregar mais imagens</button>}
+     {page.nextPageToken&&<div className="pc-image-more"><button className="secondary-button" type="button" disabled={busy} onClick={()=>setMoreToken(page.nextPageToken!)}>{busy?<LoaderCircle size={18} className="pc-spin" aria-hidden="true"/>:<ChevronDown size={18} aria-hidden="true"/>}{busy?"Carregando imagens…":"Carregar mais imagens"}</button></div>}
     </>}
    </>:cover?<>
     <button type="button" className="pc-text-button" onClick={()=>setChoosing(true)}><ArrowLeft size={16}/>Escolher outra imagem</button>
     <div className="pc-editor-preview">{src?<CoverFrame src={src} cover={cover} onChange={setCover}/>:<p role={imageError?'alert':'status'}>{imageError||'Carregando imagem…'}</p>}</div>
-    <p className="pc-helper">Arraste a imagem para posicionar. Você também pode usar os controles abaixo.</p>
-    <div className="pc-crop-controls">{([{key:'zoom',label:'Zoom',min:1,max:3,step:.01},{key:'x',label:'Posição horizontal',min:0,max:100,step:1},{key:'y',label:'Posição vertical',min:0,max:100,step:1}] as const).map(control=><label key={control.key} htmlFor={"pc-crop-"+control.key}><span>{control.label}<output>{control.key==='zoom'?Math.round(cover.zoom*100)+'%':Math.round(cover[control.key])+'%'}</output></span><input id={"pc-crop-"+control.key} aria-label={control.label} type="range" min={control.min} max={control.max} step={control.step} value={cover[control.key]} onChange={e=>setCover({...cover,[control.key]:Number(e.target.value)})}/></label>)}</div>
-    <button type="button" className="pc-text-button" onClick={()=>setCover({...cover,x:50,y:50,zoom:1})}><RotateCcw size={16}/>Redefinir enquadramento</button>
+    <p id="pc-gesture-help" className="pc-helper pc-gesture-help">Arraste para reposicionar. Use a roda do mouse ou faça pinça para ajustar o zoom.<span> No teclado, use as setas para mover, + e − para ampliar e Home para redefinir.</span></p>
    </>:null}
   </div>
   <footer><div>{project.cover&&<button type="button" className="pc-text-button" onClick={()=>{onSave(undefined);onClose();}}><Trash2 size={16}/>Remover capa</button>}</div><button type="button" className="secondary-button" onClick={onClose}>Cancelar</button><button type="button" className="primary-button" disabled={choosing||!cover||!src||!!imageError} onClick={()=>{if(cover){onSave(cover);onClose();}}}><Check size={17}/>Salvar capa</button></footer>

@@ -16,7 +16,7 @@
 .studio-cursor-ring.is-active > i { transform: scale(1.4); background: rgba(255,255,255,.1); border-color: rgba(255,255,255,.85); }
 .studio-cursor-ring.is-pressed > i { transform: scale(.8); }
 @media (hover:hover) and (pointer:fine) and (prefers-reduced-motion:no-preference) {
- :root[data-roteiva-cursor="on"] body,:root[data-roteiva-cursor="on"] body * { cursor: none !important; }
+ :root[data-roteiva-cursor="on"]:not(:has(dialog:modal)) body,:root[data-roteiva-cursor="on"]:not(:has(dialog:modal)) body * { cursor: none !important; }
  .studio-cursor-ring,.studio-cursor-dot { display: block; }
  .studio-cursor-ring.is-visible,.studio-cursor-dot.is-visible { opacity: 1; }
 }
@@ -30,3 +30,6 @@
  .brand-intro-track span { transition: none; }
  .studio-cursor-ring,.studio-cursor-dot { display: none !important; }
 }
+
+/* Native dialogs occupy the top layer, above any decorative page cursor. */
+:root:has(dialog:modal) .studio-cursor-ring,:root:has(dialog:modal) .studio-cursor-dot { display:none; }

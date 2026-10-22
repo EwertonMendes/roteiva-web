@@ -110,4 +110,4 @@ A Biblioteca reaproveita listagens recentes por sessão e busca nomes remotament
 
 ## Projetos e capas do Drive
 
-A listagem de Projetos usa cards com filtros e ícones de situação coloridos. Com o Drive conectado, é possível escolher uma imagem privada (JPG, PNG, WebP ou AVIF, até 8 MB), ajustar posição e zoom e salvar o enquadramento no projeto. Sem conexão, fotos e controles de capa ficam ocultos. A imagem original permanece no Drive.
+A listagem de Projetos usa cards com filtros e ícones de situação coloridos. Com o Drive conectado, é possível escolher uma imagem privada (JPG, PNG, WebP ou AVIF, até 8 MB), reposicionar por arraste, ajustar o zoom com roda do mouse ou pinça e salvar o enquadramento no projeto. Sem conexão, fotos e controles de capa ficam ocultos. A imagem original permanece no Drive.
