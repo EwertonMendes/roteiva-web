@@ -151,7 +151,7 @@ export function ReviewPortal({token}:{token:string}){
     setMediaKey(cacheKey);setPreviewError("");setPlayhead(0);setDuration(null);
     setVideoExpanded(false);playbackResume.current={at:0,playing:false};
     if(activeFileId&&activeVersion&&activeMime){
-      const supported=/^(image|video|audio)\\//.test(activeMime)||activeMime==="application/pdf";
+      const supported=/^(image|video|audio)\//.test(activeMime)||activeMime==="application/pdf";
       if(!supported){setMediaUrl("");setMediaMode("error");setPreviewError(messages.review_media_unsupported);}
       else{
         const existing=activeMime.startsWith("image/")?mediaCache.get(cacheKey):null;
