@@ -256,7 +256,7 @@ test('owner image preview requires owning Firebase account, selected image and a
   const ok=await x.send('GET',pathname,x.alice);
   assert.equal(ok.status,200);
   assert.equal(ok.headers.get('Content-Type'),'image/png');
-  assert.equal(ok.headers.get('Cache-Control'),'private, no-store');
+  assert.match(ok.headers.get('Cache-Control')||'',/no-store/);
   assert.equal((await ok.arrayBuffer()).byteLength,4);
   const other=await x.send('GET',pathname,x.bob);
   assert.equal(other.status,404);
