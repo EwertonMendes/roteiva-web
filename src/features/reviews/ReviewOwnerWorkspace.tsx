@@ -69,7 +69,7 @@ export function ReviewOwnerWorkspace({detail,working,error,onClose,onRevise,onPu
   const [fileSearch,setFileSearch]=useState("");
   const [typeFilter,setTypeFilter]=useState<"all"|"video"|"image"|"audio"|"pdf">("all");
   const [galleryView,setGalleryView]=useState<"grid"|"list">("grid");
-  const [visibleLimit,setVisibleLimit]=useState(12);
+  const [visibleLimit,setVisibleLimit]=useState(6);
   // Resolve the actual immediate parent lazily. Historical approvals need no
   // migration: their owner-only detail already contains the linked project folder.
   const [parentFolders,setParentFolders]=useState<Record<string,string|null>>({});
@@ -85,7 +85,7 @@ export function ReviewOwnerWorkspace({detail,working,error,onClose,onRevise,onPu
   const mediaRef=useRef<HTMLDivElement>(null);
   useEffect(()=>{
     setSelectedFile(featuredId);setNotice("");setFeedbackAll(true);
-    setFileSearch("");setTypeFilter("all");setVisibleLimit(12);
+    setFileSearch("");setTypeFilter("all");setVisibleLimit(6);
   },[review.id,review.version,featuredId]);
   const active=currentAssets.find(a=>a.fileId===selectedFile)||currentAssets[0];
   const parentKey=active?.connectionId&&active.fileId
@@ -130,7 +130,7 @@ export function ReviewOwnerWorkspace({detail,working,error,onClose,onRevise,onPu
   function focusMaterial(comment:Comment){
     setSelectedFile(comment.file_id);
     setFileSearch("");setTypeFilter("all");
-    setVisibleLimit(Math.max(12,currentAssets.findIndex(a=>a.fileId===comment.file_id)+1));
+    setVisibleLimit(Math.max(6,currentAssets.findIndex(a=>a.fileId===comment.file_id)+1));
     setNotice(comment.seconds!==null?
       "Comentário no instante "+formatReviewTime(comment.seconds)+". A prévia do Drive não permite avançar automaticamente para esse segundo; use os controles do vídeo.":"Material selecionado na prévia.");
     mediaRef.current?.scrollIntoView({behavior:"smooth",block:"nearest"});
@@ -203,10 +203,10 @@ export function ReviewOwnerWorkspace({detail,working,error,onClose,onRevise,onPu
             <label className="rowner-gallery-search">
               <Search size={16} aria-hidden="true"/>
               <input aria-label="Buscar materiais por nome" type="search" placeholder="Buscar arquivo…"
-                value={fileSearch} onChange={e=>{setFileSearch(e.target.value);setVisibleLimit(12);}}/>
+                value={fileSearch} onChange={e=>{setFileSearch(e.target.value);setVisibleLimit(6);}}/>
             </label>
             <select aria-label="Filtrar materiais por tipo" value={typeFilter}
-              onChange={e=>{setTypeFilter(e.target.value as typeof typeFilter);setVisibleLimit(12);}}>
+              onChange={e=>{setTypeFilter(e.target.value as typeof typeFilter);setVisibleLimit(6);}}>
               <option value="all">Todos os tipos</option>
               <option value="video">Vídeos</option><option value="image">Imagens</option>
               <option value="audio">Áudios</option><option value="pdf">PDFs</option>
@@ -233,10 +233,10 @@ export function ReviewOwnerWorkspace({detail,working,error,onClose,onRevise,onPu
             </button>)}
           </div>
           {!filteredAssets.length&&<p className="rowner-gallery-empty">Nenhum arquivo corresponde aos filtros.
-            <button type="button" onClick={()=>{setFileSearch("");setTypeFilter("all");setVisibleLimit(12);}}>Limpar filtros</button>
+            <button type="button" onClick={()=>{setFileSearch("");setTypeFilter("all");setVisibleLimit(6);}}>Limpar filtros</button>
           </p>}
           {remainingAssets>0&&<button type="button" className="rowner-gallery-more"
-            onClick={()=>setVisibleLimit(v=>v+12)}>Mostrar mais {Math.min(12,remainingAssets)} de {remainingAssets} arquivos <ChevronRight size={15}/></button>}
+            onClick={()=>setVisibleLimit(v=>v+6)}>Mostrar mais {Math.min(6,remainingAssets)} de {remainingAssets} arquivos <ChevronRight size={15}/></button>}
           {currentAssets.length>=5&&<p className="rowner-gallery-summary">
             Exibindo {visibleAssets.length} de {filteredAssets.length} {filteredAssets.length===1?"resultado":"resultados"}
           </p>}
