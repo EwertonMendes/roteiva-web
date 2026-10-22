@@ -289,32 +289,15 @@
   pointer-events:none;will-change:transform;
   transform-origin:center center;
 }
-.review-image-controls {
-  position:absolute;z-index:2;top:12px;right:12px;
-  display:flex;align-items:center;gap:4px;padding:5px;
-  border:1px solid var(--r-border);border-radius:12px;
-  background:var(--r-card);color:var(--r-ink);
-  box-shadow:0 6px 26px var(--r-shade);
-}
-.review-image-controls button {
-  flex:0 0 34px;width:34px;height:34px;
-  display:grid;place-items:center;border:0;border-radius:8px;
-  background:transparent;color:var(--r-ink);cursor:pointer;
-}
-.review-image-controls button:hover:not(:disabled){background:var(--r-hover)}
-.review-image-controls button:disabled{opacity:.35;cursor:not-allowed}
-.review-image-controls output {
-  min-width:47px;text-align:center;font-size:.75rem;
-  font-variant-numeric:tabular-nums;font-weight:650;color:var(--r-ink);
-}
 @media(max-width:700px){
   .review-portal-stage.is-private.is-image {
     height:clamp(280px,54dvh,480px);
   }
-  .review-image-controls {top:8px;right:8px;padding:3px;gap:2px}
-  .review-image-controls button {width:32px;height:32px;flex-basis:32px}
-  .review-image-controls output {min-width:40px}
 }
 @media(prefers-reduced-motion:reduce){
   .review-private-viewer,.review-image-viewport img{transition:none}
 }
+
+/* Zoom capsule is now shared with project covers and stays at the lower center. */
+.review-image-toolbar{bottom:14px}
+.review-private-viewer.is-expanded .review-image-toolbar{bottom:max(16px,env(safe-area-inset-bottom))}
