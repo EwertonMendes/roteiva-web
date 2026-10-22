@@ -203,7 +203,8 @@ async function detail(env:Env,r:Review){
   ]);
   return {review:{...showReview(r),url:reviewLink(token)},participants:people,votes:votes.results,
     assets:files.map(a=>({
-      version:a.version,fileId:a.file_id,name:a.name,mimeType:a.mime_type,grantState:a.grant_state
+      version:a.version,fileId:a.file_id,name:a.name,mimeType:a.mime_type,grantState:a.grant_state,
+      connectionId:a.connection_id,linkedFolderId:a.linked_folder_id
     })),comments:comments.results,decisions:decisions.results};
 }
 function pages(n:URLSearchParams):number{
