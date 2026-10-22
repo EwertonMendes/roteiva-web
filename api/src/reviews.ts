@@ -741,7 +741,18 @@ async function publicReview(request:Request,env:Env,action:'view'|'comment'|'dec
     const total=r.access_mode==='google'?
       await env.DB.prepare("SELECT COUNT(*) AS count FROM review_participants WHERE review_id=? AND role='reviewer'")
         .bind(r.id).first<{count:number}>():null;
-    return Response.json({review:{title:r.title,message:r.message,studioName:r.studio_name,
+    // The portal already verified this participant and selected the version.
+    // Bundle short-lived signed URLs with the first response, avoiding a second
+    // Worker/D1 round trip every time the user selects another file.
+    const mediaTickets:Record<string,{url:string;expiresAt:number}>={};
+    const subject=r.access_mode==='google'?await reviewMediaSubject(env,r.id,email):undefined;
+    const expiresAt=Math.min(r.expires_at,now()+12*60*1000);
+    for(const file of files){
+      if(!(/^(image|video|audio)\//.test(file.mime_type)||file.mime_type==='application/pdf'))continue;
+      const ticket=await mintReviewMediaTicket(env,r.id,file.file_id,r.current_version,r.expires_at,r.token_hash,subject);
+      mediaTickets[file.file_id]={url:'https://roteiva-api-dev.ewertonmendes9.workers.dev/reviews/media?ticket='+ticket,expiresAt};
+    }
+    return Response.json({mediaTickets,review:{title:r.title,message:r.message,studioName:r.studio_name,
       status:r.status,version:r.current_version,expiresAt:r.expires_at,mode:r.access_mode,
       driveShareEnabled:r.drive_share_enabled===1,
       role:r.access_mode==='google'?role:'reviewer',myVote:myVote?.decision||null,
