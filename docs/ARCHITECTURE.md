@@ -10,6 +10,10 @@
 
 Esta é a fonte de verdade sobre **como o sistema deverá funcionar**. O acompanhamento do que já foi entregue fica no [roadmap](MVP-ROADMAP.md); instruções operacionais em [desenvolvimento](DEVELOPMENT.md). Mudanças de arquitetura e decisões novas devem atualizar este arquivo **no mesmo PR**, conforme [AGENTS.md](../AGENTS.md).
 
+## Homologação de frontend em DEV sem merge (22/10/2026)
+
+**Decisão tomada:** o workflow Frontend DEV permite disparo manual para uma branch de PR aberto, da mesma origem e com base master. Somente o Hosting do Firebase `roteiva-web-dev` é atualizado, com identidade do ambiente protegido e verificações prévias de branch/SHA, PR, Worker de acesso e cache de rotas. Deploy automatizado de `master` continua restrito a `master`; pull requests não executam deploy por padrão. Firestore, D1, Worker, regras e índices não são afetados. A implantação manual pode ser substituída pela próxima publicação automática da master; o PR continua isolado até aprovação.
+
 ## Contrato de componentes de formulário — seleção reutilizável (22/10/2026)
 
 **Decisão tomada (PR #85):** componentes de seleção simples do frontend utilizam `src/features/ui/AppSelect.tsx` e `AppSelect.css`, em vez de delegarem a lista interna ao `<select>` do sistema operacional. O componente recebe `<option>` como dados declarativos, suporta `value`/`onValueChange(string)` ou `defaultValue`; quando `name` é informado, um input oculto espelha o valor para leitura por `FormData`, sem emitir eventos sintéticos falsos. Os IDs, enums e números convertidos no domínio continuam responsabilidade de cada tela.
