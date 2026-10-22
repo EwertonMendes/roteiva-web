@@ -1,5 +1,12 @@
 # Desenvolvimento e deploy — Roteiva
 
+## Homologação manual de um PR no Hosting DEV (22/10/2026)
+
+**Fluxo explícito, sem merge:** o workflow existente `.github/workflows/frontend.yml` aceita `workflow_dispatch` executado com `ref` igual à branch de um PR aberto, **do próprio repositório e direcionado à master**. Após os mesmos testes unitários, TypeScript e build, o job de publicação exige `FIREBASE_PROJECT_ID=roteiva-web-dev`, verifica se o SHA da branch não mudou, consulta a API do GitHub para confirmar PR aberto/head SHA e testa o Worker DEV. Somente então usa o ambiente protegido `firebase-development` para publicar exclusivamente `--only hosting` no canal principal e verificar cache. Não publica banco Firestore, índices, regras nem Worker. A execução manual em master mantém o comportamento existente.
+
+O preview temporário de PR é separado e pode falhar no login por não estar autorizado no Firebase Auth. Para testar com OAuth real, usar o Hosting principal `https://roteiva-web-dev.web.app` **somente após** publicação manual bem-sucedida. Uma publicação futura automática da master poderá substituir a versão em homologação. Registrar sempre SHA, link do workflow e resultado no roadmap. A operação de homologação não faz merge.
+
+
 ## Homologação dos detalhes do projeto — 22/10/2026
 
 `tests/browser/project-detail.spec.ts` utiliza somente a demo isolada em `127.0.0.1:4174`, com dados fictícios, e roda nos projetos desktop/mobile da configuração Playwright existente. `PROJECT_DETAIL_TEST_URL` permite selecionar outra porta local durante QA. Compilar demo antes. Localmente foram reutilizados os binários instalados de Node/TypeScript/Vite/Playwright; o PNPM no sandbox tentou registrar a pasta em um store sem permissão, então os mesmos scripts foram executados diretamente. A configuração temporária de QA fica em `outputs/`, ignorada.
