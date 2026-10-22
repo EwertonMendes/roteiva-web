@@ -251,23 +251,27 @@ test('Google-only review renders private images in both themes without third-par
       body:JSON.stringify({review:{title:'Arte com acesso privado',studioName:'Estúdio QA',message:'',
         mode:'google',role:'reviewer',version:1,status:'pending',expiresAt:Date.now()+86400000},
         assets:[first,second],comments:[],decisions:[]})});
-    if(path==='/reviews/public/file'){
+    if(path==='/reviews/public/media-ticket'){
       requests++;
       const params=req.postDataJSON();
-      expect(params).toEqual({fileId:expect.any(String),version:1,offset:0});
+      expect(params).toEqual({fileId:expect.any(String),version:1});
       if(denied&&params.fileId===second.fileId)
         return route.fulfill({status:403,headers,contentType:'application/json',
           body:JSON.stringify({error:{code:'review_recipient_denied'}})});
-      return route.fulfill({status:206,headers:{...headers,'Content-Range':'bytes 0-'+(png.length-1)+'/'+png.length,
-        'Content-Length':String(png.length)},contentType:'image/png',body:png});
+      return route.fulfill({status:200,headers,contentType:'application/json',
+        body:JSON.stringify({url:api+'/reviews/media?ticket='+params.fileId,expiresAt:Date.now()+600000})});
     }
     return route.fulfill({status:404,headers,body:'{}'});
   });
+  await context.route(api+'/reviews/media?*',async route=>route.fulfill({
+    status:200,contentType:'image/png',headers:{'Access-Control-Allow-Origin':root,'Cache-Control':'private, no-store'},
+    body:png
+  }));
   await page.goto(root+'/review/'+token);
   await expect(page.getByRole('heading',{name:'Arte com acesso privado'})).toBeVisible();
   const preview=page.locator('img.review-private-preview-image');
   await expect(preview).toBeVisible();
-  await expect(preview).toHaveAttribute('src',/^blob:/);
+  await expect(preview).toHaveAttribute('src',/\/reviews\/media\?ticket=/);
   await expect(page.locator('.review-portal-stage iframe')).toHaveCount(0);
   const stage=page.locator('.review-portal-stage.is-image');
   await expect(stage).toBeVisible();
