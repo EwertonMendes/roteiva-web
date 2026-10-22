@@ -571,3 +571,7 @@ Evidências: api/tests/deletion-access.test.mjs (negativa para conta sem provisi
 ## Estabilidade do modal e loading de capas
 
 **IMPLEMENTADO:** altura padrão responsiva entre seleção, carregamento e recorte; rolagem da lista com gutter estável; loadings centralizados horizontal/verticalmente, com spinner e anúncio acessível. Busca não limpa a lista no debounce inicial sem alteração do termo. Evidências: `CoverEditor.tsx`, `projects.css` e `tests/browser/project-covers.spec.ts` (rede atrasada controlada, comparação dos limites do modal e centros dos indicadores, animação do spinner). Resultados automatizados/visuais registrados na PR. Sem mudança de API, regras ou dados.
+
+## Simplificação da barra lateral
+
+**IMPLEMENTADO:** logos originais sem filtros que eliminavam o verde do “i”; lista única de rotas sem Ferramentas, Atividades ou Aparência; menu do perfil com tema e logout. Histórico disponível somente no dashboard e fechado na mudança de rota. Evidências: `SidebarAccountMenu.tsx`, `dashboard-client.tsx`, estilos de marca e `tests/browser/sidebar.spec.ts`; helpers de tema/logout atualizados. TypeScript, testes de domínio e builds validados; resultados visuais e de navegação/conta registrados na PR. Sem alteração de API, modelos ou regras.

@@ -62,7 +62,7 @@ Textos de interface devem explicar o benefício, o estado confirmado e a próxim
 
 ## Layout das telas internas
 
-A barra global de estúdio, busca e ações e a faixa “Seu espaço / Dados na nuvem” foram removidas do layout compartilhado. As telas começam pelo conteúdo; a busca fica em Projetos e Clientes. No celular, um botão no conteúdo abre o menu lateral. Atividades, tema e configurações continuam na lateral. O aviso de demonstração e os alertas reais de sincronização permanecem.
+A barra global de estúdio, busca e ações e a faixa “Seu espaço / Dados na nuvem” foram removidas do layout compartilhado. As telas começam pelo conteúdo; a busca fica em Projetos e Clientes. No celular, um botão no conteúdo abre o menu lateral. Configurações permanece na navegação; tema e logout ficam no menu do perfil, e o histórico de atividades abre somente pelo dashboard. O aviso de demonstração e os alertas reais de sincronização permanecem.
 
 ## Cards de Projetos — 21/10/2026
 
@@ -71,3 +71,7 @@ Layout inspirado no mockup aprovado: painel arredondado com filtros, contagem de
 No editor, remover sliders de posição e zoom. Preservar o foco visual ao ampliar, mostrar guias durante o arraste e manter o recorte idêntico ao card. O botão “Carregar mais imagens” deve ter ícone, ficar centralizado e separado da grade por pelo menos 20 px. Modais mantêm cursor nativo visível, incluindo grab/grabbing na área de recorte.
 
 O modal de capa mantém altura padrão de 760 px, limitada à altura disponível da viewport (margens de 20 px no desktop e 8 px no celular). Cabeçalho e ações permanecem estáveis. A lista tem rolagem própria com espaço de scrollbar reservado. Loadings de lista/prévia usam indicador giratório e texto centralizados nos dois eixos da área disponível; respeitar movimento reduzido.
+
+## Barra lateral e perfil
+
+Uma única lista sob “Espaço de trabalho”: Visão geral, Projetos, Clientes, Aprovações, Financeiro, Calendário, Biblioteca e Configurações. Não mostrar o grupo Ferramentas, Atividades ou Aparência como itens de navegação. O botão de reticências junto ao perfil abre menu flutuante com alternância claro/escuro e saída da conta. Garantir foco visível, Tab, Escape e fechamento ao clicar fora. Preservar as cores originais das logos de cada tema; não aplicar filtros monocromáticos à marca.

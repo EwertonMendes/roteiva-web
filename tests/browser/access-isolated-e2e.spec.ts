@@ -26,6 +26,7 @@ async function register(page:Page,email:string){
 async function logout(page:Page){
   if(await page.getByRole("button",{name:"Abrir menu",exact:true}).isVisible())
     await page.getByRole("button",{name:"Abrir menu",exact:true}).click();
+  await page.getByRole("button",{name:"Opções da conta",exact:true}).click();
   // Logout renders the signed-out UI before cache cleanup replaces the document.
   // Wait for that real navigation before starting another identity's login.
   await Promise.all([

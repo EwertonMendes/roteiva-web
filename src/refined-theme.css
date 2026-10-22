@@ -33,8 +33,6 @@ a { text-underline-offset: 3px; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 :root .sidebar { background: rgba(247,247,247,.8); color: var(--ink); border-right: 1px solid var(--line); box-shadow: none; backdrop-filter: blur(24px); }
 :root[data-theme="dark"] .sidebar { background: rgba(16,16,16,.88); border-color: var(--line); box-shadow: none; }
-.brand-lockup img { filter: brightness(0); }
-:root[data-theme="dark"] .brand-lockup img { filter: brightness(0) invert(1); }
 :root .sidebar nav > button { color: var(--muted); font-weight: 400; border-radius: 12px; border-color: transparent; }
 :root .sidebar nav > button:hover { color: var(--ink); background: var(--subtle); border-color: transparent; }
 :root .sidebar nav > button.active { background: var(--subtle); color: var(--ink); border-color: var(--line); box-shadow: none; font-weight: 500; }
