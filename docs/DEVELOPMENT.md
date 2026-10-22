@@ -1,5 +1,13 @@
 # Desenvolvimento e deploy — Roteiva
 
+## Homologação dos detalhes do projeto — 22/10/2026
+
+`tests/browser/project-detail.spec.ts` utiliza somente a demo isolada em `127.0.0.1:4174`, com dados fictícios, e roda nos projetos desktop/mobile da configuração Playwright existente. `PROJECT_DETAIL_TEST_URL` permite selecionar outra porta local durante QA. Compilar demo antes. Localmente foram reutilizados os binários instalados de Node/TypeScript/Vite/Playwright; o PNPM no sandbox tentou registrar a pasta em um store sem permissão, então os mesmos scripts foram executados diretamente. A configuração temporária de QA fica em `outputs/`, ignorada.
+
+O proprietário solicitou publicar a branch `codex/project-details-ux` no DEV para teste, mantendo a master sem merge. Após validação da branch/PR, usar apenas Hosting no projeto explícito `roteiva-web-dev`, com `node scripts/check-access-worker.mjs` antes e `node scripts/verify-hosting-cache.mjs https://roteiva-web-dev.web.app` depois. Não publicar regras, índices ou Worker por esta mudança visual. Registrar resultado no roadmap. Os testes de demo não comprovam Google Drive real nem dispositivos físicos.
+
+Publicação concluída após CI frontend e Firestore verdes na PR #77: `node node_modules/firebase-tools/lib/bin/firebase.js deploy --only hosting --project roteiva-web-dev --non-interactive`. Cache e bytes dos assets publicados conferidos por HTTPS. A próxima publicação automática da master pode substituir esta homologação; a branch continua isolada aguardando avaliação do proprietário.
+
 [README](../README.md) · [Arquitetura](ARCHITECTURE.md) · [Roadmap](MVP-ROADMAP.md).
 
 React 19/Vite 8/TypeScript, sem SSR, Next/Vinext ou Functions. API Worker/D1 DEV independente em api/ (PR #15). Node 22.13+, PNPM 11.25.0 e Java 21 para emuladores. Frontend com `pnpm-lock.yaml`; API independente com `api/package-lock.json`. Instalação congelada obrigatória em ambos.

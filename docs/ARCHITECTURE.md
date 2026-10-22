@@ -1,5 +1,11 @@
 # Arquitetura do Roteiva — MVP SaaS
 
+## Detalhes do projeto — 22/10/2026
+
+**Decisão tomada:** extrair `ProjectDetail` de `studio-features.tsx` para `features/projects/`, com CSS limitado ao conteúdo. Formulário, tarefas, finanças e compromissos reutilizam os comandos revisionados atuais. Os rascunhos do formulário permanecem montados durante alterações do checklist; trocar o ID do projeto remonta os campos. Edição financeira e de agenda usa os formulários existentes. Sem mudança de schemas, permissões, regras, backend ou barra lateral.
+
+`ProjectMaterials` consulta somente `users/{uid}/driveFolders` filtrado por `projectId`, com carregamento, erro/retry e descarte de resposta após desmontagem. A leitura segue as regras privadas já existentes; não são feitas chamadas Drive nem downloads para desenhar esses cartões. Adicionar/gerenciar abre a Biblioteca com esse projeto selecionado, preservando o fluxo de pastas/upload existente. Links externos de materiais legados só são exibidos com HTTPS. URLs de pastas são construídas no domínio fixo do Drive.
+
 **Atualizado em 16/10/2026. Fundação Firebase DEV IMPLEMENTADA na PR #6; publicação DEV e testes automatizados validados; Google real e persistência conferidos em uma conta; segunda conta e dispositivos ainda em andamento. Fundação Worker/D1 DEV na PR #15; biblioteca Drive e demais fases continuam PLANEJADAS.**
 
 Esta é a fonte de verdade sobre **como o sistema deverá funcionar**. O acompanhamento do que já foi entregue fica no [roadmap](MVP-ROADMAP.md); instruções operacionais em [desenvolvimento](DEVELOPMENT.md). Mudanças de arquitetura e decisões novas devem atualizar este arquivo **no mesmo PR**, conforme [AGENTS.md](../AGENTS.md).

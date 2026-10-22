@@ -1,5 +1,11 @@
 # Identidade visual e experiência — Roteiva
 
+## Detalhes do projeto — outubro/2026
+
+O conteúdo de `/projetos/:id` segue o mockup aprovado: formulário em largura completa, checklist compacto com progresso, resumo financeiro e lançamentos editáveis, materiais e agenda. Estilos em `features/projects/project-detail.css`, limitados a `.project-detail`; barra lateral preservada. Duas colunas passam a uma em telas estreitas; temas claro/escuro, foco e navegação por teclado mantidos. Tarefas concluídas têm marca e texto além da cor. Resultado negativo recebe cor própria.
+
+Materiais mostram as pastas realmente vinculadas ao projeto no Drive. Adicionar/gerenciar abre a Biblioteca com o projeto selecionado, reutilizando vínculo e upload existentes, em vez do antigo input de upload que apenas exibia aviso. Não há novo armazenamento de URLs arbitrárias ou sistema de versões nesta alteração.
+
 **Base visual preservada durante a migração para React/Vite em 16/10/2026.** Não redesenhar a UI ao introduzir Firebase/Auth/Drive sem uma demanda explícita.
 
 ## Tipografia e cores
