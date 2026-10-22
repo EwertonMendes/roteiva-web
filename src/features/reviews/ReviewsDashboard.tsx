@@ -207,7 +207,12 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
   const run=async(job:()=>Promise<void>)=>{
     setWorking(true);setError("");
     try{await job();setRefresh(n=>n+1);}
-    catch(e){setError(e instanceof Error?e.message:"Não foi possível concluir a operação.");}
+    catch(e){
+      const asset=(e as {asset?:{fileId?:string;fileName?:string}}|null)?.asset;
+      const selectedName=asset?.fileId&&!asset.fileName?files.find(file=>file.fileId===asset.fileId)?.name:null;
+      const message=e instanceof Error?e.message:"Não foi possível concluir a operação.";
+      setError(selectedName?`Não foi possível concluir "${selectedName}": ${message}`:message);
+    }
     finally{setWorking(false);}
   };
   const submit=async()=>{
@@ -255,8 +260,9 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
           const published=await call<{review:Detail}>("/reviews/"+created.id+"/publish","POST");
           setOpened(published.review);
         }catch(e){
-          publishWarning="Solicitação salva como rascunho, mas o compartilhamento não foi concluído. Abra o registro e tente novamente. "+
-            (e instanceof Error?e.message:"");
+          publishWarning="A solicitação foi salva, mas ainda não foi ativada. "+
+            (e instanceof Error?e.message:"Falha ao preparar os arquivos.")+
+            " Você pode tentar novamente usando “Ativar compartilhamento”, sem precisar recriar a aprovação.";
         }
       }
       setComposer(false);setReplacement(null);setFiles([]);setSelectedFolder(null);setTrail([]);setItems([]);
@@ -342,7 +348,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
 
     {opened&&!composer&&createPortal(<div className="review-modal-backdrop" ref={dialogRef} tabIndex={-1} onMouseDown={e=>{if(e.target===e.currentTarget&&!working)setOpened(null);}}>
       <section role="dialog" aria-modal="true" aria-label="Detalhes da revisão" className="review-dialog rowner-dialog">
-        <ReviewOwnerWorkspace key={opened.review.id} detail={opened} working={working}
+        <ReviewOwnerWorkspace key={opened.review.id} detail={opened} working={working} error={error}
           onClose={()=>setOpened(null)} onRevise={beginRevision} onPublish={()=>void mutate("publish")}
           onRotate={()=>void mutate("rotate")} onEnd={()=>void mutate("close")}
           onCompleteClose={()=>void mutate("close")}
@@ -397,7 +403,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
               {mode==="link"?<p className="reviews-info">Quem receber o link poderá revisar os materiais pelo Roteiva, sem precisar entrar com Google. O Roteiva cria apenas o acesso necessário para exibir os materiais; permissões públicas existentes no Drive não são alteradas.</p>:
                 <div className="review-participants-config">
                   <h3>Participantes Google</h3>
-                  <p className="reviews-muted">Cada pessoa precisará entrar com sua própria conta Google autorizada. Adicione os e-mails separados por vírgula ou em linhas diferentes.</p>
+                  <p className="reviews-muted">Somente os e-mails indicados poderão entrar nesta aprovação do Roteiva. Isso não altera a privacidade dos arquivos originais no Google Drive. Separe os e-mails por vírgulas ou linhas diferentes.</p>
                   <label>Revisores · podem comentar, aprovar ou solicitar ajustes
                     <textarea required rows={3} value={recipient} onChange={e=>setRecipient(e.target.value)}
                       placeholder={"revisor1@gmail.com\nrevisor2@gmail.com"}/>
@@ -414,7 +420,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
                   <label className="review-sharing-option">
                     <span className="review-sharing-copy">
                       <strong>Permitir abrir também pelo Google Drive</strong>
-                      <small>Concede acesso de <b>Leitor</b> aos e-mails informados. No Roteiva, revisores continuam podendo aprovar e leitores apenas visualizar.</small>
+                      <small>Em arquivos privados, concede permissão de <b>Leitor</b> aos e-mails quando o Drive autorizar. Se o arquivo já for público, reutiliza o acesso existente sem modificar a pasta. Os papéis de revisor e leitor continuam protegidos no Roteiva.</small>
                     </span>
                     <input type="checkbox" checked={shareDirect}
                       onChange={e=>{setShareDirect(e.target.checked);if(!e.target.checked)setRestrictPublic(false);}}/>
@@ -423,12 +429,12 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
                   {shareDirect&&<label className="review-sharing-option review-sharing-option-danger">
                     <span className="review-sharing-copy">
                       <strong><AlertTriangle size={16} aria-hidden="true"/> Remover acesso público existente no Drive</strong>
-                      <small>Remove permissões públicas diretas dos arquivos compartilhados. <b>Links antigos podem parar de funcionar.</b> Permissões herdadas de pastas não são modificadas.</small>
+                      <small>Remove apenas permissões públicas <b>diretas</b> dos arquivos, quando autorizado pelo Google. <b>Links antigos podem parar de funcionar.</b> Pastas públicas, grupos e domínios permanecem sob controle do proprietário.</small>
                     </span>
                     <input type="checkbox" checked={restrictPublic} onChange={e=>setRestrictPublic(e.target.checked)}/>
                     <span className="review-sharing-switch" aria-hidden="true"/>
                   </label>}
-                  <p className="review-sharing-footnote">Acesso direto pelo Drive é opcional. Para arquivos privados, confira também permissões já existentes nas pastas do seu Google Drive.</p>
+                  <p className="review-sharing-footnote">O acesso à aprovação é protegido por conta Google mesmo se o Drive original for público. Para tornar os arquivos originais privados, ajuste também as permissões no Drive.</p>
                 </div>}
               <label>Validade<select value={days} onChange={e=>setDays(Number(e.target.value))}>
                 <option value={7}>7 dias</option><option value={14}>14 dias</option><option value={30}>30 dias</option>

@@ -149,7 +149,11 @@ export async function handle(request: Request, env: Env): Promise<Response> {
     if(known && (url.pathname==='/access/ensure'||error.code.startsWith('access_')||error.code.startsWith('admin_')))
       console.error(JSON.stringify({event:'access_request_denied',code:error.code,status:error.status}));
     const status = known ? error.status : 503;
-    response = Response.json({error:{code:known ? error.code : 'service_unavailable',requestId:id}},{status});
+    response = Response.json({error:{
+      code:known ? error.code : 'service_unavailable',
+      requestId:id,
+      ...(known&&url.pathname.startsWith('/reviews/')&&error.asset?{asset:error.asset}:{})
+    }},{status});
     // Only categorical events. Never emit Request, URL, exception, headers or provider bodies.
     if (!known) console.error(JSON.stringify({event:'dependency_failure',requestId:id}));
   }
