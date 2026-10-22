@@ -245,7 +245,7 @@ export function ReviewPortal({token}:{token:string}){
         <div className="review-portal-layout">
           <div className="review-portal-maincolumn">
             <section className="review-portal-review" aria-label="Material para avaliar">
-              <div className="review-portal-stage">
+              <div className={"review-portal-stage"+(privateGoogle?" is-private":"")}>
                 {mediaMode==="loading"&&<div className="review-media-state review-private-preview-state" role="status">
                   <LoaderCircle className="rl-spin" size={25}/>
                   {privateGoogle?("Carregando arquivo com acesso seguro… "+(previewProgress?previewProgress+"%":"")):"Preparando reprodução…"}
