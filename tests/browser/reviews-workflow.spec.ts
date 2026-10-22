@@ -239,6 +239,7 @@ test('Google-only review renders private images in both themes without third-par
   const second={fileId:'REVIEW_IMAGE_22345678',name:'Arte final.png',mimeType:'image/png'};
   const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO2qFqsAAAAASUVORK5CYII=','base64');
   let denied=false,requests=0;
+  const mediaGets=new Map<string,number>();
   await context.route(api+'/reviews/public**',async route=>{
     const req=route.request(),path=new URL(req.url()).pathname;
     const headers={'Access-Control-Allow-Origin':root,'Access-Control-Allow-Methods':'GET,POST,OPTIONS',
@@ -263,15 +264,18 @@ test('Google-only review renders private images in both themes without third-par
     }
     return route.fulfill({status:404,headers,body:'{}'});
   });
-  await context.route(api+'/reviews/media?*',async route=>route.fulfill({
-    status:200,contentType:'image/png',headers:{'Access-Control-Allow-Origin':root,'Cache-Control':'private, no-store'},
-    body:png
-  }));
+  await context.route(api+'/reviews/media?*',async route=>{
+    const id=new URL(route.request().url()).searchParams.get('ticket')||'';
+    mediaGets.set(id,(mediaGets.get(id)||0)+1);
+    return route.fulfill({status:200,contentType:'image/png',
+      headers:{'Access-Control-Allow-Origin':root,'Cache-Control':'private, no-store',
+        'Content-Length':String(png.byteLength)},body:png});
+  });
   await page.goto(root+'/review/'+token);
   await expect(page.getByRole('heading',{name:'Arte com acesso privado'})).toBeVisible();
   const preview=page.locator('img.review-private-preview-image');
   await expect(preview).toBeVisible();
-  await expect(preview).toHaveAttribute('src',/\/reviews\/media\?ticket=/);
+  await expect(preview).toHaveAttribute('src',/^blob:/);
   await expect(page.locator('.review-portal-stage iframe')).toHaveCount(0);
   const stage=page.locator('.review-portal-stage.is-image');
   await expect(stage).toBeVisible();
@@ -311,5 +315,11 @@ test('Google-only review renders private images in both themes without third-par
   denied=false;
   await page.getByRole('button',{name:'Tentar novamente'}).click();
   await expect(preview).toBeVisible();
-  expect(requests).toBeGreaterThanOrEqual(3);
+  await expect(preview).toHaveAttribute('src',/^blob:/);
+  await page.getByRole('button',{name:'Arte.png'}).click();
+  await expect(preview).toBeVisible();
+  await expect(preview).toHaveAttribute('src',/^blob:/);
+  expect(mediaGets.get(first.fileId)).toBe(1);
+  expect(mediaGets.get(second.fileId)).toBe(1);
+  expect(requests).toBe(3); // first, denied second, retried second; back to first uses memory
 });
