@@ -1,5 +1,14 @@
 # Roadmap vivo — Roteiva MVP
 
+## Restrição de download direto nas páginas de aprovação — 22/10/2026
+
+**IMPLEMENTADO em branch/PR de proteção de prévias, aguardando verificação automatizada e DEV:** comportamento existente de revisão não deve mudar visualmente. Retirados atalhos de download/abertura original de PDF na própria página, permissão de download do `iframe`, controles nativos de download e menu contextual dos materiais. Worker recusa navegação direta comum ao ticket e mantém validação de acesso por token/revisão e participante Google. Testes de navegador e de backend cobrem as restrições. O recurso não cria ACLs Drive nem altera permissões existentes.
+
+- [ ] Executar testes de imagem/PDF/vídeo no Chromium desktop/mobile e unitários de segurança do Worker.
+- [ ] Publicar em DEV, sem merge, somente após validação e homologar o visualizador.
+- [ ] **Fase necessária para não entregar cópias do arquivo original:** serviço de prévias derivadas para vídeo/imagem/áudio/PDF com limitação de resolução/qualidade, opcional identificação visual, original privado exclusivamente no Drive. Estudar custo e compatibilidade antes de implementar. Mesmo derivados podem ser capturados pelo receptor. Não declarar "impede F12": tecnicamente impossível no navegador.
+
+
 ## Cursor personalizado sobre selects e modais — 22/10/2026
 
 **VALIDADO AUTOMATICAMENTE E PUBLICADO NO DEV PRINCIPAL em 22/10/2026 pela PR #85; aceite visual do proprietário pendente.** O cursor decorativo do Roteiva foi mantido, recebeu prioridade de camada superior aos popovers do `AppSelect` e portal para o diálogo nativo ativo, evitando desaparecer atrás do menu ou da top layer. `pointer-events:none` preserva os cliques; campos de texto, vídeos e o editor de capas com `data-native-cursor` continuam usando o cursor do sistema, bem como dispositivos touch e preferência por movimento reduzido. Teste em `tests/browser/cursor-layer.spec.ts` valida dropdown, seleção com clique, posicionamento no modal e retorno à página; integrações e dados não mudam. [CI frontend verde](https://github.com/EwertonMendes/roteiva-web/actions/runs/39861461197), [QA específica aprovada (2 testes desktop)](https://github.com/EwertonMendes/roteiva-web/actions/runs/39861473928), e [Hosting DEV principal publicado com cache validado](https://github.com/EwertonMendes/roteiva-web/actions/runs/39861714239) no commit `6dc837b`. Apenas Hosting atualizado; Firestore, D1 e Worker inalterados. Sem merge.
