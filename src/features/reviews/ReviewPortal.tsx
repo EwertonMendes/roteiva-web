@@ -248,13 +248,13 @@ export function ReviewPortal({token}:{token:string}){
                   onClick={()=>setVideoExpanded(v=>!v)}>{videoExpanded?"Fechar tela cheia":"Ampliar vídeo"}</button>}
                 {active&&mediaMode==="ready"&&!isVideo&&active.mimeType.startsWith("image/")&&
                   <ReviewImageViewer key={active.fileId} src={mediaUrl} name={active.name}
-                    onError={()=>{setPreviewError("O navegador não conseguiu exibir esta imagem. Abra-a no Google Drive.");setMediaMode("private-error");}}/>}
+                    onError={()=>{setPreviewError("O navegador não conseguiu exibir esta imagem. Abra-a no Google Drive.");setMediaMode("error");}}/>}
                 {active&&mediaMode==="ready"&&active.mimeType==="application/pdf"&&
                   <iframe className="review-private-preview-pdf" src={mediaUrl}
                     title={"Prévia PDF de "+active.name} sandbox="allow-scripts allow-downloads"/>}
                 {active&&mediaMode==="ready"&&active.mimeType.startsWith("audio/")&&
                   <div className="review-private-preview-audio"><FileAudio size={32}/><audio controls src={mediaUrl}
-                    onError={()=>{setPreviewError("Este áudio não pôde ser reproduzido. Abra-o no Google Drive.");setMediaMode("private-error");}}/></div>}
+                    onError={()=>{setPreviewError("Este áudio não pôde ser reproduzido. Abra-o no Google Drive.");setMediaMode("error");}}/></div>}
                 {mediaMode==="error"&&<div className="review-private-preview-error" role="alert">
                   <FileImage size={26}/><strong>Não foi possível mostrar a prévia</strong>
                   <p>{previewError}</p>
