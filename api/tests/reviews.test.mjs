@@ -587,3 +587,40 @@ test('Google-only review never issues an anonymous media streaming ticket',async
     {fileId:file},verified),e=>e.code==='review_private_media_google_drive');
   assert.equal((await x.send('POST','/reviews/'+id+'/close',x.alice)).status,200);
 });
+
+test('private preview uses verified Google reviewer/viewer access, not an iframe or public media ticket',async t=>{
+  const x=await integration(t);
+  const people=[{email:'reviewer@gmail.com',role:'reviewer'},{email:'viewer@gmail.com',role:'viewer'}];
+  const created=await createAndPublish(x,{mode:'google',recipientEmail:'reviewer@gmail.com',participants:people});
+  assert.equal(created.published.status,200);
+  const invite=(await created.published.json()).review.review.url.split('/').at(-1);
+  const viewer=await x.jwt('viewer','viewer@gmail.com');
+  const outsider=await x.jwt('outsider','outsider@gmail.com');
+  const reviewer=await x.jwt('reviewer','reviewer@gmail.com');
+  await assert.rejects(()=>route(x.f,invite,'/reviews/public/file','POST',
+    {fileId:file,offset:0}),e=>e.status===401,'no Google login cannot stream private files');
+  await assert.rejects(()=>route(x.f,invite,'/reviews/public/file','POST',
+    {fileId:file,offset:0},outsider),e=>e.status===403,'unlisted Google account cannot stream');
+  await assert.rejects(()=>route(x.f,invite,'/reviews/public/file','POST',
+    {fileId:'OTHER_FILE_12345678',offset:0},viewer),e=>e.status===404,'other files are denied');
+  await assert.rejects(()=>route(x.f,invite,'/reviews/public/file','POST',
+    {fileId:file,offset:-1},viewer),e=>e.status===400,'invalid byte ranges are denied');
+  await assert.rejects(()=>route(x.f,invite,'/reviews/public/file','POST',
+    {fileId:file,version:22,offset:0},viewer),e=>e.code==='review_version_changed');
+  const stream=await route(x.f,invite,'/reviews/public/file','POST',{fileId:file,offset:0},viewer);
+  assert.equal(stream.status,206);
+  assert.equal(stream.headers.get('Content-Type'),'video/mp4');
+  assert.equal(stream.headers.get('Content-Range'),'bytes 0-3/100');
+  assert.match(stream.headers.get('Cache-Control')||'',/no-store/);
+  assert.deepEqual([...new Uint8Array(await stream.arrayBuffer())],[1,2,3,4]);
+  assert.equal((await route(x.f,invite,'/reviews/public/file','POST',
+    {fileId:file,offset:0},reviewer)).status,206);
+  const link=await createAndPublish(x);
+  assert.equal(link.published.status,200);
+  const publicInvite=(await link.published.json()).review.review.url.split('/').at(-1);
+  await assert.rejects(()=>route(x.f,publicInvite,'/reviews/public/file','POST',
+    {fileId:file,offset:0},viewer),e=>e.status===403,'public capability cannot use Google relay');
+  assert.equal((await x.send('POST','/reviews/'+created.id+'/close',x.alice)).status,200);
+  await assert.rejects(()=>route(x.f,invite,'/reviews/public/file','POST',
+    {fileId:file,offset:0},viewer),e=>e.status===404,'close invalidates all private ranges');
+});
