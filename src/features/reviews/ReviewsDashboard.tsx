@@ -376,7 +376,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
           {!replacement&&composerStep==="details"&&<div className="review-composer-intro">
             <h3>Quem vai revisar?</h3>
             <p>Comece pelo cliente e projeto, depois defina como os participantes entrarão na aprovação.</p>
-          </div>
+          </div>}
           {error&&<p className="reviews-warning" role="alert">{error}</p>}
           {(replacement||composerStep==="details")&&<div className="review-fields">
             <label>Cliente
