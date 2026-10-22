@@ -1,3 +1,4 @@
+import { AppSelect } from "../ui/AppSelect";
 import { useEffect, useRef, useState } from "react";
 import {DriveThumbnail} from "./DriveThumbnail";
 import { ArrowLeft, Check, ChevronLeft, ChevronRight, Grid2X2, List, ExternalLink, File, FileAudio, FileImage, FileText, FileVideo, Folder, FolderOpen, Link2, LoaderCircle, Search, X, MoreHorizontal, Upload } from "lucide-react";
@@ -113,9 +114,9 @@ export function DriveFolderPicker({projects,projectId,onProjectChange,folders,pa
         <button className="rl-icon-button" type="button" onClick={onClose} aria-label="Fechar seletor" disabled={submitting}><X size={18}/></button></header>
       <div className="rl-picker-context">
         <label htmlFor="rl-picker-project">Projeto de destino</label>
-        <select id="rl-picker-project" aria-label="Projeto para vincular pastas" value={projectId??""} onChange={e=>onProjectChange(e.target.value)} disabled={submitting}>
+        <AppSelect id="rl-picker-project" aria-label="Projeto para vincular pastas" value={projectId??""} onValueChange={value=>onProjectChange(value)} disabled={submitting}>
           <option value="">Selecione um projeto</option>{projects.map(project=><option key={project.id} value={project.id}>{project.name}</option>)}
-        </select>
+        </AppSelect>
       </div>
       {!projectId?<div className="rl-picker-empty"><FolderOpen size={30}/><p>Escolha um projeto para carregar suas pastas do Google Drive.</p></div>
       :!canRead?<div className="rl-picker-empty"><Link2 size={30}/><p>É necessário autorizar a leitura das pastas existentes na sua conta Google.</p><button className="primary-button" type="button" onClick={onConnect} disabled={working}>Autorizar Google Drive</button></div>
