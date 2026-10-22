@@ -314,17 +314,28 @@ test('file already shared by owner is accepted and never revoked by Roteiva',asy
   assert.equal(x.acl.has('owner-public'),true);
   assert.equal(x.calls.filter(c=>c.method==='DELETE'||c.method==='POST'&&c.path.includes('/permissions')).length,0);
 });
-test('Google-only rejects public parent; private inaccessible file requires explicit Picker grant',async t=>{
+test('Google identity protects approval even when the linked Drive folder is public',async t=>{
   const x=await integration(t);x.hooks.publicFolder=true;x.hooks.unauthorized=true;
   const {id,published}=await createAndPublish(x,{mode:'google',recipientEmail:'client@gmail.com'});
-  assert.equal(published.status,409);
-  assert.equal((await published.json()).error.code,'review_inherited_public_permission');
+  assert.equal(published.status,200);
+  const token=(await published.json()).review.review.url.split('/').at(-1);
+  const authorized=await x.jwt('client','client@gmail.com');
+  const unrelated=await x.jwt('stranger','stranger@gmail.com');
+  assert.equal((await route(x.f,token,undefined,undefined,undefined,authorized)).status,200);
+  await assert.rejects(()=>route(x.f,token,undefined,undefined,undefined,unrelated),e=>e.status===403);
+  assert.equal(x.calls.filter(c=>c.method==='POST'&&c.path.endsWith('/permissions')).length,0);
   assert.equal((await x.send('POST','/reviews/'+id+'/close',x.alice)).status,200);
   x.hooks.publicFolder=false;
-  const second=await createAndPublish(x);
-  assert.equal(second.published.status,409);
-  assert.equal((await second.published.json()).error.code,'review_drive_file_authorization_required');
-  assert.equal(x.calls.filter(c=>c.method==='POST'&&c.path.endsWith('/permissions')).length,0);
+  const portal=await createAndPublish(x,{mode:'google',recipientEmail:'client@gmail.com',driveShareEnabled:false});
+  assert.equal(portal.published.status,200,'portal-only requires no file ACL mutation');
+  assert.equal((await x.send('POST','/reviews/'+portal.id+'/close',x.alice)).status,200);
+  const denied=await createAndPublish(x,{mode:'google',recipientEmail:'client@gmail.com'});
+  assert.equal(denied.published.status,409);
+  const detail=(await denied.published.json()).error;
+  assert.equal(detail.code,'review_drive_file_authorization_required');
+  assert.equal(detail.asset.fileId,file);
+  assert.equal(detail.asset.fileName,'Primeiro corte.mp4');
+  assert.equal((await x.send('POST','/reviews/'+denied.id+'/close',x.alice)).status,200);
 });
 test('restricted review verifies Google recipient and preserves their pre-existing ACL',async t=>{
   const x=await integration(t);
@@ -340,14 +351,15 @@ test('restricted review verifies Google recipient and preserves their pre-existi
   assert.equal(x.acl.has('external-reader'),true);
   assert.equal(x.calls.filter(c=>c.method==='DELETE').length,0);
 });
-test('Google restricted grants are created and revoked; public/domain ACLs reject restriction',async t=>{
+test('Google-restricted portal preserves public, group and domain Drive permissions',async t=>{
   const x=await integration(t);
   for(const type of ['anyone','domain','group']){
     x.acl.set('external',{type,role:'reader',emailAddress:'other@gmail.com'});
     const {id,published}=await createAndPublish(x,{mode:'google',recipientEmail:'client@gmail.com'});
-    assert.equal(published.status,409);
+    assert.equal(published.status,200,'existing '+type+' ACL must not block the portal');
     assert.equal((await x.send('POST','/reviews/'+id+'/close',x.alice)).status,200);
-    assert.equal(x.acl.has('external'),true);x.acl.clear();
+    assert.equal(x.acl.has('external'),true,'existing '+type+' ACL remains untouched');
+    x.acl.clear();
   }
   const {id,published}=await createAndPublish(x,{mode:'google',recipientEmail:'client@gmail.com'});
   assert.equal(published.status,200);
