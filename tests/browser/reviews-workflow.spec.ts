@@ -218,7 +218,7 @@ test('profissional cria, cliente comenta/pede ajustes, V2 aprovada e encerrament
   await expect(ownerDetail.locator('iframe[title="Prévia de Corte.mp4"]')).toHaveCount(1);
   await page.screenshot({path:info.outputPath('professional-contextual-feedback.png'),fullPage:true});
   await page.getByRole('button',{name:'Enviar nova versão',exact:true}).click();
-  await composer.getByRole('button',{name:'Materiais autorizados'}).click();
+  await expect(composer.locator('.review-folder-tabs button.active')).toHaveText('Materiais autorizados');
   await composer.getByText('Corte final.mp4',{exact:true}).click();
   await composer.getByRole('button',{name:'Enviar nova versão',exact:true}).click();
   await expect(page.getByLabel('Link da revisão')).toBeVisible();
