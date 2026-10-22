@@ -359,7 +359,7 @@ test('Google identity protects approval even when the linked Drive folder is pub
 });
 test('Google-restricted review publishes video and image from a public folder without mutating Drive ACLs',async t=>{
   const x=await integration(t);x.hooks.publicFolder=true;x.hooks.unauthorized=true;
-  const selection=[...x.payload.assets,{fileId:imageFile,connectionId:account,linkedFolderId:folder}];
+  const selection=[...x.payload.assets,{fileId:imageFile,connectionId:account,linkedFolderId:x.payload.assets[0].linkedFolderId}];
   const {id,published}=await createAndPublish(x,{mode:'google',recipientEmail:'client@gmail.com',assets:selection});
   assert.equal(published.status,200);
   const granted=x.f.sql.prepare("SELECT name,grant_state FROM review_assets WHERE review_id=? ORDER BY name").all(id);
@@ -375,7 +375,7 @@ test('Google-restricted review publishes video and image from a public folder wi
 test('publication identifies the blocked image and can safely resume without recreating approval',async t=>{
   const x=await integration(t);x.hooks.unauthorized=true;
   x.acl.set('owner-public',{type:'anyone',role:'reader'});
-  const selection=[...x.payload.assets,{fileId:imageFile,connectionId:account,linkedFolderId:folder}];
+  const selection=[...x.payload.assets,{fileId:imageFile,connectionId:account,linkedFolderId:x.payload.assets[0].linkedFolderId}];
   const created=await x.send('POST','/reviews',x.alice,{...x.payload,mode:'google',
     recipientEmail:'client@gmail.com',assets:selection});
   assert.equal(created.status,201);
