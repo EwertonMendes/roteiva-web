@@ -6,14 +6,14 @@ import { DRIVE_SCOPE, accessCredential } from './google.ts';
 import { driveJson } from './drive-client.ts';
 import { random, hash, encrypt, decrypt, context } from './crypto.ts';
 import { uploadBody } from './uploads.ts';
-import {mintReviewMediaTicket,streamReviewMedia} from './review-media.ts';
+import {mintReviewMediaTicket,reviewMediaSubject,streamReviewMedia} from './review-media.ts';
 
 type Status = 'draft'|'publishing'|'pending'|'changes'|'approved'|'replacing'|'closing'|'closed';
 type Mode = 'link'|'google';
 type Review = {
   id:string;owner_uid:string;client_id:number;project_id:number;client_name:string;project_name:string;
   studio_name:string;title:string;message:string;recipient_email:string;access_mode:Mode;status:Status;
-  current_version:number;expires_at:number;token_hash:string;encrypted_token:string;transition_id?:string|null;restrict_existing_public:number;created_at:number;updated_at:number;
+  current_version:number;expires_at:number;token_hash:string;encrypted_token:string;transition_id?:string|null;restrict_existing_public:number;drive_share_enabled:number;created_at:number;updated_at:number;
 };
 type Asset = {review_id:string;version:number;file_id:string;connection_id:string;linked_folder_id:string;
   name:string;mime_type:string;permission_id:string|null;grant_state:'unshared'|'granting'|'granted'|'revoking'|'revoked'};
@@ -38,7 +38,7 @@ const tokenContext=(env:Env,row:Pick<Review,'owner_uid'|'id'>)=>context(env,row.
 const showReview=(r:Review)=>({
   id:r.id,clientId:r.client_id,projectId:r.project_id,clientName:r.client_name,projectName:r.project_name,
   studioName:r.studio_name,title:r.title,message:r.message,recipientEmail:r.recipient_email,mode:r.access_mode,
-  status:r.status,version:r.current_version,expiresAt:r.expires_at,createdAt:r.created_at,updatedAt:r.updated_at
+  status:r.status,version:r.current_version,expiresAt:r.expires_at,driveShareEnabled:r.drive_share_enabled===1,createdAt:r.created_at,updatedAt:r.updated_at
 });
 
 function parseParticipants(data:unknown,mode:Mode,legacyEmail:string):Participant[] {
@@ -235,7 +235,8 @@ async function createReview(request:Request,env:Env,uid:string):Promise<Response
   const mode:Mode=data.mode==='link'?'link':data.mode==='google'?'google':(()=>{throw new ApiError(400,'review_invalid_input');})();
   const email=inputText(data.recipientEmail||'',200).toLowerCase();
   const people=parseParticipants(data.participants,mode,email);
-  const restrict=mode==='google'&&data.restrictExistingPublic===true?1:0;
+  const shareDirect=mode==='google'&&data.driveShareEnabled===true?1:0;
+  const restrict=shareDirect&&data.restrictExistingPublic===true?1:0;
   const days=integer(data.expiresInDays);
   if(!days||days>30)throw new ApiError(400,'review_invalid_input');
   const list=selected(data.assets);
@@ -246,16 +247,16 @@ async function createReview(request:Request,env:Env,uid:string):Promise<Response
   const r={id,owner_uid:uid};
   const encrypted=await encrypt(env,secret,tokenContext(env,r));
   await env.DB.batch([
-    env.DB.prepare("INSERT INTO review_requests(id,owner_uid,client_id,project_id,client_name,project_name,studio_name,title,message,recipient_email,access_mode,status,current_version,expires_at,token_hash,encrypted_token,restrict_existing_public,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,'draft',1,?,?,?,?,?,?)")
+    env.DB.prepare("INSERT INTO review_requests(id,owner_uid,client_id,project_id,client_name,project_name,studio_name,title,message,recipient_email,access_mode,status,current_version,expires_at,token_hash,encrypted_token,restrict_existing_public,drive_share_enabled,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,'draft',1,?,?,?,?,?,?,?)")
       .bind(id,uid,clientId,projectId,metadata.clientName,metadata.projectName,studio,title,message,people.find(p=>p.role==='reviewer')?.email||'',mode,
-        ts+days*86400000,await hash(secret),encrypted,restrict,ts,ts),
+        ts+days*86400000,await hash(secret),encrypted,restrict,shareDirect,ts,ts),
     ...people.map(p=>env.DB.prepare("INSERT INTO review_participants(review_id,email,role) VALUES(?,?,?)").bind(id,p.email,p.role)),
     ...insertAssets(env,entries)
   ]);
   return Response.json({id,review:{...showReview({
     id,owner_uid:uid,client_id:clientId,project_id:projectId,client_name:metadata.clientName,
     project_name:metadata.projectName,studio_name:studio,title,message,recipient_email:people.find(p=>p.role==='reviewer')?.email||'',access_mode:mode,
-    restrict_existing_public:restrict,status:'draft',current_version:1,expires_at:ts+days*86400000,token_hash:'',encrypted_token:encrypted,
+    restrict_existing_public:restrict,drive_share_enabled:shareDirect,status:'draft',current_version:1,expires_at:ts+days*86400000,token_hash:'',encrypted_token:encrypted,
     created_at:ts,updated_at:ts
   }),url:reviewLink(secret)}},{status:201});
 }
@@ -330,6 +331,7 @@ async function withAssetLease(env:Env,r:Review,a:Asset,job:(current:Asset)=>Prom
     if(revoking&&(current.grant_state==='unshared'||current.grant_state==='revoked')){
       await job(current);return;
     }
+    if(r.drive_share_enabled===0){await job(current);return;}
     if(r.access_mode==='google'){await job(current);return;}
     await env.DB.prepare('INSERT OR IGNORE INTO review_file_claims(file_id,review_id,version) VALUES(?,?,?)')
       .bind(a.file_id,r.id,a.version).run();
@@ -491,6 +493,13 @@ async function revokeGoogle(env:Env,r:Review,a:Asset):Promise<void>{
 }
 
 async function grantLocked(env:Env,r:Review,a:Asset,validation:CheckedAsset):Promise<void>{
+  if(r.drive_share_enabled===0){
+    if(!validation.appAuthorized)throw new ApiError(409,'review_drive_file_authorization_required');
+    const updated=await env.DB.prepare("UPDATE review_assets SET grant_state='granted',permission_id=NULL WHERE review_id=? AND version=? AND file_id=? AND grant_state IN ('unshared','granting') AND EXISTS(SELECT 1 FROM review_requests WHERE id=? AND status='publishing' AND current_version=?)")
+      .bind(r.id,a.version,a.file_id,r.id,a.version).run();
+    if(updated.meta.changes!==1&&a.grant_state!=='granted')throw new ApiError(409,'review_busy');
+    return;
+  }
   if(r.access_mode==='google')return grantGoogle(env,r,a,validation);
   const active=await env.DB.prepare("SELECT 1 FROM review_requests WHERE id=? AND status='publishing' AND current_version=? AND expires_at>?")
     .bind(r.id,a.version,now()).first();
@@ -572,6 +581,11 @@ async function releaseClaim(env:Env,r:Review,a:Asset):Promise<void>{
 }
 async function revokeLocked(env:Env,r:Review,a:Asset):Promise<void>{
   if(a.grant_state==='revoked'||a.grant_state==='unshared')return;
+  if(r.drive_share_enabled===0){
+    await env.DB.prepare("UPDATE review_assets SET grant_state='revoked',permission_id=NULL WHERE review_id=? AND version=? AND file_id=?")
+      .bind(r.id,a.version,a.file_id).run();
+    return;
+  }
   if(r.access_mode==='google')return revokeGoogle(env,r,a);
   if(a.permission_id&&r.access_mode==='link'){
     // Transfer ownership rather than deleting an ACL while another review
@@ -693,61 +707,7 @@ async function rotate(env:Env,r:Review):Promise<Response>{
   if(rotated.meta.changes!==1)throw new ApiError(409,'review_busy');
   return Response.json({url:reviewLink(secret)});
 }
-/** Authenticated byte-range relay for selected files in restricted Google reviews.
- * Every request rechecks the invitation, verified Google identity and file selection.
- * Neither credentials nor independently reusable media URLs leave the Worker.
- */
-async function privateReviewFile(request:Request,env:Env,r:Review,files:Asset[]):Promise<Response>{
-  if(r.access_mode!=='google')throw new ApiError(403,'review_recipient_denied');
-  const data=await uploadBody(request) as Record<string,unknown>|null;
-  if(!data||typeof data!=='object'||Array.isArray(data)||integer(data.version)!==r.current_version)
-    throw new ApiError(409,'review_version_changed');
-  const fileId=inputText(data.fileId,200,true);
-  const chosen=files.find(asset=>asset.file_id===fileId&&asset.grant_state==='granted');
-  if(!chosen)throw new ApiError(404,'review_not_found');
-  const offset=data.offset===undefined?0:data.offset;
-  if(!Number.isSafeInteger(offset)||typeof offset!=='number'||offset<0||offset>5_000_000_000_000)
-    throw new ApiError(400,'review_invalid_input');
-  const chunk=4*1024*1024;
-  const row=await connection(env,r.owner_uid,chosen.connection_id);
-  const credential=await accessCredential(env,row);
-  const endpoint=new URL('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(fileId));
-  endpoint.searchParams.set('alt','media');
-  endpoint.searchParams.set('supportsAllDrives','true');
-  let upstream:Response;
-  try{
-    upstream=await fetch(endpoint,{method:'GET',redirect:'manual',signal:AbortSignal.timeout(24000),
-      headers:{Authorization:'Bearer '+credential.value,Range:'bytes='+offset+'-'+(offset+chunk-1)}});
-  }catch{throw new ApiError(502,'review_media_unavailable');}
-  // Never auto-follow a redirect with an OAuth bearer token.
-  if(upstream.status!==206&&upstream.status!==200){
-    const status=upstream.status;await upstream.body?.cancel();
-    throw new ApiError(status===404?404:status===416?416:502,'review_media_unavailable');
-  }
-  const rawRange=upstream.headers.get('Content-Range');
-  const match=rawRange?(/^bytes (\d+)-(\d+)\/(\d+)$/.exec(rawRange)):null;
-  const length=Number(upstream.headers.get('Content-Length'));
-  let begin:number,end:number,total:number;
-  if(upstream.status===206&&match){
-    begin=Number(match[1]);end=Number(match[2]);total=Number(match[3]);
-    if(begin!==offset||end<begin||end-begin>=chunk||total<=end||
-      ![begin,end,total].every(Number.isSafeInteger)||(upstream.headers.has('Content-Length')&&length!==end-begin+1)){
-      await upstream.body?.cancel();throw new ApiError(502,'review_media_unavailable');
-    }
-  }else if(upstream.status===200&&offset===0&&upstream.headers.has('Content-Length')&&
-    Number.isSafeInteger(length)&&length>0&&length<=chunk){
-    begin=0;end=length-1;total=length;
-  }else{await upstream.body?.cancel();throw new ApiError(502,'review_media_unavailable');}
-  const headers=new Headers({
-    'Content-Type':chosen.mime_type,'Content-Range':'bytes '+begin+'-'+end+'/'+total,
-    'Accept-Ranges':'bytes','Cache-Control':'private, no-store, max-age=0',
-    'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer',
-    'Access-Control-Expose-Headers':'Content-Range, Content-Length, Content-Type',
-    'Content-Length':String(end-begin+1)
-  });
-  return new Response(upstream.body,{status:206,headers});
-}
-async function publicReview(request:Request,env:Env,action:'view'|'comment'|'decide'|'media'|'file'):Promise<Response>{
+async function publicReview(request:Request,env:Env,action:'view'|'comment'|'decide'|'media'):Promise<Response>{
   const token=request.headers.get('X-Review-Token')||'';
   if(!/^[A-Za-z0-9_-]{43}$/.test(token))throw new ApiError(404,'review_not_found');
   const r=await env.DB.prepare('SELECT * FROM review_requests WHERE token_hash=?').bind(await hash(token)).first<Review>();
@@ -788,18 +748,15 @@ async function publicReview(request:Request,env:Env,action:'view'|'comment'|'dec
       assets:files.map(a=>({fileId:a.file_id,name:a.name,mimeType:a.mime_type})),
       comments:comments.results,decisions:decisions.results});
   }
-  if(action==='file')return privateReviewFile(request,env,r,files);
   if(action==='media'){
-    // HTML5 <video> cannot send Firebase authorization on byte-range requests.
-    // Private Google reviews therefore use Drive's authenticated preview.
-    if(r.access_mode==='google')throw new ApiError(403,'review_private_media_google_drive');
     const body=await uploadBody(request) as Record<string,unknown>|null;
     if(!body||typeof body!=='object'||Array.isArray(body)||integer(body.version)!==r.current_version)
       throw new ApiError(409,'review_version_changed');
     const fileId=inputText(body.fileId,200,true);
-    const chosen=files.find(a=>a.file_id===fileId&&a.mime_type.startsWith('video/'));
+    const chosen=files.find(asset=>asset.file_id===fileId);
     if(!chosen)throw new ApiError(404,'review_not_found');
-    const ticket=await mintReviewMediaTicket(env,r.id,fileId,r.current_version,r.expires_at,r.token_hash);
+    const subject=r.access_mode==='google'?await reviewMediaSubject(r.id,email):undefined;
+    const ticket=await mintReviewMediaTicket(env,r.id,fileId,r.current_version,r.expires_at,r.token_hash,subject);
     return Response.json({url:'https://roteiva-api-dev.ewertonmendes9.workers.dev/reviews/media?ticket='+ticket,
       expiresAt:Math.min(r.expires_at,now()+12*60*1000)});
   }
@@ -864,10 +821,10 @@ async function publicReview(request:Request,env:Env,action:'view'|'comment'|'dec
 export async function reviewRouter(request:Request,env:Env,url:URL):Promise<Response>{
   const path=url.pathname;
   if(path==='/reviews/media')return streamReviewMedia(request,env,url);
-  if(path==='/reviews/public' || path==='/reviews/public/comment' || path==='/reviews/public/decide'||path==='/reviews/public/media-ticket'||path==='/reviews/public/file'){
+  if(path==='/reviews/public' || path==='/reviews/public/comment' || path==='/reviews/public/decide'||path==='/reviews/public/media-ticket'){
     if(!['GET','POST'].includes(request.method))throw new ApiError(405,'method_not_allowed');
     if((path==='/reviews/public')!==(request.method==='GET'))throw new ApiError(405,'method_not_allowed');
-    return publicReview(request,env,path.endsWith('/comment')?'comment':path.endsWith('/decide')?'decide':path.endsWith('/media-ticket')?'media':path.endsWith('/file')?'file':'view');
+    return publicReview(request,env,path.endsWith('/comment')?'comment':path.endsWith('/decide')?'decide':path.endsWith('/media-ticket')?'media':'view');
   }
   const uid=await activeOwner(request,env);
   if(path==='/reviews'&&request.method==='GET')return ownerList(env,uid,url);
