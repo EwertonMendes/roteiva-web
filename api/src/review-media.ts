@@ -125,6 +125,9 @@ export async function streamReviewMedia(request:Request,env:Env,url:URL):Promise
     'Cross-Origin-Resource-Policy':'cross-origin',
     'Content-Disposition':'inline',
   });
+  // SVG remains viewable as an image but must not execute active content if
+  // someone opens the signed media URL in a top-level browser tab.
+  if(asset.mime_type==='image/svg+xml')headers.set('Content-Security-Policy',"sandbox; default-src 'none'");
   for(const header of ['Content-Length','Content-Range','ETag','Last-Modified']){
     const value=upstream.headers.get(header);if(value)headers.set(header,value);
   }
