@@ -269,6 +269,28 @@ test('Google-only review renders private images in both themes without third-par
   await expect(preview).toBeVisible();
   await expect(preview).toHaveAttribute('src',/^blob:/);
   await expect(page.locator('.review-portal-stage iframe')).toHaveCount(0);
+  const stage=page.locator('.review-portal-stage.is-image');
+  await expect(stage).toBeVisible();
+  await expect(preview).toHaveCSS('object-fit','contain');
+  const viewport=stage.locator('.review-image-viewport');
+  const dimensions=await stage.evaluate(el=>{
+    const box=el.getBoundingClientRect();
+    const image=el.querySelector('img')!.getBoundingClientRect();
+    return {stageHeight:box.height,imageHeight:image.height,stageWidth:box.width,imageWidth:image.width};
+  });
+  expect(dimensions.imageHeight).toBeLessThanOrEqual(dimensions.stageHeight+1);
+  expect(dimensions.imageWidth).toBeLessThanOrEqual(dimensions.stageWidth+1);
+  await stage.getByRole('button',{name:'Ampliar zoom'}).click();
+  await expect(stage.getByLabel('Zoom da imagem')).toHaveText('130%');
+  await stage.getByRole('button',{name:'Ajustar imagem à tela'}).click();
+  await expect(stage.getByLabel('Zoom da imagem')).toHaveText('100%');
+  await viewport.dblclick({position:{x:140,y:120}});
+  await expect(stage.getByLabel('Zoom da imagem')).toHaveText('200%');
+  await stage.getByRole('button',{name:'Ver imagem em tela cheia'}).click();
+  await expect(page.getByRole('dialog',{name:'Imagem ampliada: Arte.png'})).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog',{name:'Imagem ampliada: Arte.png'})).toHaveCount(0);
+  await stage.getByRole('button',{name:'Ajustar imagem à tela'}).click();
   await expect(page.locator('.review-portal-stage.is-private')).toBeVisible();
   await page.getByRole('button',{name:'Ativar tema escuro'}).click();
   await expect(page.locator('main.review-portal')).toHaveAttribute('data-theme','dark');
