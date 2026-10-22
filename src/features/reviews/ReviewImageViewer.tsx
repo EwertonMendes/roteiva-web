@@ -79,7 +79,16 @@ export function ReviewImageViewer({src,name,onError}:{src:string;name:string;onE
       const current=[...pointers.current.values()];
       const oldDist=Math.hypot(points[0].x-points[1].x,points[0].y-points[1].y);
       const newDist=Math.hypot(current[0].x-current[1].x,current[0].y-current[1].y);
-      if(oldDist>0)setView(v=>limit(v.scale*newDist/oldDist,v.x,v.y));
+      if(oldDist>0){
+        const rect=e.currentTarget.getBoundingClientRect();
+        const focusX=(current[0].x+current[1].x)/2-rect.left-rect.width/2;
+        const focusY=(current[0].y+current[1].y)/2-rect.top-rect.height/2;
+        setView(v=>{
+          const next=clamp(v.scale*newDist/oldDist,1,MAX_SCALE);
+          const ratio=next/v.scale;
+          return limit(next,focusX-(focusX-v.x)*ratio,focusY-(focusY-v.y)*ratio);
+        });
+      }
     }else if(view.scale>1){
       setView(v=>limit(v.scale,v.x+e.clientX-last.x,v.y+e.clientY-last.y));
     }
@@ -93,7 +102,14 @@ export function ReviewImageViewer({src,name,onError}:{src:string;name:string;onE
     if(!viewport)return;
     const onWheel=(event:WheelEvent)=>{
       event.preventDefault();
-      setView(v=>limit(v.scale*(event.deltaY<0?1.2:1/1.2),v.x,v.y));
+      const rect=viewport.getBoundingClientRect();
+      const focusX=event.clientX-rect.left-rect.width/2;
+      const focusY=event.clientY-rect.top-rect.height/2;
+      setView(v=>{
+        const next=clamp(v.scale*(event.deltaY<0?1.2:1/1.2),1,MAX_SCALE);
+        const ratio=next/v.scale;
+        return limit(next,focusX-(focusX-v.x)*ratio,focusY-(focusY-v.y)*ratio);
+      });
     };
     // Non-passive handler: normal wheel zooms the focused image, never the page.
     viewport.addEventListener("wheel",onWheel,{passive:false});
