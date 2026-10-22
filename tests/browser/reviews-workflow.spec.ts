@@ -233,6 +233,7 @@ test('profissional cria, cliente comenta/pede ajustes, V2 aprovada e encerrament
 });
 
 test('Google-only review renders private images in both themes without third-party Drive cookies',async({page,context},info)=>{
+  await page.emulateMedia({colorScheme:'light'});
   await prepare(page,'reviews-private-preview-'+info.project.name+'@example.com');
   const first={fileId:'REVIEW_IMAGE_12345678',name:'Arte.png',mimeType:'image/png'};
   const second={fileId:'REVIEW_IMAGE_22345678',name:'Arte final.png',mimeType:'image/png'};
@@ -268,10 +269,11 @@ test('Google-only review renders private images in both themes without third-par
   await expect(preview).toBeVisible();
   await expect(preview).toHaveAttribute('src',/^blob:/);
   await expect(page.locator('.review-portal-stage iframe')).toHaveCount(0);
-  await page.getByRole('button',{name:'Ativar tema claro'}).click().catch(()=>{});
   await expect(page.locator('.review-portal-stage.is-private')).toBeVisible();
   await page.getByRole('button',{name:'Ativar tema escuro'}).click();
-  await expect(page.locator('.review-portal-stage.is-private')).toHaveCSS('color',/rgb\(/);
+  await expect(page.locator('main.review-portal')).toHaveAttribute('data-theme','dark');
+  await page.getByRole('button',{name:'Ativar tema claro'}).click();
+  await expect(page.locator('main.review-portal')).toHaveAttribute('data-theme','light');
   denied=true;
   await page.getByRole('button',{name:'Arte final.png'}).click();
   await expect(page.getByText('Não foi possível mostrar a prévia')).toBeVisible();
