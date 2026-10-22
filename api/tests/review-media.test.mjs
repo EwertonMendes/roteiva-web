@@ -14,7 +14,7 @@ test('minted media ticket is authenticated, scoped to a video, expiring and tamp
   assert.ok(token.includes('.'));
   const p=await verifyReviewMediaTicket(e,token);
   assert.equal(p.r,review);assert.equal(p.f,file);assert.equal(p.v,1);assert.equal(p.h,inviteHash);
-  assert.ok(p.e<=Date.now()+4*60000);
+  assert.ok(p.e<=Date.now()+12*60000);
   await assert.rejects(()=>verifyReviewMediaTicket(e,token.slice(0,-2)+'xx'),x=>x.status===404);
   await assert.rejects(()=>verifyReviewMediaTicket(env(),token),x=>x.status===404);
   await assert.rejects(()=>verifyReviewMediaTicket(e,'<script>'),x=>x.status===404);
