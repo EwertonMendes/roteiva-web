@@ -7,7 +7,7 @@ export async function metadata(env: Env, uid: string, connectionId: string, file
   if (!/^[A-Za-z0-9_-]{1,200}$/.test(fileId)) throw new ApiError(400,'invalid_file_id');
   const row = await connection(env,uid,connectionId);
   const target = new URL('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(fileId));
-  target.searchParams.set('fields','id,name,mimeType,size,modifiedTime');
+  target.searchParams.set('fields','id,name,mimeType,size,modifiedTime,parents');
   return Response.json({file:await driveJson(env,row,target,fetch,'file_unavailable')});
 }
 export async function disconnect(env: Env, uid: string, connectionId: string, fetcher: typeof fetch = fetch): Promise<Response> {

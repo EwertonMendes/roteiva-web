@@ -1,7 +1,7 @@
 export type Status="draft"|"publishing"|"pending"|"changes"|"approved"|"replacing"|"closing"|"closed";
 export type Mode="link"|"google";
 export type Review={id:string;clientId:number;projectId:number;clientName:string;projectName:string;studioName:string;title:string;message:string;recipientEmail:string;mode:Mode;status:Status;version:number;expiresAt:number;driveShareEnabled?:boolean;createdAt:number;updatedAt:number;url?:string};
-export type Asset={version:number;fileId:string;name:string;mimeType:string;grantState:string};
+export type Asset={version:number;fileId:string;name:string;mimeType:string;grantState:string;connectionId?:string;linkedFolderId?:string};
 export type Comment={id:string;version:number;file_id:string;author_name:string;body:string;seconds:number|null;created_at:number};
 export type Decision={version:number;decision:"approved"|"changes";author_name:string;message:string;created_at:number};
 export type Participant={email:string;role:"reviewer"|"viewer"};

@@ -1,7 +1,8 @@
 import {useEffect,useMemo,useRef,useState} from "react";
 import {CheckCircle2,ChevronRight,Clock3,Copy,ExternalLink,FileAudio,FileImage,FileText,
-  FileVideo,History,Link2,LoaderCircle,MessageSquare,RotateCcw,Send,ShieldCheck,X} from "lucide-react";
+  FileVideo,FolderOpen,History,Link2,LoaderCircle,MessageSquare,RotateCcw,Send,ShieldCheck,X} from "lucide-react";
 import {formatReviewTime} from "./review-timecode";
+import {useDriveApi} from "../drive/drive-api";
 import {fmt,statusText,type Asset,type Comment,type Detail} from "./review-model";
 import "./review-owner-workspace.css";
 
@@ -59,6 +60,10 @@ export function ReviewOwnerWorkspace({detail,working,error,onClose,onRevise,onPu
   onRotate:()=>void;onEnd:()=>void;onResume:(withFiles:boolean)=>void;onCompleteClose:()=>void
 }){
   const {review,assets,comments,decisions}=detail;
+  const driveCall=useDriveApi();
+  // Resolve the actual immediate parent lazily. Historical approvals need no
+  // migration: their owner-only detail already contains the linked project folder.
+  const [parentFolders,setParentFolders]=useState<Record<string,string|null>>({});
   const currentAssets=useMemo(()=>assets.filter(a=>a.version===review.version),[assets,review.version]);
   const currentComments=useMemo(()=>comments.filter(c=>c.version===review.version),[comments,review.version]);
   const priorComments=comments.filter(c=>c.version<review.version);
@@ -71,6 +76,26 @@ export function ReviewOwnerWorkspace({detail,working,error,onClose,onRevise,onPu
   const mediaRef=useRef<HTMLDivElement>(null);
   useEffect(()=>{setSelectedFile(featuredId);setNotice("");setFeedbackAll(true);},[review.id,review.version,featuredId]);
   const active=currentAssets.find(a=>a.fileId===selectedFile)||currentAssets[0];
+  const parentKey=active?.connectionId&&active.fileId
+    ?active.connectionId+":"+active.fileId:"";
+  useEffect(()=>{
+    if(!active?.connectionId||!parentKey||Object.prototype.hasOwnProperty.call(parentFolders,parentKey))return;
+    let mounted=true;
+    void driveCall<{file?:{parents?:string[]}}>(
+      "/integrations/drive/"+encodeURIComponent(active.connectionId)+
+      "/metadata?fileId="+encodeURIComponent(active.fileId)
+    ).then(response=>{
+      if(!mounted)return;
+      const parent=response.file?.parents?.[0];
+      setParentFolders(previous=>({...previous,[parentKey]:
+        typeof parent==="string"&&/^[A-Za-z0-9_-]{1,200}$/.test(parent)?parent:null}));
+    }).catch(()=>{
+      if(mounted)setParentFolders(previous=>({...previous,[parentKey]:null}));
+    });
+    return()=>{mounted=false;};
+  },[active?.connectionId,active?.fileId,driveCall,parentKey,parentFolders]);
+  const exactParent=parentKey?parentFolders[parentKey]:undefined;
+  const folderId=exactParent||active?.linkedFolderId;
   const displayedComments=feedbackAll?currentComments:currentComments.filter(c=>c.file_id===active?.fileId);
   const fileCounts=new Map(currentAssets.map(a=>[a.fileId,currentComments.filter(c=>c.file_id===a.fileId).length]));
   const blocked=review.status==="closed";
@@ -93,6 +118,7 @@ export function ReviewOwnerWorkspace({detail,working,error,onClose,onRevise,onPu
     </header>
     <div className="review-dialog-body rowner-body">
       {error&&<div className="reviews-warning" role="alert">{error}</div>}
+      {["pending","changes","approved"].includes(review.status)&&<ShareArea detail={detail}/>}
       <section className="rowner-overview" aria-label="Situação da aprovação">
         <div className="rowner-overview-top">
           <div className="rowner-overview-intro"><span className={"reviews-status status-"+review.status}>{statusText[review.status]}</span>
@@ -148,7 +174,16 @@ export function ReviewOwnerWorkspace({detail,working,error,onClose,onRevise,onPu
           </div>
           <div className="rowner-preview" ref={mediaRef}>
             <div className="rowner-preview-head"><strong title={active?.name}>{active?.name||"Selecione um material"}</strong>
-              {active&&<a href={driveUrl(active.fileId)} target="_blank" rel="noopener noreferrer"><ExternalLink size={14}/> Abrir no Drive</a>}</div>
+              <div className="rowner-preview-actions">
+                {active&&folderId&&<a href={"https://drive.google.com/drive/folders/"+encodeURIComponent(folderId)}
+                  target="_blank" rel="noopener noreferrer"
+                  aria-label={exactParent?"Abrir pasta do arquivo no Google Drive":"Abrir pasta vinculada ao projeto no Google Drive"}
+                  title={exactParent?"Pasta onde o arquivo está salvo":"Pasta vinculada ao projeto"}>
+                  <FolderOpen size={15}/> {exactParent?"Abrir pasta":"Pasta do projeto"}
+                </a>}
+                {active&&<a href={driveUrl(active.fileId)} target="_blank" rel="noopener noreferrer"
+                  aria-label={"Abrir "+active.name+" no Google Drive"}><ExternalLink size={14}/> Abrir arquivo</a>}
+              </div></div>
             <div className="rowner-preview-stage">
               {previewable?<iframe key={active.fileId} title={"Prévia de "+active.name}
                 src={previewUrl(active.fileId)} loading="lazy" referrerPolicy="no-referrer"
@@ -174,7 +209,6 @@ export function ReviewOwnerWorkspace({detail,working,error,onClose,onRevise,onPu
           </div>
         </section>
       </div>}
-      {["pending","changes","approved"].includes(review.status)&&<ShareArea detail={detail}/>}
       {(oldVersions.length>0||decisions.length>1||priorComments.length>0)&&<details className="rowner-history">
         <summary><span><History size={18}/> Histórico das versões anteriores</span>
           <small>{oldVersions.length} versões · {priorComments.length} comentários anteriores</small></summary>
