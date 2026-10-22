@@ -62,7 +62,6 @@ button, [role="button"] { touch-action: manipulation; }
 }
 .app-shell .sidebar nav > button,
 .app-shell .mobile-bottom-nav button,
-.app-shell .workspace-switch b,
 .app-shell .filter-pills button { font-size: var(--type-label); line-height: var(--type-leading-ui); }
 .app-shell .primary-button,
 .app-shell .secondary-button,
@@ -73,8 +72,6 @@ button, [role="button"] { touch-action: manipulation; }
   font-weight: var(--type-weight-medium);
   min-height: 2.75rem;
 }
-.app-shell .topbar .global-search input { font-size: var(--type-body); }
-.app-shell .global-search,
 .app-shell .sidebar nav > button { min-height: 2.75rem; }
 .app-shell .page-heading > div,
 .app-shell .project-name,

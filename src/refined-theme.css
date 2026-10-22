@@ -43,12 +43,7 @@ a { text-underline-offset: 3px; }
 :root .sidebar-profile { border-color: var(--line); }
 :root .sidebar-profile > span { color: var(--on-accent); background: var(--accent); }
 :root .sidebar-profile small { color: var(--muted); }
-:root .topbar { background: rgba(255,255,255,.64); border: 1px solid var(--line); box-shadow: 0 5px 25px rgba(0,0,0,.02); backdrop-filter: blur(24px); border-radius: 18px; }
-:root[data-theme="dark"] .topbar { background: rgba(24,24,24,.68); border-color: var(--line); box-shadow: 0 5px 25px rgba(0,0,0,.06); }
-:root .sync-dot { background: var(--accent); color: var(--on-accent); border-radius: 10px; }
-:root .global-search,:root .icon-button,:root .secondary-button { background: var(--subtle); color: var(--ink); border: 1px solid var(--line); box-shadow: none; backdrop-filter: none; }
-:root .global-search input { color: var(--ink); font-weight: 400; }
-:root .global-search kbd { color: var(--muted); background: transparent; border-color: var(--line); box-shadow: none; }
+:root .icon-button,:root .secondary-button { background: var(--subtle); color: var(--ink); border: 1px solid var(--line); box-shadow: none; backdrop-filter: none; }
 :root .primary-button { background: var(--accent); color: var(--on-accent); border: 1px solid transparent; box-shadow: 0 3px 10px rgba(0,0,0,.06); font-weight: 500; }
 :root .primary-button:hover { background: var(--accent); color: var(--on-accent); opacity: .87; transform: translateY(-1px); box-shadow: 0 5px 15px rgba(0,0,0,.08); }
 :root .secondary-button { font-weight: 400; }
@@ -155,7 +150,6 @@ a { text-underline-offset: 3px; }
   .flow-overview-head h2 { font-size: 22px; }
   .flow-numbers strong { font-size: 32px; }
   .flow-numbers .flow-money { font-size: clamp(23px,6vw,29px); }
-  :root .topbar { border-radius: 17px; }
   :root .project-modal .modal-actions { background: var(--paper); }
 }
 @media(max-width:560px) {
@@ -174,7 +168,6 @@ a { text-underline-offset: 3px; }
 :root .portal-page .secondary-button:hover { background: #303030; color: #eee; }
 @media(min-width:821px) {
  .sidebar nav > button { font-size: var(--type-support); }
- .global-search input { font-size: var(--type-support); }
  .primary-button,.secondary-button { font-size: var(--type-support); }
  .panel-head h2 { font-size: var(--type-card); }
  .panel-head > div > span { font-size: var(--type-caption); }

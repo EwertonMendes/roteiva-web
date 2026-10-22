@@ -409,3 +409,7 @@ Configuração e matriz: [DRIVE-UPLOAD.md](DRIVE-UPLOAD.md).
 ### Decisão — performance e quotas Cloudflare Free (21/10/2026)
 
 Separação de manutenção por criticidade: exclusões e revogações de Drive/ACLs usam polling D1 de 1 minuto; retenção e backfill usam 15 minutos. Nenhum cache em memória de Worker é autoridade para status de revogação. Busca de aprovações possui debounce na interface, mantendo autorização real no backend. Miniaturas passam diretamente ao cliente via streaming apenas se a resposta do Google declarar comprimento válido (até 1 MiB) e não comprimido; tamanho divergente aborta a transmissão. Fallback existente continua para comprimento incerto. Nunca armazenar imagens privadas em cache público.
+
+## Decisão de navegação — 21/10/2026
+
+**Decisão tomada:** retirar a barra superior global e o banner redundante de nuvem do shell compartilhado. A busca de Projetos/Clientes passa para o conteúdo, mantendo o carregamento completo sob demanda. O menu móvel usa um controle independente no conteúdo. Alertas reais de falha/sincronização e o modo demo são preservados; contratos de dados e persistência não mudam.

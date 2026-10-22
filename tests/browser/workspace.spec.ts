@@ -139,7 +139,8 @@ test("Account and studio settings persist without changing existing projects",as
   await page.goto(cloud);
   const email="settings-"+info.project.name+"@example.com";
   await login(page,email);
-  await expect(page.locator(".workspace-switch")).toContainText("Estúdio de QA");
+  await navigate(page,"Configurações");
+  await expect(page.getByLabel("Nome do estúdio ou marca",{exact:true})).toHaveValue("Estúdio de QA");
   await navigate(page,"Projetos");
   await page.locator(".heading-actions").getByRole("button",{name:"Criar projeto",exact:true}).click();
   await page.getByLabel("Nome do projeto",{exact:true}).fill("Projeto mantido");
@@ -153,7 +154,7 @@ test("Account and studio settings persist without changing existing projects",as
   await page.getByLabel("Tipo de atuação").selectOption("producer");
   await page.getByRole("button",{name:"Salvar alterações"}).click();
   await expect(page.getByRole("status").filter({hasText:"Perfil e estúdio salvos na nuvem."})).toBeVisible();
-  await expect(page.locator(".workspace-switch")).toContainText("Estúdio dos Crias");
+  await expect(page.getByLabel("Nome do estúdio ou marca",{exact:true})).toHaveValue("Estúdio dos Crias");
   await page.screenshot({path:info.outputPath("settings.png"),fullPage:true});
   await page.getByRole("button",{name:"Escuro",exact:true}).click();
   await settled(page);
@@ -164,7 +165,6 @@ test("Account and studio settings persist without changing existing projects",as
   await expect(page.getByLabel("Nome profissional",{exact:true})).toHaveValue("Direção Criativa");
   await expect(page.getByLabel("Nome do estúdio ou marca",{exact:true})).toHaveValue("Estúdio dos Crias");
   await expect(page.getByLabel("Tipo de atuação")).toHaveValue("producer");
-  await expect(page.locator(".workspace-switch")).toContainText("Estúdio dos Crias");
   await expect(page.locator("html")).toHaveAttribute("data-theme","dark");
   await expect(page.getByLabel("E-mail de acesso")).toHaveAttribute("readonly","");
   await navigate(page,"Projetos");

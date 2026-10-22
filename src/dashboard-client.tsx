@@ -2,7 +2,7 @@
 
 import {
   BadgeDollarSign, History, CalendarCheck2, CalendarDays, Check, ChevronDown,
-  ChevronRight, CirclePause, CirclePlay, Clock3, Command, Film, Folder, FolderOpen,
+  ChevronRight, CirclePause, CirclePlay, Clock3, Film, Folder, FolderOpen,
   Grid2X2, LayoutDashboard, LibraryBig, ListFilter, Menu, PanelsTopLeft,
   ArrowUpRight, Building2, Moon, UserRound,
   MoreHorizontal, Pencil, Plus, ReceiptText, Search, Sun, Trash2,
@@ -501,20 +501,9 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
       {activityOpen && <ActivityHistoryDrawer activities={activities} onClose={() => setActivityOpen(false)}/>}
 
       <main className="main">
-        <header className="topbar">
-          <button className="menu-button" onClick={() => setMobileOpen(true)} aria-label="Abrir menu" aria-expanded={mobileOpen}><Menu size={20} /></button>
-          <button type="button" className="workspace-switch" onClick={()=>changeView("settings")} title="Abrir configurações do estúdio" aria-label="Abrir configurações do estúdio"><span className="sync-dot">R</span><b title={workspaceName}>{workspaceName}</b><ChevronDown size={14} /></button>
-          {view!=="library"&&view!=="reviews"&&<label className="global-search"><Search size={17} /><input value={query} onChange={(e) => {
-              const value=e.target.value;
-              setQuery(value);
-              if(value.trim() && view==="projects")onSearchProjects?.();
-              if(value.trim() && view==="clients")onSearchClients?.();
-            }} placeholder="Buscar projetos e clientes" /><kbd><Command size={11} /> K</kbd></label>}
-          <div className="top-actions"><button className="icon-button" title="Ver atividades" aria-label="Ver atividades" onClick={() => { setMobileOpen(false);setActivityOpen(true); }}><History size={18} /></button><button className="icon-button theme-toggle" onClick={toggleTheme} aria-label={theme === "light" ? "Ativar modo escuro" : "Ativar modo claro"} title={theme === "light" ? "Modo escuro" : "Modo claro"}>{theme === "light" ? <Moon size={18} /> : <Sun size={18} />}</button><button className="primary-button" onClick={startProject}><Plus size={17} /> Novo projeto</button></div>
-        </header>
-
         <section className="page">
-          {isDemo ? <div className="pages-demo-notice" role="note"><b>Modo demonstração</b><span>Explore o Roteiva com dados salvos apenas neste navegador. Entre na sua conta para trabalhar com seus próprios projetos.</span></div> : view!=="library" && view!=="overview" ? <div className="cloud-banner" role="status"><b>Seu espaço</b><span>{cloudStatus}</span></div> : null}
+          {isDemo ? <div className="pages-demo-notice" role="note"><b>Modo demonstração</b><span>Explore o Roteiva com dados salvos apenas neste navegador. Entre na sua conta para trabalhar com seus próprios projetos.</span></div> : null}
+          <button type="button" className="menu-button page-menu-button" onClick={() => setMobileOpen(true)} aria-label="Abrir menu" aria-expanded={mobileOpen}><Menu size={20} /></button>
           <div className="page-heading">
             <div><span className="eyebrow">ROTEIVA / {view === "overview" ? "PAINEL" : pageTitles[view][0].toUpperCase()}</span><h1>{pageTitles[view][0]}</h1><p>{pageTitles[view][1]}</p></div>
             <div className="heading-actions">
@@ -526,6 +515,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
                 : view === "reviews" ? null : <button className="primary-button" onClick={startProject}><Plus size={17} /> Criar projeto</button>}
             </div>
           </div>
+          {((view === "projects" && !selectedProject) || (view === "clients" && !selectedClient)) && <label className="page-search"><Search size={17}/><input aria-label={view === "projects" ? "Buscar projetos" : "Buscar clientes"} value={query} onChange={e => { const value=e.target.value; setQuery(value); if(value.trim()){ if(view === "projects")onSearchProjects?.(); else onSearchClients?.(); } }} placeholder={view === "projects" ? "Buscar projetos" : "Buscar clientes"}/></label>}
           {view === "settings" && <SettingsPage profile={profile} email={email} photoURL={photoURL} theme={theme} toggleTheme={toggleTheme} onSaveProfile={onSaveProfile} />}
           {view === "overview" && <TodayStudio clients={clientList} projects={projects} entries={financeEntries} events={calendarEvents} activities={activities} onView={changeView} onOpenActivity={() => setActivityOpen(true)} overviewMetrics={overviewMetrics} />}
           {view === "projects" && (selectedProject && projects.some(p => p.id === selectedProject) ? <ProjectDetail project={projects.find(p => p.id === selectedProject)!} clients={clientList} entries={financeEntries} assets={libraryAssets} events={calendarEvents} onSave={updateProject} onBack={() => changeView("projects")} onRevenue={addLinkedRevenue} onUpload={uploadAssets} onEvent={(p) => { openEvent(null, p.dueDate); }} uploading={uploading} onReview={()=>{setReviewStart({clientId:projects.find(p=>p.id===selectedProject)?.clientId,projectId:selectedProject||undefined});changeView("reviews");}} /> : <ProjectsView projects={filtered.map(p => ({...p, files: libraryAssets.filter(a => a.projectId === p.id).length}))}
