@@ -53,7 +53,7 @@
 .pc-dialog > footer > div { flex:1; }
 .pc-picker-tools { display:flex; flex-wrap:wrap; gap:16px; }
 .pc-picker-tools > label { display:flex; flex-direction:column; gap:8px; min-width:0; flex:1 1 220px; font-size:var(--type-support); color:var(--muted); }
-.pc-picker-tools select,.pc-image-search > div { border:1px solid var(--line); border-radius:10px; padding:10px 12px; background:var(--subtle); color:var(--ink); min-width:0; width:100%; font:inherit; }
+.pc-image-search > div { border:1px solid var(--line); border-radius:10px; padding:10px 12px; background:var(--subtle); color:var(--ink); min-width:0; width:100%; font:inherit; }
 .pc-image-search > div { display:flex; align-items:center; gap:8px; }
 .pc-image-search input { border:0; background:transparent; color:var(--ink); font:inherit; width:100%; min-width:0; outline:none; }
 .pc-helper { color:var(--muted); font-size:var(--type-support); line-height:1.6; }
@@ -68,7 +68,7 @@
 .pc-crop-interactive:active { cursor:grabbing; }
 .pc-loading { display:flex; align-items:center; justify-content:center; gap:8px; color:var(--muted); }
 .pc-empty { text-align:center; color:var(--muted); padding:24px; }
-.pc-panel button:focus-visible,.pc-dialog button:focus-visible,.pc-dialog select:focus-visible,.pc-image-search:focus-within { outline:2px solid var(--ink); outline-offset:3px; }
+.pc-panel button:focus-visible,.pc-dialog button:focus-visible,.pc-image-search:focus-within { outline:2px solid var(--ink); outline-offset:3px; }
 .pc-spin { animation:pc-spin 1s linear infinite; } @keyframes pc-spin { to { transform:rotate(360deg); } }
 @media(min-width:1600px) { .pc-cards { grid-template-columns:repeat(auto-fill,minmax(380px,1fr)); } }
 @media(max-width:600px) { .pc-panel { border-radius:18px; }.pc-filter-bar { padding:12px; gap:10px; }.pc-filters { flex-wrap:nowrap; width:100%; overflow-x:auto; padding-bottom:4px; }.pc-filters button { flex-shrink:0; font-size:var(--type-support); padding:10px; }.pc-cards { padding:14px; gap:16px; }.pc-dialog { position:fixed; inset:0; margin:auto; width:calc(100vw - 16px); height:min(760px,calc(100dvh - 16px)); max-height:calc(100dvh - 16px); border-radius:18px; }.pc-dialog > header,.pc-editor-body { padding:18px; }.pc-dialog > footer { padding:12px; flex-wrap:wrap; }.pc-dialog > footer > div { flex-basis:100%; }.pc-image-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }.pc-result-count { font-size:var(--type-caption); }.app-view-projects .page-search { max-width:none; } }
