@@ -407,16 +407,28 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
                       placeholder={"diretoria@gmail.com\nobservador@gmail.com"}/>
                   </label>
                   <p className="reviews-info">A aprovação só fica concluída depois que todos os revisores aprovarem. Um pedido de ajustes devolve a versão ao estúdio. Leitores nunca podem enviar comentários ou decisões.</p>
-                  <label className="review-permission-optin">
+                  <div className="review-share-heading">
+                    <h4>Permissões no Google Drive</h4>
+                    <p>Estas opções são adicionais ao acesso pelo Roteiva. Desativadas, não concedem acesso direto aos arquivos no Drive.</p>
+                  </div>
+                  <label className="review-sharing-option">
+                    <span className="review-sharing-copy">
+                      <strong>Permitir abrir também pelo Google Drive</strong>
+                      <small>Concede acesso de <b>Leitor</b> aos e-mails informados. No Roteiva, revisores continuam podendo aprovar e leitores apenas visualizar.</small>
+                    </span>
                     <input type="checkbox" checked={shareDirect}
                       onChange={e=>{setShareDirect(e.target.checked);if(!e.target.checked)setRestrictPublic(false);}}/>
-                    <span>Também conceder acesso direto no Google Drive a estes participantes. O Roteiva configura automaticamente permissão Leitor por conta, mantendo os papéis de revisor/leitor no portal.</span>
+                    <span className="review-sharing-switch" aria-hidden="true"/>
                   </label>
-                  {shareDirect&&<label className="review-permission-optin">
+                  {shareDirect&&<label className="review-sharing-option review-sharing-option-danger">
+                    <span className="review-sharing-copy">
+                      <strong><AlertTriangle size={16} aria-hidden="true"/> Remover acesso público existente no Drive</strong>
+                      <small>Remove permissões públicas diretas dos arquivos compartilhados. <b>Links antigos podem parar de funcionar.</b> Permissões herdadas de pastas não são modificadas.</small>
+                    </span>
                     <input type="checkbox" checked={restrictPublic} onChange={e=>setRestrictPublic(e.target.checked)}/>
-                    <span>Remover permissão pública direta já existente no Drive. Atenção: pode invalidar outros links compartilhados.</span>
+                    <span className="review-sharing-switch" aria-hidden="true"/>
                   </label>}
-                  <p className="reviews-muted">No modo padrão, participantes acessam pelo Roteiva sem receber permissões adicionais no Drive. Para garantir que o arquivo original também seja privado, revise permissões já existentes no Drive. Permissões herdadas de pastas não são modificadas pelo Roteiva.</p>
+                  <p className="review-sharing-footnote">Acesso direto pelo Drive é opcional. Para arquivos privados, confira também permissões já existentes nas pastas do seu Google Drive.</p>
                 </div>}
               <label>Validade<select value={days} onChange={e=>setDays(Number(e.target.value))}>
                 <option value={7}>7 dias</option><option value={14}>14 dias</option><option value={30}>30 dias</option>
