@@ -1,3 +1,4 @@
+import { AppSelect } from "../ui/AppSelect";
 import {useState, type FormEvent} from 'react';
 import {ArrowLeft, ArrowUpRight, ArrowDownRight, CalendarDays, Check, ExternalLink, FolderOpen, Link2, Pencil, Plus, Trash2} from 'lucide-react';
 import type {Project, Client, FinanceEntry, CalendarEvent, LibraryAsset, Status} from '../../domain/workspace';
@@ -48,8 +49,8 @@ export function ProjectDetail({project,clients,entries,assets,events,onSave,onBa
       <h2 id="pd-name">{project.name}</h2>
       <form className="studio-form" onSubmit={save}>
         <div className="form-grid"><label>Nome do projeto<input name="name" required maxLength={200} defaultValue={project.name} onInput={event=>event.currentTarget.setCustomValidity('')}/></label>
-          <label>Etapa<div className="pd-stage" data-stage={status}><i aria-hidden="true"/><select name="status" value={status} onChange={event=>setStatus(event.target.value as Status)}>{statuses.map(status=><option key={status}>{status}</option>)}</select></div></label></div>
-        <div className="form-grid"><label>Cliente<select name="clientId" defaultValue={project.clientId||''}><option value="">Sem cliente</option>{clients.map(client=><option key={client.id} value={client.id}>{client.name}</option>)}</select></label><label>Prazo<input type="date" name="dueDate" defaultValue={project.dueDate}/></label></div>
+          <label>Etapa<div className="pd-stage" data-stage={status}><i aria-hidden="true"/><AppSelect name="status" value={status} onValueChange={value=>setStatus(value as Status)}>{statuses.map(status=><option key={status}>{status}</option>)}</AppSelect></div></label></div>
+        <div className="form-grid"><label>Cliente<AppSelect name="clientId" defaultValue={project.clientId||''}><option value="">Sem cliente</option>{clients.map(client=><option key={client.id} value={client.id}>{client.name}</option>)}</AppSelect></label><label>Prazo<input type="date" name="dueDate" defaultValue={project.dueDate}/></label></div>
         <label>Briefing<textarea name="description" rows={4} maxLength={10000} defaultValue={project.description} placeholder="Objetivo, referências, formatos e orientações…"/></label>
         <button className="primary-button" type="submit">Salvar projeto</button>
       </form>
