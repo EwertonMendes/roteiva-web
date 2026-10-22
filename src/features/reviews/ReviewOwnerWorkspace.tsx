@@ -1,3 +1,4 @@
+import { AppSelect } from "../ui/AppSelect";
 import {useEffect,useMemo,useRef,useState} from "react";
 import {CheckCircle2,ChevronRight,Clock3,Copy,ExternalLink,FileAudio,FileImage,FileText,
   FileVideo,FolderOpen,Grid2X2,History,Link2,List,LoaderCircle,MessageSquare,RotateCcw,Search,Send,ShieldCheck,X} from "lucide-react";
@@ -210,12 +211,12 @@ export function ReviewOwnerWorkspace({detail,working,error,onClose,onRevise,onPu
               <input aria-label="Buscar materiais por nome" type="search" placeholder="Buscar arquivo…"
                 value={fileSearch} onChange={e=>{setFileSearch(e.target.value);setVisibleLimit(6);}}/>
             </label>
-            <select aria-label="Filtrar materiais por tipo" value={typeFilter}
-              onChange={e=>{setTypeFilter(e.target.value as typeof typeFilter);setVisibleLimit(6);}}>
+            <AppSelect aria-label="Filtrar materiais por tipo" value={typeFilter}
+              onValueChange={value=>{setTypeFilter(value as typeof typeFilter);setVisibleLimit(6);}}>
               <option value="all">Todos os tipos</option>
               <option value="video">Vídeos</option><option value="image">Imagens</option>
               <option value="audio">Áudios</option><option value="pdf">PDFs</option>
-            </select>
+            </AppSelect>
           </div>}
           <div className="rowner-file-list" data-view={galleryView} aria-label="Galeria de materiais">
             {visibleAssets.map(a=><button type="button" key={a.fileId}
