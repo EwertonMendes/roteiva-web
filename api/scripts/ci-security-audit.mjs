@@ -24,11 +24,11 @@ export function run(){
   });
   const evaluation=evaluateAudit(result);
   if(evaluation.warning){
-    process.stdout.write('::warning::'+evaluation.message+'\\n');
+    process.stdout.write('::warning::'+evaluation.message+'\n');
   }else if(!evaluation.ok){
-    process.stderr.write('::error::'+evaluation.message+'\\n');
+    process.stderr.write('::error::'+evaluation.message+'\n');
   }else{
-    process.stdout.write(evaluation.message+'\\n');
+    process.stdout.write(evaluation.message+'\n');
   }
   if(!evaluation.ok)process.exitCode=1;
 }
