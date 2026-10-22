@@ -2,14 +2,15 @@
 
 ## Select acessível e reutilizável — 22/10/2026
 
-**IMPLEMENTADO na PR [#85](https://github.com/EwertonMendes/roteiva-web/pull/85), aguardando homologação em preview DEV e testes E2E completos.** Sem merge; o frontend de master não é alterado. Componente `src/features/ui/AppSelect.tsx` e `AppSelect.css`, migrados filtros financeiros, formulários de projeto/receita/agenda, Biblioteca/Drive, aprovações e Configurações. Menus de opções seguem os temas e não dependem da aparência nativa do sistema.
+**VALIDADO AUTOMATICAMENTE na PR [#85](https://github.com/EwertonMendes/roteiva-web/pull/85), com homologação visual/autenticação Google real ainda pendente.** Sem merge; o frontend de master não é alterado. Componente `src/features/ui/AppSelect.tsx` e `AppSelect.css`, migrados filtros financeiros, formulários de projeto/receita/agenda, Biblioteca/Drive, aprovações e Configurações. Menus de opções seguem os temas e não dependem da aparência nativa do sistema.
 
 - [x] Isolar dropdown, estado, teclado, foco, portal/reposicionamento e tokens de tema em componente reutilizável.
 - [x] Preservar contratos de `FormData` por nome, valores existentes e seleção controlada, sem alterar o backend.
 - [x] Atualizar seletores e scripts Playwright que dependiam de `selectOption` nativo.
-- [ ] Testar todo o fluxo em Chromium desktop e mobile, seleção de filtros, formulários e modais, além de teclado e overflow.
-- [ ] Confirmar preview DEV e aceite visual do proprietário em temas claro/escuro.
-- Evidências: workflow Frontend DEV do PR (teste, TypeScript, build), `tests/browser/select-helpers.ts` e testes E2E atualizados. QA manual/real DEV não foi executado neste ponto; não confundir compilação com homologação completa.
+- [x] Testar o fluxo em Chromium desktop/mobile com filtros, formulários, modal de capa, Drive, aprovações, navegação por teclado e posicionamento do menu.
+- [x] Publicar preview temporário de Hosting DEV do PR sem alterar a master, o banco ou o Worker.
+- [ ] Homologação visual pelo proprietário em temas claro/escuro e login Google no domínio de preview. O Firebase CLI avisou que não conseguiu adicionar/sincronizar o domínio temporário nas configurações de domínios autorizados do Firebase Auth; a publicação do Hosting foi concluída, mas o login real por essa URL não foi comprovado.
+- Evidências: [frontend (commit `903aacd`)](https://github.com/EwertonMendes/roteiva-web/actions/runs/39846609584), [regressão completa com emuladores](https://github.com/EwertonMendes/roteiva-web/actions/runs/39857055864) (101 Playwright aprovados, 5 ignorados; 31 testes de regras Firestore e saga isolada D1/Firebase aprovados), e [preview Hosting DEV](https://github.com/EwertonMendes/roteiva-web/actions/runs/39857063804). Preview: https://roteiva-web-dev--pr-85-4uzdvlmd.web.app (válido até 29/10/2026). A validação automatizada usa emuladores/mocks e não comprova acesso Google real; não fazer merge sem aprovação.
 
 
 ## Melhoria dos detalhes do projeto — 22/10/2026
