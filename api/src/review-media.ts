@@ -10,9 +10,9 @@ const encoder=new TextEncoder();
 const decoder=new TextDecoder();
 const MEDIA_MAX_AGE=12*60*1000;
 /** Non-reversible subject commitment: never expose a reviewer's email in the media URL. */
-export async function reviewMediaSubject(reviewId:string,email:string):Promise<string>{
-  const input=encoder.encode(reviewId+':'+email.toLowerCase());
-  return base64url(new Uint8Array(await crypto.subtle.digest('SHA-256',input)));
+export async function reviewMediaSubject(env:Env,reviewId:string,email:string,version=env.TOKEN_KEY_VERSION):Promise<string>{
+  const message=encoder.encode('roteiva/media-subject/v1/'+reviewId+':'+email.toLowerCase());
+  return base64url(new Uint8Array(await crypto.subtle.sign('HMAC',await key(env,version),message)));
 }
 const GOOGLE='https://www.googleapis.com';
 
@@ -66,7 +66,7 @@ export async function streamReviewMedia(request:Request,env:Env,url:URL):Promise
     // when access is removed; subject is a hash, not an email in a shared URL.
     let allowed=false;
     for(const person of permitted.results){
-      if(await reviewMediaSubject(r.id,person.email)===p.s){allowed=true;break;}
+      if(await reviewMediaSubject(env,r.id,person.email,p.k)===p.s){allowed=true;break;}
     }
     if(!allowed)throw new ApiError(404,'review_not_found');
   }else if(p.s)throw new ApiError(404,'review_not_found');
