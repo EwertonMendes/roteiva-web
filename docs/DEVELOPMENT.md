@@ -1,5 +1,12 @@
 # Desenvolvimento e deploy — Roteiva
 
+## Homologação manual do Worker da PR de restrição de prévias (22/10/2026)
+
+O workflow `.github/workflows/api.yml` permite publicar manualmente no DEV, mediante `workflow_dispatch` e `ref` de branch do próprio repositório, **somente** quando existe PR aberto, com base em master e SHA idêntico ao HEAD. O guard confirma Cloudflare Account/D1 DEV e bloqueia mudanças de migrations, bindings Wrangler ou dependências na promoção manual. Testes, typecheck, migration local e bundle continuam obrigatórios. Apenas em deploys da `master` executa migrations remotas; branches manuais não podem alterar a estrutura do banco. Os checks existentes de schema, secrets, health e acesso sem autenticação continuam. A proteção de branch do environment `cloudflare-development` permanece soberana: se não permitir deploys de PR, a execução será bloqueada, sem contornar controles.
+
+O frontend continua publicado apenas via Hosting DEV, em workflow independente. Não publicar Worker de branch sem concluir testes; não aplicar migrations remotas nem manipular registros da revisão. Se o Worker DEV não puder ser promovido manualmente, o fluxo deve ser reportado como parcial até integração aprovada na `master`.
+
+
 ## Homologação manual de um PR no Hosting DEV (22/10/2026)
 
 **Fluxo explícito, sem merge:** o workflow existente `.github/workflows/frontend.yml` aceita `workflow_dispatch` executado com `ref` igual à branch de um PR aberto, **do próprio repositório e direcionado à master**. Após os mesmos testes unitários, TypeScript e build, o job de publicação exige `FIREBASE_PROJECT_ID=roteiva-web-dev`, verifica se o SHA da branch não mudou, consulta a API do GitHub para confirmar PR aberto/head SHA e testa o Worker DEV. Somente então usa o ambiente protegido `firebase-development` para publicar exclusivamente `--only hosting` no canal principal e verificar cache. Não publica banco Firestore, índices, regras nem Worker. A execução manual em master mantém o comportamento existente.
