@@ -2,10 +2,9 @@
 .app-shell { --dashboard-sidebar-width: 284px; grid-template-columns:var(--dashboard-sidebar-width) minmax(0,1fr); }
 .app-shell .sidebar { width:var(--dashboard-sidebar-width); padding:24px 17px 16px; background:#111112; border-right:1px solid #292929; color:#f5f5f5; backdrop-filter:none; box-shadow:none; }
 .app-shell .sidebar .brand-lockup { height:64px; padding:0 9px; }
-.app-shell .sidebar .brand-lockup img { width:188px; max-height:47px; filter:brightness(0) invert(1); }
+.app-shell .sidebar .brand-lockup img { width:188px; max-height:47px; filter:none; }
 .app-shell .sidebar nav { margin-top:28px; gap:5px; flex:1; min-height:0; overflow-y:auto; overflow-x:hidden; padding-bottom:12px; scrollbar-width:thin; scrollbar-color:#3a3a3b transparent; }
 .app-shell .sidebar .nav-label { color:#929292; padding:0 12px 8px; font-weight:600; letter-spacing:.12em; }
-.app-shell .sidebar .nav-label.second { margin-top:24px; }
 .app-shell .sidebar nav > button { width:100%; min-height:47px; gap:14px; border:1px solid transparent; border-radius:13px; padding:0 12px; color:#b1b1b1; font-weight:500; background:transparent; }
 .app-shell .sidebar nav > button svg { flex-shrink:0; }
 .app-shell .sidebar nav > button:hover { background:#1d1d1e; color:#fff; border-color:#292929; }
@@ -15,8 +14,6 @@
 .app-shell .sidebar-profile { flex-shrink:0; padding:14px 7px 3px; border-color:#303030; margin-top:0; }
 .app-shell .sidebar-profile small { color:#aaa; }
 .app-shell .sidebar-profile > span { color:#fff; background:#252527; }
-.app-shell .sidebar-appearance-switch { flex:0 0 auto; width:38px; height:23px; border:1px solid #3a3a3b; border-radius:999px; display:flex; align-items:center; justify-content:center; background:#272729; color:#ededed; }
-.app-shell .sidebar-appearance-switch svg { width:14px; height:14px; }
 .app-view-overview { --phase-production:#348df4; --phase-approval:#f4ae39; --phase-adjustments:#8056ee; --phase-completed:#20cd63; background:#111112; }
 .app-view-overview .main { background:#111112; }
 .app-view-overview .page { max-width:none; padding:67px clamp(24px,2.4vw,44px) 80px; }
@@ -68,14 +65,12 @@
 .app-view-overview .dashboard-grid { margin-top:20px; }
 .app-view-overview .projects-panel { background:#1a1a1b; border-color:#353537; }
 :root:not([data-theme="dark"]) .app-shell .sidebar { background:#f5f5f5; color:#191919; border-color:#e1e1e1; }
-:root:not([data-theme="dark"]) .app-shell .sidebar .brand-lockup img { filter:brightness(0); }
 :root:not([data-theme="dark"]) .app-shell .sidebar nav > button { color:#595959; }
 :root:not([data-theme="dark"]) .app-shell .sidebar nav > button:hover,:root:not([data-theme="dark"]) .app-shell .sidebar nav > button.active { background:#e9e9eb; color:#171717; border-color:#e1e1e1; }
 :root:not([data-theme="dark"]) .app-shell .sidebar nav > button em { background:#e8e8e8; color:#333; }
 :root:not([data-theme="dark"]) .app-shell .sidebar .nav-label { color:#696969; }
 :root:not([data-theme="dark"]) .app-shell .sidebar-profile { border-color:#dadada; }
 :root:not([data-theme="dark"]) .app-shell .sidebar-profile small { color:#626262; }
-:root:not([data-theme="dark"]) .app-shell .sidebar-appearance-switch { background:#e2e2e4; color:#222; border-color:#c9c9ca; }
 :root:not([data-theme="dark"]) .app-view-overview { background:#f7f7f8; }
 :root:not([data-theme="dark"]) .app-view-overview .main { background:#f7f7f8; }
 :root:not([data-theme="dark"]) .app-view-overview .panel.flow-overview,:root:not([data-theme="dark"]) .app-view-overview .projects-panel { background:#fff; border-color:#e4e4e5; color:#171717; }
@@ -206,7 +201,6 @@
     gap: clamp(1px, .45dvh, 5px);
   }
   .app-shell .sidebar nav > button { min-height: clamp(34px, 5.5dvh, 47px); }
-  .app-shell .sidebar .nav-label.second { margin-top: clamp(8px, 1.5dvh, 24px); }
   .app-shell .sidebar-profile { padding-top: clamp(7px, 1.4dvh, 14px); }
 
 }

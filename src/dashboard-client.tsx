@@ -1,12 +1,13 @@
+import {SidebarAccountMenu} from "./features/ui/SidebarAccountMenu";
 import {ProjectsView} from "./features/projects/ProjectsView";
 "use client";
 
 import {
-  BadgeDollarSign, History, CalendarCheck2, CalendarDays, Check, ChevronDown,
+  BadgeDollarSign, CalendarCheck2, CalendarDays, Check, ChevronDown,
   ChevronRight, CirclePause, CirclePlay, Clock3, Film, Folder, FolderOpen,
   Grid2X2, LayoutDashboard, LibraryBig, ListFilter, Menu, PanelsTopLeft,
-  ArrowUpRight, Building2, Moon, UserRound,
-  MoreHorizontal, Pencil, Plus, ReceiptText, Search, Sun, Trash2,
+  ArrowUpRight, Building2, UserRound,
+  MoreHorizontal, Pencil, Plus, ReceiptText, Search, Trash2,
   UserRoundPlus, Users, WalletCards, X, Upload, Image as ImageIcon,
   FileVideo, FileAudio, FileText, HardDrive, ChevronLeft, Settings2,
   UsersRound, Repeat2, ContactRound, type LucideIcon,
@@ -404,6 +405,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
   }
 
   function applyRoute(next:WorkspaceRoute) {
+    setActivityOpen(false);
     setView(next.view);
     setSelectedProject(next.view==="projects" ? next.projectId || null : null);
     setSelectedClient(next.view==="clients" ? next.clientId || null : null);
@@ -486,20 +488,17 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
               <AnimatedNavIcon icon={item.icon} hoverIcon={item.hoverIcon} kind={item.id} /><span>{item.label}</span>{count !== undefined && <em>{count}</em>}
             </button>;
           })}
-          <small className="nav-label second">FERRAMENTAS</small>
           <button className={view === "calendar" ? "active" : ""} onClick={() => changeView("calendar")}><AnimatedNavIcon icon={CalendarDays} hoverIcon={CalendarCheck2} kind="calendar" /><span>Calendário</span><em>{eventCount ?? calendarEvents.length}</em></button>
           <button className={view === "library" ? "active" : ""} onClick={() => changeView("library")}><AnimatedNavIcon icon={Grid2X2} hoverIcon={LibraryBig} kind="library" /><span>Biblioteca</span><em>{isDemo?libraryAssets.length:linkedFolderCount??"—"}</em></button>
           <button className={view === "settings" ? "active" : ""} onClick={() => changeView("settings")}><AnimatedNavIcon icon={Settings2} hoverIcon={UserRound} kind="settings" /><span>Configurações</span></button>
-          <button type="button" className={activityOpen ? "active" : ""} onClick={() => { setMobileOpen(false); setActivityOpen(true); }} aria-expanded={activityOpen} aria-controls="activity-history-drawer"><History size={19} /><span>Atividades</span></button>
-          <button type="button" onClick={toggleTheme} aria-label="Alternar aparência"><Sun size={19} /><span>Aparência</span><span className="sidebar-appearance-switch" aria-hidden="true">{theme === "dark" ? <Moon size={14} /> : <Sun size={14} />}</span></button>
         </nav>
 
         <div className="sidebar-profile">
-          {photoURL ? <img className="profile-photo" src={photoURL} alt="Foto do usuário" referrerPolicy="no-referrer" /> : <span>{firstName.slice(0, 2).toUpperCase()}</span>}<div><b>{firstName}</b><small>{email}</small></div>{onLogout ? <button className="icon-button" onClick={signOut} aria-label="Sair da conta" title="Sair da conta">↪</button> : <MoreHorizontal size={18} />}
+          {photoURL ? <img className="profile-photo" src={photoURL} alt="Foto do usuário" referrerPolicy="no-referrer" /> : <span>{firstName.slice(0, 2).toUpperCase()}</span>}<div><b>{firstName}</b><small>{email}</small></div><SidebarAccountMenu key={view} theme={theme} onToggleTheme={toggleTheme} onLogout={onLogout?signOut:undefined}/>
         </div>
       </aside>
       {mobileOpen && <button className="mobile-scrim" aria-label="Fechar menu" onClick={() => setMobileOpen(false)} />}
-      {activityOpen && <ActivityHistoryDrawer activities={activities} onClose={() => setActivityOpen(false)}/>}
+      {view === "overview" && activityOpen && <ActivityHistoryDrawer activities={activities} onClose={() => setActivityOpen(false)}/>}
 
       <main className="main">
         <section className="page">

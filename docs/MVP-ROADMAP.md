@@ -567,3 +567,11 @@ Evidências: api/tests/deletion-access.test.mjs (negativa para conta sem provisi
 ## Refinamento do editor de capas — cursor e gestos
 
 **IMPLEMENTADO:** cursor nativo nos modais, incluindo abertura com ponteiro parado; enquadramento direto por arraste, roda do mouse, pinça de dois toques e eventos de gesto Safari. Zoom com âncora, limites sem espaço vazio, suporte a teclado e controles compactos; sliders removidos. Paginação centralizada, com ícone e respiro. Evidências: `CoverFrame.tsx`, `cover-geometry.ts`, `site-experience.tsx/css`, testes de geometria e `tests/browser/project-covers.spec.ts`. TypeScript, 44 testes frontend e builds demo/emulador passaram; 4 E2E Edge desktop/mobile passaram (roda/ctrl+wheel, pinça por dois toques no Chromium, arraste, cursor, paginação e persistência); capturas revisadas. Caminho de GestureEvent Safari exercitado por eventos sintéticos, sem alegar teste em aparelho Safari. Nenhuma mudança de persistência, regras ou permissões. Homologação dos gestos em aparelhos físicos permanece pendente.
+
+## Estabilidade do modal e loading de capas
+
+**IMPLEMENTADO:** altura padrão responsiva entre seleção, carregamento e recorte; rolagem da lista com gutter estável; loadings centralizados horizontal/verticalmente, com spinner e anúncio acessível. Busca não limpa a lista no debounce inicial sem alteração do termo. Evidências: `CoverEditor.tsx`, `projects.css` e `tests/browser/project-covers.spec.ts` (rede atrasada controlada, comparação dos limites do modal e centros dos indicadores, animação do spinner). Resultados automatizados/visuais registrados na PR. Sem mudança de API, regras ou dados.
+
+## Simplificação da barra lateral
+
+**IMPLEMENTADO:** logos originais sem filtros que eliminavam o verde do “i”; lista única de rotas sem Ferramentas, Atividades ou Aparência; menu do perfil com tema e logout. Histórico disponível somente no dashboard e fechado na mudança de rota. Evidências: `SidebarAccountMenu.tsx`, `dashboard-client.tsx`, estilos de marca e `tests/browser/sidebar.spec.ts`; helpers de tema/logout atualizados. TypeScript, testes de domínio e builds validados; resultados visuais e de navegação/conta registrados na PR. Sem alteração de API, modelos ou regras.

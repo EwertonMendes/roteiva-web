@@ -1,0 +1,7 @@
+.sidebar-profile > .sidebar-account-menu { position:relative; flex:0 0 auto; }
+.sidebar-account-popover { position:absolute; bottom:calc(100% + 12px); right:0; width:220px; max-width:calc(100vw - 40px); padding:7px; border:1px solid var(--line); border-radius:15px; background:var(--paper); color:var(--ink); box-shadow:0 12px 35px #0003; z-index:35; }
+.sidebar-account-popover button { display:flex; align-items:center; gap:11px; width:100%; min-height:46px; padding:11px 12px; text-align:left; border:0; border-radius:9px; color:var(--ink); background:transparent; font:inherit; font-size:var(--type-support); }
+.sidebar-account-popover button:hover { background:var(--subtle); }
+.app-shell .sidebar-account-popover button svg { color:var(--muted); flex-shrink:0; }
+.sidebar-account-divider { height:1px; margin:5px 7px; background:var(--line); }
+.sidebar-account-menu button:focus-visible { outline:2px solid var(--ink); outline-offset:2px; }

@@ -38,7 +38,8 @@ async function navigate(page:Page,name:string) {
 async function logout(page:Page) {
   await settled(page);
   if(await page.getByRole("button",{name:"Abrir menu",exact:true}).isVisible()) await page.getByRole("button",{name:"Abrir menu",exact:true}).click();
-  await page.getByRole("button",{name:"Sair da conta",exact:true}).click();
+  await page.getByRole("button",{name:"Opções da conta",exact:true}).click();
+  await Promise.all([page.waitForEvent("load"),page.getByRole("button",{name:"Sair da conta",exact:true}).click()]);
   await expect(page.getByRole("button",{name:"Entrar com Google",exact:true})).toBeVisible();
 }
 test("Google emulator session, CRUD, restoration, themes and separate users",async({page},info)=>{
@@ -86,7 +87,7 @@ test("Google emulator session, CRUD, restoration, themes and separate users",asy
   await navigate(page,"Visão geral");
   await expect(page.locator(".flow-activity-preview")).toContainText("Receita registrada");
   await expect(page.locator(".flow-legend svg")).toHaveCount(4);
-  await expect(page.locator(".sidebar nav").getByRole("button",{name:"Atividades"}).locator("em")).toHaveCount(0);
+  await expect(page.locator(".sidebar nav").getByRole("button",{name:"Atividades"})).toHaveCount(0);
   await page.getByRole("button",{name:"Ver histórico completo"}).click();
   const history=page.getByRole("dialog",{name:"Histórico de atividades"});
   await expect(history).toBeVisible();
@@ -110,9 +111,8 @@ test("Google emulator session, CRUD, restoration, themes and separate users",asy
   await page.getByLabel("Horário de término",{exact:true}).fill("10:00");
   await page.getByRole("button",{name:"Salvar compromisso"}).click();await settled(page);
   if(info.project.name==="mobile")await page.getByRole("button",{name:"Abrir menu",exact:true}).click();
-  await page.getByRole("button",{name:"Alternar aparência",exact:true}).click();
-  if(info.project.name==="mobile")await page.locator(".sidebar .mobile-close").click();
-  await settled(page);
+  await page.getByRole("button",{name:"Opções da conta",exact:true}).click();
+  await page.getByRole("button",{name:"Ativar modo escuro",exact:true}).click();await settled(page);
   await page.reload();await expect(page.locator(".app-shell")).toBeVisible();await settled(page);
   await expect(page.locator("html")).toHaveAttribute("data-theme","dark");
   await navigate(page,"Financeiro");
@@ -121,7 +121,7 @@ test("Google emulator session, CRUD, restoration, themes and separate users",asy
   await expect(page.locator(".day-agenda").getByText("Gravação Aurora",{exact:true})).toBeVisible();
   await navigate(page,"Projetos");
   await expect(page.getByText("Filme Aurora",{exact:true})).toBeVisible();
-  await page.locator(".pc-card h2").getByRole("button",{name:"Filme Aurora",exact:true}).click();
+  await page.getByRole("button",{name:"Filme Aurora",exact:true}).click();
   await expect(page.getByText("Montar primeiro corte",{exact:true})).toBeVisible();
   await page.screenshot({path:info.outputPath("workspace.png"),fullPage:true});
   await page.goto(cloud+"/review");
@@ -188,7 +188,7 @@ test("Direct routes, refresh and browser Back/Forward preserve each user's scree
   await page.getByLabel("Nome do projeto",{exact:true}).fill("Projeto com URL");
   await page.locator("form.project-modal").getByRole("button",{name:"Criar projeto",exact:true}).click();
   await settled(page);
-  await expect(page.getByLabel("Nova tarefa",{exact:true})).toBeVisible();
+  await expect(page.locator(".workspace-tools")).toContainText("Salvo na nuvem");
   await expect(page).toHaveURL(new RegExp("/projetos/[1-9][0-9]*$"));
   const projectURL=page.url();
   await expect(page.getByLabel("Nova tarefa",{exact:true})).toBeVisible();
@@ -208,7 +208,7 @@ test("Direct routes, refresh and browser Back/Forward preserve each user's scree
   await page.getByLabel("Nome do cliente",{exact:true}).fill("Cliente com URL");
   await page.getByLabel("Contato principal",{exact:true}).fill("Contato de teste");
   await page.getByRole("button",{name:"Salvar cliente"}).click();await settled(page);
-  await expect(page.locator(".client-list button").filter({hasText:"Cliente com URL"})).toBeVisible();
+  await expect(page.locator(".workspace-tools")).toContainText("Salvo na nuvem");
   await page.locator(".client-list button").filter({hasText:"Cliente com URL"}).click();
   await expect(page).toHaveURL(new RegExp("/clientes/[1-9][0-9]*$"));
   const clientURL=page.url();
