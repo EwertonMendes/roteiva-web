@@ -93,7 +93,9 @@ test('profissional cria, cliente comenta/pede ajustes, V2 aprovada e encerrament
     }
     if(path.endsWith('/thumbnail')){
       expect(req.headers().authorization).toMatch(/^Bearer /);
-      expect(url.searchParams.get('ticket')).toBe('sealed-thumb-qa');
+      const ticket=url.searchParams.get('ticket');
+      if(ticket)expect(ticket).toBe('sealed-thumb-qa');
+      else expect([file.fileId,uploaded.id,second.fileId]).toContain(path.split('/').at(-2));
       thumbCalls++;
       return route.fulfill({status:200,headers,contentType:'image/png',
         body:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO2qFqsAAAAASUVORK5CYII=','base64')});
@@ -201,6 +203,12 @@ test('profissional cria, cliente comenta/pede ajustes, V2 aprovada e encerrament
   await expect(composer.getByRole('button',{name:'Gerar aprovação'})).toBeEnabled();
   await composer.getByRole('button',{name:'Gerar aprovação'}).click();
   const owner=page.getByRole('dialog',{name:'Detalhes da revisão'});
+  const gallery=owner.getByLabel('Galeria de materiais');
+  await expect(gallery.getByRole('button',{name:'Selecionar arquivo Corte.mp4'})).toHaveAttribute('aria-pressed','true');
+  const cardThumb=gallery.getByRole('button',{name:'Selecionar arquivo Corte.mp4'}).locator('[data-thumbnail-state]');
+  await cardThumb.scrollIntoViewIfNeeded();
+  await expect(cardThumb).toHaveAttribute('data-thumbnail-state','loaded');
+  await expect(gallery.getByRole('button',{name:'Selecionar arquivo Envio.mp4'})).toHaveCount(1);
   const sharing=owner.getByRole('region',{name:'Compartilhar aprovação'});
   const summary=owner.getByRole('region',{name:'Situação da aprovação'});
   await expect(sharing.getByLabel('Link da revisão')).toHaveValue(review.url);
@@ -265,6 +273,74 @@ test('profissional cria, cliente comenta/pede ajustes, V2 aprovada e encerrament
   expect(thumbCalls).toBeGreaterThan(0);
   expect({createCalls,publishCalls,revisionCalls,closeCalls}).toEqual({createCalls:1,publishCalls:1,revisionCalls:1,closeCalls:1});
   await guest.close();
+});
+
+test('galeria de aprovação mantém miniaturas e filtros rápidos com mais de 20 arquivos',async({page,context},info)=>{
+  const {clientId,projectId}=await prepare(page,'reviews-many-'+info.project.name+'@example.com');
+  const items=Array.from({length:23},(_,i)=>{
+    const num=String(i+1).padStart(2,'0');
+    const image=i%2===0;
+    return {fileId:'QA_MATERIAL_'+num+'_1234567890',name:(image?'Arte ':'Vídeo ')+num+(image?'.png':'.mp4'),
+      mimeType:image?'image/png':'video/mp4',version:1,grantState:'granted',
+      connectionId:connection,linkedFolderId:folder};
+  });
+  let calls=0;
+  const data={review:{id:'review-many',clientId,projectId,clientName:'Cliente Revisão',
+    projectName:'Projeto Revisão',studioName:'Estúdio QA',title:'Campanha completa',message:'',
+    recipientEmail:'',mode:'link',status:'pending',version:1,
+    expiresAt:Date.now()+86400000,createdAt:Date.now(),updatedAt:Date.now(),
+    url:root+'/review/'+token},assets:items,comments:[],decisions:[]};
+  await context.route(api+'/**',async route=>{
+    const req=route.request(),url=new URL(req.url()),path=url.pathname;
+    if(req.method()==='OPTIONS')return route.fulfill({status:204,headers:{
+      'Access-Control-Allow-Origin':root,'Access-Control-Allow-Methods':'GET,POST',
+      'Access-Control-Allow-Headers':'Authorization,Content-Type'}});
+    const headers={'Access-Control-Allow-Origin':root,'Cache-Control':'no-store'};
+    if(path.endsWith('/thumbnail')){
+      calls++;
+      expect(req.headers().authorization).toMatch(/^Bearer /);
+      const id=path.split('/').at(-2)||'';
+      if(id===items[4].fileId)return route.fulfill({status:404,headers,
+        contentType:'application/json',body:JSON.stringify({error:{code:'thumbnail_unavailable'}})});
+      return route.fulfill({status:200,headers,contentType:'image/png',
+        body:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO2qFqsAAAAASUVORK5CYII=','base64')});
+    }
+    if(path.endsWith('/metadata'))return route.fulfill({status:200,headers,contentType:'application/json',
+      body:JSON.stringify({file:{parents:[folder]}})});
+    if(path==='/reviews')return route.fulfill({status:200,headers,contentType:'application/json',
+      body:JSON.stringify({reviews:[data.review],hasMore:false})});
+    if(path==='/reviews/review-many')return route.fulfill({status:200,headers,contentType:'application/json',
+      body:JSON.stringify(data)});
+    return route.fallback();
+  });
+  await page.goto(root+'/aprovacoes');
+  await page.getByText('Campanha completa',{exact:true}).click();
+  const owner=page.getByRole('dialog',{name:'Detalhes da revisão'});
+  const gallery=owner.getByLabel('Galeria de materiais');
+  await expect(gallery.getByRole('button')).toHaveCount(6);
+  const first=gallery.getByRole('button',{name:'Selecionar arquivo Arte 01.png'});
+  await first.scrollIntoViewIfNeeded();
+  await expect(first.locator('[data-thumbnail-state]')).toHaveAttribute('data-thumbnail-state','loaded');
+  expect(calls).toBeLessThan(23);
+  await owner.getByRole('button',{name:'Ver materiais em lista'}).click();
+  await expect(gallery).toHaveAttribute('data-view','list');
+  await owner.getByRole('button',{name:'Ver materiais em grade'}).click();
+  await expect(gallery).toHaveAttribute('data-view','grid');
+  await owner.getByRole('button',{name:/Mostrar mais 6 de 17 arquivos/}).click();
+  await expect(gallery.getByRole('button')).toHaveCount(12);
+  await owner.getByRole('searchbox',{name:'Buscar materiais por nome'}).fill('Vídeo 22');
+  await expect(gallery.getByRole('button')).toHaveCount(1);
+  await gallery.getByRole('button',{name:'Selecionar arquivo Vídeo 22.mp4'}).click();
+  await expect(owner.locator('iframe[title="Prévia de Vídeo 22.mp4"]')).toHaveCount(1);
+  await owner.getByRole('searchbox',{name:'Buscar materiais por nome'}).fill('');
+  await owner.getByRole('combobox',{name:'Filtrar materiais por tipo'}).selectOption('image');
+  await expect(gallery.getByRole('button')).toHaveCount(6);
+  await owner.getByRole('button',{name:/Mostrar mais 6 de 6 arquivos/}).click();
+  await expect(gallery.getByRole('button')).toHaveCount(12);
+  const noThumbnail=gallery.getByRole('button',{name:'Selecionar arquivo Arte 05.png'});
+  await noThumbnail.scrollIntoViewIfNeeded();
+  await expect(noThumbnail.locator('[data-thumbnail-state]')).toHaveAttribute('data-thumbnail-state','unavailable');
+  await page.screenshot({path:info.outputPath('review-thumbnail-gallery.png'),fullPage:true});
 });
 
 test('Google-only review renders private images in both themes without third-party Drive cookies',async({page,context},info)=>{

@@ -76,7 +76,9 @@ function initialState(key:string,available:boolean):ThumbnailState{
   return {key,src,phase:src?"loaded":available?"idle":"unavailable"};
 }
 
-/** Keep an icon when offscreen; display a spinner only during the actual request. */
+/** Keep an icon when offscreen; display a spinner only during the actual request.
+ * thumbnailFallback uses the authenticated metadata-based endpoint for review
+ * assets without ephemeral tickets; it never embeds Google's private URL. */
 export function DriveThumbnail({item,scope,getThumbnail}:{item:DriveItem;scope:string;getThumbnail:GetThumbnail}){
   const Icon=driveKindIcon(item.mimeType);
   const ref=useRef<HTMLSpanElement>(null);
@@ -116,7 +118,7 @@ export function DriveThumbnail({item,scope,getThumbnail}:{item:DriveItem;scope:s
     prefetch.observe(ref.current);
     visible.observe(ref.current);
     return ()=>{active=false;prefetch.disconnect();visible.disconnect();};
-  },[key,available,getThumbnail,item.thumbnailTicket,item.thumbnailLink]);
+  },[key,available,getThumbnail,item.thumbnailTicket,item.thumbnailLink,item.thumbnailFallback]);
 
   function handleImageError(){
     if(current.src && cache.get(key)===current.src){

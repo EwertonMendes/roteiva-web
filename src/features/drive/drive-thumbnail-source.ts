@@ -2,8 +2,8 @@
  * Legacy/demo responses may still carry thumbnailLink; never render that URL directly.
  */
 export function hasDriveThumbnailSource(item:{
-  mimeType:string;thumbnailTicket?:string;thumbnailLink?:string;
+  mimeType:string;thumbnailTicket?:string;thumbnailLink?:string;thumbnailFallback?:boolean;
 }):boolean{
   return item.mimeType!=="application/vnd.google-apps.folder" &&
-    Boolean(item.thumbnailTicket||item.thumbnailLink);
+    Boolean(item.thumbnailTicket||item.thumbnailLink||item.thumbnailFallback);
 }

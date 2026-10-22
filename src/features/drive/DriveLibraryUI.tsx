@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import {DriveThumbnail} from "./DriveThumbnail";
 import { ArrowLeft, Check, ChevronLeft, ChevronRight, Grid2X2, List, ExternalLink, File, FileAudio, FileImage, FileText, FileVideo, Folder, FolderOpen, Link2, LoaderCircle, Search, X, MoreHorizontal, Upload } from "lucide-react";
 
-export type DriveItem = {id:string;name:string;mimeType:string;size?:string;modifiedTime?:string;thumbnailLink?:string;thumbnailTicket?:string;webViewLink?:string};
+export type DriveItem = {id:string;name:string;mimeType:string;size?:string;modifiedTime?:string;thumbnailLink?:string;thumbnailTicket?:string;thumbnailFallback?:boolean;webViewLink?:string};
 export type DriveTrail = {id:string;name:string};
 export const DRIVE_FOLDER = "application/vnd.google-apps.folder";
 

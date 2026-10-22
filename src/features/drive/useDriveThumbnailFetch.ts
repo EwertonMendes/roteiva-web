@@ -9,7 +9,7 @@ const API="https://roteiva-api-dev.ewertonmendes9.workers.dev";
 export function useDriveThumbnailFetch(){
   const {user}=useAuth();
   return useCallback(async(file:DriveItem,signal?:AbortSignal,accountId?:string):Promise<Blob|null>=>{
-    if(!user||!accountId||(!file.thumbnailTicket&&!file.thumbnailLink))return null;
+    if(!user||!accountId||(!file.thumbnailTicket&&!file.thumbnailLink&&!file.thumbnailFallback))return null;
     const base="/integrations/drive/"+encodeURIComponent(accountId)+"/files/"+encodeURIComponent(file.id)+"/thumbnail";
     const load=async(useTicket:boolean,refreshToken=false)=>{
       const token=await user.getIdToken(refreshToken);
