@@ -861,6 +861,52 @@ async function publicReview(request:Request,env:Env,action:'view'|'comment'|'dec
   if(saved[0].meta.changes!==1||saved[1].meta.changes!==1)throw new ApiError(409,'review_already_decided');
   return Response.json({saved:true,status:decision});
 }
+/** Authenticated owner image preview. Unlike Drive's cross-origin iframe, this
+ * preserves Roteiva's wheel/gesture behavior even when the modal itself scrolls.
+ * Only images explicitly selected for this owner's current review are served.
+ */
+async function ownerImage(env:Env,r:Review,url:URL):Promise<Response>{
+  if(!['pending','changes','approved'].includes(r.status)||r.expires_at<=now())
+    throw new ApiError(404,'review_not_found');
+  const fileId=url.searchParams.get('fileId')||'';
+  if(!ID.test(fileId))throw new ApiError(404,'review_not_found');
+  const asset=await env.DB.prepare(
+    "SELECT connection_id,mime_type FROM review_assets WHERE review_id=? AND version=? AND file_id=? AND grant_state='granted'"
+  ).bind(r.id,r.current_version,fileId)
+    .first<{connection_id:string;mime_type:string}>();
+  if(!asset||!asset.mime_type.startsWith('image/'))throw new ApiError(404,'review_not_found');
+  const row=await connection(env,r.owner_uid,asset.connection_id);
+  const credential=await accessCredential(env,row);
+  const target=new URL('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(fileId));
+  target.searchParams.set('alt','media');target.searchParams.set('supportsAllDrives','true');
+  let upstream:Response;
+  try{upstream=await fetch(target,{
+    method:'GET',redirect:'manual',signal:AbortSignal.timeout(24000),
+    headers:{Authorization:'Bearer '+credential.value}
+  });}catch{throw new ApiError(502,'media_unavailable');}
+  if(!upstream.ok||upstream.redirected||upstream.status>=300&&upstream.status<400){
+    await upstream.body?.cancel();throw new ApiError(502,'media_unavailable');
+  }
+  const max=24*1024*1024,reported=Number(upstream.headers.get('Content-Length')||0);
+  if(Number.isFinite(reported)&&reported>max){await upstream.body?.cancel();throw new ApiError(413,'media_unavailable');}
+  const type=(upstream.headers.get('Content-Type')||'').split(';')[0].trim().toLowerCase();
+  if(!type.startsWith('image/')||type!==asset.mime_type.toLowerCase()){
+    await upstream.body?.cancel();throw new ApiError(502,'media_unavailable');
+  }
+  let used=0;
+  const bounded=upstream.body?.pipeThrough(new TransformStream<Uint8Array,Uint8Array>({
+    transform(chunk,controller){
+      used+=chunk.byteLength;
+      if(used>max)throw new Error('image exceeds preview limit');
+      controller.enqueue(chunk);
+    }
+  }));
+  return new Response(bounded||null,{status:200,headers:{
+    'Content-Type':asset.mime_type,'Cache-Control':'private, no-store',
+    'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer',
+    'Content-Disposition':'inline'
+  }});
+}
 export async function reviewRouter(request:Request,env:Env,url:URL):Promise<Response>{
   const path=url.pathname;
   if(path==='/reviews/media')return streamReviewMedia(request,env,url);
@@ -876,6 +922,7 @@ export async function reviewRouter(request:Request,env:Env,url:URL):Promise<Resp
   if(parts.length!==4&&parts.length!==3)throw new ApiError(404,'not_found');
   const r=await stored(env,parts[2],uid);
   if(parts.length===3&&request.method==='GET')return Response.json(await detail(env,r));
+  if(parts.length===4&&parts[3]==='image'&&request.method==='GET')return ownerImage(env,r,url);
   if(parts.length!==4||request.method!=='POST')throw new ApiError(405,'method_not_allowed');
   if(parts[3]==='publish')return publish(request,env,r);
   if(parts[3]==='revise')return revise(request,env,r);
