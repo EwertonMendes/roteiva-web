@@ -61,11 +61,31 @@ export class ReviewMediaSessionCache{
         // multiple full copies in memory.
         return ticketUrl;
       }
-      const blob=await response.blob();
-      if(!blob.size||blob.size>IMAGE_ENTRY_LIMIT)return ticketUrl;
       const received=(response.headers.get('Content-Type')||'').split(';')[0];
       if(!received.startsWith('image/')||!mimeType.startsWith('image/'))
         throw new Error('O conteúdo do arquivo não corresponde ao formato de imagem.');
+      // Bound memory even when upstream omits Content-Length or misreports it.
+      const reader=response.body?.getReader();
+      let blob:Blob;
+      if(reader){
+        const chunks:Uint8Array<ArrayBuffer>[]=[];let total=0;
+        try{
+          while(true){
+            const {value,done}=await reader.read();if(done)break;
+            total+=value.byteLength;
+            if(total>IMAGE_ENTRY_LIMIT){
+              await reader.cancel();
+              return ticketUrl;
+            }
+            chunks.push(new Uint8Array(value));
+          }
+        }finally{reader.releaseLock();}
+        blob=new Blob(chunks,{type:received});
+      }else{
+        blob=await response.blob();
+        if(blob.size>IMAGE_ENTRY_LIMIT)return ticketUrl;
+      }
+      if(!blob.size)throw new Error('O arquivo está vazio ou indisponível.');
       if(controller.signal.aborted||generation!==this.generation)
         throw new DOMException('Preview cancelled','AbortError');
       const url=URL.createObjectURL(blob);
