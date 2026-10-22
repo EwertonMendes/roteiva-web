@@ -9,7 +9,7 @@ import "../reviews/reviews.css";
 import "./review-portal-v2.css";
 
 type Review={title:string;message:string;studioName:string;clientName:string;projectName:string;status:string;
-  version:number;expiresAt:number;mode:"link"|"google";
+  version:number;expiresAt:number;mode:"link"|"google";driveShareEnabled?:boolean;
   role?:"reviewer"|"viewer";myVote?:"approved"|"changes"|null;approvalsReceived?:number;approvalsRequired?:number};
 type Asset={fileId:string;name:string;mimeType:string};
 type Comment={id:string;file_id:string;author_name:string;body:string;seconds:number|null;created_at:number};
@@ -241,20 +241,20 @@ export function ReviewPortal({token}:{token:string}){
                       if(resume.playing)void player.play().catch(()=>{});
                     }
                   }}
-                  onError={()=>{setPreviewError("Este vídeo não pode ser reproduzido pelo codec disponível no navegador. Utilize outro formato compatível ou abra o original no Drive.");setMediaMode("error");}}/>}
+                  onError={()=>{setPreviewError("Este vídeo não pode ser reproduzido pelo codec disponível no navegador. Peça uma versão MP4 compatível ao profissional.");setMediaMode("error");}}/>}
                 {playableVideo&&<button className="review-video-fullscreen" type="button"
                   title={videoExpanded?"Fechar vídeo ampliado":"Ampliar vídeo"}
                   aria-label={videoExpanded?"Fechar vídeo ampliado":"Ampliar vídeo"}
                   onClick={()=>setVideoExpanded(v=>!v)}>{videoExpanded?"Fechar tela cheia":"Ampliar vídeo"}</button>}
                 {active&&mediaMode==="ready"&&!isVideo&&active.mimeType.startsWith("image/")&&
                   <ReviewImageViewer key={active.fileId} src={mediaUrl} name={active.name}
-                    onError={()=>{setPreviewError("O navegador não conseguiu exibir esta imagem. Abra-a no Google Drive.");setMediaMode("error");}}/>}
+                    onError={()=>{setPreviewError("O navegador não conseguiu exibir esta imagem. Peça ao profissional uma versão compatível.");setMediaMode("error");}}/>}
                 {active&&mediaMode==="ready"&&active.mimeType==="application/pdf"&&
                   <iframe className="review-private-preview-pdf" src={mediaUrl}
                     title={"Prévia PDF de "+active.name} sandbox="allow-scripts allow-downloads"/>}
                 {active&&mediaMode==="ready"&&active.mimeType.startsWith("audio/")&&
                   <div className="review-private-preview-audio"><FileAudio size={32}/><audio controls src={mediaUrl}
-                    onError={()=>{setPreviewError("Este áudio não pôde ser reproduzido. Abra-o no Google Drive.");setMediaMode("error");}}/></div>}
+                    onError={()=>{setPreviewError("Este áudio não pôde ser reproduzido. Peça ao profissional uma versão compatível.");setMediaMode("error");}}/></div>}
                 {mediaMode==="error"&&<div className="review-private-preview-error" role="alert">
                   <FileImage size={26}/><strong>Não foi possível mostrar a prévia</strong>
                   <p>{previewError}</p>
@@ -264,7 +264,7 @@ export function ReviewPortal({token}:{token:string}){
               </div>
               <div className="review-portal-stage-footer">
                 <div><strong>{active?.name}</strong><small>{playableVideo?"Player com marcação de instantes":"Visualização segura no Roteiva"}</small></div>
-                {active&&<a href={reviewFileURL(active.fileId)} target="_blank" rel="noreferrer">
+                {active&&data.review.driveShareEnabled&&<a href={reviewFileURL(active.fileId)} target="_blank" rel="noreferrer">
                   <ExternalLink size={15}/> Abrir no Drive</a>}
               </div>
             </section>
