@@ -743,6 +743,7 @@ async function publicReview(request:Request,env:Env,action:'view'|'comment'|'dec
         .bind(r.id).first<{count:number}>():null;
     return Response.json({review:{title:r.title,message:r.message,studioName:r.studio_name,
       status:r.status,version:r.current_version,expiresAt:r.expires_at,mode:r.access_mode,
+      driveShareEnabled:r.drive_share_enabled===1,
       role:r.access_mode==='google'?role:'reviewer',myVote:myVote?.decision||null,
       approvalsReceived:votes?.count||0,approvalsRequired:total?.count||1},
       assets:files.map(a=>({fileId:a.file_id,name:a.name,mimeType:a.mime_type})),
