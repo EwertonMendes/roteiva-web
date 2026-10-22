@@ -45,8 +45,6 @@
 .rowner-gallery-search{display:flex;align-items:center;gap:7px;flex:1;min-width:0;padding:0 11px;border:1px solid var(--line);border-radius:10px;background:var(--paper);color:var(--muted)}
 .rowner-gallery-search:focus-within{outline:2px solid var(--ink);outline-offset:2px}
 .rowner-gallery-search input{min-width:0;width:100%;height:39px;border:0;outline:0;color:var(--ink);background:transparent;font:inherit;font-size:.78rem}
-.rowner-gallery-filters select{max-width:150px;min-width:116px;border:1px solid var(--line);border-radius:10px;background:var(--paper);color:var(--ink);font:inherit;font-size:.74rem;padding:0 10px;cursor:pointer}
-.rowner-gallery-filters select:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 .rowner-file-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}
 .rowner-file{position:relative;display:flex;min-width:0;flex-direction:column;overflow:hidden;padding:0;text-align:left;border:1px solid var(--line);border-radius:13px;background:var(--paper);color:var(--ink);cursor:pointer;transition:border-color .16s,box-shadow .16s,transform .16s}
 .rowner-file:hover{border-color:var(--ink);transform:translateY(-1px);box-shadow:0 4px 14px #0002}
@@ -179,8 +177,7 @@
   .rowner-file-name strong{font-size:.72rem}
   .rowner-gallery-filters{flex-wrap:wrap}
   .rowner-gallery-search{flex-basis:100%}
-  .rowner-gallery-filters select{width:100%;max-width:none;min-height:36px}
-  .rowner-file-list[data-view="list"] .rowner-file-art{width:88px;flex-basis:88px}
+    .rowner-file-list[data-view="list"] .rowner-file-art{width:88px;flex-basis:88px}
   .rowner-preview-head{flex-wrap:wrap}
   .rowner-preview-head strong{flex-basis:100%}
   .rowner-preview-actions{width:100%;justify-content:stretch}
