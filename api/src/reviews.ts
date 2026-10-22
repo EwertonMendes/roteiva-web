@@ -280,11 +280,11 @@ function permissionUrl(fileId:string,permissionId?:string):URL {
   return u;
 }
 async function permissions(env:Env,row:Connection,fileId:string){
-  const all:{id:string;type:string;role:string;emailAddress?:string}[]=[];
+  const all:{id:string;type:string;role:string;emailAddress?:string;permissionDetails?:{inherited?:boolean}[]}[]=[];
   let cursor:string|undefined;
   for(let i=0;i<20;i++){
     const u=permissionUrl(fileId);
-    u.searchParams.set('fields','nextPageToken,permissions(id,type,role,emailAddress,allowFileDiscovery)');
+    u.searchParams.set('fields','nextPageToken,permissions(id,type,role,emailAddress,allowFileDiscovery,permissionDetails(inherited))');
     u.searchParams.set('pageSize','100');
     if(cursor)u.searchParams.set('pageToken',cursor);
     const res=await driveJson(env,row,u);
@@ -394,7 +394,10 @@ async function grantGoogle(env:Env,r:Review,a:Asset,validation:CheckedAsset):Pro
   // Portal identity restrictions are independent from Google Drive ACLs.
   // A public parent is NOT a reason to block a Google-authenticated Roteiva review.
   // Never modify inherited permissions: they can also serve other projects/links.
-  const directPublic=existing.filter(p=>p.type==='anyone');
+  // Shared-drive permission listings may include inherited grants. Never try
+  // to DELETE a parent's permission via a child's permission endpoint.
+  const directPublic=existing.filter(p=>p.type==='anyone'&&
+    (!p.permissionDetails?.length||p.permissionDetails.some(detail=>detail.inherited===false)));
   if(directPublic.length&&r.restrict_existing_public===1){
     // Explicit opt-in: changing these public ACLs affects *all* Drive links.
     // Never delete an ACL that belongs to another active Roteiva invitation.
