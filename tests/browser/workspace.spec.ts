@@ -176,7 +176,7 @@ test("Account and studio settings persist without changing existing projects",as
   await navigate(page,"Configurações");
   await expect(page.getByLabel("Nome profissional",{exact:true})).toHaveValue("Direção Criativa");
   await expect(page.getByLabel("Nome do estúdio ou marca",{exact:true})).toHaveValue("Estúdio dos Crias");
-  await expect(page.getByLabel("Tipo de atuação")).toHaveValue("producer");
+  await expect(page.getByRole("combobox",{name:"Tipo de atuação"})).toContainText("Produtora");
   await expect(page.locator("html")).toHaveAttribute("data-theme","dark");
   await expect(page.getByLabel("E-mail de acesso")).toHaveAttribute("readonly","");
   await navigate(page,"Projetos");
