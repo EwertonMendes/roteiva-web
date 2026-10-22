@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {coverGeometry,dragCover} from '../src/features/projects/cover-geometry.ts';
+import {coverGeometry,dragCover,transformCover,coverGesture} from '../src/features/projects/cover-geometry.ts';
 import {emptyWorkspace} from '../src/domain/workspace.ts';
 import {encodeWorkspace,decodeWorkspace} from '../src/data/workspace-codec.ts';
 const cover={connectionId:'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa',fileId:'photo_123456789',name:'Capa.jpg',x:50,y:50,zoom:1};
@@ -16,4 +16,21 @@ test('project covers round trip through the revisioned codec, legacy projects re
  const workspace=emptyWorkspace();workspace.projects=[{id:2,name:'Project',client:'',status:'Em produção',due:'',progress:0,files:0,color:'blue',initials:'PR',cover}];
  const records=encodeWorkspace(workspace);const restored=decodeWorkspace(records);assert.deepEqual(restored.projects[0].cover,cover);assert.ok(!('cover' in records.get('projects/2')));
  delete workspace.projects[0].cover;const legacy=encodeWorkspace(workspace);assert.ok(!('coverFileId' in legacy.get('projects/2')));assert.equal(decodeWorkspace(legacy).projects[0].cover,undefined);
+});
+
+test('gesture zoom keeps its image anchor fixed and clamps every edge without blank space',()=>{
+ const from={x:170,y:70};
+ const start={...cover,zoom:1.4,x:40,y:60};
+ const before=coverGeometry(500,200,1600,900,start);
+ const afterCover=transformCover(start,500,200,1600,900,2,from);
+ const after=coverGeometry(500,200,1600,900,afterCover);
+ assert.ok(Math.abs((from.x-before.left)/before.width-(from.x-after.left)/after.width)<1e-9);
+ assert.ok(Math.abs((from.y-before.top)/before.height-(from.y-after.top)/after.height)<1e-9);
+ for(const zoom of [-10,1,2,20])for(const to of [{x:-10000,y:10000},{x:10000,y:-10000}]){
+  const c=transformCover(start,500,200,900,1600,zoom,from,to),g=coverGeometry(500,200,900,1600,c);
+  assert.ok(c.zoom>=1&&c.zoom<=3&&c.x>=0&&c.x<=100&&c.y>=0&&c.y<=100);
+  assert.ok(g.left<=0&&g.top<=0&&g.left+g.width>=500-.001&&g.top+g.height>=200-.001);
+ }
+ assert.deepEqual(coverGesture([{x:20,y:40},{x:80,y:40}]),{center:{x:50,y:40},distance:60});
+ assert.deepEqual(transformCover(cover,0,0,100,100,2,from),cover);
 });
