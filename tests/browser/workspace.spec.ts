@@ -111,7 +111,7 @@ test("Google emulator session, CRUD, restoration, themes and separate users",asy
   await page.getByRole("button",{name:"Salvar compromisso"}).click();await settled(page);
   if(info.project.name==="mobile")await page.getByRole("button",{name:"Abrir menu",exact:true}).click();
   await page.getByRole("button",{name:"Alternar aparência",exact:true}).click();
-  if(info.project.name==="mobile")await page.getByRole("button",{name:"Fechar menu",exact:true}).click();
+  if(info.project.name==="mobile")await page.locator(".sidebar .mobile-close").click();
   await settled(page);
   await page.reload();await expect(page.locator(".app-shell")).toBeVisible();await settled(page);
   await expect(page.locator("html")).toHaveAttribute("data-theme","dark");
@@ -121,7 +121,7 @@ test("Google emulator session, CRUD, restoration, themes and separate users",asy
   await expect(page.locator(".day-agenda").getByText("Gravação Aurora",{exact:true})).toBeVisible();
   await navigate(page,"Projetos");
   await expect(page.getByText("Filme Aurora",{exact:true})).toBeVisible();
-  await page.getByRole("button",{name:"Abrir projeto Filme Aurora",exact:true}).click();
+  await page.locator(".pc-card h2").getByRole("button",{name:"Filme Aurora",exact:true}).click();
   await expect(page.getByText("Montar primeiro corte",{exact:true})).toBeVisible();
   await page.screenshot({path:info.outputPath("workspace.png"),fullPage:true});
   await page.goto(cloud+"/review");

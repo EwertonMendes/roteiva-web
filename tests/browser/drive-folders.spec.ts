@@ -334,7 +334,7 @@ test('queue limits concurrency, keeps its destination across workspace navigatio
   await expect(queue.getByText('Destino: Campanha de vídeos')).toHaveCount(3);
   if(info.project.name==='mobile')await page.getByRole('button',{name:'Abrir menu',exact:true}).click();
   await page.getByRole('button',{name:'Alternar aparência'}).click();
-  if(info.project.name==='mobile')await page.getByRole('button',{name:'Fechar menu',exact:true}).click();
+  if(info.project.name==='mobile')await page.locator('.sidebar .mobile-close').click();
   await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
   await queue.getByRole('button',{name:'Recolher transferências'}).click();
   await expect(queue.getByText('one.txt')).toHaveCount(0);
