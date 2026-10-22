@@ -93,3 +93,7 @@ Uma única lista sob “Espaço de trabalho”: Visão geral, Projetos, Clientes
 O menu do perfil permanece aberto durante a alternância de tema. No modo escuro usa superfície elevada (#242426) e borda visível (#48484c). Entrada: painel sobe 10 px com fade; ações sobem em sequência a partir da opção inferior. Saída inverte o movimento e a sequência. Durações curtas (140–220 ms, com pequenos atrasos); respeitar prefers-reduced-motion, sem deslocamento.
 
 Troca de tema não exibe toast nem indicador flutuante de salvamento: a própria alteração visual confirma a ação. O menu mantém foco e permanece interativo durante a persistência da preferência na conta.
+
+## Comportamento de proteção dos materiais em aprovação (22/10/2026)
+
+Ações de salvar/arrastar e menu contextual do navegador não devem ser oferecidas na área de prévia, tanto no modo link como no modo Google. O PDF é embutido em iframe sem `allow-downloads` e sem link para abrir o ticket em outra aba. Os botões de navegação, comentários, zoom, pinça, reprodução, temas e seleção de arquivos permanecem iguais. O link oficial para o Drive aparece somente quando o proprietário optou por compartilhar o arquivo diretamente (`drive_share_enabled`). Essas medidas apenas dificultam a cópia casual, não protegem os bytes exibidos contra ferramentas de desenvolvedor, captura de tela ou clientes HTTP; a proteção de masters exige prévias derivadas.
