@@ -55,13 +55,13 @@ export const messages:Record<string,string> = {
   review_invalid_input:"Confira os dados da solicitação e os arquivos selecionados.",
   review_project_denied:"O cliente ou projeto não está mais disponível para esta aprovação.",
   review_folder_denied:"A pasta não está mais vinculada a este projeto.",
-  review_file_denied:"O arquivo não está autorizado para compartilhamento nesta pasta. Confira o Drive.",
-  review_drive_file_authorization_required:"Este arquivo é privado e ainda não foi autorizado para compartilhamento pelo aplicativo. Selecione-o pelo Google Picker na Biblioteca ou envie-o diretamente pela plataforma.",
+  review_file_denied:"Não foi possível confirmar que este arquivo pertence à pasta vinculada e está acessível pela conexão Google.",
+  review_drive_file_authorization_required:"O Google não permite ao Roteiva modificar as permissões deste arquivo. A aprovação pode continuar restrita pelo Roteiva sem conceder acesso direto no Drive.",
   review_drive_grant_required:"Reconecte o Google Drive com permissão de gerenciamento dos arquivos selecionados.",
   review_drive_share_denied:"O Google Drive não permitiu compartilhar este arquivo. Verifique as políticas e permissões da conta.",
   review_drive_unavailable:"O Google Drive não conseguiu concluir o compartilhamento agora. Tente novamente.",
-  review_existing_public_permission:"O arquivo já permite acesso a outras pessoas por link público, domínio ou grupo. Para exigir contas Google específicas, ative a opção de restringir arquivos públicos (acesso direto) ou altere o arquivo para Restrito no Drive. Permissões de grupos e domínios precisam ser ajustadas no Drive.",
-  review_inherited_public_permission:"A pasta que contém o arquivo compartilha acesso público, de grupo ou de domínio. Altere o acesso da pasta para Restrito no Google Drive antes de compartilhar somente com contas autorizadas.",
+  review_existing_public_permission:"O arquivo possui permissões públicas no Drive. Elas não são alteradas automaticamente pelo controle de acesso da aprovação no Roteiva.",
+  review_inherited_public_permission:"A pasta original compartilha acesso com outras pessoas no Drive. A aprovação no Roteiva continua restrita aos participantes escolhidos.",
   review_invalid_participants:"Informe contas Google válidas, sem e-mails repetidos, com papel revisor ou leitor.",
   review_reviewer_required:"Inclua ao menos um revisor Google para que a aprovação tenha uma decisão responsável.",
   review_viewer_read_only:"Esta conta é leitora e não pode comentar ou registrar decisões.",
@@ -86,9 +86,13 @@ export function useDriveApi(){
       if(response.status!==401)break;
     }
     if(!response?.ok){
-      const payload=await response?.json().catch(()=>({})) as {error?:{code?:string}}|undefined;
+      const payload=await response?.json().catch(()=>({})) as {error?:{code?:string;asset?:{fileId?:string;fileName?:string}}}|undefined;
       const code=payload?.error?.code||"service_unavailable";
-      throw Object.assign(new Error(messages[code]||"Não foi possível concluir a operação."),{code});
+      const asset=payload?.error?.asset;
+      const name=typeof asset?.fileName==="string"&&asset.fileName.trim()?asset.fileName.trim():null;
+      const reason=messages[code]||"Não foi possível concluir a operação.";
+      const message=name?`Não foi possível concluir o arquivo "${name}": ${reason}`:reason;
+      throw Object.assign(new Error(message),{code,asset});
     }
     return response.json() as Promise<T>;
   },[user]);
