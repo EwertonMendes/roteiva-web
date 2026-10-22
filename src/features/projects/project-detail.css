@@ -6,7 +6,7 @@
 .app-shell .project-detail h2 { margin:0 0 22px; font-size:clamp(1.25rem,1.6vw,1.6rem); font-weight:700; overflow-wrap:anywhere; }
 .app-shell .project-detail .studio-form { gap:20px; }
 .app-shell .project-detail .studio-form label { font-size:var(--type-label); gap:9px; }
-.app-shell .project-detail .studio-form :is(input,select) { min-height:48px; border-radius:12px; }
+.app-shell .project-detail .studio-form input { min-height:48px; border-radius:12px; }
 .app-shell .project-detail .studio-form textarea { min-height:116px; border-radius:12px; }
 .project-detail .pd-stage { position:relative; }
 
