@@ -288,6 +288,10 @@ test('Google-only review renders private images in both themes without third-par
   await expect(stage.getByLabel('Zoom da imagem')).toHaveText('130%');
   await stage.getByRole('button',{name:'Ajustar imagem à tela'}).click();
   await expect(stage.getByLabel('Zoom da imagem')).toHaveText('100%');
+  await viewport.hover();
+  await page.mouse.wheel(0,-180);
+  await expect(stage.getByLabel('Zoom da imagem')).toHaveText('120%');
+  await stage.getByRole('button',{name:'Ajustar imagem à tela'}).click();
   await viewport.dblclick({position:{x:140,y:120}});
   await expect(stage.getByLabel('Zoom da imagem')).toHaveText('200%');
   await stage.getByRole('button',{name:'Ver imagem em tela cheia'}).click();
