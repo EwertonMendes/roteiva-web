@@ -44,8 +44,9 @@ test("cliente sem conta deixa comentário e aprova em desktop/mobile",async({pag
   await publicApi(page);
   await page.goto(ROOT+"/review/"+TOKEN);
   await expect(page.getByRole("heading",{name:"Corte institucional"})).toBeVisible();
-  await expect(page.locator('iframe[title="Prévia de Primeiro corte.mp4"]')).toHaveCount(1);
-  await expect(page.getByRole("link",{name:"Abrir no Drive"})).toHaveAttribute("href",/drive\.google\.com/);
+  await expect(page.locator('iframe[title="Prévia de Primeiro corte.mp4"]')).toHaveCount(0);
+  await expect(page.getByText("Não foi possível mostrar a prévia")).toBeVisible();
+  await expect(page.getByRole("link",{name:"Abrir no Drive"})).toHaveCount(0);
   await page.getByPlaceholder("Como podemos chamar você?").fill("Renata Cliente");
   await page.getByPlaceholder("O que você gostaria de comentar?").fill("Aumentar a legenda");
   await page.getByPlaceholder("Ex.: 01:25").fill("00:35");
@@ -122,6 +123,10 @@ test("video input masks timestamps and prevents invalid submissions",async({page
 });
 test("image-only reviews hide all video timestamp controls",async({page})=>{
   const received: Array<unknown>=[];
+  await page.route(API+"/reviews/media?*",async route=>route.fulfill({
+    status:200,contentType:"image/png",
+    body:Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO2qFqsAAAAASUVORK5CYII=","base64")
+  }));
   await page.route(API+"/reviews/public**",async route=>{
     const headers={"Access-Control-Allow-Origin":ROOT,"Access-Control-Allow-Methods":"GET,POST,OPTIONS",
       "Access-Control-Allow-Headers":"Authorization,Content-Type,X-Review-Token"};
@@ -131,6 +136,8 @@ test("image-only reviews hide all video timestamp controls",async({page})=>{
       received.push(body);
       return route.fulfill({status:200,headers,contentType:"application/json",body:JSON.stringify({saved:true})});
     }
+    if(route.request().url().endsWith("/media-ticket"))return route.fulfill({status:200,headers,
+      contentType:"application/json",body:JSON.stringify({url:API+"/reviews/media?ticket=mock-image",expiresAt:Date.now()+600000})});
     if(!route.request().url().endsWith("/public"))return route.fulfill({status:404,body:"{}"});
     const body={review:{title:"Avaliação da arte",message:"Confira a capa",studioName:"Studio",
       status:"pending",version:1,expiresAt:Date.now()+86400000,mode:"link"},
@@ -140,7 +147,8 @@ test("image-only reviews hide all video timestamp controls",async({page})=>{
   });
   await page.goto(ROOT+"/review/"+TOKEN);
   await expect(page.getByRole("heading",{name:"Avaliação da arte"})).toBeVisible();
-  await expect(page.locator('iframe[title="Prévia de Capa.png"]')).toHaveCount(1);
+  await expect(page.locator('iframe[title="Prévia de Capa.png"]')).toHaveCount(0);
+  await expect(page.locator('img.review-private-preview-image')).toBeVisible();
   await expect(page.getByPlaceholder("Ex.: 01:25")).toHaveCount(0);
   await expect(page.getByRole("button",{name:/Usar tempo atual|Marcar este instante/})).toHaveCount(0);
   await page.getByPlaceholder("Como podemos chamar você?").fill("Cliente");
