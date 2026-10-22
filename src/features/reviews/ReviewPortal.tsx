@@ -3,6 +3,7 @@ import {Check,CheckCircle2,Clock3,ExternalLink,FileAudio,FileImage,FileText,File
   LoaderCircle,MessageSquare,Moon,Pause,Play,Send,ShieldCheck,Sun,Video,X} from "lucide-react";
 import {useAuth} from "../auth/AuthProvider";
 import {useOverlayFocus} from "../drive/DriveLibraryUI";
+import {PrivateImageViewer} from "./PrivateImageViewer";
 import {captureReviewPlayback,formatReviewTime,maskReviewTime,parseReviewTime,validReviewSecond} from "./review-timecode";
 import "../reviews/reviews.css";
 import "./review-portal-v2.css";
@@ -55,6 +56,7 @@ export function ReviewPortal({token}:{token:string}){
   const [previewRetry,setPreviewRetry]=useState(0);
   const [playhead,setPlayhead]=useState(0),[duration,setDuration]=useState<number|null>(null);
   const [mediaFailure,setMediaFailure]=useState(false);
+  const [videoExpanded,setVideoExpanded]=useState(false);
   const loadedVersion=useRef(0),videoRef=useRef<HTMLVideoElement>(null),commentRef=useRef<HTMLTextAreaElement>(null);
   const dialogRef=useOverlayFocus(()=>{if(!busy)setDecision(null);},!!decision);
   const request=useCallback(async<T,>(path:string,method:"GET"|"POST"="GET",payload?:unknown):Promise<T>=>{
@@ -110,6 +112,7 @@ export function ReviewPortal({token}:{token:string}){
     let alive=true,blobUrl="";
     const controller=new AbortController();
     setMediaUrl("");setMediaFailure(false);setPlayhead(0);setDuration(null);
+    setVideoExpanded(false);
     setPreviewProgress(0);setPreviewError("");
     setMediaMode(privateGoogle||isVideo?"loading":"drive");
     if(!activeFileId||!activeVersion||!activeMime)return;
@@ -169,6 +172,14 @@ export function ReviewPortal({token}:{token:string}){
     return()=>{alive=false;controller.abort();if(blobUrl)URL.revokeObjectURL(blobUrl);};
   },[activeFileId,activeVersion,activeMime,isVideo,privateGoogle,request,user,token,previewRetry]);
   const playableVideo=isVideo&&(mediaMode==="native"||mediaMode==="private");
+  useEffect(()=>{
+    if(!videoExpanded)return;
+    const prev=document.body.style.overflow;
+    document.body.style.overflow="hidden";
+    const handler=(event:KeyboardEvent)=>{if(event.key==="Escape"){event.preventDefault();setVideoExpanded(false);}};
+    window.addEventListener("keydown",handler);
+    return()=>{window.removeEventListener("keydown",handler);document.body.style.overflow=prev;};
+  },[videoExpanded]);
   const seconds=isVideo?parseReviewTime(minutes):null;
   const invalidTime=isVideo&&!validReviewSecond(seconds,playableVideo?duration:null);
   const switchFile=(index:number)=>{
@@ -245,7 +256,10 @@ export function ReviewPortal({token}:{token:string}){
         <div className="review-portal-layout">
           <div className="review-portal-maincolumn">
             <section className="review-portal-review" aria-label="Material para avaliar">
-              <div className={"review-portal-stage"+(privateGoogle?" is-private":"")}>
+              <div className={"review-portal-stage"+(privateGoogle?" is-private":"")+
+                (privateGoogle&&active?.mimeType.startsWith("image/")?" is-image":"")+
+                (playableVideo?" is-playable-video":"")+
+                (videoExpanded?" is-video-expanded":"")}>
                 {mediaMode==="loading"&&<div className="review-media-state review-private-preview-state" role="status">
                   <LoaderCircle className="rl-spin" size={25}/>
                   {privateGoogle?("Carregando arquivo com acesso seguro… "+(previewProgress?previewProgress+"%":"")):"Preparando reprodução…"}
@@ -255,8 +269,12 @@ export function ReviewPortal({token}:{token:string}){
                   onTimeUpdate={e=>setPlayhead(e.currentTarget.currentTime)}
                   onLoadedMetadata={e=>setDuration(Number.isFinite(e.currentTarget.duration)?e.currentTarget.duration:null)}
                   onError={()=>{if(privateGoogle){setPreviewError("Este vídeo não pôde ser reproduzido neste navegador. Abra-o no Google Drive.");setMediaMode("private-error");}else{setMediaFailure(true);setMediaMode("drive");}}}/>}
+                {playableVideo&&<button className="review-video-fullscreen" type="button"
+                  title={videoExpanded?"Fechar vídeo ampliado":"Ampliar vídeo"}
+                  aria-label={videoExpanded?"Fechar vídeo ampliado":"Ampliar vídeo"}
+                  onClick={()=>setVideoExpanded(v=>!v)}>{videoExpanded?"Fechar tela cheia":"Ampliar vídeo"}</button>}
                 {active&&mediaMode==="private"&&!isVideo&&active.mimeType.startsWith("image/")&&
-                  <img className="review-private-preview-image" src={mediaUrl} alt={active.name}
+                  <PrivateImageViewer key={active.fileId} src={mediaUrl} name={active.name}
                     onError={()=>{setPreviewError("O navegador não conseguiu exibir esta imagem. Abra-a no Google Drive.");setMediaMode("private-error");}}/>}
                 {active&&mediaMode==="private"&&active.mimeType==="application/pdf"&&
                   <iframe className="review-private-preview-pdf" src={mediaUrl}
