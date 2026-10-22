@@ -617,3 +617,21 @@ test('Google-only video and image streaming require verified review membership b
   assert.equal((await x.send('POST','/reviews/'+created.id+'/close',x.alice)).status,200);
   assert.equal((await handle(new Request(address),x.env)).status,404);
 });
+
+test('new invitations default to portal-only without modifying existing Google Drive ACLs',async t=>{
+  const x=await integration(t);
+  const input={...x.payload};delete input.driveShareEnabled;
+  const created=await x.send('POST','/reviews',x.alice,input);
+  assert.equal(created.status,201);
+  const {id}=await created.json();
+  const row=x.f.sql.prepare('SELECT drive_share_enabled FROM review_requests WHERE id=?').get(id);
+  assert.equal(row.drive_share_enabled,0);
+  const published=await x.send('POST','/reviews/'+id+'/publish',x.alice);
+  assert.equal(published.status,200);
+  const token=(await published.json()).review.review.url.split('/').at(-1);
+  const issued=await route(x.f,token,'/reviews/public/media-ticket','POST',{fileId:file});
+  assert.equal(issued.status,200);
+  assert.equal(x.acl.size,0,'portal-only must not publish a public Drive permission');
+  assert.equal((await x.send('POST','/reviews/'+id+'/close',x.alice)).status,200);
+  assert.equal(x.calls.filter(c=>c.path.includes('/permissions')&&['POST','DELETE'].includes(c.method)).length,0);
+});
