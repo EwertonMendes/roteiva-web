@@ -1,6 +1,7 @@
 import {useCallback,useEffect,useRef,useState,type PointerEvent as ReactPointerEvent,type KeyboardEvent as ReactKeyboardEvent} from "react";
 import {ZoomToolbar} from "../../components/ZoomToolbar";
 import {useImageWheelZoom} from "../../components/useImageWheelZoom";
+import "./ReviewImageViewer.css";
 
 type View={scale:number;x:number;y:number};
 type Position={x:number;y:number};
