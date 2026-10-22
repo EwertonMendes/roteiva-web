@@ -39,7 +39,7 @@ jobs:
           npm ci --ignore-scripts --prefer-offline --no-audit --no-fund --fetch-retries=1 --fetch-timeout=20000
       - name: Tests, typecheck, migrations and bundle
         run: |
-          npm audit --audit-level=high --fetch-retries=1 --fetch-timeout=20000
+          node scripts/ci-security-audit.mjs
           npm run typecheck
           npm test
           npm run migrate:local
