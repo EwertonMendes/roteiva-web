@@ -2,7 +2,7 @@
 
 ## Limites e controles de cópia das prévias de aprovação — 22/10/2026
 
-A publicação manual do Worker DEV por PR requer PR interno aberto, base master, SHA exato, bindings Cloudflare/D1 esperados, ausência de migrations/bindings/dependências novas e ambiente protegido, sem migrations remotas; a pipeline automática master continua inalterada.
+O ambiente protegido Cloudflare DEV aceita apenas a master para deploy do Worker. Alterações em PR somente validam testes e build; o job bloqueado não altera Worker nem D1. O workflow principal foi mantido sem mudança. A etapa de backend fica pendente até aprovação do merge.
 
 **Decisão de segurança (PR #86 de proteção de prévias):** aprovações em modo link e modo Google continuam usando o mesmo stream mediado por Worker, com tickets autenticados por HMAC, vigência limitada, revalidação D1 de estado/versão/expiração e, para Google, verificação de participante para cada requisição/range. Permissões diretas no Drive continuam opt-in (`drive_share_enabled`), sem qualquer concessão implícita. O link de origem de um PDF deixa de ser exposto em abertura de nova aba no portal; `iframe sandbox` não concede download. Imagens, vídeos e áudios não oferecem comandos de salvar diretamente no visualizador; arraste e menus contextuais são desabilitados somente na área de prévia. Navegação direta padrão (`Sec-Fetch-Mode: navigate`, `Sec-Fetch-Dest: document`) para tickets é negada, mantendo streaming embutido e players. Essa checagem é defesa de UX, **não é um controle de autenticação**; headers podem ser forjados.
 
