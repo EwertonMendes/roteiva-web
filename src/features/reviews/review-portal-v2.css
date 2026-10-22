@@ -276,3 +276,7 @@
 }
 
 
+
+/* The preview is for interaction and review, not browser-native copy/save actions. */
+.review-portal-stage.is-private{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.review-portal-stage.is-private img{-webkit-user-drag:none}
