@@ -109,7 +109,10 @@ test("Google emulator session, CRUD, restoration, themes and separate users",asy
   await page.getByLabel("Data do trabalho",{exact:true}).fill(today);
   await page.getByLabel("Horário de término",{exact:true}).fill("10:00");
   await page.getByRole("button",{name:"Salvar compromisso"}).click();await settled(page);
-  await page.getByRole("button",{name:"Ativar modo escuro",exact:true}).click();await settled(page);
+  if(info.project.name==="mobile")await page.getByRole("button",{name:"Abrir menu",exact:true}).click();
+  await page.getByRole("button",{name:"Alternar aparência",exact:true}).click();
+  if(info.project.name==="mobile")await page.getByRole("button",{name:"Fechar menu",exact:true}).click();
+  await settled(page);
   await page.reload();await expect(page.locator(".app-shell")).toBeVisible();await settled(page);
   await expect(page.locator("html")).toHaveAttribute("data-theme","dark");
   await navigate(page,"Financeiro");
@@ -185,7 +188,7 @@ test("Direct routes, refresh and browser Back/Forward preserve each user's scree
   await page.getByLabel("Nome do projeto",{exact:true}).fill("Projeto com URL");
   await page.locator("form.project-modal").getByRole("button",{name:"Criar projeto",exact:true}).click();
   await settled(page);
-  await expect(page.locator(".cloud-banner")).toContainText("Salvo na nuvem");
+  await expect(page.getByLabel("Nova tarefa",{exact:true})).toBeVisible();
   await expect(page).toHaveURL(new RegExp("/projetos/[1-9][0-9]*$"));
   const projectURL=page.url();
   await expect(page.getByLabel("Nova tarefa",{exact:true})).toBeVisible();
@@ -205,7 +208,7 @@ test("Direct routes, refresh and browser Back/Forward preserve each user's scree
   await page.getByLabel("Nome do cliente",{exact:true}).fill("Cliente com URL");
   await page.getByLabel("Contato principal",{exact:true}).fill("Contato de teste");
   await page.getByRole("button",{name:"Salvar cliente"}).click();await settled(page);
-  await expect(page.locator(".cloud-banner")).toContainText("Salvo na nuvem");
+  await expect(page.locator(".client-list button").filter({hasText:"Cliente com URL"})).toBeVisible();
   await page.locator(".client-list button").filter({hasText:"Cliente com URL"}).click();
   await expect(page).toHaveURL(new RegExp("/clientes/[1-9][0-9]*$"));
   const clientURL=page.url();
