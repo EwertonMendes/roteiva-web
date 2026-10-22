@@ -66,8 +66,18 @@ service cloud.firestore {
         d.monthlyDeliverables is int && d.monthlyDeliverables>=0 && d.monthlyDeliverables<=100 &&
         d.monthlyFeeCents is int && d.monthlyFeeCents>=0 && d.monthlyFeeCents<=100000000000;
     }
+    function valid_projectCover(d) {
+      let fields = ["coverConnectionId","coverFileId","coverName","coverX","coverY","coverZoom"];
+      return !d.keys().hasAny(fields) || (d.keys().hasAll(fields) &&
+        text(d.coverConnectionId,36,36) && d.coverConnectionId.matches('^[a-zA-Z0-9-]{36}$') &&
+        text(d.coverFileId,10,200) && d.coverFileId.matches('^[A-Za-z0-9_-]+$') &&
+        text(d.coverName,1,250) &&
+        d.coverX is number && d.coverX>=0 && d.coverX<=100 &&
+        d.coverY is number && d.coverY>=0 && d.coverY<=100 &&
+        d.coverZoom is number && d.coverZoom>=1 && d.coverZoom<=3);
+    }
     function valid_projects(d,uid,id) {
-      return d.keys().hasAll(["ownerUid","schemaVersion","revision","createdAt","updatedAt","id","name","clientId","client","status","dueDate","description","template","color","initials"]) && d.keys().hasOnly(["ownerUid","schemaVersion","revision","createdAt","updatedAt","id","name","clientId","client","status","dueDate","description","template","color","initials"]) &&
+      return d.keys().hasAll(["ownerUid","schemaVersion","revision","createdAt","updatedAt","id","name","clientId","client","status","dueDate","description","template","color","initials"]) && d.keys().hasOnly(["ownerUid","schemaVersion","revision","createdAt","updatedAt","id","name","clientId","client","status","dueDate","description","template","color","initials","coverConnectionId","coverFileId","coverName","coverX","coverY","coverZoom"]) &&
         metadata(d,uid) &&
         d.id is int && d.id>0 && d.id<=9007199254740991 && string(d.id)==id &&
         text(d.name,1,200) &&
@@ -78,7 +88,7 @@ service cloud.firestore {
         text(d.description,0,10000) &&
         text(d.template,0,80) &&
         text(d.color,0,80) &&
-        text(d.initials,0,80);
+        text(d.initials,0,80) && valid_projectCover(d);
     }
     function valid_tasks(d,uid,id) {
       return d.keys().hasAll(["ownerUid","schemaVersion","revision","createdAt","updatedAt","id","projectId","title","done"]) && d.keys().hasOnly(["ownerUid","schemaVersion","revision","createdAt","updatedAt","id","projectId","title","done"]) &&

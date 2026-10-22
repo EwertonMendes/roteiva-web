@@ -430,3 +430,7 @@ A busca de aprovações aguarda 300 ms sem digitação e aborta pedidos obsoleto
 Testes de contrato sem emuladores: `cd api && node --experimental-strip-types --test tests/cron-contract.test.mjs tests/thumbnail-stream.test.mjs`. O comando verifica contratos, não Google Drive real ou Firebase Auth.
 
 A aceitação requer comparação de Cloudflare/D1 com janelas equivalentes, observação do p95/p99 de CPU, smoke do Worker DEV e E2E autenticado de upload/revisão/miniaturas. Não coletar tokens, URLs privadas ou dados de usuários em logs ou artefatos.
+
+## Validação de capas de projetos
+
+`pnpm test` inclui geometria de recorte e round-trip do codec. `npm test --prefix api` inclui busca privada e download limitado, isolamento de conexão e middleware HTTP autenticado. `pnpm test:rules` verifica campos opcionais completos, limites em create/update e isolamento A/B. Depois de compilar emulador/demo, executar `pnpm exec firebase emulators:exec --project demo-roteiva --only auth,firestore "pnpm exec playwright test tests/browser/project-covers.spec.ts tests/browser/semantic-icons.spec.ts"`. Drive é simulado nesse E2E; não usa arquivos reais. Publicação exige workflows de API, regras Firestore e frontend verdes antes da homologação no DEV.

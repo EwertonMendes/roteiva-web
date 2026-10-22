@@ -91,8 +91,6 @@
   .flow-next p { font-size: var(--type-support); }
   .panel-head h2 { font-size: var(--type-card); }
   .panel-head > button { min-height: 40px; font-size: var(--type-support); }
-  .project-card h3 { font-size: var(--type-card); }
-  .project-card-copy p { font-size: var(--type-support); }
   .project-row .project-name b { font-size: var(--type-label); }
   .project-row .project-name small { font-size: var(--type-support); line-height: 1.5; }
   .filter-pills { display: flex; gap: 6px; flex-wrap: nowrap; overflow-x: auto; max-width: 100%; padding-bottom: 3px; }

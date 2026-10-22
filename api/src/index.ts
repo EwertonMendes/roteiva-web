@@ -1,3 +1,4 @@
+import {listCoverImages,coverImage} from './project-covers.ts';
 import { ApiError, type Env } from './types.ts';
 import { reviewRouter,cleanupExpiredReviews } from './reviews.ts';
 import { identity,verifiedTrialPrincipal } from './auth.ts';
@@ -16,7 +17,7 @@ const headers = {
 };
 /** Route categories are intentionally static: never log tokens, file IDs or URL params. */
 function operationName(path:string):string{
-  if(path.endsWith('/thumbnail')||path==='/reviews/media'||path==='/reviews/public/file')return 'thumbnail_or_media';
+  if(path.endsWith('/thumbnail')||path.endsWith('/cover')||path==='/reviews/media'||path==='/reviews/public/file')return 'thumbnail_or_media';
   if(path.startsWith('/reviews'))return 'reviews';
   if(path.includes('/uploads/'))return 'drive_upload';
   if(path.startsWith('/integrations/drive'))return 'drive_metadata';
@@ -46,7 +47,7 @@ export async function handle(request: Request, env: Env): Promise<Response> {
         'Access-Control-Allow-Methods':'GET, POST, OPTIONS',
         'Access-Control-Allow-Headers':'Authorization, Content-Type, X-Review-Token','Access-Control-Max-Age':'3600',
       }});
-    } else if (!(await ((url.pathname.endsWith('/thumbnail')||url.pathname==='/reviews/media'||url.pathname==='/reviews/public/file') ? env.API_THUMB_LIMIT : env.API_RATE_LIMIT)
+    } else if (!(await ((url.pathname.endsWith('/thumbnail')||url.pathname.endsWith('/cover')||url.pathname==='/reviews/media'||url.pathname==='/reviews/public/file') ? env.API_THUMB_LIMIT : env.API_RATE_LIMIT)
         .limit({key:'dev:ip:'+sourceIp.slice(0,64)})).success) {
       throw new ApiError(429,'rate_limited');
     } else if (url.pathname === '/health' && request.method === 'GET') {
@@ -95,6 +96,13 @@ export async function handle(request: Request, env: Env): Promise<Response> {
       response=parts.length===5
         ? await listFolders(env,uid,parts[3],url.searchParams.get('parentId')||'root',url.searchParams.get('pageToken'))
         : await listFolderItems(env,uid,parts[3],parts[5],url.searchParams.get('pageToken'),fetch,url.searchParams.get('search'));
+    } else if (/^\/integrations\/drive\/[^/]+\/(?:cover-images|files\/[^/]+\/cover)$/.test(url.pathname) && request.method==='GET') {
+      enabled(env);
+      const uid=await identity(request,env);
+      await assertActiveAccess(env,uid);
+      if(!(await env.API_THUMB_LIMIT.limit({key:'dev:uid:'+uid})).success)throw new ApiError(429,'rate_limited');
+      const parts=url.pathname.split('/');
+      response=parts[4]==='cover-images'?await listCoverImages(env,uid,parts[3],url.searchParams):await coverImage(env,uid,parts[3],parts[5]);
     } else if (/^\/integrations\/drive\/[^/]+\/picker\/verify$/.test(url.pathname) && request.method==='POST') {
       enabled(env);
       if(origin!==env.FRONTEND_ORIGIN)throw new ApiError(403,'origin_required');

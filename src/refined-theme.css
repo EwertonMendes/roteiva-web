@@ -51,7 +51,7 @@ a { text-underline-offset: 3px; }
 .page-heading h1 { font-weight: 700; letter-spacing: -.045em; }
 .page-heading p { color: var(--muted); font-weight: 300; font-size: var(--type-label); }
 .eyebrow,.page-heading > div > span,.panel-head > div > span { color: var(--muted); font-weight: 500; }
-:root .panel,:root .metric-grid article,:root .finance-metrics article:not(.featured),:root .library-summary article,:root .project-card,:root .asset-card,:root .comments-panel {
+:root .panel,:root .metric-grid article,:root .finance-metrics article:not(.featured),:root .library-summary article,:root .asset-card,:root .comments-panel {
   background: var(--card); border: 1px solid var(--line); box-shadow: var(--glass-shadow); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
 }
 :root .panel { border-radius: 24px; }
@@ -60,12 +60,10 @@ a { text-underline-offset: 3px; }
 :root .panel-head > button { color: var(--ink); font-weight: 500; }
 :root .project-row,:root .client-list button { background: transparent; border-color: var(--line); }
 :root .project-row:hover,:root .client-list button:hover { background: var(--subtle); }
-.project-name b,.project-card h3 { font-weight: 500; }
-:root .project-card:hover { transform: translateY(-2px); box-shadow: 0 12px 35px rgba(0,0,0,.055); }
+.project-name b{ font-weight: 500; }
 :root .metric-grid article::after,:root .library-summary article::after,:root .finance-metrics article::after { display: none; }
 :root .metric-icon,:root .finance-icon,:root .work-icon,:root .brand-avatar,:root .library-summary article > span { background: var(--subtle); color: var(--ink); border-color: var(--line); box-shadow: none; }
-:root .brand-avatar,:root .project-cover { color: var(--ink); background-color: var(--subtle); }
-:root .project-cover { background: linear-gradient(135deg,var(--subtle),var(--card)); }
+:root .brand-avatar{ color: var(--ink); background-color: var(--subtle); }
 :root .status,:root .client-type,:root .payment-status { color: var(--ink); background: var(--subtle); border: 1px solid var(--line); font-weight: 500; }
 :root .status::before { background: var(--muted); }
 :root .status-aprovado::before { background: var(--ink); }
@@ -74,7 +72,7 @@ a { text-underline-offset: 3px; }
 :root .filter-pills button { font-weight: 400; color: var(--muted); }
 :root .filter-pills button.active { color: var(--ink); background: var(--subtle); border-color: var(--line); box-shadow: none; font-weight: 500; }
 :root .filter-pills button:hover { color: var(--ink); background: var(--subtle); }
-:root .progress-cell i,:root .card-progress i { background: var(--accent); }
+:root .progress-cell i{ background: var(--accent); }
 :root .client-summary > div,:root .client-toolbar { border-color: var(--line); }
 :root .client-list-head,:root .finance-table-head,:root .calendar-week { background: transparent; color: var(--muted); }
 :root .flow-overview { border-radius: 26px; }
@@ -159,7 +157,7 @@ a { text-underline-offset: 3px; }
 }
 :root .payment-status.paid,:root .payment-status.pending,:root .client-type.recurring,:root .client-type.one-off { color: var(--ink); background: var(--subtle); border-color: var(--line); }
 :root .metric-icon.violet,:root .metric-icon.lime,:root .metric-icon.amber,:root .metric-icon.blue { color: var(--ink); background: var(--subtle); }
-:root .progress-cell > span,:root .card-progress > span { background: var(--line); }
+:root .progress-cell > span{ background: var(--line); }
 :root .calendar-toolbar > div button,:root .calendar-toolbar > button,:root .view-button { border-color: var(--line); color: var(--ink); }
 :root .day-agenda > article,:root .upcoming-list article { border-color: var(--line); }
 :root .revenue-actions button:focus-visible { outline-color: var(--accent); }

@@ -107,3 +107,7 @@ A Biblioteca reaproveita listagens recentes por sessão e busca nomes remotament
 **Teste gratuito único (PR #51, publicado em DEV):** sete dias por identidade Google/e-mail verificado elegível; excluir e recriar a conta não concede outro período. Marcadores HMAC pseudonimizados permanecem após a exclusão para essa finalidade. O prazo beta de 30 dias continua fixo. Publicação/homologação DEV rastreada no [roadmap](docs/MVP-ROADMAP.md), com detalhes e limites em [TRIAL-REUSE-PREVENTION.md](docs/TRIAL-REUSE-PREVENTION.md).
 
 **Exclusão da conta:** disponível somente em Configurações → Zona de perigo para usuários com acesso ativo. Telas de acesso expirado, suspensão, cadastro ou erro de validação não oferecem a ação; o backend também bloqueia novos pedidos sem acesso ativo.
+
+## Projetos e capas do Drive
+
+A listagem de Projetos usa cards com filtros e ícones de situação coloridos. Com o Drive conectado, é possível escolher uma imagem privada (JPG, PNG, WebP ou AVIF, até 8 MB), ajustar posição e zoom e salvar o enquadramento no projeto. Sem conexão, fotos e controles de capa ficam ocultos. A imagem original permanece no Drive.

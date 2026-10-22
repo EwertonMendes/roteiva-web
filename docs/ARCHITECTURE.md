@@ -413,3 +413,11 @@ Separação de manutenção por criticidade: exclusões e revogações de Drive/
 ## Decisão de navegação — 21/10/2026
 
 **Decisão tomada:** retirar a barra superior global e o banner redundante de nuvem do shell compartilhado. A busca de Projetos/Clientes passa para o conteúdo, mantendo o carregamento completo sob demanda. O menu móvel usa um controle independente no conteúdo. Alertas reais de falha/sincronização e o modo demo são preservados; contratos de dados e persistência não mudam.
+
+## Decisão — capas privadas de projetos (21/10/2026)
+
+**Decisão tomada:** capa é uma referência opcional no documento de projeto: `coverConnectionId`, `coverFileId`, `coverName`, `coverX`, `coverY`, `coverZoom`. O codec preserva projetos legados sem capa e omite todos os campos ao remover. As gravações continuam nas transações revisionadas existentes; regras exigem o conjunto completo, tipos, limites e proprietário. Referências de conexão não concedem acesso: a API verifica Firebase, acesso comercial e propriedade da conexão em cada leitura.
+
+`GET /integrations/drive/:id/cover-images` busca imagens paginadas (40 por página), com escape de busca e miniaturas privadas existentes. `GET /integrations/drive/:id/files/:fileId/cover` valida tipo, tamanho (8 MiB), dimensão (40 milhões de pixels quando informada) e lixeira antes de ler a imagem original autenticada, sem seguir redirecionamentos. Valida o tamanho efetivo e reconfirma estado/revisão da conexão antes de liberar bytes. Não cria ACLs, URLs públicas, tokens de mídia duráveis ou cópia permanente. Usa apenas a permissão de leitura já concedida à Biblioteca; não amplia OAuth.
+
+No navegador, capas só aparecem com conexão ativa, carregam ao se aproximarem da área visível e têm no máximo três downloads concorrentes. URLs de objeto são revogadas ao trocar imagem, projeto ou conta. O editor mantém rascunho local até Salvar; arraste, zoom e controles nativos de posição compartilham a mesma geometria proporcional (formato 2,5:1). Diálogo nativo garante foco modal e Escape. Falhas não são substituídas por fotos fictícias.

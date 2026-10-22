@@ -557,3 +557,9 @@ Evidências: api/tests/deletion-access.test.mjs (negativa para conta sem provisi
 ## Remoção das faixas superiores — 21/10/2026
 
 **IMPLEMENTADO:** removidos JSX e estilos da barra global de todas as telas e a faixa redundante de status. Busca de Projetos/Clientes preservada no conteúdo e menu móvel preservado. Evidências: `src/dashboard-client.tsx` e estilos compartilhados. Validação: `pnpm typecheck`, `pnpm test` (41 testes + agenda/financeiro), builds Firebase/demo e QA local Playwright/Edge desktop e celular (menu e busca). Suíte Firebase/emuladores e homologação DEV pendentes.
+
+## Projetos — cards e capas privadas do Drive (21/10/2026)
+
+**IMPLEMENTADO:** novo painel de projetos conforme mockup, ícones atuais coloridos, capa opcional apenas para conexões Drive ativas, escolha paginada/busca de imagens, edição por arraste/zoom/posição, cancelamento e remoção. Persistência revisionada dos identificadores e recorte, regras completas e leitura privada com limite de 8 MiB. Evidências: `src/features/projects/`, `api/src/project-covers.ts`, `firestore.rules`, `tests/project-covers.test.mjs`, `api/tests/project-covers.test.mjs`, `tests/browser/project-covers.spec.ts`.
+
+**VALIDADO PARCIALMENTE:** TypeScript frontend/API, builds Firebase/demo/emulador, testes de geometria/codec, rotas privadas e 31 testes Firestore A/B passaram localmente. Validação desktop/mobile e CI registradas na PR. Aceite com imagens de Drive real pelo proprietário permanece pendente; não confundir os mocks do E2E com Google real.

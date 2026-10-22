@@ -13,7 +13,7 @@ export function encodeWorkspace(workspace: WorkspaceData, scope?: ReadonlySet<Co
     for (const d of c.deliveries || []) if (accepts("deliveries")) put("deliveries",d.id,{...d,clientId:c.id});
   }
   for (const p of workspace.projects) {
-    if (accepts("projects")) put("projects",p.id,{id:p.id,name:p.name,clientId:p.clientId || 0,client:p.client,status:p.status,dueDate:p.dueDate || "",description:p.description || "",template:p.template || "Livre",color:p.color,initials:p.initials});
+    if (accepts("projects")) put("projects",p.id,{id:p.id,name:p.name,clientId:p.clientId || 0,client:p.client,status:p.status,dueDate:p.dueDate || "",description:p.description || "",template:p.template || "Livre",color:p.color,initials:p.initials,...(p.cover?{coverConnectionId:p.cover.connectionId,coverFileId:p.cover.fileId,coverName:p.cover.name,coverX:p.cover.x,coverY:p.cover.y,coverZoom:p.cover.zoom}:{})});
     for (const t of p.tasks || []) if (accepts("tasks")) put("tasks",t.id,{...t,projectId:p.id});
   }
   for (const e of workspace.calendarEvents) if (accepts("events")) put("events",e.id,{...e,projectId:e.projectId || 0,endTime:e.endTime || "",autoDeadline:!!e.autoDeadline});
@@ -34,7 +34,7 @@ export function decodeWorkspace(records: Records): WorkspaceData {
       const {monthlyFeeCents, ...rest} = d;
       workspace.clients.push({...rest,monthlyFee:Number(monthlyFeeCents)/100,projects:0,active:0,deliveries:[]} as unknown as Client);
     }
-    if (collection === "projects") workspace.projects.push({...d,due:d.dueDate ? new Date(d.dueDate+"T12:00:00").toLocaleDateString("pt-BR",{day:"2-digit",month:"short"}) : "Sem prazo",tasks:[],progress:0,files:0} as unknown as Project);
+    if (collection === "projects") workspace.projects.push({...d,...(typeof d.coverFileId==="string"?{cover:{connectionId:d.coverConnectionId,fileId:d.coverFileId,name:d.coverName,x:d.coverX,y:d.coverY,zoom:d.coverZoom}}:{}),due:d.dueDate ? new Date(d.dueDate+"T12:00:00").toLocaleDateString("pt-BR",{day:"2-digit",month:"short"}) : "Sem prazo",tasks:[],progress:0,files:0} as unknown as Project);
     if (collection === "events") workspace.calendarEvents.push(d as unknown as WorkspaceData["calendarEvents"][number]);
     if (collection === "financeEntries") {
       const {amountCents, ...rest} = d;
