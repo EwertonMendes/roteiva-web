@@ -21,6 +21,7 @@ import "./features/settings/settings.css";
 import "./typography.css";
 import "./features/ui/semantic-icons.css";
 import "./features/dashboard/dashboard.css";
+import "./features/ui/AppSelect.css";
 
 class AppErrorBoundary extends Component<{children:ReactNode},{error:string}> {
   state={error:""};
