@@ -42,7 +42,7 @@ test("all frontend selects use the shared AppSelect primitive", () => {
     return entry.isDirectory() ? walk(path) : path.endsWith(".tsx") ? [path] : [];
   });
   for (const path of walk("src")) {
-    assert.doesNotMatch(read(path), /<select(?=[\\s>])/i, path + " should import AppSelect");
+    assert.doesNotMatch(read(path), /<select(?=[\s>])/i, path + " should import AppSelect");
   }
   const appSelect = read("src/features/ui/AppSelect.tsx");
   assert.match(appSelect, /role="combobox"/);
