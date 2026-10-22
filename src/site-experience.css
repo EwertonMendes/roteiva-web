@@ -10,13 +10,13 @@
 .brand-intro-track { width: 120px; height: 1px; background: #333; overflow: hidden; }
 .brand-intro-track span { display: block; height: 100%; width: 100%; background: #eee; transform: scaleX(.1); transform-origin: left; transition: transform .65s cubic-bezier(.2,.7,.3,1); }
 @keyframes brand-wordmark-in { from { opacity: 0; transform: translateY(16px); clip-path: inset(100% 0 0); } to { opacity: 1; transform: translateY(0); clip-path: inset(0); } }
-.studio-cursor-ring,.studio-cursor-dot { display: none; position: fixed; inset: 0 auto auto 0; z-index: 2000; pointer-events: none; opacity: 0; mix-blend-mode: difference; transition: opacity .15s ease; }
+.studio-cursor-ring,.studio-cursor-dot { display: none; position: fixed; inset: 0 auto auto 0; z-index: 2147483000; pointer-events: none; opacity: 0; mix-blend-mode: difference; transition: opacity .15s ease; }
 .studio-cursor-ring > i { position: absolute; left: -15px; top: -15px; width: 30px; height: 30px; border-radius: 50%; border: 1px solid rgba(255,255,255,.55); background: transparent; transition: transform .22s ease, background .22s ease, border-color .22s ease; }
 .studio-cursor-dot > i { position: absolute; left: -2px; top: -2px; width: 4px; height: 4px; border-radius: 50%; background: #fff; }
 .studio-cursor-ring.is-active > i { transform: scale(1.4); background: rgba(255,255,255,.1); border-color: rgba(255,255,255,.85); }
 .studio-cursor-ring.is-pressed > i { transform: scale(.8); }
 @media (hover:hover) and (pointer:fine) and (prefers-reduced-motion:no-preference) {
- :root[data-roteiva-cursor="on"]:not(:has(dialog:modal)) body,:root[data-roteiva-cursor="on"]:not(:has(dialog:modal)) body * { cursor: none !important; }
+ :root[data-roteiva-cursor="on"] body,:root[data-roteiva-cursor="on"] body * { cursor: none !important; }
  .studio-cursor-ring,.studio-cursor-dot { display: block; }
  .studio-cursor-ring.is-visible,.studio-cursor-dot.is-visible { opacity: 1; }
 }
@@ -31,5 +31,3 @@
  .studio-cursor-ring,.studio-cursor-dot { display: none !important; }
 }
 
-/* Native dialogs occupy the top layer, above any decorative page cursor. */
-:root:has(dialog:modal) .studio-cursor-ring,:root:has(dialog:modal) .studio-cursor-dot { display:none; }
