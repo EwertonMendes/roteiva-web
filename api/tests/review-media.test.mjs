@@ -32,7 +32,7 @@ test('wrong file type and a closed review cannot stream even with signed ticket'
   const DB={prepare(sql){
     return {bind(...args){
       return {async first(){
-        if(sql.includes('FROM review_requests'))return {id:review,owner_uid:'alice',status,current_version:1,expires_at:Date.now()+60000,token_hash:inviteHash};
+        if(sql.includes('FROM review_requests'))return {id:review,owner_uid:'alice',status,current_version:1,expires_at:Date.now()+60000,token_hash:inviteHash,access_mode:'link'};
         if(sql.includes('FROM review_assets'))return {file_id:file,connection_id:'unused',mime_type:mime};
         return null;
       }};
@@ -41,6 +41,6 @@ test('wrong file type and a closed review cannot stream even with signed ticket'
   const scope={...e,DB};
   const request=new Request('https://roteiva-api-dev.ewertonmendes9.workers.dev/reviews/media?ticket='+ticket);
   await assert.rejects(()=>streamReviewMedia(request,scope,new URL(request.url)),x=>x.status===404);
-  status='pending';mime='image/png';
+  status='pending';mime='application/x-unsafe';
   await assert.rejects(()=>streamReviewMedia(request,scope,new URL(request.url)),x=>x.status===404);
 });

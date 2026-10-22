@@ -54,7 +54,9 @@
   .sidebar { width: min(310px, 86vw); overflow-y: auto; padding-top: max(18px, env(safe-area-inset-top)); padding-bottom: max(18px, env(safe-area-inset-bottom)); }
   .sidebar nav > button { min-height: 47px; font-size: var(--type-label); }
   .sidebar .sidebar-profile { margin-top: auto; padding-top: 20px; }
-  .mobile-scrim { z-index: 29; }
+  /* An open navigation drawer must outrank floating Drive transfers (z-index:95). */
+  .sidebar.mobile-open { z-index: 120; }
+  .mobile-scrim { z-index: 119; }
   .page { padding: 28px 16px calc(110px + env(safe-area-inset-bottom)); }
   .page-heading { display: flex; flex-direction: column; gap: 18px; margin-bottom: 24px; }
   .page-heading h1 { font-size: 33px; margin-top: 10px; }

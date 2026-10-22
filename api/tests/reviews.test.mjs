@@ -221,7 +221,7 @@ async function integration(t){
         ...(payload?{'Content-Type':'application/json'}:{})},
       ...(payload?{body:JSON.stringify(payload)}:{})}),env);
   const payload={clientId:7,projectId:17,studioName:'Estudio',title:'Primeiro corte',message:'Avalie',
-    mode:'link',expiresInDays:14,assets:[{fileId:file,connectionId:account,linkedFolderId:folder}]};
+    mode:'link',driveShareEnabled:true,expiresInDays:14,assets:[{fileId:file,connectionId:account,linkedFolderId:folder}]};
   return {f,env,send,payload,alice,bob,jwt,acl,calls,hooks};
 }
 test('public video media uses signed range tickets and stops immediately after review closure',async t=>{
@@ -557,7 +557,7 @@ test('owner explicitly restricts a directly public Drive file without removing o
   const x=await integration(t);
   x.acl.set('owner-public',{type:'anyone',role:'reader'});
   x.acl.set('owner-reader',{type:'user',role:'reader',emailAddress:'other@gmail.com'});
-  const options={mode:'google',recipientEmail:'first@gmail.com',restrictExistingPublic:true};
+  const options={mode:'google',recipientEmail:'first@gmail.com',driveShareEnabled:true,restrictExistingPublic:true};
   const {id,published}=await createAndPublish(x,options);
   assert.equal(published.status,200);
   assert.equal(x.acl.has('owner-public'),false);
@@ -577,50 +577,71 @@ test('same file may be reviewed in parallel; public grant survives the first clo
   assert.equal(x.acl.size,0);
 });
 
-test('Google-only review never issues an anonymous media streaming ticket',async t=>{
-  const x=await integration(t);
-  const {id,published}=await createAndPublish(x,{mode:'google',recipientEmail:'client@gmail.com'});
-  assert.equal(published.status,200);
-  const token=(await published.json()).review.review.url.split('/').at(-1);
-  const verified=await x.jwt('recipient','client@gmail.com');
-  await assert.rejects(()=>route(x.f,token,'/reviews/public/media-ticket','POST',
-    {fileId:file},verified),e=>e.code==='review_private_media_google_drive');
-  assert.equal((await x.send('POST','/reviews/'+id+'/close',x.alice)).status,200);
-});
 
-test('private preview uses verified Google reviewer/viewer access, not an iframe or public media ticket',async t=>{
+test('portal-only review does not mutate Drive permissions and supports repeated files',async t=>{
+  const x=await integration(t);
+  x.acl.set('owner-public',{type:'anyone',role:'reader'});
+  const base={driveShareEnabled:false,mode:'google',recipientEmail:'client@gmail.com'};
+  const first=await createAndPublish(x,base),second=await createAndPublish(x,base);
+  assert.equal(first.published.status,200);assert.equal(second.published.status,200);
+  assert.equal(x.acl.size,1,'pre-existing ACL must remain intact');
+  assert.equal(x.f.sql.prepare('SELECT drive_share_enabled FROM review_requests WHERE id=?')
+    .get(first.id).drive_share_enabled,0);
+  assert.equal((await x.send('POST','/reviews/'+first.id+'/close',x.alice)).status,200);
+  assert.equal((await x.send('POST','/reviews/'+second.id+'/close',x.alice)).status,200);
+  assert.equal(x.acl.size,1);
+});
+test('Google-only video and image streaming require verified review membership before ticket mint',async t=>{
   const x=await integration(t);
   const people=[{email:'reviewer@gmail.com',role:'reviewer'},{email:'viewer@gmail.com',role:'viewer'}];
-  const created=await createAndPublish(x,{mode:'google',recipientEmail:'reviewer@gmail.com',participants:people});
+  const created=await createAndPublish(x,{driveShareEnabled:false,mode:'google',
+    recipientEmail:'reviewer@gmail.com',participants:people});
   assert.equal(created.published.status,200);
   const invite=(await created.published.json()).review.review.url.split('/').at(-1);
   const viewer=await x.jwt('viewer','viewer@gmail.com');
-  const outsider=await x.jwt('outsider','outsider@gmail.com');
-  const reviewer=await x.jwt('reviewer','reviewer@gmail.com');
-  await assert.rejects(()=>route(x.f,invite,'/reviews/public/file','POST',
-    {fileId:file,offset:0}),e=>e.status===401,'no Google login cannot stream private files');
-  await assert.rejects(()=>route(x.f,invite,'/reviews/public/file','POST',
-    {fileId:file,offset:0},outsider),e=>e.status===403,'unlisted Google account cannot stream');
-  await assert.rejects(()=>route(x.f,invite,'/reviews/public/file','POST',
-    {fileId:'OTHER_FILE_12345678',offset:0},viewer),e=>e.status===404,'other files are denied');
-  await assert.rejects(()=>route(x.f,invite,'/reviews/public/file','POST',
-    {fileId:file,offset:-1},viewer),e=>e.status===400,'invalid byte ranges are denied');
-  await assert.rejects(()=>route(x.f,invite,'/reviews/public/file','POST',
-    {fileId:file,version:22,offset:0},viewer),e=>e.code==='review_version_changed');
-  const stream=await route(x.f,invite,'/reviews/public/file','POST',{fileId:file,offset:0},viewer);
+  const intruder=await x.jwt('intruder','intruder@gmail.com');
+  await assert.rejects(()=>route(x.f,invite,'/reviews/public/media-ticket','POST',
+    {fileId:file}),e=>e.status===401);
+  await assert.rejects(()=>route(x.f,invite,'/reviews/public/media-ticket','POST',
+    {fileId:file},intruder),e=>e.status===403);
+  await assert.rejects(()=>route(x.f,invite,'/reviews/public/media-ticket','POST',
+    {fileId:'OTHER_FILE_12345678'},viewer),e=>e.status===404);
+  const ticket=await route(x.f,invite,'/reviews/public/media-ticket','POST',{fileId:file},viewer);
+  assert.equal(ticket.status,200);
+  const address=(await ticket.json()).url;
+  const stream=await handle(new Request(address,{headers:{Range:'bytes=0-'}}),x.env);
   assert.equal(stream.status,206);
-  assert.equal(stream.headers.get('Content-Type'),'video/mp4');
   assert.equal(stream.headers.get('Content-Range'),'bytes 0-3/100');
   assert.match(stream.headers.get('Cache-Control')||'',/no-store/);
   assert.deepEqual([...new Uint8Array(await stream.arrayBuffer())],[1,2,3,4]);
-  assert.equal((await route(x.f,invite,'/reviews/public/file','POST',
-    {fileId:file,offset:0},reviewer)).status,206);
-  const link=await createAndPublish(x);
-  assert.equal(link.published.status,200);
-  const publicInvite=(await link.published.json()).review.review.url.split('/').at(-1);
-  await assert.rejects(()=>route(x.f,publicInvite,'/reviews/public/file','POST',
-    {fileId:file,offset:0},viewer),e=>e.status===403,'public capability cannot use Google relay');
   assert.equal((await x.send('POST','/reviews/'+created.id+'/close',x.alice)).status,200);
-  await assert.rejects(()=>route(x.f,invite,'/reviews/public/file','POST',
-    {fileId:file,offset:0},viewer),e=>e.status===404,'close invalidates all private ranges');
+  assert.equal((await handle(new Request(address),x.env)).status,404);
+});
+
+test('new invitations default to portal-only without modifying existing Google Drive ACLs',async t=>{
+  const x=await integration(t);
+  const input={...x.payload};delete input.driveShareEnabled;
+  const created=await x.send('POST','/reviews',x.alice,input);
+  assert.equal(created.status,201);
+  const {id}=await created.json();
+  const row=x.f.sql.prepare('SELECT drive_share_enabled FROM review_requests WHERE id=?').get(id);
+  assert.equal(row.drive_share_enabled,0);
+  const published=await x.send('POST','/reviews/'+id+'/publish',x.alice);
+  assert.equal(published.status,200);
+  const token=(await published.json()).review.review.url.split('/').at(-1);
+  const issued=await route(x.f,token,'/reviews/public/media-ticket','POST',{fileId:file});
+  assert.equal(issued.status,200);
+  assert.equal(x.acl.size,0,'portal-only must not publish a public Drive permission');
+  assert.equal((await x.send('POST','/reviews/'+id+'/close',x.alice)).status,200);
+  assert.equal(x.calls.filter(c=>c.path.includes('/permissions')&&['POST','DELETE'].includes(c.method)).length,0);
+});
+
+test('unsupported Drive-native documents fail explicitly without minting unusable tickets',async t=>{
+  const x=await integration(t);
+  const {id,published}=await createAndPublish(x,{driveShareEnabled:false});
+  assert.equal(published.status,200);
+  x.f.sql.prepare("UPDATE review_assets SET mime_type=? WHERE review_id=?").run('application/vnd.google-apps.document',id);
+  const invite=(await published.json()).review.review.url.split('/').at(-1);
+  await assert.rejects(()=>route(x.f,invite,'/reviews/public/media-ticket','POST',{fileId:file}),
+    e=>e.status===415&&e.code==='review_media_unsupported');
 });
