@@ -222,7 +222,7 @@ export function ReviewPortal({token}:{token:string}){
         <div className="review-portal-layout">
           <div className="review-portal-maincolumn">
             <section className="review-portal-review" aria-label="Material para avaliar">
-              <div className={"review-portal-stage"+(mediaMode==="ready"?" is-private":"")+
+              <div className={"review-portal-stage is-private"+
                 (active?.mimeType.startsWith("image/")?" is-image":"")+
                 (playableVideo?" is-playable-video":"")+
                 (videoExpanded?" is-video-expanded":"")}>
