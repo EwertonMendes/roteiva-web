@@ -27,7 +27,7 @@ Materiais mostram as pastas realmente vinculadas ao projeto no Drive. Adicionar/
 
 - Abertura com marca e cursor decorativo estão em `src/site-experience.tsx` e `src/site-experience.css`.
 - A abertura nunca deve prender a pessoa; há saída de segurança e suporte a `prefers-reduced-motion`.
-- Cursor personalizado somente em dispositivos com mouse e sobre elementos compatíveis; campos e vídeos preservam comportamento nativo; seletores de opção usam interação acessível consistente com a identidade do produto.
+- Cursor personalizado somente em dispositivos com mouse e sobre elementos compatíveis; campos de texto, vídeos e editores marcados com `data-native-cursor` preservam comportamento nativo. Dropdowns, opções e modais comuns mantêm o cursor personalizado acima de seu conteúdo, sem bloquear cliques; telas touch e movimento reduzido seguem usando cursor/gestos nativos.
 - Desktop e mobile têm navegação adaptada; manter contraste, foco visível, teclado, textos completos e modais com rolagem adequada.
 
 ## Código e arquivos de estilo
