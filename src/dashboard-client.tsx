@@ -1,3 +1,4 @@
+import {ProjectDetail} from './features/projects/ProjectDetail';
 import {SidebarAccountMenu} from "./features/ui/SidebarAccountMenu";
 import {ProjectsView} from "./features/projects/ProjectsView";
 "use client";
@@ -12,7 +13,7 @@ import {
   FileVideo, FileAudio, FileText, HardDrive, ChevronLeft, Settings2,
   UsersRound, Repeat2, ContactRound, type LucideIcon,
 } from "lucide-react";
-import { ProjectDetail, ClientDetail, StudioReviews, WorkspaceTools, FinancePanel, projectTemplates } from "./studio-features";
+import { ClientDetail, StudioReviews, WorkspaceTools, FinancePanel, projectTemplates } from "./studio-features";
 import {ReviewsDashboard} from "./features/reviews/ReviewsDashboard";
 import { TodayStudio } from "./features/dashboard/DashboardOverview";
 import { ActivityHistoryDrawer } from "./features/dashboard/ActivityHistory";
@@ -517,7 +518,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
           {((view === "projects" && !selectedProject) || (view === "clients" && !selectedClient)) && <label className="page-search"><Search size={17}/><input aria-label={view === "projects" ? "Buscar projetos" : "Buscar clientes"} value={query} onChange={e => { const value=e.target.value; setQuery(value); if(value.trim()){ if(view === "projects")onSearchProjects?.(); else onSearchClients?.(); } }} placeholder={view === "projects" ? "Buscar projetos" : "Buscar clientes"}/></label>}
           {view === "settings" && <SettingsPage profile={profile} email={email} photoURL={photoURL} theme={theme} toggleTheme={toggleTheme} onSaveProfile={onSaveProfile} />}
           {view === "overview" && <TodayStudio clients={clientList} projects={projects} entries={financeEntries} events={calendarEvents} activities={activities} onView={changeView} onOpenActivity={() => setActivityOpen(true)} overviewMetrics={overviewMetrics} />}
-          {view === "projects" && (selectedProject && projects.some(p => p.id === selectedProject) ? <ProjectDetail project={projects.find(p => p.id === selectedProject)!} clients={clientList} entries={financeEntries} assets={libraryAssets} events={calendarEvents} onSave={updateProject} onBack={() => changeView("projects")} onRevenue={addLinkedRevenue} onUpload={uploadAssets} onEvent={(p) => { openEvent(null, p.dueDate); }} uploading={uploading} onReview={()=>{setReviewStart({clientId:projects.find(p=>p.id===selectedProject)?.clientId,projectId:selectedProject||undefined});changeView("reviews");}} /> : <ProjectsView projects={filtered.map(p => ({...p, files: libraryAssets.filter(a => a.projectId === p.id).length}))}
+          {view === "projects" && (selectedProject && projects.some(p => p.id === selectedProject) ? <ProjectDetail key={selectedProject} project={projects.find(p => p.id === selectedProject)!} clients={clientList} entries={financeEntries} assets={libraryAssets} events={calendarEvents} onSave={updateProject} onBack={() => changeView("projects")} onRevenue={addLinkedRevenue} onEditRevenue={openFinanceModal} onMaterials={()=>{setLibraryProject(String(selectedProject));changeView("library");}} onEditEvent={(event)=>openEvent(event)} onEvent={(p) => { openEvent(null, p.dueDate); }} onReview={()=>{setReviewStart({clientId:projects.find(p=>p.id===selectedProject)?.clientId,projectId:selectedProject||undefined});changeView("reviews");}} /> : <ProjectsView projects={filtered.map(p => ({...p, files: libraryAssets.filter(a => a.projectId === p.id).length}))}
                   onSaveCover={(id,cover)=>{const project=projects.find(p=>p.id===id);if(project)updateProject({...project,cover});}} statusFilter={statusFilter} setStatusFilter={(status)=>{
                     setStatusFilter(status);
                     onProjectStatus?.(status);
