@@ -3,7 +3,7 @@ import {Check,CheckCircle2,Clock3,ExternalLink,FileAudio,FileImage,FileText,File
   LoaderCircle,MessageSquare,Moon,Pause,Play,Send,ShieldCheck,Sun,Video,X} from "lucide-react";
 import {useAuth} from "../auth/AuthProvider";
 import {useOverlayFocus} from "../drive/DriveLibraryUI";
-import {PrivateImageViewer} from "./PrivateImageViewer";
+import {ReviewImageViewer} from "./ReviewImageViewer";
 import {captureReviewPlayback,formatReviewTime,maskReviewTime,parseReviewTime,validReviewSecond} from "./review-timecode";
 import "../reviews/reviews.css";
 import "./review-portal-v2.css";
@@ -247,7 +247,7 @@ export function ReviewPortal({token}:{token:string}){
                   aria-label={videoExpanded?"Fechar vídeo ampliado":"Ampliar vídeo"}
                   onClick={()=>setVideoExpanded(v=>!v)}>{videoExpanded?"Fechar tela cheia":"Ampliar vídeo"}</button>}
                 {active&&mediaMode==="ready"&&!isVideo&&active.mimeType.startsWith("image/")&&
-                  <PrivateImageViewer key={active.fileId} src={mediaUrl} name={active.name}
+                  <ReviewImageViewer key={active.fileId} src={mediaUrl} name={active.name}
                     onError={()=>{setPreviewError("O navegador não conseguiu exibir esta imagem. Abra-a no Google Drive.");setMediaMode("private-error");}}/>}
                 {active&&mediaMode==="ready"&&active.mimeType==="application/pdf"&&
                   <iframe className="review-private-preview-pdf" src={mediaUrl}
