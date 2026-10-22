@@ -1,5 +1,17 @@
 # Roadmap vivo — Roteiva MVP
 
+## Select acessível e reutilizável — 22/10/2026
+
+**IMPLEMENTADO na PR [#85](https://github.com/EwertonMendes/roteiva-web/pull/85), aguardando homologação em preview DEV e testes E2E completos.** Sem merge; o frontend de master não é alterado. Componente `src/features/ui/AppSelect.tsx` e `AppSelect.css`, migrados filtros financeiros, formulários de projeto/receita/agenda, Biblioteca/Drive, aprovações e Configurações. Menus de opções seguem os temas e não dependem da aparência nativa do sistema.
+
+- [x] Isolar dropdown, estado, teclado, foco, portal/reposicionamento e tokens de tema em componente reutilizável.
+- [x] Preservar contratos de `FormData` por nome, valores existentes e seleção controlada, sem alterar o backend.
+- [x] Atualizar seletores e scripts Playwright que dependiam de `selectOption` nativo.
+- [ ] Testar todo o fluxo em Chromium desktop e mobile, seleção de filtros, formulários e modais, além de teclado e overflow.
+- [ ] Confirmar preview DEV e aceite visual do proprietário em temas claro/escuro.
+- Evidências: workflow Frontend DEV do PR (teste, TypeScript, build), `tests/browser/select-helpers.ts` e testes E2E atualizados. QA manual/real DEV não foi executado neste ponto; não confundir compilação com homologação completa.
+
+
 ## Melhoria dos detalhes do projeto — 22/10/2026
 
 **IMPLEMENTADO e PUBLICADO no DEV; validação automatizada concluída. Homologação Google real pelo proprietário pendente.** [PR #77](https://github.com/EwertonMendes/roteiva-web/pull/77), branch `codex/project-details-ux`, baseada na master `cadce49`, sem merge.
