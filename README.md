@@ -54,7 +54,7 @@ O Firestore usa centavos inteiros e datas civis ISO, sem converter dias da agend
 
 ## Configurações do perfil e estúdio (PR #11)
 
-No Firebase DEV, a área **Configurações** permite editar nome profissional, nome da marca/estúdio e tipo de atuação. O nome escolhido aparece automaticamente no topo e na lateral do painel, no lugar do rótulo genérico `Roteiva Studio` (usado somente quando não há nome cadastrado). E-mail e foto continuam gerenciados pelo Google, somente para leitura.
+No Firebase DEV, a área **Configurações** permite editar nome profissional, nome da marca/estúdio e tipo de atuação. O nome escolhido é usado nas configurações e nas aprovações, no lugar do rótulo genérico `Roteiva Studio` (usado somente quando não há nome cadastrado). E-mail e foto continuam gerenciados pelo Google, somente para leitura.
 
 O perfil é salvo no próprio `users/{uid}` do Firestore com revisão sequencial verificada em transação; alterações concorrentes produzem erro de conflito, não perda silenciosa. Usuários antigos continuam acessando seus dados; para eles, a área acrescenta somente os campos opcionais de estúdio e ocupação, **sem inventar datas ou aceite de cadastro**. O tema continua em `users/{uid}/preferences/ui`. Exportação JSON dos registros **carregados** é reutilizada, sem incluir mídia/credenciais.
 

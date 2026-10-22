@@ -69,7 +69,8 @@ test("mobile overview remains naturally scrollable and uses Ubuntu",async({page}
   test.skip(info.project.name==="desktop","Mobile-specific contract");
   await createWorkspace(page,"dashboard-mobile-"+info.project.name+"@example.com");
   await page.setViewportSize({width:375,height:667});
-  await expect(page.locator(".topbar")).toBeVisible();
+  await expect(page.locator(".topbar")).toHaveCount(0);
+  await expect(page.getByRole("button",{name:"Abrir menu",exact:true})).toBeVisible();
   await expect(page.locator(".flow-overview")).toBeVisible();
   const result=await page.evaluate(()=>({
     pageOverflow:getComputedStyle(document.querySelector(".app-view-overview .page")!).overflowY,

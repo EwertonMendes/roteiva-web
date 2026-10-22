@@ -55,11 +55,6 @@
   .sidebar nav > button { min-height: 47px; font-size: var(--type-label); }
   .sidebar .sidebar-profile { margin-top: auto; padding-top: 20px; }
   .mobile-scrim { z-index: 29; }
-  .topbar { height: 62px; margin: 8px 12px 0; padding: 0 12px; gap: 9px; border-radius: 18px; }
-  .topbar .menu-button,.topbar .theme-toggle { min-width: 40px; min-height: 40px; }
-  .topbar .global-search { min-width: 0; height: 40px; }
-  .topbar .global-search input { font-size: var(--type-support); }
-  .global-search kbd { display: none; }
   .page { padding: 28px 16px calc(110px + env(safe-area-inset-bottom)); }
   .page-heading { display: flex; flex-direction: column; gap: 18px; margin-bottom: 24px; }
   .page-heading h1 { font-size: 33px; margin-top: 10px; }
@@ -220,7 +215,6 @@
 [data-theme="dark"] .project-modal > label,[data-theme="dark"] .project-modal .form-grid > label { color: #b9bdaf; }
 .project-modal input,.project-modal select,.project-modal textarea { font-weight: 450; }
 @media (max-width: 820px) {
- .topbar .global-search input { font-size: var(--type-body); }
  .client-summary { grid-template-columns: repeat(3,minmax(0,1fr)); }
  .client-summary > div { min-width: 0; padding: 16px 12px; border-bottom: 0; border-right: 1px solid var(--line); }
  .client-summary > div:last-child { border-right: 0; }

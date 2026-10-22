@@ -49,7 +49,8 @@ test("mobile layout remains navigable with enlarged content and respects user fo
   await enterWorkspace(page,"readable-mobile-"+info.project.name+"@example.com");
   if(info.project.name==="mobile"){
     await page.setViewportSize({width:320,height:720});
-    await expect(page.locator(".topbar")).toBeVisible();
+    await expect(page.locator(".topbar")).toHaveCount(0);
+  await expect(page.getByRole("button",{name:"Abrir menu",exact:true})).toBeVisible();
     await expect(page.locator(".mobile-bottom-nav")).toBeVisible();
     expect(await fontSize(page,".mobile-bottom-nav button.active")).toBeGreaterThanOrEqual(13);
   }else{
