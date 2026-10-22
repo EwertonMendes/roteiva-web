@@ -1,38 +1,33 @@
-# Aprovações Google — participantes e reutilização segura de mídia
+# Revisões — mídia e acesso unificados
 
-## Objetivo
+## Política de acesso
 
-Um mesmo material da pasta vinculada pode participar de múltiplas solicitações e versões, inclusive quando uma solicitação anterior já foi aprovada. O proprietário escolhe o material; não há regra de exclusividade por arquivo. O acesso ao portal não equivale à concessão de acesso geral ao Drive.
+- Todos os novos convites são **portal-first**, tanto em modo "link" quanto em modo Google.
+- No modo link, o token secreto da revisão autoriza acesso ao portal. Ter o link equivale a uma capacidade de leitura; compartilhe-o apenas com os participantes desejados.
+- No modo Google, o Worker exige ID Token Firebase com login `google.com`, email verificado e participação ativa em D1 antes de apresentar metadados, comentários ou emitir tickets de mídia.
+- **Revisor** pode comentar, votar e pedir ajustes; **leitor** acompanha sem votar. Todos os revisores precisam aprovar a versão.
+- O estúdio pode optar expressamente por **também** compartilhar arquivos originais diretamente no Google Drive com cada participante. Nesse caso, o backend gerencia ACL de leitura e conserva concessões já existentes.
+- O padrão não cria permissões públicas nem concede acesso aos participantes dentro do Google Drive. Permissões diretas ou herdadas preexistentes do arquivo original continuam existindo e **não** são alteradas implicitamente.
+- Compartilhamento direto pré-existente não é revogado pela expiração do portal. Não afirmar que um arquivo já público ficou privado por criar um convite restrito.
+- A migração `0016_portal_first_review_access.sql` preserva `drive_share_enabled=1` para convites anteriores; novos convites usam `0` salvo opção explícita.
 
-## Tipos de acesso
+## Visualizador único
 
-- **Link:** qualquer pessoa que possua o token válido de convite pode acessar. O Roteiva pode reutilizar acesso público já existente ou gerenciar uma ACL `anyone/reader`, com referências entre revisões; só remove uma ACL que criou quando não restam consumidores ativos.
-- **Google:** exige Firebase ID Token assinado, associado a login `google.com` com e-mail verificado, e presença em `review_participants`. O token do link por si só não autoriza acesso. `reviewer` pode ler, comentar e registrar uma decisão; `viewer` só pode ler o estado, arquivos e comentários. O backend impõe esse controle mesmo quando a UI for manipulada.
-- **Votos:** cada revisor dá uma decisão por versão. Um pedido de ajustes devolve a versão à produção; para aprovação final é preciso confirmação de *todos* os revisores. Contas leitoras não contam no quórum.
-- **Prévia:** o Drive fornece iframe autenticado no modo Google; o relay de vídeo com ticket não é liberado para esse modo, pois a URL do elemento HTML5 `video` não propaga o Firebase ID Token.
+- Um endpoint de emissão de **ticket de mídia** valida a revisão e, se necessário, o participante Google. Serve imagens, vídeos, áudios e PDFs, sem Google Drive iframe.
+- Ticket limitado a 12 minutos, assinado HMAC com keyring, escopo único de arquivo/versão/revisão, compromisso SHA-256 da identidade autorizada para evitar email em URLs.
+- Cada GET/HEAD e cada requisição Range ao Worker valida HMAC, expiração, estado e versão da revisão, seleção exata do arquivo e permanência do participante Google. O Worker usa somente OAuth de proprietário e não expõe a credencial Google.
+- O ticket é uma capacidade transitória: **não é equivalente a reautenticar a sessão Firebase a cada GET nativo de mídia**. Possui vida curta, é renovado via autenticação, não é armazenado em cache, possui política no-referrer e deixa de funcionar ao encerrar/rotacionar a revisão. Não exibir a URL em logs.
+- O Worker aceita apenas uma faixa Range por requisição; limite 8 MiB por segmento em vídeo. Imagens e PDFs permitem streaming HTTP sem carregar o arquivo inteiro no Worker.
+- A UI unificada usa o mesmo componente de imagens com zoom, arraste, mouse, pinça, enquadramento e tela cheia; player HTML5 nativo para vídeo/áudio, controle de tempo, fullscreen, PDFs via visualizador nativo do navegador.
+- Durante reproduções longas, o portal renova o ticket mediante sessão autorizada e restaura o ponto da reprodução.
+- Suporte a codecs depende do navegador: não há transcodificação automática. PDFs têm suporte dependente do leitor PDF do navegador; navegadores sem renderização embutida podem precisar baixar o arquivo.
+- Arquivos compartilhados via Drive Picker precisam estar autorizados ao app com o escopo `drive.file`. Caso contrário, a criação orienta a autorizar pelo fluxo do Roteiva; não ampliar para escopos globais.
+- Rotas legadas `/reviews/public/file` e blobs gigantes removidos; `/reviews/media` é o único mecanismo de bytes de prévia.
 
-## Permissões preexistentes no Google Drive
+## Operação e QA
 
-O erro `review_existing_public_permission` ocorre quando o arquivo ainda tem permissão pública, de grupo ou de domínio. É diferente de ter outros leitores nomeados, que não são motivo para bloquear publicação. Os e-mails informados como participantes recebem acesso `reader` no arquivo, aproveitando concessões que já existiam sem assumir sua propriedade. Participantes com papel de revisor no Roteiva também possuem apenas leitura no Drive; sua decisão acontece exclusivamente no portal.
-
-O proprietário pode optar explicitamente por **remover acesso público direto** `anyone` do arquivo. Essa opção pode desativar links compartilhados anteriores e não é executada por padrão. O sistema nunca modifica ACLs herdadas de pastas: se alguma pasta ancestral permanece pública, de domínio ou grupo, a operação é bloqueada com orientação de configuração no Drive. O projeto não deve afirmar que um arquivo público se tornou privado apenas porque a página exige login.
-
-Uma revisão Google já aprovada pode deixar de aceitar novas decisões, mas continuar disponível até seu encerramento/expiração. Uma nova revisão que utilize os mesmos arquivos e participantes cria uma solicitação distinta.
-
-## Gerenciamento e ciclo de vida
-
-- D1 `0015_review_participants.sql` migra o destinatário restrito antigo e introduz participações, votos e rastreamento dos leitores Google por arquivo.
-- `review_google_acl` representa uma permissão gerenciada por par (arquivo, e-mail) e registra sua origem. `review_google_uses` lista solicitações que ainda precisam daquele acesso.
-- `review_file_claims` protege a propriedade de ACLs públicas criadas pelo Roteiva; `review_link_uses` mantém consumidores adicionais enquanto o arquivo é compartilhado.
-- Ao encerrar, o sistema remove apenas concessões da própria aplicação e apenas quando não houver outra solicitação ativa dependente. Permissões já existentes antes do Roteiva não são revogadas.
-- Retentativas de publicação e revogação não podem adotar ACLs de terceiros; uso de leases e estados persiste as operações em andamento. A expiração e exclusão da conta continuam usando a rotina de encerramento existente.
-
-## Limites
-
-- Há limites técnicos de segurança: até 200 e-mails únicos por solicitação (revisores e leitores somados), com no máximo 64 KiB de metadados, e limite configurado de 8 arquivos por versão.
-- O Google Drive pode impor políticas de compartilhamento da organização, limites de quota, e poderá exigir autorização de arquivo pelo Google Picker.
-- Restringir acesso ao **portal** não retira, retroativamente, permissões preexistentes no Drive. O Roteiva comunica qualquer impedimento e exige ação explícita ou correção manual.
-
-## Validação
-
-`api/tests/reviews.test.mjs` cobre participantes com identidade Google, papéis, quórum, reutilização de ACLs Google e link em revisões simultâneas, restrição pública com consentimento, preservação de permissões do proprietário e bloqueio de media tickets no modo Google. Verificar os testes e as migrações da API e a regressão E2E desktop/mobile antes de liberar DEV.
+- Em D1, a propriedade de cada ACL gerenciada continua distinta de cada uso; fechar um convite não remove acesso compartilhado por outra revisão.
+- CI da API verifica migração, versionamento, autoria, controle de participante, expiração, rotação e permissões.
+- CI frontend e E2E manual de aprovações verificam convidados, tema claro/escuro, zoom, troca de arquivos e recuperação de falhas.
+- Métricas de streaming devem acompanhar volume transferido, requisições Range, respostas 401/403/404/416/502 e latência, sem registrar tokens ou dados de participantes.
+- Isolamento por cópias privadas ou transcodificação de codecs não são parte desta migração; exigem fluxo próprio para controlar quota, arquivo duplicado, retenção, autorização e custo. Não prometer essas funcionalidades enquanto não implementadas.

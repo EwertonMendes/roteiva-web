@@ -33,6 +33,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
   const [title,setTitle]=useState(""),[message,setMessage]=useState("");
   const [mode,setMode]=useState<Mode>("link"),[recipient,setRecipient]=useState("");
   const [viewers,setViewers]=useState(""),[restrictPublic,setRestrictPublic]=useState(false);
+  const [shareDirect,setShareDirect]=useState(false);
   const [days,setDays]=useState(14),[links,setLinks]=useState<DriveFolderLink[]>([]);
   const [selectedFolder,setSelectedFolder]=useState<DriveFolderLink|null>(null);
   const [trail,setTrail]=useState<{id:string;name:string}[]>([]);
@@ -177,11 +178,11 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
   const resetComposer=()=>{
     if(working)return;
     browseSequence.current++;searchSequence.current++;
-    setComposer(false);setReplacement(null);setFiles([]);setTitle("");setMessage("");setSelectedFolder(null);setViewers("");setRestrictPublic(false);
+    setComposer(false);setReplacement(null);setFiles([]);setTitle("");setMessage("");setSelectedFolder(null);setViewers("");setRestrictPublic(false);setShareDirect(false);
     setTrail([]);setItems([]);setError("");setFolderError("");
   };
   const newReview=()=>{
-    setClientId(0);setProjectId(0);setRecipient("");setViewers("");setRestrictPublic(false);setTitle("");setMessage("");setFiles([]);setMode("link");
+    setClientId(0);setProjectId(0);setRecipient("");setViewers("");setRestrictPublic(false);setShareDirect(false);setTitle("");setMessage("");setFiles([]);setMode("link");
     setReplacement(null);setComposer(true);setOpened(null);setError("");
   };
   const openDetail=async(id:string)=>{
@@ -232,7 +233,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
         const participants=[...reviewers.map(email=>({email,role:"reviewer"})),...readers.map(email=>({email,role:"viewer"}))];
         const created=await call<{id:string}>("/reviews","POST",{
           clientId,projectId,studioName,title,message,mode,recipientEmail:reviewers[0]||"",
-          participants,restrictExistingPublic:restrictPublic,
+          participants,driveShareEnabled:shareDirect,restrictExistingPublic:restrictPublic,
           expiresInDays:days,assets:selections
         });
         setOpened(await call<Detail>("/reviews/"+created.id));
@@ -342,7 +343,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
               <label>Tipo de acesso<select value={mode} onChange={e=>setMode(e.target.value as Mode)}>
                 <option value="link">Qualquer pessoa com o link</option><option value="google">Somente Google autorizado</option>
               </select></label>
-              {mode==="link"?<p className="reviews-info">Os arquivos selecionados poderão ser vistos por quem tiver o link. Se o arquivo ou a pasta já estiver público no Google Drive, essa permissão continuará mesmo depois de encerrar a aprovação. Não utilize com informações confidenciais.</p>:
+              {mode==="link"?<p className="reviews-info">Quem tiver o link da aprovação poderá abrir os materiais dentro do Roteiva. O sistema não publica o arquivo no Drive. Permissões públicas que já existem no Google Drive não serão alteradas.</p>:
                 <div className="review-participants-config">
                   <h3>Participantes Google</h3>
                   <p className="reviews-muted">Cada pessoa precisará entrar com sua própria conta Google autorizada. Adicione os e-mails separados por vírgula ou em linhas diferentes.</p>
@@ -356,10 +357,15 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
                   </label>
                   <p className="reviews-info">A aprovação só fica concluída depois que todos os revisores aprovarem. Um pedido de ajustes devolve a versão ao estúdio. Leitores nunca podem enviar comentários ou decisões.</p>
                   <label className="review-permission-optin">
-                    <input type="checkbox" checked={restrictPublic} onChange={e=>setRestrictPublic(e.target.checked)}/>
-                    <span>Também restringir arquivos que já estão públicos: remover a permissão direta “Qualquer pessoa com o link” no Google Drive. Isso pode afetar outros links compartilhados.</span>
+                    <input type="checkbox" checked={shareDirect}
+                      onChange={e=>{setShareDirect(e.target.checked);if(!e.target.checked)setRestrictPublic(false);}}/>
+                    <span>Também conceder acesso direto no Google Drive a estes participantes. O Roteiva configura automaticamente permissão Leitor por conta, mantendo os papéis de revisor/leitor no portal.</span>
                   </label>
-                  <p className="reviews-muted">Para garantir acesso restrito, pastas ancestrais também precisam estar configuradas como Restritas no Drive. O Roteiva nunca remove permissões herdadas automaticamente.</p>
+                  {shareDirect&&<label className="review-permission-optin">
+                    <input type="checkbox" checked={restrictPublic} onChange={e=>setRestrictPublic(e.target.checked)}/>
+                    <span>Remover permissão pública direta já existente no Drive. Atenção: pode invalidar outros links compartilhados.</span>
+                  </label>}
+                  <p className="reviews-muted">No modo padrão, participantes acessam pelo Roteiva sem receber permissões adicionais no Drive. Para garantir que o arquivo original também seja privado, revise permissões já existentes no Drive. Permissões herdadas de pastas não são modificadas pelo Roteiva.</p>
                 </div>}
               <label>Validade<select value={days} onChange={e=>setDays(Number(e.target.value))}>
                 <option value={7}>7 dias</option><option value={14}>14 dias</option><option value={30}>30 dias</option>

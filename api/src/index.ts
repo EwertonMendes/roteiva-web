@@ -17,7 +17,7 @@ const headers = {
 };
 /** Route categories are intentionally static: never log tokens, file IDs or URL params. */
 function operationName(path:string):string{
-  if(path.endsWith('/thumbnail')||path.endsWith('/cover')||path==='/reviews/media'||path==='/reviews/public/file')return 'thumbnail_or_media';
+  if(path.endsWith('/thumbnail')||path.endsWith('/cover')||path==='/reviews/media')return 'thumbnail_or_media';
   if(path.startsWith('/reviews'))return 'reviews';
   if(path.includes('/uploads/'))return 'drive_upload';
   if(path.startsWith('/integrations/drive'))return 'drive_metadata';
@@ -47,7 +47,7 @@ export async function handle(request: Request, env: Env): Promise<Response> {
         'Access-Control-Allow-Methods':'GET, POST, OPTIONS',
         'Access-Control-Allow-Headers':'Authorization, Content-Type, X-Review-Token','Access-Control-Max-Age':'3600',
       }});
-    } else if (!(await ((url.pathname.endsWith('/thumbnail')||url.pathname.endsWith('/cover')||url.pathname==='/reviews/media'||url.pathname==='/reviews/public/file') ? env.API_THUMB_LIMIT : env.API_RATE_LIMIT)
+    } else if (!(await ((url.pathname.endsWith('/thumbnail')||url.pathname.endsWith('/cover')||url.pathname==='/reviews/media') ? env.API_THUMB_LIMIT : env.API_RATE_LIMIT)
         .limit({key:'dev:ip:'+sourceIp.slice(0,64)})).success) {
       throw new ApiError(429,'rate_limited');
     } else if (url.pathname === '/health' && request.method === 'GET') {
@@ -73,7 +73,7 @@ export async function handle(request: Request, env: Env): Promise<Response> {
       response=await ensureAccess(env,principal.uid,undefined,principal);
     } else if (url.pathname === '/reviews' || url.pathname.startsWith('/reviews/')) {
       if (request.method === 'POST' && origin !== env.FRONTEND_ORIGIN) throw new ApiError(403,'origin_required');
-      if (!(await env.API_RATE_LIMIT.limit({key:'dev:reviews:'+sourceIp.slice(0,64)})).success) throw new ApiError(429,'rate_limited');
+      if (url.pathname!=='/reviews/media'&&!(await env.API_RATE_LIMIT.limit({key:'dev:reviews:'+sourceIp.slice(0,64)})).success) throw new ApiError(429,'rate_limited');
       response = await reviewRouter(request,env,url);
     } else if (url.pathname === '/integrations/drive' && request.method === 'GET') {
       const uid = await identity(request,env);

@@ -11,6 +11,7 @@ export function database(...rows) {
   sql.exec(readFileSync(new URL('../../migrations/0013_reviews.sql',import.meta.url),'utf8'));
   sql.exec(readFileSync(new URL('../../migrations/0014_review_grant_coordination.sql',import.meta.url),'utf8'));
   sql.exec(readFileSync(new URL('../../migrations/0015_review_participants.sql',import.meta.url),'utf8'));
+  sql.exec(readFileSync(new URL('../../migrations/0016_portal_first_review_access.sql',import.meta.url),'utf8'));
   for (const row of rows) {
     sql.prepare('INSERT INTO drive_connections(id,owner_uid,google_account_id,google_email,encrypted_refresh_token,status,scopes,revision,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)')
       .run(row.id,row.owner_uid,row.google_account_id,row.google_email||'test@example.com',

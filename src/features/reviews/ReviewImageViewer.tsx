@@ -11,7 +11,7 @@ const clamp=(number:number,min:number,max:number)=>Math.max(min,Math.min(max,num
  * Zoom is relative to the *contained* image, not its original pixel dimensions.
  * Panning is constrained to the displayed image's actual (letterboxed) bounds.
  */
-export function PrivateImageViewer({src,name,onError}:{src:string;name:string;onError?:()=>void}){
+export function ReviewImageViewer({src,name,onError}:{src:string;name:string;onError?:()=>void}){
   const [view,setView]=useState<View>(FIT);
   const [natural,setNatural]=useState<Position|null>(null);
   const [expanded,setExpanded]=useState(false);
@@ -92,12 +92,10 @@ export function PrivateImageViewer({src,name,onError}:{src:string;name:string;on
     const viewport=viewportRef.current;
     if(!viewport)return;
     const onWheel=(event:WheelEvent)=>{
-      if(!event.ctrlKey&&!event.metaKey)return;
       event.preventDefault();
       setView(v=>limit(v.scale*(event.deltaY<0?1.2:1/1.2),v.x,v.y));
     };
-    // React's synthetic wheel listener is passive; prevent the browser from
-    // zooming the entire page only for deliberate Ctrl/Command+wheel zoom.
+    // Non-passive handler: normal wheel zooms the focused image, never the page.
     viewport.addEventListener("wheel",onWheel,{passive:false});
     return()=>viewport.removeEventListener("wheel",onWheel);
   },[limit]);
