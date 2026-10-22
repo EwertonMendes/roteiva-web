@@ -249,13 +249,16 @@ export function ReviewPortal({token}:{token:string}){
               <div className={"review-portal-stage is-private"+
                 (active?.mimeType.startsWith("image/")?" is-image":"")+
                 (playableVideo?" is-playable-video":"")+
-                (videoExpanded?" is-video-expanded":"")}>
+                (videoExpanded?" is-video-expanded":"")}
+                 onContextMenu={event=>event.preventDefault()}
+                 onDragStart={event=>event.preventDefault()}>
                 {previewMode==="loading"&&<div className="review-media-state review-private-preview-state" role="status">
                   <LoaderCircle className="rl-spin" size={25}/>
                   "Preparando visualização segura…"
                 </div>}
                 {playableVideo&&<video ref={videoRef} key={activeFileId}
-                  controls playsInline preload="metadata" src={previewUrl} aria-label={"Reproduzir "+active?.name}
+                  controls controlsList="nodownload noremoteplayback" disablePictureInPicture disableRemotePlayback
+                   playsInline preload="metadata" src={previewUrl} aria-label={"Reproduzir "+active?.name}
                   onTimeUpdate={e=>setPlayhead(e.currentTarget.currentTime)}
                   onLoadedMetadata={e=>{
                     const player=e.currentTarget;
@@ -275,9 +278,9 @@ export function ReviewPortal({token}:{token:string}){
                     onError={()=>{setPreviewError("O navegador não conseguiu exibir esta imagem. Peça ao profissional uma versão compatível.");setMediaMode("error");}}/>}
                 {active&&previewMode==="ready"&&active.mimeType==="application/pdf"&&
                   <iframe className="review-private-preview-pdf" src={previewUrl}
-                    title={"Prévia PDF de "+active.name} sandbox="allow-scripts allow-downloads"/>}
+                    title={"Prévia PDF de "+active.name} sandbox="allow-scripts" referrerPolicy="no-referrer"/>}
                 {active&&previewMode==="ready"&&active.mimeType.startsWith("audio/")&&
-                  <div className="review-private-preview-audio"><FileAudio size={32}/><audio controls src={previewUrl}
+                  <div className="review-private-preview-audio"><FileAudio size={32}/><audio controls controlsList="nodownload noremoteplayback" disableRemotePlayback src={previewUrl}
                     onError={()=>{setPreviewError("Este áudio não pôde ser reproduzido. Peça ao profissional uma versão compatível.");setMediaMode("error");}}/></div>}
                 {previewMode==="error"&&<div className="review-private-preview-error" role="alert">
                   <FileImage size={26}/><strong>Não foi possível mostrar a prévia</strong>
@@ -288,9 +291,7 @@ export function ReviewPortal({token}:{token:string}){
               </div>
               <div className="review-portal-stage-footer">
                 <div><strong>{active?.name}</strong><small>{playableVideo?"Player com marcação de instantes":"Visualização segura no Roteiva"}</small></div>
-                {active&&active.mimeType==="application/pdf"&&previewMode==="ready"&&
-                  <a href={previewUrl} target="_blank" rel="noopener noreferrer">
-                    <ExternalLink size={15}/> Abrir PDF em outra aba</a>}
+                
                 {active&&data.review.driveShareEnabled&&<a href={reviewFileURL(active.fileId)} target="_blank" rel="noreferrer">
                   <ExternalLink size={15}/> Abrir no Drive</a>}
               </div>
