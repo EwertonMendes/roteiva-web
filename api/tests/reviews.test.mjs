@@ -247,6 +247,26 @@ async function integration(t){
     mode:'link',driveShareEnabled:true,expiresInDays:14,assets:[{fileId:file,connectionId:account,linkedFolderId:folder}]};
   return {f,env,send,payload,alice,bob,jwt,acl,imageAcl,calls,hooks};
 }
+test('owner image preview requires owning Firebase account, selected image and active review',async t=>{
+  const x=await integration(t);
+  const selected=[...x.payload.assets,{fileId:imageFile,connectionId:account,linkedFolderId:'PARENT_FOLDER_12345'}];
+  const create=await createAndPublish(x,{assets:selected});
+  assert.equal(create.published.status,200);
+  const pathname='/reviews/'+create.id+'/image?fileId='+imageFile;
+  const ok=await x.send('GET',pathname,x.alice);
+  assert.equal(ok.status,200);
+  assert.equal(ok.headers.get('Content-Type'),'image/png');
+  assert.equal(ok.headers.get('Cache-Control'),'private, no-store');
+  assert.equal((await ok.arrayBuffer()).byteLength,4);
+  const other=await x.send('GET',pathname,x.bob);
+  assert.equal(other.status,404);
+  const video=await x.send('GET','/reviews/'+create.id+'/image?fileId='+file,x.alice);
+  assert.equal(video.status,404,'video cannot use the owner image endpoint');
+  const missing=await x.send('GET','/reviews/'+create.id+'/image?fileId=OTHER_IMAGE_12345678',x.alice);
+  assert.equal(missing.status,404,'unselected image cannot be downloaded');
+  assert.equal((await x.send('POST','/reviews/'+create.id+'/close',x.alice)).status,200);
+  assert.equal((await x.send('GET',pathname,x.alice)).status,404);
+});
 test('public video media uses signed range tickets and stops immediately after review closure',async t=>{
   const x=await integration(t);
   const {id,published}=await createAndPublish(x);
