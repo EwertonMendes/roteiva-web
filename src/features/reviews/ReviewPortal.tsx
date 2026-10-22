@@ -280,7 +280,7 @@ export function ReviewPortal({token}:{token:string}){
                   <iframe className="review-private-preview-pdf" src={previewUrl}
                     title={"Prévia PDF de "+active.name} sandbox="allow-scripts" referrerPolicy="no-referrer"/>}
                 {active&&previewMode==="ready"&&active.mimeType.startsWith("audio/")&&
-                  <div className="review-private-preview-audio"><FileAudio size={32}/><audio controls controlsList="nodownload noremoteplayback" disableRemotePlayback src={previewUrl}
+                  <div className="review-private-preview-audio"><FileAudio size={32}/><audio controls controlsList="nodownload noremoteplayback" src={previewUrl}
                     onError={()=>{setPreviewError("Este áudio não pôde ser reproduzido. Peça ao profissional uma versão compatível.");setMediaMode("error");}}/></div>}
                 {previewMode==="error"&&<div className="review-private-preview-error" role="alert">
                   <FileImage size={26}/><strong>Não foi possível mostrar a prévia</strong>
