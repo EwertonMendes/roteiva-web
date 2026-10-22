@@ -92,11 +92,12 @@ export function AppSelect({
       const rect = triggerRef.current?.getBoundingClientRect();
       if (!rect) return;
       const gap = 5, edge = 8, maxVisible = 312;
+      const desiredHeight = Math.min(maxVisible, options.length * 42 + 12);
       const width = Math.min(Math.max(rect.width, 180), window.innerWidth - edge * 2);
       const below = window.innerHeight - rect.bottom - gap - edge;
       const above = rect.top - gap - edge;
-      const up = below < Math.min(maxVisible, 180) && above > below;
-      const height = Math.max(72, Math.min(maxVisible, up ? above : below));
+      const up = below < Math.min(desiredHeight, 180) && above > below;
+      const height = Math.max(48, Math.min(desiredHeight, up ? above : below));
       setPlacement({
         top: up ? Math.max(edge, rect.top - gap - height) : Math.min(window.innerHeight - edge, rect.bottom + gap),
         left: Math.max(edge, Math.min(rect.left, window.innerWidth - width - edge)),
@@ -113,7 +114,7 @@ export function AppSelect({
       window.removeEventListener("scroll", align, true);
       window.visualViewport?.removeEventListener("resize", align);
     };
-  }, [open]);
+  }, [open, options.length]);
 
   useEffect(() => {
     if (!open) return;
