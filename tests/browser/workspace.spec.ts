@@ -64,7 +64,7 @@ test("Google emulator session, CRUD, restoration, themes and separate users",asy
   await navigate(page,"Projetos");
   await page.locator(".heading-actions").getByRole("button",{name:"Criar projeto",exact:true}).click();
   await page.getByLabel("Nome do projeto",{exact:true}).fill("Filme Aurora");
-  await chooseAppSelect(page, page.locator("form.project-modal .rt-select:has(input[name="clientId"]) .rt-select-trigger"), {label:"Estúdio Aurora"});
+  await chooseAppSelect(page, page.locator('form.project-modal .rt-select:has(input[name="clientId"]) .rt-select-trigger'), {label:"Estúdio Aurora"});
   await page.locator("form.project-modal").getByRole("button",{name:"Criar projeto",exact:true}).click();await settled(page);
   const taskField=page.getByLabel("Nova tarefa",{exact:true});
   // Mobile: ensure the checklist below the long project form is actually in view.
