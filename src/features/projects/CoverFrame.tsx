@@ -1,4 +1,4 @@
-import {Minus,Plus,RotateCcw} from 'lucide-react';
+import {ZoomToolbar} from '../../components/ZoomToolbar';
 import {useEffect,useRef,useState,type CSSProperties} from 'react';
 import type {ProjectCover} from '../../domain/workspace';
 import {coverGeometry,coverGesture,transformCover,type CoverPoint} from './cover-geometry';
@@ -51,12 +51,10 @@ export function CoverFrame({src,cover,onChange}:{src:string;cover:ProjectCover;o
   }}>
   <img src={src} alt="" draggable={false} style={style} onLoad={e=>setImage({src,width:e.currentTarget.naturalWidth,height:e.currentTarget.naturalHeight})}/>
   {onChange&&<><span className="pc-crop-grid" aria-hidden="true"/>
-   <div className="pc-crop-toolbar" role="group" aria-label="Ajustar enquadramento" onPointerDown={e=>e.stopPropagation()}>
-    <button type="button" aria-label="Diminuir zoom" title="Diminuir zoom" disabled={cover.zoom<=1} onClick={()=>emit(transform(cover,cover.zoom/1.15,{x:size.width/2,y:size.height/2}))}><Minus size={18}/></button>
-    <output aria-label="Zoom da capa" aria-live="off">{Math.round(cover.zoom*100)}%</output>
-    <button type="button" aria-label="Aumentar zoom" title="Aumentar zoom" disabled={cover.zoom>=3} onClick={()=>emit(transform(cover,cover.zoom*1.15,{x:size.width/2,y:size.height/2}))}><Plus size={18}/></button>
-    <span className="pc-toolbar-divider"/>
-    <button type="button" aria-label="Redefinir enquadramento" title="Redefinir enquadramento" onClick={()=>emit({...cover,x:50,y:50,zoom:1})}><RotateCcw size={17}/></button>
-   </div></>}
+   <ZoomToolbar className="pc-crop-toolbar" value={cover.zoom} min={1} max={3}
+     label="Zoom da capa" decreaseLabel="Diminuir zoom" increaseLabel="Aumentar zoom" resetLabel="Redefinir enquadramento"
+     onDecrease={()=>emit(transform(cover,cover.zoom/1.15,{x:size.width/2,y:size.height/2}))}
+     onIncrease={()=>emit(transform(cover,cover.zoom*1.15,{x:size.width/2,y:size.height/2}))}
+     onReset={()=>emit({...cover,x:50,y:50,zoom:1})}/></>}
  </div>;
 }
