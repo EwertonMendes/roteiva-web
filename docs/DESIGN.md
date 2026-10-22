@@ -75,3 +75,5 @@ O modal de capa mantém altura padrão de 760 px, limitada à altura disponível
 ## Barra lateral e perfil
 
 Uma única lista sob “Espaço de trabalho”: Visão geral, Projetos, Clientes, Aprovações, Financeiro, Calendário, Biblioteca e Configurações. Não mostrar o grupo Ferramentas, Atividades ou Aparência como itens de navegação. O botão de reticências junto ao perfil abre menu flutuante com alternância claro/escuro e saída da conta. Garantir foco visível, Tab, Escape e fechamento ao clicar fora. Preservar as cores originais das logos de cada tema; não aplicar filtros monocromáticos à marca.
+
+O menu do perfil permanece aberto durante a alternância de tema. No modo escuro usa superfície elevada (#242426) e borda visível (#48484c). Entrada: painel sobe 10 px com fade; ações sobem em sequência a partir da opção inferior. Saída inverte o movimento e a sequência. Durações curtas (140–220 ms, com pequenos atrasos); respeitar prefers-reduced-motion, sem deslocamento.

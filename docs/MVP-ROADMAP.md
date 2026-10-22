@@ -575,3 +575,7 @@ Evidências: api/tests/deletion-access.test.mjs (negativa para conta sem provisi
 ## Simplificação da barra lateral
 
 **IMPLEMENTADO:** logos originais sem filtros que eliminavam o verde do “i”; lista única de rotas sem Ferramentas, Atividades ou Aparência; menu do perfil com tema e logout. Histórico disponível somente no dashboard e fechado na mudança de rota. Evidências: `SidebarAccountMenu.tsx`, `dashboard-client.tsx`, estilos de marca e `tests/browser/sidebar.spec.ts`; helpers de tema/logout atualizados. TypeScript, testes de domínio e builds validados; resultados visuais e de navegação/conta registrados na PR. Sem alteração de API, modelos ou regras.
+
+## Refinamento do menu do perfil
+
+**IMPLEMENTADO:** alternância de tema mantém o menu aberto; logout continua fechando. Superfície e borda com contraste próprio no modo escuro. Entrada/saída com fade e deslocamento, ações escalonadas de baixo para cima na entrada e ordem inversa na saída, suporte a movimento reduzido e reabertura durante o fechamento. Evidências: `SidebarAccountMenu.tsx`, `sidebar-account-menu.css` e `tests/browser/sidebar.spec.ts`; validações registradas na PR. Sem mudança de dados ou serviços.
