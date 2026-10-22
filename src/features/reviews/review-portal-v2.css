@@ -203,3 +203,37 @@
 
 
 .review-approval-progress { margin:10px 0 0; font-size:.84rem; color:var(--muted); }
+
+
+/* Private files are rendered by Roteiva after verified Google authentication,
+   never by the cross-site Drive sign-in iframe. Respect the portal theme. */
+.review-portal-stage.is-private { background:var(--r-soft); color:var(--r-ink); }
+.review-portal-stage.is-private .review-private-preview-state,
+.review-portal-stage.is-private .review-private-preview-error {
+  width:100%;height:100%;min-height:180px;padding:22px;
+  text-align:center;color:var(--r-ink);background:var(--r-soft);
+}
+.review-private-preview-state {display:grid;place-content:center;justify-items:center;gap:13px;font-size:.86rem}
+.review-portal-stage.is-private .review-private-preview-image {
+  display:block;width:100%;height:100%;object-fit:contain;
+  background:var(--r-soft);
+}
+.review-portal-stage.is-private .review-private-preview-pdf {
+  display:block;width:100%;height:100%;border:0;background:white;
+}
+.review-private-preview-audio {
+  display:grid;width:100%;height:100%;place-content:center;justify-items:center;
+  gap:18px;color:var(--r-muted);padding:24px;
+}
+.review-private-preview-audio audio { width:min(100%,430px);max-width:100%; }
+.review-private-preview-error {
+  display:grid;place-content:center;justify-items:center;gap:11px;
+  color:var(--r-ink);font-size:.86rem;line-height:1.5;
+}
+.review-private-preview-error strong {font-size:1.02rem;color:var(--r-ink);}
+.review-private-preview-error p {margin:0;color:var(--r-muted);max-width:440px;overflow-wrap:anywhere}
+.review-private-preview-error button {
+  margin-top:8px;background:var(--r-cta);color:var(--r-cta-text);
+  padding:10px 16px;border:0;border-radius:10px;font-weight:700;cursor:pointer;
+}
+.review-private-preview-error button:hover {opacity:.88}
