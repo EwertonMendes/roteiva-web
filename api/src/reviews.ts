@@ -235,7 +235,7 @@ async function createReview(request:Request,env:Env,uid:string):Promise<Response
   const mode:Mode=data.mode==='link'?'link':data.mode==='google'?'google':(()=>{throw new ApiError(400,'review_invalid_input');})();
   const email=inputText(data.recipientEmail||'',200).toLowerCase();
   const people=parseParticipants(data.participants,mode,email);
-  const shareDirect=mode==='google'&&data.driveShareEnabled===true?1:0;
+  const shareDirect=data.driveShareEnabled===true?1:0;
   const restrict=shareDirect&&data.restrictExistingPublic===true?1:0;
   const days=integer(data.expiresInDays);
   if(!days||days>30)throw new ApiError(400,'review_invalid_input');
