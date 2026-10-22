@@ -63,3 +63,7 @@ Textos de interface devem explicar o benefício, o estado confirmado e a próxim
 ## Layout das telas internas
 
 A barra global de estúdio, busca e ações e a faixa “Seu espaço / Dados na nuvem” foram removidas do layout compartilhado. As telas começam pelo conteúdo; a busca fica em Projetos e Clientes. No celular, um botão no conteúdo abre o menu lateral. Atividades, tema e configurações continuam na lateral. O aviso de demonstração e os alertas reais de sincronização permanecem.
+
+## Cards de Projetos — 21/10/2026
+
+Layout inspirado no mockup aprovado: painel arredondado com filtros, contagem de resultados, cards com título, cliente, situação, progresso e rodapé de prazo/tipo. Manter Clapperboard, Eye, Wrench e BadgeCheck com azul, amarelo, roxo e verde. Sem Drive conectado, não reservar área de fotografia nem mostrar edição de capa. Com capa disponível, mídia 2,5:1, ações legíveis sobre a imagem e edição por arraste/controles de teclado. Claro/escuro, filtros roláveis no celular e foco visível são obrigatórios.

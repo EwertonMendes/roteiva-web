@@ -1,3 +1,4 @@
+import {ProjectsView} from "./features/projects/ProjectsView";
 "use client";
 
 import {
@@ -8,7 +9,7 @@ import {
   MoreHorizontal, Pencil, Plus, ReceiptText, Search, Sun, Trash2,
   UserRoundPlus, Users, WalletCards, X, Upload, Image as ImageIcon,
   FileVideo, FileAudio, FileText, HardDrive, ChevronLeft, Settings2,
-  LayoutGrid, UsersRound, Repeat2, ContactRound, type LucideIcon,
+  UsersRound, Repeat2, ContactRound, type LucideIcon,
 } from "lucide-react";
 import { ProjectDetail, ClientDetail, StudioReviews, WorkspaceTools, FinancePanel, projectTemplates } from "./studio-features";
 import {ReviewsDashboard} from "./features/reviews/ReviewsDashboard";
@@ -519,7 +520,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
           {view === "settings" && <SettingsPage profile={profile} email={email} photoURL={photoURL} theme={theme} toggleTheme={toggleTheme} onSaveProfile={onSaveProfile} />}
           {view === "overview" && <TodayStudio clients={clientList} projects={projects} entries={financeEntries} events={calendarEvents} activities={activities} onView={changeView} onOpenActivity={() => setActivityOpen(true)} overviewMetrics={overviewMetrics} />}
           {view === "projects" && (selectedProject && projects.some(p => p.id === selectedProject) ? <ProjectDetail project={projects.find(p => p.id === selectedProject)!} clients={clientList} entries={financeEntries} assets={libraryAssets} events={calendarEvents} onSave={updateProject} onBack={() => changeView("projects")} onRevenue={addLinkedRevenue} onUpload={uploadAssets} onEvent={(p) => { openEvent(null, p.dueDate); }} uploading={uploading} onReview={()=>{setReviewStart({clientId:projects.find(p=>p.id===selectedProject)?.clientId,projectId:selectedProject||undefined});changeView("reviews");}} /> : <ProjectsView projects={filtered.map(p => ({...p, files: libraryAssets.filter(a => a.projectId === p.id).length}))}
-                  statusFilter={statusFilter} setStatusFilter={(status)=>{
+                  onSaveCover={(id,cover)=>{const project=projects.find(p=>p.id===id);if(project)updateProject({...project,cover});}} statusFilter={statusFilter} setStatusFilter={(status)=>{
                     setStatusFilter(status);
                     onProjectStatus?.(status);
                   }} onOpen={openProject}
@@ -628,26 +629,6 @@ function ProjectRow({ project, onOpen }: { project: Project; onOpen: () => void 
     <StatusBadge status={project.status} /><div className="progress-cell"><span><i style={{ width: `${project.progress}%` }} /></span><small>{project.progress}%</small></div>
     <div className="due-cell"><small>Prazo</small><b>{project.due}</b></div><ChevronRight size={16} />
   </button>;
-}
-
-function ProjectsView({ projects, statusFilter, setStatusFilter, onOpen, total, hasMore, onMore }: {
-  onOpen:(id:number)=>void;projects:Project[];statusFilter:Status|"Todos";
-  setStatusFilter:(status:Status|"Todos")=>void;total?:number;hasMore?:boolean;onMore?:()=>void;
-}) {
-  const filters: (Status | "Todos")[] = ["Todos", "Em produção", "Em aprovação", "Ajustes", "Aprovado"];
-  return <div className="panel full-panel">
-    <div className="filter-bar"><div className="filter-pills">{filters.map((filter) =>
-      <button key={filter} type="button" className={statusFilter === filter ? "active" : ""}
-        aria-pressed={statusFilter === filter} onClick={() => setStatusFilter(filter)}>
-        <IconLabel icon={filter === "Todos" ? LayoutGrid : PROJECT_STATUS_ICONS[filter]} size={16}>{filter}</IconLabel>
-      </button>)}</div><span className="field-hint">{total!==undefined&&total>projects.length?`${projects.length} de ${total}`:`${projects.length}`} projetos encontrados</span></div>
-    <div className="project-cards">{projects.map((project) => <article className="project-card" key={project.id} onClick={() => onOpen(project.id)}>
-      <div className={`project-cover ${project.color}`}><span className="cover-grid" /><BrandAvatar initials={project.initials} color={project.color} large /><button aria-label={`Abrir projeto ${project.name}`} onClick={(e) => { e.stopPropagation(); onOpen(project.id); }}><ChevronRight size={17} /></button><em><Film size={14} /> {project.files} arquivos</em></div>
-      <div className="project-card-copy"><StatusBadge status={project.status} /><h3>{project.name}</h3><p>{project.client}</p><div className="card-progress"><span><i style={{ width: `${project.progress}%` }} /></span><b>{project.progress}%</b></div><footer><span><CalendarDays size={14} /> {project.due}</span><span>{project.template || "Produção"}</span></footer></div>
-    </article>)}</div>
-    {!projects.length && <div className="empty-state"><FolderOpen size={28} /><h3>Nenhum projeto cadastrado</h3><p>Use o botão “Criar projeto” para iniciar sua primeira produção.</p></div>}
-    {hasMore&&<div className="modal-actions"><button className="secondary-button" type="button" onClick={onMore}>Carregar mais projetos <ChevronDown size={16}/></button></div>}
-  </div>;
 }
 
 function ClientsView({ clients, onOpen, onAdd,totalCount,recurringCount,activeProjectsCount,hasMore,onMore }: {

@@ -45,7 +45,6 @@ button, [role="button"] { touch-action: manipulation; }
 .app-shell .panel-head h2,
 .app-shell .studio-section h2,
 .app-shell .flow-overview-head h2 { font-size: var(--type-section); line-height: var(--type-leading-tight); }
-.app-shell .project-card h3,
 .app-shell .comments-head h2,
 .app-shell .settings-section-head h3 { font-size: var(--type-card); line-height: var(--type-leading-tight); }
 .app-shell .eyebrow,
@@ -75,7 +74,6 @@ button, [role="button"] { touch-action: manipulation; }
 .app-shell .sidebar nav > button { min-height: 2.75rem; }
 .app-shell .page-heading > div,
 .app-shell .project-name,
-.app-shell .project-card-copy,
 .app-shell .asset-copy,
 .app-shell .client-contact-meta,
 .app-shell .panel-head > div { min-width: 0; }
@@ -83,7 +81,6 @@ button, [role="button"] { touch-action: manipulation; }
 .app-shell .client-list button > div b,
 .app-shell .asset-copy b { font-size: var(--type-body); font-weight: var(--type-weight-semibold); line-height: var(--type-leading-ui); }
 .app-shell .project-name small,
-.app-shell .project-card-copy p,
 .app-shell .asset-copy small,
 .app-shell .asset-copy > span,
 .app-shell .comment header small { font-size: var(--type-support); line-height: var(--type-leading-meta); }
@@ -152,7 +149,6 @@ button, [role="button"] { touch-action: manipulation; }
 :root { --muted: #626262; }
 :root[data-theme="dark"] { --muted: #b5b5b5; }
 .app-shell .project-name small,
-.app-shell .project-card-copy p,
 .app-shell .metric-grid article small,
 .app-shell .metric-grid article > span,
 .app-shell .client-contact-meta small,
