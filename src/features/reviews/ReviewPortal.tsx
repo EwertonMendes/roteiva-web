@@ -29,7 +29,6 @@ const messages:Record<string,string>={
   rate_limited:"Muitas tentativas. Tente novamente em instantes."
 };
 function reviewFileURL(id:string){return "https://drive.google.com/file/d/"+encodeURIComponent(id)+"/view";}
-function previewURL(id:string){return "https://drive.google.com/file/d/"+encodeURIComponent(id)+"/preview";}
 function FileGlyph({mime}:{mime:string}){
   if(mime.startsWith("video/"))return <FileVideo size={18}/>;
   if(mime.startsWith("image/"))return <FileImage size={18}/>;
@@ -51,13 +50,13 @@ export function ReviewPortal({token}:{token:string}){
   const [selected,setSelected]=useState(0),[name,setName]=useState(""),[body,setBody]=useState("");
   const [minutes,setMinutes]=useState(""),[busy,setBusy]=useState(false),[decision,setDecision]=useState<"approved"|"changes"|null>(null);
   const [decisionText,setDecisionText]=useState(""),[notice,setNotice]=useState("");
-  const [mediaUrl,setMediaUrl]=useState(""),[mediaMode,setMediaMode]=useState<"loading"|"native"|"drive"|"private"|"private-error">("loading");
-  const [previewProgress,setPreviewProgress]=useState(0),[previewError,setPreviewError]=useState("");
+  const [mediaUrl,setMediaUrl]=useState(""),[mediaMode,setMediaMode]=useState<"loading"|"ready"|"error">("loading");
+  const [previewError,setPreviewError]=useState("");
   const [previewRetry,setPreviewRetry]=useState(0);
   const [playhead,setPlayhead]=useState(0),[duration,setDuration]=useState<number|null>(null);
-  const [mediaFailure,setMediaFailure]=useState(false);
   const [videoExpanded,setVideoExpanded]=useState(false);
   const loadedVersion=useRef(0),videoRef=useRef<HTMLVideoElement>(null),commentRef=useRef<HTMLTextAreaElement>(null);
+  const playbackResume=useRef({at:0,playing:false});
   const dialogRef=useOverlayFocus(()=>{if(!busy)setDecision(null);},!!decision);
   const request=useCallback(async<T,>(path:string,method:"GET"|"POST"="GET",payload?:unknown):Promise<T>=>{
     const auth=user?await user.getIdToken():null;
@@ -106,72 +105,39 @@ export function ReviewPortal({token}:{token:string}){
   const isVideo=active?.mimeType.startsWith("video/")??false;
   const activeFileId=active?.fileId;
   const activeVersion=data?.review.version;
-  const privateGoogle=data?.review.mode==="google";
   const activeMime=active?.mimeType;
   useEffect(()=>{
-    let alive=true,blobUrl="";
-    const controller=new AbortController();
-    setMediaUrl("");setMediaFailure(false);setPlayhead(0);setDuration(null);
-    setVideoExpanded(false);
-    setPreviewProgress(0);setPreviewError("");
-    setMediaMode(privateGoogle||isVideo?"loading":"drive");
-    if(!activeFileId||!activeVersion||!activeMime)return;
-    if(privateGoogle){
-      // Avoid Google's third-party-cookie-dependent iframe. Every file chunk
-      // is authorized against the verified Google identity by the Worker.
-      void (async()=>{
-        if(!user)throw new Error("Entre com sua conta Google autorizada para visualizar.");
-        const parts:ArrayBuffer[]=[];
-        const max=96*1024*1024;
-        let offset=0,total=0;
-        do{
-          const auth=await user.getIdToken();
-          const response=await fetch(API+"/reviews/public/file",{
-            method:"POST",cache:"no-store",referrerPolicy:"no-referrer",signal:controller.signal,
-            headers:{"Content-Type":"application/json","X-Review-Token":token,"Authorization":"Bearer "+auth},
-            body:JSON.stringify({fileId:activeFileId,version:activeVersion,offset})
-          });
-          if(!response.ok){
-            const body=await response.json().catch(()=>({})) as {error?:{code?:string}};
-            if(response.status===401||response.status===403)
-              throw new Error("Acesso não autorizado. Entre novamente com a conta Google permitida.");
-            if(body.error?.code==="review_version_changed"||response.status===404)
-              throw new Error("Este material mudou ou não está mais disponível. Atualize a revisão.");
-            throw new Error("Não foi possível carregar o arquivo com segurança. Tente novamente.");
-          }
-          const match=/^bytes (\d+)-(\d+)\/(\d+)$/.exec(response.headers.get("Content-Range")||"");
-          if(response.status!==206||!match)throw new Error("O Drive enviou uma resposta inválida para a prévia.");
-          const start=Number(match[1]),end=Number(match[2]),length=Number(match[3]);
-          if(start!==offset||end<start||!Number.isSafeInteger(length)||length<1||length>max)
-            throw new Error(length>max
-              ?"Este arquivo é grande demais para a prévia integrada. Abra-o no Google Drive."
-              :"A prévia recebida é inválida. Tente novamente.");
-          total=length;
-          const bytes=await response.arrayBuffer();
-          if(bytes.byteLength!==end-start+1||offset+bytes.byteLength>max)
-            throw new Error("Não foi possível validar o conteúdo retornado pelo Drive.");
-          parts.push(bytes);offset+=bytes.byteLength;
-          if(alive)setPreviewProgress(Math.min(100,Math.round(100*offset/total)));
-        }while(offset<total&&!controller.signal.aborted);
-        if(!alive||controller.signal.aborted)return;
-        blobUrl=URL.createObjectURL(new Blob(parts,{type:activeMime}));
-        setMediaUrl(blobUrl);setMediaMode("private");
-      })().catch(err=>{
-        if(alive&&!controller.signal.aborted){
-          setPreviewError(err instanceof Error?err.message:"Não foi possível abrir a prévia.");
-          setMediaMode("private-error");
+    let alive=true;
+    let renewal:ReturnType<typeof setTimeout>|undefined;
+    const issue=async(refresh=false)=>{
+      if(!activeFileId||!activeVersion)return;
+      if(refresh&&videoRef.current){
+        playbackResume.current={at:videoRef.current.currentTime,playing:!videoRef.current.paused};
+      }
+      try{
+        const ticket=await request<{url:string;expiresAt:number}>("/reviews/public/media-ticket","POST",
+          {fileId:activeFileId,version:activeVersion});
+        if(!alive)return;
+        if(!ticket.url.startsWith(API+"/reviews/media?ticket="))
+          throw new Error("Endereço de mídia inválido.");
+        setMediaUrl(ticket.url);setMediaMode("ready");setPreviewError("");
+        if(isVideo){
+          const delay=Math.max(30000,Math.min(9*60000,ticket.expiresAt-Date.now()-120000));
+          renewal=setTimeout(()=>void issue(true),delay);
         }
-      });
-    }else if(isVideo){
-      void request<{url:string;expiresAt:number}>("/reviews/public/media-ticket","POST",
-        {fileId:activeFileId,version:activeVersion}).then(ticket=>{
-        if(alive&&ticket.url.startsWith(API+"/reviews/media?ticket=")){setMediaUrl(ticket.url);setMediaMode("native");}
-        else if(alive){setMediaMode("drive");setMediaFailure(true);}
-      }).catch(()=>{if(alive){setMediaMode("drive");setMediaFailure(true);}});
-    }
-    return()=>{alive=false;controller.abort();if(blobUrl)URL.revokeObjectURL(blobUrl);};
-  },[activeFileId,activeVersion,activeMime,isVideo,privateGoogle,request,user,token,previewRetry]);
-  const playableVideo=isVideo&&(mediaMode==="native"||mediaMode==="private");
+      }catch(e){
+        if(!alive)return;
+        // Keep an already playing video visible after a transient renewal failure.
+        if(!refresh){setMediaMode("error");setPreviewError(e instanceof Error?e.message:"Não foi possível carregar.");}
+        else renewal=setTimeout(()=>void issue(true),30000);
+      }
+    };
+    setMediaMode("loading");setMediaUrl("");setPreviewError("");setPlayhead(0);setDuration(null);
+    setVideoExpanded(false);playbackResume.current={at:0,playing:false};
+    if(activeFileId&&activeVersion&&activeMime)void issue();
+    return()=>{alive=false;if(renewal)clearTimeout(renewal);};
+  },[activeFileId,activeVersion,activeMime,isVideo,request,previewRetry]);
+  const playableVideo=isVideo&&mediaMode==="ready";
   useEffect(()=>{
     if(!videoExpanded)return;
     const prev=document.body.style.overflow;
@@ -256,44 +222,48 @@ export function ReviewPortal({token}:{token:string}){
         <div className="review-portal-layout">
           <div className="review-portal-maincolumn">
             <section className="review-portal-review" aria-label="Material para avaliar">
-              <div className={"review-portal-stage"+(privateGoogle?" is-private":"")+
-                (privateGoogle&&active?.mimeType.startsWith("image/")?" is-image":"")+
+              <div className={"review-portal-stage"+(mediaMode==="ready"?" is-private":"")+
+                (active?.mimeType.startsWith("image/")?" is-image":"")+
                 (playableVideo?" is-playable-video":"")+
                 (videoExpanded?" is-video-expanded":"")}>
                 {mediaMode==="loading"&&<div className="review-media-state review-private-preview-state" role="status">
                   <LoaderCircle className="rl-spin" size={25}/>
-                  {privateGoogle?("Carregando arquivo com acesso seguro… "+(previewProgress?previewProgress+"%":"")):"Preparando reprodução…"}
+                  "Preparando visualização segura…"
                 </div>}
                 {playableVideo&&<video ref={videoRef} key={activeFileId}
                   controls playsInline preload="metadata" src={mediaUrl} aria-label={"Reproduzir "+active?.name}
                   onTimeUpdate={e=>setPlayhead(e.currentTarget.currentTime)}
-                  onLoadedMetadata={e=>setDuration(Number.isFinite(e.currentTarget.duration)?e.currentTarget.duration:null)}
-                  onError={()=>{if(privateGoogle){setPreviewError("Este vídeo não pôde ser reproduzido neste navegador. Abra-o no Google Drive.");setMediaMode("private-error");}else{setMediaFailure(true);setMediaMode("drive");}}}/>}
+                  onLoadedMetadata={e=>{
+                    const player=e.currentTarget;
+                    setDuration(Number.isFinite(player.duration)?player.duration:null);
+                    const resume=playbackResume.current;
+                    if(resume.at>0){player.currentTime=resume.at;playbackResume.current={at:0,playing:false};
+                      if(resume.playing)void player.play().catch(()=>{});
+                    }
+                  }}
+                  onError={()=>{setPreviewError("Este vídeo não pode ser reproduzido pelo codec disponível no navegador. Utilize outro formato compatível ou abra o original no Drive.");setMediaMode("error");}}/>}
                 {playableVideo&&<button className="review-video-fullscreen" type="button"
                   title={videoExpanded?"Fechar vídeo ampliado":"Ampliar vídeo"}
                   aria-label={videoExpanded?"Fechar vídeo ampliado":"Ampliar vídeo"}
                   onClick={()=>setVideoExpanded(v=>!v)}>{videoExpanded?"Fechar tela cheia":"Ampliar vídeo"}</button>}
-                {active&&mediaMode==="private"&&!isVideo&&active.mimeType.startsWith("image/")&&
+                {active&&mediaMode==="ready"&&!isVideo&&active.mimeType.startsWith("image/")&&
                   <PrivateImageViewer key={active.fileId} src={mediaUrl} name={active.name}
                     onError={()=>{setPreviewError("O navegador não conseguiu exibir esta imagem. Abra-a no Google Drive.");setMediaMode("private-error");}}/>}
-                {active&&mediaMode==="private"&&active.mimeType==="application/pdf"&&
+                {active&&mediaMode==="ready"&&active.mimeType==="application/pdf"&&
                   <iframe className="review-private-preview-pdf" src={mediaUrl}
                     title={"Prévia PDF de "+active.name} sandbox="allow-scripts allow-downloads"/>}
-                {active&&mediaMode==="private"&&active.mimeType.startsWith("audio/")&&
+                {active&&mediaMode==="ready"&&active.mimeType.startsWith("audio/")&&
                   <div className="review-private-preview-audio"><FileAudio size={32}/><audio controls src={mediaUrl}
                     onError={()=>{setPreviewError("Este áudio não pôde ser reproduzido. Abra-o no Google Drive.");setMediaMode("private-error");}}/></div>}
-                {mediaMode==="private-error"&&<div className="review-private-preview-error" role="alert">
+                {mediaMode==="error"&&<div className="review-private-preview-error" role="alert">
                   <FileImage size={26}/><strong>Não foi possível mostrar a prévia</strong>
                   <p>{previewError}</p>
                   <button type="button" onClick={()=>setPreviewRetry(n=>n+1)}>Tentar novamente</button>
                 </div>}
-                {active&&mediaMode==="drive"&&!privateGoogle&&<iframe key={active.fileId} title={"Prévia de "+active.name}
-                  src={previewURL(active.fileId)} referrerPolicy="no-referrer" allow="fullscreen"
-                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation"/>}
                 {!active&&<p>Nenhum material disponível.</p>}
               </div>
               <div className="review-portal-stage-footer">
-                <div><strong>{active?.name}</strong><small>{playableVideo?"Player com marcação de instantes":privateGoogle?"Visualização segura no Roteiva":"Prévia fornecida pelo Google Drive"}</small></div>
+                <div><strong>{active?.name}</strong><small>{playableVideo?"Player com marcação de instantes":"Visualização segura no Roteiva"}</small></div>
                 {active&&<a href={reviewFileURL(active.fileId)} target="_blank" rel="noreferrer">
                   <ExternalLink size={15}/> Abrir no Drive</a>}
               </div>
@@ -305,10 +275,6 @@ export function ReviewPortal({token}:{token:string}){
                 <button type="button" className="review-capture-button" onClick={markNow}>
                   <Pause size={16}/> Marcar este instante e comentar</button>
               </div>}
-            {mediaFailure&&isVideo&&<p className="review-portal-hint" role="status">
-              Este vídeo está usando a prévia do Drive, que não permite ler o tempo exato.
-              Você pode informar o minuto manualmente no comentário ou abrir o arquivo no Drive.
-            </p>}
             <nav className="review-portal-assets" aria-label="Arquivos da aprovação">
               <div className="review-portal-assets-label"><span>Materiais para revisar</span><span>{data.assets.length} arquivos</span></div>
               {data.assets.map((a,i)=><button type="button" key={a.fileId} aria-current={i===selected}
