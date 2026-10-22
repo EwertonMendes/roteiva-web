@@ -579,3 +579,7 @@ Evidências: api/tests/deletion-access.test.mjs (negativa para conta sem provisi
 ## Refinamento do menu do perfil
 
 **IMPLEMENTADO:** alternância de tema mantém o menu aberto; logout continua fechando. Superfície e borda com contraste próprio no modo escuro. Entrada/saída com fade e deslocamento, ações escalonadas de baixo para cima na entrada e ordem inversa na saída, suporte a movimento reduzido e reabertura durante o fechamento. Evidências: `SidebarAccountMenu.tsx`, `sidebar-account-menu.css` e `tests/browser/sidebar.spec.ts`; validações registradas na PR. Sem mudança de dados ou serviços.
+
+## Permanência do menu ao salvar tema na conta
+
+**IMPLEMENTADO:** preferências de tema salvam sem tornar a interface inert; gravações de negócio preservam o bloqueio existente. Removidos toast de tema e indicador flutuante para essa preferência. Fila, tratamento de erro e persistência continuam ativos. Regressão em `tests/browser/workspace.spec.ts` cobre três alternâncias com conta conectada, foco e painel após confirmação e tema persistido no reload; `sidebar.spec.ts` verifica ausência de toast no demo. A regressão reproduziu o fechamento da versão anterior; resultados da correção registrados na PR.

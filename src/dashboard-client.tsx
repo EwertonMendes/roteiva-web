@@ -246,7 +246,6 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     if (isDemo) { try { localStorage.setItem("roteiva-theme", next); } catch { /* Theme still works in memory. */ } }
     else onThemeChange?.(next);
     document.documentElement.setAttribute("data-theme", next);
-    notify(next === "dark" ? "Modo escuro ativado" : "Modo claro ativado");
   }
 
   const notify = useCallback((message: string) => {
