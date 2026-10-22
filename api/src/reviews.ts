@@ -169,7 +169,12 @@ function selected(value:unknown):Selection[]{
 async function validatedAssets(env:Env,uid:string,token:string,projectId:number,list:Selection[],id:string,version:number){
   const result:Asset[]=[];
   for(const item of list){
-    const meta=await checkedFile(env,uid,token,projectId,item);
+    let meta:Awaited<ReturnType<typeof checkedFile>>;
+    try{meta=await checkedFile(env,uid,token,projectId,item);}
+    catch(error){
+      if(error instanceof ApiError)error.asset={fileId:item.fileId};
+      throw error;
+    }
     result.push({review_id:id,version,file_id:item.fileId,connection_id:item.connectionId,
       linked_folder_id:item.linkedFolderId,name:meta.name,mime_type:meta.mimeType,permission_id:null,grant_state:'unshared'});
   }
@@ -386,14 +391,9 @@ async function grantGoogle(env:Env,r:Review,a:Asset,validation:CheckedAsset):Pro
   if(a.grant_state!=='unshared'&&a.grant_state!=='granting')throw new ApiError(409,'review_grant_conflict');
   const row=await connection(env,r.owner_uid,a.connection_id);
   let existing=await permissions(env,row,a.file_id);
-  // Check inherited access before modifying *any* direct user ACL.
-  if(validation.inheritsPublic){
-    for(const parent of validation.ancestors){
-      const list=await permissions(env,row,parent);
-      if(list.some(p=>p.type==='anyone'||p.type==='domain'||p.type==='group'))
-        throw new ApiError(409,'review_inherited_public_permission');
-    }
-  }
+  // Portal identity restrictions are independent from Google Drive ACLs.
+  // A public parent is NOT a reason to block a Google-authenticated Roteiva review.
+  // Never modify inherited permissions: they can also serve other projects/links.
   const directPublic=existing.filter(p=>p.type==='anyone');
   if(directPublic.length&&r.restrict_existing_public===1){
     // Explicit opt-in: changing these public ACLs affects *all* Drive links.
@@ -404,10 +404,26 @@ async function grantGoogle(env:Env,r:Review,a:Asset,validation:CheckedAsset):Pro
     for(const p of directPublic)await mutatePermission(env,row,a.file_id,'DELETE',undefined,p.id);
     existing=await permissions(env,row,a.file_id);
   }
-  if(existing.some(p=>p.type==='anyone'||p.type==='domain'||p.type==='group'))
-    throw new ApiError(409,'review_existing_public_permission');
   const people=await participants(env,r.id);
   if(!people.length||!people.some(p=>p.role==='reviewer'))throw new ApiError(409,'review_reviewer_required');
+
+  // Anyone-with-link access might belong to the file itself or a public parent.
+  // It already permits opening the original in Drive. Do not create redundant
+  // per-account ACLs or take ownership of the user's public permissions.
+  // Authentication and reviewer/viewer roles remain enforced in the Roteiva portal.
+  let inheritedAnyone=false;
+  if(validation.inheritsPublic&&!existing.some(p=>p.type==='anyone')){
+    for(const parent of validation.ancestors){
+      const acl=await permissions(env,row,parent);
+      if(acl.some(p=>p.type==='anyone')){inheritedAnyone=true;break;}
+    }
+  }
+  if(inheritedAnyone||existing.some(p=>p.type==='anyone')){
+    const granted=await env.DB.prepare("UPDATE review_assets SET grant_state='granted',permission_id=NULL WHERE review_id=? AND version=? AND file_id=? AND grant_state IN ('unshared','granting') AND EXISTS(SELECT 1 FROM review_requests WHERE id=? AND status='publishing' AND current_version=?)")
+      .bind(r.id,a.version,a.file_id,r.id,a.version).run();
+    if(granted.meta.changes!==1)throw new ApiError(409,'review_busy');
+    return;
+  }
   if(a.grant_state==='unshared'){
     const started=await env.DB.prepare("UPDATE review_assets SET grant_state='granting' WHERE review_id=? AND version=? AND file_id=? AND grant_state='unshared'")
       .bind(r.id,a.version,a.file_id).run();
@@ -494,7 +510,10 @@ async function revokeGoogle(env:Env,r:Review,a:Asset):Promise<void>{
 
 async function grantLocked(env:Env,r:Review,a:Asset,validation:CheckedAsset):Promise<void>{
   if(r.drive_share_enabled===0){
-    if(!validation.appAuthorized)throw new ApiError(409,'review_drive_file_authorization_required');
+    // The chosen asset was already verified as readable via the owner's Drive
+    // connection and linked project folder. isAppAuthorized can be false for
+    // public/inherited files even though Roteiva can read/stream them; no Drive
+    // permission mutation is necessary in portal-only mode.
     const updated=await env.DB.prepare("UPDATE review_assets SET grant_state='granted',permission_id=NULL WHERE review_id=? AND version=? AND file_id=? AND grant_state IN ('unshared','granting') AND EXISTS(SELECT 1 FROM review_requests WHERE id=? AND status='publishing' AND current_version=?)")
       .bind(r.id,a.version,a.file_id,r.id,a.version).run();
     if(updated.meta.changes!==1&&a.grant_state!=='granted')throw new ApiError(409,'review_busy');
@@ -632,7 +651,13 @@ async function publish(request:Request,env:Env,r:Review):Promise<Response>{
     .bind(now(),r.id,r.owner_uid).run();
   const files=await assets(env,r.id,r.current_version);
   if(!files.length)throw new ApiError(409,'review_invalid_state');
-  for(const file of files)await grant(env,r,file,bearer);
+  for(const file of files){
+    try{await grant(env,r,file,bearer);}
+    catch(error){
+      if(error instanceof ApiError)error.asset={fileId:file.file_id,fileName:file.name};
+      throw error;
+    }
+  }
   const published=await env.DB.prepare("UPDATE review_requests SET status='pending',updated_at=? WHERE id=? AND owner_uid=? AND status='publishing' AND current_version=? AND expires_at>? AND NOT EXISTS(SELECT 1 FROM review_assets WHERE review_id=? AND version=? AND grant_state!='granted')")
     .bind(now(),r.id,r.owner_uid,r.current_version,now(),r.id,r.current_version).run();
   if(published.meta.changes!==1)throw new ApiError(409,'review_busy');
