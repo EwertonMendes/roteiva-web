@@ -1,3 +1,4 @@
+import { AppSelect } from "../ui/AppSelect";
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {ArrowLeft,Check,LoaderCircle,ChevronDown,Search,Trash2,X} from 'lucide-react';
 import type {Project,ProjectCover} from '../../domain/workspace';
@@ -37,7 +38,7 @@ export function CoverEditor({project,onClose,onSave}:{project:Project;onClose:()
   <header><div><span className="eyebrow">CAPA DO PROJETO</span><h2 id="pc-editor-title">{choosing?'Escolha uma imagem':'Encontre o melhor enquadramento'}</h2><p>{project.name}</p></div><button className="icon-button" type="button" onClick={onClose} aria-label="Fechar editor de capa"><X size={20}/></button></header>
   <div className={"pc-editor-body "+(choosing?"pc-editor-body--picker":"pc-editor-body--crop")}>
    {choosing?<>
-    <div className="pc-picker-tools"><label>Conta do Drive<select value={account} onChange={e=>{setAccount(e.target.value);setPage({files:[],nextPageToken:null});setMoreToken('');}}>{context.connections.map(c=><option key={c.id} value={c.id}>{c.google_email}</option>)}</select></label><label className="pc-image-search"><span>Buscar imagens no Drive</span><div><Search size={18}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Nome da imagem" maxLength={100}/></div></label></div>
+    <div className="pc-picker-tools"><label>Conta do Drive<AppSelect aria-label="Conta do Drive" value={account} onValueChange={value=>{setAccount(value);setPage({files:[],nextPageToken:null});setMoreToken('');}}>{context.connections.map(c=><option key={c.id} value={c.id}>{c.google_email}</option>)}</AppSelect></label><label className="pc-image-search"><span>Buscar imagens no Drive</span><div><Search size={18}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Nome da imagem" maxLength={100}/></div></label></div>
     <p className="pc-helper">JPG, PNG, WebP ou AVIF de até 8 MB. O arquivo permanece privado no seu Drive.</p>
     {!canRead?<p role="status">Autorize a leitura do Drive na <a href="/biblioteca">Biblioteca</a> para escolher suas imagens.</p>:<>
      <div className="pc-picker-results" aria-busy={busy}>
