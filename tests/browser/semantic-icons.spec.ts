@@ -1,3 +1,4 @@
+import { chooseAppSelect } from "./select-helpers";
 import { test, expect, type Page } from "./fixtures";
 
 const app = "http://127.0.0.1:4173";
@@ -52,9 +53,30 @@ test("semantic icon labels remain accessible, responsive and functional", async 
   await page.goto(app + "/financeiro");
   await expect(page.locator(".finance-filters label > .ui-icon-label svg[aria-hidden='true']")).toHaveCount(4);
   await expect(page.locator(".finance-metrics article .finance-metric-label svg[aria-hidden='true']")).toHaveCount(4);
-  await expect(page.locator(".finance-filters select")).toHaveCount(4);
-  await page.locator(".finance-filters select").nth(3).selectOption({ label: "Recebido" });
-  await expect(page.locator(".finance-filters select").nth(3)).toHaveValue("Recebido");
+  await expect(page.locator(".finance-filters .rt-select-trigger")).toHaveCount(4);
+  await chooseAppSelect(page, page.locator(".finance-filters .rt-select-trigger").nth(3), { label: "Recebido" });
+  await expect(page.locator(".finance-filters .rt-select-trigger").nth(3)).toContainText("Recebido");
+  // Popup is app-styled, accessible and stays inside the viewport on both devices.
+  const statusControl = page.getByRole("combobox", { name: "Situação" });
+  await statusControl.press("Enter");
+  const popup = page.getByRole("listbox");
+  await expect(popup).toBeVisible();
+  await expect(page.getByRole("option", { name: "Recebido" })).toHaveAttribute("aria-selected", "true");
+  const fits = await popup.evaluate(element => {
+    const bounds = element.getBoundingClientRect();
+    return bounds.left >= 0 && bounds.right <= innerWidth + 1 && bounds.top >= 0 && bounds.bottom <= innerHeight + 1;
+  });
+  expect(fits).toBe(true);
+  await statusControl.press("ArrowDown");
+  await statusControl.press("Escape");
+  await expect(statusControl).toHaveAttribute("aria-expanded", "false");
+  await expect(statusControl).toContainText("Recebido"); // Escape does not commit.
+  await statusControl.press("Enter");
+  await statusControl.press("Home");
+  await statusControl.press("ArrowDown");
+  await statusControl.press("Enter");
+  await expect(statusControl).toContainText("Recebido");
+
   await expect(page.locator(".revenue-chart-panel .ui-icon-label svg[aria-hidden='true']")).toHaveCount(1);
   await expect(page.locator(".finance-side .ui-icon-label svg[aria-hidden='true']")).toHaveCount(1);
 

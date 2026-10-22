@@ -8,6 +8,14 @@ Materiais mostram as pastas realmente vinculadas ao projeto no Drive. Adicionar/
 
 **Base visual preservada durante a migração para React/Vite em 16/10/2026.** Não redesenhar a UI ao introduzir Firebase/Auth/Drive sem uma demanda explícita.
 
+## Select compartilhado (22/10/2026 · PR #85)
+
+- O controle único `AppSelect` em `src/features/ui/` substitui os `select` nativos dos fluxos internos. Opções continuam declarativas via `<option>`, sem lógica de DOM duplicada nas páginas. Valor controlado: `value` + `onValueChange(string)`; formulários não controlados: `defaultValue` e `name` com campo oculto para `FormData`.
+- O trigger e as opções usam tokens `--ink`, `--muted`, `--line`, `--paper` e `--subtle`, com os mesmos estados em claro/escuro. Menu em portal para não ser cortado por `overflow` de cartões/modais, com posição adaptada ao espaço disponível. Ícone ChevronDown/Check via Lucide.
+- Acessibilidade: função combobox/listbox/option, label explícito, foco visível, Tab natural, Escape, setas, Home/End, Enter/Espaço e busca pelo início do nome. Itens desabilitados não são selecionáveis. Não adicionar estilos particulares de menus em páginas.
+- Seletores de formulário preservam a semântica de `name`, os mesmos IDs/valores de negócio e isolamento por usuário; a UI não interfere em queries, APIs ou regras de segurança.
+- Teste em Chromium desktop/mobile e temas claro/escuro; testes E2E escolhem opções visíveis via `chooseAppSelect`, nunca via `selectOption` nativo. Homologação visual em DEV permanece uma etapa distinta de compilação.
+
 ## Tipografia e cores
 
 - Família **Ubuntu**, arquivos locais em `public/fonts/ubuntu/` e licença de redistribuição UFL.
@@ -19,7 +27,7 @@ Materiais mostram as pastas realmente vinculadas ao projeto no Drive. Adicionar/
 
 - Abertura com marca e cursor decorativo estão em `src/site-experience.tsx` e `src/site-experience.css`.
 - A abertura nunca deve prender a pessoa; há saída de segurança e suporte a `prefers-reduced-motion`.
-- Cursor personalizado somente em dispositivos com mouse e sobre elementos compatíveis; campos, selects e vídeos preservam comportamento nativo.
+- Cursor personalizado somente em dispositivos com mouse e sobre elementos compatíveis; campos de texto, vídeos e editores marcados com `data-native-cursor` preservam comportamento nativo. Dropdowns, opções e modais comuns mantêm o cursor personalizado acima de seu conteúdo, sem bloquear cliques; telas touch e movimento reduzido seguem usando cursor/gestos nativos.
 - Desktop e mobile têm navegação adaptada; manter contraste, foco visível, teclado, textos completos e modais com rolagem adequada.
 
 ## Código e arquivos de estilo
@@ -43,7 +51,7 @@ Textos de interface devem explicar o benefício, o estado confirmado e a próxim
 - `src/features/ui/project-status.ts` define uma só correspondência entre estado e ícone; **Todos = grade, Em produção = claquete, Em aprovação = olho, Ajustes = ferramenta, Aprovado = selo de aprovação**.
 - Filtros de projetos declaram `aria-pressed` e mantêm texto visível; chips de status não acumulam ponto decorativo e ícone.
 - Clientes: ícones discretos em indicadores superiores, cabeçalho da carteira e links de telefone/e-mail na ficha; as células continuam majoritariamente textuais.
-- Financeiro: filtros recebem ícones no label (nunca dentro das opções nativas), indicadores numéricos recebem símbolo secundário, alerta de atraso e cabeçalhos de gráficos/tabela.
+- Financeiro: filtros recebem ícones no label (sem poluir a lista de opções), indicadores numéricos recebem símbolo secundário, alerta de atraso e cabeçalhos de gráficos/tabela.
 - Configurações: evitar redundância com ícones existentes; labels de identificação e armazenamento local usam símbolos específicos. Diagnóstico técnico não integra a interface do cliente.
 - Tamanhos usuais: filtros 16px, indicadores 18–19px, etiquetas 14–16px, cabeçalhos 16–20px; traço coerente, ritmo de 6–8px e cores herdadas do tema.
 - CSS em `src/features/ui/semantic-icons.css`, carregado depois da camada tipográfica; respeitar layouts responsivos e `prefers-reduced-motion`.

@@ -39,6 +39,7 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+  pull-requests: read
 concurrency:
   group: frontend-dev-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -65,7 +66,7 @@ jobs:
           pnpm build
           node scripts/verify-static-build.mjs dist /
       - name: Reuse validated SPA output
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch')
         uses: actions/upload-artifact@v4
         with:
           name: roteiva-frontend-dist
@@ -75,7 +76,7 @@ jobs:
   deploy:
     name: Deploy Firebase Hosting DEV
     needs: validate
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     timeout-minutes: 3
     environment: firebase-development
@@ -97,14 +98,38 @@ jobs:
         with:
           name: roteiva-frontend-dist
           path: dist/
-      - name: Guard project and stale commit
+      - name: Guard DEV project, exact commit and explicit manual PR promotion
         env:
           CONFIGURED_PROJECT: ${{ vars.FIREBASE_PROJECT_ID }}
+          GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
           test "$CONFIGURED_PROJECT" = "roteiva-web-dev"
-          test "$(git ls-remote origin refs/heads/master | cut -f1)" = "$GITHUB_SHA" || {
-            echo "Outdated SHA: skip stale DEV deploy"; exit 1;
+          test "$GITHUB_REF_TYPE" = "branch"
+          branch="${GITHUB_REF#refs/heads/}"
+          test "$GITHUB_REF" = "refs/heads/$branch"
+          test "$(git ls-remote origin "refs/heads/$branch" | cut -f1)" = "$GITHUB_SHA" || {
+            echo "Ref changed since build: refuse stale DEV deploy"; exit 1;
           }
+          if [ "$branch" != "master" ]; then
+            test "$GITHUB_EVENT_NAME" = "workflow_dispatch" || {
+              echo "Only an explicit manual dispatch can publish a PR to DEV"; exit 1;
+            }
+            owner="${GITHUB_REPOSITORY%%/*}"
+            prs="$(gh api "repos/$GITHUB_REPOSITORY/pulls?state=open&head=$owner:$branch&per_page=100")"
+            echo "$prs" | jq -e --arg repo "$GITHUB_REPOSITORY" --arg branch "$branch" --arg sha "$GITHUB_SHA" '
+              any(.[];
+                .state == "open"
+                and .base.ref == "master"
+                and .head.repo.full_name == $repo
+                and .head.ref == $branch
+                and .head.sha == $sha
+              )
+            ' >/dev/null || {
+              echo "Only a current, open and same-repo PR targeting master can be manually published to DEV"; exit 1;
+            }
+            echo "Explicit manual DEV Hosting promotion authorized for current PR commit."
+          fi
       - name: Require deployed access Worker before integrated frontend
         run: node scripts/check-access-worker.mjs
       - uses: google-github-actions/auth@v3

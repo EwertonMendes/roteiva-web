@@ -1,3 +1,4 @@
+import { AppSelect } from "../ui/AppSelect";
 import {useCallback,useEffect,useMemo,useRef,useState} from "react";
 import {createPortal} from "react-dom";
 import {AlertTriangle,Check,ChevronLeft,ChevronRight,ExternalLink,Folder,LoaderCircle,Plus,Search,Send,ShieldCheck,X} from "lucide-react";
@@ -323,10 +324,10 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
     <div className="reviews-toolbar">
       <label className="reviews-search"><Search size={16}/><input aria-label="Buscar aprovações" placeholder="Cliente, projeto ou material" value={search}
         onChange={e=>{setSearch(e.target.value);setPage(0);}}/></label>
-      <select aria-label="Filtrar aprovações" value={status} onChange={e=>{setStatus(e.target.value);setPage(0);}}>
+      <AppSelect aria-label="Filtrar aprovações" value={status} onValueChange={value=>{setStatus(value);setPage(0);}}>
         <option value="">Todas as situações</option>
         {(["draft","pending","changes","approved","closed"] as const).map(s=><option key={s} value={s}>{statusText[s]}</option>)}
-      </select>
+      </AppSelect>
       <button className="primary-button" onClick={newReview}><Plus size={16}/> Nova aprovação</button>
     </div>
     {error&&<div className="reviews-warning" role="alert">{error}<button aria-label="Dispensar mensagem" onClick={()=>setError("")}><X size={14}/></button></div>}
@@ -386,20 +387,20 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
           {error&&<p className="reviews-warning" role="alert">{error}</p>}
           {(replacement||composerStep==="details")&&<div className="review-fields">
             <label>Cliente
-              <select disabled={!!replacement} value={clientId} onChange={e=>{
-                const id=Number(e.target.value);setClientId(id);setProjectId(0);setFiles([]);setSelectedFolder(null);
+              <AppSelect aria-label="Cliente" disabled={!!replacement} value={clientId} onValueChange={value=>{
+                const id=Number(value);setClientId(id);setProjectId(0);setFiles([]);setSelectedFolder(null);
                 setRecipient(clients.find(c=>c.id===id)?.email||"");
-              }}><option value={0}>Selecionar cliente</option>{clients.map(c=><option value={c.id} key={c.id}>{c.name}</option>)}</select></label>
+              }}><option value={0}>Selecionar cliente</option>{clients.map(c=><option value={c.id} key={c.id}>{c.name}</option>)}</AppSelect></label>
             <label>Projeto
-              <select disabled={!!replacement} value={projectId} onChange={e=>{
-                setProjectId(Number(e.target.value));setFiles([]);setSelectedFolder(null);setTrail([]);setItems([]);
-              }}><option value={0}>Selecionar projeto</option>{relevantProjects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
+              <AppSelect aria-label="Projeto" disabled={!!replacement} value={projectId} onValueChange={value=>{
+                setProjectId(Number(value));setFiles([]);setSelectedFolder(null);setTrail([]);setItems([]);
+              }}><option value={0}>Selecionar projeto</option>{relevantProjects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</AppSelect></label>
             {!replacement&&<>
               <label>Título da aprovação<input maxLength={180} required value={title} onChange={e=>setTitle(e.target.value)} placeholder="Ex.: Primeiro corte da campanha"/></label>
               <label>Mensagem (opcional)<textarea maxLength={1500} rows={2} value={message} onChange={e=>setMessage(e.target.value)} placeholder="O que o cliente deve avaliar?"/></label>
-              <label>Tipo de acesso<select value={mode} onChange={e=>{setMode(e.target.value as Mode);setShareDirect(false);setRestrictPublic(false);}}>
+              <label>Tipo de acesso<AppSelect aria-label="Tipo de acesso" value={mode} onValueChange={value=>{setMode(value as Mode);setShareDirect(false);setRestrictPublic(false);}}>
                 <option value="link">Acesso por link de aprovação</option><option value="google">Acesso restrito com conta Google</option>
-              </select></label>
+              </AppSelect></label>
               {mode==="link"?<p className="reviews-info">Quem receber o link poderá revisar os materiais pelo Roteiva, sem precisar entrar com Google. O Roteiva cria apenas o acesso necessário para exibir os materiais; permissões públicas existentes no Drive não são alteradas.</p>:
                 <div className="review-participants-config">
                   <h3>Participantes Google</h3>
@@ -436,9 +437,9 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
                   </label>}
                   <p className="review-sharing-footnote">O acesso à aprovação é protegido por conta Google mesmo se o Drive original for público. Para tornar os arquivos originais privados, ajuste também as permissões no Drive.</p>
                 </div>}
-              <label>Validade<select value={days} onChange={e=>setDays(Number(e.target.value))}>
+              <label>Validade<AppSelect aria-label="Validade" value={days} onValueChange={value=>setDays(Number(value))}>
                 <option value={7}>7 dias</option><option value={14}>14 dias</option><option value={30}>30 dias</option>
-              </select></label>
+              </AppSelect></label>
             </>}
             {chosenClient&&!relevantProjects.length&&<p className="reviews-muted">Este cliente ainda não possui projetos vinculados.</p>}
           </div>}

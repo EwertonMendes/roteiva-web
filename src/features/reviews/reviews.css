@@ -6,8 +6,8 @@
 .reviews-toolbar .primary-button{margin-left:auto}
 .reviews-search{display:flex;align-items:center;gap:10px;flex:1;min-width:190px;border:1px solid var(--line,#dedede);border-radius:12px;padding:0 12px;background:var(--card,#fff);color:var(--muted)}
 .reviews-search input{border:0!important;background:transparent!important;min-width:0;flex:1;padding:12px 0!important;box-shadow:none!important;color:var(--ink)}
-.reviews-toolbar select,.review-fields select,.review-fields input,.review-fields textarea,.review-portal input,.review-portal textarea{border:1px solid var(--line,#dedede);border-radius:11px;padding:11px 12px;background:var(--card,#fff);color:var(--ink,#222);font:inherit;min-width:0;width:100%}
-.reviews-toolbar select{width:auto}
+.review-fields input,.review-fields textarea,.review-portal input,.review-portal textarea{border:1px solid var(--line,#dedede);border-radius:11px;padding:11px 12px;background:var(--card,#fff);color:var(--ink,#222);font:inherit;min-width:0;width:100%}
+
 .reviews-list{background:var(--card,#fff);border:1px solid var(--line,#dedede);border-radius:18px;overflow:hidden}
 .reviews-list-item{width:100%;background:none;border:0;border-bottom:1px solid var(--line,#eee);padding:17px 20px;display:flex;align-items:center;gap:14px;color:var(--ink,#222);cursor:pointer;text-align:left;transition:background .2s}
 .reviews-list-item:last-child{border-bottom:0}.reviews-list-item:hover{background:var(--subtle,#f8f8f8)}
@@ -101,7 +101,7 @@
 .review-portal-confirm>textarea,.review-portal-confirm>label{width:100%}.review-portal-confirm .review-portal-buttons{width:100%;justify-content:flex-end}
 @media(max-width:700px){
  .reviews-summary{gap:7px}.reviews-stat{padding:13px 10px;border-radius:12px}.reviews-stat span{font-size:.67rem}.reviews-stat strong{font-size:1.35rem}
- .reviews-toolbar{display:grid;grid-template-columns:1fr}.reviews-toolbar select{width:100%}.reviews-toolbar .primary-button{margin:0}
+ .reviews-toolbar{display:grid;grid-template-columns:1fr}.reviews-toolbar .primary-button{margin:0}
  .reviews-list-item{padding:14px 11px;gap:9px}.reviews-list-copy strong{font-size:.84rem}.reviews-list-copy small{font-size:.7rem}
  .reviews-status{font-size:.66rem;padding:5px 7px}.reviews-list-item>.reviews-status{max-width:100px;white-space:normal;text-align:center}
  .reviews-initial{width:34px;height:34px;font-size:.72rem}

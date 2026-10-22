@@ -10,6 +10,16 @@
 
 Esta é a fonte de verdade sobre **como o sistema deverá funcionar**. O acompanhamento do que já foi entregue fica no [roadmap](MVP-ROADMAP.md); instruções operacionais em [desenvolvimento](DEVELOPMENT.md). Mudanças de arquitetura e decisões novas devem atualizar este arquivo **no mesmo PR**, conforme [AGENTS.md](../AGENTS.md).
 
+## Homologação de frontend em DEV sem merge (22/10/2026)
+
+**Decisão tomada:** o workflow Frontend DEV permite disparo manual para uma branch de PR aberto, da mesma origem e com base master. Somente o Hosting do Firebase `roteiva-web-dev` é atualizado, com identidade do ambiente protegido e verificações prévias de branch/SHA, PR, Worker de acesso e cache de rotas. Deploy automatizado de `master` continua restrito a `master`; pull requests não executam deploy por padrão. Firestore, D1, Worker, regras e índices não são afetados. A implantação manual pode ser substituída pela próxima publicação automática da master; o PR continua isolado até aprovação.
+
+## Contrato de componentes de formulário — seleção reutilizável (22/10/2026)
+
+**Decisão tomada (PR #85):** componentes de seleção simples do frontend utilizam `src/features/ui/AppSelect.tsx` e `AppSelect.css`, em vez de delegarem a lista interna ao `<select>` do sistema operacional. O componente recebe `<option>` como dados declarativos, suporta `value`/`onValueChange(string)` ou `defaultValue`; quando `name` é informado, um input oculto espelha o valor para leitura por `FormData`, sem emitir eventos sintéticos falsos. Os IDs, enums e números convertidos no domínio continuam responsabilidade de cada tela.
+
+A lista acessível é montada via portal no `body` para escapar do recorte em painéis e modais, mas o foco de teclado fica no trigger; `aria-controls`, `aria-activedescendant`, `role=listbox` e `role=option` expressam a seleção. Escape/Tab, rolagem, resize e redução de movimento são tratados na camada de UI. Cores e estados ficam no design system, não nas páginas. Não há nova dependência de terceiros, persistência, permissão, regra Firestore, acesso Drive ou mudança de API. Em futuros formulários que demandem validação HTML nativa `required`, assegurar validação semântica explícita antes de depender desse atributo.
+
 ## 1. Objetivo e princípios
 
 O Roteiva é um SaaS para profissionais audiovisuais que precisam gerir clientes, produções, prazos, receitas/despesas, arquivos, versões e revisões.
@@ -428,7 +438,7 @@ Separação de manutenção por criticidade: exclusões e revogações de Drive/
 
 No navegador, capas só aparecem com conexão ativa, carregam ao se aproximarem da área visível e têm no máximo três downloads concorrentes. URLs de objeto são revogadas ao trocar imagem, projeto ou conta. O editor mantém rascunho local até Salvar; arraste, roda do mouse, pinça (Pointer Events) e gestos nativos do Safari compartilham a mesma geometria proporcional (formato 2,5:1). O zoom preserva a âncora sob o cursor/centro dos dedos; coordenadas e zoom continuam com os mesmos limites persistidos. Sliders foram removidos; botões compactos e teclado oferecem alternativas acessíveis. Diálogo nativo garante foco modal e Escape. Falhas não são substituídas por fotos fictícias.
 
-**Decisão de cursor:** diálogos nativos usam o cursor do sistema. O efeito decorativo permanece na camada da página e não deve ocultar o cursor sobre `dialog:modal`, inclusive quando um modal abre com o ponteiro parado. CSS e detecção do alvo cobrem abertura e movimentação, sem tentar ultrapassar a top layer com z-index.
+**Decisão de cursor (atualizada em 22/10/2026):** o cursor personalizado do shell cobre dropdowns e overlays por um z-index maior, com `pointer-events:none`. Quando o ponteiro entra num `dialog:modal` **não especializado**, o cursor é renderizado via React portal dentro do diálogo, respeitando a top layer real do navegador (z-index do `body` sozinho não a ultrapassa). Elementos de texto, vídeo e diálogos de imagem marcados com `data-native-cursor` preservam o cursor nativo para seleção, recorte e arraste. Touch e `prefers-reduced-motion` permanecem nativos; nenhuma alteração de persistência, acesso ou eventos de negócio.
 
 **Estados de carregamento do editor:** o shell tem dimensões independentes da quantidade de imagens e do estado da rede. A lista rola em um contêiner próprio; a prévia conserva a proporção da capa. O mesmo indicador acessível (`role=status`) representa download inicial e busca da lista, sem modificar contratos de API ou persistência. O debounce de busca não limpa resultados quando o termo não mudou.
 

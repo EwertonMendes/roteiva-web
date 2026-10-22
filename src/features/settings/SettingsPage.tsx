@@ -1,3 +1,4 @@
+import { AppSelect } from "../ui/AppSelect";
 import { useEffect, useState, type FormEvent } from "react";
 import { ArrowUpRight, Check, Cloud, LockKeyhole, Moon, ShieldCheck, Sun, UserRound, Video, Info, Building2, BriefcaseBusiness, AlertTriangle } from "lucide-react";
 import type { ProfileChanges, ProfessionalType, RoteivaProfile } from "../../data/firestore-workspace";
@@ -89,9 +90,9 @@ export function SettingsPage({profile,email,photoURL,theme,toggleTheme,onSavePro
           <input aria-label="Nome do estúdio ou marca" maxLength={120} autoComplete="organization" value={studio} placeholder="Ex.: Estúdio Aurora" onChange={e=>{setStudio(e.target.value);setFeedback(null);}} disabled={!onSaveProfile||busy}/>
         </label>
         <label className="settings-field"><span><IconLabel icon={BriefcaseBusiness}>Tipo de atuação</IconLabel></span>
-          <select aria-label="Tipo de atuação" value={occupation} onChange={e=>{setOccupation(e.target.value as ProfessionalType);setFeedback(null);}} disabled={!onSaveProfile||busy}>
+          <AppSelect aria-label="Tipo de atuação" value={occupation} onValueChange={value=>{setOccupation(value as ProfessionalType);setFeedback(null);}} disabled={!onSaveProfile||busy}>
             {occupations.map(item=><option key={item.value} value={item.value}>{item.label}</option>)}
-          </select>
+          </AppSelect>
         </label>
       </div>
       {!onSaveProfile&&<p className="settings-note"><Info size={15}/> Na demonstração, suas alterações ficam apenas neste navegador. Entre na sua conta para personalizar seu perfil.</p>}

@@ -1,3 +1,4 @@
+import { chooseAppSelect } from "./select-helpers";
 import {test,expect,type Page} from "./fixtures";
 const cloud="http://127.0.0.1:4173";
 async function googlePopup(page:Page,email:string,existing=false) {
@@ -63,7 +64,7 @@ test("Google emulator session, CRUD, restoration, themes and separate users",asy
   await navigate(page,"Projetos");
   await page.locator(".heading-actions").getByRole("button",{name:"Criar projeto",exact:true}).click();
   await page.getByLabel("Nome do projeto",{exact:true}).fill("Filme Aurora");
-  await page.locator("form.project-modal select[name=clientId]").selectOption({label:"Estúdio Aurora"});
+  await chooseAppSelect(page, page.locator('form.project-modal .rt-select:has(input[name="clientId"]) .rt-select-trigger'), {label:"Estúdio Aurora"});
   await page.locator("form.project-modal").getByRole("button",{name:"Criar projeto",exact:true}).click();await settled(page);
   const taskField=page.getByLabel("Nova tarefa",{exact:true});
   // Mobile: ensure the checklist below the long project form is actually in view.
@@ -162,7 +163,7 @@ test("Account and studio settings persist without changing existing projects",as
   await expect(page.getByLabel("E-mail de acesso")).toHaveValue(email);
   await page.getByLabel("Nome profissional",{exact:true}).fill("Direção Criativa");
   await page.getByLabel("Nome do estúdio ou marca",{exact:true}).fill("Estúdio dos Crias");
-  await page.getByLabel("Tipo de atuação").selectOption("producer");
+  await chooseAppSelect(page, page.getByLabel("Tipo de atuação"), "producer");
   await page.getByRole("button",{name:"Salvar alterações"}).click();
   await expect(page.getByRole("status").filter({hasText:"Perfil e estúdio salvos na nuvem."})).toBeVisible();
   await expect(page.getByLabel("Nome do estúdio ou marca",{exact:true})).toHaveValue("Estúdio dos Crias");
@@ -175,7 +176,7 @@ test("Account and studio settings persist without changing existing projects",as
   await navigate(page,"Configurações");
   await expect(page.getByLabel("Nome profissional",{exact:true})).toHaveValue("Direção Criativa");
   await expect(page.getByLabel("Nome do estúdio ou marca",{exact:true})).toHaveValue("Estúdio dos Crias");
-  await expect(page.getByLabel("Tipo de atuação")).toHaveValue("producer");
+  await expect(page.getByRole("combobox",{name:"Tipo de atuação"})).toContainText("Produtora");
   await expect(page.locator("html")).toHaveAttribute("data-theme","dark");
   await expect(page.getByLabel("E-mail de acesso")).toHaveAttribute("readonly","");
   await navigate(page,"Projetos");

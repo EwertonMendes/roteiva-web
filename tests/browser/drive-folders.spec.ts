@@ -1,3 +1,4 @@
+import { chooseAppSelect } from "./select-helpers";
 import { test, expect, type Page } from "./fixtures";
 
 const cloud = "http://127.0.0.1:4173";
@@ -101,7 +102,7 @@ test("folder picker links multiple folders, explorer opens files in one click an
   const dialog=page.getByRole("dialog",{name:"Selecionar pastas do Google Drive"});
   await expect(dialog).toBeVisible();
   await expect(dialog.getByText(/Escolha um projeto para carregar suas pastas/)).toBeVisible();
-  await dialog.getByLabel("Projeto para vincular pastas").selectOption({label:"Projeto Drive Teste"});
+  await chooseAppSelect(page, dialog.getByLabel("Projeto para vincular pastas"), {label:"Projeto Drive Teste"});
   await expect(dialog.getByText("Campanha de vídeos")).toBeVisible();
   await dialog.getByRole("checkbox",{name:"Selecionar Campanha de vídeos"}).check();
   await dialog.getByRole("checkbox",{name:"Selecionar Documentos cliente"}).check();
@@ -143,7 +144,7 @@ test("mobile shows one navigation level and a full-height folder picker",async({
   const panel=page.getByRole("region",{name:"Biblioteca Google Drive"});
   await panel.getByRole("button",{name:"Vincular pasta",exact:true}).first().click();
   const dialog=page.getByRole("dialog",{name:"Selecionar pastas do Google Drive"});
-  await dialog.getByLabel("Projeto para vincular pastas").selectOption({label:"Projeto Drive Teste"});
+  await chooseAppSelect(page, dialog.getByLabel("Projeto para vincular pastas"), {label:"Projeto Drive Teste"});
   await dialog.getByRole("checkbox",{name:"Selecionar Campanha de vídeos"}).check();
   await dialog.getByRole("button",{name:"Vincular 1 pasta"}).click();
   await expect(dialog).toHaveCount(0);
@@ -168,7 +169,7 @@ test("private thumbnails show loading while pending and recover to image or icon
   const panel=page.getByRole("region",{name:"Biblioteca Google Drive"});
   await panel.getByRole("button",{name:"Vincular pasta",exact:true}).first().click();
   const dialog=page.getByRole("dialog",{name:"Selecionar pastas do Google Drive"});
-  await dialog.getByLabel("Projeto para vincular pastas").selectOption({label:"Projeto Drive Teste"});
+  await chooseAppSelect(page, dialog.getByLabel("Projeto para vincular pastas"), {label:"Projeto Drive Teste"});
   await dialog.getByRole("checkbox",{name:"Selecionar Campanha de vídeos"}).check();
   await dialog.getByRole("button",{name:"Vincular 1 pasta"}).click();
   await expect(dialog).toHaveCount(0);
@@ -194,7 +195,7 @@ test("grid cards keep media, names and menus inside separate non-overlapping tra
   const panel=page.getByRole("region",{name:"Biblioteca Google Drive"});
   await panel.getByRole("button",{name:"Vincular pasta",exact:true}).first().click();
   const dialog=page.getByRole("dialog",{name:"Selecionar pastas do Google Drive"});
-  await dialog.getByLabel("Projeto para vincular pastas").selectOption({label:"Projeto Drive Teste"});
+  await chooseAppSelect(page, dialog.getByLabel("Projeto para vincular pastas"), {label:"Projeto Drive Teste"});
   await dialog.getByRole("checkbox",{name:"Selecionar Campanha de vídeos"}).check();
   await dialog.getByRole("button",{name:"Vincular 1 pasta"}).click();
   await expect(dialog).toHaveCount(0);
@@ -271,7 +272,7 @@ test("upload uses file picker and drag-and-drop, confirms Drive and updates the 
   const panel=page.getByRole("region",{name:"Biblioteca Google Drive"});
   await panel.getByRole("button",{name:"Vincular pasta",exact:true}).first().click();
   const dialog=page.getByRole("dialog",{name:"Selecionar pastas do Google Drive"});
-  await dialog.getByLabel("Projeto para vincular pastas").selectOption({label:"Projeto Drive Teste"});
+  await chooseAppSelect(page, dialog.getByLabel("Projeto para vincular pastas"), {label:"Projeto Drive Teste"});
   await dialog.getByRole("checkbox",{name:"Selecionar Campanha de vídeos"}).check();
   await dialog.getByRole("button",{name:"Vincular 1 pasta"}).click();
   await expect(panel.getByRole("button",{name:"Enviar arquivos"})).toBeVisible();
@@ -305,7 +306,7 @@ async function openUploadFolder(page:Page,email:string){
   const panel=page.getByRole('region',{name:'Biblioteca Google Drive'});
   await panel.getByRole('button',{name:'Vincular pasta',exact:true}).first().click();
   const dialog=page.getByRole('dialog',{name:'Selecionar pastas do Google Drive'});
-  await dialog.getByLabel('Projeto para vincular pastas').selectOption({label:'Projeto Drive Teste'});
+  await chooseAppSelect(page, dialog.getByLabel('Projeto para vincular pastas'), {label:'Projeto Drive Teste'});
   await dialog.getByRole('checkbox',{name:'Selecionar Campanha de vídeos'}).check();
   await dialog.getByRole('button',{name:'Vincular 1 pasta'}).click();
   await expect(panel.getByRole('button',{name:'Enviar arquivos'})).toBeVisible();return panel;

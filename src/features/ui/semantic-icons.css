@@ -61,7 +61,7 @@
 }
 .app-shell .finance-filters label > .ui-icon-label svg { color: var(--muted); }
 .app-shell .finance-filters label,
-.app-shell .finance-filters label select { min-width: 0; }
+.app-shell .finance-filters label .rt-select { min-width: 0; }
 
 .app-shell .finance-metrics .finance-metric-label {
   display: flex;

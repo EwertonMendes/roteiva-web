@@ -1,3 +1,4 @@
+import { AppSelect } from "../ui/AppSelect";
 import { useState } from "react";
 import { Check, ChevronDown, FolderOpen, MoreHorizontal, Plus, ShieldCheck } from "lucide-react";
 import { DRIVE_FOLDER, DriveFileExplorer, DriveFolderPicker, type DriveItem, type DriveTrail } from "./DriveLibraryUI";
@@ -75,9 +76,9 @@ export function LibraryReviewDemo() {
     </header>
     <div className="rl-review-project">
       <label htmlFor="rl-review-project-select">Projeto</label>
-      <select id="rl-review-project-select" value={project} onChange={e=>changeProject(e.target.value)}>
+      <AppSelect id="rl-review-project-select" value={project} onValueChange={value=>changeProject(value)}>
         {projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
-      </select>
+      </AppSelect>
     </div>
     {notice&&<p className="rl-status" role="status"><Check size={16}/>{notice}<button type="button" className="rl-retry" onClick={()=>setNotice("")}>Fechar</button></p>}
     <div className="rl-explorer" data-mobile-detail={!!active}>

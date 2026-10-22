@@ -1,5 +1,23 @@
 # Roadmap vivo — Roteiva MVP
 
+## Cursor personalizado sobre selects e modais — 22/10/2026
+
+**VALIDADO AUTOMATICAMENTE E PUBLICADO NO DEV PRINCIPAL em 22/10/2026 pela PR #85; aceite visual do proprietário pendente.** O cursor decorativo do Roteiva foi mantido, recebeu prioridade de camada superior aos popovers do `AppSelect` e portal para o diálogo nativo ativo, evitando desaparecer atrás do menu ou da top layer. `pointer-events:none` preserva os cliques; campos de texto, vídeos e o editor de capas com `data-native-cursor` continuam usando o cursor do sistema, bem como dispositivos touch e preferência por movimento reduzido. Teste em `tests/browser/cursor-layer.spec.ts` valida dropdown, seleção com clique, posicionamento no modal e retorno à página; integrações e dados não mudam. [CI frontend verde](https://github.com/EwertonMendes/roteiva-web/actions/runs/39861461197), [QA específica aprovada (2 testes desktop)](https://github.com/EwertonMendes/roteiva-web/actions/runs/39861473928), e [Hosting DEV principal publicado com cache validado](https://github.com/EwertonMendes/roteiva-web/actions/runs/39861714239) no commit `6dc837b`. Apenas Hosting atualizado; Firestore, D1 e Worker inalterados. Sem merge.
+
+## Select acessível e reutilizável — 22/10/2026
+
+**VALIDADO AUTOMATICAMENTE E PUBLICADO NO HOSTING DEV PRINCIPAL em 22/10/2026 pela PR [#85](https://github.com/EwertonMendes/roteiva-web/pull/85), com homologação visual/autenticação Google real ainda pendente.** Sem merge; o frontend de master não é alterado. Componente `src/features/ui/AppSelect.tsx` e `AppSelect.css`, migrados filtros financeiros, formulários de projeto/receita/agenda, Biblioteca/Drive, aprovações e Configurações. Menus de opções seguem os temas e não dependem da aparência nativa do sistema.
+
+- [x] Isolar dropdown, estado, teclado, foco, portal/reposicionamento e tokens de tema em componente reutilizável.
+- [x] Preservar contratos de `FormData` por nome, valores existentes e seleção controlada, sem alterar o backend.
+- [x] Atualizar seletores e scripts Playwright que dependiam de `selectOption` nativo.
+- [x] Testar o fluxo em Chromium desktop/mobile com filtros, formulários, modal de capa, Drive, aprovações, navegação por teclado e posicionamento do menu.
+- [x] Publicar preview temporário de Hosting DEV do PR sem alterar a master, o banco ou o Worker.
+- [x] Publicar **o mesmo frontend no DEV principal**, https://roteiva-web-dev.web.app, via `workflow_dispatch` da branch, com guard de PR interno aberto, SHA, projeto, Worker e cache. [Workflow verde](https://github.com/EwertonMendes/roteiva-web/actions/runs/39859426623), commit de aplicação `3e4127e`. Somente Hosting foi publicado; Firestore, D1, Worker, regras e índices não foram alterados. Sem merge na master.
+- [ ] Homologação visual pelo proprietário em temas claro/escuro e login real Google no **DEV principal**. O preview temporário exibiu aviso de domínio não autorizado do Firebase Auth, por isso o PR foi publicado no domínio principal já utilizado pelo app. Testes automatizados não substituem o aceite com conta real.
+- Evidências: [frontend (commit `903aacd`)](https://github.com/EwertonMendes/roteiva-web/actions/runs/39846609584), [regressão completa com emuladores](https://github.com/EwertonMendes/roteiva-web/actions/runs/39857055864) (101 Playwright aprovados, 5 ignorados; 31 testes de regras Firestore e saga isolada D1/Firebase aprovados), e [preview Hosting DEV](https://github.com/EwertonMendes/roteiva-web/actions/runs/39857063804). Preview: https://roteiva-web-dev--pr-85-4uzdvlmd.web.app (válido até 29/10/2026). A validação automatizada usa emuladores/mocks e não comprova acesso Google real; publicação manual do Hosting principal DEV concluída e comprovada, sem merge e sem mudanças de banco/Worker. Não fazer merge sem aprovação.
+
+
 ## Melhoria dos detalhes do projeto — 22/10/2026
 
 **IMPLEMENTADO e PUBLICADO no DEV; validação automatizada concluída. Homologação Google real pelo proprietário pendente.** [PR #77](https://github.com/EwertonMendes/roteiva-web/pull/77), branch `codex/project-details-ux`, baseada na master `cadce49`, sem merge.

@@ -1,0 +1,127 @@
+/* One visual contract for selects: filters, forms, Drive overlays and review flows. */
+.rt-select {
+  display: inline-block;
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  vertical-align: middle;
+  font: inherit;
+}
+.rt-select .rt-select-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  min-height: 43px;
+  padding: 10px 12px 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--subtle);
+  color: var(--ink);
+  box-shadow: none;
+  font: inherit;
+  font-size: var(--type-support, .9rem);
+  font-weight: 450;
+  line-height: 1.35;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .16s ease, background-color .16s ease, box-shadow .16s ease;
+}
+.rt-select .rt-select-trigger:hover:not(:disabled) { border-color: var(--muted); }
+.rt-select .rt-select-trigger:focus-visible,
+.rt-select[data-open] .rt-select-trigger {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+.rt-select .rt-select-trigger:disabled {
+  cursor: not-allowed;
+  opacity: .55;
+}
+.rt-select .rt-select-value {
+  display: block;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rt-select .rt-select-placeholder { color: var(--muted); }
+.rt-select .rt-select-chevron {
+  flex: 0 0 auto;
+  opacity: .75;
+  transition: transform .18s ease;
+}
+.rt-select[data-open] .rt-select-chevron { transform: rotate(180deg); }
+.rt-select-menu {
+  z-index: 12000;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 16px 50px rgba(0,0,0,.22), 0 3px 14px rgba(0,0,0,.08);
+  font-family: Ubuntu, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: var(--type-support, .9rem);
+  line-height: 1.4;
+  animation: rt-select-appear .14s ease-out both;
+  scrollbar-width: thin;
+  scrollbar-color: var(--muted) transparent;
+}
+.rt-select-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 38px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  color: var(--ink);
+  cursor: pointer;
+  user-select: none;
+  transition: background-color .12s ease;
+}
+.rt-select-option[data-active] { background: var(--subtle); }
+.rt-select-option[data-selected] { font-weight: 600; }
+.rt-select-option[aria-disabled="true"] { opacity: .42; cursor: not-allowed; }
+.rt-select-option[aria-disabled="true"][data-active] { background: transparent; }
+.rt-select-option-label { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@keyframes rt-select-appear {
+  from { opacity: 0; transform: translateY(-3px) scale(.99); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.rt-select-check { flex: 0 0 auto; color: var(--ink); }
+
+/* Layout integration only; colors, states and popover styling remain centralized. */
+.heading-actions > .rt-select { width: min(190px, 55vw); flex: 0 1 190px; }
+.library-toolbar .rt-select, .rl-review-project .rt-select { width: min(240px, 100%); }
+.reviews-toolbar > .rt-select { width: auto; min-width: 190px; }
+.settings-field .rt-select-trigger { min-height: 49px; }
+.rl-picker-context .rt-select-trigger { min-height: 42px; }
+.project-detail .pd-stage .rt-select-trigger { padding-left: 43px; }
+.rl-account-panel .rt-select-trigger { min-height: 39px; }
+/* A filter beside a search field must not consume all available flex width. */
+.rowner-gallery-filters > .rt-select { flex: 0 0 150px; width: 150px; max-width: 48%; }
+.rowner-gallery-filters .rowner-gallery-search { flex: 1 1 0; min-width: 120px; }
+.project-detail .studio-form .rt-select-trigger { min-height: 48px; }
+@media (max-width: 700px) {
+  .rowner-gallery-filters > .rt-select { flex: 1 1 100%; max-width: 100%; width: 100%; }
+  .rowner-gallery-filters .rowner-gallery-search { flex: 1 1 100%; }
+}
+@media (max-width: 820px) {
+  .rt-select .rt-select-trigger { min-height: 44px; }
+  .project-modal .rt-select-trigger { min-height: 46px; }
+  .rt-select-option { min-height: 44px; }
+  .finance-filters .rt-select { width: 100%; }
+  .reviews-toolbar > .rt-select { width: 100%; min-width: 0; }
+  .rl-review-project .rt-select { width: min(240px, 70%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rt-select .rt-select-trigger, .rt-select .rt-select-chevron, .rt-select-option { transition: none; }
+  .rt-select-menu { animation: none; }
+}
