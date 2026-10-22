@@ -1,3 +1,4 @@
+import { chooseAppSelect } from "./select-helpers";
 import {test,expect,type Page} from './fixtures';
 import {initializeTestEnvironment} from '@firebase/rules-unit-testing';
 import {collection,doc,getDocs,query,setDoc,where,Timestamp} from 'firebase/firestore';
@@ -31,7 +32,7 @@ async function prepare(page:Page,email:string){
   await page.goto(root+'/projetos');
   await page.locator('.heading-actions').getByRole('button',{name:'Criar projeto',exact:true}).click();
   await page.getByLabel('Nome do projeto',{exact:true}).fill('Projeto Revisão');
-  await page.locator('form.project-modal select[name=clientId]').selectOption({label:'Cliente Revisão'});
+  await chooseAppSelect(page, page.locator('form.project-modal .rt-select:has(input[name="clientId"]) .rt-select-trigger'), {label:'Cliente Revisão'});
   await page.locator('form.project-modal').getByRole('button',{name:'Criar projeto',exact:true}).click();
   await expect(page.locator('[aria-busy]').first()).toHaveAttribute('aria-busy','false');
   const env=await initializeTestEnvironment({projectId:'demo-roteiva',firestore:{host:'127.0.0.1',port:8080}});
@@ -167,17 +168,17 @@ test('profissional cria, cliente comenta/pede ajustes, V2 aprovada e encerrament
   await expect(composer.getByText('Selecione um cliente.',{exact:true})).toBeVisible();
   await composer.getByRole('button',{name:'Selecionar materiais'}).click();
   await expect(composer.getByRole('alert')).toContainText('Selecione um cliente.');
-  await composer.getByRole('combobox',{name:'Cliente',exact:true}).selectOption({label:'Cliente Revisão'});
-  await composer.getByRole('combobox',{name:'Projeto',exact:true}).selectOption({label:'Projeto Revisão'});
+  await chooseAppSelect(page, composer.getByRole('combobox',{name:'Cliente',exact:true}), {label:'Cliente Revisão'});
+  await chooseAppSelect(page, composer.getByRole('combobox',{name:'Projeto',exact:true}), {label:'Projeto Revisão'});
   await composer.getByLabel('Título da aprovação').fill('Corte para revisão');
-  await composer.getByRole('combobox',{name:'Tipo de acesso'}).selectOption('google');
+  await chooseAppSelect(page, composer.getByRole('combobox',{name:'Tipo de acesso'}), 'google');
   const directAccess=composer.getByRole('checkbox',{name:/Permitir abrir também pelo Google Drive/});
   await expect(directAccess).not.toBeChecked();
   await directAccess.check();
   const removePublic=composer.getByRole('checkbox',{name:/Remover acesso público existente no Drive/});
   await expect(removePublic).toBeVisible();
   await expect(removePublic).not.toBeChecked();
-  await composer.getByRole('combobox',{name:'Tipo de acesso'}).selectOption('link');
+  await chooseAppSelect(page, composer.getByRole('combobox',{name:'Tipo de acesso'}), 'link');
   await expect(removePublic).toHaveCount(0);
   await composer.getByRole('button',{name:'Selecionar materiais'}).click();
   await expect(composer.locator('.review-folder-tabs button.active')).toHaveText('Materiais autorizados');
@@ -354,7 +355,7 @@ test('galeria de aprovação mantém miniaturas e filtros rápidos com mais de 2
   await gallery.getByRole('button',{name:'Selecionar arquivo Vídeo 22.mp4'}).click();
   await expect(owner.locator('iframe[title="Prévia de Vídeo 22.mp4"]')).toHaveCount(1);
   await owner.getByRole('searchbox',{name:'Buscar materiais por nome'}).fill('');
-  await owner.getByRole('combobox',{name:'Filtrar materiais por tipo'}).selectOption('image');
+  await chooseAppSelect(page, owner.getByRole('combobox',{name:'Filtrar materiais por tipo'}), 'image');
   await expect(gallery.getByRole('button')).toHaveCount(6);
   await owner.getByRole('button',{name:/Mostrar mais 6 de 6 arquivos/}).click();
   await expect(gallery.getByRole('button')).toHaveCount(12);
