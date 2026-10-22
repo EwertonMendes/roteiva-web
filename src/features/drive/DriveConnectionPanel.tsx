@@ -1,3 +1,4 @@
+import { AppSelect } from "../ui/AppSelect";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronDown, Cloud, FolderOpen, Link2, MoreHorizontal, Plus, RefreshCw, ShieldCheck, Unplug } from "lucide-react";
 import { useAuth } from "../auth/AuthProvider";
@@ -375,8 +376,8 @@ export function DriveConnectionPanel({
       <div className="rl-toolbar-actions">
         {connected.length?<details className="rl-account"><summary aria-label="Gerenciar Google Drive"><ShieldCheck size={16}/><span className="rl-account-text">Drive conectado</span><ChevronDown size={14}/></summary>
           <div className="rl-account-panel"><div><strong>Google Drive conectado</strong><p>{currentAccount?.google_email}</p></div>
-            {authorized.length>1&&<select aria-label="Selecionar conta Google Drive" value={connection?.id||""} onChange={e=>setSelectedAccount(e.target.value)}>
-              {authorized.map(c=><option key={c.id} value={c.id}>{c.google_email}</option>)}</select>}
+            {authorized.length>1&&<AppSelect aria-label="Selecionar conta Google Drive" value={connection?.id||""} onValueChange={value=>setSelectedAccount(value)}>
+              {authorized.map(c=><option key={c.id} value={c.id}>{c.google_email}</option>)}</AppSelect>}
             <button className="secondary-button" type="button" disabled={busy} onClick={()=>void refresh().catch(e=>setError(e instanceof Error?e.message:"Não foi possível atualizar."))}><RefreshCw size={15}/> Atualizar conexão</button>
             {confirmId?<><p>Desconectar esta conta? As pastas vinculadas não serão apagadas.</p>
               <button className="secondary-button" type="button" disabled={busy} onClick={()=>setConfirmId("")}>Cancelar</button>
