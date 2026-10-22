@@ -1,3 +1,4 @@
+import { chooseAppSelect } from "./select-helpers";
 import {test,expect} from '@playwright/test';
 
 const base=process.env.PROJECT_DETAIL_TEST_URL||'http://127.0.0.1:4174';
@@ -38,21 +39,21 @@ test('project detail: tasks, drafts, finance, agenda, materials and responsive t
   await page.getByRole('button',{name:'Remover tarefa Revisar áudio',exact:true}).click();
   await expect(page.getByRole('checkbox',{name:'Revisar áudio',exact:true})).toHaveCount(0);
   await page.getByLabel('Nome do projeto',{exact:true}).fill('Projeto atualizado');
-  await page.getByRole('combobox',{name:'Etapa',exact:true}).selectOption('Ajustes');
+  await chooseAppSelect(page, page.getByRole('combobox',{name:'Etapa',exact:true}), 'Ajustes');
   await page.getByRole('button',{name:'Salvar projeto',exact:true}).click();
   await page.reload();
   await expect(page.getByLabel('Nome do projeto',{exact:true})).toHaveValue('Projeto atualizado');
   await expect(page.getByRole('textbox',{name:'Briefing',exact:true})).toHaveValue('Rascunho preservado durante o checklist.');
-  await expect(page.getByRole('combobox',{name:'Etapa',exact:true})).toHaveValue('Ajustes');
+  await expect(page.getByRole('combobox',{name:'Etapa',exact:true})).toContainText('Ajustes');
   await page.getByRole('button',{name:'Editar lançamento Transporte',exact:true}).click();
   await page.getByLabel('Valor do trabalho').fill('75,00');
   await page.getByRole('button',{name:'Salvar alterações',exact:true}).click();
   await expect(detail.locator('.pd-totals')).toContainText('225,00');
   await page.getByRole('button',{name:'Receita ou custo',exact:true}).click();
-  await expect(page.locator('.finance-modal select[name="projectId"]')).toHaveValue('11');
+  await expect(page.locator('.finance-modal input[name="projectId"]')).toHaveValue('11');
   await page.getByRole('button',{name:'Cancelar',exact:true}).click();
   await page.getByRole('button',{name:'Agendar',exact:true}).click();
-  await expect(page.locator('.calendar-event-modal select[name="projectId"]')).toHaveValue('11');
+  await expect(page.locator('.calendar-event-modal input[name="projectId"]')).toHaveValue('11');
   await page.getByRole('button',{name:'Cancelar',exact:true}).click();
   await page.getByRole('button',{name:/Editar compromisso Entrega/}).click();
   await expect(page.getByRole('heading',{name:'Atualize sua agenda'})).toBeVisible();
