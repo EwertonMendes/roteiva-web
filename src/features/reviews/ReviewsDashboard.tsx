@@ -207,7 +207,12 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
   const run=async(job:()=>Promise<void>)=>{
     setWorking(true);setError("");
     try{await job();setRefresh(n=>n+1);}
-    catch(e){setError(e instanceof Error?e.message:"Não foi possível concluir a operação.");}
+    catch(e){
+      const asset=(e as {asset?:{fileId?:string;fileName?:string}}|null)?.asset;
+      const selectedName=asset?.fileId&&!asset.fileName?files.find(file=>file.fileId===asset.fileId)?.name:null;
+      const message=e instanceof Error?e.message:"Não foi possível concluir a operação.";
+      setError(selectedName?`Não foi possível concluir "${selectedName}": ${message}`:message);
+    }
     finally{setWorking(false);}
   };
   const submit=async()=>{
