@@ -1,4 +1,5 @@
 import {ZoomToolbar} from '../../components/ZoomToolbar';
+import {useImageWheelZoom} from '../../components/useImageWheelZoom';
 import {useEffect,useRef,useState,type CSSProperties} from 'react';
 import type {ProjectCover} from '../../domain/workspace';
 import {coverGeometry,coverGesture,transformCover,type CoverPoint} from './cover-geometry';
@@ -17,22 +18,21 @@ export function CoverFrame({src,cover,onChange}:{src:string;cover:ProjectCover;o
  function rebase(){const points=[...pointers.current.values()];gesture.current=points.length?{cover:current.current.cover,...coverGesture(points)}:null;setInteracting(points.length>0);}
  function transform(start:ProjectCover,zoom:number,from:CoverPoint,to=from){const {size,image}=current.current;return transformCover(start,size.width,size.height,image.width,image.height,zoom,from,to);}
  useEffect(()=>{const el=box.current;if(!el)return;const observer=new ResizeObserver(([entry])=>setSize({width:entry.contentRect.width,height:entry.contentRect.height}));observer.observe(el);return ()=>observer.disconnect();},[]);
+ useImageWheelZoom(box,e=>{
+  if(current.current.image.src!==src||safari.current)return;
+  const delta=e.deltaY*(e.deltaMode===1?16:e.deltaMode===2?current.current.size.height:1);
+  if(delta===0)return;
+  const next=current.current.cover.zoom*Math.exp(-delta*(e.ctrlKey?0.01:0.002));
+  emit(transform(current.current.cover,next,point(e.clientX,e.clientY)));
+  if(pointers.current.size)rebase();
+ },Boolean(onChange));
  useEffect(()=>{
   const el=box.current;if(!el||!onChange)return;
-  function wheel(e:WheelEvent){
-   if(current.current.image.src!==src)return;e.preventDefault();
-   if(safari.current)return;
-   const delta=e.deltaY*(e.deltaMode===1?16:e.deltaMode===2?current.current.size.height:1);
-   const next=current.current.cover.zoom*Math.exp(-delta*(e.ctrlKey ? 0.01 : 0.002));
-   emit(transform(current.current.cover,next,point(e.clientX,e.clientY)));
-   if(pointers.current.size)rebase();
-  }
   function start(e:Event){e.preventDefault();if(pointers.current.size>=2)return;const {size}=current.current;const native=e as SafariGestureEvent;safari.current={cover:current.current.cover,center:typeof native.clientX==='number'&&typeof native.clientY==='number'?point(native.clientX,native.clientY):{x:size.width/2,y:size.height/2},distance:1};}
   function change(e:Event){e.preventDefault();const start=safari.current;if(!start)return;const native=e as SafariGestureEvent;if(!Number.isFinite(native.scale)||native.scale<=0)return;emit(transform(start.cover,start.cover.zoom*native.scale,start.center));}
   function end(){safari.current=null;}
-  el.addEventListener('wheel',wheel,{passive:false});
   el.addEventListener('gesturestart',start,{passive:false});el.addEventListener('gesturechange',change,{passive:false});el.addEventListener('gestureend',end);
-  return ()=>{el.removeEventListener('wheel',wheel);el.removeEventListener('gesturestart',start);el.removeEventListener('gesturechange',change);el.removeEventListener('gestureend',end);};
+  return ()=>{el.removeEventListener('gesturestart',start);el.removeEventListener('gesturechange',change);el.removeEventListener('gestureend',end);};
  },[!!onChange,src]);
  useEffect(()=>{pointers.current.clear();gesture.current=null;safari.current=null;setInteracting(false);},[src]);
  const geometry=coverGeometry(size.width,size.height,image.width,image.height,cover);

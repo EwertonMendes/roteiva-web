@@ -54,8 +54,15 @@ test('project covers require Drive, persist crop, cancel safely and support remo
  expect(await area.evaluate(el=>getComputedStyle(el).cursor)).toBe('grab');
  const frame=(await area.boundingBox())!;
  const cx=frame.x+frame.width*.5,cy=frame.y+frame.height*.25;
+ const scrollBefore=await page.evaluate(()=>document.scrollingElement?.scrollTop||0);
  await page.mouse.move(cx,cy);await page.mouse.wheel(0,-180);
  await expect.poll(async()=>parseInt((await zoom.textContent())!)).toBeGreaterThan(100);
+ expect(await page.evaluate(()=>document.scrollingElement?.scrollTop||0)).toBe(scrollBefore);
+ await page.locator('.pc-crop-toolbar output').hover();
+ const zoomBeforeToolbar=parseInt((await zoom.textContent())!);
+ await page.mouse.wheel(0,-120);
+ await expect.poll(async()=>parseInt((await zoom.textContent())!)).toBeGreaterThan(zoomBeforeToolbar);
+ expect(await page.evaluate(()=>document.scrollingElement?.scrollTop||0)).toBe(scrollBefore);
  const beforeTrackpad=parseInt((await zoom.textContent())!);await page.keyboard.down('Control');await page.mouse.wheel(0,-10);await page.keyboard.up('Control');
  await expect.poll(async()=>parseInt((await zoom.textContent())!)).toBeGreaterThan(beforeTrackpad);
  const beforeDrag=await page.locator('.pc-editor-preview img').evaluate(el=>(el as HTMLImageElement).style.left);

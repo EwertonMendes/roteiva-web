@@ -3,6 +3,8 @@ import {CheckCircle2,ChevronRight,Clock3,Copy,ExternalLink,FileAudio,FileImage,F
   FileVideo,FolderOpen,Grid2X2,History,Link2,List,LoaderCircle,MessageSquare,RotateCcw,Search,Send,ShieldCheck,X} from "lucide-react";
 import {formatReviewTime} from "./review-timecode";
 import {useDriveApi} from "../drive/drive-api";
+import {ReviewImageViewer} from "./ReviewImageViewer";
+import {useOwnerReviewImage} from "./useOwnerReviewImage";
 import {DriveThumbnail} from "../drive/DriveThumbnail";
 import {useDriveThumbnailFetch} from "../drive/useDriveThumbnailFetch";
 import {useAuth} from "../auth/AuthProvider";
@@ -126,6 +128,9 @@ export function ReviewOwnerWorkspace({detail,working,error,onClose,onRevise,onPu
   const remainingAssets=filteredAssets.length-visibleAssets.length;
   const blocked=review.status==="closed";
   const previewable=active&&active.grantState==="granted"&&!blocked;
+  const isImage=Boolean(active?.mimeType.startsWith("image/"));
+  const imagePreview=useOwnerReviewImage(review.id,isImage?active?.fileId:undefined,
+    Boolean(isImage&&previewable));
   const showMaterials=review.status!=="draft"||currentAssets.length>0;
   function focusMaterial(comment:Comment){
     setSelectedFile(comment.file_id);
@@ -252,8 +257,16 @@ export function ReviewOwnerWorkspace({detail,working,error,onClose,onRevise,onPu
                 {active&&<a href={driveUrl(active.fileId)} target="_blank" rel="noopener noreferrer"
                   aria-label={"Abrir "+active.name+" no Google Drive"}><ExternalLink size={14}/> Abrir arquivo</a>}
               </div></div>
-            <div className="rowner-preview-stage">
-              {previewable?<iframe key={active.fileId} title={"Prévia de "+active.name}
+            <div className={"rowner-preview-stage"+(isImage?" is-image":"")}>
+              {previewable&&isImage?(
+                imagePreview.fileId===active?.fileId&&imagePreview.url?
+                  <ReviewImageViewer key={active.fileId} src={imagePreview.url} name={active.name}/>:
+                  <div className="rowner-preview-empty" role="status">
+                    {imagePreview.fileId===active?.fileId&&imagePreview.error?
+                      <><ShieldCheck size={24}/><p>{imagePreview.error}</p></>:
+                      <><LoaderCircle size={22} className="rl-spin"/><p>Preparando imagem…</p></>}
+                  </div>
+              ):previewable?<iframe key={active.fileId} title={"Prévia de "+active.name}
                 src={previewUrl(active.fileId)} loading="lazy" referrerPolicy="no-referrer"
                 allow="fullscreen" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation"/>:
                 <div className="rowner-preview-empty"><ShieldCheck size={24}/><p>{blocked?"Revisão encerrada.":active?.grantState==="revoked"?"O compartilhamento deste material foi encerrado.":"Prévia indisponível até o compartilhamento ser concluído."}</p></div>}

@@ -1,5 +1,7 @@
 import {useCallback,useEffect,useRef,useState,type PointerEvent as ReactPointerEvent,type KeyboardEvent as ReactKeyboardEvent} from "react";
 import {ZoomToolbar} from "../../components/ZoomToolbar";
+import {useImageWheelZoom} from "../../components/useImageWheelZoom";
+import "./ReviewImageViewer.css";
 
 type View={scale:number;x:number;y:number};
 type Position={x:number;y:number};
@@ -16,6 +18,7 @@ export function ReviewImageViewer({src,name,onError}:{src:string;name:string;onE
   const [natural,setNatural]=useState<Position|null>(null);
   const [expanded,setExpanded]=useState(false);
   const viewportRef=useRef<HTMLDivElement>(null);
+  const viewerRef=useRef<HTMLDivElement>(null);
   const pointers=useRef(new Map<number,Position>());
   const [size,setSize]=useState<Position>({x:0,y:0});
   useEffect(()=>{
@@ -96,24 +99,21 @@ export function ReviewImageViewer({src,name,onError}:{src:string;name:string;onE
     pointers.current.delete(e.pointerId);
     if(e.currentTarget.hasPointerCapture(e.pointerId))e.currentTarget.releasePointerCapture(e.pointerId);
   };
-  useEffect(()=>{
+  useImageWheelZoom(viewerRef,(event)=>{
     const viewport=viewportRef.current;
     if(!viewport)return;
-    const onWheel=(event:WheelEvent)=>{
-      event.preventDefault();
-      const rect=viewport.getBoundingClientRect();
-      const focusX=event.clientX-rect.left-rect.width/2;
-      const focusY=event.clientY-rect.top-rect.height/2;
-      setView(v=>{
-        const next=clamp(v.scale*(event.deltaY<0?1.2:1/1.2),1,MAX_SCALE);
-        const ratio=next/v.scale;
-        return limit(next,focusX-(focusX-v.x)*ratio,focusY-(focusY-v.y)*ratio);
-      });
-    };
-    // Non-passive handler: normal wheel zooms the focused image, never the page.
-    viewport.addEventListener("wheel",onWheel,{passive:false});
-    return()=>viewport.removeEventListener("wheel",onWheel);
-  },[limit]);
+    const rect=viewport.getBoundingClientRect();
+    const focusX=clamp(event.clientX,rect.left,rect.right)-rect.left-rect.width/2;
+    const focusY=clamp(event.clientY,rect.top,rect.bottom)-rect.top-rect.height/2;
+    setView(v=>{
+      const delta=event.deltaY*(event.deltaMode===1?16:event.deltaMode===2?rect.height:1);
+      if(delta===0)return v;
+      // Match the existing 20% wheel zoom steps while absorbing all wheel input.
+      const next=clamp(v.scale*(delta<0?1.2:1/1.2),1,MAX_SCALE);
+      const ratio=next/v.scale;
+      return limit(next,focusX-(focusX-v.x)*ratio,focusY-(focusY-v.y)*ratio);
+    });
+  });
   const onKeys=(e:ReactKeyboardEvent<HTMLDivElement>)=>{
     if(e.target!==e.currentTarget)return;
     if(e.key==="+"||e.key==="="){e.preventDefault();changeZoom(view.scale*1.3);}
@@ -128,7 +128,7 @@ export function ReviewImageViewer({src,name,onError}:{src:string;name:string;onE
       setView(v=>limit(v.scale,v.x+delta[e.key].x,v.y+delta[e.key].y));
     }
   };
-  return <div className={"review-private-viewer"+(expanded?" is-expanded":"")} role={expanded?"dialog":undefined}
+  return <div ref={viewerRef} className={"review-private-viewer"+(expanded?" is-expanded":"")} role={expanded?"dialog":undefined}
       aria-modal={expanded?true:undefined} aria-label={expanded?"Imagem ampliada: "+name:undefined}>
     <div ref={viewportRef} className={"review-image-viewport"+(view.scale>1?" is-zoomed":"")}
       tabIndex={0} role="group" aria-label={"Imagem "+name+". Amplie com os controles, duplo clique ou gesto de pinça."}
