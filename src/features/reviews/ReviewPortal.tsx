@@ -264,6 +264,9 @@ export function ReviewPortal({token}:{token:string}){
               </div>
               <div className="review-portal-stage-footer">
                 <div><strong>{active?.name}</strong><small>{playableVideo?"Player com marcação de instantes":"Visualização segura no Roteiva"}</small></div>
+                {active&&active.mimeType==="application/pdf"&&mediaMode==="ready"&&
+                  <a href={mediaUrl} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink size={15}/> Abrir PDF em outra aba</a>}
                 {active&&data.review.driveShareEnabled&&<a href={reviewFileURL(active.fileId)} target="_blank" rel="noreferrer">
                   <ExternalLink size={15}/> Abrir no Drive</a>}
               </div>
