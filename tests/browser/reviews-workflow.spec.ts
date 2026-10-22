@@ -231,3 +231,55 @@ test('profissional cria, cliente comenta/pede ajustes, V2 aprovada e encerrament
   expect({createCalls,publishCalls,revisionCalls,closeCalls}).toEqual({createCalls:1,publishCalls:1,revisionCalls:1,closeCalls:1});
   await guest.close();
 });
+
+test('Google-only review renders private images in both themes without third-party Drive cookies',async({page,context},info)=>{
+  await page.emulateMedia({colorScheme:'light'});
+  await prepare(page,'reviews-private-preview-'+info.project.name+'@example.com');
+  const first={fileId:'REVIEW_IMAGE_12345678',name:'Arte.png',mimeType:'image/png'};
+  const second={fileId:'REVIEW_IMAGE_22345678',name:'Arte final.png',mimeType:'image/png'};
+  const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO2qFqsAAAAASUVORK5CYII=','base64');
+  let denied=false,requests=0;
+  await context.route(api+'/reviews/public**',async route=>{
+    const req=route.request(),path=new URL(req.url()).pathname;
+    const headers={'Access-Control-Allow-Origin':root,'Access-Control-Allow-Methods':'GET,POST,OPTIONS',
+      'Access-Control-Allow-Headers':'Authorization,Content-Type,X-Review-Token',
+      'Access-Control-Expose-Headers':'Content-Range,Content-Length,Content-Type','Cache-Control':'no-store'};
+    if(req.method()==='OPTIONS')return route.fulfill({status:204,headers});
+    expect(req.headers()['x-review-token']).toBe(token);
+    expect(req.headers().authorization).toMatch(/^Bearer /);
+    if(path==='/reviews/public')return route.fulfill({status:200,headers,contentType:'application/json',
+      body:JSON.stringify({review:{title:'Arte com acesso privado',studioName:'Estúdio QA',message:'',
+        mode:'google',role:'reviewer',version:1,status:'pending',expiresAt:Date.now()+86400000},
+        assets:[first,second],comments:[],decisions:[]})});
+    if(path==='/reviews/public/file'){
+      requests++;
+      const params=req.postDataJSON();
+      expect(params).toEqual({fileId:expect.any(String),version:1,offset:0});
+      if(denied&&params.fileId===second.fileId)
+        return route.fulfill({status:403,headers,contentType:'application/json',
+          body:JSON.stringify({error:{code:'review_recipient_denied'}})});
+      return route.fulfill({status:206,headers:{...headers,'Content-Range':'bytes 0-'+(png.length-1)+'/'+png.length,
+        'Content-Length':String(png.length)},contentType:'image/png',body:png});
+    }
+    return route.fulfill({status:404,headers,body:'{}'});
+  });
+  await page.goto(root+'/review/'+token);
+  await expect(page.getByRole('heading',{name:'Arte com acesso privado'})).toBeVisible();
+  const preview=page.locator('img.review-private-preview-image');
+  await expect(preview).toBeVisible();
+  await expect(preview).toHaveAttribute('src',/^blob:/);
+  await expect(page.locator('.review-portal-stage iframe')).toHaveCount(0);
+  await expect(page.locator('.review-portal-stage.is-private')).toBeVisible();
+  await page.getByRole('button',{name:'Ativar tema escuro'}).click();
+  await expect(page.locator('main.review-portal')).toHaveAttribute('data-theme','dark');
+  await page.getByRole('button',{name:'Ativar tema claro'}).click();
+  await expect(page.locator('main.review-portal')).toHaveAttribute('data-theme','light');
+  denied=true;
+  await page.getByRole('button',{name:'Arte final.png'}).click();
+  await expect(page.getByText('Não foi possível mostrar a prévia')).toBeVisible();
+  await expect(page.locator('.review-portal-stage iframe')).toHaveCount(0);
+  denied=false;
+  await page.getByRole('button',{name:'Tentar novamente'}).click();
+  await expect(preview).toBeVisible();
+  expect(requests).toBeGreaterThanOrEqual(3);
+});

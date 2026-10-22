@@ -693,7 +693,61 @@ async function rotate(env:Env,r:Review):Promise<Response>{
   if(rotated.meta.changes!==1)throw new ApiError(409,'review_busy');
   return Response.json({url:reviewLink(secret)});
 }
-async function publicReview(request:Request,env:Env,action:'view'|'comment'|'decide'|'media'):Promise<Response>{
+/** Authenticated byte-range relay for selected files in restricted Google reviews.
+ * Every request rechecks the invitation, verified Google identity and file selection.
+ * Neither credentials nor independently reusable media URLs leave the Worker.
+ */
+async function privateReviewFile(request:Request,env:Env,r:Review,files:Asset[]):Promise<Response>{
+  if(r.access_mode!=='google')throw new ApiError(403,'review_recipient_denied');
+  const data=await uploadBody(request) as Record<string,unknown>|null;
+  if(!data||typeof data!=='object'||Array.isArray(data)||integer(data.version)!==r.current_version)
+    throw new ApiError(409,'review_version_changed');
+  const fileId=inputText(data.fileId,200,true);
+  const chosen=files.find(asset=>asset.file_id===fileId&&asset.grant_state==='granted');
+  if(!chosen)throw new ApiError(404,'review_not_found');
+  const offset=data.offset===undefined?0:data.offset;
+  if(!Number.isSafeInteger(offset)||typeof offset!=='number'||offset<0||offset>5_000_000_000_000)
+    throw new ApiError(400,'review_invalid_input');
+  const chunk=4*1024*1024;
+  const row=await connection(env,r.owner_uid,chosen.connection_id);
+  const credential=await accessCredential(env,row);
+  const endpoint=new URL('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(fileId));
+  endpoint.searchParams.set('alt','media');
+  endpoint.searchParams.set('supportsAllDrives','true');
+  let upstream:Response;
+  try{
+    upstream=await fetch(endpoint,{method:'GET',redirect:'manual',signal:AbortSignal.timeout(24000),
+      headers:{Authorization:'Bearer '+credential.value,Range:'bytes='+offset+'-'+(offset+chunk-1)}});
+  }catch{throw new ApiError(502,'review_media_unavailable');}
+  // Never auto-follow a redirect with an OAuth bearer token.
+  if(upstream.status!==206&&upstream.status!==200){
+    const status=upstream.status;await upstream.body?.cancel();
+    throw new ApiError(status===404?404:status===416?416:502,'review_media_unavailable');
+  }
+  const rawRange=upstream.headers.get('Content-Range');
+  const match=rawRange?(/^bytes (\d+)-(\d+)\/(\d+)$/.exec(rawRange)):null;
+  const length=Number(upstream.headers.get('Content-Length'));
+  let begin:number,end:number,total:number;
+  if(upstream.status===206&&match){
+    begin=Number(match[1]);end=Number(match[2]);total=Number(match[3]);
+    if(begin!==offset||end<begin||end-begin>=chunk||total<=end||
+      ![begin,end,total].every(Number.isSafeInteger)||(upstream.headers.has('Content-Length')&&length!==end-begin+1)){
+      await upstream.body?.cancel();throw new ApiError(502,'review_media_unavailable');
+    }
+  }else if(upstream.status===200&&offset===0&&upstream.headers.has('Content-Length')&&
+    Number.isSafeInteger(length)&&length>0&&length<=chunk){
+    begin=0;end=length-1;total=length;
+  }else{await upstream.body?.cancel();throw new ApiError(502,'review_media_unavailable');}
+  const headers=new Headers({
+    'Content-Type':chosen.mime_type,'Content-Range':'bytes '+begin+'-'+end+'/'+total,
+    'Accept-Ranges':'bytes','Cache-Control':'private, no-store, max-age=0',
+    'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer',
+    'Access-Control-Expose-Headers':'Content-Range, Content-Length, Content-Type',
+    'Content-Length':String(end-begin+1)
+  });
+  return new Response(upstream.body,{status:206,headers});
+}
+async function publicReview(request:Request,env:Env,action:'view'|'comment'|'decide'|'media'|'file'):Promise<Response>{
   const token=request.headers.get('X-Review-Token')||'';
   if(!/^[A-Za-z0-9_-]{43}$/.test(token))throw new ApiError(404,'review_not_found');
   const r=await env.DB.prepare('SELECT * FROM review_requests WHERE token_hash=?').bind(await hash(token)).first<Review>();
@@ -734,6 +788,7 @@ async function publicReview(request:Request,env:Env,action:'view'|'comment'|'dec
       assets:files.map(a=>({fileId:a.file_id,name:a.name,mimeType:a.mime_type})),
       comments:comments.results,decisions:decisions.results});
   }
+  if(action==='file')return privateReviewFile(request,env,r,files);
   if(action==='media'){
     // HTML5 <video> cannot send Firebase authorization on byte-range requests.
     // Private Google reviews therefore use Drive's authenticated preview.
@@ -809,10 +864,10 @@ async function publicReview(request:Request,env:Env,action:'view'|'comment'|'dec
 export async function reviewRouter(request:Request,env:Env,url:URL):Promise<Response>{
   const path=url.pathname;
   if(path==='/reviews/media')return streamReviewMedia(request,env,url);
-  if(path==='/reviews/public' || path==='/reviews/public/comment' || path==='/reviews/public/decide'||path==='/reviews/public/media-ticket'){
+  if(path==='/reviews/public' || path==='/reviews/public/comment' || path==='/reviews/public/decide'||path==='/reviews/public/media-ticket'||path==='/reviews/public/file'){
     if(!['GET','POST'].includes(request.method))throw new ApiError(405,'method_not_allowed');
     if((path==='/reviews/public')!==(request.method==='GET'))throw new ApiError(405,'method_not_allowed');
-    return publicReview(request,env,path.endsWith('/comment')?'comment':path.endsWith('/decide')?'decide':path.endsWith('/media-ticket')?'media':'view');
+    return publicReview(request,env,path.endsWith('/comment')?'comment':path.endsWith('/decide')?'decide':path.endsWith('/media-ticket')?'media':path.endsWith('/file')?'file':'view');
   }
   const uid=await activeOwner(request,env);
   if(path==='/reviews'&&request.method==='GET')return ownerList(env,uid,url);
