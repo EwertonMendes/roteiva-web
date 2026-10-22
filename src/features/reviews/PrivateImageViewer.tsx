@@ -1,4 +1,4 @@
-import {useCallback,useEffect,useRef,useState,type PointerEvent as ReactPointerEvent,type WheelEvent as ReactWheelEvent,type KeyboardEvent as ReactKeyboardEvent} from "react";
+import {useCallback,useEffect,useRef,useState,type PointerEvent as ReactPointerEvent,type KeyboardEvent as ReactKeyboardEvent} from "react";
 import {Expand,Minimize,Minus,Plus,RotateCcw} from "lucide-react";
 
 type View={scale:number;x:number;y:number};
@@ -88,11 +88,19 @@ export function PrivateImageViewer({src,name,onError}:{src:string;name:string;on
     pointers.current.delete(e.pointerId);
     if(e.currentTarget.hasPointerCapture(e.pointerId))e.currentTarget.releasePointerCapture(e.pointerId);
   };
-  const onWheel=(e:ReactWheelEvent<HTMLDivElement>)=>{
-    if(!e.ctrlKey&&!e.metaKey)return; // ordinary scroll must remain page scroll
-    e.preventDefault();
-    setView(v=>limit(v.scale*(e.deltaY<0?1.2:1/1.2),v.x,v.y));
-  };
+  useEffect(()=>{
+    const viewport=viewportRef.current;
+    if(!viewport)return;
+    const onWheel=(event:WheelEvent)=>{
+      if(!event.ctrlKey&&!event.metaKey)return;
+      event.preventDefault();
+      setView(v=>limit(v.scale*(event.deltaY<0?1.2:1/1.2),v.x,v.y));
+    };
+    // React's synthetic wheel listener is passive; prevent the browser from
+    // zooming the entire page only for deliberate Ctrl/Command+wheel zoom.
+    viewport.addEventListener("wheel",onWheel,{passive:false});
+    return()=>viewport.removeEventListener("wheel",onWheel);
+  },[limit]);
   const onKeys=(e:ReactKeyboardEvent<HTMLDivElement>)=>{
     if(e.target!==e.currentTarget)return;
     if(e.key==="+"||e.key==="="){e.preventDefault();changeZoom(view.scale*1.3);}
@@ -113,7 +121,7 @@ export function PrivateImageViewer({src,name,onError}:{src:string;name:string;on
       tabIndex={0} role="group" aria-label={"Imagem "+name+". Amplie com os controles, duplo clique ou gesto de pinça."}
       onPointerDown={onPointerDown} onPointerMove={onPointerMove}
       onPointerUp={onPointerEnd} onPointerCancel={onPointerEnd}
-      onWheel={onWheel} onKeyDown={onKeys}
+      onKeyDown={onKeys}
       onDoubleClick={()=>view.scale>1?reset():changeZoom(2)}>
       <img className="review-private-preview-image" src={src} alt={name} draggable={false}
         onLoad={e=>setNatural({x:e.currentTarget.naturalWidth,y:e.currentTarget.naturalHeight})}
