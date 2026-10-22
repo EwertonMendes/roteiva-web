@@ -13,6 +13,7 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+  pull-requests: read
 env:
   WRANGLER_SEND_METRICS: 'false'
 concurrency:
@@ -47,7 +48,7 @@ jobs:
   deploy:
     name: Deploy Cloudflare Worker DEV
     needs: validate
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     timeout-minutes: 8
     environment: cloudflare-development
@@ -68,21 +69,43 @@ jobs:
         run: |
           npm ci --ignore-scripts --offline --no-audit --no-fund ||
           npm ci --ignore-scripts --prefer-offline --no-audit --no-fund --fetch-retries=1 --fetch-timeout=20000
-      - name: Guard DEV bindings and current SHA
+      - name: Guard DEV bindings, immutable commit and explicit PR promotion
         env:
           ACCOUNT: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           DATABASE: ${{ vars.CLOUDFLARE_D1_DATABASE_ID }}
+          GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
           test "$ACCOUNT" = "b3855f9c192541a01a45b2dae7b6a7f8"
           test "$DATABASE" = "302adc88-76b2-4827-bb16-99662fa0408b"
-          test "$(git ls-remote origin refs/heads/master | cut -f1)" = "$GITHUB_SHA" || {
-            echo "Outdated SHA: skip stale DEV deploy"; exit 1;
+          test "$GITHUB_REF_TYPE" = "branch"
+          branch="${GITHUB_REF#refs/heads/}"
+          test "$(git ls-remote origin "refs/heads/$branch" | cut -f1)" = "$GITHUB_SHA" || {
+            echo "Outdated branch SHA: skip stale DEV deploy"; exit 1;
           }
+          if [ "$branch" != "master" ]; then
+            test "$GITHUB_EVENT_NAME" = "workflow_dispatch" || exit 1
+            owner="${GITHUB_REPOSITORY%%/*}"
+            prs="$(gh api "repos/$GITHUB_REPOSITORY/pulls?state=open&head=$owner:$branch&per_page=100")"
+            pr="$(echo "$prs" | jq -er --arg repo "$GITHUB_REPOSITORY" --arg branch "$branch" --arg sha "$GITHUB_SHA" '
+              [.[] | select(.state == "open" and .base.ref == "master"
+                and .head.repo.full_name == $repo and .head.ref == $branch and .head.sha == $sha)
+              | .number][0] // empty')"
+            files="$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$pr/files?per_page=100")"
+            if echo "$files" | jq -se 'add | any(.[];
+                (.filename | startswith("api/migrations/"))
+                or (.filename | test("^api/(wrangler\\.|package(-lock)?\\.json)"))
+              )'; then
+              echo "Manual Worker promotion may not change migrations, bindings or dependencies"; exit 1;
+            fi
+            echo "Verified open same-repo PR #$pr without infrastructure changes."
+          fi
       - name: Verify anti-replay Worker secret is configured
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: node scripts/check-trial-secret.mjs
       - name: Apply versioned migrations before Worker rollout
+        if: github.ref == 'refs/heads/master'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
