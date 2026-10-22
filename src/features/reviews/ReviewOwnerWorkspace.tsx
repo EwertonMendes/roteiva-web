@@ -54,8 +54,8 @@ function CommentCard({comment,asset,selected,onSelect}:{comment:Comment;asset:As
     </button>}
   </article>;
 }
-export function ReviewOwnerWorkspace({detail,working,onClose,onRevise,onPublish,onRotate,onEnd,onResume,onCompleteClose}:{
-  detail:Detail;working:boolean;onClose:()=>void;onRevise:()=>void;onPublish:()=>void;
+export function ReviewOwnerWorkspace({detail,working,error,onClose,onRevise,onPublish,onRotate,onEnd,onResume,onCompleteClose}:{
+  detail:Detail;working:boolean;error?:string;onClose:()=>void;onRevise:()=>void;onPublish:()=>void;
   onRotate:()=>void;onEnd:()=>void;onResume:(withFiles:boolean)=>void;onCompleteClose:()=>void
 }){
   const {review,assets,comments,decisions}=detail;
@@ -92,6 +92,7 @@ export function ReviewOwnerWorkspace({detail,working,onClose,onRevise,onPublish,
       <button type="button" className="review-icon" disabled={working} aria-label="Fechar" onClick={onClose}><X size={20}/></button>
     </header>
     <div className="review-dialog-body rowner-body">
+      {error&&<div className="reviews-warning" role="alert">{error}</div>}
       <section className="rowner-overview" aria-label="Situação da aprovação">
         <div className="rowner-overview-top">
           <div className="rowner-overview-intro"><span className={"reviews-status status-"+review.status}>{statusText[review.status]}</span>
@@ -117,7 +118,7 @@ export function ReviewOwnerWorkspace({detail,working,onClose,onRevise,onPublish,
         <section className="rowner-participants" aria-label="Participantes autorizados">
           <h3>Participantes autorizados</h3>
           <p>{review.driveShareEnabled
-            ?"Estes participantes também receberam permissão de leitura diretamente no Google Drive."
+            ?"O acesso direto ao Drive utiliza permissões já existentes em arquivos públicos ou concede leitura individual quando necessário e autorizado."
             :"Acesso restrito ao portal Roteiva. Nenhuma permissão adicional foi criada no Google Drive."}</p>
           <p>{detail.participants.filter(p=>p.role==="reviewer"&&detail.votes?.some(v=>v.email===p.email&&v.version===review.version&&v.decision==="approved")).length}
             {" de "}{detail.participants.filter(p=>p.role==="reviewer").length} revisores aprovaram esta versão.</p>
