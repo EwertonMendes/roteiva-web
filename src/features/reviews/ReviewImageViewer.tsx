@@ -16,7 +16,6 @@ export function ReviewImageViewer({src,name,onError}:{src:string;name:string;onE
   const [natural,setNatural]=useState<Position|null>(null);
   const [expanded,setExpanded]=useState(false);
   const viewportRef=useRef<HTMLDivElement>(null);
-  const expandRef=useRef<HTMLButtonElement>(null);
   const pointers=useRef(new Map<number,Position>());
   const [size,setSize]=useState<Position>({x:0,y:0});
   useEffect(()=>{
@@ -50,7 +49,7 @@ export function ReviewImageViewer({src,name,onError}:{src:string;name:string;onE
     const onKey=(event:KeyboardEvent)=>{
       if(event.key==="Escape"){event.preventDefault();setExpanded(false);}
       if(event.key==="Tab"){
-        const buttons=viewportRef.current?.parentElement?.querySelectorAll<HTMLButtonElement>(".review-image-controls button");
+        const buttons=viewportRef.current?.parentElement?.querySelectorAll<HTMLButtonElement>(".rz-zoom-toolbar button");
         if(!buttons?.length)return;
         const first=buttons[0],last=buttons[buttons.length-1];
         if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}
@@ -61,7 +60,7 @@ export function ReviewImageViewer({src,name,onError}:{src:string;name:string;onE
     return()=>{
       document.removeEventListener("keydown",onKey);
       document.body.style.overflow=previousOverflow;
-      expandRef.current?.focus();
+      viewportRef.current?.parentElement?.querySelector<HTMLButtonElement>('.review-image-toolbar button[aria-label="Ver imagem em tela cheia"]')?.focus();
     };
   },[expanded]);
   const onPointerDown=(e:ReactPointerEvent<HTMLDivElement>)=>{
