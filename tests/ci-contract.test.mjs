@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {existsSync, readFileSync} from "node:fs";
+import {existsSync, readFileSync, readdirSync} from "node:fs";
 
 const read = (path) => readFileSync(path, "utf8");
 test("GitHub Pages and workflow_run coupling are removed", () => {
@@ -33,4 +33,19 @@ test("admin Firestore remains disabled for public Actions and never reuses deplo
   assert.match(ops, /FIREBASE_DATA_SERVICE_ACCOUNT/);
   assert.match(ops, /FIREBASE_DATA_OPS_ENABLED/);
   assert.ok(!ops.includes("secrets.FIREBASE_SERVICE_ACCOUNT"));
+});
+
+// The visual contract must be reused: native selects reintroduce OS-specific menus.
+test("all frontend selects use the shared AppSelect primitive", () => {
+  const walk = (dir) => readdirSync(dir, {withFileTypes:true}).flatMap(entry => {
+    const path = dir + "/" + entry.name;
+    return entry.isDirectory() ? walk(path) : path.endsWith(".tsx") ? [path] : [];
+  });
+  for (const path of walk("src")) {
+    assert.doesNotMatch(read(path), /<select(?=[\\s>])/i, path + " should import AppSelect");
+  }
+  const appSelect = read("src/features/ui/AppSelect.tsx");
+  assert.match(appSelect, /role="combobox"/);
+  assert.match(appSelect, /role="listbox"/);
+  assert.match(appSelect, /type="hidden" name=\{name\}/);
 });
