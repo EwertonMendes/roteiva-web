@@ -254,14 +254,16 @@ export function ReviewPortal({token}:{token:string}){
                   controls playsInline preload="metadata" src={mediaUrl} aria-label={"Reproduzir "+active?.name}
                   onTimeUpdate={e=>setPlayhead(e.currentTarget.currentTime)}
                   onLoadedMetadata={e=>setDuration(Number.isFinite(e.currentTarget.duration)?e.currentTarget.duration:null)}
-                  onError={()=>{setMediaFailure(true);setMediaMode("drive");}}/>}
+                  onError={()=>{if(privateGoogle){setPreviewError("Este vídeo não pôde ser reproduzido neste navegador. Abra-o no Google Drive.");setMediaMode("private-error");}else{setMediaFailure(true);setMediaMode("drive");}}}/>}
                 {active&&mediaMode==="private"&&!isVideo&&active.mimeType.startsWith("image/")&&
-                  <img className="review-private-preview-image" src={mediaUrl} alt={active.name}/>}
+                  <img className="review-private-preview-image" src={mediaUrl} alt={active.name}
+                    onError={()=>{setPreviewError("O navegador não conseguiu exibir esta imagem. Abra-a no Google Drive.");setMediaMode("private-error");}}/>}
                 {active&&mediaMode==="private"&&active.mimeType==="application/pdf"&&
                   <iframe className="review-private-preview-pdf" src={mediaUrl}
                     title={"Prévia PDF de "+active.name} sandbox="allow-scripts allow-downloads"/>}
                 {active&&mediaMode==="private"&&active.mimeType.startsWith("audio/")&&
-                  <div className="review-private-preview-audio"><FileAudio size={32}/><audio controls src={mediaUrl}/></div>}
+                  <div className="review-private-preview-audio"><FileAudio size={32}/><audio controls src={mediaUrl}
+                    onError={()=>{setPreviewError("Este áudio não pôde ser reproduzido. Abra-o no Google Drive.");setMediaMode("private-error");}}/></div>}
                 {mediaMode==="private-error"&&<div className="review-private-preview-error" role="alert">
                   <FileImage size={26}/><strong>Não foi possível mostrar a prévia</strong>
                   <p>{previewError}</p>
