@@ -1,5 +1,16 @@
 # Roadmap vivo — Roteiva MVP
 
+## Melhoria dos detalhes do projeto — 22/10/2026
+
+**IMPLEMENTADO; validação local automatizada concluída. Homologação Google real pelo proprietário pendente.** Branch `codex/project-details-ux`, baseada na master `cadce49`.
+
+- Formulário com hierarquia e espaçamento do mockup; checklist compacto, tarefas acessíveis e progresso calculado dos itens reais.
+- Receitas/custos/resultado em centavos, lançamentos e edição pelo formulário financeiro existente; agenda ordenada e edição de compromissos.
+- Materiais com pastas reais do Drive e ação para a Biblioteca já selecionada no projeto. Upload falso retirado dos detalhes. URLs arbitrárias e novo versionamento não fazem parte desta entrega.
+- Conteúdo isolado, lateral preservada, temas claro/escuro, desktop/mobile e rascunho de briefing preservado durante o checklist.
+- Evidências locais: TypeScript, 44 testes do script unitário além dos testes de agenda/financeiro; builds Firebase/demo e verificação estática; `tests/browser/project-detail.spec.ts` passou em Chromium desktop e Pixel 7, incluindo os dois temas, persistência após reload, tarefas, edição de custo e recálculo, formulários vinculados e Biblioteca. Screenshots são artefatos locais ignorados em `test-results/`.
+- Publicação solicitada no Hosting DEV da branch sem merge; nenhuma alteração em Firestore/Worker necessária. Conferir publicação e homologação real antes de marcar validação integral.
+
 **Atualização inicial: 16/10/2026.** Este é o documento **obrigatório** de acompanhamento por humanos e IAs. Arquitetura em [ARCHITECTURE.md](ARCHITECTURE.md). Entrega de cada PR deve revisar status, critérios, evidência e bloqueios (ver [AGENTS.md](../AGENTS.md)).
 
 ## Convenções de status
