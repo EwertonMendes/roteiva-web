@@ -93,7 +93,7 @@ export async function streamReviewMedia(request:Request,env:Env,url:URL):Promise
       if(!Number.isSafeInteger(tail)||tail<1)throw new ApiError(416,'media_invalid_range');
       upstreamRange='bytes=-'+Math.min(tail,chunk);
     }else throw new ApiError(416,'media_invalid_range');
-  }else if(request.method==='GET')upstreamRange='bytes=0-'+(chunk-1);
+  }else if(request.method==='GET'&&asset.mime_type.startsWith('video/'))upstreamRange='bytes=0-'+(chunk-1);
   const row=await connection(env,r.owner_uid,asset.connection_id);
   const token=await accessCredential(env,row);
   const endpoint=new URL(GOOGLE+'/drive/v3/files/'+encodeURIComponent(asset.file_id));
