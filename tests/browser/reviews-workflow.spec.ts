@@ -305,6 +305,13 @@ test('galeria de aprovação mantém miniaturas e filtros rápidos com mais de 2
       return route.fulfill({status:200,headers,contentType:'image/png',
         body:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO2qFqsAAAAASUVORK5CYII=','base64')});
     }
+    if(path==='/reviews/review-many/image'){
+      expect(req.headers().authorization).toMatch(/^Bearer /);
+      expect(items.some(item=>item.fileId===url.searchParams.get('fileId')&&item.mimeType.startsWith('image/'))).toBe(true);
+      return route.fulfill({status:200,headers:{...headers,'Cache-Control':'private, no-store'},
+        contentType:'image/png',
+        body:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO2qFqsAAAAASUVORK5CYII=','base64')});
+    }
     if(path.endsWith('/metadata'))return route.fulfill({status:200,headers,contentType:'application/json',
       body:JSON.stringify({file:{parents:[folder]}})});
     if(path==='/reviews')return route.fulfill({status:200,headers,contentType:'application/json',
@@ -322,6 +329,20 @@ test('galeria de aprovação mantém miniaturas e filtros rápidos com mais de 2
   await first.scrollIntoViewIfNeeded();
   await expect(first.locator('[data-thumbnail-state]')).toHaveAttribute('data-thumbnail-state','loaded');
   expect(calls).toBeLessThan(23);
+  const ownerImage=owner.locator('.rowner-preview-stage.is-image .review-image-viewport');
+  await expect(ownerImage).toBeVisible();
+  await expect(owner.locator('.rowner-preview-stage.is-image img.review-private-preview-image')).toHaveAttribute('src',/^blob:/);
+  await ownerImage.hover();
+  const ownerScroller=owner.locator('.rowner-body');
+  const ownerScrollBefore=await ownerScroller.evaluate(el=>el.scrollTop);
+  await page.mouse.wheel(0,-160);
+  await expect(owner.locator('.rowner-preview-stage.is-image').getByLabel('Zoom da imagem')).toHaveText('120%');
+  expect(await ownerScroller.evaluate(el=>el.scrollTop)).toBe(ownerScrollBefore);
+  await owner.locator('.rowner-preview-stage.is-image .rz-zoom-toolbar output').hover();
+  const secondScrollBefore=await ownerScroller.evaluate(el=>el.scrollTop);
+  await page.mouse.wheel(0,-160);
+  await expect(owner.locator('.rowner-preview-stage.is-image').getByLabel('Zoom da imagem')).toHaveText('144%');
+  expect(await ownerScroller.evaluate(el=>el.scrollTop)).toBe(secondScrollBefore);
   await owner.getByRole('button',{name:'Ver materiais em lista'}).click();
   await expect(gallery).toHaveAttribute('data-view','list');
   await owner.getByRole('button',{name:'Ver materiais em grade'}).click();
@@ -404,8 +425,19 @@ test('Google-only review renders private images in both themes without third-par
   await stage.getByRole('button',{name:'Ajustar imagem à tela'}).click();
   await expect(stage.getByLabel('Zoom da imagem')).toHaveText('100%');
   await viewport.hover();
+  const pageScrollBefore=await page.evaluate(()=>document.scrollingElement?.scrollTop||0);
   await page.mouse.wheel(0,-180);
   await expect(stage.getByLabel('Zoom da imagem')).toHaveText('120%');
+  expect(await page.evaluate(()=>document.scrollingElement?.scrollTop||0)).toBe(pageScrollBefore);
+  await stage.locator('.rz-zoom-toolbar output').hover();
+  const toolbarScrollBefore=await page.evaluate(()=>document.scrollingElement?.scrollTop||0);
+  await page.mouse.wheel(0,-180);
+  await expect(stage.getByLabel('Zoom da imagem')).toHaveText('144%');
+  expect(await page.evaluate(()=>document.scrollingElement?.scrollTop||0)).toBe(toolbarScrollBefore);
+  await page.evaluate(()=>window.scrollTo(0,0));
+  await page.getByRole('heading',{name:'Arte com acesso privado'}).hover();
+  await page.mouse.wheel(0,420);
+  await expect.poll(()=>page.evaluate(()=>document.scrollingElement?.scrollTop||0)).toBeGreaterThan(0);
   await stage.getByRole('button',{name:'Ajustar imagem à tela'}).click();
   await viewport.dblclick({position:{x:140,y:120}});
   await expect(stage.getByLabel('Zoom da imagem')).toHaveText('200%');
