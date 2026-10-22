@@ -170,20 +170,20 @@ export function ReviewPortal({token}:{token:string}){
   },[activeFileId,activeVersion,activeMime,isVideo,privateGoogle,request,user,token,previewRetry]);
   const playableVideo=isVideo&&(mediaMode==="native"||mediaMode==="private");
   const seconds=isVideo?parseReviewTime(minutes):null;
-  const invalidTime=isVideo&&!validReviewSecond(seconds,mediaMode==="native"?duration:null);
+  const invalidTime=isVideo&&!validReviewSecond(seconds,playableVideo?duration:null);
   const switchFile=(index:number)=>{
     if(index===selected)return;
     setSelected(index);setBody("");setMinutes("");setNotice("");
   };
   const markNow=()=>{
-    if(!isVideo||mediaMode!=="native")return;
+    if(!playableVideo)return;
     const value=captureReviewPlayback(videoRef.current);
     if(value===null)return;
     setMinutes(formatReviewTime(value));setNotice("Instante "+formatReviewTime(value)+" marcado. Agora escreva seu comentário.");
     commentRef.current?.focus();
   };
   const jumpTo=(secondsValue:number)=>{
-    if(mediaMode==="native"&&videoRef.current){
+    if(playableVideo&&videoRef.current){
       videoRef.current.currentTime=secondsValue;
       videoRef.current.scrollIntoView({behavior:"smooth",block:"center"});
     }else setNotice("Abra o vídeo no Google Drive e avance até "+formatReviewTime(secondsValue)+".");
@@ -246,26 +246,39 @@ export function ReviewPortal({token}:{token:string}){
           <div className="review-portal-maincolumn">
             <section className="review-portal-review" aria-label="Material para avaliar">
               <div className="review-portal-stage">
-                {isVideo&&mediaMode==="loading"&&<div className="review-media-state" role="status">
-                  <LoaderCircle className="rl-spin" size={25}/>Preparando reprodução…</div>}
-                {isVideo&&mediaMode==="native"&&<video ref={videoRef} key={activeFileId}
+                {mediaMode==="loading"&&<div className="review-media-state review-private-preview-state" role="status">
+                  <LoaderCircle className="rl-spin" size={25}/>
+                  {privateGoogle?("Carregando arquivo com acesso seguro… "+(previewProgress?previewProgress+"%":"")):"Preparando reprodução…"}
+                </div>}
+                {playableVideo&&<video ref={videoRef} key={activeFileId}
                   controls playsInline preload="metadata" src={mediaUrl} aria-label={"Reproduzir "+active?.name}
                   onTimeUpdate={e=>setPlayhead(e.currentTarget.currentTime)}
                   onLoadedMetadata={e=>setDuration(Number.isFinite(e.currentTarget.duration)?e.currentTarget.duration:null)}
                   onError={()=>{setMediaFailure(true);setMediaMode("drive");}}/>}
-                {active&&mediaMode==="drive"&&<iframe key={active.fileId} title={"Prévia de "+active.name}
+                {active&&mediaMode==="private"&&!isVideo&&active.mimeType.startsWith("image/")&&
+                  <img className="review-private-preview-image" src={mediaUrl} alt={active.name}/>}
+                {active&&mediaMode==="private"&&active.mimeType==="application/pdf"&&
+                  <iframe className="review-private-preview-pdf" src={mediaUrl}
+                    title={"Prévia PDF de "+active.name} sandbox="allow-scripts allow-downloads"/>}
+                {active&&mediaMode==="private"&&active.mimeType.startsWith("audio/")&&
+                  <div className="review-private-preview-audio"><FileAudio size={32}/><audio controls src={mediaUrl}/></div>}
+                {mediaMode==="private-error"&&<div className="review-private-preview-error" role="alert">
+                  <FileImage size={26}/><strong>Não foi possível mostrar a prévia</strong>
+                  <p>{previewError}</p>
+                  <button type="button" onClick={()=>setPreviewRetry(n=>n+1)}>Tentar novamente</button>
+                </div>}
+                {active&&mediaMode==="drive"&&!privateGoogle&&<iframe key={active.fileId} title={"Prévia de "+active.name}
                   src={previewURL(active.fileId)} referrerPolicy="no-referrer" allow="fullscreen"
                   sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation"/>}
                 {!active&&<p>Nenhum material disponível.</p>}
               </div>
               <div className="review-portal-stage-footer">
-                <div><strong>{active?.name}</strong><small>{isVideo&&mediaMode==="native"
-                  ?"Player com marcação de instantes": "Prévia fornecida pelo Google Drive"}</small></div>
+                <div><strong>{active?.name}</strong><small>{playableVideo?"Player com marcação de instantes":privateGoogle?"Visualização segura no Roteiva":"Prévia fornecida pelo Google Drive"}</small></div>
                 {active&&<a href={reviewFileURL(active.fileId)} target="_blank" rel="noreferrer">
                   <ExternalLink size={15}/> Abrir no Drive</a>}
               </div>
             </section>
-            {isVideo&&mediaMode==="native"&&data.review.status==="pending"&&
+            {playableVideo&&data.review.status==="pending"&&
               <div className="review-capture-bar">
                 <div><span className="review-live-label"><span/> TEMPO ATUAL</span>
                   <strong>{formatReviewTime(playhead)}{duration!==null&&<small> / {formatReviewTime(duration)}</small>}</strong></div>
@@ -306,7 +319,7 @@ export function ReviewPortal({token}:{token:string}){
                 onChange={e=>setName(e.target.value)}/></label>
               {isVideo&&<div className="review-video-time-field">
                 <div className="review-time-field-heading"><label htmlFor="review-video-second">Instante do vídeo <span>(opcional)</span></label>
-                  {mediaMode==="native"&&<button type="button" onClick={markNow} className="review-use-time">
+                  {playableVideo&&<button type="button" onClick={markNow} className="review-use-time">
                     <Clock3 size={14}/> Usar tempo atual</button>}</div>
                 <div className="review-time-input"><Clock3 size={16}/><input id="review-video-second"
                   value={minutes} placeholder="Ex.: 01:25" inputMode="numeric"
@@ -314,7 +327,7 @@ export function ReviewPortal({token}:{token:string}){
                   onChange={e=>setMinutes(maskReviewTime(e.target.value))}
                   onBlur={()=>{if(seconds!==null&&!invalidTime)setMinutes(formatReviewTime(seconds));}}/></div>
                 <small id="review-time-hint" className={invalidTime?"review-input-error":""}>
-                  {invalidTime?"Informe mm:ss válido, dentro da duração do vídeo.":mediaMode==="native"?
+                  {invalidTime?"Informe mm:ss válido, dentro da duração do vídeo.":playableVideo?
                     "Pause no momento desejado e capture o instante com um clique.":"Digite mm:ss (ex.: 01:25). A prévia do Drive não informa o tempo automaticamente."}</small>
               </div>}
               <label>Seu comentário<textarea ref={commentRef} maxLength={1500} rows={4} value={body}
