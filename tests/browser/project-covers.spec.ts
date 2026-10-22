@@ -47,9 +47,10 @@ test('project covers require Drive, persist crop, cancel safely and support remo
  await centeredLoading('.pc-picker-results .pc-loading-fill','.pc-picker-results');await page.screenshot({path:info.outputPath('picker-loading.png')});releaseList();
  const more=page.getByRole('button',{name:'Carregar mais imagens',exact:true});
  await expect(more.locator('svg')).toHaveCount(1);await stableModal();
- await page.evaluate(()=>document.documentElement.setAttribute('data-roteiva-cursor','on'));
+ await more.hover();
+ await expect(page.locator('html')).not.toHaveAttribute('data-roteiva-cursor','on');
  expect(await more.evaluate(el=>getComputedStyle(el).cursor)).not.toBe('none');
- expect(await page.locator('.studio-cursor-ring').evaluate(el=>getComputedStyle(el).display)).toBe('none');
+ await expect(page.locator('.studio-cursor-ring')).toHaveCSS('opacity','0');
  const spacing=await page.locator('.pc-image-more').evaluate(el=>{const grid=el.previousElementSibling!.getBoundingClientRect(),row=el.getBoundingClientRect(),button=el.querySelector('button')!.getBoundingClientRect();return {gap:button.top-grid.bottom,center:Math.abs(button.x+button.width/2-(row.x+row.width/2))};});
  expect(spacing.gap).toBeGreaterThanOrEqual(20);expect(spacing.center).toBeLessThan(2);
  await more.click();await expect(page.getByRole('button',{name:'Campanha 2.png',exact:true})).toBeVisible();
