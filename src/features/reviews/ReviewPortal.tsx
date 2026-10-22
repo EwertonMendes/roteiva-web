@@ -118,7 +118,7 @@ export function ReviewPortal({token}:{token:string}){
       // is authorized against the verified Google identity by the Worker.
       void (async()=>{
         if(!user)throw new Error("Entre com sua conta Google autorizada para visualizar.");
-        const parts:Uint8Array[]=[];
+        const parts:ArrayBuffer[]=[];
         const max=96*1024*1024;
         let offset=0,total=0;
         do{
@@ -144,7 +144,7 @@ export function ReviewPortal({token}:{token:string}){
               ?"Este arquivo é grande demais para a prévia integrada. Abra-o no Google Drive."
               :"A prévia recebida é inválida. Tente novamente.");
           total=length;
-          const bytes=new Uint8Array(await response.arrayBuffer());
+          const bytes=await response.arrayBuffer();
           if(bytes.byteLength!==end-start+1||offset+bytes.byteLength>max)
             throw new Error("Não foi possível validar o conteúdo retornado pelo Drive.");
           parts.push(bytes);offset+=bytes.byteLength;
