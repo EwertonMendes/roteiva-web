@@ -115,7 +115,7 @@ export function PrivateImageViewer({src,name,onError}:{src:string;name:string;on
       onPointerUp={onPointerEnd} onPointerCancel={onPointerEnd}
       onWheel={onWheel} onKeyDown={onKeys}
       onDoubleClick={()=>view.scale>1?reset():changeZoom(2)}>
-      <img src={src} alt={name} draggable={false}
+      <img className="review-private-preview-image" src={src} alt={name} draggable={false}
         onLoad={e=>setNatural({x:e.currentTarget.naturalWidth,y:e.currentTarget.naturalHeight})}
         onError={onError}
         style={{transform:`translate(${view.x}px, ${view.y}px) scale(${view.scale})`}}/>
