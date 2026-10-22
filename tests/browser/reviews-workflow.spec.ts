@@ -2,7 +2,7 @@ import {test,expect,type Page} from './fixtures';
 import {initializeTestEnvironment} from '@firebase/rules-unit-testing';
 import {collection,doc,getDocs,query,setDoc,where,Timestamp} from 'firebase/firestore';
 const root='http://127.0.0.1:4173',api='https://roteiva-api-dev.ewertonmendes9.workers.dev';
-const connection='aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa',folder='REVIEW_FOLDER_12345';
+const connection='aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa',folder='REVIEW_FOLDER_12345',childFolder='REVIEW_CHILD_FOLDER_12345';
 const file={fileId:'REVIEW_FILE_12345678',name:'Corte.mp4',mimeType:'video/mp4'};
 const second={fileId:'REVIEW_FILE_22345678',name:'Corte final.mp4',mimeType:'video/mp4',thumbnailTicket:'sealed-thumb-qa'};
 const token='w'.repeat(43);
@@ -75,14 +75,22 @@ test('profissional cria, cliente comenta/pede ajustes, V2 aprovada e encerrament
     return route.fulfill({status:201,headers,contentType:'application/json',body:JSON.stringify(uploaded)});
   });
   const comments:Record<string,unknown>[]=[],decisions:Record<string,unknown>[]=[];
-  const detail=()=>({review,assets:selected.map(f=>({...f,version:review.version,grantState:'granted'})),comments,decisions});
+  const detail=()=>({review,assets:selected.map(f=>({...f,version:review.version,grantState:'granted',
+    connectionId:connection,linkedFolderId:folder})),comments,decisions});
   await context.route(api+'/**',async route=>{
     const req=route.request(),url=new URL(req.url()),path=url.pathname;
-    if(!path.startsWith('/reviews')&&!path.includes('/folders/')&&!path.endsWith('/thumbnail'))return route.fallback();
+    if(!path.startsWith('/reviews')&&!path.includes('/folders/')&&!path.endsWith('/thumbnail')&&!path.endsWith('/metadata'))return route.fallback();
     const headers={'Access-Control-Allow-Origin':root,'Access-Control-Allow-Methods':'GET,POST,OPTIONS',
       'Access-Control-Allow-Headers':'Authorization,Content-Type,X-Review-Token','Cache-Control':'no-store'};
     const json=(body:unknown,status=200)=>route.fulfill({status,headers,contentType:'application/json',body:JSON.stringify(body)});
     if(req.method()==='OPTIONS')return route.fulfill({status:204,headers});
+    if(path.endsWith('/metadata')){
+      expect(req.method()).toBe('GET');
+      expect(req.headers().authorization).toMatch(/^Bearer /);
+      const id=url.searchParams.get('fileId');
+      expect([file.fileId,uploaded.id,second.fileId]).toContain(id);
+      return json({file:{id,parents:[id===file.fileId?childFolder:folder]}});
+    }
     if(path.endsWith('/thumbnail')){
       expect(req.headers().authorization).toMatch(/^Bearer /);
       expect(url.searchParams.get('ticket')).toBe('sealed-thumb-qa');
@@ -192,7 +200,21 @@ test('profissional cria, cliente comenta/pede ajustes, V2 aprovada e encerrament
   await expect(composer.getByRole('heading',{name:'Arquivos do Google Drive (2/8)'})).toBeVisible();
   await expect(composer.getByRole('button',{name:'Gerar aprovação'})).toBeEnabled();
   await composer.getByRole('button',{name:'Gerar aprovação'}).click();
-  await expect(page.getByLabel('Link da revisão')).toHaveValue(review.url);
+  const owner=page.getByRole('dialog',{name:'Detalhes da revisão'});
+  const sharing=owner.getByRole('region',{name:'Compartilhar aprovação'});
+  const summary=owner.getByRole('region',{name:'Situação da aprovação'});
+  await expect(sharing.getByLabel('Link da revisão')).toHaveValue(review.url);
+  await expect(sharing.getByRole('button',{name:/Copiar link/})).toBeVisible();
+  await expect(sharing.getByRole('link',{name:/Compartilhar aprovação por WhatsApp/})).toBeVisible();
+  const [sharingBounds,summaryBounds]=await Promise.all([sharing.boundingBox(),summary.boundingBox()]);
+  expect(sharingBounds).toBeTruthy();expect(summaryBounds).toBeTruthy();
+  expect(sharingBounds!.y).toBeLessThan(summaryBounds!.y);
+  const folderLink=owner.getByRole('link',{name:'Abrir pasta do arquivo no Google Drive'});
+  await expect(folderLink).toHaveAttribute('href','https://drive.google.com/drive/folders/'+childFolder);
+  await expect(owner.getByRole('link',{name:'Abrir Corte.mp4 no Google Drive'}))
+    .toHaveAttribute('href','https://drive.google.com/file/d/'+file.fileId+'/view');
+  await owner.getByRole('button',{name:/Envio.mp4/}).click();
+  await expect(folderLink).toHaveAttribute('href','https://drive.google.com/drive/folders/'+folder);
   await page.screenshot({path:info.outputPath('professional-review.png'),fullPage:true});
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
