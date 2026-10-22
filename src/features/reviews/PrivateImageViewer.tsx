@@ -1,4 +1,4 @@
-import {useCallback,useEffect,useRef,useState,type PointerEvent as ReactPointerEvent,type WheelEvent as ReactWheelEvent} from "react";
+import {useCallback,useEffect,useRef,useState,type PointerEvent as ReactPointerEvent,type WheelEvent as ReactWheelEvent,type KeyboardEvent as ReactKeyboardEvent} from "react";
 import {Expand,Minimize,Minus,Plus,RotateCcw} from "lucide-react";
 
 type View={scale:number;x:number;y:number};
@@ -11,7 +11,7 @@ const clamp=(number:number,min:number,max:number)=>Math.max(min,Math.min(max,num
  * Zoom is relative to the *contained* image, not its original pixel dimensions.
  * Panning is constrained to the displayed image's actual (letterboxed) bounds.
  */
-export function PrivateImageViewer({src,name}:{src:string;name:string}){
+export function PrivateImageViewer({src,name,onError}:{src:string;name:string;onError?:()=>void}){
   const [view,setView]=useState<View>(FIT);
   const [natural,setNatural]=useState<Position|null>(null);
   const [expanded,setExpanded]=useState(false);
@@ -93,7 +93,7 @@ export function PrivateImageViewer({src,name}:{src:string;name:string}){
     e.preventDefault();
     setView(v=>limit(v.scale*(e.deltaY<0?1.2:1/1.2),v.x,v.y));
   };
-  const onKeys=(e:React.KeyboardEvent<HTMLDivElement>)=>{
+  const onKeys=(e:ReactKeyboardEvent<HTMLDivElement>)=>{
     if(e.target!==e.currentTarget)return;
     if(e.key==="+"||e.key==="="){e.preventDefault();changeZoom(view.scale*1.3);}
     if(e.key==="-"){e.preventDefault();changeZoom(view.scale/1.3);}
@@ -117,6 +117,7 @@ export function PrivateImageViewer({src,name}:{src:string;name:string}){
       onDoubleClick={()=>view.scale>1?reset():changeZoom(2)}>
       <img src={src} alt={name} draggable={false}
         onLoad={e=>setNatural({x:e.currentTarget.naturalWidth,y:e.currentTarget.naturalHeight})}
+        onError={onError}
         style={{transform:`translate(${view.x}px, ${view.y}px) scale(${view.scale})`}}/>
     </div>
     <div className="review-image-controls" aria-label="Controles da imagem">
