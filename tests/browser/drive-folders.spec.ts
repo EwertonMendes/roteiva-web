@@ -332,10 +332,18 @@ test('queue limits concurrency, keeps its destination across workspace navigatio
   await page.locator('.sidebar nav').getByRole('button',{name:/Projetos/}).click();
   await expect(page.getByRole('heading',{name:'Projetos',exact:true})).toBeVisible();
   await expect(queue.getByText('Destino: Campanha de vídeos')).toHaveCount(3);
-  if(info.project.name==='mobile')await page.getByRole('button',{name:'Abrir menu',exact:true}).click();
+  if(info.project.name==='mobile'){
+    await page.getByRole('button',{name:'Abrir menu',exact:true}).click();
+    await expect(queue).toBeHidden();
+  }
   await page.getByRole('button',{name:'Opções da conta',exact:true}).click();
-  await page.getByRole('button',{name:'Ativar modo escuro'}).click();
-  if(info.project.name==='mobile')await page.getByRole('button',{name:'Fechar menu',exact:true}).first().click();
+  const themeButton=page.getByRole('button',{name:'Ativar modo escuro'});
+  await expect(themeButton).toBeVisible();
+  await themeButton.click();
+  if(info.project.name==='mobile'){
+    await page.getByRole('button',{name:'Fechar menu',exact:true}).first().click();
+    await expect(queue).toBeVisible();
+  }
   await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
   await queue.getByRole('button',{name:'Recolher transferências'}).click();
   await expect(queue.getByText('one.txt')).toHaveCount(0);
