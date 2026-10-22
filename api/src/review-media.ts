@@ -8,9 +8,9 @@ const idPattern=/^[0-9a-f-]{36}$/i;
 const filePattern=/^[A-Za-z0-9_-]{10,200}$/;
 const encoder=new TextEncoder();
 const decoder=new TextDecoder();
-// Limit the lifetime of a copied preview URL. This does not prevent extraction
-// of bytes that an authorized browser has already received.
-export const REVIEW_MEDIA_MAX_AGE=4*60*1000;
+// Bounded capability lifetime; the same value is returned to the portal so
+// media renewals do not interrupt an active video sooner than necessary.
+export const REVIEW_MEDIA_MAX_AGE=12*60*1000;
 /** Non-reversible subject commitment: never expose a reviewer's email in the media URL. */
 export async function reviewMediaSubject(env:Env,reviewId:string,email:string,version=env.TOKEN_KEY_VERSION):Promise<string>{
   const message=encoder.encode('roteiva/media-subject/v1/'+reviewId+':'+email.toLowerCase());
