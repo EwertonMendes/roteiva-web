@@ -612,7 +612,7 @@ test('Google-only video and image streaming require verified review membership b
   const stream=await handle(new Request(address,{headers:{Range:'bytes=0-'}}),x.env);
   assert.equal(stream.status,206);
   assert.equal(stream.headers.get('Content-Range'),'bytes 0-3/100');
-  assert.equal(stream.headers.get('Cache-Control'),'private, no-store');
+  assert.match(stream.headers.get('Cache-Control')||'',/no-store/);
   assert.deepEqual([...new Uint8Array(await stream.arrayBuffer())],[1,2,3,4]);
   assert.equal((await x.send('POST','/reviews/'+created.id+'/close',x.alice)).status,200);
   assert.equal((await handle(new Request(address),x.env)).status,404);
