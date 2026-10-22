@@ -357,14 +357,28 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
     </div>,document.body)}
 
     {composer&&createPortal(<div className="review-modal-backdrop" ref={dialogRef} tabIndex={-1} onMouseDown={e=>{if(e.target===e.currentTarget)resetComposer();}}>
-      <section className="review-dialog" role="dialog" aria-modal="true" aria-label="Enviar materiais para aprovação">
+      <section className="review-dialog review-composer-dialog" role="dialog" aria-modal="true" aria-label="Enviar materiais para aprovação">
         <header><div><span className="eyebrow">APROVAÇÕES / {replacement?"NOVA VERSÃO":"NOVA SOLICITAÇÃO"}</span>
           <h2>{replacement?"Selecione os novos arquivos":"Enviar para aprovação"}</h2>
-          <p>Escolha os materiais que o cliente poderá revisar.</p></div>
+          <p>{replacement?"Escolha os arquivos da nova versão.":"Configure o acesso e selecione os materiais, sem perder o contexto."}</p></div>
           <button className="review-icon" disabled={working} onClick={resetComposer} aria-label="Fechar"><X size={20}/></button></header>
-        <div className="review-dialog-body">
+        {!replacement&&<div className="review-composer-steps" aria-label="Etapas da nova aprovação">
+          <span className={"review-composer-step"+(composerStep==="details"?" active":" complete")}>
+            <span className="review-step-number">{composerStep==="materials"?<Check size={14}/>:1}</span>
+            <span>Configuração</span>
+          </span>
+          <span className="review-step-connector" aria-hidden="true"/>
+          <span className={"review-composer-step"+(composerStep==="materials"?" active":"")}>
+            <span className="review-step-number">2</span><span>Selecionar materiais</span>
+          </span>
+        </div>}
+        <div className="review-dialog-body" ref={composerBodyRef}>
+          {!replacement&&composerStep==="details"&&<div className="review-composer-intro">
+            <h3>Quem vai revisar?</h3>
+            <p>Comece pelo cliente e projeto, depois defina como os participantes entrarão na aprovação.</p>
+          </div>
           {error&&<p className="reviews-warning" role="alert">{error}</p>}
-          <div className="review-fields">
+          {(replacement||composerStep==="details")&&<div className="review-fields">
             <label>Cliente
               <select disabled={!!replacement} value={clientId} onChange={e=>{
                 const id=Number(e.target.value);setClientId(id);setProjectId(0);setFiles([]);setSelectedFolder(null);
@@ -377,10 +391,10 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
             {!replacement&&<>
               <label>Título da aprovação<input maxLength={180} required value={title} onChange={e=>setTitle(e.target.value)} placeholder="Ex.: Primeiro corte da campanha"/></label>
               <label>Mensagem (opcional)<textarea maxLength={1500} rows={2} value={message} onChange={e=>setMessage(e.target.value)} placeholder="O que o cliente deve avaliar?"/></label>
-              <label>Tipo de acesso<select value={mode} onChange={e=>setMode(e.target.value as Mode)}>
-                <option value="link">Qualquer pessoa com o link</option><option value="google">Somente Google autorizado</option>
+              <label>Tipo de acesso<select value={mode} onChange={e=>{setMode(e.target.value as Mode);setShareDirect(false);setRestrictPublic(false);}}>
+                <option value="link">Acesso por link de aprovação</option><option value="google">Acesso restrito com conta Google</option>
               </select></label>
-              {mode==="link"?<p className="reviews-info">Quem tiver o link da aprovação poderá abrir os materiais dentro do Roteiva. O sistema não publica o arquivo no Drive. Permissões públicas que já existem no Google Drive não serão alteradas.</p>:
+              {mode==="link"?<p className="reviews-info">Quem receber o link poderá revisar os materiais pelo Roteiva, sem precisar entrar com Google. O Roteiva cria apenas o acesso necessário para exibir os materiais; permissões públicas existentes no Drive não são alteradas.</p>:
                 <div className="review-participants-config">
                   <h3>Participantes Google</h3>
                   <p className="reviews-muted">Cada pessoa precisará entrar com sua própria conta Google autorizada. Adicione os e-mails separados por vírgula ou em linhas diferentes.</p>
