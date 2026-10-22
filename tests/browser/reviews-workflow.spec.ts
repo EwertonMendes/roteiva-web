@@ -170,7 +170,7 @@ test('profissional cria, cliente comenta/pede ajustes, V2 aprovada e encerrament
   await composer.getByRole('combobox',{name:'Tipo de acesso'}).selectOption('link');
   await expect(removePublic).toHaveCount(0);
   await composer.getByRole('button',{name:'Selecionar materiais'}).click();
-  await expect(composer.getByRole('button',{name:'Materiais autorizados'})).toHaveClass(/active/);
+  await expect(composer.locator('.review-folder-tabs button.active')).toHaveText('Materiais autorizados');
   await expect(composer.getByRole('link',{name:'Abrir pasta no Drive'})).toHaveAttribute(
     'href','https://drive.google.com/drive/folders/'+folder);
   await expect(composer.getByRole('link',{name:'Abrir Corte final.mp4 no Google Drive'}))
