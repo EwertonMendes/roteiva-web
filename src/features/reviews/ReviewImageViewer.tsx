@@ -1,5 +1,5 @@
 import {useCallback,useEffect,useRef,useState,type PointerEvent as ReactPointerEvent,type KeyboardEvent as ReactKeyboardEvent} from "react";
-import {Expand,Minimize,Minus,Plus,RotateCcw} from "lucide-react";
+import {ZoomToolbar} from "../../components/ZoomToolbar";
 
 type View={scale:number;x:number;y:number};
 type Position={x:number;y:number};
@@ -142,17 +142,9 @@ export function ReviewImageViewer({src,name,onError}:{src:string;name:string;onE
         onError={onError}
         style={{transform:`translate(${view.x}px, ${view.y}px) scale(${view.scale})`}}/>
     </div>
-    <div className="review-image-controls" aria-label="Controles da imagem">
-      <button type="button" aria-label="Reduzir zoom" title="Reduzir zoom"
-        disabled={view.scale<=1} onClick={()=>changeZoom(view.scale/1.3)}><Minus size={17}/></button>
-      <output aria-live="off" aria-label="Zoom da imagem">{Math.round(view.scale*100)}%</output>
-      <button type="button" aria-label="Ampliar zoom" title="Ampliar zoom"
-        disabled={view.scale>=MAX_SCALE} onClick={()=>changeZoom(view.scale*1.3)}><Plus size={17}/></button>
-      <button type="button" aria-label="Ajustar imagem à tela" title="Ajustar imagem à tela"
-        onClick={reset}><RotateCcw size={17}/></button>
-      <button ref={expandRef} type="button" aria-label={expanded?"Sair da tela cheia":"Ver imagem em tela cheia"}
-        title={expanded?"Sair da tela cheia":"Ver imagem em tela cheia"}
-        onClick={()=>setExpanded(v=>!v)}>{expanded?<Minimize size={17}/>:<Expand size={17}/>}</button>
-    </div>
+    <ZoomToolbar className="review-image-toolbar" value={view.scale} min={1} max={MAX_SCALE}
+      onDecrease={()=>changeZoom(view.scale/1.3)}
+      onIncrease={()=>changeZoom(view.scale*1.3)} onReset={reset}
+      fullscreen={expanded} onToggleFullscreen={()=>setExpanded(v=>!v)}/>
   </div>;
 }
