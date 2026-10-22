@@ -1,8 +1,11 @@
 import {useEffect,useMemo,useRef,useState} from "react";
 import {CheckCircle2,ChevronRight,Clock3,Copy,ExternalLink,FileAudio,FileImage,FileText,
-  FileVideo,FolderOpen,History,Link2,LoaderCircle,MessageSquare,RotateCcw,Send,ShieldCheck,X} from "lucide-react";
+  FileVideo,FolderOpen,Grid2X2,History,Link2,List,LoaderCircle,MessageSquare,RotateCcw,Search,Send,ShieldCheck,X} from "lucide-react";
 import {formatReviewTime} from "./review-timecode";
 import {useDriveApi} from "../drive/drive-api";
+import {DriveThumbnail} from "../drive/DriveThumbnail";
+import {useDriveThumbnailFetch} from "../drive/useDriveThumbnailFetch";
+import {useAuth} from "../auth/AuthProvider";
 import {fmt,statusText,type Asset,type Comment,type Detail} from "./review-model";
 import "./review-owner-workspace.css";
 
@@ -61,6 +64,12 @@ export function ReviewOwnerWorkspace({detail,working,error,onClose,onRevise,onPu
 }){
   const {review,assets,comments,decisions}=detail;
   const driveCall=useDriveApi();
+  const getThumbnail=useDriveThumbnailFetch();
+  const {user}=useAuth();
+  const [fileSearch,setFileSearch]=useState("");
+  const [typeFilter,setTypeFilter]=useState<"all"|"video"|"image"|"audio"|"pdf">("all");
+  const [galleryView,setGalleryView]=useState<"grid"|"list">("grid");
+  const [visibleLimit,setVisibleLimit]=useState(12);
   // Resolve the actual immediate parent lazily. Historical approvals need no
   // migration: their owner-only detail already contains the linked project folder.
   const [parentFolders,setParentFolders]=useState<Record<string,string|null>>({});
@@ -74,7 +83,10 @@ export function ReviewOwnerWorkspace({detail,working,error,onClose,onRevise,onPu
   const [feedbackAll,setFeedbackAll]=useState(true);
   const [notice,setNotice]=useState("");
   const mediaRef=useRef<HTMLDivElement>(null);
-  useEffect(()=>{setSelectedFile(featuredId);setNotice("");setFeedbackAll(true);},[review.id,review.version,featuredId]);
+  useEffect(()=>{
+    setSelectedFile(featuredId);setNotice("");setFeedbackAll(true);
+    setFileSearch("");setTypeFilter("all");setVisibleLimit(12);
+  },[review.id,review.version,featuredId]);
   const active=currentAssets.find(a=>a.fileId===selectedFile)||currentAssets[0];
   const parentKey=active?.connectionId&&active.fileId
     ?active.connectionId+":"+active.fileId:"";
@@ -97,12 +109,28 @@ export function ReviewOwnerWorkspace({detail,working,error,onClose,onRevise,onPu
   const exactParent=parentKey?parentFolders[parentKey]:undefined;
   const folderId=exactParent||active?.linkedFolderId;
   const displayedComments=feedbackAll?currentComments:currentComments.filter(c=>c.file_id===active?.fileId);
-  const fileCounts=new Map(currentAssets.map(a=>[a.fileId,currentComments.filter(c=>c.file_id===a.fileId).length]));
+  const fileCounts=useMemo(()=>{
+    const counts=new Map<string,number>();
+    for(const comment of currentComments)counts.set(comment.file_id,(counts.get(comment.file_id)||0)+1);
+    return counts;
+  },[currentComments]);
+  const fileKind=(mime:string):"video"|"image"|"audio"|"pdf"=>
+    mime.startsWith("video/")?"video":mime.startsWith("image/")?"image":
+    mime.startsWith("audio/")?"audio":"pdf";
+  const fileKindLabel=(mime:string)=>({video:"Vídeo",image:"Imagem",audio:"Áudio",pdf:"PDF"})[fileKind(mime)];
+  const filteredAssets=useMemo(()=>currentAssets.filter(asset=>
+    (typeFilter==="all"||fileKind(asset.mimeType)===typeFilter)&&
+    asset.name.toLocaleLowerCase("pt-BR").includes(fileSearch.trim().toLocaleLowerCase("pt-BR"))
+  ),[currentAssets,fileSearch,typeFilter]);
+  const visibleAssets=filteredAssets.slice(0,visibleLimit);
+  const remainingAssets=filteredAssets.length-visibleAssets.length;
   const blocked=review.status==="closed";
   const previewable=active&&active.grantState==="granted"&&!blocked;
   const showMaterials=review.status!=="draft"||currentAssets.length>0;
   function focusMaterial(comment:Comment){
     setSelectedFile(comment.file_id);
+    setFileSearch("");setTypeFilter("all");
+    setVisibleLimit(Math.max(12,currentAssets.findIndex(a=>a.fileId===comment.file_id)+1));
     setNotice(comment.seconds!==null?
       "Comentário no instante "+formatReviewTime(comment.seconds)+". A prévia do Drive não permite avançar automaticamente para esse segundo; use os controles do vídeo.":"Material selecionado na prévia.");
     mediaRef.current?.scrollIntoView({behavior:"smooth",block:"nearest"});
@@ -162,16 +190,56 @@ export function ReviewOwnerWorkspace({detail,working,error,onClose,onRevise,onPu
       {showMaterials&&<div className="rowner-workspace">
         <section className="rowner-materials" aria-label="Materiais da versão atual">
           <div className="rowner-section-label"><div><h3>Materiais · V{review.version}</h3><small>Selecione para visualizar</small></div></div>
-          <div className="rowner-file-list">
-            {currentAssets.map(a=><button type="button" key={a.fileId}
+          <div className="rowner-gallery-toolbar">
+            <span className="rowner-gallery-count">{currentAssets.length} {currentAssets.length===1?"arquivo":"arquivos"}</span>
+            <div className="rowner-gallery-layout" role="group" aria-label="Visualização dos materiais">
+              <button type="button" aria-label="Ver materiais em grade" aria-pressed={galleryView==="grid"}
+                onClick={()=>setGalleryView("grid")}><Grid2X2 size={16}/></button>
+              <button type="button" aria-label="Ver materiais em lista" aria-pressed={galleryView==="list"}
+                onClick={()=>setGalleryView("list")}><List size={17}/></button>
+            </div>
+          </div>
+          {currentAssets.length>=5&&<div className="rowner-gallery-filters">
+            <label className="rowner-gallery-search">
+              <Search size={16} aria-hidden="true"/>
+              <input aria-label="Buscar materiais por nome" type="search" placeholder="Buscar arquivo…"
+                value={fileSearch} onChange={e=>{setFileSearch(e.target.value);setVisibleLimit(12);}}/>
+            </label>
+            <select aria-label="Filtrar materiais por tipo" value={typeFilter}
+              onChange={e=>{setTypeFilter(e.target.value as typeof typeFilter);setVisibleLimit(12);}}>
+              <option value="all">Todos os tipos</option>
+              <option value="video">Vídeos</option><option value="image">Imagens</option>
+              <option value="audio">Áudios</option><option value="pdf">PDFs</option>
+            </select>
+          </div>}
+          <div className="rowner-file-list" data-view={galleryView} aria-label="Galeria de materiais">
+            {visibleAssets.map(a=><button type="button" key={a.fileId}
               className={"rowner-file"+(active?.fileId===a.fileId?" is-active":"")}
-              aria-current={active?.fileId===a.fileId?"true":undefined}
-              onClick={()=>{setSelectedFile(a.fileId);setNotice("");}}>
-              <span className="rowner-file-symbol"><Glyph mime={a.mimeType}/></span>
-              <span className="rowner-file-name"><strong title={a.name}>{a.name}</strong><small>{a.mimeType.startsWith("video/")?"Vídeo":a.mimeType.startsWith("image/")?"Imagem":a.mimeType==="application/pdf"?"PDF":"Áudio"}</small></span>
-              {fileCounts.get(a.fileId)?<span className="rowner-file-count" aria-label={fileCounts.get(a.fileId)+" comentários"}><MessageSquare size={12}/>{fileCounts.get(a.fileId)}</span>:null}
+              aria-pressed={active?.fileId===a.fileId} aria-label={"Selecionar arquivo "+a.name}
+              title={a.name} onClick={()=>{setSelectedFile(a.fileId);setNotice("");}}>
+              <span className="rowner-file-art">
+                {user&&a.connectionId?<DriveThumbnail
+                  item={{id:a.fileId,name:a.name,mimeType:a.mimeType,
+                    thumbnailFallback:a.grantState==="granted"&&review.status!=="closed"}}
+                  scope={user.uid+":"+a.connectionId} getThumbnail={getThumbnail}/>:
+                  <span className="rowner-file-fallback"><Glyph mime={a.mimeType}/></span>}
+                {active?.fileId===a.fileId&&<span className="rowner-file-selected" aria-hidden="true"><CheckCircle2 size={19} fill="currentColor"/></span>}
+                {!!fileCounts.get(a.fileId)&&<span className="rowner-file-count"
+                  aria-label={fileCounts.get(a.fileId)+" comentários"}><MessageSquare size={12}/>{fileCounts.get(a.fileId)}</span>}
+              </span>
+              <span className="rowner-file-name"><strong>{a.name}</strong>
+                <small>{fileKindLabel(a.mimeType)}</small>
+              </span>
             </button>)}
           </div>
+          {!filteredAssets.length&&<p className="rowner-gallery-empty">Nenhum arquivo corresponde aos filtros.
+            <button type="button" onClick={()=>{setFileSearch("");setTypeFilter("all");setVisibleLimit(12);}}>Limpar filtros</button>
+          </p>}
+          {remainingAssets>0&&<button type="button" className="rowner-gallery-more"
+            onClick={()=>setVisibleLimit(v=>v+12)}>Mostrar mais {Math.min(12,remainingAssets)} de {remainingAssets} arquivos <ChevronRight size={15}/></button>}
+          {currentAssets.length>=5&&<p className="rowner-gallery-summary">
+            Exibindo {visibleAssets.length} de {filteredAssets.length} {filteredAssets.length===1?"resultado":"resultados"}
+          </p>}
           <div className="rowner-preview" ref={mediaRef}>
             <div className="rowner-preview-head"><strong title={active?.name}>{active?.name||"Selecione um material"}</strong>
               <div className="rowner-preview-actions">
