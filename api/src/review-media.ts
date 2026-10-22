@@ -10,7 +10,7 @@ const encoder=new TextEncoder();
 const decoder=new TextDecoder();
 // Limit the lifetime of a copied preview URL. This does not prevent extraction
 // of bytes that an authorized browser has already received.
-const MEDIA_MAX_AGE=4*60*1000;
+export const REVIEW_MEDIA_MAX_AGE=4*60*1000;
 /** Non-reversible subject commitment: never expose a reviewer's email in the media URL. */
 export async function reviewMediaSubject(env:Env,reviewId:string,email:string,version=env.TOKEN_KEY_VERSION):Promise<string>{
   const message=encoder.encode('roteiva/media-subject/v1/'+reviewId+':'+email.toLowerCase());
@@ -28,7 +28,7 @@ async function key(env:Env,version:string):Promise<CryptoKey>{
   return crypto.subtle.importKey('raw',raw,{name:'HMAC',hash:'SHA-256'},false,['sign','verify']);
 }
 export async function mintReviewMediaTicket(env:Env,reviewId:string,fileId:string,version:number,expiry:number,inviteHash:string,subject?:string):Promise<string>{
-  const p:Ticket={r:reviewId,f:fileId,v:version,e:Math.min(expiry,Date.now()+MEDIA_MAX_AGE),k:env.TOKEN_KEY_VERSION,h:inviteHash,...(subject?{s:subject}:{})};
+  const p:Ticket={r:reviewId,f:fileId,v:version,e:Math.min(expiry,Date.now()+REVIEW_MEDIA_MAX_AGE),k:env.TOKEN_KEY_VERSION,h:inviteHash,...(subject?{s:subject}:{})};
   const payload=base64url(encoder.encode(JSON.stringify(p)));
   const mac=await crypto.subtle.sign('HMAC',await key(env,p.k),encoder.encode('roteiva/review-media/v1/'+payload));
   return payload+'.'+base64url(new Uint8Array(mac));
@@ -40,7 +40,7 @@ export async function verifyReviewMediaTicket(env:Env,token:string):Promise<Tick
   try{p=JSON.parse(decoder.decode(decode(part))) as Ticket;}catch{throw new ApiError(404,'review_not_found');}
   if(!p||typeof p!=='object'||!idPattern.test(p.r)||!filePattern.test(p.f)||
      !Number.isSafeInteger(p.v)||p.v<1||typeof p.h!=='string'||!/^[A-Za-z0-9_-]{43}$/.test(p.h)||typeof p.e!=='number'||!Number.isFinite(p.e)||
-     p.e<=Date.now()||p.e>Date.now()+MEDIA_MAX_AGE+5000||typeof p.k!=='string'||
+     p.e<=Date.now()||p.e>Date.now()+REVIEW_MEDIA_MAX_AGE+5000||typeof p.k!=='string'||
      !/^[A-Za-z0-9_-]{1,50}$/.test(p.k)||(p.s!==undefined&&!/^[A-Za-z0-9_-]{43}$/.test(p.s)))throw new ApiError(404,'review_not_found');
   let verified=false;
   try{verified=await crypto.subtle.verify('HMAC',await key(env,p.k),decode(mac),
