@@ -50,7 +50,9 @@ export function ReviewPortal({token}:{token:string}){
   const [selected,setSelected]=useState(0),[name,setName]=useState(""),[body,setBody]=useState("");
   const [minutes,setMinutes]=useState(""),[busy,setBusy]=useState(false),[decision,setDecision]=useState<"approved"|"changes"|null>(null);
   const [decisionText,setDecisionText]=useState(""),[notice,setNotice]=useState("");
-  const [mediaUrl,setMediaUrl]=useState(""),[mediaMode,setMediaMode]=useState<"loading"|"native"|"drive">("loading");
+  const [mediaUrl,setMediaUrl]=useState(""),[mediaMode,setMediaMode]=useState<"loading"|"native"|"drive"|"private"|"private-error">("loading");
+  const [previewProgress,setPreviewProgress]=useState(0),[previewError,setPreviewError]=useState("");
+  const [previewRetry,setPreviewRetry]=useState(0);
   const [playhead,setPlayhead]=useState(0),[duration,setDuration]=useState<number|null>(null);
   const [mediaFailure,setMediaFailure]=useState(false);
   const loadedVersion=useRef(0),videoRef=useRef<HTMLVideoElement>(null),commentRef=useRef<HTMLTextAreaElement>(null);
@@ -103,18 +105,70 @@ export function ReviewPortal({token}:{token:string}){
   const activeFileId=active?.fileId;
   const activeVersion=data?.review.version;
   const privateGoogle=data?.review.mode==="google";
+  const activeMime=active?.mimeType;
   useEffect(()=>{
-    let alive=true;
+    let alive=true,blobUrl="";
+    const controller=new AbortController();
     setMediaUrl("");setMediaFailure(false);setPlayhead(0);setDuration(null);
-    setMediaMode(isVideo&&!privateGoogle?"loading":"drive");
-    if(privateGoogle||!isVideo||!activeFileId||!activeVersion)return;
-    void request<{url:string;expiresAt:number}>("/reviews/public/media-ticket","POST",
-      {fileId:activeFileId,version:activeVersion}).then(ticket=>{
-      if(alive&&ticket.url.startsWith(API+"/reviews/media?ticket=")){setMediaUrl(ticket.url);setMediaMode("native");}
-      else if(alive){setMediaMode("drive");setMediaFailure(true);}
-    }).catch(()=>{if(alive){setMediaMode("drive");setMediaFailure(true);}});
-    return()=>{alive=false;};
-  },[activeFileId,activeVersion,isVideo,privateGoogle,request]);
+    setPreviewProgress(0);setPreviewError("");
+    setMediaMode(privateGoogle||isVideo?"loading":"drive");
+    if(!activeFileId||!activeVersion||!activeMime)return;
+    if(privateGoogle){
+      // Avoid Google's third-party-cookie-dependent iframe. Every file chunk
+      // is authorized against the verified Google identity by the Worker.
+      void (async()=>{
+        if(!user)throw new Error("Entre com sua conta Google autorizada para visualizar.");
+        const parts:Uint8Array[]=[];
+        const max=96*1024*1024;
+        let offset=0,total=0;
+        do{
+          const auth=await user.getIdToken();
+          const response=await fetch(API+"/reviews/public/file",{
+            method:"POST",cache:"no-store",referrerPolicy:"no-referrer",signal:controller.signal,
+            headers:{"Content-Type":"application/json","X-Review-Token":token,"Authorization":"Bearer "+auth},
+            body:JSON.stringify({fileId:activeFileId,version:activeVersion,offset})
+          });
+          if(!response.ok){
+            const body=await response.json().catch(()=>({})) as {error?:{code?:string}};
+            if(response.status===401||response.status===403)
+              throw new Error("Acesso não autorizado. Entre novamente com a conta Google permitida.");
+            if(body.error?.code==="review_version_changed"||response.status===404)
+              throw new Error("Este material mudou ou não está mais disponível. Atualize a revisão.");
+            throw new Error("Não foi possível carregar o arquivo com segurança. Tente novamente.");
+          }
+          const match=/^bytes (\d+)-(\d+)\/(\d+)$/.exec(response.headers.get("Content-Range")||"");
+          if(response.status!==206||!match)throw new Error("O Drive enviou uma resposta inválida para a prévia.");
+          const start=Number(match[1]),end=Number(match[2]),length=Number(match[3]);
+          if(start!==offset||end<start||!Number.isSafeInteger(length)||length<1||length>max)
+            throw new Error(length>max
+              ?"Este arquivo é grande demais para a prévia integrada. Abra-o no Google Drive."
+              :"A prévia recebida é inválida. Tente novamente.");
+          total=length;
+          const bytes=new Uint8Array(await response.arrayBuffer());
+          if(bytes.byteLength!==end-start+1||offset+bytes.byteLength>max)
+            throw new Error("Não foi possível validar o conteúdo retornado pelo Drive.");
+          parts.push(bytes);offset+=bytes.byteLength;
+          if(alive)setPreviewProgress(Math.min(100,Math.round(100*offset/total)));
+        }while(offset<total&&!controller.signal.aborted);
+        if(!alive||controller.signal.aborted)return;
+        blobUrl=URL.createObjectURL(new Blob(parts,{type:activeMime}));
+        setMediaUrl(blobUrl);setMediaMode("private");
+      })().catch(err=>{
+        if(alive&&!controller.signal.aborted){
+          setPreviewError(err instanceof Error?err.message:"Não foi possível abrir a prévia.");
+          setMediaMode("private-error");
+        }
+      });
+    }else if(isVideo){
+      void request<{url:string;expiresAt:number}>("/reviews/public/media-ticket","POST",
+        {fileId:activeFileId,version:activeVersion}).then(ticket=>{
+        if(alive&&ticket.url.startsWith(API+"/reviews/media?ticket=")){setMediaUrl(ticket.url);setMediaMode("native");}
+        else if(alive){setMediaMode("drive");setMediaFailure(true);}
+      }).catch(()=>{if(alive){setMediaMode("drive");setMediaFailure(true);}});
+    }
+    return()=>{alive=false;controller.abort();if(blobUrl)URL.revokeObjectURL(blobUrl);};
+  },[activeFileId,activeVersion,activeMime,isVideo,privateGoogle,request,user,token,previewRetry]);
+  const playableVideo=isVideo&&(mediaMode==="native"||mediaMode==="private");
   const seconds=isVideo?parseReviewTime(minutes):null;
   const invalidTime=isVideo&&!validReviewSecond(seconds,mediaMode==="native"?duration:null);
   const switchFile=(index:number)=>{
