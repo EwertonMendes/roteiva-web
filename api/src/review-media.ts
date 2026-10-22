@@ -8,7 +8,9 @@ const idPattern=/^[0-9a-f-]{36}$/i;
 const filePattern=/^[A-Za-z0-9_-]{10,200}$/;
 const encoder=new TextEncoder();
 const decoder=new TextDecoder();
-const MEDIA_MAX_AGE=12*60*1000;
+// Limit the lifetime of a copied preview URL. This does not prevent extraction
+// of bytes that an authorized browser has already received.
+const MEDIA_MAX_AGE=4*60*1000;
 /** Non-reversible subject commitment: never expose a reviewer's email in the media URL. */
 export async function reviewMediaSubject(env:Env,reviewId:string,email:string,version=env.TOKEN_KEY_VERSION):Promise<string>{
   const message=encoder.encode('roteiva/media-subject/v1/'+reviewId+':'+email.toLowerCase());
@@ -53,6 +55,11 @@ export async function verifyReviewMediaTicket(env:Env,token:string):Promise<Tick
  */
 export async function streamReviewMedia(request:Request,env:Env,url:URL):Promise<Response>{
   if(request.method!=='GET'&&request.method!=='HEAD')throw new ApiError(405,'method_not_allowed');
+  // Reject ordinary top-level opening of preview URLs. Native media elements
+  // and streaming fetches still work. Fetch metadata is advisory and is NOT
+  // an authorization boundary: signed tickets and D1 checks remain mandatory.
+  if(request.headers.get('Sec-Fetch-Mode')==='navigate'&&request.headers.get('Sec-Fetch-Dest')==='document')
+    throw new ApiError(404,'review_not_found');
   const p=await verifyReviewMediaTicket(env,url.searchParams.get('ticket')||'');
   const r=await env.DB.prepare("SELECT id,owner_uid,status,current_version,expires_at,token_hash,access_mode FROM review_requests WHERE id=?")
     .bind(p.r).first<{id:string;owner_uid:string;status:string;current_version:number;expires_at:number;token_hash:string;access_mode:string}>();
