@@ -26,6 +26,7 @@ const messages:Record<string,string>={
   review_already_decided:"A decisão desta versão já foi registrada.",
   review_invalid_input:"Revise os dados preenchidos e tente novamente.",
   review_version_changed:"Uma nova versão está disponível. Atualize a página e revise o material antes de responder.",
+  review_media_unsupported:"Este formato não possui visualização integrada. Peça ao estúdio uma versão compatível em imagem, vídeo, áudio ou PDF.",
   rate_limited:"Muitas tentativas. Tente novamente em instantes."
 };
 function reviewFileURL(id:string){return "https://drive.google.com/file/d/"+encodeURIComponent(id)+"/view";}
@@ -134,7 +135,11 @@ export function ReviewPortal({token}:{token:string}){
     };
     setMediaMode("loading");setMediaUrl("");setPreviewError("");setPlayhead(0);setDuration(null);
     setVideoExpanded(false);playbackResume.current={at:0,playing:false};
-    if(activeFileId&&activeVersion&&activeMime)void issue();
+    if(activeFileId&&activeVersion&&activeMime){
+      const supported=/^(image|video|audio)\//.test(activeMime)||activeMime==="application/pdf";
+      if(!supported){setMediaMode("error");setPreviewError(messages.review_media_unsupported);}
+      else void issue();
+    }
     return()=>{alive=false;if(renewal)clearTimeout(renewal);};
   },[activeFileId,activeVersion,activeMime,isVideo,request,previewRetry]);
   const playableVideo=isVideo&&mediaMode==="ready";
@@ -163,7 +168,7 @@ export function ReviewPortal({token}:{token:string}){
     if(playableVideo&&videoRef.current){
       videoRef.current.currentTime=secondsValue;
       videoRef.current.scrollIntoView({behavior:"smooth",block:"center"});
-    }else setNotice("Abra o vídeo no Google Drive e avance até "+formatReviewTime(secondsValue)+".");
+    }else setNotice("Não é possível avançar no vídeo neste momento. Verifique a prévia e tente novamente.");
   };
   const action=async(kind:"comment"|"decide",status?:"approved"|"changes")=>{
     if(!name.trim()){setNotice("Informe seu nome antes de continuar.");return;}

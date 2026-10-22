@@ -157,3 +157,22 @@ test("image-only reviews hide all video timestamp controls",async({page})=>{
   await expect.poll(()=>received.length).toBe(1);
   expect((received[0] as {seconds:unknown}).seconds).toBeNull();
 });
+
+test('unsupported document preview shows clear next step without blank canvas',async({page})=>{
+  await page.route(API+'/reviews/public**',async route=>{
+    const headers={'Access-Control-Allow-Origin':ROOT,'Access-Control-Allow-Methods':'GET,POST,OPTIONS',
+      'Access-Control-Allow-Headers':'Authorization,Content-Type,X-Review-Token'};
+    if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
+    if(route.request().url().endsWith('/media-ticket'))throw new Error('Unsupported file must not request streaming');
+    const result={review:{title:'Documento para avaliação',message:'',studioName:'Estúdio QA',
+      status:'pending',version:1,expiresAt:Date.now()+86400000,mode:'link'},
+      assets:[{fileId:'DOC_FILE_12345678',name:'Roteiro Google Docs',mimeType:'application/vnd.google-apps.document'}],
+      comments:[],decisions:[]};
+    return route.fulfill({status:200,headers,contentType:'application/json',body:JSON.stringify(result)});
+  });
+  await page.goto(ROOT+'/review/'+TOKEN);
+  await expect(page.getByRole('heading',{name:'Documento para avaliação'})).toBeVisible();
+  await expect(page.getByText('Não foi possível mostrar a prévia')).toBeVisible();
+  await expect(page.getByText(/Peça ao estúdio uma versão compatível/)).toBeVisible();
+  await expect(page.locator('.review-portal-stage iframe')).toHaveCount(0);
+});

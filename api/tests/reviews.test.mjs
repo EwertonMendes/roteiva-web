@@ -635,3 +635,13 @@ test('new invitations default to portal-only without modifying existing Google D
   assert.equal((await x.send('POST','/reviews/'+id+'/close',x.alice)).status,200);
   assert.equal(x.calls.filter(c=>c.path.includes('/permissions')&&['POST','DELETE'].includes(c.method)).length,0);
 });
+
+test('unsupported Drive-native documents fail explicitly without minting unusable tickets',async t=>{
+  const x=await integration(t);
+  const {id,published}=await createAndPublish(x,{driveShareEnabled:false});
+  assert.equal(published.status,200);
+  x.f.sql.prepare("UPDATE review_assets SET mime_type=? WHERE review_id=?").run('application/vnd.google-apps.document',id);
+  const invite=(await published.json()).review.review.url.split('/').at(-1);
+  await assert.rejects(()=>route(x.f,invite,'/reviews/public/media-ticket','POST',{fileId:file}),
+    e=>e.status===415&&e.code==='review_media_unsupported');
+});
