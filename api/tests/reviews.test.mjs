@@ -8,6 +8,7 @@ import {random,hash,encrypt,context,base64url} from '../src/crypto.ts';
 const BASE='https://roteiva-api-dev.ewertonmendes9.workers.dev';
 const account='aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa';
 const file='FILE_REVIEW_12345678';
+const imageFile='IMAGE_REVIEW_12345678';
 const pair=await generateKeyPair('RS256');
 function fixture(){
   const db=database({id:account,owner_uid:'alice',google_account_id:'google-alice',
@@ -153,7 +154,7 @@ async function integration(t){
     OAUTH_REDIRECT_URI:'https://roteiva-api-dev.ewertonmendes9.workers.dev/oauth/drive/callback',
     API_RATE_LIMIT:{limit:async()=>({success:true})},
     API_THUMB_LIMIT:{limit:async()=>({success:true})}};
-  const acl=new Map();
+  const acl=new Map(),imageAcl=new Map();
   const calls=[];
   const hooks={beforeGrant:null,deleteFails:false,lostGrant:false,outside:false,
     publicFolder:false,unauthorized:false,disableInheritance:false};
@@ -184,6 +185,15 @@ async function integration(t){
           'Content-Type':'video/mp4','Content-Range':'bytes 0-3/100',
           'Content-Length':'4','Accept-Ranges':'bytes'}});
       }
+      if(u.pathname.endsWith('/files/'+imageFile)&&u.searchParams.get('alt')==='media'){
+        return new Response(new Uint8Array([1,2,3,4]),{status:206,headers:{
+          'Content-Type':'image/png','Content-Range':'bytes 0-3/100',
+          'Content-Length':'4','Accept-Ranges':'bytes'}});
+      }
+      if(u.pathname.endsWith('/files/'+imageFile))return Response.json({
+        id:imageFile,name:'Capa de campanha.png',mimeType:'image/png',
+        trashed:false,isAppAuthorized:!hooks.unauthorized,inheritedPermissionsDisabled:hooks.disableInheritance,
+        parents:[folder],capabilities:{canShare:!hooks.unauthorized}});
       if(u.pathname.endsWith('/files/'+file))return Response.json({
         id:file,name:'Primeiro corte.mp4',mimeType:'video/mp4',
         trashed:false,isAppAuthorized:!hooks.unauthorized,inheritedPermissionsDisabled:hooks.disableInheritance,
@@ -196,6 +206,16 @@ async function integration(t){
       if(u.pathname.endsWith('/files/'+folder+'/permissions')){
         return Response.json({permissions:hooks.publicFolder?[
           {id:'folder-share',type:'anyone',role:'reader',permissionDetails:[{inherited:false}]}]:[]});
+      }
+      if(u.pathname.endsWith('/files/'+imageFile+'/permissions')){
+        if(init.method==='POST'){
+          const value=JSON.parse(init.body),id='image-permission-'+(imageAcl.size+1);
+          imageAcl.set(id,value);return Response.json({id,...value});
+        }
+        return Response.json({permissions:[...imageAcl].map(([id,p])=>({id,...p}))});
+      }
+      if(u.pathname.includes('/files/'+imageFile+'/permissions/')&&init.method==='DELETE'){
+        imageAcl.delete(u.pathname.split('/').at(-1));return new Response(null,{status:204});
       }
       if(u.pathname.endsWith('/files/'+file+'/permissions')){
         if(init.method==='POST'){
@@ -225,7 +245,7 @@ async function integration(t){
       ...(payload?{body:JSON.stringify(payload)}:{})}),env);
   const payload={clientId:7,projectId:17,studioName:'Estudio',title:'Primeiro corte',message:'Avalie',
     mode:'link',driveShareEnabled:true,expiresInDays:14,assets:[{fileId:file,connectionId:account,linkedFolderId:folder}]};
-  return {f,env,send,payload,alice,bob,jwt,acl,calls,hooks};
+  return {f,env,send,payload,alice,bob,jwt,acl,imageAcl,calls,hooks};
 }
 test('public video media uses signed range tickets and stops immediately after review closure',async t=>{
   const x=await integration(t);
@@ -336,6 +356,41 @@ test('Google identity protects approval even when the linked Drive folder is pub
   assert.equal(detail.asset.fileId,file);
   assert.equal(detail.asset.fileName,'Primeiro corte.mp4');
   assert.equal((await x.send('POST','/reviews/'+denied.id+'/close',x.alice)).status,200);
+});
+test('Google-restricted review publishes video and image from a public folder without mutating Drive ACLs',async t=>{
+  const x=await integration(t);x.hooks.publicFolder=true;x.hooks.unauthorized=true;
+  const selection=[...x.payload.assets,{fileId:imageFile,connectionId:account,linkedFolderId:folder}];
+  const {id,published}=await createAndPublish(x,{mode:'google',recipientEmail:'client@gmail.com',assets:selection});
+  assert.equal(published.status,200);
+  const granted=x.f.sql.prepare("SELECT name,grant_state FROM review_assets WHERE review_id=? ORDER BY name").all(id);
+  assert.deepEqual(granted.map(r=>[r.name,r.grant_state]),[['Capa de campanha.png','granted'],['Primeiro corte.mp4','granted']]);
+  const invitation=(await published.json()).review.review.url.split('/').at(-1);
+  const recipient=await x.jwt('recipient','client@gmail.com');
+  const stranger=await x.jwt('stranger','stranger@gmail.com');
+  assert.equal((await route(x.f,invitation,undefined,undefined,undefined,recipient)).status,200);
+  await assert.rejects(()=>route(x.f,invitation,undefined,undefined,undefined,stranger),e=>e.status===403);
+  assert.equal(x.calls.filter(v=>['POST','DELETE'].includes(v.method)&&v.path.includes('/permissions')).length,0);
+  assert.equal((await x.send('POST','/reviews/'+id+'/close',x.alice)).status,200);
+});
+test('publication identifies the blocked image and can safely resume without recreating approval',async t=>{
+  const x=await integration(t);x.hooks.unauthorized=true;
+  x.acl.set('owner-public',{type:'anyone',role:'reader'});
+  const selection=[...x.payload.assets,{fileId:imageFile,connectionId:account,linkedFolderId:folder}];
+  const created=await x.send('POST','/reviews',x.alice,{...x.payload,mode:'google',
+    recipientEmail:'client@gmail.com',assets:selection});
+  assert.equal(created.status,201);
+  const {id}=await created.json();
+  const failed=await x.send('POST','/reviews/'+id+'/publish',x.alice);
+  assert.equal(failed.status,409);
+  const error=(await failed.json()).error;
+  assert.equal(error.code,'review_drive_file_authorization_required');
+  assert.deepEqual(error.asset,{fileId:imageFile,fileName:'Capa de campanha.png'});
+  x.hooks.unauthorized=false;
+  const retried=await x.send('POST','/reviews/'+id+'/publish',x.alice);
+  assert.equal(retried.status,200);
+  assert.equal((await retried.json()).review.review.status,'pending');
+  assert.equal((await x.send('POST','/reviews/'+id+'/close',x.alice)).status,200);
+  assert.equal(x.acl.has('owner-public'),true);
 });
 test('restricted review verifies Google recipient and preserves their pre-existing ACL',async t=>{
   const x=await integration(t);
