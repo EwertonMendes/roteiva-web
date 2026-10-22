@@ -9,7 +9,7 @@
 .app-shell .project-detail .studio-form :is(input,select) { min-height:48px; border-radius:12px; }
 .app-shell .project-detail .studio-form textarea { min-height:116px; border-radius:12px; }
 .project-detail .pd-stage { position:relative; }
-.app-shell .project-detail .pd-stage select { padding-left:43px; }
+
 .project-detail .pd-stage i { position:absolute; top:50%; left:17px; transform:translateY(-50%); width:12px; height:12px; border-radius:50%; background:#4f95ed; pointer-events:none; }
 .project-detail .pd-stage[data-stage="Em aprovação"] i { background:#a98af4; }
 .project-detail .pd-stage[data-stage="Ajustes"] i { background:var(--pd-warning); }
