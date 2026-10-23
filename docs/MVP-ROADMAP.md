@@ -1,5 +1,14 @@
 # Roadmap vivo — Roteiva MVP
 
+## Cobertura total dos menus e atalhos na revisão — 22/10/2026
+
+- [x] Centralizar em `useReviewBrowserGuards` o bloqueio do menu de contexto na página de aprovação inteira, e não somente na área de imagem
+- [x] Interceptar F12, Ctrl+Shift+I/J/C/K/M, Cmd+Option+I/J/C/K, Ctrl/Cmd+U/S/P, ContextMenu e Shift+F10 onde eventos do navegador chegam ao JavaScript
+- [x] Preservar atalhos de digitação/edição comuns e remover listeners ao sair da revisão; sem criar mensagens novas
+- [x] Adicionar testes reutilizáveis para revisões públicas e restritas por Google, desktop/mobile
+- [ ] Validar CI e publicar o frontend do PR no Hosting DEV principal novamente
+- [ ] Proteção real do original: derivados reduzidos/marcados continuam pendentes. Navegação via UI/browser não pode ser eliminada por código JavaScript; F12 pelo menu do Chrome continua possível.
+
 ## Restrição de download direto nas páginas de aprovação — 22/10/2026
 
 **IMPLEMENTADO, TESTADO E FRONTEND PUBLICADO EM DEV no PR [#86](https://github.com/EwertonMendes/roteiva-web/pull/86). Worker validado em CI, porém não publicado (ambiente protegido permite somente master).** comportamento existente de revisão não deve mudar visualmente. Retirados atalhos de download/abertura original de PDF na própria página, permissão de download do `iframe`, controles nativos de download e menu contextual dos materiais. Worker recusa navegação direta comum ao ticket e mantém validação de acesso por token/revisão e participante Google. Testes de navegador e de backend cobrem as restrições. O recurso não cria ACLs Drive nem altera permissões existentes.
