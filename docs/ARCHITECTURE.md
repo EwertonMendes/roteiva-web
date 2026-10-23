@@ -1,5 +1,9 @@
 # Arquitetura do Roteiva — MVP SaaS
 
+## Guardas da página de aprovação — 22/10/2026
+
+`src/features/reviews/useReviewBrowserGuards.ts` usa efeito de montagem/desmontagem de `ReviewPortal`, com um único listener em captura de `contextmenu` no documento e `keydown` no window. Cobre o layout público e o Google-restrito, inclusive áreas vazias fora do quadro da mídia, overlay, formulários e cabeçalho. Intercepta F12 e combinações usuais de DevTools/fonte/salvar/imprimir, mantendo teclas de edição e navegação. Essa é uma **conveniência de interface/dissuasão de cópias casuais**, nunca um controle de acesso; browser chrome, ferramentas externas, atalhos privilegiados e requisições HTTP independentes não estão sujeitos à página. O Worker continua sendo o único ponto de autorização do stream e o risco residual de cópia dos bytes já recebidos permanece.
+
 ## Limites e controles de cópia das prévias de aprovação — 22/10/2026
 
 O ambiente protegido Cloudflare DEV aceita apenas a master para deploy do Worker. Alterações em PR somente validam testes e build; o job bloqueado não altera Worker nem D1. O workflow principal foi mantido sem mudança. A etapa de backend fica pendente até aprovação do merge.
