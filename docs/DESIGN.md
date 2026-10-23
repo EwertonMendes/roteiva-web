@@ -101,3 +101,7 @@ Ações de salvar/arrastar e menu contextual do navegador não devem ser ofereci
 ## Atalhos e menu de contexto na aprovação — 22/10/2026
 
 Sem adicionar textos ou elementos na interface, `useReviewBrowserGuards` centraliza a supressão de `contextmenu` em captura no `document` inteiro (inclusive áreas vazias, cabeçalho, comentários e overlays da página), e intercepta atalhos comuns de inspeção, fonte, salvar e imprimir enquanto o portal está montado. O restante da área autenticada do profissional não recebe esses listeners. Os controles de player, zoom, campos de comentário, gestos touch, tema e navegação continuam funcionais. A página não pode interceptar menus do próprio navegador, DevTools externos, processos automatizados, contexto interno de PDF cross-origin nem gravação de tela; essas limitações não são falhas de permissão do Worker.
+
+## Player de vídeo na página de aprovação (23/10/2026)
+
+O vídeo utiliza exclusivamente controles nativos do `<video controls>`, inclusive tela cheia. O Roteiva não adiciona botões de "Ampliar vídeo" ou "Fechar tela cheia", estado auxiliar de expansão, comportamento de Escape ou overlay de fullscreen. Os recursos de marcação de tempo, comentários, reprodução responsiva e restrições de download continuam independentes. Não reutilizar os estilos `review-video-fullscreen` ou `is-video-expanded`.
