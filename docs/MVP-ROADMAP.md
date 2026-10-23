@@ -1,5 +1,13 @@
 # Roadmap vivo — Roteiva MVP
 
+## Simplificação da tela cheia de vídeo — 23/10/2026
+
+- [x] Remover os botões redundantes "Ampliar vídeo" / "Fechar tela cheia" da página de aprovação
+- [x] Remover estado React, listeners Escape, manipulação de overflow e seletores CSS de fullscreen customizado
+- [x] Manter `<video controls>` com fullscreen nativo, marcação de instantes e restrições de download
+- [x] Adicionar proteção de contrato e teste de navegador desktop/mobile para evitar regressão
+- [ ] Validar CI/QA, fazer merge do PR #86 conforme aprovação do usuário e confirmar deploy do Hosting/Worker DEV
+
 ## Cobertura total dos menus e atalhos na revisão — 22/10/2026
 
 - [x] Centralizar em `useReviewBrowserGuards` o bloqueio do menu de contexto na página de aprovação inteira, e não somente na área de imagem
