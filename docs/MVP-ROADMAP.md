@@ -6,7 +6,8 @@
 - [x] Interceptar F12, Ctrl+Shift+I/J/C/K/M, Cmd+Option+I/J/C/K, Ctrl/Cmd+U/S/P, ContextMenu e Shift+F10 onde eventos do navegador chegam ao JavaScript
 - [x] Preservar atalhos de digitação/edição comuns e remover listeners ao sair da revisão; sem criar mensagens novas
 - [x] Adicionar testes reutilizáveis para revisões públicas e restritas por Google, desktop/mobile
-- [ ] Validar CI e publicar o frontend do PR no Hosting DEV principal novamente
+- [x] CI frontend e Worker aprovados no PR #86; [regressão específica de aprovação desktop/mobile: 22 testes aprovados](https://github.com/EwertonMendes/roteiva-web/actions/runs/39876780348)
+- [x] [Frontend do PR publicado no Hosting DEV principal](https://github.com/EwertonMendes/roteiva-web/actions/runs/39877054678) após teste e cache validado. Sem merge e sem alterações em D1/Worker.
 - [ ] Proteção real do original: derivados reduzidos/marcados continuam pendentes. Navegação via UI/browser não pode ser eliminada por código JavaScript; F12 pelo menu do Chrome continua possível.
 
 ## Restrição de download direto nas páginas de aprovação — 22/10/2026
