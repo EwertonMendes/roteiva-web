@@ -62,7 +62,6 @@ export function ReviewPortal({token}:{token:string}){
   if(!cache.current)cache.current=new ReviewMediaSessionCache();
   const mediaCache=cache.current;
   const [playhead,setPlayhead]=useState(0),[duration,setDuration]=useState<number|null>(null);
-  const [videoExpanded,setVideoExpanded]=useState(false);
   const loadedVersion=useRef(0),videoRef=useRef<HTMLVideoElement>(null),commentRef=useRef<HTMLTextAreaElement>(null);
   const playbackResume=useRef({at:0,playing:false});
   const dialogRef=useOverlayFocus(()=>{if(!busy)setDecision(null);},!!decision);
@@ -151,7 +150,7 @@ export function ReviewPortal({token}:{token:string}){
       }
     };
     setMediaKey(cacheKey);setPreviewError("");setPlayhead(0);setDuration(null);
-    setVideoExpanded(false);playbackResume.current={at:0,playing:false};
+    playbackResume.current={at:0,playing:false};
     if(activeFileId&&activeVersion&&activeMime){
       const supported=/^(image|video|audio)\//.test(activeMime)||activeMime==="application/pdf";
       if(!supported){setMediaUrl("");setMediaMode("error");setPreviewError(messages.review_media_unsupported);}
@@ -164,14 +163,6 @@ export function ReviewPortal({token}:{token:string}){
     return()=>{alive=false;if(renewal)clearTimeout(renewal);};
   },[activeFileId,activeVersion,activeMime,isVideo,request,previewRetry,mediaCache,cacheKey]);
   const playableVideo=isVideo&&previewMode==="ready";
-  useEffect(()=>{
-    if(!videoExpanded)return;
-    const prev=document.body.style.overflow;
-    document.body.style.overflow="hidden";
-    const handler=(event:KeyboardEvent)=>{if(event.key==="Escape"){event.preventDefault();setVideoExpanded(false);}};
-    window.addEventListener("keydown",handler);
-    return()=>{window.removeEventListener("keydown",handler);document.body.style.overflow=prev;};
-  },[videoExpanded]);
   const seconds=isVideo?parseReviewTime(minutes):null;
   const invalidTime=isVideo&&!validReviewSecond(seconds,playableVideo?duration:null);
   const switchFile=(index:number)=>{
@@ -250,8 +241,7 @@ export function ReviewPortal({token}:{token:string}){
             <section className="review-portal-review" aria-label="Material para avaliar">
               <div className={"review-portal-stage is-private"+
                 (active?.mimeType.startsWith("image/")?" is-image":"")+
-                (playableVideo?" is-playable-video":"")+
-                (videoExpanded?" is-video-expanded":"")}
+                (playableVideo?" is-playable-video":"")}
                  onDragStart={event=>event.preventDefault()}>
                 {previewMode==="loading"&&<div className="review-media-state review-private-preview-state" role="status">
                   <LoaderCircle className="rl-spin" size={25}/>
@@ -270,10 +260,6 @@ export function ReviewPortal({token}:{token:string}){
                     }
                   }}
                   onError={()=>{setPreviewError("Este vídeo não pode ser reproduzido pelo codec disponível no navegador. Peça uma versão MP4 compatível ao profissional.");setMediaMode("error");}}/>}
-                {playableVideo&&<button className="review-video-fullscreen" type="button"
-                  title={videoExpanded?"Fechar vídeo ampliado":"Ampliar vídeo"}
-                  aria-label={videoExpanded?"Fechar vídeo ampliado":"Ampliar vídeo"}
-                  onClick={()=>setVideoExpanded(v=>!v)}>{videoExpanded?"Fechar tela cheia":"Ampliar vídeo"}</button>}
                 {active&&previewMode==="ready"&&!isVideo&&active.mimeType.startsWith("image/")&&
                   <ReviewImageViewer key={active.fileId} src={previewUrl} name={active.name}
                     onError={()=>{setPreviewError("O navegador não conseguiu exibir esta imagem. Peça ao profissional uma versão compatível.");setMediaMode("error");}}/>}
