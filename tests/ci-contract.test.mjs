@@ -49,3 +49,16 @@ test("all frontend selects use the shared AppSelect primitive", () => {
   assert.match(appSelect, /role="listbox"/);
   assert.match(appSelect, /type="hidden" name=\{name\}/);
 });
+
+// Video fullscreen is owned by the native <video controls> element, not by a
+// duplicate application overlay that competes with the browser's player.
+test("review video uses only native fullscreen controls", () => {
+  const portal = read("src/features/reviews/ReviewPortal.tsx");
+  const css = read("src/features/reviews/review-portal-v2.css");
+  assert.match(portal, /<video ref=\{videoRef\}/);
+  assert.match(portal, /controls controlsList="nodownload noremoteplayback"/);
+  for (const orphan of ["videoExpanded", "setVideoExpanded", "review-video-fullscreen", "is-video-expanded", "Ampliar vídeo", "Fechar tela cheia"]) {
+    assert.equal(portal.includes(orphan), false, `Obsolete fullscreen UI in ReviewPortal: ${orphan}`);
+    assert.equal(css.includes(orphan), false, `Obsolete fullscreen style: ${orphan}`);
+  }
+});
