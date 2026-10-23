@@ -1,3 +1,4 @@
+import {assertReviewPageGuards} from "./review-browser-guards";
 import { chooseAppSelect } from "./select-helpers";
 import {test,expect,type Page} from './fixtures';
 import {initializeTestEnvironment} from '@firebase/rules-unit-testing';
@@ -406,6 +407,7 @@ test('Google-only review renders private images in both themes without third-par
   });
   await page.goto(root+'/review/'+token);
   await expect(page.getByRole('heading',{name:'Arte com acesso privado'})).toBeVisible();
+  await assertReviewPageGuards(page);
   const preview=page.locator('img.review-private-preview-image');
   await expect(preview).toBeVisible();
   await expect(preview).toHaveAttribute('src',/^blob:/);

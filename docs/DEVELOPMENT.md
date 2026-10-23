@@ -1,5 +1,9 @@
 # Desenvolvimento e deploy — Roteiva
 
+## Proteção de prévias — deploy do Worker (22/10/2026)
+
+O workflow `.github/workflows/api.yml` e o ambiente `cloudflare-development` restringem o deploy do Worker à branch `master`. A validação em PR executa testes, typecheck e build, mas não publica código. A tentativa de promoção manual do PR #86 foi negada pela proteção do ambiente antes de executar a publicação. O guard manual experimental foi revertido; nenhum Worker DEV ou dado D1 foi alterado por ela. Publicação futura do código de mídia depende de merge aprovado e do pipeline normal da master, seguido de smoke tests.
+
 ## Homologação manual de um PR no Hosting DEV (22/10/2026)
 
 **Fluxo explícito, sem merge:** o workflow existente `.github/workflows/frontend.yml` aceita `workflow_dispatch` executado com `ref` igual à branch de um PR aberto, **do próprio repositório e direcionado à master**. Após os mesmos testes unitários, TypeScript e build, o job de publicação exige `FIREBASE_PROJECT_ID=roteiva-web-dev`, verifica se o SHA da branch não mudou, consulta a API do GitHub para confirmar PR aberto/head SHA e testa o Worker DEV. Somente então usa o ambiente protegido `firebase-development` para publicar exclusivamente `--only hosting` no canal principal e verificar cache. Não publica banco Firestore, índices, regras nem Worker. A execução manual em master mantém o comportamento existente.

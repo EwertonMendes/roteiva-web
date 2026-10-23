@@ -1,5 +1,34 @@
 # Roadmap vivo — Roteiva MVP
 
+## Simplificação da tela cheia de vídeo — 23/10/2026
+
+- [x] Remover os botões redundantes "Ampliar vídeo" / "Fechar tela cheia" da página de aprovação
+- [x] Remover estado React, listeners Escape, manipulação de overflow e seletores CSS de fullscreen customizado
+- [x] Manter `<video controls>` com fullscreen nativo, marcação de instantes e restrições de download
+- [x] Adicionar proteção de contrato e teste de navegador desktop/mobile para evitar regressão
+- [ ] Validar CI/QA, fazer merge do PR #86 conforme aprovação do usuário e confirmar deploy do Hosting/Worker DEV
+
+## Cobertura total dos menus e atalhos na revisão — 22/10/2026
+
+- [x] Centralizar em `useReviewBrowserGuards` o bloqueio do menu de contexto na página de aprovação inteira, e não somente na área de imagem
+- [x] Interceptar F12, Ctrl+Shift+I/J/C/K/M, Cmd+Option+I/J/C/K, Ctrl/Cmd+U/S/P, ContextMenu e Shift+F10 onde eventos do navegador chegam ao JavaScript
+- [x] Preservar atalhos de digitação/edição comuns e remover listeners ao sair da revisão; sem criar mensagens novas
+- [x] Adicionar testes reutilizáveis para revisões públicas e restritas por Google, desktop/mobile
+- [x] CI frontend e Worker aprovados no PR #86; [regressão específica de aprovação desktop/mobile: 22 testes aprovados](https://github.com/EwertonMendes/roteiva-web/actions/runs/39876780348)
+- [x] [Frontend do PR publicado no Hosting DEV principal](https://github.com/EwertonMendes/roteiva-web/actions/runs/39877054678) após teste e cache validado. Sem merge e sem alterações em D1/Worker.
+- [ ] Proteção real do original: derivados reduzidos/marcados continuam pendentes. Navegação via UI/browser não pode ser eliminada por código JavaScript; F12 pelo menu do Chrome continua possível.
+
+## Restrição de download direto nas páginas de aprovação — 22/10/2026
+
+**IMPLEMENTADO, TESTADO E FRONTEND PUBLICADO EM DEV no PR [#86](https://github.com/EwertonMendes/roteiva-web/pull/86). Worker validado em CI, porém não publicado (ambiente protegido permite somente master).** comportamento existente de revisão não deve mudar visualmente. Retirados atalhos de download/abertura original de PDF na própria página, permissão de download do `iframe`, controles nativos de download e menu contextual dos materiais. Worker recusa navegação direta comum ao ticket e mantém validação de acesso por token/revisão e participante Google. Testes de navegador e de backend cobrem as restrições. O recurso não cria ACLs Drive nem altera permissões existentes.
+
+- [x] [QA completa verde](https://github.com/EwertonMendes/roteiva-web/actions/runs/39870584075): 104 testes Chromium desktop/mobile passaram (6 ignorados); 31 testes de isolamento Firestore e saga D1/Firebase passaram. Inclui revisão de imagem/PDF com restrições de download e teste de navegação do Worker, além do CI frontend/Worker verde.
+- [x] [Publicar somente frontend no DEV principal](https://github.com/EwertonMendes/roteiva-web/actions/runs/39871048291), sem merge, após CI verde. Login Google e links públicos continuam nos mesmos fluxos.
+- [ ] Publicar Worker DEV somente após merge aprovado na master, devido ao bloqueio de branch imposto pelo ambiente protegido do GitHub. Sem alterações em D1 ou Worker neste PR antes disso.
+- [ ] Homologar a experiência real do visualizador após release completo.
+- [ ] **Fase necessária para não entregar cópias do arquivo original:** serviço de prévias derivadas para vídeo/imagem/áudio/PDF com limitação de resolução/qualidade, opcional identificação visual, original privado exclusivamente no Drive. Estudar custo e compatibilidade antes de implementar. Mesmo derivados podem ser capturados pelo receptor. Não declarar "impede F12": tecnicamente impossível no navegador.
+
+
 ## Cursor personalizado sobre selects e modais — 22/10/2026
 
 **VALIDADO AUTOMATICAMENTE E PUBLICADO NO DEV PRINCIPAL em 22/10/2026 pela PR #85; aceite visual do proprietário pendente.** O cursor decorativo do Roteiva foi mantido, recebeu prioridade de camada superior aos popovers do `AppSelect` e portal para o diálogo nativo ativo, evitando desaparecer atrás do menu ou da top layer. `pointer-events:none` preserva os cliques; campos de texto, vídeos e o editor de capas com `data-native-cursor` continuam usando o cursor do sistema, bem como dispositivos touch e preferência por movimento reduzido. Teste em `tests/browser/cursor-layer.spec.ts` valida dropdown, seleção com clique, posicionamento no modal e retorno à página; integrações e dados não mudam. [CI frontend verde](https://github.com/EwertonMendes/roteiva-web/actions/runs/39861461197), [QA específica aprovada (2 testes desktop)](https://github.com/EwertonMendes/roteiva-web/actions/runs/39861473928), e [Hosting DEV principal publicado com cache validado](https://github.com/EwertonMendes/roteiva-web/actions/runs/39861714239) no commit `6dc837b`. Apenas Hosting atualizado; Firestore, D1 e Worker inalterados. Sem merge.

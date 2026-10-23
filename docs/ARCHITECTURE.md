@@ -1,5 +1,18 @@
 # Arquitetura do Roteiva — MVP SaaS
 
+## Guardas da página de aprovação — 22/10/2026
+
+`src/features/reviews/useReviewBrowserGuards.ts` usa efeito de montagem/desmontagem de `ReviewPortal`, com um único listener em captura de `contextmenu` no documento e `keydown` no window. Cobre o layout público e o Google-restrito, inclusive áreas vazias fora do quadro da mídia, overlay, formulários e cabeçalho. Intercepta F12 e combinações usuais de DevTools/fonte/salvar/imprimir, mantendo teclas de edição e navegação. Essa é uma **conveniência de interface/dissuasão de cópias casuais**, nunca um controle de acesso; browser chrome, ferramentas externas, atalhos privilegiados e requisições HTTP independentes não estão sujeitos à página. O Worker continua sendo o único ponto de autorização do stream e o risco residual de cópia dos bytes já recebidos permanece.
+
+## Limites e controles de cópia das prévias de aprovação — 22/10/2026
+
+O ambiente protegido Cloudflare DEV aceita apenas a master para deploy do Worker. Alterações em PR somente validam testes e build; o job bloqueado não altera Worker nem D1. O workflow principal foi mantido sem mudança. A etapa de backend fica pendente até aprovação do merge.
+
+**Decisão de segurança (PR #86 de proteção de prévias):** aprovações em modo link e modo Google continuam usando o mesmo stream mediado por Worker, com tickets autenticados por HMAC, vigência limitada, revalidação D1 de estado/versão/expiração e, para Google, verificação de participante para cada requisição/range. Permissões diretas no Drive continuam opt-in (`drive_share_enabled`), sem qualquer concessão implícita. O link de origem de um PDF deixa de ser exposto em abertura de nova aba no portal; `iframe sandbox` não concede download. Imagens, vídeos e áudios não oferecem comandos de salvar diretamente no visualizador; arraste e menus contextuais são desabilitados somente na área de prévia. Navegação direta padrão (`Sec-Fetch-Mode: navigate`, `Sec-Fetch-Dest: document`) para tickets é negada, mantendo streaming embutido e players. Essa checagem é defesa de UX, **não é um controle de autenticação**; headers podem ser forjados.
+
+**Limite não contornável no navegador:** toda prévia de mídia exige entregar dados ao navegador. DevTools, requisições HTTP feitas por um receptor autorizado, capturas de tela e gravações ainda podem copiar os bytes exibidos; CSS, eventos do mouse, sandbox e controles nativos não fornecem DRM. Mesmo links Google-restritos não tornam bytes já entregues irrecuperáveis. Para proteger o **original comercial** contra cópia, somente distribuir ao revisor derivados de qualidade/resolução reduzida, eventualmente marcados com identidade, e guardar o master exclusivamente no Drive do profissional, sem ACL pública ou direta até liberação. Esse pipeline de derivados para imagem/vídeo/áudio/PDF exige arquitetura, infraestrutura, orçamento, processamento e testes separados e **não faz parte desta alteração**. O proprietário deve manter originais sensíveis fora dos assets enviados à aprovação por enquanto. Se o arquivo já é público no Drive por configuração própria, o Roteiva não pode cancelar essa exposição sem ação explícita do proprietário.
+
+
 ## Detalhes do projeto — 22/10/2026
 
 **Decisão tomada:** extrair `ProjectDetail` de `studio-features.tsx` para `features/projects/`, com CSS limitado ao conteúdo. Formulário, tarefas, finanças e compromissos reutilizam os comandos revisionados atuais. Os rascunhos do formulário permanecem montados durante alterações do checklist; trocar o ID do projeto remonta os campos. Edição financeira e de agenda usa os formulários existentes. Sem mudança de schemas, permissões, regras, backend ou barra lateral.

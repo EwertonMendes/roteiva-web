@@ -6,7 +6,7 @@ import { DRIVE_SCOPE, accessCredential } from './google.ts';
 import { driveJson } from './drive-client.ts';
 import { random, hash, encrypt, decrypt, context } from './crypto.ts';
 import { uploadBody } from './uploads.ts';
-import {mintReviewMediaTicket,reviewMediaSubject,streamReviewMedia} from './review-media.ts';
+import {mintReviewMediaTicket,reviewMediaSubject,streamReviewMedia,REVIEW_MEDIA_MAX_AGE} from './review-media.ts';
 
 type Status = 'draft'|'publishing'|'pending'|'changes'|'approved'|'replacing'|'closing'|'closed';
 type Mode = 'link'|'google';
@@ -775,7 +775,7 @@ async function publicReview(request:Request,env:Env,action:'view'|'comment'|'dec
     // Worker/D1 round trip every time the user selects another file.
     const mediaTickets:Record<string,{url:string;expiresAt:number}>={};
     const subject=r.access_mode==='google'?await reviewMediaSubject(env,r.id,email):undefined;
-    const expiresAt=Math.min(r.expires_at,now()+12*60*1000);
+    const expiresAt=Math.min(r.expires_at,now()+REVIEW_MEDIA_MAX_AGE);
     for(const file of files){
       if(!(/^(image|video|audio)\//.test(file.mime_type)||file.mime_type==='application/pdf'))continue;
       const ticket=await mintReviewMediaTicket(env,r.id,file.file_id,r.current_version,r.expires_at,r.token_hash,subject);
@@ -801,7 +801,7 @@ async function publicReview(request:Request,env:Env,action:'view'|'comment'|'dec
     const subject=r.access_mode==='google'?await reviewMediaSubject(env,r.id,email):undefined;
     const ticket=await mintReviewMediaTicket(env,r.id,fileId,r.current_version,r.expires_at,r.token_hash,subject);
     return Response.json({url:'https://roteiva-api-dev.ewertonmendes9.workers.dev/reviews/media?ticket='+ticket,
-      expiresAt:Math.min(r.expires_at,now()+12*60*1000)});
+      expiresAt:Math.min(r.expires_at,now()+REVIEW_MEDIA_MAX_AGE)});
   }
   if(r.status!=='pending')throw new ApiError(409,'review_already_decided');
   const data=await uploadBody(request) as Record<string,unknown>|null;

@@ -44,3 +44,16 @@ test('wrong file type and a closed review cannot stream even with signed ticket'
   status='pending';mime='application/x-unsafe';
   await assert.rejects(()=>streamReviewMedia(request,scope,new URL(request.url)),x=>x.status===404);
 });
+
+test('browser top-level navigation cannot open a preview ticket as a standalone document',async()=>{
+  const e=env(),ticket=await mintReviewMediaTicket(e,review,file,1,Date.now()+60000,inviteHash);
+  const url='https://roteiva-api-dev.ewertonmendes9.workers.dev/reviews/media?ticket='+ticket;
+  const navigation=new Request(url,{headers:{'Sec-Fetch-Mode':'navigate','Sec-Fetch-Dest':'document'}});
+  await assert.rejects(()=>streamReviewMedia(navigation,e,new URL(url)),err=>err.status===404);
+  // A same URL with a media destination still proceeds to server authorization.
+  let checks=0;
+  const mediaRequest=new Request(url,{headers:{'Sec-Fetch-Mode':'no-cors','Sec-Fetch-Dest':'video'}});
+  const mediaEnv={...e,DB:{prepare(){checks++;return {bind(){return {first:async()=>null};}};}}};
+  await assert.rejects(()=>streamReviewMedia(mediaRequest,mediaEnv,new URL(url)),err=>err.status===404);
+  assert.equal(checks,1,'media requests continue through D1 authorization');
+});

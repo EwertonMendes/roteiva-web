@@ -1,3 +1,4 @@
+import {assertReviewPageGuards} from "./review-browser-guards";
 import {test,expect} from "./fixtures";
 const ROOT="http://127.0.0.1:4173";
 const API="https://roteiva-api-dev.ewertonmendes9.workers.dev";
@@ -44,6 +45,7 @@ test("cliente sem conta deixa comentário e aprova em desktop/mobile",async({pag
   await publicApi(page);
   await page.goto(ROOT+"/review/"+TOKEN);
   await expect(page.getByRole("heading",{name:"Corte institucional"})).toBeVisible();
+  await assertReviewPageGuards(page);
   await expect(page.locator('iframe[title="Prévia de Primeiro corte.mp4"]')).toHaveCount(0);
   await expect(page.getByText("Não foi possível mostrar a prévia")).toBeVisible();
   await expect(page.getByRole("link",{name:"Abrir no Drive"})).toHaveCount(0);
@@ -149,6 +151,10 @@ test("image-only reviews hide all video timestamp controls",async({page})=>{
   await expect(page.getByRole("heading",{name:"Avaliação da arte"})).toBeVisible();
   await expect(page.locator('iframe[title="Prévia de Capa.png"]')).toHaveCount(0);
   await expect(page.locator('img.review-private-preview-image')).toBeVisible();
+  const stage=page.locator(".review-portal-stage");
+  expect(await stage.evaluate(element=>element.dispatchEvent(new MouseEvent("contextmenu",{bubbles:true,cancelable:true})))).toBe(false);
+  expect(await stage.evaluate(element=>element.dispatchEvent(new Event("dragstart",{bubbles:true,cancelable:true})))).toBe(false);
+  await expect(page.getByRole("link",{name:"Abrir no Drive"})).toHaveCount(0);
   await expect(page.getByPlaceholder("Ex.: 01:25")).toHaveCount(0);
   await expect(page.getByRole("button",{name:/Usar tempo atual|Marcar este instante/})).toHaveCount(0);
   await page.getByPlaceholder("Como podemos chamar você?").fill("Cliente");
@@ -175,4 +181,64 @@ test('unsupported document preview shows clear next step without blank canvas',a
   await expect(page.getByText('Não foi possível mostrar a prévia')).toBeVisible();
   await expect(page.getByText(/Peça ao estúdio uma versão compatível/)).toBeVisible();
   await expect(page.locator('.review-portal-stage iframe')).toHaveCount(0);
+});
+
+test("portal-only PDF preview cannot expose a direct download link or iframe download permission",async({page})=>{
+  const pdf=Buffer.from("%PDF-1.4\n1 0 obj <</Type/Catalog/Pages 2 0 R>> endobj\n2 0 obj <</Type/Pages/Kids []/Count 0>> endobj\ntrailer <</Root 1 0 R>>\n%%EOF");
+  const headers={"Access-Control-Allow-Origin":ROOT,"Access-Control-Allow-Methods":"GET,POST,OPTIONS",
+    "Access-Control-Allow-Headers":"Authorization,Content-Type,X-Review-Token"};
+  await page.route(API+"/reviews/media?*",route=>route.fulfill({status:200,contentType:"application/pdf",
+    headers:{"Cache-Control":"private, no-store"},body:pdf}));
+  await page.route(API+"/reviews/public**",async route=>{
+    if(route.request().method()==="OPTIONS")return route.fulfill({status:204,headers});
+    const path=new URL(route.request().url()).pathname;
+    if(path==="/reviews/public")return route.fulfill({status:200,headers,contentType:"application/json",
+      body:JSON.stringify({review:{title:"PDF restrito",studioName:"Estúdio",status:"pending",version:1,
+        expiresAt:Date.now()+86400000,mode:"link",driveShareEnabled:false},
+        assets:[{fileId:"REVIEW_PDF_123456789",name:"Roteiro.pdf",mimeType:"application/pdf"}],
+        comments:[],decisions:[]})});
+    if(path==="/reviews/public/media-ticket")return route.fulfill({status:200,headers,
+      contentType:"application/json",body:JSON.stringify({url:API+"/reviews/media?ticket=pdf-review",
+        expiresAt:Date.now()+240000})});
+    return route.fulfill({status:404,headers,body:"{}"});
+  });
+  await page.goto(ROOT+"/review/"+TOKEN);
+  const frame=page.locator("iframe.review-private-preview-pdf");
+  await expect(frame).toBeVisible();
+  await expect(frame).toHaveAttribute("sandbox","allow-scripts");
+  await expect(frame).toHaveAttribute("referrerpolicy","no-referrer");
+  await expect(page.getByRole("link",{name:/Abrir PDF em outra aba|Abrir no Drive/})).toHaveCount(0);
+  const stage=page.locator(".review-portal-stage");
+  expect(await stage.evaluate(element=>element.dispatchEvent(new MouseEvent("contextmenu",{bubbles:true,cancelable:true})))).toBe(false);
+});
+
+test("approval videos use only native player controls, without duplicate fullscreen buttons",async({page})=>{
+  const headers={"Access-Control-Allow-Origin":ROOT,"Access-Control-Allow-Methods":"GET,POST,OPTIONS",
+    "Access-Control-Allow-Headers":"Authorization,Content-Type,X-Review-Token"};
+  // Keep the test video pending while asserting its player; no codec fixtures
+  // or real Drive connections are required for a DOM-level control regression.
+  await page.route(API+"/reviews/media?*",async route=>{
+    await new Promise<void>(resolve=>setTimeout(resolve,2000));
+    await route.abort().catch(()=>{});
+  });
+  await page.route(API+"/reviews/public**",async route=>{
+    if(route.request().method()==="OPTIONS")return route.fulfill({status:204,headers});
+    const path=new URL(route.request().url()).pathname;
+    if(path==="/reviews/public")return route.fulfill({status:200,headers,contentType:"application/json",
+      body:JSON.stringify({review:{title:"Vídeo para aprovação",studioName:"Estúdio",status:"pending",
+        version:1,expiresAt:Date.now()+86400000,mode:"link",driveShareEnabled:false},
+        assets:[{fileId:"VIDEO_REVIEW_123456789",name:"Corte.mp4",mimeType:"video/mp4"}],
+        comments:[],decisions:[]})});
+    if(path==="/reviews/public/media-ticket")return route.fulfill({status:200,headers,contentType:"application/json",
+      body:JSON.stringify({url:API+"/reviews/media?ticket=video-review",expiresAt:Date.now()+600000})});
+    return route.fulfill({status:404,headers,body:"{}"});
+  });
+  await page.goto(ROOT+"/review/"+TOKEN);
+  const video=page.locator(".review-portal-stage video");
+  await expect(video).toBeVisible();
+  await expect(video).toHaveAttribute("controls","");
+  await expect(video).toHaveAttribute("controlslist",/nodownload/);
+  await expect(page.locator(".review-video-fullscreen,.review-portal-stage.is-video-expanded")).toHaveCount(0);
+  await expect(page.getByRole("button",{name:/^(Ampliar vídeo|Fechar tela cheia|Fechar vídeo ampliado)$/})).toHaveCount(0);
+  await expect(page.getByRole("button",{name:"Marcar este instante e comentar"})).toBeVisible();
 });

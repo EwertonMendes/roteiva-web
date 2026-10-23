@@ -8,7 +8,9 @@ const idPattern=/^[0-9a-f-]{36}$/i;
 const filePattern=/^[A-Za-z0-9_-]{10,200}$/;
 const encoder=new TextEncoder();
 const decoder=new TextDecoder();
-const MEDIA_MAX_AGE=12*60*1000;
+// Bounded capability lifetime; the same value is returned to the portal so
+// media renewals do not interrupt an active video sooner than necessary.
+export const REVIEW_MEDIA_MAX_AGE=12*60*1000;
 /** Non-reversible subject commitment: never expose a reviewer's email in the media URL. */
 export async function reviewMediaSubject(env:Env,reviewId:string,email:string,version=env.TOKEN_KEY_VERSION):Promise<string>{
   const message=encoder.encode('roteiva/media-subject/v1/'+reviewId+':'+email.toLowerCase());
@@ -26,7 +28,7 @@ async function key(env:Env,version:string):Promise<CryptoKey>{
   return crypto.subtle.importKey('raw',raw,{name:'HMAC',hash:'SHA-256'},false,['sign','verify']);
 }
 export async function mintReviewMediaTicket(env:Env,reviewId:string,fileId:string,version:number,expiry:number,inviteHash:string,subject?:string):Promise<string>{
-  const p:Ticket={r:reviewId,f:fileId,v:version,e:Math.min(expiry,Date.now()+MEDIA_MAX_AGE),k:env.TOKEN_KEY_VERSION,h:inviteHash,...(subject?{s:subject}:{})};
+  const p:Ticket={r:reviewId,f:fileId,v:version,e:Math.min(expiry,Date.now()+REVIEW_MEDIA_MAX_AGE),k:env.TOKEN_KEY_VERSION,h:inviteHash,...(subject?{s:subject}:{})};
   const payload=base64url(encoder.encode(JSON.stringify(p)));
   const mac=await crypto.subtle.sign('HMAC',await key(env,p.k),encoder.encode('roteiva/review-media/v1/'+payload));
   return payload+'.'+base64url(new Uint8Array(mac));
@@ -38,7 +40,7 @@ export async function verifyReviewMediaTicket(env:Env,token:string):Promise<Tick
   try{p=JSON.parse(decoder.decode(decode(part))) as Ticket;}catch{throw new ApiError(404,'review_not_found');}
   if(!p||typeof p!=='object'||!idPattern.test(p.r)||!filePattern.test(p.f)||
      !Number.isSafeInteger(p.v)||p.v<1||typeof p.h!=='string'||!/^[A-Za-z0-9_-]{43}$/.test(p.h)||typeof p.e!=='number'||!Number.isFinite(p.e)||
-     p.e<=Date.now()||p.e>Date.now()+MEDIA_MAX_AGE+5000||typeof p.k!=='string'||
+     p.e<=Date.now()||p.e>Date.now()+REVIEW_MEDIA_MAX_AGE+5000||typeof p.k!=='string'||
      !/^[A-Za-z0-9_-]{1,50}$/.test(p.k)||(p.s!==undefined&&!/^[A-Za-z0-9_-]{43}$/.test(p.s)))throw new ApiError(404,'review_not_found');
   let verified=false;
   try{verified=await crypto.subtle.verify('HMAC',await key(env,p.k),decode(mac),
@@ -53,6 +55,11 @@ export async function verifyReviewMediaTicket(env:Env,token:string):Promise<Tick
  */
 export async function streamReviewMedia(request:Request,env:Env,url:URL):Promise<Response>{
   if(request.method!=='GET'&&request.method!=='HEAD')throw new ApiError(405,'method_not_allowed');
+  // Reject ordinary top-level opening of preview URLs. Native media elements
+  // and streaming fetches still work. Fetch metadata is advisory and is NOT
+  // an authorization boundary: signed tickets and D1 checks remain mandatory.
+  if(request.headers.get('Sec-Fetch-Mode')==='navigate'&&request.headers.get('Sec-Fetch-Dest')==='document')
+    throw new ApiError(404,'review_not_found');
   const p=await verifyReviewMediaTicket(env,url.searchParams.get('ticket')||'');
   const r=await env.DB.prepare("SELECT id,owner_uid,status,current_version,expires_at,token_hash,access_mode FROM review_requests WHERE id=?")
     .bind(p.r).first<{id:string;owner_uid:string;status:string;current_version:number;expires_at:number;token_hash:string;access_mode:string}>();

@@ -4,6 +4,7 @@ import {Check,CheckCircle2,Clock3,ExternalLink,FileAudio,FileImage,FileText,File
 import {useAuth} from "../auth/AuthProvider";
 import {useOverlayFocus} from "../drive/DriveLibraryUI";
 import {ReviewImageViewer} from "./ReviewImageViewer";
+import {useReviewBrowserGuards} from "./useReviewBrowserGuards";
 import {ReviewMediaSessionCache,type MediaTicket} from "./review-media-cache";
 import {captureReviewPlayback,formatReviewTime,maskReviewTime,parseReviewTime,validReviewSecond} from "./review-timecode";
 import "../reviews/reviews.css";
@@ -45,6 +46,7 @@ function initialTheme():Mode{
   return window.matchMedia?.("(prefers-color-scheme: dark)").matches?"dark":"light";
 }
 export function ReviewPortal({token}:{token:string}){
+  useReviewBrowserGuards();
   const {user,loading:authLoading,busy:authBusy,login,error:authError}=useAuth();
   const [theme,setTheme]=useState<Mode>(initialTheme);
   const [data,setData]=useState<PublicData|null>(null),[loading,setLoading]=useState(true);
@@ -60,7 +62,6 @@ export function ReviewPortal({token}:{token:string}){
   if(!cache.current)cache.current=new ReviewMediaSessionCache();
   const mediaCache=cache.current;
   const [playhead,setPlayhead]=useState(0),[duration,setDuration]=useState<number|null>(null);
-  const [videoExpanded,setVideoExpanded]=useState(false);
   const loadedVersion=useRef(0),videoRef=useRef<HTMLVideoElement>(null),commentRef=useRef<HTMLTextAreaElement>(null);
   const playbackResume=useRef({at:0,playing:false});
   const dialogRef=useOverlayFocus(()=>{if(!busy)setDecision(null);},!!decision);
@@ -149,7 +150,7 @@ export function ReviewPortal({token}:{token:string}){
       }
     };
     setMediaKey(cacheKey);setPreviewError("");setPlayhead(0);setDuration(null);
-    setVideoExpanded(false);playbackResume.current={at:0,playing:false};
+    playbackResume.current={at:0,playing:false};
     if(activeFileId&&activeVersion&&activeMime){
       const supported=/^(image|video|audio)\//.test(activeMime)||activeMime==="application/pdf";
       if(!supported){setMediaUrl("");setMediaMode("error");setPreviewError(messages.review_media_unsupported);}
@@ -162,14 +163,6 @@ export function ReviewPortal({token}:{token:string}){
     return()=>{alive=false;if(renewal)clearTimeout(renewal);};
   },[activeFileId,activeVersion,activeMime,isVideo,request,previewRetry,mediaCache,cacheKey]);
   const playableVideo=isVideo&&previewMode==="ready";
-  useEffect(()=>{
-    if(!videoExpanded)return;
-    const prev=document.body.style.overflow;
-    document.body.style.overflow="hidden";
-    const handler=(event:KeyboardEvent)=>{if(event.key==="Escape"){event.preventDefault();setVideoExpanded(false);}};
-    window.addEventListener("keydown",handler);
-    return()=>{window.removeEventListener("keydown",handler);document.body.style.overflow=prev;};
-  },[videoExpanded]);
   const seconds=isVideo?parseReviewTime(minutes):null;
   const invalidTime=isVideo&&!validReviewSecond(seconds,playableVideo?duration:null);
   const switchFile=(index:number)=>{
@@ -248,14 +241,15 @@ export function ReviewPortal({token}:{token:string}){
             <section className="review-portal-review" aria-label="Material para avaliar">
               <div className={"review-portal-stage is-private"+
                 (active?.mimeType.startsWith("image/")?" is-image":"")+
-                (playableVideo?" is-playable-video":"")+
-                (videoExpanded?" is-video-expanded":"")}>
+                (playableVideo?" is-playable-video":"")}
+                 onDragStart={event=>event.preventDefault()}>
                 {previewMode==="loading"&&<div className="review-media-state review-private-preview-state" role="status">
                   <LoaderCircle className="rl-spin" size={25}/>
                   "Preparando visualização segura…"
                 </div>}
                 {playableVideo&&<video ref={videoRef} key={activeFileId}
-                  controls playsInline preload="metadata" src={previewUrl} aria-label={"Reproduzir "+active?.name}
+                  controls controlsList="nodownload noremoteplayback" disablePictureInPicture disableRemotePlayback
+                   playsInline preload="metadata" src={previewUrl} aria-label={"Reproduzir "+active?.name}
                   onTimeUpdate={e=>setPlayhead(e.currentTarget.currentTime)}
                   onLoadedMetadata={e=>{
                     const player=e.currentTarget;
@@ -266,18 +260,14 @@ export function ReviewPortal({token}:{token:string}){
                     }
                   }}
                   onError={()=>{setPreviewError("Este vídeo não pode ser reproduzido pelo codec disponível no navegador. Peça uma versão MP4 compatível ao profissional.");setMediaMode("error");}}/>}
-                {playableVideo&&<button className="review-video-fullscreen" type="button"
-                  title={videoExpanded?"Fechar vídeo ampliado":"Ampliar vídeo"}
-                  aria-label={videoExpanded?"Fechar vídeo ampliado":"Ampliar vídeo"}
-                  onClick={()=>setVideoExpanded(v=>!v)}>{videoExpanded?"Fechar tela cheia":"Ampliar vídeo"}</button>}
                 {active&&previewMode==="ready"&&!isVideo&&active.mimeType.startsWith("image/")&&
                   <ReviewImageViewer key={active.fileId} src={previewUrl} name={active.name}
                     onError={()=>{setPreviewError("O navegador não conseguiu exibir esta imagem. Peça ao profissional uma versão compatível.");setMediaMode("error");}}/>}
                 {active&&previewMode==="ready"&&active.mimeType==="application/pdf"&&
                   <iframe className="review-private-preview-pdf" src={previewUrl}
-                    title={"Prévia PDF de "+active.name} sandbox="allow-scripts allow-downloads"/>}
+                    title={"Prévia PDF de "+active.name} sandbox="allow-scripts" referrerPolicy="no-referrer"/>}
                 {active&&previewMode==="ready"&&active.mimeType.startsWith("audio/")&&
-                  <div className="review-private-preview-audio"><FileAudio size={32}/><audio controls src={previewUrl}
+                  <div className="review-private-preview-audio"><FileAudio size={32}/><audio controls controlsList="nodownload noremoteplayback" src={previewUrl}
                     onError={()=>{setPreviewError("Este áudio não pôde ser reproduzido. Peça ao profissional uma versão compatível.");setMediaMode("error");}}/></div>}
                 {previewMode==="error"&&<div className="review-private-preview-error" role="alert">
                   <FileImage size={26}/><strong>Não foi possível mostrar a prévia</strong>
@@ -288,9 +278,7 @@ export function ReviewPortal({token}:{token:string}){
               </div>
               <div className="review-portal-stage-footer">
                 <div><strong>{active?.name}</strong><small>{playableVideo?"Player com marcação de instantes":"Visualização segura no Roteiva"}</small></div>
-                {active&&active.mimeType==="application/pdf"&&previewMode==="ready"&&
-                  <a href={previewUrl} target="_blank" rel="noopener noreferrer">
-                    <ExternalLink size={15}/> Abrir PDF em outra aba</a>}
+                
                 {active&&data.review.driveShareEnabled&&<a href={reviewFileURL(active.fileId)} target="_blank" rel="noreferrer">
                   <ExternalLink size={15}/> Abrir no Drive</a>}
               </div>
