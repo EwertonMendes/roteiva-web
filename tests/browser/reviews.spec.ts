@@ -211,3 +211,34 @@ test("portal-only PDF preview cannot expose a direct download link or iframe dow
   const stage=page.locator(".review-portal-stage");
   expect(await stage.evaluate(element=>element.dispatchEvent(new MouseEvent("contextmenu",{bubbles:true,cancelable:true})))).toBe(false);
 });
+
+test("approval videos use only native player controls, without duplicate fullscreen buttons",async({page})=>{
+  const headers={"Access-Control-Allow-Origin":ROOT,"Access-Control-Allow-Methods":"GET,POST,OPTIONS",
+    "Access-Control-Allow-Headers":"Authorization,Content-Type,X-Review-Token"};
+  // Keep the test video pending while asserting its player; no codec fixtures
+  // or real Drive connections are required for a DOM-level control regression.
+  await page.route(API+"/reviews/media?*",async route=>{
+    await new Promise<void>(resolve=>setTimeout(resolve,2000));
+    await route.abort().catch(()=>{});
+  });
+  await page.route(API+"/reviews/public**",async route=>{
+    if(route.request().method()==="OPTIONS")return route.fulfill({status:204,headers});
+    const path=new URL(route.request().url()).pathname;
+    if(path==="/reviews/public")return route.fulfill({status:200,headers,contentType:"application/json",
+      body:JSON.stringify({review:{title:"Vídeo para aprovação",studioName:"Estúdio",status:"pending",
+        version:1,expiresAt:Date.now()+86400000,mode:"link",driveShareEnabled:false},
+        assets:[{fileId:"VIDEO_REVIEW_123456789",name:"Corte.mp4",mimeType:"video/mp4"}],
+        comments:[],decisions:[]})});
+    if(path==="/reviews/public/media-ticket")return route.fulfill({status:200,headers,contentType:"application/json",
+      body:JSON.stringify({url:API+"/reviews/media?ticket=video-review",expiresAt:Date.now()+600000})});
+    return route.fulfill({status:404,headers,body:"{}"});
+  });
+  await page.goto(ROOT+"/review/"+TOKEN);
+  const video=page.locator(".review-portal-stage video");
+  await expect(video).toBeVisible();
+  await expect(video).toHaveAttribute("controls","");
+  await expect(video).toHaveAttribute("controlslist",/nodownload/);
+  await expect(page.locator(".review-video-fullscreen,.review-portal-stage.is-video-expanded")).toHaveCount(0);
+  await expect(page.getByRole("button",{name:/^(Ampliar vídeo|Fechar tela cheia|Fechar vídeo ampliado)$/})).toHaveCount(0);
+  await expect(page.getByRole("button",{name:"Marcar este instante e comentar"})).toBeVisible();
+});
