@@ -1,3 +1,4 @@
+import {assertReviewPageGuards} from "./review-browser-guards";
 import {test,expect} from "./fixtures";
 const ROOT="http://127.0.0.1:4173";
 const API="https://roteiva-api-dev.ewertonmendes9.workers.dev";
@@ -44,6 +45,7 @@ test("cliente sem conta deixa comentário e aprova em desktop/mobile",async({pag
   await publicApi(page);
   await page.goto(ROOT+"/review/"+TOKEN);
   await expect(page.getByRole("heading",{name:"Corte institucional"})).toBeVisible();
+  await assertReviewPageGuards(page);
   await expect(page.locator('iframe[title="Prévia de Primeiro corte.mp4"]')).toHaveCount(0);
   await expect(page.getByText("Não foi possível mostrar a prévia")).toBeVisible();
   await expect(page.getByRole("link",{name:"Abrir no Drive"})).toHaveCount(0);
