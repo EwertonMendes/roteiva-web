@@ -4,6 +4,7 @@ import {Check,CheckCircle2,Clock3,ExternalLink,FileAudio,FileImage,FileText,File
 import {useAuth} from "../auth/AuthProvider";
 import {useOverlayFocus} from "../drive/DriveLibraryUI";
 import {ReviewImageViewer} from "./ReviewImageViewer";
+import {useReviewBrowserGuards} from "./useReviewBrowserGuards";
 import {ReviewMediaSessionCache,type MediaTicket} from "./review-media-cache";
 import {captureReviewPlayback,formatReviewTime,maskReviewTime,parseReviewTime,validReviewSecond} from "./review-timecode";
 import "../reviews/reviews.css";
@@ -45,6 +46,7 @@ function initialTheme():Mode{
   return window.matchMedia?.("(prefers-color-scheme: dark)").matches?"dark":"light";
 }
 export function ReviewPortal({token}:{token:string}){
+  useReviewBrowserGuards();
   const {user,loading:authLoading,busy:authBusy,login,error:authError}=useAuth();
   const [theme,setTheme]=useState<Mode>(initialTheme);
   const [data,setData]=useState<PublicData|null>(null),[loading,setLoading]=useState(true);
@@ -250,7 +252,6 @@ export function ReviewPortal({token}:{token:string}){
                 (active?.mimeType.startsWith("image/")?" is-image":"")+
                 (playableVideo?" is-playable-video":"")+
                 (videoExpanded?" is-video-expanded":"")}
-                 onContextMenu={event=>event.preventDefault()}
                  onDragStart={event=>event.preventDefault()}>
                 {previewMode==="loading"&&<div className="review-media-state review-private-preview-state" role="status">
                   <LoaderCircle className="rl-spin" size={25}/>
