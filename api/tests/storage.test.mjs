@@ -18,5 +18,7 @@ test('selection is provider-bound with stable namespaced key',()=>{
  assert.ok(isStorageSelection({provider:'dropbox',connectionId:uuid,fileId:'id:aBcD12345_qWERt',linkedFolderId:'id:aBcD12345_qWERt'}));
  assert.equal(storageFileKey({provider:'dropbox',fileId:'id:aBcD12345_qWERt'}),'dropbox:id:aBcD12345_qWERt');
  assert.equal(isStorageSelection({provider:'google_drive',connectionId:uuid,fileId:'id:aBcD12345_qWERt',linkedFolderId:'root'}),false);
- assert.equal(Object.values(STORAGE_CAPABILITIES.dropbox).every(Boolean),true);
+ assert.equal(STORAGE_CAPABILITIES.dropbox.directShare,false);
+ assert.equal(STORAGE_CAPABILITIES.dropbox.browse,true);
+ assert.equal(STORAGE_CAPABILITIES.dropbox.resumableUpload,true);
 });
