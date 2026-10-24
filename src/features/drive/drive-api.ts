@@ -4,6 +4,10 @@ const API='https://roteiva-api-dev.ewertonmendes9.workers.dev';
 export const messages:Record<string,string> = {
   dropbox_not_configured:"A integração Dropbox ainda está sendo preparada neste ambiente.",
   dropbox_reconnect_required:"A autorização do Dropbox expirou. Conecte sua conta novamente.",
+  dropbox_oauth_code_invalid:"Não foi possível confirmar o código de autorização do Dropbox. Inicie uma nova conexão; se persistir, verifique a configuração OAuth do aplicativo.",
+  dropbox_oauth_exchange_invalid:"A autenticação do Dropbox não foi aceita. Verifique as configurações OAuth do aplicativo.",
+  dropbox_oauth_exchange_failed:"A conexão com o Dropbox não pôde ser confirmada. Tente conectar novamente.",
+  dropbox_app_credentials_invalid:"As credenciais do aplicativo Dropbox não foram aceitas. É necessário corrigir a configuração da integração.",
   dropbox_connection_not_found:"Esta conta Dropbox não está mais conectada.",
   dropbox_identity_unverified:"O Dropbox não confirmou a identidade desta conta. Confira seu e-mail e tente novamente.",
   dropbox_scope_missing:"O Dropbox não concedeu todas as permissões necessárias. Conecte novamente.",
