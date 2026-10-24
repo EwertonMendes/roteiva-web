@@ -99,7 +99,6 @@ type FolderPickerProps={
 };
 export function DriveFolderPicker({projects,projectId,onProjectChange,folders,path,loading,working,canRead,hasMore,mode,onModeChange,linkedIds,error,onNavigate,onMore,onLink,onConnect,onClose}:FolderPickerProps){
   const [chosen,setChosen]=useState<Record<string,DriveItem>>({});
-  const providerName=provider==='dropbox'?'Dropbox':'Google Drive';
   const [filter,setFilter]=useState("");
   const [submitting,setSubmitting]=useState(false);
   const ref=useOverlayFocus(()=>{if(!working&&!submitting)onClose();});
@@ -192,6 +191,7 @@ function savedView():ViewMode{
 }
 const noThumbnail=async (_:DriveItem):Promise<Blob|null>=>null;
 export function DriveFileExplorer({folderName,path,files,loading,hasMore,thumbnailScope="",getThumbnail=noThumbnail,searchResults,searchTerm,searchLoading=false,onSearchChange,onBack,onNavigate,onOpen,onMore,onUploadFiles,uploadDisabled=false,provider='google_drive',externalUrl=driveFileUrl}:ExplorerProps){
+  const providerName=provider==='dropbox'?'Dropbox':'Google Drive';
   const [filter,setFilter]=useState("");
   const [dragging,setDragging]=useState(false);
   const uploadInput=useRef<HTMLInputElement>(null);

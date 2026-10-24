@@ -20,7 +20,7 @@ import { TodayStudio } from "./features/dashboard/DashboardOverview";
 import { ActivityHistoryDrawer } from "./features/dashboard/ActivityHistory";
 import { validTimeRange, overlaps, eventRange, eventDuration } from "./studio-calendar";
 import { toISO as toISOAdded, parseMoney, splitInstallments } from "./studio-finance";
-import { FormEvent, useEffect, useLayoutEffect, useMemo, useState, useCallback } from "react";
+import { FormEvent, useEffect, useLayoutEffect, useMemo, useState, useCallback, useRef } from "react";
 
 import { isDemo, useEmulators } from "./lib/firebase";
 import { hrefForWorkspaceRoute, routeFromLocation, type WorkspaceRoute } from "./lib/workspace-routing";
