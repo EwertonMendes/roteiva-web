@@ -30,18 +30,40 @@ export function dropboxEnabled(env:Env):void {
 function positiveSeconds(value:unknown):number {
  return typeof value==='number'&&Number.isFinite(value)&&value>=60&&value<=86400?value:0;
 }
+/**
+ * Dropbox PKCE exchanges authenticate with client_id + code_verifier, not
+ * client_secret. The same PKCE grant permits refresh using client_id only.
+ * Supplying the confidential-client secret here can select a different OAuth
+ * authentication mode (and surface a misleading reconnect_required on the
+ * first callback). Never send the secret to Dropbox for this PKCE grant.
+ */
 async function tokenRequest(env:Env,body:Record<string,string>,fetcher:typeof fetch=fetch):Promise<DbxToken>{
- if(!env.DROPBOX_APP_KEY||!env.DROPBOX_APP_SECRET)throw new ApiError(503,'dropbox_not_configured');
+ if(!env.DROPBOX_APP_KEY)throw new ApiError(503,'dropbox_not_configured');
+ const operation=body.grant_type==='authorization_code'?'exchange':'refresh';
  let response:Response;
  try{response=await fetcher('https://api.dropboxapi.com/oauth2/token',{
    method:'POST',redirect:'manual',signal:AbortSignal.timeout(12000),
    headers:{'Content-Type':'application/x-www-form-urlencoded'},
-   body:new URLSearchParams({...body,client_id:env.DROPBOX_APP_KEY!,client_secret:env.DROPBOX_APP_SECRET!})
+   body:new URLSearchParams({...body,client_id:env.DROPBOX_APP_KEY})
  });}catch{throw new ApiError(502,'dropbox_token_unavailable');}
  if(response.status>=300&&response.status<400){await response.body?.cancel();throw new ApiError(502,'dropbox_token_unavailable');}
- const data=await response.json().catch(()=>null) as DbxToken|null;
+ const data=await response.json().catch(()=>null) as (DbxToken & {error?:string|{'.tag'?:string}})|null;
  if(!response.ok){
-   if(response.status===400||response.status===401)throw new ApiError(409,'dropbox_reconnect_required');
+   const providerCode=typeof data?.error==='string'?data.error:
+     data?.error&&typeof data.error==='object'?data.error['.tag']:'';
+   // Safe metadata only: never log tokens, authorization codes or error_description.
+   console.warn(JSON.stringify({event:'dropbox_oauth_token_error',operation,status:response.status,
+     category:providerCode==='invalid_client'?'invalid_client':
+       providerCode==='invalid_grant'?'invalid_grant':
+       providerCode==='invalid_request'?'invalid_request':'other'}));
+   if(providerCode==='invalid_client')throw new ApiError(503,'dropbox_app_credentials_invalid');
+   if(operation==='exchange'){
+     if(providerCode==='invalid_grant')throw new ApiError(409,'dropbox_oauth_code_invalid');
+     if(providerCode==='invalid_request')throw new ApiError(502,'dropbox_oauth_exchange_invalid');
+     throw new ApiError(502,'dropbox_oauth_exchange_failed');
+   }
+   if((response.status===400||response.status===401)&&providerCode==='invalid_grant')
+     throw new ApiError(409,'dropbox_reconnect_required');
    throw new ApiError(503,'dropbox_token_unavailable');
  }
  if(!data||typeof data.access_token!=='string'||!data.access_token||
@@ -206,7 +228,8 @@ export async function dropboxCallback(request:Request,env:Env):Promise<Response>
   await finishExchange(env,row.owner_uid,exchangeId);
   return finish(env,'connected');
  }catch(error){
-  const allowed=new Set(['dropbox_scope_missing','dropbox_offline_required','dropbox_identity_unverified','dropbox_reconnect_required']);
+  const allowed=new Set(['dropbox_scope_missing','dropbox_offline_required','dropbox_identity_unverified','dropbox_reconnect_required',
+   'dropbox_oauth_code_invalid','dropbox_oauth_exchange_invalid','dropbox_oauth_exchange_failed','dropbox_app_credentials_invalid']);
   return finish(env,error instanceof ApiError&&allowed.has(error.code)?error.code:'connection_failed');
  }
 }
