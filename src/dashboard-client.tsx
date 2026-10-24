@@ -702,8 +702,9 @@ function assetIcon(kind: AssetKind) {
 }
 
 function LibraryView({ assets, query, onUpload, projects, selectedProjectId, onSelectProject, onLinkedFolderCountChange }: { assets: LibraryAsset[]; query: string; onUpload: (files: FileList | null) => void; projects: readonly Project[]; selectedProjectId?:number; onSelectProject:(id:string)=>void; onLinkedFolderCountChange?:(count:number)=>void }) {
-  const [provider,setProvider]=useState<'google_drive'|'dropbox'>('google_drive');
   const dropboxEnabled=import.meta.env.VITE_DROPBOX_ENABLED==='true';
+  const [provider,setProvider]=useState<'google_drive'|'dropbox'>(()=>dropboxEnabled&&
+    new URLSearchParams(window.location.search).has('dropbox')?'dropbox':'google_drive');
   const folderCounts=useRef({google_drive:0,dropbox:0});
   const updateFolderCount=(type:'google_drive'|'dropbox',count:number)=>{
     if(folderCounts.current[type]===count)return;
