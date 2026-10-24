@@ -182,7 +182,7 @@ test('profissional cria, cliente comenta/pede ajustes, V2 aprovada e encerrament
   await chooseAppSelect(page, composer.getByRole('combobox',{name:'Tipo de acesso'}), 'link');
   await expect(removePublic).toHaveCount(0);
   await composer.getByRole('button',{name:'Selecionar materiais'}).click();
-  await expect(composer.locator('.review-folder-tabs button.active')).toHaveText('Materiais autorizados');
+  await expect(composer.locator('.review-folder-tabs button.active')).toHaveText('Materiais autorizados · Drive');
   await expect(composer.getByRole('link',{name:'Abrir pasta no Drive'})).toHaveAttribute(
     'href','https://drive.google.com/drive/folders/'+folder);
   await expect(composer.getByRole('link',{name:'Abrir Corte final.mp4 no Google Drive'}))
@@ -250,7 +250,7 @@ test('profissional cria, cliente comenta/pede ajustes, V2 aprovada e encerrament
   await expect(ownerDetail.locator('iframe[title="Prévia de Corte.mp4"]')).toHaveCount(1);
   await page.screenshot({path:info.outputPath('professional-contextual-feedback.png'),fullPage:true});
   await page.getByRole('button',{name:'Enviar nova versão',exact:true}).click();
-  await expect(composer.locator('.review-folder-tabs button.active')).toHaveText('Materiais autorizados');
+  await expect(composer.locator('.review-folder-tabs button.active')).toHaveText('Materiais autorizados · Drive');
   await composer.getByText('Corte final.mp4',{exact:true}).click();
   await composer.getByRole('button',{name:'Enviar nova versão',exact:true}).click();
   await expect(page.getByLabel('Link da revisão')).toBeVisible();
