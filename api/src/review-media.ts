@@ -1,11 +1,13 @@
 import {ApiError,type Env} from './types.ts';
 import {connection} from './repository.ts';
 import {accessCredential} from './google.ts';
+import {dropboxMedia} from './dropbox.ts';
+import type {StorageProviderId} from './storage.ts';
 import {base64url,decode} from './crypto.ts';
 
 type Ticket={r:string;f:string;v:number;e:number;k:string;h:string;s?:string};
 const idPattern=/^[0-9a-f-]{36}$/i;
-const filePattern=/^[A-Za-z0-9_-]{10,200}$/;
+const filePattern=/^(?:[A-Za-z0-9_-]{10,200}|id:[A-Za-z0-9_-]{8,200})$/;
 const encoder=new TextEncoder();
 const decoder=new TextDecoder();
 // Bounded capability lifetime; the same value is returned to the portal so
@@ -77,8 +79,8 @@ export async function streamReviewMedia(request:Request,env:Env,url:URL):Promise
     }
     if(!allowed)throw new ApiError(404,'review_not_found');
   }else if(p.s)throw new ApiError(404,'review_not_found');
-  const asset=await env.DB.prepare("SELECT file_id,connection_id,mime_type FROM review_assets WHERE review_id=? AND version=? AND file_id=? AND grant_state='granted'")
-    .bind(p.r,p.v,p.f).first<{file_id:string;connection_id:string;mime_type:string}>();
+  const asset=await env.DB.prepare("SELECT file_id,connection_id,mime_type,provider FROM review_assets WHERE review_id=? AND version=? AND file_id=? AND grant_state='granted'")
+    .bind(p.r,p.v,p.f).first<{file_id:string;connection_id:string;mime_type:string;provider:StorageProviderId}>();
   if(!asset||!(/^(video|image|audio)\//.test(asset.mime_type)||asset.mime_type==='application/pdf'))throw new ApiError(404,'review_not_found');
   const range=request.headers.get('Range');
   // Single bounded chunks avoid turning a paused preview into a full large-file
@@ -101,16 +103,20 @@ export async function streamReviewMedia(request:Request,env:Env,url:URL):Promise
       upstreamRange='bytes=-'+Math.min(tail,chunk);
     }else throw new ApiError(416,'media_invalid_range');
   }else if(request.method==='GET'&&asset.mime_type.startsWith('video/'))upstreamRange='bytes=0-'+(chunk-1);
-  const row=await connection(env,r.owner_uid,asset.connection_id);
-  const token=await accessCredential(env,row);
-  const endpoint=new URL(GOOGLE+'/drive/v3/files/'+encodeURIComponent(asset.file_id));
-  endpoint.searchParams.set('alt','media');
-  endpoint.searchParams.set('supportsAllDrives','true');
   let upstream:Response;
-  try{
-    upstream=await fetch(endpoint,{method:request.method,redirect:'manual',signal:AbortSignal.timeout(24000),
-      headers:{Authorization:'Bearer '+token.value,...(upstreamRange?{'Range':upstreamRange}:{})}});
-  }catch{throw new ApiError(502,'media_unavailable');}
+  if(asset.provider==='dropbox'){
+    upstream=await dropboxMedia(env,r.owner_uid,asset.connection_id,asset.file_id,upstreamRange);
+  }else{
+    const row=await connection(env,r.owner_uid,asset.connection_id);
+    const token=await accessCredential(env,row);
+    const endpoint=new URL(GOOGLE+'/drive/v3/files/'+encodeURIComponent(asset.file_id));
+    endpoint.searchParams.set('alt','media');
+    endpoint.searchParams.set('supportsAllDrives','true');
+    try{
+      upstream=await fetch(endpoint,{method:request.method,redirect:'manual',signal:AbortSignal.timeout(24000),
+        headers:{Authorization:'Bearer '+token.value,...(upstreamRange?{'Range':upstreamRange}:{})}});
+    }catch{throw new ApiError(502,'media_unavailable');}
+  }
   // No automatic redirects with an OAuth bearer: refuse cross-origin redirects.
   if(upstream.status>=300&&upstream.status<400){await upstream.body?.cancel();throw new ApiError(502,'media_unavailable');}
   if(!upstream.ok){
