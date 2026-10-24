@@ -503,7 +503,7 @@ test('Dropbox: vincular pasta funciona com Todos os projetos, sem mudar o filtro
       return json({folder:{id:linkedFolderId,name:'Materiais Dropbox'},files:[],nextPageToken:null});
     return route.fallback();
   });
-  await page.goto(root+'/biblioteca');
+  await page.goto(root+'/biblioteca?driveE2E=1');
   await page.getByRole('tab',{name:'Dropbox'}).click();
   const library=page.getByRole('region',{name:'Biblioteca Dropbox'});
   await expect(library.getByText('Dropbox conectado')).toBeVisible();
