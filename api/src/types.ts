@@ -2,6 +2,7 @@ export interface Env {
   DB: D1Database;
   API_RATE_LIMIT: RateLimit;
   API_THUMB_LIMIT: RateLimit;
+  API_UPLOAD_LIMIT: RateLimit;
   ENVIRONMENT: string;
   FIREBASE_PROJECT_ID: string;
   FRONTEND_ORIGIN: string;

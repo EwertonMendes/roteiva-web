@@ -99,8 +99,9 @@ export async function handle(request: Request, env: Env): Promise<Response> {
       dropboxEnabled(env);
       if(origin!==env.FRONTEND_ORIGIN)throw new ApiError(403,'origin_required');
       const uid=await identity(request,env);await assertActiveAccess(env,uid);
-      if(!(await env.API_RATE_LIMIT.limit({key:'dev:upload:'+uid})).success)throw new ApiError(429,'rate_limited');
       const parts=url.pathname.split('/');
+      const limiter=parts[6]==='chunk'?env.API_UPLOAD_LIMIT:env.API_RATE_LIMIT;
+      if(!(await limiter.limit({key:'dev:dropbox-upload:'+uid})).success)throw new ApiError(429,'rate_limited');
       response=parts[6]==='chunk' ? await appendDropboxUpload(env,uid,parts[3],parts[5],request)
         : await finishDropboxUpload(env,uid,parts[3],parts[5],request);
     } else if (url.pathname === '/integrations/dropbox/media') {

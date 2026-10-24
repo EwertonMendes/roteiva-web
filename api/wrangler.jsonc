@@ -59,7 +59,15 @@
           "simple": {
             "limit": 240,
             "period": 60
+          },
+        {
+          "name": "API_UPLOAD_LIMIT",
+          "namespace_id": "479738001563",
+          "simple": {
+            "limit": 240,
+            "period": 60
           }
+        }
         }
       ]
     }
