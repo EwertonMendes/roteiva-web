@@ -68,7 +68,7 @@ jobs:
       - name: Validate exact code without Cloudflare/Firebase/Dropbox credentials
         run: |
           set -euo pipefail
-          pnpm install --frozen-lockfile --ignore-scripts
+          pnpm install --frozen-lockfile
           pnpm audit --audit-level high
           pnpm typecheck
           pnpm build
@@ -113,7 +113,6 @@ jobs:
           test "$DATABASE" = '302adc88-76b2-4827-bb16-99662fa0408b'
           test "$(gh api "repos/$GITHUB_REPOSITORY/pulls/87" --jq '.head.sha')" = "$SHA"
           test "$(git rev-parse HEAD)" = "$SHA"
-          node -e 'const c=require("./wrangler.jsonc");' 2>/dev/null && exit 1 || true
           grep -q '"name": "roteiva-api-dev"' wrangler.jsonc
           grep -q '"DROPBOX_ENABLED": "true"' wrangler.jsonc
       - name: Ensure all seven Worker secrets are published before touching D1
