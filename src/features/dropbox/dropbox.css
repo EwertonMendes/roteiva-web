@@ -1,6 +1,14 @@
 .db-picker{background:var(--surface,#fff);color:inherit;width:min(720px,calc(100vw - 28px));max-height:min(88vh,760px);border-radius:18px;display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--line,#ddd);box-shadow:0 20px 70px #0004}
 .db-picker>header{display:flex;justify-content:space-between;align-items:start;gap:16px;padding:20px 22px;border-bottom:1px solid var(--line,#ddd)}
 .db-picker h3{margin:0;font-size:1.2rem}.db-picker header p{margin:5px 0 0;font-size:.9rem;opacity:.75}
+.db-picker-project{display:grid;gap:7px;padding:15px 22px 14px;border-bottom:1px solid var(--line,#ddd)}
+.db-picker-project label{font-size:.82rem;font-weight:650}
+.db-picker-project small{font-size:.78rem;color:var(--muted);line-height:1.4}
+.db-picker-project .rt-select{max-width:100%}
+.db-picker-error{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;padding:13px;border-radius:10px;color:var(--ink);background:var(--subtle);border:1px solid var(--line);font-size:.86rem;line-height:1.45}
+.db-picker-error span{flex:1;min-width:180px;overflow-wrap:anywhere}
+.db-picker-error button{flex:0 0 auto}
+
 .db-crumbs{display:flex;gap:4px;align-items:center;padding:12px 18px;overflow-x:auto}.db-crumbs button{display:flex;gap:2px;align-items:center;flex-shrink:0;border:0;background:none;color:inherit;cursor:pointer;padding:6px}
 .db-picker-body{padding:8px 16px;overflow-y:auto;min-height:170px;flex:1}.db-pick-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--line,#ddd)}
 .db-pick-row>button:first-child{border:0;background:none;color:inherit;display:flex;align-items:center;gap:10px;min-width:0;flex:1;text-align:left;cursor:pointer}.db-pick-row span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -18,3 +26,5 @@
 [data-theme="dark"] .storage-providers button:hover{background:#252720;color:#f1f2ea}
 [data-theme="dark"] .storage-providers button.active,[data-theme="dark"] .storage-providers button[aria-selected="true"]{background:#2c2e28;color:#fafaf4;border-color:#494c41;box-shadow:0 1px 6px #0004}
 @media(max-width:420px){.storage-providers{display:flex;width:100%}.storage-providers button{flex:1;padding:8px 9px;font-size:.85rem;gap:7px}.storage-providers button img{width:18px;height:18px;flex-basis:18px}}
+
+@media(max-width:580px){.db-picker-project{padding:13px 16px}.db-picker-error button{width:100%}}
