@@ -257,6 +257,6 @@ export async function finishDropboxUpload(env:Env,uid:string,connectionId:string
  }finally{await unlock(env,row,lease)}
 }
 export async function cleanupDropboxUploads(env:Env):Promise<void>{
- await env.DB.prepare('DELETE FROM dropbox_upload_attempts WHERE expires_at<? LIMIT 50').bind(Date.now()).run();
- await env.DB.prepare('DELETE FROM dropbox_oauth_transactions WHERE expires_at<? LIMIT 50').bind(Date.now()).run();
+ await env.DB.prepare('DELETE FROM dropbox_upload_attempts WHERE rowid IN (SELECT rowid FROM dropbox_upload_attempts WHERE expires_at<? LIMIT 50)').bind(Date.now()).run();
+ await env.DB.prepare('DELETE FROM dropbox_oauth_transactions WHERE rowid IN (SELECT rowid FROM dropbox_oauth_transactions WHERE expires_at<? LIMIT 50)').bind(Date.now()).run();
 }
