@@ -303,3 +303,32 @@ export async function dropboxMedia(env:Env,uid:string,connectionId:string,fileId
   throw new ApiError(st===416?416:st===404||st===409?404:502,'media_unavailable');}
  return response;
 }
+
+/** Authenticated thumbnails. Dropbox supports only some formats/sizes; never treat a 409 as a fatal file error. */
+export async function dropboxThumbnail(env:Env,uid:string,connectionId:string,fileId:string,fetcher:typeof fetch=fetch):Promise<Response>{
+ if(!validStorageFileId('dropbox',fileId))throw new ApiError(404,'dropbox_file_not_found');
+ const row=await dropboxConnection(env,uid,connectionId);
+ const bearer=await dropboxAccess(env,row,fetcher);
+ let upstream:Response;
+ try{upstream=await fetcher(CONTENT+'files/get_thumbnail_v2',{method:'POST',redirect:'manual',
+  signal:AbortSignal.timeout(12000),headers:{
+   Authorization:'Bearer '+bearer,
+   'Dropbox-API-Arg':JSON.stringify({resource:{'.tag':'path',path:fileId},format:{'.tag':'jpeg'},size:{'.tag':'w256h256'}})
+  }});
+ }catch{throw new ApiError(502,'dropbox_thumbnail_unavailable')}
+ if(!upstream.ok||upstream.status>=300&&upstream.status<400){
+  const status=upstream.status;await upstream.body?.cancel();
+  if(status===404||status===409||status===415)return new Response(null,{status:204});
+  throw new ApiError(502,'dropbox_thumbnail_unavailable');
+ }
+ const reported=Number(upstream.headers.get('Content-Length')||0);
+ if(reported>2*1024*1024){await upstream.body?.cancel();throw new ApiError(413,'dropbox_thumbnail_too_large')}
+ let count=0;
+ const bounded=upstream.body?.pipeThrough(new TransformStream<Uint8Array,Uint8Array>({
+   transform(bytes,controller){count+=bytes.length;if(count>2*1024*1024)throw Error('thumbnail too large');controller.enqueue(bytes)}
+ }));
+ return new Response(bounded||null,{status:200,headers:{
+  'Content-Type':'image/jpeg','Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff',
+  'Content-Disposition':'inline','Referrer-Policy':'no-referrer'
+ }});
+}
