@@ -27,6 +27,15 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
 }){
   const {user}=useAuth(),call=useDriveApi(),transfers=useDriveTransfers();
   const getThumbnail=useDriveThumbnailFetch();
+  const getStorageThumbnail=useCallback(async(item:DriveItem,signal?:AbortSignal,accountId?:string)=>{
+    if(selectedFolder?.provider!=='dropbox')return getThumbnail(item,signal,accountId);
+    if(!user||!item.thumbnailFallback)return null;
+    const token=await user.getIdToken();
+    const response=await fetch('https://roteiva-api-dev.ewertonmendes9.workers.dev/integrations/dropbox/'+
+      encodeURIComponent(accountId||selectedFolder.connectionId)+'/files/'+encodeURIComponent(item.id)+'/thumbnail',
+      {headers:{Authorization:'Bearer '+token},signal,cache:'no-store'});
+    return response.ok&&response.status!==204?response.blob():null;
+  },[getThumbnail,user,selectedFolder?.provider,selectedFolder?.connectionId]);
   const [rows,setRows]=useState<Review[]>([]);
   const [search,setSearch]=useState(""),[debouncedSearch,setDebouncedSearch]=useState("");
   const [status,setStatus]=useState(""),[page,setPage]=useState(0);
@@ -90,8 +99,11 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
     if(!user||!projectId||!composer){setLinksLoading(false);return;}
     setLinksLoading(true);
     let alive=true;
-    Promise.all([readDriveLinks(user.uid),readDropboxLinks(user.uid)]).then(([google,dropbox])=>{
-      if(alive)setLinks([...google.map(l=>({...l,provider:'google_drive' as const})),...dropbox]
+    Promise.allSettled([readDriveLinks(user.uid),readDropboxLinks(user.uid)]).then(([drive,dropbox])=>{
+      if(drive.status==='rejected'&&dropbox.status==='rejected')throw new Error('Não foi possível ler as pastas.');
+      const google=drive.status==='fulfilled'?drive.value:[];
+      const other=dropbox.status==='fulfilled'?dropbox.value:[];
+      if(alive)setLinks([...google.map(l=>({...l,provider:'google_drive' as const})),...other]
        .filter(l=>l.projectId===projectId));
     }).catch(()=>{if(alive)setFolderError("Não foi possível ler as pastas vinculadas.");})
       .finally(()=>{if(alive)setLinksLoading(false);});
@@ -112,6 +124,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
     finally{if(sequence===browseSequence.current)setFolderBusy(false);}
   },[call]);
   const pickFolder=(folder:StorageFolderLink)=>{
+    if(folder.provider==='dropbox'&&shareDirect){setShareDirect(false);setRestrictPublic(false);}
     setSelectedFolder(folder);setTrail([{id:folder.folderId,name:folder.folderName}]);
     void browse(folder,folder.folderId,[{id:folder.folderId,name:folder.folderName}]);
   };
@@ -220,6 +233,10 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
     finally{setWorking(false);}
   };
   const submit=async()=>{
+    if(shareDirect&&files.some(f=>f.provider==='dropbox')){
+      setError('O compartilhamento direto do original ainda não está disponível para arquivos Dropbox. Desative essa opção para utilizar a aprovação segura do Roteiva.');
+      return;
+    }
     if(working||pendingUploads.length){setError("Conclua ou cancele os envios pendentes antes de compartilhar.");return;}
     if(!projectId||!clientId||!files.length) {setError("Escolha o cliente, projeto e pelo menos um arquivo.");return;}
     if(!replacement&&missingDetails.length){setComposerStep("details");setError(missingDetails[0]);return;}
@@ -458,7 +475,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
              </button>
            </div>}
            <div className="review-materials-heading">
-             <h3>Arquivos do Google Drive <span>({files.length}/8)</span></h3>
+             <h3>Arquivos dos projetos <span>({files.length}/8)</span></h3>
              <p>Escolha pelo menos um arquivo. Você pode selecionar até 8 imagens, vídeos, áudios ou PDFs.</p>
            </div>
           {!projectId?<p className="reviews-muted">Selecione um projeto para explorar os arquivos vinculados.</p>:
@@ -467,20 +484,21 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
             <button className="secondary-button" onClick={()=>{resetComposer();onLibrary();}}>Vincular pasta na Biblioteca</button></div>:
           <>
             <div className="review-folder-tabs">{links.map(l=><button type="button" key={l.id} className={selectedFolder?.id===l.id?"active":""}
-              onClick={()=>pickFolder(l)}><Folder size={15}/>{l.folderName}</button>)}</div>
+              onClick={()=>pickFolder(l)}><Folder size={15}/>{l.folderName} · {l.provider==='dropbox'?'Dropbox':'Drive'}</button>)}</div>
             {selectedFolder&&<div className="review-breadcrumbs">{trail.map((node,i)=><button key={node.id}
               onClick={()=>void browse(selectedFolder,node.id,trail.slice(0,i+1))}>
                 {i>0&&<ChevronRight size={12}/>} {node.name}</button>)}</div>}
             {selectedFolder&&<div className="review-file-tools">
               <label className="review-drive-search"><Search size={16}/>
-                <input type="search" aria-label="Buscar arquivos no Google Drive"
+                <input type="search" aria-label="Buscar arquivos na pasta"
                   placeholder="Buscar arquivos nesta pasta" value={fileSearch}
                   onChange={e=>setFileSearch(e.target.value)}/>
                 {fileSearch&&<button type="button" aria-label="Limpar busca" onClick={()=>setFileSearch("")}><X size={14}/></button>}
               </label>
               <a className="review-drive-external" target="_blank" rel="noopener noreferrer"
-                href={"https://drive.google.com/drive/folders/"+encodeURIComponent(activeFolderId)}>
-                <ExternalLink size={15}/> Abrir pasta no Drive</a>
+                href={selectedFolder?.provider==='dropbox'?'https://www.dropbox.com/home':
+                 "https://drive.google.com/drive/folders/"+encodeURIComponent(activeFolderId)}>
+                <ExternalLink size={15}/> Abrir {selectedFolder?.provider==='dropbox'?'Dropbox':'pasta no Drive'}</a>
             </div>}
             {destination&&<div className="review-upload-zone"
               onDragOver={event=>{if(Array.from(event.dataTransfer.types).includes("Files"))event.preventDefault();}}
@@ -489,7 +507,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
               <label className="secondary-button">Adicionar arquivos do dispositivo
                 <input type="file" multiple accept="video/*,image/*,audio/*,application/pdf"
                   onChange={event=>{uploadNew(Array.from(event.target.files||[]));event.target.value="";}}/></label>
-              <span>Ou arraste arquivos aqui. Envio direto ao seu Google Drive.</span>
+              <span>Ou arraste arquivos aqui. Envio direto para o provedor selecionado.</span>
             </div>}
             {transfers.authorizationNotice}
             {destination&&transfers.uploads.filter(entry=>
@@ -508,20 +526,20 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
             {folderError&&<p className="reviews-warning" role="alert">{folderError}</p>}
             <div className="review-files" aria-label="Arquivos disponíveis">
               {folderBusy&&!items.length&&<p role="status"><LoaderCircle size={16} className="rl-spin"/> Carregando arquivos…</p>}
-              {searchBusy&&<p className="reviews-muted" role="status"><LoaderCircle size={15} className="rl-spin"/> Buscando arquivos no Google Drive…</p>}
+              {searchBusy&&<p className="reviews-muted" role="status"><LoaderCircle size={15} className="rl-spin"/> Buscando arquivos na pasta…</p>}
               {!folderBusy&&!searchBusy&&selectedFolder&&!displayedItems.length&&
                 <p className="reviews-muted">{fileSearch?"Nenhum arquivo encontrado nesta pasta.":"Esta pasta está vazia."}</p>}
               {displayedItems.map(f=><div className="review-picker-row" key={f.id}>
-                {f.mimeType==="application/vnd.google-apps.folder"?
+                {isStorageFolder(f.mimeType)?
                   <button type="button" className="review-picker-main" onClick={()=>{
                     if(selectedFolder)void browse(selectedFolder,f.id,[...trail,{id:f.id,name:f.name}]);}}>
                     <Folder size={19}/><span className="review-picker-name">{f.name}<small>Subpasta</small></span><ChevronRight size={16}/>
                   </button>:
                   <label className={"review-picker-main"+(!supported(f)?" unsupported":"")}>
                     <input type="checkbox" disabled={!supported(f)} aria-label={"Selecionar "+f.name}
-                      checked={files.some(a=>a.fileId===f.id)} onChange={()=>addFile(f)}/>
+                      checked={files.some(a=>a.fileId===f.id&&a.connectionId===selectedFolder?.connectionId)} onChange={()=>addFile(f)}/>
                     {selectedFolder&&user&&<DriveThumbnail item={f} scope={user.uid+":"+selectedFolder.connectionId}
-                      getThumbnail={getThumbnail}/>}
+                      getThumbnail={getStorageThumbnail}/>}
                     <span className="review-picker-name" title={f.name}><span>{f.name}</span>
                       <small>{supported(f)?readableFileType(f.mimeType):"Formato não aceito para aprovação"}</small></span>
                   </label>}
@@ -540,7 +558,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
           {files.length>0&&<div className="reviews-selected"><h3>Selecionados</h3>
             {files.map(f=><div key={f.fileId}><Check size={14}/><span>{f.name}</span>
               <button onClick={()=>setFiles(x=>x.filter(a=>a.fileId!==f.fileId))} aria-label={"Remover "+f.name}><X size={15}/></button></div>)}</div>}
-          <p className="reviews-muted">Os envios usam a mesma fila segura da Biblioteca. Aguarde a confirmação do Google Drive antes de compartilhar.</p>
+          <p className="reviews-muted">Os envios usam a mesma fila segura da Biblioteca. Aguarde a confirmação do provedor antes de compartilhar.</p>
            </>}
          </div>
         <footer className="review-composer-footer">
