@@ -190,7 +190,7 @@ test('profissional cria, cliente comenta/pede ajustes, V2 aprovada e encerrament
   const thumb=composer.locator('[data-mime="video/mp4"][data-thumbnail-state]').last();
   await thumb.scrollIntoViewIfNeeded();
   await expect(thumb).toHaveAttribute('data-thumbnail-state','loaded');
-  const driveSearch=composer.getByRole('searchbox',{name:'Buscar arquivos no Google Drive'});
+  const driveSearch=composer.getByRole('searchbox',{name:'Buscar arquivos na pasta'});
   await driveSearch.fill('Corte final');
   await expect(composer.getByText('Corte final.mp4',{exact:true})).toBeVisible();
   await expect(composer.getByText('Corte.mp4',{exact:true})).toHaveCount(0);
@@ -201,7 +201,7 @@ test('profissional cria, cliente comenta/pede ajustes, V2 aprovada e encerrament
   await composer.locator('input[type=file]').setInputFiles({name:uploaded.name,mimeType:'video/mp4',buffer:Buffer.alloc(300000)});
   await expect(composer.getByRole('button',{name:'Gerar aprovação'})).toBeDisabled();
   releaseUpload();
-  await expect(composer.getByRole('heading',{name:'Arquivos do Google Drive (2/8)'})).toBeVisible();
+  await expect(composer.locator('.review-composer-footnote')).toContainText('2 material(is) selecionado(s)');
   await expect(composer.getByRole('button',{name:'Gerar aprovação'})).toBeEnabled();
   await composer.getByRole('button',{name:'Gerar aprovação'}).click();
   const owner=page.getByRole('dialog',{name:'Detalhes da revisão'});
