@@ -137,7 +137,7 @@ test('Fail closed: malformed uploads, reconnects and different owners never star
   await assert.rejects(()=>bad({...raw,...patch}),e=>e.status===400&&e.code===code);
  }
  assert.equal(f.sql.prepare('SELECT COUNT(*) AS n FROM dropbox_upload_attempts').get().n,0);
- await assert.rejects(()=>startDropboxUpload(f.env,'not-owner',conn,request(raw)),e=>e.status===404);
+ await assert.rejects(()=>startDropboxUpload(f.env,'not-owner',conn,request(raw)),e=>e.status===403&&e.code==='dropbox_folder_not_linked');
  f.sql.prepare("UPDATE dropbox_connections SET status='reconnect_required' WHERE id=?").run(conn);
  await assert.rejects(async()=>dropboxAccess(f.env,await dropboxConnection(f.env,uid,conn)),
    e=>e.code==='dropbox_reconnect_required');
