@@ -29,6 +29,8 @@ import { IconLabel } from "./features/ui/IconLabel";
 import { PROJECT_STATUS_ICONS, PROJECT_STATUS_LABELS } from "./features/ui/project-status";
 import { DriveConnectionPanel } from "./features/drive/DriveConnectionPanel";
 import { DropboxConnectionPanel } from "./features/dropbox/DropboxConnectionPanel";
+import googleDriveMark from "./assets/brand/google-drive.svg";
+import dropboxMark from "./assets/brand/dropbox.svg";
 import { LibraryReviewDemo } from "./features/drive/LibraryReviewDemo";
 import type { RoteivaProfile, ProfileChanges } from "./data/firestore-workspace";
 import type { WorkspaceCommand } from "./data/firestore-commands";
@@ -722,16 +724,24 @@ function LibraryView({ assets, query, onUpload, projects, selectedProjectId, onS
   return <div className="library-layout">
     {!isDemo && (!useEmulators || (import.meta.env.MODE === "emulator" && new URLSearchParams(window.location.search).get("driveE2E") === "1")) && <>
       {dropboxEnabled&&<nav className="storage-providers" aria-label="Provedor de armazenamento" role="tablist">
-        <button type="button" role="tab" aria-selected={provider==='google_drive'} className={provider==='google_drive'?'active':''}
-          onClick={()=>setProvider('google_drive')}>Google Drive</button>
-        <button type="button" role="tab" aria-selected={provider==='dropbox'} className={provider==='dropbox'?'active':''}
-          onClick={()=>setProvider('dropbox')}>Dropbox</button>
+        <button type="button" role="tab" aria-selected={provider==='google_drive'} aria-controls="storage-drive-panel"
+          className={provider==='google_drive'?'active':''}
+          onClick={()=>setProvider('google_drive')}>
+          <img src={googleDriveMark} alt="" aria-hidden="true" width="20" height="20"/>
+          <span>Google Drive</span>
+        </button>
+        <button type="button" role="tab" aria-selected={provider==='dropbox'} aria-controls="storage-dropbox-panel"
+          className={provider==='dropbox'?'active':''}
+          onClick={()=>setProvider('dropbox')}>
+          <img src={dropboxMark} alt="" aria-hidden="true" width="20" height="20"/>
+          <span>Dropbox</span>
+        </button>
       </nav>}
-      <div hidden={dropboxEnabled&&provider!=='google_drive'}>
+      <div id="storage-drive-panel" role="tabpanel" hidden={dropboxEnabled&&provider!=='google_drive'}>
         <DriveConnectionPanel projects={projects} selectedProjectId={selectedProjectId} onSelectProject={onSelectProject}
           onLinkedFolderCountChange={count=>updateFolderCount('google_drive',count)} />
       </div>
-      {dropboxEnabled&&<div hidden={provider!=='dropbox'}>
+      {dropboxEnabled&&<div id="storage-dropbox-panel" role="tabpanel" hidden={provider!=='dropbox'}>
         <DropboxConnectionPanel projects={projects} selectedProjectId={selectedProjectId} onSelectProject={onSelectProject}
           onLinkedFolderCountChange={count=>updateFolderCount('dropbox',count)} />
       </div>}
