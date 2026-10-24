@@ -38,6 +38,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   isolated-e2e:
+    if: github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/master'
     name: Worker tests, emulator rules and desktop/mobile E2E
     runs-on: ubuntu-latest
     timeout-minutes: 18
@@ -86,3 +87,49 @@ jobs:
             playwright-report/
           if-no-files-found: ignore
           retention-days: 7
+
+  # Temporary maintenance job: run only by explicit workflow_dispatch on this
+  # repository-owned PR branch. No Cloudflare/Firebase/Dropbox secrets are read.
+  lockfile-refresh:
+    name: Regenerate patched pnpm lockfile (manual, no deployment)
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/feat/dropbox-storage-integration'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: write
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Guard internal PR 87, triggering actor and exact head
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "${{ github.actor }}" = "EwertonMendes"
+          test "$GITHUB_REF" = "refs/heads/feat/dropbox-storage-integration"
+          actual="$(gh api repos/$GITHUB_REPOSITORY/pulls/87 --jq '.head.sha')"
+          test "$actual" = "$GITHUB_SHA"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - name: Resolve only patched versions and verify reproducibility
+        run: |
+          pnpm install --lockfile-only --no-frozen-lockfile --ignore-scripts
+          pnpm install --frozen-lockfile --ignore-scripts
+          pnpm audit --audit-level high
+          git diff --check
+      - name: Commit only regenerated lockfile to this exact PR branch
+        run: |
+          set -euo pipefail
+          git add -- pnpm-lock.yaml
+          if ! git diff --cached --quiet; then
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m "security(deps): regenerate lockfile for patched advisories"
+            git push origin HEAD:refs/heads/feat/dropbox-storage-integration
+          fi
