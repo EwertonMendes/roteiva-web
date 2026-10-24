@@ -1,4 +1,4 @@
-name: Dropbox PR Worker - manual DEV homologation
+name: Dropbox PR - manual DEV homologation
 on:
   workflow_dispatch:
     inputs:
@@ -205,3 +205,86 @@ jobs:
           const dbx=await fetch(root+'/integrations/dropbox',{headers:{Authorization:'Bearer invalid'}});
           assert.equal(dbx.status,401);
           NODE
+
+  firestore:
+    name: Publish reviewed Dropbox Firestore rules to DEV only
+    needs: [validate, deploy]
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    environment: firebase-development
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.sha }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: pnpm install --frozen-lockfile
+      - name: Guard exact Firebase DEV project and rules before credentials
+        env:
+          PROJECT: ${{ vars.FIREBASE_PROJECT_ID }}
+          SHA: ${{ needs.validate.outputs.sha }}
+        run: |
+          test "$PROJECT" = 'roteiva-web-dev'
+          test "$(git rev-parse HEAD)" = "$SHA"
+          grep -q 'dropboxFolders' firestore.rules
+      - name: Revalidate owner/project isolation locally
+        run: pnpm test:rules
+      - uses: google-github-actions/auth@v3
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+      - name: Publish rules and indexes only (no database content or Hosting)
+        run: pnpm exec firebase deploy --only firestore:rules,firestore:indexes --project roteiva-web-dev --non-interactive
+
+  frontend:
+    name: Publish reviewed Dropbox frontend to Firebase Hosting DEV only
+    needs: [validate, deploy, firestore]
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    environment: firebase-development
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.sha }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Guard exact DEV target and requested client flag
+        env:
+          PROJECT: ${{ vars.FIREBASE_PROJECT_ID }}
+          SHA: ${{ needs.validate.outputs.sha }}
+        run: |
+          test "$PROJECT" = 'roteiva-web-dev'
+          test "$(git rev-parse HEAD)" = "$SHA"
+          grep -q '^VITE_DROPBOX_ENABLED=true$' .env.firebase
+      - name: Build validated static frontend and verify hosting contract
+        run: |
+          pnpm build
+          node scripts/verify-static-build.mjs dist /
+          node scripts/check-access-worker.mjs
+      - uses: google-github-actions/auth@v3
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+      - name: Publish Hosting only, never overwrite Firestore content
+        run: pnpm exec firebase deploy --only hosting --project roteiva-web-dev --non-interactive
+      - name: Verify live SPA cache policy after deployment
+        run: node scripts/verify-hosting-cache.mjs https://roteiva-web-dev.web.app
