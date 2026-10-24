@@ -221,7 +221,7 @@ test('profissional cria, cliente comenta/pede ajustes, V2 aprovada e encerrament
   expect(sharingBounds!.y).toBeLessThan(summaryBounds!.y);
   const folderLink=owner.getByRole('link',{name:'Abrir pasta do arquivo no Google Drive'});
   await expect(folderLink).toHaveAttribute('href','https://drive.google.com/drive/folders/'+childFolder);
-  await expect(owner.getByRole('link',{name:'Abrir Corte.mp4 no Google Drive'}))
+  await expect(owner.getByRole('link',{name:'Abrir arquivo Corte.mp4 no Google Drive'}))
     .toHaveAttribute('href','https://drive.google.com/file/d/'+file.fileId+'/view');
   await owner.getByRole('button',{name:/Envio.mp4/}).click();
   await expect(folderLink).toHaveAttribute('href','https://drive.google.com/drive/folders/'+folder);
