@@ -11,8 +11,9 @@ import { verifyPickerToken } from './picker.ts';
 import { deletionStatus, requestDeletion, runPendingDeletions, runDeletionMaintenance } from './account-deletion.ts';
 import { ensureAccess, assertActiveAccess } from './access.ts';
 import { backfillAccess } from './access-backfill.ts';
-import {dropboxEnabled,dropboxStart,dropboxLaunch,dropboxCallback,dropboxConnections,dropboxList,dropboxMetadata,dropboxRevoke} from './dropbox.ts';
+import {dropboxEnabled,dropboxStart,dropboxLaunch,dropboxCallback,dropboxConnections,dropboxList,dropboxMetadata,dropboxRevoke,dropboxThumbnail} from './dropbox.ts';
 import {startDropboxUpload,appendDropboxUpload,finishDropboxUpload,cleanupDropboxUploads} from './dropbox-uploads.ts';
+import {issueDropboxPreview,streamDropboxPreview} from './dropbox-preview.ts';
 const headers = {
   'Cache-Control':'no-store', 'Referrer-Policy':'no-referrer',
   'X-Content-Type-Options':'nosniff', 'Content-Security-Policy':"default-src 'none'; frame-ancestors 'none'",
@@ -102,6 +103,21 @@ export async function handle(request: Request, env: Env): Promise<Response> {
       const parts=url.pathname.split('/');
       response=parts[6]==='chunk' ? await appendDropboxUpload(env,uid,parts[3],parts[5],request)
         : await finishDropboxUpload(env,uid,parts[3],parts[5],request);
+    } else if (url.pathname === '/integrations/dropbox/media') {
+      dropboxEnabled(env);
+      if(!(await env.API_THUMB_LIMIT.limit({key:'dev:media:'+sourceIp.slice(0,64)})).success)throw new ApiError(429,'rate_limited');
+      response=await streamDropboxPreview(env,request,url);
+    } else if (/^\/integrations\/dropbox\/[^/]+\/files\/[^/]+\/thumbnail$/.test(url.pathname) && request.method==='GET') {
+      dropboxEnabled(env);
+      const uid=await identity(request,env);await assertActiveAccess(env,uid);
+      if(!(await env.API_THUMB_LIMIT.limit({key:'dev:thumb:'+uid})).success)throw new ApiError(429,'rate_limited');
+      const parts=url.pathname.split('/');
+      response=await dropboxThumbnail(env,uid,parts[3],decodeURIComponent(parts[5]));
+    } else if (/^\/integrations\/dropbox\/[^/]+\/preview-ticket$/.test(url.pathname) && request.method==='POST') {
+      dropboxEnabled(env);
+      if(origin!==env.FRONTEND_ORIGIN)throw new ApiError(403,'origin_required');
+      const uid=await identity(request,env);await assertActiveAccess(env,uid);
+      response=await issueDropboxPreview(env,uid,url.pathname.split('/')[3],request);
     } else if (url.pathname === '/integrations/dropbox' && request.method === 'GET') {
       dropboxEnabled(env);
       const uid=await identity(request,env);await assertActiveAccess(env,uid);
