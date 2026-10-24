@@ -149,14 +149,14 @@ test('profissional cria, cliente comenta/pede ajustes, V2 aprovada e encerrament
     if(path==='/reviews'&&req.method()==='POST'){
       const body=req.postDataJSON();expect(body.clientId).toBe(clientId);expect(body.projectId).toBe(projectId);
       expect(uploadConfirmed).toBe(true);
-      expect(body.assets).toEqual([file.fileId,uploaded.id].map(fileId=>({fileId,connectionId:connection,linkedFolderId:folder})));
+      expect(body.assets).toEqual([file.fileId,uploaded.id].map(fileId=>({fileId,connectionId:connection,linkedFolderId:folder,provider:'google_drive'})));
       expect(body.mode).toBe('link');expect(body.expiresInDays).toBe(14);expect(body.title).toBe('Corte para revisão');
       created=true;createCalls++;review.title=body.title;selected=[file,{...uploaded,fileId:uploaded.id}];return json({id:review.id},201);
     }
     if(path.endsWith('/publish')){expect(created).toBe(true);publishCalls++;review.status='pending';return json({review:detail()});}
     if(path.endsWith('/revise')){
       expect(review.status).toBe('changes');
-      expect(req.postDataJSON().assets).toEqual([{fileId:second.fileId,connectionId:connection,linkedFolderId:folder}]);
+      expect(req.postDataJSON().assets).toEqual([{fileId:second.fileId,connectionId:connection,linkedFolderId:folder,provider:'google_drive'}]);
       revisionCalls++;selected=[second];review.version=2;review.status='pending';return json({review:detail()});
     }
     if(path.endsWith('/close')){closeCalls++;review.status='closed';return json({closed:true});}
