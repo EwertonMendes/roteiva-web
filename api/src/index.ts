@@ -12,6 +12,7 @@ import { deletionStatus, requestDeletion, runPendingDeletions, runDeletionMainte
 import { ensureAccess, assertActiveAccess } from './access.ts';
 import { backfillAccess } from './access-backfill.ts';
 import {dropboxEnabled,dropboxStart,dropboxLaunch,dropboxCallback,dropboxConnections,dropboxList,dropboxMetadata,dropboxRevoke} from './dropbox.ts';
+import {startDropboxUpload,appendDropboxUpload,finishDropboxUpload,cleanupDropboxUploads} from './dropbox-uploads.ts';
 const headers = {
   'Cache-Control':'no-store', 'Referrer-Policy':'no-referrer',
   'X-Content-Type-Options':'nosniff', 'Content-Security-Policy':"default-src 'none'; frame-ancestors 'none'",
@@ -87,6 +88,20 @@ export async function handle(request: Request, env: Env): Promise<Response> {
       if(origin!==env.FRONTEND_ORIGIN)throw new ApiError(403,'origin_required');
       const uid=await identity(request,env);await assertActiveAccess(env,uid);
       response=await dropboxStart(env,uid);
+    } else if (/^\/integrations\/dropbox\/[^/]+\/uploads\/start$/.test(url.pathname) && request.method==='POST') {
+      dropboxEnabled(env);
+      if(origin!==env.FRONTEND_ORIGIN)throw new ApiError(403,'origin_required');
+      const uid=await identity(request,env);await assertActiveAccess(env,uid);
+      if(!(await env.API_RATE_LIMIT.limit({key:'dev:upload:'+uid})).success)throw new ApiError(429,'rate_limited');
+      response=await startDropboxUpload(env,uid,url.pathname.split('/')[3],request);
+    } else if (/^\/integrations\/dropbox\/[^/]+\/uploads\/[0-9a-f-]{36}\/(chunk|finish)$/.test(url.pathname) && request.method==='POST') {
+      dropboxEnabled(env);
+      if(origin!==env.FRONTEND_ORIGIN)throw new ApiError(403,'origin_required');
+      const uid=await identity(request,env);await assertActiveAccess(env,uid);
+      if(!(await env.API_RATE_LIMIT.limit({key:'dev:upload:'+uid})).success)throw new ApiError(429,'rate_limited');
+      const parts=url.pathname.split('/');
+      response=parts[6]==='chunk' ? await appendDropboxUpload(env,uid,parts[3],parts[5],request)
+        : await finishDropboxUpload(env,uid,parts[3],parts[5],request);
     } else if (url.pathname === '/integrations/dropbox' && request.method === 'GET') {
       dropboxEnabled(env);
       const uid=await identity(request,env);await assertActiveAccess(env,uid);
@@ -217,6 +232,7 @@ export default {fetch:handle, scheduled(controller:ScheduledController,env:Env,c
       try{await runDeletionMaintenance(env);}catch{console.error(JSON.stringify({event:'deletion_maintenance_retry'}));}
       try{await backfillAccess(env);}catch(error){console.error(JSON.stringify({event:'access_backfill_retry',code:error instanceof ApiError?error.code:'dependency_failure'}));}
       try{await cleanupUploads(env);}catch{console.error(JSON.stringify({event:'drive_upload_retention_retry'}));}
+      try{await cleanupDropboxUploads(env);}catch{console.error(JSON.stringify({event:'dropbox_upload_retention_retry'}));}
     }else{
       console.error(JSON.stringify({event:'unexpected_cron_trigger'}));
     }
