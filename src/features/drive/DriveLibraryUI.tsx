@@ -3,12 +3,14 @@ import { useEffect, useRef, useState } from "react";
 import {DriveThumbnail} from "./DriveThumbnail";
 import { ArrowLeft, Check, ChevronLeft, ChevronRight, Grid2X2, List, ExternalLink, File, FileAudio, FileImage, FileText, FileVideo, Folder, FolderOpen, Link2, LoaderCircle, Search, X, MoreHorizontal, Upload } from "lucide-react";
 
-export type DriveItem = {id:string;name:string;mimeType:string;size?:string;modifiedTime?:string;thumbnailLink?:string;thumbnailTicket?:string;thumbnailFallback?:boolean;webViewLink?:string};
+export type DriveItem = {id:string;name:string;mimeType:string;size?:string;modifiedTime?:string;thumbnailLink?:string;thumbnailTicket?:string;thumbnailFallback?:boolean;webViewLink?:string;pathDisplay?:string};
 export type DriveTrail = {id:string;name:string};
 export const DRIVE_FOLDER = "application/vnd.google-apps.folder";
+export const DROPBOX_FOLDER = "application/vnd.roteiva.folder";
+export const isStorageFolder=(mime:string)=>mime===DRIVE_FOLDER||mime===DROPBOX_FOLDER;
 
 export function driveKindIcon(mime:string) {
-  return mime===DRIVE_FOLDER ? Folder : mime.startsWith("video/") ? FileVideo :
+  return isStorageFolder(mime) ? Folder : mime.startsWith("video/") ? FileVideo :
     mime.startsWith("image/") ? FileImage : mime.startsWith("audio/") ? FileAudio :
     mime.includes("pdf") || mime.includes("document") ? FileText : File;
 }
@@ -29,9 +31,9 @@ export function driveFileUrl(file:DriveItem) {
   }catch{ /* fall through to a trusted Google Drive URL */ }
   return fallback;
 }
-export const isPreviewable=(item:DriveItem)=>item.mimeType!==DRIVE_FOLDER && !item.mimeType.startsWith("application/vnd.google-apps.");
+export const isPreviewable=(item:DriveItem)=>!isStorageFolder(item.mimeType) && !item.mimeType.startsWith("application/vnd.google-apps.");
 export function readableFileType(mime:string){
-  if(mime===DRIVE_FOLDER)return "Pasta";
+  if(isStorageFolder(mime))return "Pasta";
   if(mime==="application/pdf")return "PDF";
   if(mime.startsWith("image/"))return "Imagem";
   if(mime.startsWith("video/"))return "Vídeo";
@@ -97,6 +99,7 @@ type FolderPickerProps={
 };
 export function DriveFolderPicker({projects,projectId,onProjectChange,folders,path,loading,working,canRead,hasMore,mode,onModeChange,linkedIds,error,onNavigate,onMore,onLink,onConnect,onClose}:FolderPickerProps){
   const [chosen,setChosen]=useState<Record<string,DriveItem>>({});
+  const providerName=provider==='dropbox'?'Dropbox':'Google Drive';
   const [filter,setFilter]=useState("");
   const [submitting,setSubmitting]=useState(false);
   const ref=useOverlayFocus(()=>{if(!working&&!submitting)onClose();});
@@ -179,6 +182,8 @@ type ExplorerProps={
   onMore:()=>void;
   onUploadFiles?:(files:File[])=>void;
   uploadDisabled?:boolean;
+  provider?:'google_drive'|'dropbox';
+  externalUrl?:(file:DriveItem)=>string;
 };
 type ViewMode="list"|"grid";
 const VIEW_KEY="roteiva-drive-view-v1";
@@ -186,7 +191,7 @@ function savedView():ViewMode{
   try{return window.localStorage.getItem(VIEW_KEY)==="grid"?"grid":"list";}catch{return "list";}
 }
 const noThumbnail=async (_:DriveItem):Promise<Blob|null>=>null;
-export function DriveFileExplorer({folderName,path,files,loading,hasMore,thumbnailScope="",getThumbnail=noThumbnail,searchResults,searchTerm,searchLoading=false,onSearchChange,onBack,onNavigate,onOpen,onMore,onUploadFiles,uploadDisabled=false}:ExplorerProps){
+export function DriveFileExplorer({folderName,path,files,loading,hasMore,thumbnailScope="",getThumbnail=noThumbnail,searchResults,searchTerm,searchLoading=false,onSearchChange,onBack,onNavigate,onOpen,onMore,onUploadFiles,uploadDisabled=false,provider='google_drive',externalUrl=driveFileUrl}:ExplorerProps){
   const [filter,setFilter]=useState("");
   const [dragging,setDragging]=useState(false);
   const uploadInput=useRef<HTMLInputElement>(null);
@@ -199,7 +204,7 @@ export function DriveFileExplorer({folderName,path,files,loading,hasMore,thumbna
   const source=searchResults && searchTerm?.trim()===filter.trim()?searchResults:files;
   const visible=source.filter(f=>f.name.toLocaleLowerCase("pt-BR").includes(filter.toLocaleLowerCase("pt-BR")));
   const makeRow=(file:DriveItem)=>{
-    const isFolder=file.mimeType===DRIVE_FOLDER;
+    const isFolder=isStorageFolder(file.mimeType);
     return <div className="rl-file-row" key={file.id}>
       <button type="button" className="rl-file-open" title={file.name} onClick={()=>onOpen(file)} disabled={loading}>
         <DriveThumbnail item={file} scope={thumbnailScope} getThumbnail={getThumbnail}/>
@@ -209,8 +214,8 @@ export function DriveFileExplorer({folderName,path,files,loading,hasMore,thumbna
       <span className="rl-file-size">{readableSize(file.size)||"—"}</span>
       <details className="rl-menu"><summary title={"Opções de "+file.name} aria-label={"Opções de "+file.name}><MoreHorizontal size={19}/></summary>
         <div className="rl-menu-items">
-          <button type="button" onClick={()=>onOpen(file)}>{isFolder?"Abrir pasta":isPreviewable(file)?"Visualizar":"Abrir no Drive"}</button>
-          <a href={driveFileUrl(file)} target="_blank" rel="noreferrer"><ExternalLink size={14}/> Abrir no Google Drive</a>
+          <button type="button" onClick={()=>onOpen(file)}>{isFolder?"Abrir pasta":isPreviewable(file)?"Visualizar":"Abrir no "+providerName}</button>
+          <a href={externalUrl(file)} target="_blank" rel="noreferrer"><ExternalLink size={14}/> Abrir no {providerName}</a>
         </div>
       </details>
     </div>;
@@ -221,7 +226,7 @@ export function DriveFileExplorer({folderName,path,files,loading,hasMore,thumbna
     onDragOver={event=>{if(!acceptsFiles(event))return;event.preventDefault();event.dataTransfer.dropEffect="copy";setDragging(true);}}
     onDragLeave={event=>{if(!event.currentTarget.contains(event.relatedTarget as Node))setDragging(false);}}
     onDrop={event=>{setDragging(false);if(!acceptsFiles(event))return;event.preventDefault();onUploadFiles?.(Array.from(event.dataTransfer.files));}}> 
-    {dragging&&<div className="rl-drop-layer" aria-hidden="true"><Upload size={32}/><strong>Solte para enviar ao Google Drive</strong></div>}
+    {dragging&&<div className="rl-drop-layer" aria-hidden="true"><Upload size={32}/><strong>Solte para enviar ao {providerName}</strong></div>}
     {folderName?<><header className="rl-content-head">
       <button type="button" className="rl-back" onClick={onBack} aria-label="Voltar para as pastas"><ArrowLeft size={18}/></button>
       <nav className="rl-breadcrumbs" aria-label="Caminho da pasta">{path.map((part,index)=><span key={part.id}>
@@ -247,7 +252,7 @@ export function DriveFileExplorer({folderName,path,files,loading,hasMore,thumbna
     {view==="list"&&<div className="rl-file-head" aria-hidden="true"><span>Nome</span><span>Modificado</span><span>Tamanho</span><span/></div>}
     <div className="rl-files" data-view={view}>
       {loading&&!files.length&&<div className="rl-state" role="status"><LoaderCircle size={23} className="rl-spin"/><p>Carregando arquivos…</p></div>}
-      {searchLoading&&<span className="rl-search-progress" role="status">Buscando no Drive…</span>}
+      {searchLoading&&<span className="rl-search-progress" role="status">Buscando no {providerName}…</span>}
       {visible.map(makeRow)}
       {!loading&&!searchLoading&&!visible.length&&<div className="rl-state"><FolderOpen size={27}/><p>{filter?"Nenhum item corresponde à busca.":"Esta pasta está vazia."}</p></div>}
       {hasMore&&<button type="button" className="rl-load-more" onClick={onMore} disabled={loading}>Carregar mais arquivos</button>}
