@@ -520,7 +520,7 @@ test('Dropbox: vincular pasta funciona com Todos os projetos, sem mudar o filtro
   await expect(dialog.getByRole('button',{name:'Vincular',exact:true})).toBeEnabled();
   await dialog.getByRole('button',{name:'Vincular',exact:true}).click();
   await expect(dialog).not.toBeVisible();
-  await expect(library.getByLabel('Pastas Dropbox vinculadas').getByText('Materiais Dropbox',{exact:true})).toBeVisible();
+  await expect(library.getByRole('button',{name:'Materiais Dropbox',exact:true})).toBeVisible();
   const env=await initializeTestEnvironment({projectId:'demo-roteiva',firestore:{host:'127.0.0.1',port:8080}});
   try{await env.withSecurityRulesDisabled(async admin=>{
     const db=admin.firestore();
