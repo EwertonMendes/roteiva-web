@@ -701,6 +701,8 @@ async function revise(request:Request,env:Env,r:Review):Promise<Response>{
   const version=r.current_version+1;
   if(r.status==='changes'){
     const entries=await validatedAssets(env,r.owner_uid,bearer,r.project_id,selected(data?.assets),r.id,version);
+    if(r.drive_share_enabled&&entries.some(a=>a.provider==='dropbox'))
+      throw new ApiError(409,'dropbox_direct_share_not_supported');
     const transition=crypto.randomUUID();
     const commands=[
       env.DB.prepare("UPDATE review_requests SET status='replacing',transition_id=?,updated_at=? WHERE id=? AND owner_uid=? AND status='changes' AND current_version=?")
@@ -804,7 +806,7 @@ async function publicReview(request:Request,env:Env,action:'view'|'comment'|'dec
       driveShareEnabled:r.drive_share_enabled===1,
       role:r.access_mode==='google'?role:'reviewer',myVote:myVote?.decision||null,
       approvalsReceived:votes?.count||0,approvalsRequired:total?.count||1},
-      assets:files.map(a=>({fileId:a.file_id,name:a.name,mimeType:a.mime_type})),
+      assets:files.map(a=>({fileId:a.file_id,name:a.name,mimeType:a.mime_type,provider:a.provider})),
       comments:comments.results,decisions:decisions.results});
   }
   if(action==='media'){
@@ -887,28 +889,32 @@ async function ownerImage(env:Env,r:Review,url:URL):Promise<Response>{
   if(!['pending','changes','approved'].includes(r.status)||r.expires_at<=now())
     throw new ApiError(404,'review_not_found');
   const fileId=url.searchParams.get('fileId')||'';
-  if(!ID.test(fileId))throw new ApiError(404,'review_not_found');
+  if(!validStorageFileId(fileId.startsWith('id:')?'dropbox':'google_drive',fileId))throw new ApiError(404,'review_not_found');
   const asset=await env.DB.prepare(
-    "SELECT connection_id,mime_type FROM review_assets WHERE review_id=? AND version=? AND file_id=? AND grant_state='granted'"
+    "SELECT connection_id,mime_type,provider FROM review_assets WHERE review_id=? AND version=? AND file_id=? AND grant_state='granted'"
   ).bind(r.id,r.current_version,fileId)
-    .first<{connection_id:string;mime_type:string}>();
+    .first<{connection_id:string;mime_type:string;provider:StorageProviderId}>();
   if(!asset||!asset.mime_type.startsWith('image/'))throw new ApiError(404,'review_not_found');
-  const row=await connection(env,r.owner_uid,asset.connection_id);
-  const credential=await accessCredential(env,row);
-  const target=new URL('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(fileId));
-  target.searchParams.set('alt','media');target.searchParams.set('supportsAllDrives','true');
   let upstream:Response;
-  try{upstream=await fetch(target,{
-    method:'GET',redirect:'manual',signal:AbortSignal.timeout(24000),
-    headers:{Authorization:'Bearer '+credential.value}
-  });}catch{throw new ApiError(502,'media_unavailable');}
+  if(asset.provider==='dropbox'){
+    upstream=await dropboxMedia(env,r.owner_uid,asset.connection_id,fileId);
+  }else{
+    const row=await connection(env,r.owner_uid,asset.connection_id);
+    const credential=await accessCredential(env,row);
+    const target=new URL('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(fileId));
+    target.searchParams.set('alt','media');target.searchParams.set('supportsAllDrives','true');
+    try{upstream=await fetch(target,{
+      method:'GET',redirect:'manual',signal:AbortSignal.timeout(24000),
+      headers:{Authorization:'Bearer '+credential.value}
+    });}catch{throw new ApiError(502,'media_unavailable');}
+  }
   if(!upstream.ok||upstream.redirected||upstream.status>=300&&upstream.status<400){
     await upstream.body?.cancel();throw new ApiError(502,'media_unavailable');
   }
   const max=24*1024*1024,reported=Number(upstream.headers.get('Content-Length')||0);
   if(Number.isFinite(reported)&&reported>max){await upstream.body?.cancel();throw new ApiError(413,'media_unavailable');}
   const type=(upstream.headers.get('Content-Type')||'').split(';')[0].trim().toLowerCase();
-  if(!type.startsWith('image/')||type!==asset.mime_type.toLowerCase()){
+  if(!(asset.provider==='dropbox'&&type==='application/octet-stream')&&(!type.startsWith('image/')||type!==asset.mime_type.toLowerCase())){
     await upstream.body?.cancel();throw new ApiError(502,'media_unavailable');
   }
   let used=0;
