@@ -703,8 +703,10 @@ function assetIcon(kind: AssetKind) {
 
 function LibraryView({ assets, query, onUpload, projects, selectedProjectId, onSelectProject, onLinkedFolderCountChange }: { assets: LibraryAsset[]; query: string; onUpload: (files: FileList | null) => void; projects: readonly Project[]; selectedProjectId?:number; onSelectProject:(id:string)=>void; onLinkedFolderCountChange?:(count:number)=>void }) {
   const [provider,setProvider]=useState<'google_drive'|'dropbox'>('google_drive');
+  const dropboxEnabled=import.meta.env.VITE_DROPBOX_ENABLED==='true';
   const folderCounts=useRef({google_drive:0,dropbox:0});
   const updateFolderCount=(type:'google_drive'|'dropbox',count:number)=>{
+    if(folderCounts.current[type]===count)return;
     folderCounts.current[type]=count;
     onLinkedFolderCountChange?.(folderCounts.current.google_drive+folderCounts.current.dropbox);
   };
@@ -718,20 +720,20 @@ function LibraryView({ assets, query, onUpload, projects, selectedProjectId, onS
   if (isDemo && import.meta.env.VITE_LIBRARY_REVIEW === "true") return <LibraryReviewDemo />;
   return <div className="library-layout">
     {!isDemo && (!useEmulators || (import.meta.env.MODE === "emulator" && new URLSearchParams(window.location.search).get("driveE2E") === "1")) && <>
-      <nav className="storage-providers" aria-label="Provedor de armazenamento" role="tablist">
+      {dropboxEnabled&&<nav className="storage-providers" aria-label="Provedor de armazenamento" role="tablist">
         <button type="button" role="tab" aria-selected={provider==='google_drive'} className={provider==='google_drive'?'active':''}
           onClick={()=>setProvider('google_drive')}>Google Drive</button>
         <button type="button" role="tab" aria-selected={provider==='dropbox'} className={provider==='dropbox'?'active':''}
           onClick={()=>setProvider('dropbox')}>Dropbox</button>
-      </nav>
-      <div hidden={provider!=='google_drive'}>
+      </nav>}
+      <div hidden={dropboxEnabled&&provider!=='google_drive'}>
         <DriveConnectionPanel projects={projects} selectedProjectId={selectedProjectId} onSelectProject={onSelectProject}
           onLinkedFolderCountChange={count=>updateFolderCount('google_drive',count)} />
       </div>
-      <div hidden={provider!=='dropbox'}>
+      {dropboxEnabled&&<div hidden={provider!=='dropbox'}>
         <DropboxConnectionPanel projects={projects} selectedProjectId={selectedProjectId} onSelectProject={onSelectProject}
           onLinkedFolderCountChange={count=>updateFolderCount('dropbox',count)} />
-      </div>
+      </div>}
     </>}
     {(isDemo || assets.length>0) && <>
     <div className="library-summary"><article><span><HardDrive size={18} /></span><div><small>ARQUIVOS</small><b>{assets.length}</b></div></article><article><span><Film size={18} /></span><div><small>ARMAZENAMENTO</small><b>{totalMb >= 1024 ? `${(totalMb / 1024).toFixed(1)} GB` : `${Math.round(totalMb)} MB`}</b></div></article><article><span><CalendarDays size={18} /></span><div><small>ADICIONADOS ESTE MÊS</small><b>{assets.filter(a => toISOAdded(a.addedAt).slice(0,7) === new Date().toLocaleDateString("en-CA").slice(0,7)).length}</b></div></article></div>
