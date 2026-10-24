@@ -31,7 +31,7 @@ function positiveSeconds(value:unknown):number {
  return typeof value==='number'&&Number.isFinite(value)&&value>=60&&value<=86400?value:0;
 }
 async function tokenRequest(env:Env,body:Record<string,string>,fetcher:typeof fetch=fetch):Promise<DbxToken>{
- dropboxEnabled(env);
+ if(!env.DROPBOX_APP_KEY||!env.DROPBOX_APP_SECRET)throw new ApiError(503,'dropbox_not_configured');
  let response:Response;
  try{response=await fetcher('https://api.dropboxapi.com/oauth2/token',{
    method:'POST',redirect:'manual',signal:AbortSignal.timeout(12000),
@@ -214,13 +214,13 @@ export async function dropboxConnections(env:Env,uid:string):Promise<Response>{
  const rows=await env.DB.prepare('SELECT id,dropbox_email AS email,status,scopes,updated_at FROM dropbox_connections WHERE owner_uid=? ORDER BY created_at LIMIT 20').bind(uid).all();
  return Response.json({connections:rows.results});
 }
-export async function dropboxRevoke(env:Env,uid:string,id:string):Promise<Response>{
+export async function dropboxRevoke(env:Env,uid:string,id:string,accountDeletion=false):Promise<Response>{
  const row=await dropboxConnection(env,uid,id);
  await assertNoConnectionReviews(env,uid,id);
  // Do not invalidate credentials until the remote revocation has a chance to run.
  let access:string;
  try{
-  if(row.status==='connected')access=await dropboxAccess(env,row);
+  if(row.status==='connected'&&!accountDeletion)access=await dropboxAccess(env,row);
   else access=(await tokenRequest(env,{grant_type:'refresh_token',refresh_token:await decrypt(env,row.encrypted_refresh_token!,refreshContext(env,row))})).access_token;
  }catch(error){
   if(error instanceof ApiError&&error.code==='dropbox_reconnect_required')access='';
