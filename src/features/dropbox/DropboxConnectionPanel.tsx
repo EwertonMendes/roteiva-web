@@ -6,6 +6,7 @@ import {useAuth} from '../auth/AuthProvider';
 import {useDriveApi} from '../drive/drive-api';
 import {DriveFileExplorer,DROPBOX_FOLDER,isStorageFolder,useOverlayFocus,type DriveItem,type DriveTrail} from '../drive/DriveLibraryUI';
 import {ReviewImageViewer} from '../reviews/ReviewImageViewer';
+import {dropboxWebUrl} from './dropbox-web-url';
 import {clearDriveThumbnailCache} from '../drive/DriveThumbnail';
 import {useDriveTransfers} from '../drive/DriveTransfersProvider';
 import {dropboxFolderLinkId,linkDropboxFolder,readDropboxLinks,unlinkDropboxFolder,type DropboxFolderLink} from '../../data/dropbox-folder-links';
@@ -64,7 +65,7 @@ function DropboxPreview({file,link,onClose,onNext,onPrevious}:{file:DriveItem;li
  return <div className="rl-overlay rl-preview-overlay" onMouseDown={e=>{if(e.target===e.currentTarget)onClose()}}>
   <section className="rl-preview db-preview" ref={ref} role="dialog" aria-modal="true" tabIndex={-1} aria-label={'Prévia de '+file.name}>
    <header><div className="rl-preview-title"><strong title={file.name}>{file.name}</strong><small>Dropbox · Prévia protegida pelo Roteiva</small></div>
-    <div><a href="https://www.dropbox.com/home" target="_blank" rel="noreferrer" className="secondary-button"><ExternalLink size={15}/> Abrir Dropbox</a>
+    <div><a href={dropboxWebUrl(file)} target="_blank" rel="noreferrer" className="secondary-button"><ExternalLink size={15}/> Abrir Dropbox</a>
      <button type="button" className="rl-icon-button" aria-label="Fechar" onClick={onClose}><X size={17}/></button></div></header>
    <div className="rl-preview-body db-preview-body">
     {onPrevious&&<button className="rl-preview-nav rl-preview-nav-prev" onClick={onPrevious} aria-label="Arquivo anterior"><ChevronRight size={19} style={{transform:'rotate(180deg)'}}/></button>}
@@ -271,7 +272,7 @@ export function DropboxConnectionPanel({projects,selectedProjectId,onSelectProje
      {!relevant.length&&<div className="rl-state"><FolderOpen size={26}/><p>Nenhuma pasta Dropbox vinculada.</p></div>}
     </div>
    </aside>
-   <DriveFileExplorer provider="dropbox" externalUrl={()=>"https://www.dropbox.com/home"} folderName={viewing?.folderName}
+   <DriveFileExplorer provider="dropbox" externalUrl={dropboxWebUrl} folderName={viewing?.folderName}
     path={path} files={items} loading={fileBusy} hasMore={search.trim().length>=2?!!remote?.next:!!filesPage}
     thumbnailScope={(user?.uid||'')+':'+(viewing?.connectionId||account?.id||'')} getThumbnail={getThumbnail}
     searchResults={remote?.folder===currentFolder?remote.files:undefined} searchTerm={remote?.term}

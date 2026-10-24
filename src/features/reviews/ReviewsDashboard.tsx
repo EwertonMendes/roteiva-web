@@ -7,6 +7,7 @@ import {useAuth} from "../auth/AuthProvider";
 import {useDriveApi} from "../drive/drive-api";
 import {readDriveLinks,type DriveFolderLink} from "../../data/drive-folder-links";
 import {readDropboxLinks,type DropboxFolderLink} from "../../data/dropbox-folder-links";
+import {dropboxWebUrl} from '../dropbox/dropbox-web-url';
 import {driveFileUrl,isStorageFolder,readableFileType,type DriveItem,useOverlayFocus} from "../drive/DriveLibraryUI";
 import {DriveThumbnail} from "../drive/DriveThumbnail";
 import {useDriveThumbnailFetch} from "../drive/useDriveThumbnailFetch";
@@ -443,7 +444,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
                       <strong>Permitir abrir também pelo Google Drive</strong>
                       <small>Em arquivos privados, concede permissão de <b>Leitor</b> aos e-mails quando o Drive autorizar. Se o arquivo já for público, reutiliza o acesso existente sem modificar a pasta. Os papéis de revisor e leitor continuam protegidos no Roteiva.</small>
                     </span>
-                    <input type="checkbox" checked={shareDirect}
+                    <input type="checkbox" disabled={files.some(f=>f.provider==='dropbox')} checked={shareDirect}
                       onChange={e=>{setShareDirect(e.target.checked);if(!e.target.checked)setRestrictPublic(false);}}/>
                     <span className="review-sharing-switch" aria-hidden="true"/>
                   </label>
