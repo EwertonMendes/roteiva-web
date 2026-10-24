@@ -12,7 +12,7 @@ export function DriveUploadQueue({uploads,onCancel,onRetry,onDismiss}:{
   const [collapsed,setCollapsed]=useState(false);
   if(!uploads.length)return null;
   const running=uploads.filter(u=>active.has(u.status)).length;
-  return <aside className="rl-upload-queue" aria-label="Transferências para Google Drive">
+  return <aside className="rl-upload-queue" aria-label="Transferências para a nuvem">
     <header className="rl-upload-heading"><span><CloudUpload size={17}/> Transferências</span><div className="rl-upload-heading-actions"><small aria-live="polite">{running?running+" em andamento":uploads.length+" arquivo(s)"}</small><button type="button" aria-label={collapsed?"Expandir transferências":"Recolher transferências"} aria-expanded={!collapsed} onClick={()=>setCollapsed(value=>!value)}>{collapsed?<ChevronUp size={17}/>:<ChevronDown size={17}/>}</button></div></header>
     {!collapsed&&<div className="rl-upload-items">
       {uploads.map(upload=>{
@@ -27,7 +27,7 @@ export function DriveUploadQueue({uploads,onCancel,onRetry,onDismiss}:{
               <small>{upload.status==="queued"?"Na fila":
                 upload.status==="starting"?"Preparando envio…":
                 upload.status==="uploading"?"Enviando para "+upload.destination.folderName+" · "+pct+"%":
-                upload.status==="verifying"?"Confirmando no Google Drive…":
+                upload.status==="verifying"?"Confirmando no "+(upload.destination.provider==="dropbox"?"Dropbox":"Google Drive")+"…":
                 upload.status==="completed"?"Arquivo enviado para "+upload.destination.folderName:
                 upload.status==="cancelled"?(upload.error||"Envio cancelado"):
                 upload.error||"Falha no envio"}</small>

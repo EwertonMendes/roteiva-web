@@ -1,11 +1,12 @@
 import {createContext,useContext,useCallback,useEffect,useRef,useState,type ReactNode} from 'react';
 import {useAuth} from '../auth/AuthProvider';
 import {useDriveApi} from './drive-api';
-import {useDriveUploads,type UploadDestination} from './useDriveUploads';
+import {useDriveUploads,type UploadDestination,type StorageUploadSession} from './useDriveUploads';
+import {sendToDropbox} from '../dropbox/dropbox-upload-client';
 import {DriveUploadQueue} from './DriveUploadQueue';
 import {preparePicker,pickUploadFolder,type PickerConfig} from './google-picker';
 import {invalidateDriveFolderCache} from './drive-folder-cache';
-import type {UploadSession,UploadedFile} from './drive-upload-client';
+import {sendToDrive,type UploadSession,type UploadedFile} from './drive-upload-client';
 import './drive-library.css';
 type Completion=(file:UploadedFile,destination:UploadDestination)=>void;
 type Transfers=ReturnType<typeof useDriveUploads>&{subscribe:(callback:Completion)=>()=>void;
@@ -25,7 +26,12 @@ function DriveTransfersSession({children}:{children:ReactNode}){
   const subscribers=useRef(new Set<Completion>());
   const subscribe=useCallback((callback:Completion)=>{subscribers.current.add(callback);return ()=>{subscribers.current.delete(callback);};},[]);
   useEffect(()=>()=>{grantController.current?.abort();},[]);
-  const createUpload=useCallback(async(file:File,dest:UploadDestination,attemptId:string,signal:AbortSignal):Promise<UploadSession>=>{
+  const createUpload=useCallback(async(file:File,dest:UploadDestination,attemptId:string,signal:AbortSignal):Promise<StorageUploadSession>=>{
+    if(dest.provider==='dropbox'){
+      return call<StorageUploadSession>('/integrations/dropbox/'+encodeURIComponent(dest.connectionId)+'/uploads/start',
+        'POST',{attemptId,projectId:dest.projectId,linkedFolderId:dest.linkedFolderId,
+          targetFolderId:dest.targetFolderId,name:file.name,size:file.size,mimeType:file.type||'application/octet-stream'},signal);
+    }
     const path="/integrations/drive/"+encodeURIComponent(dest.connectionId)+"/folders/"+
       encodeURIComponent(dest.targetFolderId)+"/uploads";
     try{return await call<UploadSession>(path,"POST",{attemptId,projectId:dest.projectId,linkedFolderId:dest.linkedFolderId,
@@ -39,20 +45,34 @@ function DriveTransfersSession({children}:{children:ReactNode}){
       throw error;
     }
   },[call]);
-  const confirmUpload=useCallback((uploaded:UploadedFile,size:number,dest:UploadDestination,session:UploadSession,signal:AbortSignal):Promise<UploadedFile>=>{
+  const confirmUpload=useCallback((uploaded:UploadedFile,size:number,dest:UploadDestination,session:StorageUploadSession,signal:AbortSignal):Promise<UploadedFile>=>{
+    if(dest.provider==='dropbox')return call<UploadedFile>(
+      '/integrations/dropbox/'+encodeURIComponent(dest.connectionId)+'/uploads/'+
+      encodeURIComponent(session.attemptId)+'/finish','POST',{},signal);
+    const driveSession=session as UploadSession;
     const path="/integrations/drive/"+encodeURIComponent(dest.connectionId)+"/folders/"+
       encodeURIComponent(dest.targetFolderId)+"/uploads/complete";
-    return call<{file:UploadedFile}>(path,"POST",{attemptId:session.attemptId,projectId:dest.projectId,linkedFolderId:dest.linkedFolderId,
+    return call<{file:UploadedFile}>(path,"POST",{attemptId:driveSession.attemptId,projectId:dest.projectId,linkedFolderId:dest.linkedFolderId,
       fileId:uploaded.id,size},signal).then(result=>result.file);
   },[call]);
 
+  const send=useCallback(async(file:File,session:StorageUploadSession,dest:UploadDestination,signal:AbortSignal,
+    onProgress:(bytes:number)=>void,resume:boolean):Promise<UploadedFile>=>{
+    if(dest.provider==='dropbox'){
+      if('sessionUrl' in session)throw new Error('Sessão incompatível com Dropbox.');
+      if(!user)throw new Error('Entre novamente no Roteiva.');
+      return sendToDropbox(file,session,dest.connectionId,()=>user.getIdToken(),signal,onProgress);
+    }
+    if(!('sessionUrl' in session))throw new Error('Sessão incompatível com Google Drive.');
+    return sendToDrive(file,session,signal,onProgress,resume);
+  },[user]);
   const completed=useCallback<Completion>((file,dest)=>{
     if(!user)return;
     setResult('');
     invalidateDriveFolderCache(user.uid,dest.connectionId,dest.targetFolderId);
     subscribers.current.forEach(callback=>callback(file,dest));
   },[user]);
-  const uploads=useDriveUploads(createUpload,confirmUpload,completed,user?.uid||'');
+  const uploads=useDriveUploads(createUpload,confirmUpload,completed,user?.uid||'',send);
   function authorizeFolder(){
     if(!uploadGrant||busy)return;
     const {config,destination:dest}=uploadGrant;
