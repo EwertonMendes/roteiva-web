@@ -16,32 +16,42 @@ const API='https://roteiva-api-dev.ewertonmendes9.workers.dev';
 type Connection={id:string;email:string;status:'connected'|'reconnect_required'|'revocation_pending';scopes:string};
 type Page={folder:{id:string;name:string};files:DriveItem[];nextPageToken:string|null};
 type PreviewTicket={url:string;mimeType:string;expiresAt:number;size:number};
-type FolderPickerProps={folders:DriveItem[];path:DriveTrail[];projectId?:number;loading:boolean;hasMore:boolean;
- linkedIds:Set<string>;onClose:()=>void;onEnter:(folder:DriveItem)=>void;onNavigate:(trail:DriveTrail[])=>void;
- onMore:()=>void;onLink:(folder:{id:string;name:string})=>void};
-function DropboxFolderPicker({folders,path,projectId,loading,hasMore,linkedIds,onClose,onEnter,onNavigate,onMore,onLink}:FolderPickerProps){
- const ref=useOverlayFocus(onClose);
+type FolderPickerProps={projects:readonly Pick<Project,'id'|'name'>[];folders:DriveItem[];path:DriveTrail[];projectId:number;loading:boolean;working:boolean;hasMore:boolean;error:string;
+ linkedIds:Set<string>;onProjectChange:(id:number)=>void;onClose:()=>void;onEnter:(folder:DriveItem)=>void;onNavigate:(trail:DriveTrail[])=>void;
+ onMore:()=>void;onRetry:()=>void;onLink:(folder:{id:string;name:string})=>void};
+function DropboxFolderPicker({projects,folders,path,projectId,loading,working,hasMore,error,linkedIds,onProjectChange,onClose,onEnter,onNavigate,onMore,onRetry,onLink}:FolderPickerProps){
+ const ref=useOverlayFocus(()=>{if(!working)onClose()});
  const active=path.at(-1)||{id:'root',name:'Meu Dropbox'};
- return <div className="rl-overlay" onMouseDown={event=>{if(event.target===event.currentTarget)onClose()}}>
+ return <div className="rl-overlay" onMouseDown={event=>{if(event.target===event.currentTarget&&!working)onClose()}}>
   <section className="db-picker" ref={ref} role="dialog" aria-modal="true" aria-label="Vincular pasta Dropbox" tabIndex={-1}>
-   <header><div><h3>Vincular pasta do Dropbox</h3><p>Escolha uma pasta para usar nos projetos. Seus arquivos continuam no Dropbox.</p></div>
-    <button type="button" className="rl-icon-button" aria-label="Fechar" onClick={onClose}><X size={18}/></button></header>
+   <header><div><h3>Vincular pasta do Dropbox</h3><p>Escolha um projeto e uma pasta. Os arquivos continuam armazenados no Dropbox.</p></div>
+    <button type="button" className="rl-icon-button" aria-label="Fechar" disabled={working} onClick={onClose}><X size={18}/></button></header>
+   <div className="db-picker-project">
+    <label htmlFor="db-picker-project">Projeto de destino</label>
+    <AppSelect id="db-picker-project" aria-label="Projeto para vincular a pasta" value={projectId}
+      disabled={working} onValueChange={value=>onProjectChange(Number(value))}>
+     <option value={0}>Selecione um projeto</option>
+     {projects.map(project=><option key={project.id} value={project.id}>{project.name}</option>)}
+    </AppSelect>
+    {!projectId&&<small>Selecione em qual projeto esta pasta ficará disponível.</small>}
+   </div>
    <nav className="db-crumbs" aria-label="Caminho">{path.map((node,index)=>
     <button key={node.id} type="button" onClick={()=>onNavigate(path.slice(0,index+1))}>{node.name}{index<path.length-1&&<ChevronRight size={13}/>}</button>)}</nav>
    <div className="db-picker-body">
     {loading&&!folders.length?<p role="status"><LoaderCircle size={17} className="rl-spin"/> Carregando pastas…</p>:null}
-    {!loading&&!folders.length?<p>Esta pasta não possui subpastas.</p>:null}
+    {error&&<div className="db-picker-error" role="alert"><span>{error}</span><button type="button" className="secondary-button" disabled={loading||working} onClick={onRetry}>Tentar novamente</button></div>}
+    {!loading&&!folders.length&&!error?<p>Esta pasta não possui subpastas. Você pode vincular a pasta atual.</p>:null}
     {folders.filter(f=>isStorageFolder(f.mimeType)).map(f=><div className="db-pick-row" key={f.id}>
       <button type="button" onClick={()=>onEnter(f)}><FolderOpen size={19}/><span>{f.name}</span><ChevronRight size={16}/></button>
-      <button type="button" className="secondary-button" disabled={!projectId||linkedIds.has(f.id)} onClick={()=>onLink(f)}>
+      <button type="button" className="secondary-button" disabled={!projectId||working||linkedIds.has(f.id)} onClick={()=>onLink(f)}>
        {linkedIds.has(f.id)?<><Check size={14}/> Vinculada</>:<><Plus size={14}/> Vincular</>}
       </button>
     </div>)}
-    {hasMore&&<button className="secondary-button" type="button" disabled={loading} onClick={onMore}>Carregar mais pastas</button>}
+    {hasMore&&<button className="secondary-button" type="button" disabled={loading||working} onClick={onMore}>Carregar mais pastas</button>}
    </div>
-   <footer><small>{projectId?'Pasta vinculada apenas ao projeto selecionado.':'Selecione um projeto antes de vincular uma pasta.'}</small>
-    <button type="button" disabled={!projectId||linkedIds.has(active.id)} className="primary-button" onClick={()=>onLink(active)}>
-      <Plus size={16}/> Vincular pasta atual
+   <footer><small>{projectId?'A pasta será vinculada somente ao projeto escolhido.':'Escolha o projeto de destino acima.'}</small>
+    <button type="button" disabled={!projectId||working||loading||!!error||linkedIds.has(active.id)} className="primary-button" onClick={()=>onLink(active)}>
+      {working?<LoaderCircle size={16} className="rl-spin"/>:<Plus size={16}/>} Vincular pasta atual
     </button>
    </footer>
   </section>
@@ -91,7 +101,8 @@ export function DropboxConnectionPanel({projects,selectedProjectId,onSelectProje
  const [ready,setReady]=useState(false),[busy,setBusy]=useState(false),[disabled,setDisabled]=useState(false);
  const [error,setError]=useState(''),[result,setResult]=useState('');
  const [selectedConn,setSelectedConn]=useState(''),[confirmId,setConfirmId]=useState('');
- const [picker,setPicker]=useState(false),[pickerPath,setPickerPath]=useState<DriveTrail[]>([{id:'root',name:'Meu Dropbox'}]);
+ const [picker,setPicker]=useState(false),[pickerProjectId,setPickerProjectId]=useState(0);
+ const [pickerError,setPickerError]=useState(''),[pickerPath,setPickerPath]=useState<DriveTrail[]>([{id:'root',name:'Meu Dropbox'}]);
  const [pickerItems,setPickerItems]=useState<DriveItem[]>([]),[pickerPage,setPickerPage]=useState<string|null>(null),[pickerBusy,setPickerBusy]=useState(false);
  const [viewing,setViewing]=useState<DropboxFolderLink|null>(null),[path,setPath]=useState<DriveTrail[]>([]);
  const [items,setItems]=useState<DriveItem[]>([]),[filesPage,setFilesPage]=useState<string|null>(null),[fileBusy,setFileBusy]=useState(false);
@@ -144,7 +155,7 @@ export function DropboxConnectionPanel({projects,selectedProjectId,onSelectProje
   [ready,relevant,viewing,picker,disabled,load]);
  const browsePicker=useCallback(async(folderId:string,nextPath:DriveTrail[],cursor?:string,append=false)=>{
   if(!account)return;
-  const request=++pickerId.current;setPickerBusy(true);
+  const request=++pickerId.current;setPickerBusy(true);setPickerError('');
   if(!append){setPickerItems([]);setPickerPage(null);setPickerPath(nextPath)}
   try{
    const params=new URLSearchParams({parentId:folderId});if(cursor)params.set('pageToken',cursor);
@@ -152,21 +163,23 @@ export function DropboxConnectionPanel({projects,selectedProjectId,onSelectProje
    if(request!==pickerId.current)return;
    setPickerItems(old=>append?[...old,...response.files.filter(f=>!old.some(x=>x.id===f.id))]:response.files);
    setPickerPage(response.nextPageToken);setPickerPath(nextPath);
-  }catch(e){if(request===pickerId.current)setError(e instanceof Error?e.message:'Não foi possível navegar pelas pastas.')}
+  }catch(e){if(request===pickerId.current)setPickerError(e instanceof Error?e.message:'Não foi possível navegar pelas pastas.')}
   finally{if(request===pickerId.current)setPickerBusy(false)}
  },[account?.id,call]);
  useEffect(()=>{if(picker&&account)void browsePicker('root',[{id:'root',name:'Meu Dropbox'}]);},[picker,account?.id,browsePicker]);
  async function link(folder:{id:string;name:string}){
-  if(!user||!selectedProjectId||!account)return;
-  setBusy(true);setError('');
+  const projectId=pickerProjectId;
+  if(!user||!account||busy)return;
+  if(!projects.some(project=>project.id===projectId)){setPickerError('Selecione um projeto válido antes de vincular.');return;}
+  setBusy(true);setError('');setPickerError('');
   try{
-   await linkDropboxFolder(user.uid,selectedProjectId,account.id,folder);
-   const record:DropboxFolderLink={id:dropboxFolderLinkId(selectedProjectId,account.id,folder.id),
-    provider:'dropbox',projectId:selectedProjectId,connectionId:account.id,folderId:folder.id,folderName:folder.name};
+   await linkDropboxFolder(user.uid,projectId,account.id,folder);
+   const record:DropboxFolderLink={id:dropboxFolderLinkId(projectId,account.id,folder.id),
+    provider:'dropbox',projectId,connectionId:account.id,folderId:folder.id,folderName:folder.name};
    setLinks(prev=>prev.some(l=>l.id===record.id)?prev:[...prev,record]);
    setPicker(false);setResult('Pasta do Dropbox vinculada ao projeto.');
    await load(record,record.folderId,[{id:record.folderId,name:record.folderName}]);
-  }catch(e){setError(e instanceof Error?e.message:'Não foi possível vincular a pasta.')}
+  }catch(e){setPickerError(e instanceof Error?e.message:'Não foi possível vincular a pasta.')}
   finally{setBusy(false)}
  }
  async function unlink(link:DropboxFolderLink){
@@ -248,7 +261,12 @@ export function DropboxConnectionPanel({projects,selectedProjectId,onSelectProje
         <button type="button" className="secondary-button" disabled={busy} onClick={()=>setConfirmId(account?.id||'')}><Unplug size={15}/> Desconectar</button>}
       </div></details>:null}
     <button className="secondary-button" disabled={busy||disabled} onClick={()=>void refresh().catch(e=>setError(e instanceof Error?e.message:'Falha ao atualizar.'))}><RefreshCw size={16}/></button>
-    {validAccounts.length>0?<button className="primary-button" disabled={disabled||busy||!selectedProjectId} onClick={()=>setPicker(true)}><Plus size={16}/> Vincular pasta</button>:
+    {validAccounts.length>0?<button type="button" className="primary-button" disabled={disabled||busy||!projects.length}
+      onClick={()=>{
+       setPickerProjectId(selectedProjectId&&projects.some(project=>project.id===selectedProjectId)
+         ?selectedProjectId:projects.length===1?projects[0].id:0);
+       setPickerError('');setResult('');setPicker(true);
+      }}><Plus size={16}/> Vincular pasta</button>:
       <button className="primary-button" disabled={disabled||busy||!ready} onClick={()=>void start()}><Cloud size={16}/> Conectar Dropbox</button>}
    </div>
   </header>
@@ -259,7 +277,7 @@ export function DropboxConnectionPanel({projects,selectedProjectId,onSelectProje
    <div className="rl-status" role="alert">{messages[callback]||'Não foi possível concluir a autorização do Dropbox. Tente conectar novamente.'}</div>}
   {error&&<div className="rl-status" role="alert">{error}</div>}
   {result&&<div className="rl-status" role="status">{result}</div>}
-  {!selectedProjectId&&<p className="rl-status">Selecione um projeto para vincular novas pastas do Dropbox.</p>}
+  {!projects.length&&<p className="rl-status">Crie um projeto para organizar e vincular suas pastas do Dropbox.</p>}
   <div className="rl-explorer" data-mobile-detail={!!viewing}>
    <aside className="rl-folders" aria-label="Pastas Dropbox vinculadas">
     <div className="rl-folders-header"><h3>Pastas {selectedProjectId?'do projeto':'dos projetos'}</h3><small>{relevant.length}</small></div>
@@ -284,10 +302,12 @@ export function DropboxConnectionPanel({projects,selectedProjectId,onSelectProje
     onOpen={openItem} onUploadFiles={upload} uploadDisabled={!viewing||busy||fileBusy}
     onMore={()=>{if(search.trim().length>=2)void moreSearch();else if(viewing&&filesPage)void load(viewing,currentFolder,path,filesPage,true)}}/>
   </div>
-  {picker&&<DropboxFolderPicker folders={pickerItems} path={pickerPath} projectId={selectedProjectId} loading={pickerBusy}
-   hasMore={!!pickerPage} linkedIds={new Set(links.filter(l=>l.projectId===selectedProjectId&&l.connectionId===account?.id).map(l=>l.folderId))}
+  {picker&&<DropboxFolderPicker projects={projects} folders={pickerItems} path={pickerPath} projectId={pickerProjectId}
+   onProjectChange={setPickerProjectId} loading={pickerBusy} working={busy} error={pickerError}
+   hasMore={!!pickerPage} linkedIds={new Set(links.filter(l=>l.projectId===pickerProjectId&&l.connectionId===account?.id).map(l=>l.folderId))}
    onClose={()=>setPicker(false)} onEnter={f=>void browsePicker(f.id,[...pickerPath,{id:f.id,name:f.name}])}
    onNavigate={trail=>void browsePicker(trail.at(-1)?.id||'root',trail)}
+   onRetry={()=>void browsePicker(pickerPath.at(-1)?.id||'root',pickerPath)}
    onMore={()=>void browsePicker(pickerPath.at(-1)?.id||'root',pickerPath,pickerPage||undefined,true)}
    onLink={folder=>void link(folder)}/>}
   {preview&&viewing&&<DropboxPreview file={preview} link={viewing} onClose={()=>setPreview(null)}
