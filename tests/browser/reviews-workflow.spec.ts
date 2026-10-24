@@ -469,3 +469,67 @@ test('Google-only review renders private images in both themes without third-par
   expect(mediaGets.get(second.fileId)).toBe(1);
   expect(requests).toBe(3); // first, denied second, retried second; back to first uses memory
 });
+
+
+test('Dropbox: vincular pasta funciona com Todos os projetos, sem mudar o filtro global',async({page,context},info)=>{
+  const email='dropbox-link-'+info.project.name+'@example.com';
+  const {projectId}=await prepare(page,email);
+  const connectionId='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  const linkedFolderId='id:AAAAAAAAAAAAAAABBBBBBBB';
+  let attempts=0;
+  await context.route(api+'/integrations/dropbox**',async route=>{
+    const req=route.request(),url=new URL(req.url()),path=url.pathname;
+    const headers={
+      'Access-Control-Allow-Origin':root,
+      'Access-Control-Allow-Methods':'GET,POST,OPTIONS',
+      'Access-Control-Allow-Headers':'Authorization,Content-Type',
+      'Cache-Control':'no-store'
+    };
+    if(req.method()==='OPTIONS')return route.fulfill({status:204,headers});
+    const json=(data:unknown,status=200)=>route.fulfill({status,headers,contentType:'application/json',body:JSON.stringify(data)});
+    if(path==='/integrations/dropbox')return json({connections:[{
+      id:connectionId,email:'qa-dropbox@example.com',status:'connected',
+      scopes:'account_info.read files.metadata.read files.content.read files.content.write'
+    }]});
+    if(path==='/integrations/dropbox/'+connectionId+'/folders'){
+      attempts++;
+      if(attempts===1)return json({error:{code:'dropbox_unavailable'}},502);
+      return json({folder:{id:'root',name:'Meu Dropbox'},files:[{
+        id:linkedFolderId,name:'Materiais Dropbox',mimeType:'application/vnd.roteiva.folder',isFolder:true
+      }],nextPageToken:null});
+    }
+    if(path==='/integrations/dropbox/'+connectionId+'/folders/'+encodeURIComponent(linkedFolderId)+'/items'||
+      path==='/integrations/dropbox/'+connectionId+'/folders/'+linkedFolderId+'/items')
+      return json({folder:{id:linkedFolderId,name:'Materiais Dropbox'},files:[],nextPageToken:null});
+    return route.fallback();
+  });
+  await page.goto(root+'/biblioteca');
+  await page.getByRole('tab',{name:'Dropbox'}).click();
+  const library=page.getByRole('region',{name:'Biblioteca Dropbox'});
+  await expect(library.getByText('Dropbox conectado')).toBeVisible();
+  const linkButton=library.getByRole('button',{name:'Vincular pasta',exact:true});
+  await expect(linkButton).toBeEnabled();
+  await linkButton.click();
+  const dialog=page.getByRole('dialog',{name:'Vincular pasta Dropbox'});
+  await expect(dialog).toBeVisible();
+  // One available project: the project picker must be usable even when the
+  // global filter says "Todos os projetos".
+  await expect(dialog.getByRole('combobox',{name:'Projeto para vincular a pasta'})).toContainText('Projeto Revisão');
+  await expect(dialog.getByRole('alert')).toContainText('Dropbox');
+  await dialog.getByRole('button',{name:'Tentar novamente'}).click();
+  await expect(dialog.getByRole('button',{name:'Vincular',exact:true})).toBeEnabled();
+  await dialog.getByRole('button',{name:'Vincular',exact:true}).click();
+  await expect(dialog).not.toBeVisible();
+  await expect(library.getByText('Materiais Dropbox')).toBeVisible();
+  const env=await initializeTestEnvironment({projectId:'demo-roteiva',firestore:{host:'127.0.0.1',port:8080}});
+  try{await env.withSecurityRulesDisabled(async admin=>{
+    const db=admin.firestore();
+    const users=await getDocs(query(collection(db,'users'),where('email','==',email)));
+    expect(users.size).toBe(1);
+    const links=await getDocs(collection(db,'users',users.docs[0].id,'dropboxFolders'));
+    expect(links.size).toBe(1);
+    expect(links.docs[0].data()).toMatchObject({
+      projectId,connectionId,folderId:linkedFolderId,folderName:'Materiais Dropbox'
+    });
+  });}finally{await env.cleanup();}
+});
