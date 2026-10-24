@@ -1,0 +1,165 @@
+name: Dropbox PR Worker - manual DEV homologation
+on:
+  workflow_dispatch:
+    inputs:
+      pr_sha:
+        description: 'Exact 40-character SHA of the approved Dropbox PR 87 head'
+        type: string
+        required: true
+      confirmation:
+        description: 'Type PUBLICAR_DROPBOX_DEV to authorize shared DEV Worker rollout'
+        type: string
+        required: true
+permissions:
+  contents: read
+  checks: read
+  pull-requests: read
+concurrency:
+  group: api-worker-dev
+  cancel-in-progress: false
+jobs:
+  validate:
+    name: Authenticate PR, verify checks and validate source (unprivileged)
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    outputs:
+      sha: ${{ steps.guard.outputs.sha }}
+    steps:
+      - name: Owner-only, SHA-pinned, same-repository PR and mandatory green checks
+        id: guard
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ inputs.pr_sha }}
+          CONFIRM: ${{ inputs.confirmation }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTOR" = 'EwertonMendes'
+          test "$CONFIRM" = 'PUBLICAR_DROPBOX_DEV'
+          [[ "$SHA" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          pr="$(gh api "repos/$GITHUB_REPOSITORY/pulls/87")"
+          jq -e --arg repo "$GITHUB_REPOSITORY" --arg sha "$SHA" '
+            .state == "open" and .base.ref == "master"
+            and .head.repo.full_name == $repo
+            and .head.ref == "feat/dropbox-storage-integration"
+            and .head.sha == $sha
+          ' <<< "$pr" >/dev/null
+          checks="$(gh api "repos/$GITHUB_REPOSITORY/commits/$SHA/check-runs?per_page=100")"
+          for name in 'Validate Worker and D1' 'Validate frontend' \
+            'Security rules and account isolation' \
+            'Worker tests, emulator rules and desktop/mobile E2E'; do
+            jq -e --arg name "$name" '[.check_runs[] | select(.name == $name and .conclusion == "success")] | length >= 1' \
+              <<< "$checks" >/dev/null || { echo "Blocking check not green: $name"; exit 1; }
+          done
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.guard.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+          run_install: false
+      - name: Validate exact code without Cloudflare/Firebase/Dropbox credentials
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile
+          pnpm audit --audit-level high
+          pnpm typecheck
+          pnpm build
+          cd api
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run typecheck
+          npm test
+          npm run migrate:local
+          npm run build
+          node scripts/ci-security-audit.mjs
+
+  deploy:
+    name: Publish verified Dropbox Worker to Cloudflare DEV (manual)
+    needs: validate
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    environment: cloudflare-development
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Guard current PR SHA, account and D1 (no credentials)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ needs.validate.outputs.sha }}
+          ACCOUNT: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          DATABASE: ${{ vars.CLOUDFLARE_D1_DATABASE_ID }}
+        run: |
+          set -euo pipefail
+          test "$ACCOUNT" = 'b3855f9c192541a01a45b2dae7b6a7f8'
+          test "$DATABASE" = '302adc88-76b2-4827-bb16-99662fa0408b'
+          test "$(gh api "repos/$GITHUB_REPOSITORY/pulls/87" --jq '.head.sha')" = "$SHA"
+          test "$(git rev-parse HEAD)" = "$SHA"
+          grep -q '"name": "roteiva-api-dev"' wrangler.jsonc
+          grep -q '"DROPBOX_ENABLED": "true"' wrangler.jsonc
+      - name: Ensure all seven Worker secrets are published before touching D1
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          WRANGLER_SEND_METRICS: 'false'
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          npx wrangler secret list --env dev --json > "$RUNNER_TEMP/roteiva-secret-names.json"
+          node --input-type=module -e '
+            import fs from "node:fs";
+            const list=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+"/roteiva-secret-names.json","utf8"));
+            if(!Array.isArray(list))process.exit(1);
+            const names=new Set(list.map(x=>x.name));
+            for(const n of ["DROPBOX_APP_KEY","DROPBOX_APP_SECRET","TOKEN_KEYS",
+              "FIREBASE_ADMIN_CREDENTIALS_JSON","GOOGLE_CLIENT_SECRET",
+              "GOOGLE_PICKER_API_KEY","TRIAL_IDENTITY_HMAC_KEY"]){
+              if(!names.has(n)){console.error("Missing secret name: "+n);process.exitCode=1;}
+            }
+          '
+          rm -f "$RUNNER_TEMP/roteiva-secret-names.json"
+      - name: Record non-destructive D1 recovery bookmark, apply additive migrations
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          WRANGLER_SEND_METRICS: 'false'
+        run: |
+          set -euo pipefail
+          npx wrangler d1 time-travel info DB --env dev --json
+          node scripts/check-access-migration.mjs --before
+          npm run migrate:dev
+          node scripts/check-access-migration.mjs
+      - name: Publish SHA-pinned Worker to existing DEV only
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          WRANGLER_SEND_METRICS: 'false'
+        run: npm run deploy:dev
+      - name: Smoke real API, including OAuth route availability (no Dropbox token)
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          const root='https://roteiva-api-dev.ewertonmendes9.workers.dev';
+          const health=await fetch(root+'/health',{cache:'no-store'});
+          assert.equal(health.status,200);
+          assert.deepEqual(await health.json(),{status:'ok',environment:'dev'});
+          const drive=await fetch(root+'/integrations/drive',{headers:{Authorization:'Bearer invalid'}});
+          assert.equal(drive.status,401);
+          const dbx=await fetch(root+'/integrations/dropbox',{headers:{Authorization:'Bearer invalid'}});
+          assert.equal(dbx.status,401);
+          NODE
