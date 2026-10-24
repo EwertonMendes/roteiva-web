@@ -36,7 +36,7 @@ export async function sendToDropbox(file:File,session:DropboxUploadSession,conne
     });
     const result=await response.json().catch(()=>null) as {offset?:number;error?:{code?:string}}|null;
     if(response.ok&&result&&result.offset===end){
-     offset=end;onProgress(offset);sent=true;break;
+     offset=end;session.offset=offset;onProgress(offset);sent=true;break;
     }
     if(response.status===409&&result?.error?.code==='dropbox_upload_invalid_offset')
      throw new UploadFailure('uncertain','O servidor não confirmou o próximo bloco. Verifique a fila antes de reiniciar.');
