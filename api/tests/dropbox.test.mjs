@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {database} from './helpers/database.mjs';
 import {encrypt,context,base64url} from '../src/crypto.ts';
-import {dropboxAccess,dropboxConnection,dropboxList,dropboxStart} from '../src/dropbox.ts';
+import {dropboxAccess,dropboxConnection,dropboxList,dropboxStart,dropboxLaunch,dropboxCallback} from '../src/dropbox.ts';
 import {startDropboxUpload,appendDropboxUpload,finishDropboxUpload} from '../src/dropbox-uploads.ts';
 import {issueDropboxPreview,streamDropboxPreview} from '../src/dropbox-preview.ts';
 
@@ -141,4 +141,75 @@ test('Fail closed: malformed uploads, reconnects and different owners never star
  f.sql.prepare("UPDATE dropbox_connections SET status='reconnect_required' WHERE id=?").run(conn);
  await assert.rejects(async()=>dropboxAccess(f.env,await dropboxConnection(f.env,uid,conn)),
    e=>e.code==='dropbox_reconnect_required');
+});
+
+test('Dropbox PKCE OAuth callback creates persistent connection and refreshes without app secret',async t=>{
+ const f=await fixture(t),now=Date.now(),seen=[];
+ f.sql.prepare('INSERT INTO access_accounts(owner_uid,trial_started_at,trial_ends_at,created_at,updated_at) VALUES(?,?,?,?,?)')
+   .run(uid,now-86400000,now+518400000,now-86400000,now);
+ const original=global.fetch;t.after(()=>{global.fetch=original});
+ global.fetch=async(url,init={})=>{
+   const path=new URL(url).pathname;
+   if(path==='/oauth2/token'){
+     const params=new URLSearchParams(init.body);
+     seen.push(params);
+     assert.equal(params.get('client_id'),f.env.DROPBOX_APP_KEY);
+     assert.equal(params.has('client_secret'),false,'PKCE must not send confidential app credentials');
+     if(params.get('grant_type')==='authorization_code'){
+       assert.ok(params.get('code_verifier')?.length>=43);
+       assert.equal(params.get('redirect_uri'),f.env.DROPBOX_OAUTH_REDIRECT_URI);
+       return Response.json({access_token:'pkce-access',refresh_token:'pkce-refresh',expires_in:14400,
+         token_type:'bearer',scope:'account_info.read files.metadata.read files.content.read files.content.write',
+         account_id:'dbid:someaccount'});
+     }
+     assert.equal(params.get('grant_type'),'refresh_token');
+     assert.equal(params.get('refresh_token'),'pkce-refresh');
+     return Response.json({access_token:'renewed-access',expires_in:14400,token_type:'bearer'});
+   }
+   if(path.endsWith('/users/get_current_account'))return Response.json({
+     account_id:'dbid:someaccount',email:'alice@example.com',email_verified:true,disabled:false
+   });
+   throw Error('Unexpected external endpoint: '+path);
+ };
+ const launchUrl=(await (await dropboxStart(f.env,uid)).json()).launchUrl;
+ const launch=await dropboxLaunch(new Request(launchUrl),f.env);
+ assert.equal(launch.status,303);
+ const oauthUrl=new URL(launch.headers.get('Location'));
+ assert.equal(oauthUrl.searchParams.get('token_access_type'),'offline');
+ assert.equal(oauthUrl.searchParams.get('code_challenge_method'),'S256');
+ const cookie=launch.headers.get('Set-Cookie').split(';')[0];
+ const callback=await dropboxCallback(new Request(API+'/oauth/dropbox/callback?code=one-use&state='+
+   encodeURIComponent(oauthUrl.searchParams.get('state')),{headers:{Cookie:cookie}}),f.env);
+ assert.equal(callback.status,303);
+ assert.match(callback.headers.get('Location'),/dropbox=connected$/);
+ const row=await dropboxConnection(f.env,uid,conn);
+ assert.equal(row.status,'connected');
+ assert.equal(row.dropbox_email,'alice@example.com');
+ assert.ok(row.encrypted_refresh_token);
+ assert.ok(row.access_token_expires_at>now+3600000);
+ assert.equal(seen.length,1);
+ f.sql.prepare('UPDATE dropbox_connections SET access_token_expires_at=0 WHERE id=?').run(conn);
+ assert.equal(await dropboxAccess(f.env,row,global.fetch),'renewed-access');
+ assert.equal(seen.length,2);
+ const refreshed=await dropboxConnection(f.env,uid,conn);
+ assert.ok(refreshed.access_token_expires_at>Date.now()+3600000);
+ assert.equal(refreshed.encrypted_refresh_token,row.encrypted_refresh_token,'refresh must preserve the long-lived token');
+});
+
+test('Dropbox invalid OAuth code is not reported as an expired connected session',async t=>{
+ const f=await fixture(t),now=Date.now();const original=global.fetch;t.after(()=>{global.fetch=original});
+ f.sql.prepare('INSERT INTO access_accounts(owner_uid,trial_started_at,trial_ends_at,created_at,updated_at) VALUES(?,?,?,?,?)')
+   .run(uid,now-86400000,now+518400000,now-86400000,now);
+ global.fetch=async url=>{
+   if(new URL(url).pathname==='/oauth2/token')return Response.json({error:'invalid_grant',error_description:'synthetic code failure'}, {status:400});
+   throw Error('Unexpected external request');
+ };
+ const start=(await (await dropboxStart(f.env,uid)).json()).launchUrl;
+ const launch=await dropboxLaunch(new Request(start),f.env);
+ const state=new URL(launch.headers.get('Location')).searchParams.get('state');
+ const callback=await dropboxCallback(new Request(API+'/oauth/dropbox/callback?code=used&state='+state,{
+   headers:{Cookie:launch.headers.get('Set-Cookie').split(';')[0]}
+ }),f.env);
+ assert.match(callback.headers.get('Location'),/dropbox=dropbox_oauth_code_invalid$/);
+ assert.doesNotMatch(callback.headers.get('Location'),/dropbox_reconnect_required/);
 });
