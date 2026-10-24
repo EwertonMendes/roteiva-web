@@ -298,7 +298,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
   };
   const mutate=async(action:"publish"|"rotate"|"close")=>{
     if(!opened)return;
-    if(action==="close"&&!window.confirm("Encerrar esta revisão e revogar os acessos concedidos no Google Drive?"))return;
+    if(action==="close"&&!window.confirm("Encerrar esta revisão e revogar os acessos diretos concedidos aos materiais, quando aplicável?"))return;
     await run(async()=>{
       await call("/reviews/"+opened.review.id+"/"+action,"POST");
       if(action==="close")setOpened(null);
@@ -422,7 +422,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
               <label>Tipo de acesso<AppSelect aria-label="Tipo de acesso" value={mode} onValueChange={value=>{setMode(value as Mode);setShareDirect(false);setRestrictPublic(false);}}>
                 <option value="link">Acesso por link de aprovação</option><option value="google">Acesso restrito com conta Google</option>
               </AppSelect></label>
-              {mode==="link"?<p className="reviews-info">Quem receber o link poderá revisar os materiais pelo Roteiva, sem precisar entrar com Google. O Roteiva cria apenas o acesso necessário para exibir os materiais; permissões públicas existentes no Drive não são alteradas.</p>:
+              {mode==="link"?<p className="reviews-info">Quem receber o link poderá revisar os materiais pelo Roteiva, sem precisar entrar com Google. O Roteiva cria apenas o acesso necessário para exibir os materiais; permissões públicas existentes nos provedores originais não são alteradas.</p>:
                 <div className="review-participants-config">
                   <h3>Participantes Google</h3>
                   <p className="reviews-muted">Somente os e-mails indicados poderão entrar nesta aprovação do Roteiva. Isso não altera a privacidade dos arquivos originais no Google Drive. Separe os e-mails por vírgulas ou linhas diferentes.</p>
@@ -544,10 +544,12 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
                     <span className="review-picker-name" title={f.name}><span>{f.name}</span>
                       <small>{supported(f)?readableFileType(f.mimeType):"Formato não aceito para aprovação"}</small></span>
                   </label>}
-                <a className="review-picker-external" href={f.mimeType==="application/vnd.google-apps.folder"?
-                  "https://drive.google.com/drive/folders/"+encodeURIComponent(f.id):driveFileUrl(f)}
-                  target="_blank" rel="noopener noreferrer" aria-label={"Abrir "+f.name+" no Google Drive"}
-                  title="Abrir no Google Drive"><ExternalLink size={16}/></a>
+                <a className="review-picker-external" href={selectedFolder?.provider==='dropbox'?dropboxWebUrl(f):
+                  (f.mimeType==="application/vnd.google-apps.folder"?
+                    "https://drive.google.com/drive/folders/"+encodeURIComponent(f.id):driveFileUrl(f))}
+                  target="_blank" rel="noopener noreferrer"
+                  aria-label={"Abrir "+f.name+(selectedFolder?.provider==='dropbox'?" no Dropbox":" no Google Drive")}
+                  title={selectedFolder?.provider==='dropbox'?"Abrir no Dropbox":"Abrir no Google Drive"}><ExternalLink size={16}/></a>
               </div>)}
             </div>
             {fileSearch.trim().length===1&&<p className="reviews-muted">Digite mais uma letra para pesquisar em todos os itens da pasta, não apenas os carregados.</p>}
@@ -568,7 +570,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
                (pendingUploads.length?"Aguarde a conclusão dos envios.":files.length?"Nova versão pronta para enviar.":"Selecione pelo menos um arquivo para esta versão."):
                composerStep==="details"?
                  (missingDetails.length?missingDetails[0]:"Configuração pronta. Avance para selecionar arquivos."):
-                 pendingUploads.length?"Aguarde a conclusão dos envios ao Drive.":
+                 pendingUploads.length?"Aguarde a conclusão dos envios ao provedor.":
                  files.length?`${files.length} material(is) selecionado(s) · pronto para gerar.`:"Selecione pelo menos um arquivo para gerar a aprovação."}
            </div>
            <div className="review-composer-actions">
