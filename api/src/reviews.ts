@@ -7,6 +7,9 @@ import { driveJson } from './drive-client.ts';
 import { random, hash, encrypt, decrypt, context } from './crypto.ts';
 import { uploadBody } from './uploads.ts';
 import {mintReviewMediaTicket,reviewMediaSubject,streamReviewMedia,REVIEW_MEDIA_MAX_AGE} from './review-media.ts';
+import {assertDropboxFolderLinked,verifyDropboxFile} from './dropbox-uploads.ts';
+import {dropboxMedia} from './dropbox.ts';
+import {validStorageFileId,validStorageFolderId,type StorageProviderId} from './storage.ts';
 
 type Status = 'draft'|'publishing'|'pending'|'changes'|'approved'|'replacing'|'closing'|'closed';
 type Mode = 'link'|'google';
@@ -15,9 +18,9 @@ type Review = {
   studio_name:string;title:string;message:string;recipient_email:string;access_mode:Mode;status:Status;
   current_version:number;expires_at:number;token_hash:string;encrypted_token:string;transition_id?:string|null;restrict_existing_public:number;drive_share_enabled:number;created_at:number;updated_at:number;
 };
-type Asset = {review_id:string;version:number;file_id:string;connection_id:string;linked_folder_id:string;
+type Asset = {review_id:string;version:number;file_id:string;connection_id:string;linked_folder_id:string;provider:StorageProviderId;
   name:string;mime_type:string;permission_id:string|null;grant_state:'unshared'|'granting'|'granted'|'revoking'|'revoked'};
-type Selection = {fileId:string;connectionId:string;linkedFolderId:string};
+type Selection = {fileId:string;connectionId:string;linkedFolderId:string;provider:StorageProviderId};
 const ID=/^[A-Za-z0-9_-]{10,200}$/;
 const CONN=/^[A-Za-z0-9-]{36}$/;
 type Participant={email:string;role:'reviewer'|'viewer'};
@@ -106,6 +109,9 @@ async function verifyProject(env:Env,uid:string,token:string,projectId:number,cl
     clientName:inputText(client.fields?.name?.stringValue,200,true)};
 }
 async function verifyFolder(env:Env,uid:string,token:string,projectId:number,s:Selection):Promise<void>{
+  if(s.provider==='dropbox'){
+    return assertDropboxFolderLinked(env,uid,token,s.connectionId,projectId,s.linkedFolderId);
+  }
   const key=projectId+'_'+s.connectionId+'_'+s.linkedFolderId;
   const url='https://firestore.googleapis.com/v1/projects/'+env.FIREBASE_PROJECT_ID+
     '/databases/(default)/documents/users/'+encodeURIComponent(uid)+'/driveFolders/'+key;
@@ -121,9 +127,14 @@ async function verifyFolder(env:Env,uid:string,token:string,projectId:number,s:S
 }
 async function checkedFile(env:Env,uid:string,token:string,projectId:number,s:Selection):
   Promise<{name:string;mimeType:string;appAuthorized:boolean;canShare:boolean;ancestors:string[];inheritsPublic:boolean}>{
-  if(!ID.test(s.fileId)||!ID.test(s.linkedFolderId)||!CONN.test(s.connectionId))
+  if(!validStorageFileId(s.provider,s.fileId)||!validStorageFolderId(s.provider,s.linkedFolderId,true)||!CONN.test(s.connectionId))
     throw new ApiError(400,'review_invalid_input');
   await verifyFolder(env,uid,token,projectId,s);
+  if(s.provider==='dropbox'){
+    const meta=await verifyDropboxFile(env,uid,s.connectionId,s.linkedFolderId,s.fileId);
+    return {name:meta.name,mimeType:meta.mimeType,appAuthorized:false,
+      canShare:false,ancestors:[],inheritsPublic:false};
+  }
   const row=await connection(env,uid,s.connectionId);
   const item=await driveFile(env,row,s.fileId);
   if(item.id!==s.fileId||item.trashed===true||
@@ -159,11 +170,14 @@ function selected(value:unknown):Selection[]{
   return value.map((x:unknown)=>{
     if(!x||typeof x!=='object'||Array.isArray(x))throw new ApiError(400,'review_invalid_input');
     const d=x as Partial<Selection>;
+    const provider=d.provider??'google_drive';
+    if(provider!=='google_drive'&&provider!=='dropbox')throw new ApiError(400,'review_invalid_input');
     if(typeof d.fileId!=='string'||typeof d.connectionId!=='string'||typeof d.linkedFolderId!=='string'||
-      !ID.test(d.fileId)||!ID.test(d.linkedFolderId)||!CONN.test(d.connectionId)||seen.has(d.fileId))
+      !validStorageFileId(provider,d.fileId)||!validStorageFolderId(provider,d.linkedFolderId,true)||
+      !CONN.test(d.connectionId)||seen.has(provider+':'+d.connectionId+':'+d.fileId))
       throw new ApiError(400,'review_invalid_input');
-    seen.add(d.fileId);
-    return {fileId:d.fileId,connectionId:d.connectionId,linkedFolderId:d.linkedFolderId};
+    seen.add(provider+':'+d.connectionId+':'+d.fileId);
+    return {fileId:d.fileId,connectionId:d.connectionId,linkedFolderId:d.linkedFolderId,provider};
   });
 }
 async function validatedAssets(env:Env,uid:string,token:string,projectId:number,list:Selection[],id:string,version:number){
@@ -176,15 +190,15 @@ async function validatedAssets(env:Env,uid:string,token:string,projectId:number,
       throw error;
     }
     result.push({review_id:id,version,file_id:item.fileId,connection_id:item.connectionId,
-      linked_folder_id:item.linkedFolderId,name:meta.name,mime_type:meta.mimeType,permission_id:null,grant_state:'unshared'});
+      linked_folder_id:item.linkedFolderId,provider:item.provider,name:meta.name,mime_type:meta.mimeType,permission_id:null,grant_state:'unshared'});
   }
   return result;
 }
 function insertAssets(env:Env,entries:Asset[],transition?:string){
   return entries.map(a=>env.DB.prepare(
-    "INSERT INTO review_assets(review_id,version,file_id,connection_id,linked_folder_id,name,mime_type,grant_state) SELECT ?,?,?,?,?,?,?,'unshared'"+
+    "INSERT INTO review_assets(review_id,version,file_id,connection_id,linked_folder_id,provider,name,mime_type,grant_state) SELECT ?,?,?,?,?,?,?,?,'unshared'"+
     (transition?" WHERE EXISTS(SELECT 1 FROM review_requests WHERE id=? AND status='replacing' AND transition_id=?)":""))
-    .bind(a.review_id,a.version,a.file_id,a.connection_id,a.linked_folder_id,a.name,a.mime_type,
+    .bind(a.review_id,a.version,a.file_id,a.connection_id,a.linked_folder_id,a.provider,a.name,a.mime_type,
       ...(transition?[a.review_id,transition]:[])));
 }
 async function tokenFor(env:Env,r:Review):Promise<string>{
@@ -204,7 +218,7 @@ async function detail(env:Env,r:Review){
   return {review:{...showReview(r),url:reviewLink(token)},participants:people,votes:votes.results,
     assets:files.map(a=>({
       version:a.version,fileId:a.file_id,name:a.name,mimeType:a.mime_type,grantState:a.grant_state,
-      connectionId:a.connection_id,linkedFolderId:a.linked_folder_id
+      connectionId:a.connection_id,linkedFolderId:a.linked_folder_id,provider:a.provider
     })),comments:comments.results,decisions:decisions.results};
 }
 function pages(n:URLSearchParams):number{
@@ -250,6 +264,8 @@ async function createReview(request:Request,env:Env,uid:string):Promise<Response
   const metadata=await verifyProject(env,uid,bearer,projectId,clientId);
   const id=crypto.randomUUID(),secret=random(),ts=now();
   const entries=await validatedAssets(env,uid,bearer,projectId,list,id,1);
+  if(shareDirect&&entries.some(a=>a.provider==='dropbox'))
+    throw new ApiError(409,'dropbox_direct_share_not_supported');
   const r={id,owner_uid:uid};
   const encrypted=await encrypt(env,secret,tokenContext(env,r));
   await env.DB.batch([
@@ -317,7 +333,7 @@ async function mutatePermission(env:Env,row:Connection,fileId:string,method:'POS
   return method==='DELETE'?{}:res.json() as Promise<Record<string,unknown>>;
 }
 async function grant(env:Env,r:Review,a:Asset,ownerToken:string):Promise<void>{
-  const sel={fileId:a.file_id,connectionId:a.connection_id,linkedFolderId:a.linked_folder_id};
+  const sel={fileId:a.file_id,connectionId:a.connection_id,linkedFolderId:a.linked_folder_id,provider:a.provider};
   const validation=await checkedFile(env,r.owner_uid,ownerToken,r.project_id,sel);
   return withAssetLease(env,r,a,async current=>grantLocked(env,r,current,validation));
 }
@@ -513,6 +529,8 @@ async function revokeGoogle(env:Env,r:Review,a:Asset):Promise<void>{
 }
 
 async function grantLocked(env:Env,r:Review,a:Asset,validation:CheckedAsset):Promise<void>{
+  if(a.provider==='dropbox'&&r.drive_share_enabled!==0)
+    throw new ApiError(409,'dropbox_direct_share_not_supported');
   if(r.drive_share_enabled===0){
     // The chosen asset was already verified as readable via the owner's Drive
     // connection and linked project folder. isAppAuthorized can be false for
