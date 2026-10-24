@@ -68,6 +68,7 @@ export function ReviewOwnerWorkspace({detail,working,error,onClose,onRevise,onPu
   const {review,assets,comments,decisions}=detail;
   const driveCall=useDriveApi();
   const getThumbnail=useDriveThumbnailFetch();
+  const {user}=useAuth();
   const getDropboxThumbnail=useCallback(async(item:{id:string;thumbnailFallback?:boolean},signal?:AbortSignal,accountId?:string)=>{
     if(!user||!item.thumbnailFallback||!accountId)return null;
     const token=await user.getIdToken();
@@ -76,7 +77,6 @@ export function ReviewOwnerWorkspace({detail,working,error,onClose,onRevise,onPu
       {cache:'no-store',signal,headers:{Authorization:'Bearer '+token}});
     return response.ok&&response.status!==204?response.blob():null;
   },[user]);
-  const {user}=useAuth();
   const [fileSearch,setFileSearch]=useState("");
   const [typeFilter,setTypeFilter]=useState<"all"|"video"|"image"|"audio"|"pdf">("all");
   const [galleryView,setGalleryView]=useState<"grid"|"list">("grid");
