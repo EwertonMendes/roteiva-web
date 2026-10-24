@@ -6,7 +6,8 @@ import type {Client,Project} from "../../domain/workspace";
 import {useAuth} from "../auth/AuthProvider";
 import {useDriveApi} from "../drive/drive-api";
 import {readDriveLinks,type DriveFolderLink} from "../../data/drive-folder-links";
-import {driveFileUrl,readableFileType,type DriveItem,useOverlayFocus} from "../drive/DriveLibraryUI";
+import {readDropboxLinks,type DropboxFolderLink} from "../../data/dropbox-folder-links";
+import {driveFileUrl,isStorageFolder,readableFileType,type DriveItem,useOverlayFocus} from "../drive/DriveLibraryUI";
 import {DriveThumbnail} from "../drive/DriveThumbnail";
 import {useDriveThumbnailFetch} from "../drive/useDriveThumbnailFetch";
 import {cacheKey,getCachedFolder,setCachedFolder} from "../drive/drive-folder-cache";
@@ -16,7 +17,8 @@ import "./reviews.css";
 import {ReviewOwnerWorkspace} from "./ReviewOwnerWorkspace";
 import {statusText,type Mode,type Review,type Detail} from "./review-model";
 
-type Selection={fileId:string;connectionId:string;linkedFolderId:string;name:string;mimeType:string};
+type StorageFolderLink=(DriveFolderLink & {provider:'google_drive'})|DropboxFolderLink;
+type Selection={fileId:string;connectionId:string;linkedFolderId:string;name:string;mimeType:string;provider:'google_drive'|'dropbox'};
 const supported=(file:DriveItem)=>/^(video|image|audio)\//.test(file.mimeType)||file.mimeType==="application/pdf";
 const splitEmails=(raw:string)=>raw.split(/[\n,;]+/).map(v=>v.trim().toLowerCase()).filter(Boolean);
 const validEmail=(value:string)=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -39,9 +41,9 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
   const [mode,setMode]=useState<Mode>("link"),[recipient,setRecipient]=useState("");
   const [viewers,setViewers]=useState(""),[restrictPublic,setRestrictPublic]=useState(false);
   const [shareDirect,setShareDirect]=useState(false);
-  const [days,setDays]=useState(14),[links,setLinks]=useState<DriveFolderLink[]>([]);
+  const [days,setDays]=useState(14),[links,setLinks]=useState<StorageFolderLink[]>([]);
   const [linksLoading,setLinksLoading]=useState(false);
-  const [selectedFolder,setSelectedFolder]=useState<DriveFolderLink|null>(null);
+  const [selectedFolder,setSelectedFolder]=useState<StorageFolderLink|null>(null);
   const [trail,setTrail]=useState<{id:string;name:string}[]>([]);
   const [items,setItems]=useState<DriveItem[]>([]);
   const [files,setFiles]=useState<Selection[]>([]);
@@ -88,27 +90,28 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
     if(!user||!projectId||!composer){setLinksLoading(false);return;}
     setLinksLoading(true);
     let alive=true;
-    readDriveLinks(user.uid).then(result=>{
-      if(alive)setLinks(result.filter(l=>l.projectId===projectId));
+    Promise.all([readDriveLinks(user.uid),readDropboxLinks(user.uid)]).then(([google,dropbox])=>{
+      if(alive)setLinks([...google.map(l=>({...l,provider:'google_drive' as const})),...dropbox]
+       .filter(l=>l.projectId===projectId));
     }).catch(()=>{if(alive)setFolderError("Não foi possível ler as pastas vinculadas.");})
       .finally(()=>{if(alive)setLinksLoading(false);});
     return()=>{alive=false;};
   },[user,projectId,composer]);
-  const browse=useCallback(async(folder:DriveFolderLink,targetId:string,path:{id:string;name:string}[],append=false,pageKey?:string)=>{
+  const browse=useCallback(async(folder:StorageFolderLink,targetId:string,path:{id:string;name:string}[],append=false,pageKey?:string)=>{
     const sequence=++browseSequence.current;
     setFolderBusy(true);setFolderError("");
     if(!append){++searchSequence.current;setFileSearch("");setRemote(null);setSearchBusy(false);setItems([]);setNextToken(null);setTrail(path);}
     try{
       const params=pageKey?"?pageToken="+encodeURIComponent(pageKey):"";
       const response=await call<{files:DriveItem[];nextPageToken:string|null}>(
-        "/integrations/drive/"+encodeURIComponent(folder.connectionId)+"/folders/"+encodeURIComponent(targetId)+"/items"+params);
+        ('/integrations/'+(folder.provider==='dropbox'?'dropbox':'drive')+'/'+encodeURIComponent(folder.connectionId))+"/folders/"+encodeURIComponent(targetId)+"/items"+params);
       if(sequence!==browseSequence.current)return;
       setItems(old=>append?[...old,...response.files.filter(f=>!old.some(o=>o.id===f.id))]:response.files);
       setTrail(path);setNextToken(response.nextPageToken);
     }catch(e){if(sequence===browseSequence.current){setFolderError(e instanceof Error?e.message:"Não foi possível abrir a pasta.");if(!append)setItems([]);}}
     finally{if(sequence===browseSequence.current)setFolderBusy(false);}
   },[call]);
-  const pickFolder=(folder:DriveFolderLink)=>{
+  const pickFolder=(folder:StorageFolderLink)=>{
     setSelectedFolder(folder);setTrail([{id:folder.folderId,name:folder.folderName}]);
     void browse(folder,folder.folderId,[{id:folder.folderId,name:folder.folderName}]);
   };
@@ -135,7 +138,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
       try{
         const params=new URLSearchParams({search:term});
         const result=await call<{files:DriveItem[];nextPageToken:string|null}>(
-          "/integrations/drive/"+encodeURIComponent(folder.connectionId)+"/folders/"+
+          ('/integrations/'+(folder.provider==='dropbox'?'dropbox':'drive')+'/'+encodeURIComponent(folder.connectionId))+"/folders/"+
           encodeURIComponent(folderId)+"/items?"+params);
         if(seq!==searchSequence.current)return;
         setCachedFolder(key,{files:result.files,nextPageToken:result.nextPageToken});
@@ -155,7 +158,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
     try{
       const params=new URLSearchParams({search:current.term,pageToken:current.page!});
       const result=await call<{files:DriveItem[];nextPageToken:string|null}>(
-        "/integrations/drive/"+encodeURIComponent(selectedFolder.connectionId)+"/folders/"+
+        ('/integrations/'+(selectedFolder.provider==='dropbox'?'dropbox':'drive')+'/'+encodeURIComponent(selectedFolder.connectionId))+"/folders/"+
         encodeURIComponent(current.folderId)+"/items?"+params);
       if(seq!==searchSequence.current)return;
       const files=[...current.files,...result.files.filter(item=>!current.files.some(old=>old.id===item.id))];
@@ -166,7 +169,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
     finally{if(seq===searchSequence.current)setSearchBusy(false);}
   };
   const destination:UploadDestination|null=selectedFolder&&projectId?{
-    connectionId:selectedFolder.connectionId,linkedFolderId:selectedFolder.folderId,
+    provider:selectedFolder.provider,connectionId:selectedFolder.connectionId,linkedFolderId:selectedFolder.folderId,
     targetFolderId:trail.at(-1)?.id||selectedFolder.folderId,
     projectId,folderName:trail.at(-1)?.name||selectedFolder.folderName
   }:null;
@@ -184,7 +187,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
     if(!/^(video|image|audio)\//.test(file.mimeType)&&file.mimeType!=="application/pdf")return;
     setFiles(old=>old.some(a=>a.fileId===file.id)||old.length>=8?old:
       [...old,{fileId:file.id,name:file.name,mimeType:file.mimeType,
-        connectionId:uploaded.connectionId,linkedFolderId:uploaded.linkedFolderId}]);
+        provider:uploaded.provider||'google_drive',connectionId:uploaded.connectionId,linkedFolderId:uploaded.linkedFolderId}]);
     const target=trail.at(-1)?.id||selectedFolder?.folderId;
     if(selectedFolder&&uploaded.connectionId===selectedFolder.connectionId&&uploaded.targetFolderId===target)
       void browse(selectedFolder,target,trail);
@@ -222,7 +225,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
     if(!replacement&&missingDetails.length){setComposerStep("details");setError(missingDetails[0]);return;}
     await run(async()=>{
       let publishWarning="";
-      const selections=files.map(f=>({fileId:f.fileId,linkedFolderId:f.linkedFolderId,connectionId:f.connectionId}));
+      const selections=files.map(f=>({fileId:f.fileId,linkedFolderId:f.linkedFolderId,connectionId:f.connectionId,provider:f.provider}));
       if(replacement){
         const beforeVersion=opened?.review.version??0;
         const endpoint="/reviews/"+replacement;
@@ -313,7 +316,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
     if(!supported(file))return;
     setFiles(old=>old.some(f=>f.fileId===file.id)?old.filter(f=>f.fileId!==file.id):
       old.length+pendingUploads.length>=8?old:[...old,{fileId:file.id,name:file.name,mimeType:file.mimeType,
-        connectionId:selectedFolder.connectionId,linkedFolderId:selectedFolder.folderId}]);
+        provider:selectedFolder.provider,connectionId:selectedFolder.connectionId,linkedFolderId:selectedFolder.folderId}]);
   };
   return <div className="reviews-panel">
     <div className="reviews-summary">
