@@ -250,7 +250,7 @@ export function dropboxNormalize(meta:DropboxMeta){
  if(!folder&&meta['.tag']!=='file')return null;
  return {id:meta.id,name:meta.name,mimeType:folder?'application/vnd.roteiva.folder':mime(meta.name),
    isFolder:folder,size:folder?undefined:String(meta.size||0),modifiedTime:meta.server_modified,
-   pathDisplay:meta.path_display,thumbnailAvailable:!folder&&/\.(jpe?g|png|gif|webp|bmp|tiff?)$/i.test(meta.name)};
+   pathDisplay:meta.path_display,thumbnailFallback:!folder&&/\.(jpe?g|png|gif|webp|bmp|tiff?)$/i.test(meta.name)};
 }
 export async function dropboxMetadata(env:Env,uid:string,connectionId:string,fileId:string):Promise<DropboxMeta>{
  if(!validStorageFileId('dropbox',fileId))throw new ApiError(400,'dropbox_invalid_file');
