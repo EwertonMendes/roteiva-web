@@ -27,15 +27,6 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
 }){
   const {user}=useAuth(),call=useDriveApi(),transfers=useDriveTransfers();
   const getThumbnail=useDriveThumbnailFetch();
-  const getStorageThumbnail=useCallback(async(item:DriveItem,signal?:AbortSignal,accountId?:string)=>{
-    if(selectedFolder?.provider!=='dropbox')return getThumbnail(item,signal,accountId);
-    if(!user||!item.thumbnailFallback)return null;
-    const token=await user.getIdToken();
-    const response=await fetch('https://roteiva-api-dev.ewertonmendes9.workers.dev/integrations/dropbox/'+
-      encodeURIComponent(accountId||selectedFolder.connectionId)+'/files/'+encodeURIComponent(item.id)+'/thumbnail',
-      {headers:{Authorization:'Bearer '+token},signal,cache:'no-store'});
-    return response.ok&&response.status!==204?response.blob():null;
-  },[getThumbnail,user,selectedFolder?.provider,selectedFolder?.connectionId]);
   const [rows,setRows]=useState<Review[]>([]);
   const [search,setSearch]=useState(""),[debouncedSearch,setDebouncedSearch]=useState("");
   const [status,setStatus]=useState(""),[page,setPage]=useState(0);
@@ -53,6 +44,15 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
   const [days,setDays]=useState(14),[links,setLinks]=useState<StorageFolderLink[]>([]);
   const [linksLoading,setLinksLoading]=useState(false);
   const [selectedFolder,setSelectedFolder]=useState<StorageFolderLink|null>(null);
+  const getStorageThumbnail=useCallback(async(item:DriveItem,signal?:AbortSignal,accountId?:string)=>{
+    if(selectedFolder?.provider!=='dropbox')return getThumbnail(item,signal,accountId);
+    if(!user||!item.thumbnailFallback)return null;
+    const token=await user.getIdToken();
+    const response=await fetch('https://roteiva-api-dev.ewertonmendes9.workers.dev/integrations/dropbox/'+
+      encodeURIComponent(accountId||selectedFolder.connectionId)+'/files/'+encodeURIComponent(item.id)+'/thumbnail',
+      {headers:{Authorization:'Bearer '+token},signal,cache:'no-store'});
+    return response.ok&&response.status!==204?response.blob():null;
+  },[getThumbnail,user,selectedFolder?.provider,selectedFolder?.connectionId]);
   const [trail,setTrail]=useState<{id:string;name:string}[]>([]);
   const [items,setItems]=useState<DriveItem[]>([]);
   const [files,setFiles]=useState<Selection[]>([]);
