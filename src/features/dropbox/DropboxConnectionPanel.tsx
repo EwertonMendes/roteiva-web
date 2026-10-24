@@ -3,7 +3,7 @@ import {Check,ChevronDown,ChevronRight,Cloud,ExternalLink,FolderOpen,LoaderCircl
 import type {Project} from '../../domain/workspace';
 import {AppSelect} from '../ui/AppSelect';
 import {useAuth} from '../auth/AuthProvider';
-import {useDriveApi} from '../drive/drive-api';
+import {useDriveApi,messages} from '../drive/drive-api';
 import {DriveFileExplorer,DROPBOX_FOLDER,isStorageFolder,useOverlayFocus,type DriveItem,type DriveTrail} from '../drive/DriveLibraryUI';
 import {ReviewImageViewer} from '../reviews/ReviewImageViewer';
 import {dropboxWebUrl} from './dropbox-web-url';
@@ -255,6 +255,8 @@ export function DropboxConnectionPanel({projects,selectedProjectId,onSelectProje
   {!ready&&<div className="rl-status" role="status"><LoaderCircle className="rl-spin" size={16}/> Carregando Dropbox…</div>}
   {callback==='connected'&&<div className="rl-status" role="status"><Check size={16}/> Conta Dropbox conectada.</div>}
   {callback==='cancelled'&&<div className="rl-status">Autorização cancelada.</div>}
+  {callback&&callback!=='connected'&&callback!=='cancelled'&&
+   <div className="rl-status" role="alert">{messages[callback]||'Não foi possível concluir a autorização do Dropbox. Tente conectar novamente.'}</div>}
   {error&&<div className="rl-status" role="alert">{error}</div>}
   {result&&<div className="rl-status" role="status">{result}</div>}
   {!selectedProjectId&&<p className="rl-status">Selecione um projeto para vincular novas pastas do Dropbox.</p>}
