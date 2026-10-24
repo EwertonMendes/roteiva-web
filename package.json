@@ -38,6 +38,6 @@
     "firebase-tools": "^15.34.0",
     "tailwindcss": "4.2.1",
     "typescript": "5.9.3",
-    "vite": "8.0.13"
+    "vite": "8.1.6"
   }
 }
