@@ -115,6 +115,48 @@ jobs:
           test "$(git rev-parse HEAD)" = "$SHA"
           grep -q '"name": "roteiva-api-dev"' wrangler.jsonc
           grep -q '"DROPBOX_ENABLED": "true"' wrangler.jsonc
+      - name: Promote verified secrets-only DEV version if the staged Dropbox secrets are still inactive
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          WRANGLER_SEND_METRICS: 'false'
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          npx wrangler secret list --env dev --format json > "$RUNNER_TEMP/active-secret-names.json"
+          if ! node --input-type=module -e '
+            import fs from "node:fs";
+            const a=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+"/active-secret-names.json","utf8"));
+            if(!Array.isArray(a)||!["DROPBOX_APP_KEY","DROPBOX_APP_SECRET"].every(n=>a.some(x=>x.name===n)))process.exit(1);
+          '; then
+            # This exact secrets-only version was prepared and recorded by the
+            # independent Cloudflare infrastructure audit on 24 Oct 2026.
+            # Never promote it if the active Worker has changed in the meantime.
+            old='8a69e41a-2bc5-4ccb-9ea1-f7833d97fab9'
+            prepared='f73f50fa-f367-4ad0-9722-31e3d02eac2c'
+            npx wrangler deployments list --env dev --json > "$RUNNER_TEMP/worker-deployments.json"
+            npx wrangler versions view "$prepared" --env dev --json > "$RUNNER_TEMP/prepared-worker-version.json"
+            OLD="$old" node --input-type=module -e '
+              import fs from "node:fs";
+              const d=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+"/worker-deployments.json","utf8"));
+              const current=Array.isArray(d)?d[0]:d.deployments?.[0];
+              if(!current||!JSON.stringify(current).includes(process.env.OLD))throw Error("Active DEV Worker differs from verified pre-Dropbox version: stop.");
+              const v=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+"/prepared-worker-version.json","utf8"));
+              const data=JSON.stringify(v);
+              for(const n of ["DROPBOX_APP_KEY","DROPBOX_APP_SECRET","TOKEN_KEYS",
+                "FIREBASE_ADMIN_CREDENTIALS_JSON","GOOGLE_CLIENT_SECRET",
+                "GOOGLE_PICKER_API_KEY","TRIAL_IDENTITY_HMAC_KEY"]){
+                if(!data.includes(n))throw Error("Prepared version metadata missing required secret name: "+n);
+              }
+            '
+            npx wrangler versions deploy "$prepared@100" --env dev --yes \
+              --message 'Promote previously verified secrets-only version before Dropbox QA'
+            node --input-type=module -e '
+              const r=await fetch("https://roteiva-api-dev.ewertonmendes9.workers.dev/health",{cache:"no-store"});
+              if(r.status!==200)process.exit(1);
+            '
+          fi
+          rm -f "$RUNNER_TEMP/active-secret-names.json" \
+            "$RUNNER_TEMP/worker-deployments.json" "$RUNNER_TEMP/prepared-worker-version.json"
       - name: Ensure all seven Worker secrets are published before touching D1
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -122,7 +164,7 @@ jobs:
         run: |
           set -euo pipefail
           test -n "$CLOUDFLARE_API_TOKEN"
-          npx wrangler secret list --env dev --json > "$RUNNER_TEMP/roteiva-secret-names.json"
+          npx wrangler secret list --env dev --format json > "$RUNNER_TEMP/roteiva-secret-names.json"
           node --input-type=module -e '
             import fs from "node:fs";
             const list=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+"/roteiva-secret-names.json","utf8"));
