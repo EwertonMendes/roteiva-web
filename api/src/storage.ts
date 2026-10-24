@@ -19,7 +19,7 @@ export type StorageFolderPage = {
 };
 export const STORAGE_CAPABILITIES: Readonly<Record<StorageProviderId,Readonly<Record<StorageCapability,boolean>>>>={
   google_drive:{browse:true,search:true,thumbnail:true,resumableUpload:true,streamRange:true,directShare:true},
-  dropbox:{browse:true,search:true,thumbnail:true,resumableUpload:true,streamRange:true,directShare:true}
+  dropbox:{browse:true,search:true,thumbnail:true,resumableUpload:true,streamRange:true,directShare:false}
 } as const;
 const GOOGLE_ID=/^[A-Za-z0-9_-]{10,200}$/;
 const DROPBOX_ID=/^id:[A-Za-z0-9_-]{8,200}$/;

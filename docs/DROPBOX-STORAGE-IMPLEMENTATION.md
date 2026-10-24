@@ -21,7 +21,7 @@ Nunca solicitar a senha do Dropbox. Tokens de acesso e refresh somente no Worker
 ## Infra — dependências externas reais, não necessariamente tarefas para o Codex
 
 - Criar App Dropbox em https://www.dropbox.com/developers/apps, modelo **Scoped access, Full Dropbox**.
-- Habilitar escopos account_info.read, files.metadata.read, files.content.read, files.content.write, e somente para acesso direto sharing.read/sharing.write. Nunca files.permanent_delete nem scopes de admin de equipe.
+- Habilitar escopos account_info.read, files.metadata.read, files.content.read, files.content.write. **Não solicitar sharing.read/sharing.write enquanto o compartilhamento nativo estiver desabilitado.** Nunca files.permanent_delete nem scopes de admin de equipe.
 - Registrar redirect exato DEV: https://roteiva-api-dev.ewertonmendes9.workers.dev/oauth/dropbox/callback
 - Configurar DROPBOX_APP_KEY e DROPBOX_APP_SECRET como secrets criptografados no Cloudflare. DROPBOX_OAUTH_REDIRECT_URI com o redirect acima e DROPBOX_ENABLED=true somente após testes. Nunca gravar segredo em GitHub/repositório.
 - Ter conta Dropbox de teste, com consentimento, para E2E de OAuth, upload, mídia Range, álbum grande, pasta compartilhada e políticas empresariais. Validar aprovação do app para status de produção conforme regras do Dropbox.
@@ -79,3 +79,7 @@ Links oficiais:
 - https://docs.dropboxapi.com/dropbox-api/api-reference/user-endpoints/files/upload-session-append-v-2
 - https://docs.dropboxapi.com/dropbox-api/api-reference/user-endpoints/files/upload-session-finish
 - https://docs.dropboxapi.com/dropbox-api/api-reference/user-endpoints/sharing/add-file-member
+
+## Estado do compartilhamento nativo Dropbox (revisão 24/10/2026)
+
+A experiência de aprovação **portal-first** está implementada, mas a concessão de **acesso direto a arquivos originais do Dropbox** não foi habilitada. As APIs de compartilhamento do Dropbox requerem tratamento seguro de compartilhamentos preexistentes, permissões herdadas de equipes e referências cruzadas de múltiplas aprovações. Não é aceitável criar grant e removê-lo no encerramento sem descobrir o proprietário e as outras revisões que dependem dele. O backend falha explicitamente para `dropbox_direct_share_not_supported`, o frontend desabilita a opção e a capability está false. OAuth solicita apenas os quatro escopos necessários às funcionalidades disponíveis. A habilitação da capacidade futura exige ACLs testadas com Dropbox real antes de pedir os escopos de compartilhamento.

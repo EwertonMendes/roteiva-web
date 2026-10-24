@@ -15,7 +15,7 @@ export type DropboxConnection={
 type DropboxMeta={'.tag':'file'|'folder'|'deleted';id?:string;name?:string;size?:number;
  path_display?:string;path_lower?:string;server_modified?:string;is_downloadable?:boolean};
 type DropboxAccount={account_id:string;email:string;email_verified:boolean;disabled?:boolean};
-export const DROPBOX_SCOPE=['account_info.read','files.metadata.read','files.content.read','files.content.write','sharing.read','sharing.write'];
+export const DROPBOX_SCOPE=['account_info.read','files.metadata.read','files.content.read','files.content.write'];
 const CALLBACK='/oauth/dropbox/callback';
 const COOKIE='__Host-roteiva-dropbox-oauth';
 const ENDPOINT='https://api.dropboxapi.com/2/';
