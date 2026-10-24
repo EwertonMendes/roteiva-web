@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {database} from './helpers/database.mjs';
 import {encrypt,context,base64url} from '../src/crypto.ts';
-import {dropboxAccess,dropboxConnection,dropboxList} from '../src/dropbox.ts';
+import {dropboxAccess,dropboxConnection,dropboxList,dropboxStart} from '../src/dropbox.ts';
 import {startDropboxUpload,appendDropboxUpload,finishDropboxUpload} from '../src/dropbox-uploads.ts';
 import {issueDropboxPreview,streamDropboxPreview} from '../src/dropbox-preview.ts';
 
@@ -105,4 +105,40 @@ test('signed library media tickets reject tampering and account reconnection',as
  assert.equal(media.status,206);assert.equal(media.headers.get('Content-Type'),'video/mp4');
  f.sql.prepare('UPDATE dropbox_connections SET revision=revision+1 WHERE id=?').run(conn);
  await assert.rejects(()=>streamDropboxPreview(f.env,new Request(url),new URL(url)),e=>e.status===404);
+});
+
+test('Dropbox OAuth launch is one-use, short-lived and never returns credentials',async t=>{
+ const f=await fixture(t);
+ const launch=await (await dropboxStart(f.env,uid)).json();
+ assert.match(launch.launchUrl,/^https:\/\/roteiva-api-dev\.ewertonmendes9\.workers\.dev\/oauth\/dropbox\/launch\?ticket=/);
+ assert.doesNotMatch(JSON.stringify(launch),/demo-token|demo-refresh|synthetic-secret/);
+ const records=f.sql.prepare('SELECT * FROM dropbox_oauth_transactions').all();
+ assert.equal(records.length,1);
+ assert.notEqual(records[0].encrypted_verifier,'');
+ assert.equal(records[0].owner_uid,uid);
+ assert.ok(records[0].expires_at>Date.now());
+ assert.ok(records[0].expires_at<=Date.now()+600000);
+ for(let i=0;i<4;i++)await dropboxStart(f.env,uid);
+ await assert.rejects(()=>dropboxStart(f.env,uid),e=>e.status===429&&e.code==='oauth_rate_limited');
+ const other=await (await dropboxStart(f.env,'another-user')).json();
+ assert.match(other.launchUrl,/\/oauth\/dropbox\/launch\?ticket=/);
+});
+test('Fail closed: malformed uploads, reconnects and different owners never start a Dropbox transfer',async t=>{
+ const f=await fixture(t);
+ const raw={attemptId,projectId,linkedFolderId:'root',targetFolderId:'root',
+  name:'Video.mp4',size:4194304,mimeType:'video/mp4'};
+ const bad=(data)=>startDropboxUpload(f.env,uid,conn,request(data));
+ for(const [patch,code] of [
+   [{name:'../unsafe.mp4'},'dropbox_invalid_upload'],
+   [{size:0},'dropbox_invalid_upload'],
+   [{linkedFolderId:'../../secret'},'dropbox_invalid_upload'],
+   [{attemptId:'not-a-uuid'},'dropbox_invalid_upload']
+ ]){
+  await assert.rejects(()=>bad({...raw,...patch}),e=>e.status===400&&e.code===code);
+ }
+ assert.equal(f.sql.prepare('SELECT COUNT(*) AS n FROM dropbox_upload_attempts').get().n,0);
+ await assert.rejects(()=>startDropboxUpload(f.env,'not-owner',conn,request(raw)),e=>e.status===404);
+ f.sql.prepare("UPDATE dropbox_connections SET status='reconnect_required' WHERE id=?").run(conn);
+ await assert.rejects(()=>dropboxAccess(f.env,await dropboxConnection(f.env,uid,conn)),
+   e=>e.code==='dropbox_reconnect_required');
 });
