@@ -69,7 +69,7 @@ function DriveTransfersSession({children}:{children:ReactNode}){
   const completed=useCallback<Completion>((file,dest)=>{
     if(!user)return;
     setResult('');
-    invalidateStorageFolderCache(dest.provider,user.uid,dest.connectionId,dest.targetFolderId);
+    invalidateStorageFolderCache(dest.provider||'google_drive',user.uid,dest.connectionId,dest.targetFolderId);
     subscribers.current.forEach(callback=>callback(file,dest));
   },[user]);
   const uploads=useDriveUploads(createUpload,confirmUpload,completed,user?.uid||'',send);
