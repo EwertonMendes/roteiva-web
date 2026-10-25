@@ -403,6 +403,82 @@
 .rl-file-icon:not(.rl-file-icon--image)[data-mime^="audio/"] {color:#d19c51;background:#d49b451a;}
 .rl-file-icon:not(.rl-file-icon--image)[data-mime^="application/vnd.google-apps."] {color:#598ec9;background:#477ab81b;}
 
+
+/* Original vector file badges: the literal extension always identifies a file.
+ * Used in both list and grid; no remote assets, PDF iframe or font downloads. */
+.rl-format-art {
+  --format-tone:#64748b;
+  display:grid;
+  place-items:center;
+  width:100%;
+  height:100%;
+  min-width:0;
+  min-height:0;
+  color:var(--format-tone);
+  background:color-mix(in srgb,var(--format-tone) 10%,var(--rl-hover));
+}
+.rl-format-art[data-family="pdf"]{--format-tone:#df5357;}
+.rl-format-art[data-family="slides"]{--format-tone:#e2783d;}
+.rl-format-art[data-family="document"]{--format-tone:#4287db;}
+.rl-format-art[data-family="sheet"]{--format-tone:#289c65;}
+.rl-format-art[data-family="archive"]{--format-tone:#b78a30;}
+.rl-format-art[data-family="code"]{--format-tone:#8a72c8;}
+.rl-format-art[data-family="image"]{--format-tone:#329da6;}
+.rl-format-art[data-family="video"]{--format-tone:#9357bf;}
+.rl-format-art[data-family="audio"]{--format-tone:#bd7690;}
+.rl-format-sheet{
+  box-sizing:border-box;
+  position:relative;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:space-between;
+  width:31px;
+  height:37px;
+  padding:6px 2px 4px;
+  border:1px solid color-mix(in srgb,var(--format-tone) 34%,transparent);
+  border-radius:5px 9px 5px 5px;
+  background:color-mix(in srgb,var(--format-tone) 10%,var(--rl-surface));
+  box-shadow:0 2px 6px #00000012;
+  overflow:hidden;
+}
+.rl-format-sheet::after{
+  content:"";
+  position:absolute;
+  top:-1px;
+  right:-1px;
+  width:10px;
+  height:10px;
+  background:color-mix(in srgb,var(--format-tone) 34%,var(--rl-surface));
+  border-radius:0 8px 0 3px;
+}
+.rl-format-symbol{width:14px;height:14px;flex:none;}
+.rl-format-extension{
+  position:relative;
+  z-index:1;
+  display:block;
+  width:100%;
+  padding:2px 0;
+  border-radius:3px;
+  color:#fff;
+  background:var(--format-tone);
+  font-size:7.8px;
+  line-height:1;
+  font-weight:800;
+  letter-spacing:-.035em;
+  text-align:center;
+}
+.rl-files[data-view="grid"] .rl-format-sheet{
+  width:86px;
+  height:107px;
+  padding:21px 8px 10px;
+  border-radius:10px 19px 10px 10px;
+  box-shadow:0 7px 18px #00000018;
+}
+.rl-files[data-view="grid"] .rl-format-sheet::after{width:24px;height:24px;border-radius:0 18px 0 6px;}
+.rl-files[data-view="grid"] .rl-format-symbol{width:30px;height:30px;}
+.rl-files[data-view="grid"] .rl-format-extension{padding:6px 2px;font-size:14px;border-radius:5px;letter-spacing:.025em;}
+
 /* Thumbnail lifecycle: only show a loading indicator during an active request. */
 .rl-thumb-loading {position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:5px;background:var(--rl-hover);color:var(--rl-muted);overflow:hidden;}
 .rl-thumb-loading-spin {flex:none;animation:rl-rotate 1s linear infinite;}
