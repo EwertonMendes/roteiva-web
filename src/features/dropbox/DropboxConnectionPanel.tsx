@@ -82,6 +82,7 @@ export function DropboxConnectionPanel({projects,selectedProjectId,onLinkedFolde
  const relevant=useMemo(()=>selectedProjectId?links.filter(x=>x.projectId===selectedProjectId):links,[links,selectedProjectId]);
  const currentFolder=path.at(-1)?.id||viewing?.folderId||'';
  const requestId=useRef(0),pickerId=useRef(0),searchId=useRef(0);
+ const autoOpened=useRef('');
  const refresh=useCallback(async()=>{
   if(!user)return;
   const [next,linked]=await Promise.all([
@@ -120,8 +121,14 @@ export function DropboxConnectionPanel({projects,selectedProjectId,onLinkedFolde
   }catch(e){if(request===requestId.current)setError(e instanceof Error?e.message:'Não foi possível carregar a pasta.')}
   finally{if(request===requestId.current)setFileBusy(false)}
  },[call]);
- useEffect(()=>{if(ready&&relevant.length&&!viewing&&!picker&&!disabled)void load(relevant[0],relevant[0].folderId,[{id:relevant[0].folderId,name:relevant[0].folderName}]);},
-  [ready,relevant,viewing,picker,disabled,load]);
+ useEffect(()=>{
+  const first=relevant[0];
+  if(!ready||!first||viewing||picker||disabled)return;
+  const key=(selectedProjectId||'all')+':'+first.id;
+  if(autoOpened.current===key)return;
+  autoOpened.current=key;
+  void load(first,first.folderId,[{id:first.folderId,name:first.folderName}]);
+ },[ready,relevant,viewing,picker,disabled,load,selectedProjectId]);
  const browsePicker=useCallback(async(folderId:string,nextPath:DriveTrail[],cursor?:string,append=false)=>{
   if(!account)return;
   const request=++pickerId.current;setPickerBusy(true);setPickerError('');
