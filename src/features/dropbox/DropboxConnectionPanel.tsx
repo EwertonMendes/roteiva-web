@@ -302,23 +302,47 @@ export function DropboxConnectionPanel({projects,selectedProjectId,onLinkedFolde
  useEffect(()=>{
   const id=++searchId.current,term=search.trim();
   setRemote(null);setSearchBusy(false);
-  if(!viewing||term.length<2)return;
-  const handle=window.setTimeout(()=>{setSearchBusy(true);const qs=new URLSearchParams({search:term});
-   void call<Page>('/integrations/dropbox/'+encodeURIComponent(viewing.connectionId)+'/folders/'+encodeURIComponent(currentFolder)+'/items?'+qs)
-    .then(data=>{if(id===searchId.current)setRemote({term,folder:currentFolder,files:data.files,next:data.nextPageToken})})
-    .catch(e=>{if(id===searchId.current)setError(e instanceof Error?e.message:'Falha na busca.')})
-    .finally(()=>{if(id===searchId.current)setSearchBusy(false)});
+  if(!viewing||!user||term.length<2)return;
+  const currentViewing=viewing,folderId=currentFolder;
+  const handle=window.setTimeout(()=>{
+   const key=cacheKey(user.uid,currentViewing.connectionId,folderId,term,'','dropbox');
+   const cached=getCachedFolder(key);
+   if(cached&&id===searchId.current)
+     setRemote({term,folder:folderId,files:cached.files,next:cached.nextPageToken});
+   if(cached&&Date.now()-cached.fetchedAt<FRESH_MS)return;
+   if(!cached&&id===searchId.current)setSearchBusy(true);
+   const qs=new URLSearchParams({search:term});
+   void onceFolderRequest(key+':search',
+     ()=>call<Page>('/integrations/dropbox/'+encodeURIComponent(currentViewing.connectionId)+
+       '/folders/'+encodeURIComponent(folderId)+'/items?'+qs)
+   ).then(data=>{
+    if(id!==searchId.current)return;
+    setCachedFolder(key,{files:data.files,nextPageToken:data.nextPageToken});
+    setRemote({term,folder:folderId,files:data.files,next:data.nextPageToken});
+   }).catch(e=>{
+    if(id===searchId.current)setError(e instanceof Error?e.message:'Falha na busca.');
+   }).finally(()=>{if(id===searchId.current)setSearchBusy(false)});
   },300);
   return()=>window.clearTimeout(handle);
- },[search,viewing?.id,currentFolder,call]);
+ },[search,viewing?.id,currentFolder,call,user?.uid]);
  async function moreSearch(){
-  if(!viewing||!remote?.next)return;
-  const qs=new URLSearchParams({search:remote.term,pageToken:remote.next});
+  if(!viewing||!user||!remote?.next||searchBusy)return;
+  const previous=remote;
+  const reqId=searchId.current;
+  const qs=new URLSearchParams({search:previous.term,pageToken:previous.next});
   setSearchBusy(true);
-  try{const response=await call<Page>('/integrations/dropbox/'+encodeURIComponent(viewing.connectionId)+'/folders/'+encodeURIComponent(remote.folder)+'/items?'+qs);
-   setRemote(old=>old&&old.term===remote.term?{...old,files:[...old.files,...response.files.filter(f=>!old.files.some(x=>x.id===f.id))],next:response.nextPageToken}:old);
-  }catch(e){setError(e instanceof Error?e.message:'Falha ao carregar a próxima página.')}
-  finally{setSearchBusy(false)}
+  try{
+   const response=await onceFolderRequest(
+    cacheKey(user.uid,viewing.connectionId,previous.folder,previous.term,previous.next,'dropbox')+':search-page',
+    ()=>call<Page>('/integrations/dropbox/'+encodeURIComponent(viewing.connectionId)+
+      '/folders/'+encodeURIComponent(previous.folder)+'/items?'+qs));
+   if(reqId!==searchId.current)return;
+   const files=[...previous.files,...response.files.filter(f=>!previous.files.some(x=>x.id===f.id))];
+   setRemote({term:previous.term,folder:previous.folder,files,next:response.nextPageToken});
+   setCachedFolder(cacheKey(user.uid,viewing.connectionId,previous.folder,previous.term,'','dropbox'),
+     {files,nextPageToken:response.nextPageToken});
+  }catch(e){if(reqId===searchId.current)setError(e instanceof Error?e.message:'Falha ao carregar a próxima página.')}
+  finally{if(reqId===searchId.current)setSearchBusy(false)}
  }
  function upload(files:File[]){
   if(!viewing||!user||!currentFolder)return;
