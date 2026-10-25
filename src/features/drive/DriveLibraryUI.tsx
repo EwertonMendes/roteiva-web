@@ -91,8 +91,8 @@ export type FolderPickerProps={
   working:boolean;
   canRead:boolean;
   hasMore:boolean;
-  mode:"root"|"all";
-  onModeChange:(mode:"root"|"all")=>void;
+  mode?:"root"|"all";
+  onModeChange?:(mode:"root"|"all")=>void;
   linkedIds:ReadonlySet<string>;
   error:string;
   onNavigate:(id:string,path:DriveTrail[])=>void;
@@ -101,7 +101,7 @@ export type FolderPickerProps={
   onConnect:()=>void;
   onClose:()=>void;
 };
-export function DriveFolderPicker({provider='google_drive',projects,projectId,onProjectChange,folders,path,loading,working,canRead,hasMore,mode,onModeChange,linkedIds,error,onNavigate,onMore,onLink,onConnect,onClose,onRetry,onLinkCurrent}:FolderPickerProps){
+export function DriveFolderPicker({provider='google_drive',projects,projectId,onProjectChange,folders,path,loading,working,canRead,hasMore,mode='root',onModeChange,linkedIds,error,onNavigate,onMore,onLink,onConnect,onClose,onRetry,onLinkCurrent}:FolderPickerProps){
   const providerName=provider==='dropbox'?'Dropbox':'Google Drive';
   const [chosen,setChosen]=useState<Record<string,DriveItem>>({});
   const [filter,setFilter]=useState("");
@@ -137,8 +137,8 @@ export function DriveFolderPicker({provider='google_drive',projects,projectId,on
       :!canRead?<div className="rl-picker-empty"><Link2 size={30}/><p>É necessário autorizar a leitura das pastas existentes na sua conta Google.</p><button className="primary-button" type="button" onClick={onConnect} disabled={working}>Autorizar Google Drive</button></div>
       :<>
         {provider==='google_drive'&&<div className="rl-picker-modes" role="group" aria-label="Local de pesquisa">
-          <button type="button" aria-pressed={mode==="root"} onClick={()=>onModeChange("root")} disabled={loading}>Meu Drive</button>
-          <button type="button" aria-pressed={mode==="all"} onClick={()=>onModeChange("all")} disabled={loading}>Todas as pastas</button>
+          <button type="button" aria-pressed={mode==="root"} onClick={()=>onModeChange?.("root")} disabled={loading}>Meu Drive</button>
+          <button type="button" aria-pressed={mode==="all"} onClick={()=>onModeChange?.("all")} disabled={loading}>Todas as pastas</button>
         </div>}
         <nav className="rl-breadcrumbs" aria-label={"Localização no "+providerName}>{path.map((entry,i)=><span key={entry.id}>
           {i>0&&<ChevronRight size={13}/>}
