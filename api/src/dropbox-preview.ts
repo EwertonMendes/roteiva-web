@@ -34,9 +34,16 @@ async function sign(env:Env,p:Ticket):Promise<string>{
 async function verify(env:Env,raw:string):Promise<Ticket>{
  if(raw.length>1100||!/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(raw))throw new ApiError(404,'media_unavailable');
  const [payload,mac]=raw.split('.');
- let p:unknown;try{p=JSON.parse(decoder.decode(decode(payload)))}catch{throw new ApiError(404,'media_unavailable')}
+ // Reject noncanonical base64url aliases: changes to unused pad bits must not
+ // produce a second valid spelling for the same signed media ticket.
+ let p:unknown,signature:Uint8Array;
+ try{
+  const data=decode(payload);signature=decode(mac);
+  if(base64url(data)!==payload||base64url(signature)!==mac)throw new Error('noncanonical');
+  p=JSON.parse(decoder.decode(data));
+ }catch{throw new ApiError(404,'media_unavailable')}
  if(!valid(p))throw new ApiError(404,'media_unavailable');
- const ok=await crypto.subtle.verify('HMAC',await hmac(env,p.k),decode(mac),encoder.encode('roteiva/dropbox-owner-media/v1/'+payload)).catch(()=>false);
+ const ok=await crypto.subtle.verify('HMAC',await hmac(env,p.k),signature,encoder.encode('roteiva/dropbox-owner-media/v1/'+payload)).catch(()=>false);
  if(!ok)throw new ApiError(404,'media_unavailable');
  return p;
 }
