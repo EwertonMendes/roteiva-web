@@ -333,7 +333,7 @@ export function DropboxConnectionPanel({projects,selectedProjectId,onLinkedFolde
   setSearchBusy(true);
   try{
    const response=await onceFolderRequest(
-    cacheKey(user.uid,viewing.connectionId,previous.folder,previous.term,previous.next,'dropbox')+':search-page',
+    cacheKey(user.uid,viewing.connectionId,previous.folder,previous.term,previous.next!,'dropbox')+':search-page',
     ()=>call<Page>('/integrations/dropbox/'+encodeURIComponent(viewing.connectionId)+
       '/folders/'+encodeURIComponent(previous.folder)+'/items?'+qs));
    if(reqId!==searchId.current)return;
