@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {database} from './helpers/database.mjs';
 import {encrypt,context,base64url} from '../src/crypto.ts';
-import {dropboxAccess,dropboxConnection,dropboxList,dropboxStart,dropboxLaunch,dropboxCallback,dropboxNormalize} from '../src/dropbox.ts';
+import {dropboxAccess,dropboxConnection,dropboxList,dropboxStart,dropboxLaunch,dropboxCallback,dropboxNormalize,dropboxThumbnail} from '../src/dropbox.ts';
 import {startDropboxUpload,appendDropboxUpload,finishDropboxUpload} from '../src/dropbox-uploads.ts';
 import {issueDropboxPreview,streamDropboxPreview} from '../src/dropbox-preview.ts';
 
@@ -72,6 +72,40 @@ test('Dropbox list preserves provider opaque ids and normalizes metadata',async 
  assert.equal(body.files[0].mimeType,'video/mp4');assert.equal(body.nextPageToken,null);
  assert.equal(log[0].authorization,'Bearer demo-token');
 });
+test('Dropbox only advertises native thumbnails for image/PDF, and unsupported PDF gracefully falls back',async t=>{
+ const f=await fixture(t);
+ const files=[
+   {name:'Manual.pdf',supported:true},
+   {name:'Deck.pptx',supported:false},
+   {name:'Roteiro.docx',supported:false},
+   {name:'Captura.png',supported:true}
+ ];
+ for(const file of files)assert.equal(
+   dropboxNormalize({'.tag':'file',id,name:file.name,size:2048})?.thumbnailFallback,
+   file.supported,file.name
+ );
+ let attempts=0;
+ const fetcher=async(url,init)=>{
+   assert.equal(new URL(url).pathname,'/2/files/get_thumbnail_v2');
+   assert.equal(init.method,'POST');
+   assert.equal(init.headers.Authorization,'Bearer demo-token');
+   assert.equal(JSON.parse(init.headers['Dropbox-API-Arg']).resource.path,id);
+   attempts++;
+   if(attempts===1)return new Response(new Uint8Array([255,216,255,217]),{
+     status:200,headers:{'Content-Length':'4','Content-Type':'image/jpeg'}
+   });
+   return Response.json({error_summary:'unsupported_image/..'},{status:409});
+ };
+ const success=await dropboxThumbnail(f.env,uid,conn,id,fetcher);
+ assert.equal(success.status,200);
+ assert.equal(success.headers.get('Content-Type'),'image/jpeg');
+ assert.equal((await success.arrayBuffer()).byteLength,4);
+ const unsupported=await dropboxThumbnail(f.env,uid,conn,id,fetcher);
+ assert.equal(unsupported.status,204);
+ assert.equal((await unsupported.arrayBuffer()).byteLength,0);
+ assert.equal(attempts,2);
+});
+
 test('Dropbox resumable upload validates immutable linked project and avoids a second commit',async t=>{
  const f=await fixture(t);const old=global.fetch;const log=[];global.fetch=fetchStub(log);
  t.after(()=>{global.fetch=old});
