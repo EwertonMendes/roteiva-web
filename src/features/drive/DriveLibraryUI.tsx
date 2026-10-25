@@ -101,7 +101,7 @@ export type FolderPickerProps={
   onConnect:()=>void;
   onClose:()=>void;
 };
-export function DriveFolderPicker({provider='google_drive',projects,projectId,onProjectChange,folders,path,loading,working,canRead,hasMore,mode='root',onModeChange,linkedIds,error,onNavigate,onMore,onLink,onConnect,onClose,onRetry,onLinkCurrent}:FolderPickerProps){
+export function StorageFolderPicker({provider='google_drive',projects,projectId,onProjectChange,folders,path,loading,working,canRead,hasMore,mode='root',onModeChange,linkedIds,error,onNavigate,onMore,onLink,onConnect,onClose,onRetry,onLinkCurrent}:FolderPickerProps){
   const providerName=provider==='dropbox'?'Dropbox':'Google Drive';
   const [chosen,setChosen]=useState<Record<string,DriveItem>>({});
   const [filter,setFilter]=useState("");
