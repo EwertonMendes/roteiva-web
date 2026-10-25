@@ -3,12 +3,14 @@ import { useEffect, useRef, useState } from "react";
 import {DriveThumbnail} from "./DriveThumbnail";
 import { ArrowLeft, Check, ChevronLeft, ChevronRight, Grid2X2, List, ExternalLink, File, FileAudio, FileImage, FileText, FileVideo, Folder, FolderOpen, Link2, LoaderCircle, Search, X, MoreHorizontal, Upload } from "lucide-react";
 
-export type DriveItem = {id:string;name:string;mimeType:string;size?:string;modifiedTime?:string;thumbnailLink?:string;thumbnailTicket?:string;thumbnailFallback?:boolean;webViewLink?:string};
+export type DriveItem = {id:string;name:string;mimeType:string;size?:string;modifiedTime?:string;pathLower?:string;thumbnailLink?:string;thumbnailTicket?:string;thumbnailFallback?:boolean;webViewLink?:string;pathDisplay?:string};
 export type DriveTrail = {id:string;name:string};
 export const DRIVE_FOLDER = "application/vnd.google-apps.folder";
+export const DROPBOX_FOLDER = "application/vnd.roteiva.folder";
+export const isStorageFolder=(mime:string)=>mime===DRIVE_FOLDER||mime===DROPBOX_FOLDER;
 
 export function driveKindIcon(mime:string) {
-  return mime===DRIVE_FOLDER ? Folder : mime.startsWith("video/") ? FileVideo :
+  return isStorageFolder(mime) ? Folder : mime.startsWith("video/") ? FileVideo :
     mime.startsWith("image/") ? FileImage : mime.startsWith("audio/") ? FileAudio :
     mime.includes("pdf") || mime.includes("document") ? FileText : File;
 }
@@ -29,9 +31,9 @@ export function driveFileUrl(file:DriveItem) {
   }catch{ /* fall through to a trusted Google Drive URL */ }
   return fallback;
 }
-export const isPreviewable=(item:DriveItem)=>item.mimeType!==DRIVE_FOLDER && !item.mimeType.startsWith("application/vnd.google-apps.");
+export const isPreviewable=(item:DriveItem)=>!isStorageFolder(item.mimeType) && !item.mimeType.startsWith("application/vnd.google-apps.");
 export function readableFileType(mime:string){
-  if(mime===DRIVE_FOLDER)return "Pasta";
+  if(isStorageFolder(mime))return "Pasta";
   if(mime==="application/pdf")return "PDF";
   if(mime.startsWith("image/"))return "Imagem";
   if(mime.startsWith("video/"))return "Vídeo";
@@ -39,9 +41,9 @@ export function readableFileType(mime:string){
   if(mime==="application/vnd.google-apps.document")return "Documento Google";
   if(mime==="application/vnd.google-apps.spreadsheet")return "Planilha Google";
   if(mime==="application/vnd.google-apps.presentation")return "Apresentação Google";
-  if(mime.includes("presentation"))return "Apresentação";
+  if(mime.includes("presentation")||mime.includes("powerpoint"))return "Apresentação";
   if(mime.includes("spreadsheet")||mime.includes("excel"))return "Planilha";
-  if(mime.includes("document")||mime.includes("word"))return "Documento";
+  if(mime.includes("document")||mime.includes("word")||mime==="application/msword"||mime==="application/rtf")return "Documento";
   return "Arquivo";
 }
 
@@ -75,7 +77,11 @@ export function useOverlayFocus(onClose:()=>void,enabled=true,overlayKey?:string
   return dialogRef;
 }
 
-type FolderPickerProps={
+export type FolderPickerProps={
+  /** Provider-specific actions; theme and structure are shared. */
+  provider?:'google_drive'|'dropbox';
+  onRetry?:()=>void;
+  onLinkCurrent?:(folder:DriveItem)=>Promise<boolean>;
   projects:readonly {id:number;name:string}[];
   projectId?:number;
   onProjectChange:(id:string)=>void;
@@ -85,8 +91,8 @@ type FolderPickerProps={
   working:boolean;
   canRead:boolean;
   hasMore:boolean;
-  mode:"root"|"all";
-  onModeChange:(mode:"root"|"all")=>void;
+  mode?:"root"|"all";
+  onModeChange?:(mode:"root"|"all")=>void;
   linkedIds:ReadonlySet<string>;
   error:string;
   onNavigate:(id:string,path:DriveTrail[])=>void;
@@ -95,37 +101,46 @@ type FolderPickerProps={
   onConnect:()=>void;
   onClose:()=>void;
 };
-export function DriveFolderPicker({projects,projectId,onProjectChange,folders,path,loading,working,canRead,hasMore,mode,onModeChange,linkedIds,error,onNavigate,onMore,onLink,onConnect,onClose}:FolderPickerProps){
+export function StorageFolderPicker({provider='google_drive',projects,projectId,onProjectChange,folders,path,loading,working,canRead,hasMore,mode='root',onModeChange,linkedIds,error,onNavigate,onMore,onLink,onConnect,onClose,onRetry,onLinkCurrent}:FolderPickerProps){
+  const providerName=provider==='dropbox'?'Dropbox':'Google Drive';
   const [chosen,setChosen]=useState<Record<string,DriveItem>>({});
   const [filter,setFilter]=useState("");
   const [submitting,setSubmitting]=useState(false);
   const ref=useOverlayFocus(()=>{if(!working&&!submitting)onClose();});
   useEffect(()=>{setChosen({});setFilter("");},[projectId]);
   const selected=Object.values(chosen).filter(f=>!linkedIds.has(f.id));
+  const currentFolder=path.at(-1);
+  const canLinkCurrent=provider==='dropbox'&&!!onLinkCurrent&&!!projectId&&!!currentFolder&&!linkedIds.has(currentFolder.id);
   const visible=folders.filter(f=>f.name.toLocaleLowerCase("pt-BR").includes(filter.toLocaleLowerCase("pt-BR")));
   async function commit(){
-    if(!selected.length || !projectId || submitting)return;
+    if(!selected.length || !projectId || submitting || working || loading)return;
     setSubmitting(true);
     try{if(await onLink(selected)) onClose();}finally{setSubmitting(false);}
   }
+  async function linkCurrent(){
+    if(!canLinkCurrent||!currentFolder||!onLinkCurrent||submitting||working||loading)return;
+    setSubmitting(true);
+    try{if(await onLinkCurrent({...currentFolder,mimeType:DROPBOX_FOLDER}))onClose();}
+    finally{setSubmitting(false);}
+  }
   return <div className="rl-overlay" onMouseDown={event=>{if(event.target===event.currentTarget && !working && !submitting)onClose();}}>
-    <div className="rl-picker" ref={ref} role="dialog" aria-modal="true" aria-label="Selecionar pastas do Google Drive" tabIndex={-1}>
-      <header className="rl-picker-head"><div><h2>Vincular pastas</h2><p>Escolha as pastas que deseja organizar no projeto.</p></div>
-        <button className="rl-icon-button" type="button" onClick={onClose} aria-label="Fechar seletor" disabled={submitting}><X size={18}/></button></header>
+    <div className="rl-picker" ref={ref} role="dialog" aria-modal="true" aria-label={"Selecionar pastas do "+providerName} tabIndex={-1}>
+      <header className="rl-picker-head"><div><h2>Vincular pastas</h2><p>Escolha as pastas que deseja organizar no projeto. Os arquivos continuam no {providerName}.</p></div>
+        <button className="rl-icon-button" type="button" onClick={onClose} aria-label="Fechar seletor" disabled={working||submitting}><X size={18}/></button></header>
       <div className="rl-picker-context">
         <label htmlFor="rl-picker-project">Projeto de destino</label>
-        <AppSelect id="rl-picker-project" aria-label="Projeto para vincular pastas" value={projectId??""} onValueChange={value=>onProjectChange(value)} disabled={submitting}>
+        <AppSelect id="rl-picker-project" aria-label="Projeto para vincular pastas" value={projectId??""} onValueChange={value=>onProjectChange(value)} disabled={working||submitting}>
           <option value="">Selecione um projeto</option>{projects.map(project=><option key={project.id} value={project.id}>{project.name}</option>)}
         </AppSelect>
       </div>
-      {!projectId?<div className="rl-picker-empty"><FolderOpen size={30}/><p>Escolha um projeto para carregar suas pastas do Google Drive.</p></div>
+      {!projectId?<div className="rl-picker-empty"><FolderOpen size={30}/><p>Escolha um projeto para carregar suas pastas do {providerName}.</p></div>
       :!canRead?<div className="rl-picker-empty"><Link2 size={30}/><p>É necessário autorizar a leitura das pastas existentes na sua conta Google.</p><button className="primary-button" type="button" onClick={onConnect} disabled={working}>Autorizar Google Drive</button></div>
       :<>
-        <div className="rl-picker-modes" role="group" aria-label="Local de pesquisa">
-          <button type="button" aria-pressed={mode==="root"} onClick={()=>onModeChange("root")} disabled={loading}>Meu Drive</button>
-          <button type="button" aria-pressed={mode==="all"} onClick={()=>onModeChange("all")} disabled={loading}>Todas as pastas</button>
-        </div>
-        <nav className="rl-breadcrumbs" aria-label="Localização no Google Drive">{path.map((entry,i)=><span key={entry.id}>
+        {provider==='google_drive'&&<div className="rl-picker-modes" role="group" aria-label="Local de pesquisa">
+          <button type="button" aria-pressed={mode==="root"} onClick={()=>onModeChange?.("root")} disabled={loading}>Meu Drive</button>
+          <button type="button" aria-pressed={mode==="all"} onClick={()=>onModeChange?.("all")} disabled={loading}>Todas as pastas</button>
+        </div>}
+        <nav className="rl-breadcrumbs" aria-label={"Localização no "+providerName}>{path.map((entry,i)=><span key={entry.id}>
           {i>0&&<ChevronRight size={13}/>}
           <button type="button" onClick={()=>onNavigate(entry.id,path.slice(0,i+1))} disabled={loading}>{entry.name}</button>
         </span>)}</nav>
@@ -151,10 +166,11 @@ export function DriveFolderPicker({projects,projectId,onProjectChange,folders,pa
         </div>
         <p className="rl-picker-note">A seleção permanece ao navegar entre pastas. O filtro considera apenas os resultados carregados.</p>
       </>}
-      {error&&<p role="alert" className="rl-error">{error}</p>}
+      {error&&<div role="alert" className="rl-error rl-picker-error"><span>{error}</span>{onRetry&&<button type="button" className="secondary-button" onClick={onRetry} disabled={loading||working||submitting}>Tentar novamente</button>}</div>}
       <footer className="rl-picker-footer"><span>{selected.length} {selected.length===1?"pasta selecionada":"pastas selecionadas"}</span>
-        <div><button type="button" className="secondary-button" onClick={onClose} disabled={submitting}>Cancelar</button>
-          <button type="button" className="primary-button" onClick={()=>void commit()} disabled={!selected.length||!canRead||working||submitting}>{submitting?"Vinculando…":selected.length?`Vincular ${selected.length} ${selected.length===1?"pasta":"pastas"}`:"Vincular pastas"}</button>
+        <div><button type="button" className="secondary-button" onClick={onClose} disabled={working||submitting}>Cancelar</button>
+           {canLinkCurrent&&<button type="button" className="secondary-button" onClick={()=>void linkCurrent()} disabled={loading||working||submitting}>Vincular pasta atual</button>}
+          <button type="button" className="primary-button" onClick={()=>void commit()} disabled={!projectId||!selected.length||!canRead||working||submitting||loading}>{submitting?"Vinculando…":selected.length?`Vincular ${selected.length} ${selected.length===1?"pasta":"pastas"}`:"Vincular pastas"}</button>
         </div>
       </footer>
     </div>
@@ -179,6 +195,8 @@ type ExplorerProps={
   onMore:()=>void;
   onUploadFiles?:(files:File[])=>void;
   uploadDisabled?:boolean;
+  provider?:'google_drive'|'dropbox';
+  externalUrl?:(file:DriveItem)=>string;
 };
 type ViewMode="list"|"grid";
 const VIEW_KEY="roteiva-drive-view-v1";
@@ -186,7 +204,8 @@ function savedView():ViewMode{
   try{return window.localStorage.getItem(VIEW_KEY)==="grid"?"grid":"list";}catch{return "list";}
 }
 const noThumbnail=async (_:DriveItem):Promise<Blob|null>=>null;
-export function DriveFileExplorer({folderName,path,files,loading,hasMore,thumbnailScope="",getThumbnail=noThumbnail,searchResults,searchTerm,searchLoading=false,onSearchChange,onBack,onNavigate,onOpen,onMore,onUploadFiles,uploadDisabled=false}:ExplorerProps){
+export function DriveFileExplorer({folderName,path,files,loading,hasMore,thumbnailScope="",getThumbnail=noThumbnail,searchResults,searchTerm,searchLoading=false,onSearchChange,onBack,onNavigate,onOpen,onMore,onUploadFiles,uploadDisabled=false,provider='google_drive',externalUrl=driveFileUrl}:ExplorerProps){
+  const providerName=provider==='dropbox'?'Dropbox':'Google Drive';
   const [filter,setFilter]=useState("");
   const [dragging,setDragging]=useState(false);
   const uploadInput=useRef<HTMLInputElement>(null);
@@ -199,7 +218,7 @@ export function DriveFileExplorer({folderName,path,files,loading,hasMore,thumbna
   const source=searchResults && searchTerm?.trim()===filter.trim()?searchResults:files;
   const visible=source.filter(f=>f.name.toLocaleLowerCase("pt-BR").includes(filter.toLocaleLowerCase("pt-BR")));
   const makeRow=(file:DriveItem)=>{
-    const isFolder=file.mimeType===DRIVE_FOLDER;
+    const isFolder=isStorageFolder(file.mimeType);
     return <div className="rl-file-row" key={file.id}>
       <button type="button" className="rl-file-open" title={file.name} onClick={()=>onOpen(file)} disabled={loading}>
         <DriveThumbnail item={file} scope={thumbnailScope} getThumbnail={getThumbnail}/>
@@ -209,8 +228,8 @@ export function DriveFileExplorer({folderName,path,files,loading,hasMore,thumbna
       <span className="rl-file-size">{readableSize(file.size)||"—"}</span>
       <details className="rl-menu"><summary title={"Opções de "+file.name} aria-label={"Opções de "+file.name}><MoreHorizontal size={19}/></summary>
         <div className="rl-menu-items">
-          <button type="button" onClick={()=>onOpen(file)}>{isFolder?"Abrir pasta":isPreviewable(file)?"Visualizar":"Abrir no Drive"}</button>
-          <a href={driveFileUrl(file)} target="_blank" rel="noreferrer"><ExternalLink size={14}/> Abrir no Google Drive</a>
+          <button type="button" onClick={()=>onOpen(file)}>{isFolder?"Abrir pasta":isPreviewable(file)?"Visualizar":"Abrir no "+providerName}</button>
+          <a href={externalUrl(file)} target="_blank" rel="noreferrer"><ExternalLink size={14}/> Abrir no {providerName}</a>
         </div>
       </details>
     </div>;
@@ -221,7 +240,7 @@ export function DriveFileExplorer({folderName,path,files,loading,hasMore,thumbna
     onDragOver={event=>{if(!acceptsFiles(event))return;event.preventDefault();event.dataTransfer.dropEffect="copy";setDragging(true);}}
     onDragLeave={event=>{if(!event.currentTarget.contains(event.relatedTarget as Node))setDragging(false);}}
     onDrop={event=>{setDragging(false);if(!acceptsFiles(event))return;event.preventDefault();onUploadFiles?.(Array.from(event.dataTransfer.files));}}> 
-    {dragging&&<div className="rl-drop-layer" aria-hidden="true"><Upload size={32}/><strong>Solte para enviar ao Google Drive</strong></div>}
+    {dragging&&<div className="rl-drop-layer" aria-hidden="true"><Upload size={32}/><strong>Solte para enviar ao {providerName}</strong></div>}
     {folderName?<><header className="rl-content-head">
       <button type="button" className="rl-back" onClick={onBack} aria-label="Voltar para as pastas"><ArrowLeft size={18}/></button>
       <nav className="rl-breadcrumbs" aria-label="Caminho da pasta">{path.map((part,index)=><span key={part.id}>
@@ -247,7 +266,7 @@ export function DriveFileExplorer({folderName,path,files,loading,hasMore,thumbna
     {view==="list"&&<div className="rl-file-head" aria-hidden="true"><span>Nome</span><span>Modificado</span><span>Tamanho</span><span/></div>}
     <div className="rl-files" data-view={view}>
       {loading&&!files.length&&<div className="rl-state" role="status"><LoaderCircle size={23} className="rl-spin"/><p>Carregando arquivos…</p></div>}
-      {searchLoading&&<span className="rl-search-progress" role="status">Buscando no Drive…</span>}
+      {searchLoading&&<span className="rl-search-progress" role="status">Buscando no {providerName}…</span>}
       {visible.map(makeRow)}
       {!loading&&!searchLoading&&!visible.length&&<div className="rl-state"><FolderOpen size={27}/><p>{filter?"Nenhum item corresponde à busca.":"Esta pasta está vazia."}</p></div>}
       {hasMore&&<button type="button" className="rl-load-more" onClick={onMore} disabled={loading}>Carregar mais arquivos</button>}

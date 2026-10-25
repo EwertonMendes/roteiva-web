@@ -1,8 +1,11 @@
 import {useCallback,useEffect,useRef,useState} from "react";
 import {sendToDrive,UploadFailure,type UploadSession,type UploadedFile} from "./drive-upload-client";
+import type {DropboxUploadSession} from "../dropbox/dropbox-upload-client";
+export type StorageUploadSession=UploadSession|DropboxUploadSession;
 
 export type UploadDestination={
   connectionId:string;linkedFolderId:string;targetFolderId:string;projectId:number;folderName:string;
+  provider?:'google_drive'|'dropbox';
 };
 export type UploadEntry={
   id:string;name:string;size:number;sent:number;destination:UploadDestination;
@@ -11,20 +14,22 @@ export type UploadEntry={
   canVerify?:boolean;
   canResume?:boolean;
 };
-type Task={entry:UploadEntry;file:File|undefined;controller:AbortController;session?:UploadSession;uploaded?:UploadedFile};
+type Task={entry:UploadEntry;file:File|undefined;controller:AbortController;session?:StorageUploadSession;uploaded?:UploadedFile};
 
 export function useDriveUploads(
-  create:(file:File,destination:UploadDestination,attemptId:string,signal:AbortSignal)=>Promise<UploadSession>,
-  confirm:(uploaded:UploadedFile,size:number,destination:UploadDestination,session:UploadSession,signal:AbortSignal)=>Promise<UploadedFile>,
+  create:(file:File,destination:UploadDestination,attemptId:string,signal:AbortSignal)=>Promise<StorageUploadSession>,
+  confirm:(uploaded:UploadedFile,size:number,destination:UploadDestination,session:StorageUploadSession,signal:AbortSignal)=>Promise<UploadedFile>,
   completed:(file:UploadedFile,destination:UploadDestination)=>void,
   ownerUid:string,
+  send?:(file:File,session:StorageUploadSession,destination:UploadDestination,signal:AbortSignal,
+    onProgress:(bytes:number)=>void,resume:boolean)=>Promise<UploadedFile>,
 ){
   const [uploads,setUploads]=useState<UploadEntry[]>([]);
   const tasks=useRef<Task[]>([]);
   const active=useRef(0);
   const disposed=useRef(false);
-  const callbacks=useRef({create,confirm,completed});
-  callbacks.current={create,confirm,completed};
+  const callbacks=useRef({create,confirm,completed,send});
+  callbacks.current={create,confirm,completed,send};
   const pumpRef=useRef<()=>void>(()=>{});
   const publish=useCallback(()=>{
     setUploads(tasks.current.map(t=>({...t.entry})));
@@ -47,9 +52,10 @@ export function useDriveUploads(
         task.session=session;sessionStarted=true;
         if(task.controller.signal.aborted)throw new UploadFailure("cancelled","Envio cancelado.");
         update(task,{status:"uploading"});
-        task.uploaded=await sendToDrive(task.file,session,task.controller.signal,bytes=>{
-          update(task,{sent:Math.min(bytes,task.entry.size)});
-        },resume);
+        const report=(bytes:number)=>update(task,{sent:Math.min(bytes,task.entry.size)});
+        task.uploaded=callbacks.current.send
+          ?await callbacks.current.send(task.file,session,task.entry.destination,task.controller.signal,report,resume)
+          :await sendToDrive(task.file,session as UploadSession,task.controller.signal,report,resume);
         task.file=undefined; // Release the browser's file handle as soon as bytes finish.
       }
       if(task.controller.signal.aborted)throw new UploadFailure("cancelled","Envio cancelado.");
@@ -62,7 +68,7 @@ export function useDriveUploads(
     }catch(error){
       if(task.controller.signal.aborted){
         task.file=undefined;task.session=undefined;
-        update(task,{status:"cancelled",error:sessionStarted?'Envio interrompido. Confira a pasta: o Google pode ter recebido o arquivo.':undefined});
+        update(task,{status:"cancelled",error:sessionStarted?'Envio interrompido. Confira a pasta: o provedor pode ter recebido o arquivo.':undefined});
       }else{
         const canResume=sessionStarted&&Boolean(task.file)&&error instanceof UploadFailure&&
           ['network','timeout','retries_exhausted'].includes(error.code);
@@ -70,7 +76,7 @@ export function useDriveUploads(
         const message=error instanceof Error?error.message:"Não foi possível enviar o arquivo.";
         update(task,{status:sessionStarted?"unconfirmed":"failed",canVerify:Boolean(task.uploaded),canResume,error:canResume
           ?'Envio interrompido. Você pode retomá-lo enquanto esta página permanecer aberta. '+message:sessionStarted
-          ?"Não foi possível confirmar o estado do arquivo no Google. Verifique a pasta antes de tentar outro envio. "+message
+          ?"Não foi possível confirmar o estado do arquivo no armazenamento. Verifique a pasta antes de tentar outro envio. "+message
           :message});
       }
     }finally{

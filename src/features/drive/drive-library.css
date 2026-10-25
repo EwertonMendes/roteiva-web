@@ -124,6 +124,9 @@
 .rl-picker-empty {display:flex;align-items:center;justify-content:center;flex:1;min-height:150px;gap:12px;flex-direction:column;text-align:center;padding:24px;color:var(--rl-muted);font-size:.875rem;}
 .rl-picker-empty p {max-width:340px;margin:0;}
 .rl-error {margin:4px 20px 10px;border:1px solid var(--rl-border);border-radius:9px;padding:10px 12px;color:var(--rl-ink);font-size:.875rem;}
+.rl-picker-error{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.rl-picker-error span{flex:1;min-width:170px;overflow-wrap:anywhere}
+.rl-picker-error button{flex:0 0 auto}
 .rl-preview-overlay {justify-content:center;align-items:center;}
 .rl-preview {display:flex;flex-direction:column;min-width:0;width:min(1060px,100%);height:min(850px,calc(100dvh - 32px));border-radius:15px;background:var(--paper,#fff);color:var(--ink);border:1px solid var(--line);overflow:hidden;outline:0;}
 .rl-preview header {min-height:63px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 16px;}
@@ -184,7 +187,14 @@
 @media(max-width:560px){.rl-picker-modes{padding:3px 16px 8px;}}
 
 /* Keep contextual menus visible for rows near the bottom of scroll panes. */
-.rl-file-row:nth-last-child(-n+3) .rl-menu-items,.rl-folder-entry:nth-last-child(-n+3) .rl-menu-items {top:auto;bottom:calc(100% + 3px);}
+.rl-file-row:nth-last-child(-n+3) .rl-menu-items {top:auto;bottom:calc(100% + 3px);}
+/* The folder-actions panel is portalled to document.body so neither the
+ * scroll pane nor the explorer's clipping radius can obscure its options. */
+.rl-folder-actions-trigger{height:32px;width:30px;border:0;border-radius:8px;background:transparent;color:var(--rl-muted);display:grid;place-items:center;cursor:pointer}
+.rl-folder-actions-trigger:hover,.rl-folder-actions-trigger[aria-expanded="true"]{background:var(--rl-hover);color:var(--rl-ink)}
+.rl-folder-actions-trigger:focus-visible{outline:2px solid var(--lime,#a9cd57);outline-offset:2px}
+.rl-folder-actions-popup{position:fixed;z-index:1100;top:0;left:0;min-width:190px;--rl-border:var(--line);--rl-ink:var(--ink);--rl-hover:var(--subtle)}
+.rl-folder-actions-popup:focus-within{outline:1px solid var(--line)}
 
 /* Preserve the workspace backup action, without competing with library navigation. */
 .rl-page-more {position:relative;align-self:center;}
@@ -392,6 +402,82 @@
 .rl-file-icon:not(.rl-file-icon--image)[data-mime^="image/"] {color:#54a9ab;background:#429c9c1a;}
 .rl-file-icon:not(.rl-file-icon--image)[data-mime^="audio/"] {color:#d19c51;background:#d49b451a;}
 .rl-file-icon:not(.rl-file-icon--image)[data-mime^="application/vnd.google-apps."] {color:#598ec9;background:#477ab81b;}
+
+
+/* Original vector file badges: the literal extension always identifies a file.
+ * Used in both list and grid; no remote assets, PDF iframe or font downloads. */
+.rl-format-art {
+  --format-tone:#64748b;
+  display:grid;
+  place-items:center;
+  width:100%;
+  height:100%;
+  min-width:0;
+  min-height:0;
+  color:var(--format-tone);
+  background:color-mix(in srgb,var(--format-tone) 10%,var(--rl-hover));
+}
+.rl-format-art[data-family="pdf"]{--format-tone:#df5357;}
+.rl-format-art[data-family="slides"]{--format-tone:#e2783d;}
+.rl-format-art[data-family="document"]{--format-tone:#4287db;}
+.rl-format-art[data-family="sheet"]{--format-tone:#289c65;}
+.rl-format-art[data-family="archive"]{--format-tone:#b78a30;}
+.rl-format-art[data-family="code"]{--format-tone:#8a72c8;}
+.rl-format-art[data-family="image"]{--format-tone:#329da6;}
+.rl-format-art[data-family="video"]{--format-tone:#9357bf;}
+.rl-format-art[data-family="audio"]{--format-tone:#bd7690;}
+.rl-format-sheet{
+  box-sizing:border-box;
+  position:relative;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:space-between;
+  width:31px;
+  height:37px;
+  padding:6px 2px 4px;
+  border:1px solid color-mix(in srgb,var(--format-tone) 34%,transparent);
+  border-radius:5px 9px 5px 5px;
+  background:color-mix(in srgb,var(--format-tone) 10%,var(--rl-surface));
+  box-shadow:0 2px 6px #00000012;
+  overflow:hidden;
+}
+.rl-format-sheet::after{
+  content:"";
+  position:absolute;
+  top:-1px;
+  right:-1px;
+  width:10px;
+  height:10px;
+  background:color-mix(in srgb,var(--format-tone) 34%,var(--rl-surface));
+  border-radius:0 8px 0 3px;
+}
+.rl-format-symbol{width:14px;height:14px;flex:none;}
+.rl-format-extension{
+  position:relative;
+  z-index:1;
+  display:block;
+  width:100%;
+  padding:2px 0;
+  border-radius:3px;
+  color:#fff;
+  background:var(--format-tone);
+  font-size:7.8px;
+  line-height:1;
+  font-weight:800;
+  letter-spacing:-.035em;
+  text-align:center;
+}
+.rl-files[data-view="grid"] .rl-format-sheet{
+  width:86px;
+  height:107px;
+  padding:21px 8px 10px;
+  border-radius:10px 19px 10px 10px;
+  box-shadow:0 7px 18px #00000018;
+}
+.rl-files[data-view="grid"] .rl-format-sheet::after{width:24px;height:24px;border-radius:0 18px 0 6px;}
+.rl-files[data-view="grid"] .rl-format-symbol{width:30px;height:30px;}
+.rl-files[data-view="grid"] .rl-format-extension{padding:6px 2px;font-size:14px;border-radius:5px;letter-spacing:.025em;}
 
 /* Thumbnail lifecycle: only show a loading indicator during an active request. */
 .rl-thumb-loading {position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:5px;background:var(--rl-hover);color:var(--rl-muted);overflow:hidden;}

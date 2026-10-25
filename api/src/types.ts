@@ -2,6 +2,7 @@ export interface Env {
   DB: D1Database;
   API_RATE_LIMIT: RateLimit;
   API_THUMB_LIMIT: RateLimit;
+  API_UPLOAD_LIMIT: RateLimit;
   ENVIRONMENT: string;
   FIREBASE_PROJECT_ID: string;
   FRONTEND_ORIGIN: string;
@@ -10,6 +11,10 @@ export interface Env {
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
   GOOGLE_PICKER_API_KEY?: string;
+  DROPBOX_ENABLED?: string;
+  DROPBOX_APP_KEY?: string;
+  DROPBOX_APP_SECRET?: string;
+  DROPBOX_OAUTH_REDIRECT_URI?: string;
   TOKEN_KEYS?: string;
   TOKEN_KEY_VERSION: string;
   ACCOUNT_DELETION_ENABLED?: string;

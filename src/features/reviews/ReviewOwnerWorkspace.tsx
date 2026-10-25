@@ -1,5 +1,5 @@
 import { AppSelect } from "../ui/AppSelect";
-import {useEffect,useMemo,useRef,useState} from "react";
+import {useCallback,useEffect,useMemo,useRef,useState} from "react";
 import {CheckCircle2,ChevronRight,Clock3,Copy,ExternalLink,FileAudio,FileImage,FileText,
   FileVideo,FolderOpen,Grid2X2,History,Link2,List,LoaderCircle,MessageSquare,RotateCcw,Search,Send,ShieldCheck,X} from "lucide-react";
 import {formatReviewTime} from "./review-timecode";
@@ -69,6 +69,14 @@ export function ReviewOwnerWorkspace({detail,working,error,onClose,onRevise,onPu
   const driveCall=useDriveApi();
   const getThumbnail=useDriveThumbnailFetch();
   const {user}=useAuth();
+  const getDropboxThumbnail=useCallback(async(item:{id:string;thumbnailFallback?:boolean},signal?:AbortSignal,accountId?:string)=>{
+    if(!user||!item.thumbnailFallback||!accountId)return null;
+    const token=await user.getIdToken();
+    const response=await fetch('https://roteiva-api-dev.ewertonmendes9.workers.dev/integrations/dropbox/'+
+      encodeURIComponent(accountId)+'/files/'+encodeURIComponent(item.id)+'/thumbnail',
+      {cache:'no-store',signal,headers:{Authorization:'Bearer '+token}});
+    return response.ok&&response.status!==204?response.blob():null;
+  },[user]);
   const [fileSearch,setFileSearch]=useState("");
   const [typeFilter,setTypeFilter]=useState<"all"|"video"|"image"|"audio"|"pdf">("all");
   const [galleryView,setGalleryView]=useState<"grid"|"list">("grid");
@@ -95,6 +103,7 @@ export function ReviewOwnerWorkspace({detail,working,error,onClose,onRevise,onPu
     ?active.connectionId+":"+active.fileId:"";
   useEffect(()=>{
     if(!active?.connectionId||!parentKey||Object.prototype.hasOwnProperty.call(parentFolders,parentKey))return;
+    if(active.provider==='dropbox'){setParentFolders(prev=>({...prev,[parentKey]:null}));return;}
     let mounted=true;
     void driveCall<{file?:{parents?:string[]}}>(
       "/integrations/drive/"+encodeURIComponent(active.connectionId)+
@@ -133,6 +142,20 @@ export function ReviewOwnerWorkspace({detail,working,error,onClose,onRevise,onPu
   const imagePreview=useOwnerReviewImage(review.id,isImage?active?.fileId:undefined,
     Boolean(isImage&&previewable));
   const showMaterials=review.status!=="draft"||currentAssets.length>0;
+  const [dropboxPreview,setDropboxPreview]=useState<{fileId:string;url:string;error:string}>({fileId:'',url:'',error:''});
+  useEffect(()=>{
+    if(!previewable||!active||active.provider!=='dropbox'||isImage){
+      setDropboxPreview({fileId:'',url:'',error:''});return;
+    }
+    let alive=true;
+    const fileId=active.fileId;
+    setDropboxPreview({fileId,url:'',error:''});
+    void driveCall<{url:string;expiresAt:number}>('/integrations/dropbox/'+encodeURIComponent(active.connectionId||'')+
+      '/preview-ticket','POST',{fileId,projectId:review.projectId,linkedFolderId:active.linkedFolderId})
+      .then(result=>{if(alive)setDropboxPreview({fileId,url:result.url,error:''})})
+      .catch(error=>{if(alive)setDropboxPreview({fileId,url:'',error:error instanceof Error?error.message:'Prévia indisponível.'})});
+    return()=>{alive=false};
+  },[previewable,active?.fileId,active?.provider,active?.connectionId,active?.linkedFolderId,review.projectId,isImage,driveCall]);
   function focusMaterial(comment:Comment){
     setSelectedFile(comment.file_id);
     setFileSearch("");setTypeFilter("all");
@@ -227,7 +250,7 @@ export function ReviewOwnerWorkspace({detail,working,error,onClose,onRevise,onPu
                 {user&&a.connectionId?<DriveThumbnail
                   item={{id:a.fileId,name:a.name,mimeType:a.mimeType,
                     thumbnailFallback:a.grantState==="granted"&&review.status!=="closed"}}
-                  scope={user.uid+":"+a.connectionId} getThumbnail={getThumbnail}/>:
+                  scope={user.uid+":"+a.connectionId} getThumbnail={a.provider==='dropbox'?getDropboxThumbnail:getThumbnail}/>:
                   <span className="rowner-file-fallback"><Glyph mime={a.mimeType}/></span>}
                 {active?.fileId===a.fileId&&<span className="rowner-file-selected" aria-hidden="true"><CheckCircle2 size={19} fill="currentColor"/></span>}
                 {!!fileCounts.get(a.fileId)&&<span className="rowner-file-count"
@@ -249,14 +272,16 @@ export function ReviewOwnerWorkspace({detail,working,error,onClose,onRevise,onPu
           <div className="rowner-preview" ref={mediaRef}>
             <div className="rowner-preview-head"><strong title={active?.name}>{active?.name||"Selecione um material"}</strong>
               <div className="rowner-preview-actions">
-                {active&&folderId&&<a href={"https://drive.google.com/drive/folders/"+encodeURIComponent(folderId)}
+                {active&&folderId&&<a href={active?.provider==='dropbox'?'https://www.dropbox.com/home':
+                   "https://drive.google.com/drive/folders/"+encodeURIComponent(folderId)}
                   target="_blank" rel="noopener noreferrer"
-                  aria-label={exactParent?"Abrir pasta do arquivo no Google Drive":"Abrir pasta vinculada ao projeto no Google Drive"}
+                  aria-label={active?.provider==='dropbox'?'Abrir Dropbox':
+                     exactParent?'Abrir pasta do arquivo no Google Drive':'Abrir pasta vinculada ao projeto no Google Drive'}
                   title={exactParent?"Pasta onde o arquivo está salvo":"Pasta vinculada ao projeto"}>
                   <FolderOpen size={15}/> {exactParent?"Abrir pasta":"Pasta do projeto"}
                 </a>}
-                {active&&<a href={driveUrl(active.fileId)} target="_blank" rel="noopener noreferrer"
-                  aria-label={"Abrir "+active.name+" no Google Drive"}><ExternalLink size={14}/> Abrir arquivo</a>}
+                {active&&<a href={active.provider==='dropbox'?'https://www.dropbox.com/home':driveUrl(active.fileId)} target="_blank" rel="noopener noreferrer"
+                  aria-label={'Abrir '+(active.provider==='dropbox'?'Dropbox':'arquivo '+active.name+' no Google Drive')}><ExternalLink size={14}/> Abrir arquivo</a>}
               </div></div>
             <div className={"rowner-preview-stage"+(isImage?" is-image":"")}>
               {previewable&&isImage?(
@@ -267,6 +292,17 @@ export function ReviewOwnerWorkspace({detail,working,error,onClose,onRevise,onPu
                       <><ShieldCheck size={24}/><p>{imagePreview.error}</p></>:
                       <><LoaderCircle size={22} className="rl-spin"/><p>Preparando imagem…</p></>}
                   </div>
+              ):previewable&&active?.provider==='dropbox'?(
+                dropboxPreview.fileId===active.fileId&&dropboxPreview.url?
+                  active.mimeType.startsWith('video/')?
+                    <video key={dropboxPreview.url} src={dropboxPreview.url} controls playsInline preload="metadata" controlsList="nodownload" disablePictureInPicture/>:
+                  active.mimeType.startsWith('audio/')?
+                    <audio key={dropboxPreview.url} src={dropboxPreview.url} controls preload="metadata" controlsList="nodownload"/>:
+                  active.mimeType==='application/pdf'?
+                    <iframe key={dropboxPreview.url} src={dropboxPreview.url} title={'PDF '+active.name} referrerPolicy="no-referrer"/>:
+                    <div className="rowner-preview-empty">Formato indisponível.</div>:
+                  <div className="rowner-preview-empty" role={dropboxPreview.error?'alert':'status'}>
+                    {dropboxPreview.error||'Preparando prévia Dropbox…'}</div>
               ):previewable?<iframe key={active.fileId} title={"Prévia de "+active.name}
                 src={previewUrl(active.fileId)} loading="lazy" referrerPolicy="no-referrer"
                 allow="fullscreen" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation"/>:

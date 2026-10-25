@@ -4,6 +4,6 @@
 export function hasDriveThumbnailSource(item:{
   mimeType:string;thumbnailTicket?:string;thumbnailLink?:string;thumbnailFallback?:boolean;
 }):boolean{
-  return item.mimeType!=="application/vnd.google-apps.folder" &&
+  return item.mimeType!=="application/vnd.google-apps.folder" && item.mimeType!=="application/vnd.roteiva.folder" &&
     Boolean(item.thumbnailTicket||item.thumbnailLink||item.thumbnailFallback);
 }

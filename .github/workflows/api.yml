@@ -39,11 +39,11 @@ jobs:
           npm ci --ignore-scripts --prefer-offline --no-audit --no-fund --fetch-retries=1 --fetch-timeout=20000
       - name: Tests, typecheck, migrations and bundle
         run: |
-          node scripts/ci-security-audit.mjs
           npm run typecheck
           npm test
           npm run migrate:local
           npm run build
+          node scripts/ci-security-audit.mjs
   deploy:
     name: Deploy Cloudflare Worker DEV
     needs: validate

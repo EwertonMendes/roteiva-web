@@ -518,6 +518,35 @@ test("Drive folder links: user-owned projects only, no cross-account reads or ed
   await assertSucceeds(deleteDoc(ref));
 });
 
+
+test("Dropbox folder links require owner, valid provider id, and an existing project",async()=>{
+  const alice=dbFor("alice"),bob=dbFor("bob"),anon=dbFor();
+  const connectionId="aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa";
+  const folderId="id:a4ayc_80_OEAAAAAAAAAXw";
+  const docId="2_"+connectionId+"_"+folderId;
+  const path="users/alice/dropboxFolders/"+docId;
+  const data={ownerUid:"alice",schemaVersion:1,projectId:2,connectionId,
+    folderId,folderName:"Revisões Dropbox",createdAt:serverTimestamp()};
+  const ref=doc(alice,path);
+  await assertFails(setDoc(ref,{...data,ownerUid:"bob"}));
+  await assertFails(setDoc(ref,{...data,projectId:999}));
+  await assertFails(setDoc(ref,{...data,folderName:""}));
+  await assertFails(setDoc(ref,{...data,folderId:"../../root"}));
+  await assertFails(setDoc(ref,{...data,dropboxToken:"secret"}));
+  await assertSucceeds(setDoc(ref,data));
+  await assertSucceeds(getDoc(ref));
+  await assertSucceeds(getDocs(collection(alice,"users/alice/dropboxFolders")));
+  await assertFails(updateDoc(ref,{folderName:"Alterada"}));
+  await assertFails(setDoc(ref,data));
+  for(const context of [bob,anon]){
+    await assertFails(getDoc(doc(context,path)));
+    await assertFails(getDocs(collection(context,"users/alice/dropboxFolders")));
+    await assertFails(setDoc(doc(context,path),data));
+    await assertFails(deleteDoc(doc(context,path)));
+  }
+  await assertSucceeds(deleteDoc(ref));
+});
+
 test("deletion marker blocks all client mutations while retaining per-owner isolation",async()=>{
   const alice=dbFor("alice"),bob=dbFor("bob");
   const root=doc(alice,"users/alice"),item=doc(alice,"users/alice/projects/2");

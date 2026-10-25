@@ -3,6 +3,7 @@ import {closeOwnerReviews} from './reviews.ts';
 import { adminToken, deletionConfigured, deleteIdentity, deleteFirestoreChunk, deleteRoot, deleteFence, lockAccount } from './firebase-admin.ts';
 import { decrypt, context } from './crypto.ts';
 import {revokeGuard} from './oauth-guard.ts';
+import {dropboxRevoke} from './dropbox.ts';
 import {eraseAccess,assertActiveAccess} from './access.ts';
 import {retainTrialIdentity,assertTrialIdentityRetained,type TrialPrincipal} from './trial-identity.ts';
 
@@ -85,6 +86,17 @@ async function revokeConnections(env:Env,uid:string):Promise<boolean>{
   }
   const outstanding=await env.DB.prepare('SELECT 1 FROM drive_connections WHERE owner_uid=? LIMIT 1').bind(uid).first();
   if(outstanding)return false;
+  // Revoke one Dropbox account per iteration before removing Firestore and identity.
+  // In deletion mode fetch a short-lived bearer directly, without a connected-state
+  // token-cache write (which is intentionally prohibited by deletion fences).
+  const dropbox=await env.DB.prepare('SELECT id FROM dropbox_connections WHERE owner_uid=? LIMIT 1')
+    .bind(uid).first<{id:string}>();
+  if(dropbox){
+    await dropboxRevoke(env,uid,dropbox.id,true);
+    return false;
+  }
+  await env.DB.prepare('DELETE FROM dropbox_upload_attempts WHERE owner_uid=?').bind(uid).run();
+  await env.DB.prepare('DELETE FROM dropbox_oauth_transactions WHERE owner_uid=?').bind(uid).run();
   await env.DB.prepare('DELETE FROM oauth_transactions WHERE owner_uid=?').bind(uid).run();
   return true;
 }

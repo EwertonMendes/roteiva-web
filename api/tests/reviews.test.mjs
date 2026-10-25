@@ -746,3 +746,43 @@ test('unsupported Drive-native documents fail explicitly without minting unusabl
   await assert.rejects(()=>route(x.f,invite,'/reviews/public/media-ticket','POST',{fileId:file}),
     e=>e.status===415&&e.code==='review_media_unsupported');
 });
+
+test('Dropbox originals work with the portal-first public approval and signed video Range gateway',async t=>{
+  const f=fixture();t.after(f.close);
+  const invited=await inserted(f);
+  const dbxId='id:a4ayc_80_OEAAAAAAAAAXw';
+  const dbxAccount='dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+  const accountId='dbid:synthetic-approval';
+  const scopes='account_info.read files.metadata.read files.content.read files.content.write';
+  const ts=Date.now();
+  const refresh=await encrypt(f.env,'dropbox-refresh',context(f.env,'alice',accountId,'dropbox-refresh'));
+  const access=await encrypt(f.env,'dropbox-access',context(f.env,'alice',accountId,'dropbox-access:'+dbxAccount+':1'));
+  f.sql.prepare("INSERT INTO dropbox_connections(id,owner_uid,dropbox_account_id,dropbox_email,encrypted_refresh_token,encrypted_access_token,access_token_expires_at,status,scopes,revision,created_at,updated_at) VALUES(?,?,?,?,?,?,?,'connected',?,1,?,?)")
+    .run(dbxAccount,'alice',accountId,'alice@example.com',refresh,access,ts+3600000,scopes,ts,ts);
+  f.sql.prepare("UPDATE review_assets SET provider='dropbox',file_id=?,connection_id=?,linked_folder_id='root' WHERE review_id=?")
+    .run(dbxId,dbxAccount,invited.id);
+  const view=await (await route(f,invited.token)).json();
+  assert.deepEqual(view.assets.map(a=>[a.provider,a.fileId]),[['dropbox',dbxId]]);
+  assert.ok(view.mediaTickets[dbxId].url.includes('/reviews/media?ticket='));
+  const mediaUrl=new URL(view.mediaTickets[dbxId].url);
+  const old=global.fetch;
+  let called=0;
+  global.fetch=async(url,init={})=>{
+    called++;assert.match(String(url),/^https:\/\/content\.dropboxapi\.com\/2\/files\/download$/);
+    assert.equal(init.headers.Authorization,'Bearer dropbox-access');
+    assert.equal(init.headers.Range,'bytes=0-3');
+    const arg=JSON.parse(init.headers['Dropbox-API-Arg']);
+    assert.equal(arg.path,dbxId);
+    return new Response('DATA',{status:206,headers:{
+      'Content-Range':'bytes 0-3/4000','Content-Length':'4','Content-Type':'application/octet-stream'
+    }});
+  };
+  t.after(()=>{global.fetch=old});
+  const response=await reviewRouter(new Request(mediaUrl.href,{headers:{Range:'bytes=0-3'}}),f.env,mediaUrl);
+  assert.equal(response.status,206);
+  assert.equal(response.headers.get('Content-Type'),'video/mp4');
+  assert.equal(await response.text(),'DATA');
+  assert.equal(called,1);
+  f.sql.prepare("UPDATE review_requests SET status='closed' WHERE id=?").run(invited.id);
+  await assert.rejects(()=>reviewRouter(new Request(mediaUrl.href),f.env,mediaUrl),e=>e.status===404||e.status===409);
+});

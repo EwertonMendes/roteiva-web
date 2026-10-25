@@ -11,6 +11,9 @@ import { verifyPickerToken } from './picker.ts';
 import { deletionStatus, requestDeletion, runPendingDeletions, runDeletionMaintenance } from './account-deletion.ts';
 import { ensureAccess, assertActiveAccess } from './access.ts';
 import { backfillAccess } from './access-backfill.ts';
+import {dropboxEnabled,dropboxStart,dropboxLaunch,dropboxCallback,dropboxConnections,dropboxList,dropboxMetadata,dropboxRevoke,dropboxThumbnail} from './dropbox.ts';
+import {startDropboxUpload,appendDropboxUpload,finishDropboxUpload,cleanupDropboxUploads} from './dropbox-uploads.ts';
+import {issueDropboxPreview,streamDropboxPreview} from './dropbox-preview.ts';
 const headers = {
   'Cache-Control':'no-store', 'Referrer-Policy':'no-referrer',
   'X-Content-Type-Options':'nosniff', 'Content-Security-Policy':"default-src 'none'; frame-ancestors 'none'",
@@ -21,6 +24,7 @@ function operationName(path:string):string{
   if(path.startsWith('/reviews'))return 'reviews';
   if(path.includes('/uploads/'))return 'drive_upload';
   if(path.startsWith('/integrations/drive'))return 'drive_metadata';
+  if(path.startsWith('/integrations/dropbox'))return 'dropbox_metadata';
   if(path.startsWith('/oauth/'))return 'oauth';
   if(path.startsWith('/account/'))return 'account';
   if(path.startsWith('/access/'))return 'access';
@@ -36,7 +40,8 @@ export async function handle(request: Request, env: Env): Promise<Response> {
   try {
     if (env.ENVIRONMENT !== 'dev' || env.FIREBASE_PROJECT_ID !== 'roteiva-web-dev' ||
         env.FRONTEND_ORIGIN !== 'https://roteiva-web-dev.web.app' ||
-        env.OAUTH_REDIRECT_URI !== 'https://roteiva-api-dev.ewertonmendes9.workers.dev/oauth/drive/callback') throw new ApiError(503,'invalid_environment');
+        env.OAUTH_REDIRECT_URI !== 'https://roteiva-api-dev.ewertonmendes9.workers.dev/oauth/drive/callback' ||
+        (env.DROPBOX_ENABLED==='true' && env.DROPBOX_OAUTH_REDIRECT_URI !== 'https://roteiva-api-dev.ewertonmendes9.workers.dev/oauth/dropbox/callback')) throw new ApiError(503,'invalid_environment');
     if (origin && origin !== env.FRONTEND_ORIGIN) throw new ApiError(403,'origin_denied');
     // Rate limiting per edge-provided source address prevents one user's traffic
     // from exhausting the entire DEV account's shared 60/minute bucket.
@@ -54,6 +59,10 @@ export async function handle(request: Request, env: Env): Promise<Response> {
       await env.DB.prepare('SELECT 1 FROM d1_migrations LIMIT 1').first();
       response = Response.json({status:'ok',environment:'dev'});
       response.headers.set('X-Roteiva-Access-Version','1');
+    } else if (url.pathname === '/oauth/dropbox/launch' && request.method === 'GET') {
+      response=await dropboxLaunch(request,env);
+    } else if (url.pathname === '/oauth/dropbox/callback' && request.method === 'GET') {
+      response=await dropboxCallback(request,env);
     } else if (url.pathname === '/oauth/drive/launch' && request.method === 'GET') {
       response = await launch(request,env);
     } else if (url.pathname === '/oauth/drive/callback' && request.method === 'GET') {
@@ -75,6 +84,61 @@ export async function handle(request: Request, env: Env): Promise<Response> {
       if (request.method === 'POST' && origin !== env.FRONTEND_ORIGIN) throw new ApiError(403,'origin_required');
       if (url.pathname!=='/reviews/media'&&!(await env.API_RATE_LIMIT.limit({key:'dev:reviews:'+sourceIp.slice(0,64)})).success) throw new ApiError(429,'rate_limited');
       response = await reviewRouter(request,env,url);
+    } else if (url.pathname === '/oauth/dropbox/start' && request.method === 'POST') {
+      dropboxEnabled(env);
+      if(origin!==env.FRONTEND_ORIGIN)throw new ApiError(403,'origin_required');
+      const uid=await identity(request,env);await assertActiveAccess(env,uid);
+      response=await dropboxStart(env,uid);
+    } else if (/^\/integrations\/dropbox\/[^/]+\/uploads\/start$/.test(url.pathname) && request.method==='POST') {
+      dropboxEnabled(env);
+      if(origin!==env.FRONTEND_ORIGIN)throw new ApiError(403,'origin_required');
+      const uid=await identity(request,env);await assertActiveAccess(env,uid);
+      if(!(await env.API_RATE_LIMIT.limit({key:'dev:upload:'+uid})).success)throw new ApiError(429,'rate_limited');
+      response=await startDropboxUpload(env,uid,url.pathname.split('/')[3],request);
+    } else if (/^\/integrations\/dropbox\/[^/]+\/uploads\/[0-9a-f-]{36}\/(chunk|finish)$/.test(url.pathname) && request.method==='POST') {
+      dropboxEnabled(env);
+      if(origin!==env.FRONTEND_ORIGIN)throw new ApiError(403,'origin_required');
+      const uid=await identity(request,env);await assertActiveAccess(env,uid);
+      const parts=url.pathname.split('/');
+      const limiter=parts[6]==='chunk'?env.API_UPLOAD_LIMIT:env.API_RATE_LIMIT;
+      if(!(await limiter.limit({key:'dev:dropbox-upload:'+uid})).success)throw new ApiError(429,'rate_limited');
+      response=parts[6]==='chunk' ? await appendDropboxUpload(env,uid,parts[3],parts[5],request)
+        : await finishDropboxUpload(env,uid,parts[3],parts[5],request);
+    } else if (url.pathname === '/integrations/dropbox/media') {
+      dropboxEnabled(env);
+      if(!(await env.API_THUMB_LIMIT.limit({key:'dev:media:'+sourceIp.slice(0,64)})).success)throw new ApiError(429,'rate_limited');
+      response=await streamDropboxPreview(env,request,url);
+    } else if (/^\/integrations\/dropbox\/[^/]+\/files\/[^/]+\/thumbnail$/.test(url.pathname) && request.method==='GET') {
+      dropboxEnabled(env);
+      const uid=await identity(request,env);await assertActiveAccess(env,uid);
+      if(!(await env.API_THUMB_LIMIT.limit({key:'dev:thumb:'+uid})).success)throw new ApiError(429,'rate_limited');
+      const parts=url.pathname.split('/');
+      response=await dropboxThumbnail(env,uid,parts[3],decodeURIComponent(parts[5]));
+    } else if (/^\/integrations\/dropbox\/[^/]+\/preview-ticket$/.test(url.pathname) && request.method==='POST') {
+      dropboxEnabled(env);
+      if(origin!==env.FRONTEND_ORIGIN)throw new ApiError(403,'origin_required');
+      const uid=await identity(request,env);await assertActiveAccess(env,uid);
+      response=await issueDropboxPreview(env,uid,url.pathname.split('/')[3],request);
+    } else if (url.pathname === '/integrations/dropbox' && request.method === 'GET') {
+      dropboxEnabled(env);
+      const uid=await identity(request,env);await assertActiveAccess(env,uid);
+      response=await dropboxConnections(env,uid);
+    } else if (/^\/integrations\/dropbox\/[^/]+\/folders(?:\/[^/]+\/items)?$/.test(url.pathname) && request.method==='GET') {
+      dropboxEnabled(env);
+      const uid=await identity(request,env);await assertActiveAccess(env,uid);
+      const parts=url.pathname.split('/');
+      response=await dropboxList(env,uid,parts[3],parts.length>5?decodeURIComponent(parts[5]):url.searchParams.get('parentId')||'root',
+       url.searchParams.get('pageToken'),url.searchParams.get('search'),url.searchParams.get('changesCursor'));
+    } else if (/^\/integrations\/dropbox\/[^/]+\/metadata$/.test(url.pathname) && request.method==='GET') {
+      dropboxEnabled(env);
+      const uid=await identity(request,env);await assertActiveAccess(env,uid);
+      const parts=url.pathname.split('/');
+      response=Response.json({file:await dropboxMetadata(env,uid,parts[3],url.searchParams.get('fileId')||'')});
+    } else if (/^\/integrations\/dropbox\/[^/]+\/disconnect$/.test(url.pathname) && request.method==='POST') {
+      dropboxEnabled(env);
+      if(origin!==env.FRONTEND_ORIGIN)throw new ApiError(403,'origin_required');
+      const uid=await identity(request,env);await assertActiveAccess(env,uid);
+      response=await dropboxRevoke(env,uid,url.pathname.split('/')[3]);
     } else if (url.pathname === '/integrations/drive' && request.method === 'GET') {
       const uid = await identity(request,env);
       await assertActiveAccess(env,uid);
@@ -185,6 +249,7 @@ export default {fetch:handle, scheduled(controller:ScheduledController,env:Env,c
       try{await runDeletionMaintenance(env);}catch{console.error(JSON.stringify({event:'deletion_maintenance_retry'}));}
       try{await backfillAccess(env);}catch(error){console.error(JSON.stringify({event:'access_backfill_retry',code:error instanceof ApiError?error.code:'dependency_failure'}));}
       try{await cleanupUploads(env);}catch{console.error(JSON.stringify({event:'drive_upload_retention_retry'}));}
+      try{await cleanupDropboxUploads(env);}catch{console.error(JSON.stringify({event:'dropbox_upload_retention_retry'}));}
     }else{
       console.error(JSON.stringify({event:'unexpected_cron_trigger'}));
     }

@@ -18,6 +18,8 @@
         "FRONTEND_ORIGIN": "https://roteiva-web-dev.web.app",
         "OAUTH_REDIRECT_URI": "https://roteiva-api-dev.ewertonmendes9.workers.dev/oauth/drive/callback",
         "OAUTH_ENABLED": "true",
+        "DROPBOX_ENABLED": "true",
+        "DROPBOX_OAUTH_REDIRECT_URI": "https://roteiva-api-dev.ewertonmendes9.workers.dev/oauth/dropbox/callback",
         "TOKEN_KEY_VERSION": "v1",
         "GOOGLE_CLIENT_ID": "479738001561-4gu97o42v4m8kiq1bga8ck3msmjp0me3.apps.googleusercontent.com"
       },
@@ -46,18 +48,17 @@
         {
           "name": "API_RATE_LIMIT",
           "namespace_id": "479738001561",
-          "simple": {
-            "limit": 60,
-            "period": 60
-          }
+          "simple": { "limit": 60, "period": 60 }
         },
         {
           "name": "API_THUMB_LIMIT",
           "namespace_id": "479738001562",
-          "simple": {
-            "limit": 240,
-            "period": 60
-          }
+          "simple": { "limit": 240, "period": 60 }
+        },
+        {
+          "name": "API_UPLOAD_LIMIT",
+          "namespace_id": "479738001563",
+          "simple": { "limit": 240, "period": 60 }
         }
       ]
     }

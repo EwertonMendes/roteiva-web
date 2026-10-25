@@ -149,14 +149,14 @@ test('profissional cria, cliente comenta/pede ajustes, V2 aprovada e encerrament
     if(path==='/reviews'&&req.method()==='POST'){
       const body=req.postDataJSON();expect(body.clientId).toBe(clientId);expect(body.projectId).toBe(projectId);
       expect(uploadConfirmed).toBe(true);
-      expect(body.assets).toEqual([file.fileId,uploaded.id].map(fileId=>({fileId,connectionId:connection,linkedFolderId:folder})));
+      expect(body.assets).toEqual([file.fileId,uploaded.id].map(fileId=>({fileId,connectionId:connection,linkedFolderId:folder,provider:'google_drive'})));
       expect(body.mode).toBe('link');expect(body.expiresInDays).toBe(14);expect(body.title).toBe('Corte para revisão');
       created=true;createCalls++;review.title=body.title;selected=[file,{...uploaded,fileId:uploaded.id}];return json({id:review.id},201);
     }
     if(path.endsWith('/publish')){expect(created).toBe(true);publishCalls++;review.status='pending';return json({review:detail()});}
     if(path.endsWith('/revise')){
       expect(review.status).toBe('changes');
-      expect(req.postDataJSON().assets).toEqual([{fileId:second.fileId,connectionId:connection,linkedFolderId:folder}]);
+      expect(req.postDataJSON().assets).toEqual([{fileId:second.fileId,connectionId:connection,linkedFolderId:folder,provider:'google_drive'}]);
       revisionCalls++;selected=[second];review.version=2;review.status='pending';return json({review:detail()});
     }
     if(path.endsWith('/close')){closeCalls++;review.status='closed';return json({closed:true});}
@@ -182,7 +182,7 @@ test('profissional cria, cliente comenta/pede ajustes, V2 aprovada e encerrament
   await chooseAppSelect(page, composer.getByRole('combobox',{name:'Tipo de acesso'}), 'link');
   await expect(removePublic).toHaveCount(0);
   await composer.getByRole('button',{name:'Selecionar materiais'}).click();
-  await expect(composer.locator('.review-folder-tabs button.active')).toHaveText('Materiais autorizados');
+  await expect(composer.locator('.review-folder-tabs button.active')).toHaveText('Materiais autorizados · Drive');
   await expect(composer.getByRole('link',{name:'Abrir pasta no Drive'})).toHaveAttribute(
     'href','https://drive.google.com/drive/folders/'+folder);
   await expect(composer.getByRole('link',{name:'Abrir Corte final.mp4 no Google Drive'}))
@@ -190,7 +190,7 @@ test('profissional cria, cliente comenta/pede ajustes, V2 aprovada e encerrament
   const thumb=composer.locator('[data-mime="video/mp4"][data-thumbnail-state]').last();
   await thumb.scrollIntoViewIfNeeded();
   await expect(thumb).toHaveAttribute('data-thumbnail-state','loaded');
-  const driveSearch=composer.getByRole('searchbox',{name:'Buscar arquivos no Google Drive'});
+  const driveSearch=composer.getByRole('searchbox',{name:'Buscar arquivos na pasta'});
   await driveSearch.fill('Corte final');
   await expect(composer.getByText('Corte final.mp4',{exact:true})).toBeVisible();
   await expect(composer.getByText('Corte.mp4',{exact:true})).toHaveCount(0);
@@ -201,7 +201,7 @@ test('profissional cria, cliente comenta/pede ajustes, V2 aprovada e encerrament
   await composer.locator('input[type=file]').setInputFiles({name:uploaded.name,mimeType:'video/mp4',buffer:Buffer.alloc(300000)});
   await expect(composer.getByRole('button',{name:'Gerar aprovação'})).toBeDisabled();
   releaseUpload();
-  await expect(composer.getByRole('heading',{name:'Arquivos do Google Drive (2/8)'})).toBeVisible();
+  await expect(composer.locator('.review-composer-footnote')).toContainText('2 material(is) selecionado(s)');
   await expect(composer.getByRole('button',{name:'Gerar aprovação'})).toBeEnabled();
   await composer.getByRole('button',{name:'Gerar aprovação'}).click();
   const owner=page.getByRole('dialog',{name:'Detalhes da revisão'});
@@ -221,7 +221,7 @@ test('profissional cria, cliente comenta/pede ajustes, V2 aprovada e encerrament
   expect(sharingBounds!.y).toBeLessThan(summaryBounds!.y);
   const folderLink=owner.getByRole('link',{name:'Abrir pasta do arquivo no Google Drive'});
   await expect(folderLink).toHaveAttribute('href','https://drive.google.com/drive/folders/'+childFolder);
-  await expect(owner.getByRole('link',{name:'Abrir Corte.mp4 no Google Drive'}))
+  await expect(owner.getByRole('link',{name:'Abrir arquivo Corte.mp4 no Google Drive'}))
     .toHaveAttribute('href','https://drive.google.com/file/d/'+file.fileId+'/view');
   await owner.getByRole('button',{name:/Envio.mp4/}).click();
   await expect(folderLink).toHaveAttribute('href','https://drive.google.com/drive/folders/'+folder);
@@ -250,7 +250,7 @@ test('profissional cria, cliente comenta/pede ajustes, V2 aprovada e encerrament
   await expect(ownerDetail.locator('iframe[title="Prévia de Corte.mp4"]')).toHaveCount(1);
   await page.screenshot({path:info.outputPath('professional-contextual-feedback.png'),fullPage:true});
   await page.getByRole('button',{name:'Enviar nova versão',exact:true}).click();
-  await expect(composer.locator('.review-folder-tabs button.active')).toHaveText('Materiais autorizados');
+  await expect(composer.locator('.review-folder-tabs button.active')).toHaveText('Materiais autorizados · Drive');
   await composer.getByText('Corte final.mp4',{exact:true}).click();
   await composer.getByRole('button',{name:'Enviar nova versão',exact:true}).click();
   await expect(page.getByLabel('Link da revisão')).toBeVisible();
@@ -468,4 +468,303 @@ test('Google-only review renders private images in both themes without third-par
   expect(mediaGets.get(first.fileId)).toBe(1);
   expect(mediaGets.get(second.fileId)).toBe(1);
   expect(requests).toBe(3); // first, denied second, retried second; back to first uses memory
+});
+
+
+test('Dropbox: vincular pasta funciona com Todos os projetos, sem mudar o filtro global',async({page,context},info)=>{
+  const email='dropbox-link-'+info.project.name+'@example.com';
+  const {projectId}=await prepare(page,email);
+  const connectionId='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  const linkedFolderId='id:AAAAAAAAAAAAAAABBBBBBBB';
+  let attempts=0;
+  await context.route(api+'/integrations/dropbox**',async route=>{
+    const req=route.request(),url=new URL(req.url()),path=url.pathname;
+    const headers={
+      'Access-Control-Allow-Origin':root,
+      'Access-Control-Allow-Methods':'GET,POST,OPTIONS',
+      'Access-Control-Allow-Headers':'Authorization,Content-Type',
+      'Cache-Control':'no-store'
+    };
+    if(req.method()==='OPTIONS')return route.fulfill({status:204,headers});
+    const json=(data:unknown,status=200)=>route.fulfill({status,headers,contentType:'application/json',body:JSON.stringify(data)});
+    if(path==='/integrations/dropbox')return json({connections:[{
+      id:connectionId,email:'qa-dropbox@example.com',status:'connected',
+      scopes:'account_info.read files.metadata.read files.content.read files.content.write'
+    }]});
+    if(path==='/integrations/dropbox/'+connectionId+'/folders'){
+      attempts++;
+      if(attempts===1)return json({error:{code:'dropbox_unavailable'}},502);
+      return json({folder:{id:'root',name:'Meu Dropbox'},files:[{
+        id:linkedFolderId,name:'Materiais Dropbox',mimeType:'application/vnd.roteiva.folder',isFolder:true
+      }],nextPageToken:null});
+    }
+    if(path==='/integrations/dropbox/'+connectionId+'/folders/'+encodeURIComponent(linkedFolderId)+'/items'||
+      path==='/integrations/dropbox/'+connectionId+'/folders/'+linkedFolderId+'/items')
+      return json({folder:{id:linkedFolderId,name:'Materiais Dropbox'},files:[],nextPageToken:null});
+    return route.fallback();
+  });
+  await page.goto(root+'/biblioteca?driveE2E=1');
+  await page.getByRole('tab',{name:'Dropbox'}).click();
+  const library=page.getByRole('region',{name:'Biblioteca Dropbox'});
+  await expect(library.getByText('Dropbox conectado')).toBeVisible();
+  const linkButton=library.getByRole('button',{name:'Vincular pasta',exact:true});
+  await expect(linkButton).toBeEnabled();
+  await linkButton.click();
+  const dialog=page.getByRole('dialog',{name:'Selecionar pastas do Dropbox'});
+  await expect(dialog).toBeVisible();
+  // One available project: the project picker must be usable even when the
+  // global filter says "Todos os projetos".
+  await expect(dialog.getByRole('combobox',{name:'Projeto para vincular pastas'})).toContainText('Projeto Revisão');
+  await expect(dialog.getByRole('alert')).toContainText('Dropbox');
+  await dialog.getByRole('button',{name:'Tentar novamente'}).click();
+  await expect(dialog).toHaveClass(/rl-picker/);
+  for(const theme of ['light','dark']){
+    await page.evaluate(theme=>{document.documentElement.dataset.theme=theme},theme);
+    const style=await dialog.evaluate(element=>{
+      const modal=getComputedStyle(element);
+      const root=getComputedStyle(document.documentElement);
+      return {background:modal.backgroundColor,color:modal.color,
+        expectedBackground:root.getPropertyValue('--paper').trim(),expectedColor:root.getPropertyValue('--ink').trim(),
+        width:element.getBoundingClientRect().width,viewport:window.innerWidth};
+    });
+    // The same semantic surface tokens must work for both providers on both themes.
+    expect(style.background.toLowerCase()).not.toBe(style.color.toLowerCase());
+    expect(style.width).toBeLessThanOrEqual(style.viewport);
+    expect(style.width).toBeGreaterThan(260);
+  }
+  await dialog.getByRole('checkbox',{name:'Selecionar Materiais Dropbox'}).check();
+  await expect(dialog.getByRole('button',{name:'Vincular 1 pasta',exact:true})).toBeEnabled();
+  await dialog.getByRole('button',{name:'Vincular 1 pasta',exact:true}).click();
+  await expect(dialog).not.toBeVisible();
+  await expect(library.getByRole('button',{name:'Materiais Dropbox',exact:true})).toBeVisible();
+  // A folder action popup must escape the scrolling sidebar on every viewport.
+  const options=library.getByRole('button',{name:'Opções da pasta Materiais Dropbox'});
+  // Mobile uses a master/detail explorer: reveal the folder list before
+  // testing its action menu, rather than clicking an intentionally hidden row.
+  if(!(await options.isVisible()))await library.getByRole('button',{name:'Voltar para as pastas'}).click();
+  await options.click();
+  const menu=page.getByRole('menu',{name:'Opções da pasta Materiais Dropbox'});
+  await expect(menu.getByRole('menuitem',{name:'Abrir pasta'})).toBeVisible();
+  await expect(menu.getByRole('menuitem',{name:'Desvincular do projeto'})).toBeVisible();
+  const geometry=await menu.evaluate(el=>{
+    const r=el.getBoundingClientRect(),sidebar=document.querySelector('.rl-folder-list')?.getBoundingClientRect();
+    return {top:r.top,bottom:r.bottom,left:r.left,right:r.right,
+      viewportWidth:innerWidth,viewportHeight:innerHeight,sidebarBottom:sidebar?.bottom||0};
+  });
+  expect(geometry.top).toBeGreaterThanOrEqual(0);
+  expect(geometry.bottom).toBeLessThanOrEqual(geometry.viewportHeight);
+  expect(geometry.right).toBeLessThanOrEqual(geometry.viewportWidth);
+  expect(geometry.left).toBeGreaterThanOrEqual(0);
+  await menu.getByRole('menuitem',{name:'Desvincular do projeto'}).click();
+  await expect(page.getByRole('dialog',{name:'Desvincular pasta'})).toBeVisible();
+  await page.getByRole('button',{name:'Manter pasta'}).click();
+  await expect(library.getByRole('button',{name:'Opções da pasta Materiais Dropbox'})).toBeVisible();
+
+  const env=await initializeTestEnvironment({projectId:'demo-roteiva',firestore:{host:'127.0.0.1',port:8080}});
+  try{await env.withSecurityRulesDisabled(async admin=>{
+    const db=admin.firestore();
+    const users=await getDocs(query(collection(db,'users'),where('email','==',email)));
+    expect(users.size).toBe(1);
+    const links=await getDocs(collection(db,'users',users.docs[0].id,'dropboxFolders'));
+    expect(links.size).toBe(1);
+    expect(links.docs[0].data()).toMatchObject({
+      projectId,connectionId,folderId:linkedFolderId,folderName:'Materiais Dropbox'
+    });
+  });}finally{await env.cleanup();}
+});
+
+
+test('Dropbox: PDF acima de 8 MiB usa todos os ranges e PPTX gera prévia em PDF',async({page,context},info)=>{
+  const email='dropbox-preview-'+info.project.name+'@example.com';
+  const {projectId}=await prepare(page,email);
+  const connectionId='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  const folderId='id:AAAAAAABBBBBBBBCCCCCCCC';
+  const pdfId='id:BBBBBBBBCCCCCCCCDDDDDDDD';
+  const pptId='id:CCCCCCCCDDDDDDDDEEEEEEEE';
+  const unavailablePdfId='id:DDDDDDDDEEEEEEEEFFFFFFFF';
+  const chunkSize=8*1024*1024,pdfSize=chunkSize+17;
+  const pdfBytes=Buffer.alloc(pdfSize,32);
+  pdfBytes.write('%PDF-1.7\n',0,'ascii');
+  pdfBytes.write('%%EOF\n',pdfSize-6,'ascii');
+  const officeBytes=Buffer.from('%PDF-1.7\n1 0 obj << /Type /Catalog >> endobj\n%%EOF\n');
+  const ranges:string[]=[];
+  const thumbnailRequests:string[]=[];
+  let previewTickets=0;
+  const environment=await initializeTestEnvironment({projectId:'demo-roteiva',firestore:{host:'127.0.0.1',port:8080}});
+  try{
+    await environment.withSecurityRulesDisabled(async admin=>{
+      const db=admin.firestore();
+      const users=await getDocs(query(collection(db,'users'),where('email','==',email)));
+      expect(users.size).toBe(1);
+      const uid=users.docs[0].id;
+      await setDoc(doc(db,'users',uid,'dropboxFolders',projectId+'_'+connectionId+'_'+folderId),{
+        id:projectId+'_'+connectionId+'_'+folderId,
+        ownerUid:uid,schemaVersion:1,provider:'dropbox',projectId,connectionId,
+        folderId,folderName:'Materiais da produção',createdAt:Timestamp.now()
+      });
+    });
+  }finally{await environment.cleanup();}
+  await context.route(api+'/integrations/dropbox**',async route=>{
+    const req=route.request(),url=new URL(req.url()),path=url.pathname;
+    const headers={
+      'Access-Control-Allow-Origin':root,
+      'Access-Control-Allow-Methods':'GET,POST,OPTIONS',
+      'Access-Control-Allow-Headers':'Authorization,Content-Type,Range,Accept',
+      'Access-Control-Expose-Headers':'Content-Length,Content-Range',
+      'Cache-Control':'no-store'
+    };
+    if(req.method()==='OPTIONS')return route.fulfill({status:204,headers});
+    const json=(value:unknown)=>route.fulfill({status:200,headers,
+      contentType:'application/json',body:JSON.stringify(value)});
+    if(path==='/integrations/dropbox')return json({connections:[{
+      id:connectionId,email:'qa-dropbox@example.com',status:'connected',
+      scopes:'account_info.read files.metadata.read files.content.read files.content.write'
+    }]});
+    if(path.endsWith('/items'))return json({folder:{id:folderId,name:'Materiais da produção'},
+      files:[
+        {id:pdfId,name:'Roteiro grande.pdf',mimeType:'application/pdf',size:String(pdfSize),thumbnailFallback:true},
+        {id:unavailablePdfId,name:'Sem miniatura.pdf',mimeType:'application/pdf',size:'98304',thumbnailFallback:true},
+        {id:pptId,name:'Apresentação.pptx',
+         mimeType:'application/vnd.openxmlformats-officedocument.presentationml.presentation',size:'120'}
+      ],nextPageToken:null});
+    if(path.endsWith('/thumbnail')){
+      const fileId=decodeURIComponent(path.split('/')[5]);
+      thumbnailRequests.push(fileId);
+      if(fileId===unavailablePdfId)return route.fulfill({status:204,headers});
+      if(fileId!==pdfId)throw Error('Only PDF files request native Dropbox thumbnails');
+      const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO8aRs0AAAAASUVORK5CYII=','base64');
+      return route.fulfill({status:200,headers:{...headers,'Content-Type':'image/png'},body:png});
+    }
+    if(path.endsWith('/preview-ticket')){
+      previewTickets++;
+      const fileId=(req.postDataJSON() as {fileId:string}).fileId;
+      return json({url:api+'/integrations/dropbox/media?ticket='+(fileId===pdfId?'pdf':'office'),
+        mimeType:'application/pdf',size:fileId===pdfId?pdfSize:120,expiresAt:Date.now()+60000});
+    }
+    if(path==='/integrations/dropbox/media'){
+      if(url.searchParams.get('ticket')==='office')
+        return route.fulfill({status:200,headers:{...headers,'Content-Type':'application/pdf'},
+          body:officeBytes});
+      const range=req.headers().range||'';
+      ranges.push(range);
+      const match=/^bytes=(\d+)-(\d+)$/.exec(range);
+      if(!match)return route.fulfill({status:416,headers,body:'Missing range'});
+      const first=Number(match[1]),last=Number(match[2]);
+      if(last>=pdfSize||first>last)return route.fulfill({status:416,headers,body:'Invalid range'});
+      return route.fulfill({status:206,headers:{...headers,'Content-Type':'application/pdf',
+        'Content-Range':`bytes ${first}-${last}/${pdfSize}`},
+        body:pdfBytes.subarray(first,last+1)});
+    }
+    return route.fallback();
+  });
+  await page.goto(root+'/biblioteca?driveE2E=1');
+  await page.getByRole('tab',{name:'Dropbox'}).click();
+  const library=page.getByRole('region',{name:'Biblioteca Dropbox'});
+  await expect(library.locator('.rl-file-open').filter({hasText:'Roteiro grande.pdf'})).toBeVisible();
+  await library.getByRole('button',{name:'Visualização em lista'}).click();
+  const pdfCard=library.locator('.rl-file-open').filter({hasText:'Roteiro grande.pdf'});
+  const missingThumb=library.locator('.rl-file-open').filter({hasText:'Sem miniatura.pdf'});
+  await expect(pdfCard.locator('[data-thumbnail-state]')).toHaveAttribute('data-thumbnail-state','loaded');
+  await expect(missingThumb.locator('[data-thumbnail-state]')).toHaveAttribute('data-thumbnail-state','unavailable');
+  await expect(missingThumb.locator('[data-extension="pdf"]')).toBeVisible();
+  await expect(library.locator('[data-extension="pptx"]')).toBeVisible();
+  expect(previewTickets).toBe(0);
+  expect(thumbnailRequests.sort()).toEqual([pdfId,unavailablePdfId].sort());
+  await library.locator('.rl-file-open').filter({hasText:'Roteiro grande.pdf'}).click();
+  const pdfDialog=page.getByRole('dialog',{name:'Prévia de Roteiro grande.pdf'});
+  await expect(pdfDialog.locator('iframe')).toHaveAttribute('src',/^blob:/);
+  expect(ranges).toEqual(['bytes=0-'+(chunkSize-1),'bytes='+chunkSize+'-'+(pdfSize-1)]);
+  await pdfDialog.getByRole('button',{name:'Fechar'}).click();
+
+  await library.locator('.rl-file-open').filter({hasText:'Apresentação.pptx'}).click();
+  const pptDialog=page.getByRole('dialog',{name:'Prévia de Apresentação.pptx'});
+  await expect(pptDialog.locator('iframe')).toHaveAttribute('src',/^blob:/);
+  await pptDialog.getByRole('button',{name:'Fechar'}).click();
+  await library.getByRole('button',{name:'Visualização em grade'}).click();
+  await expect(library.locator('.rl-file-open').filter({hasText:'Apresentação.pptx'})
+    .locator('[data-extension="pptx"]')).toBeVisible();
+  await expect(library.locator('.rl-file-open').filter({hasText:'Roteiro grande.pdf'})
+    .locator('[data-thumbnail-state]')).toHaveAttribute('data-thumbnail-state','loaded');
+  await expect(library.locator('.rl-file-open').filter({hasText:'Sem miniatura.pdf'})
+    .locator('[data-extension="pdf"]')).toBeVisible();
+  expect(thumbnailRequests.length).toBe(2); // Native + unsupported cached across view switches.
+  expect(previewTickets).toBe(2); // Nothing downloaded for presentation thumbnails.
+});
+
+
+test('Dropbox: voltar à pasta usa cache e atualizar aplica somente alterações do cursor',async({page,context},info)=>{
+ const email='dropbox-cache-'+info.project.name+'@example.com';
+ const {projectId}=await prepare(page,email);
+ const connectionId='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+ const folderId='id:AAAAAAAAAAAAAAABBBBBBBB';
+ const childId='id:BBBBBBBBBBBBBBBBCCCCCCCC';
+ const oldId='id:CCCCCCCCCCCCCCCCDDDDDDDD';
+ const newId='id:DDDDDDDDDDDDDDDDFFFFFFFF';
+ const userEnv=await initializeTestEnvironment({projectId:'demo-roteiva',firestore:{host:'127.0.0.1',port:8080}});
+ try{await userEnv.withSecurityRulesDisabled(async admin=>{
+  const db=admin.firestore();
+  const matches=await getDocs(query(collection(db,'users'),where('email','==',email)));
+  expect(matches.size).toBe(1);
+  const uid=matches.docs[0].id;
+  await setDoc(doc(db,'users',uid,'dropboxFolders',projectId+'_'+connectionId+'_'+folderId),{
+   ownerUid:uid,schemaVersion:1,projectId,connectionId,folderId,
+   folderName:'Materiais',createdAt:Timestamp.now()
+  });
+ });}finally{await userEnv.cleanup();}
+ const calls={root:0,child:0,delta:0};
+ await context.route(api+'/integrations/dropbox**',async route=>{
+  const request=route.request(),url=new URL(request.url()),path=decodeURIComponent(url.pathname);
+  const headers={'Access-Control-Allow-Origin':root,
+   'Access-Control-Allow-Methods':'GET,POST,OPTIONS',
+   'Access-Control-Allow-Headers':'Authorization,Content-Type','Cache-Control':'no-store'};
+  if(request.method()==='OPTIONS')return route.fulfill({status:204,headers});
+  const json=(body:unknown)=>route.fulfill({status:200,headers,contentType:'application/json',body:JSON.stringify(body)});
+  if(path==='/integrations/dropbox')return json({connections:[{
+   id:connectionId,email:'qa@example.com',status:'connected',
+   scopes:'account_info.read files.metadata.read files.content.read files.content.write'
+  }]});
+  if(path.endsWith('/items')){
+   if(url.searchParams.has('changesCursor')){
+    calls.delta++;
+    expect(url.searchParams.get('changesCursor')).toBe('ROOT1');
+    return json({reset:false,changes:[
+     {deleted:true,pathLower:'/materiais/antigo.pdf'},
+     {id:newId,name:'Novo.pdf',mimeType:'application/pdf',size:'51000',
+      pathLower:'/materiais/novo.pdf',pathDisplay:'/Materiais/Novo.pdf'}
+    ],syncCursor:'ROOT2',hasMore:false});
+   }
+   if(path.includes(childId)){
+    calls.child++;
+    return json({folder:{id:childId,name:'Subpasta'},files:[
+     {id:'id:EEEEEEEEEEEEEEEEFFFFFFFF',name:'Notas.txt',mimeType:'text/plain',size:'300'}
+    ],nextPageToken:null,syncCursor:'CHILD1'});
+   }
+   calls.root++;
+   return json({folder:{id:folderId,name:'Materiais'},files:[
+    {id:childId,name:'Subpasta',mimeType:'application/vnd.roteiva.folder',size:'0'},
+    {id:oldId,name:'Antigo.pdf',mimeType:'application/pdf',size:'50000',
+     pathLower:'/materiais/antigo.pdf',pathDisplay:'/Materiais/Antigo.pdf'}
+   ],nextPageToken:null,syncCursor:'ROOT1'});
+  }
+  return route.fallback();
+ });
+ await page.goto(root+'/biblioteca?driveE2E=1');
+ await page.getByRole('tab',{name:'Dropbox'}).click();
+ const library=page.getByRole('region',{name:'Biblioteca Dropbox'});
+ await expect(library.locator('.rl-file-open').filter({hasText:'Antigo.pdf'})).toBeVisible();
+ const sub=library.locator('.rl-file-open').filter({hasText:'Subpasta'});
+ await sub.click();
+ await expect(library.locator('.rl-file-open').filter({hasText:'Notas.txt'})).toBeVisible();
+ const breadcrumb=library.getByRole('navigation',{name:'Caminho da pasta'});
+ await breadcrumb.getByRole('button',{name:'Materiais'}).click();
+ await expect(library.locator('.rl-file-open').filter({hasText:'Antigo.pdf'})).toBeVisible();
+ expect(calls.root).toBe(1); // No second Worker/Dropbox listing for cached folder.
+ await library.getByRole('button',{name:'Atualizar Dropbox'}).click();
+ await expect(library.locator('.rl-file-open').filter({hasText:'Novo.pdf'})).toBeVisible();
+ await expect(library.locator('.rl-file-open').filter({hasText:'Antigo.pdf'})).toHaveCount(0);
+ expect(calls.root).toBe(1);
+ expect(calls.delta).toBe(1);
+ await library.locator('.rl-file-open').filter({hasText:'Subpasta'}).click();
+ await expect(library.locator('.rl-file-open').filter({hasText:'Notas.txt'})).toBeVisible();
+ expect(calls.child).toBe(1);
 });

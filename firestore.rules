@@ -151,6 +151,17 @@ service cloud.firestore {
         text(d.folderName,1,250) && d.createdAt==request.time &&
         id==string(d.projectId)+'_'+d.connectionId+'_'+d.folderId;
     }
+    function valid_dropboxFolders(d,uid,id) {
+      return d.keys().hasAll(["ownerUid","schemaVersion","projectId","connectionId","folderId","folderName","createdAt"]) &&
+        d.keys().hasOnly(["ownerUid","schemaVersion","projectId","connectionId","folderId","folderName","createdAt"]) &&
+        d.ownerUid==uid && d.schemaVersion==1 &&
+        d.projectId is int && d.projectId>0 &&
+        exists(/databases/$(database)/documents/users/$(uid)/projects/$(string(d.projectId))) &&
+        text(d.connectionId,36,36) && d.connectionId.matches('^[a-zA-Z0-9-]{36}$') &&
+        text(d.folderId,4,203) && (d.folderId=='root' || d.folderId.matches('^id:[a-zA-Z0-9_-]{8,200}$')) &&
+        text(d.folderName,1,250) && d.createdAt==request.time &&
+        id==string(d.projectId)+'_'+d.connectionId+'_'+d.folderId;
+    }
     function valid_preferences(d,uid,id) {
       return d.keys().hasAll(["ownerUid","schemaVersion","revision","createdAt","updatedAt","theme"]) && d.keys().hasOnly(["ownerUid","schemaVersion","revision","createdAt","updatedAt","theme"]) &&
         metadata(d,uid) &&
@@ -287,6 +298,12 @@ service cloud.firestore {
       match /driveFolders/{id} {
         allow read: if member(uid);
         allow create: if writable(uid) && valid_driveFolders(request.resource.data,uid,id);
+        allow update: if false;
+        allow delete: if writable(uid);
+      }
+      match /dropboxFolders/{id} {
+        allow read: if member(uid);
+        allow create: if writable(uid) && valid_dropboxFolders(request.resource.data,uid,id);
         allow update: if false;
         allow delete: if writable(uid);
       }
