@@ -6,7 +6,7 @@ import {useAuth} from '../auth/AuthProvider';
 import {useDriveApi,messages} from '../drive/drive-api';
 import {DriveFileExplorer,StorageFolderPicker,DriveUnlinkConfirm,isStorageFolder,useOverlayFocus,type DriveItem,type DriveTrail} from '../drive/DriveLibraryUI';
 import {FolderActionsMenu} from '../drive/FolderActionsMenu';
-import {DropboxDocumentThumbnail,fetchDropboxDocument,isDropboxDocument} from './DropboxDocumentPreview';
+import {fetchDropboxDocument,isDropboxDocument} from './DropboxDocumentPreview';
 import {ReviewImageViewer} from '../reviews/ReviewImageViewer';
 import {dropboxWebUrl} from './dropbox-web-url';
 import {clearDriveThumbnailCache} from '../drive/DriveThumbnail';
@@ -292,7 +292,6 @@ export function DropboxConnectionPanel({projects,selectedProjectId,onLinkedFolde
    <DriveFileExplorer provider="dropbox" externalUrl={dropboxWebUrl} folderName={viewing?.folderName}
     path={path} files={items} loading={fileBusy} hasMore={search.trim().length>=2?!!remote?.next:!!filesPage}
     thumbnailScope={(user?.uid||'')+':'+(viewing?.connectionId||account?.id||'')} getThumbnail={getThumbnail}
-    renderDocumentThumbnail={viewing?file=>isDropboxDocument(file)?<DropboxDocumentThumbnail file={file} link={viewing}/>:null:undefined}
     searchResults={remote?.folder===currentFolder?remote.files:undefined} searchTerm={remote?.term}
     searchLoading={searchBusy} onSearchChange={setSearch}
     onBack={()=>{
