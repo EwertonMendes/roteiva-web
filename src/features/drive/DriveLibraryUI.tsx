@@ -197,6 +197,7 @@ type ExplorerProps={
   uploadDisabled?:boolean;
   provider?:'google_drive'|'dropbox';
   externalUrl?:(file:DriveItem)=>string;
+  renderDocumentThumbnail?:(file:DriveItem)=>React.ReactNode;
 };
 type ViewMode="list"|"grid";
 const VIEW_KEY="roteiva-drive-view-v1";
@@ -204,7 +205,7 @@ function savedView():ViewMode{
   try{return window.localStorage.getItem(VIEW_KEY)==="grid"?"grid":"list";}catch{return "list";}
 }
 const noThumbnail=async (_:DriveItem):Promise<Blob|null>=>null;
-export function DriveFileExplorer({folderName,path,files,loading,hasMore,thumbnailScope="",getThumbnail=noThumbnail,searchResults,searchTerm,searchLoading=false,onSearchChange,onBack,onNavigate,onOpen,onMore,onUploadFiles,uploadDisabled=false,provider='google_drive',externalUrl=driveFileUrl}:ExplorerProps){
+export function DriveFileExplorer({folderName,path,files,loading,hasMore,thumbnailScope="",getThumbnail=noThumbnail,searchResults,searchTerm,searchLoading=false,onSearchChange,onBack,onNavigate,onOpen,onMore,onUploadFiles,uploadDisabled=false,provider='google_drive',externalUrl=driveFileUrl,renderDocumentThumbnail}:ExplorerProps){
   const providerName=provider==='dropbox'?'Dropbox':'Google Drive';
   const [filter,setFilter]=useState("");
   const [dragging,setDragging]=useState(false);
@@ -221,7 +222,7 @@ export function DriveFileExplorer({folderName,path,files,loading,hasMore,thumbna
     const isFolder=isStorageFolder(file.mimeType);
     return <div className="rl-file-row" key={file.id}>
       <button type="button" className="rl-file-open" title={file.name} onClick={()=>onOpen(file)} disabled={loading}>
-        <DriveThumbnail item={file} scope={thumbnailScope} getThumbnail={getThumbnail}/>
+        {view==='grid'&&renderDocumentThumbnail?.(file)||<DriveThumbnail item={file} scope={thumbnailScope} getThumbnail={getThumbnail}/>}
         <span className="rl-file-name">{file.name}<small>{isFolder?"Subpasta":readableFileType(file.mimeType)}{!isFolder&&readableSize(file.size)?" · "+readableSize(file.size):""}</small></span>
       </button>
       <time>{file.modifiedTime?new Date(file.modifiedTime).toLocaleDateString("pt-BR"):"—"}</time>
