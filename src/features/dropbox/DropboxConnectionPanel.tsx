@@ -4,7 +4,7 @@ import type {Project} from '../../domain/workspace';
 import {AppSelect} from '../ui/AppSelect';
 import {useAuth} from '../auth/AuthProvider';
 import {useDriveApi,messages} from '../drive/drive-api';
-import {DriveFileExplorer,DriveFolderPicker,isStorageFolder,useOverlayFocus,type DriveItem,type DriveTrail} from '../drive/DriveLibraryUI';
+import {DriveFileExplorer,StorageFolderPicker,isStorageFolder,useOverlayFocus,type DriveItem,type DriveTrail} from '../drive/DriveLibraryUI';
 import {ReviewImageViewer} from '../reviews/ReviewImageViewer';
 import {dropboxWebUrl} from './dropbox-web-url';
 import {clearDriveThumbnailCache} from '../drive/DriveThumbnail';
@@ -280,7 +280,7 @@ export function DropboxConnectionPanel({projects,selectedProjectId,onLinkedFolde
     onOpen={openItem} onUploadFiles={upload} uploadDisabled={!viewing||busy||fileBusy}
     onMore={()=>{if(search.trim().length>=2)void moreSearch();else if(viewing&&filesPage)void load(viewing,currentFolder,path,filesPage,true)}}/>
   </div>
-  {picker&&<DriveFolderPicker provider="dropbox" projects={projects}
+  {picker&&<StorageFolderPicker provider="dropbox" projects={projects}
    projectId={pickerProjectId||undefined} onProjectChange={value=>setPickerProjectId(Number(value)||0)}
    folders={pickerItems.filter(item=>isStorageFolder(item.mimeType))} path={pickerPath}
    loading={pickerBusy} working={busy} canRead={!!account} hasMore={!!pickerPage}
