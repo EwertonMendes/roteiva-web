@@ -8,7 +8,7 @@ import type { Project } from "../../domain/workspace";
 import { DRIVE_FOLDER, DriveFileExplorer, StorageFolderPicker, DrivePreview, DriveUnlinkConfirm, driveFileUrl, isPreviewable, type DriveItem, type DriveTrail } from "./DriveLibraryUI";
 import {clearDriveThumbnailCache} from "./DriveThumbnail";
 import {useDriveThumbnailFetch} from "./useDriveThumbnailFetch";
-import {cacheKey,getCachedFolder,setCachedFolder,clearDriveFolderCache} from "./drive-folder-cache";
+import {cacheKey,getCachedFolder,setCachedFolder,clearDriveFolderCache} from "./storage-folder-cache";
 import type {UploadDestination} from "./useDriveUploads";
 import {useDriveTransfers} from "./DriveTransfersProvider";
 import {useDriveApi,messages} from "./drive-api";
