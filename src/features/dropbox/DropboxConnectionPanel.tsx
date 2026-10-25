@@ -4,7 +4,8 @@ import type {Project} from '../../domain/workspace';
 import {AppSelect} from '../ui/AppSelect';
 import {useAuth} from '../auth/AuthProvider';
 import {useDriveApi,messages} from '../drive/drive-api';
-import {DriveFileExplorer,StorageFolderPicker,isStorageFolder,useOverlayFocus,type DriveItem,type DriveTrail} from '../drive/DriveLibraryUI';
+import {DriveFileExplorer,StorageFolderPicker,DriveUnlinkConfirm,isStorageFolder,useOverlayFocus,type DriveItem,type DriveTrail} from '../drive/DriveLibraryUI';
+import {FolderActionsMenu} from '../drive/FolderActionsMenu';
 import {ReviewImageViewer} from '../reviews/ReviewImageViewer';
 import {dropboxWebUrl} from './dropbox-web-url';
 import {clearDriveThumbnailCache} from '../drive/DriveThumbnail';
@@ -67,6 +68,7 @@ export function DropboxConnectionPanel({projects,selectedProjectId,onLinkedFolde
  const [items,setItems]=useState<DriveItem[]>([]),[filesPage,setFilesPage]=useState<string|null>(null),[fileBusy,setFileBusy]=useState(false);
  const [search,setSearch]=useState(''),[remote,setRemote]=useState<{term:string;folder:string;files:DriveItem[];next:string|null}|null>(null),[searchBusy,setSearchBusy]=useState(false);
  const [preview,setPreview]=useState<DriveItem|null>(null);
+ const [unlinkTarget,setUnlinkTarget]=useState<DropboxFolderLink|null>(null);
  const account=connections.find(c=>c.id===selectedConn&&c.status==='connected')||connections.find(c=>c.status==='connected');
  const validAccounts=connections.filter(c=>c.status==='connected');
  const relevant=useMemo(()=>selectedProjectId?links.filter(x=>x.projectId===selectedProjectId):links,[links,selectedProjectId]);
@@ -166,6 +168,7 @@ export function DropboxConnectionPanel({projects,selectedProjectId,onLinkedFolde
   try{await unlinkDropboxFolder(user.uid,link.id);
    setLinks(prev=>prev.filter(x=>x.id!==link.id));
    if(viewing?.id===link.id){setViewing(null);setItems([])}
+   setUnlinkTarget(null);
    setResult('Vínculo removido. Os arquivos continuam no Dropbox.');
   }catch(e){setError(e instanceof Error?e.message:'Não foi possível desvincular a pasta.')}finally{setBusy(false)}
  }
@@ -264,8 +267,9 @@ export function DropboxConnectionPanel({projects,selectedProjectId,onLinkedFolde
       <button type="button" className="rl-folder-button" onClick={()=>void load(link,link.folderId,[{id:link.folderId,name:link.folderName}])}>
        <FolderOpen size={18}/><span><b>{link.folderName}</b><small>{projects.find(p=>p.id===link.projectId)?.name||'Projeto'}</small></span>
       </button>
-      <button type="button" className="rl-icon-button" title="Desvincular pasta" aria-label={'Desvincular '+link.folderName}
-        disabled={busy} onClick={()=>void unlink(link)}><X size={16}/></button>
+      <FolderActionsMenu name={link.folderName} disabled={busy}
+        onOpen={()=>void load(link,link.folderId,[{id:link.folderId,name:link.folderName}])}
+        onUnlink={()=>setUnlinkTarget(link)}/>
      </div>)}
      {!relevant.length&&<div className="rl-state"><FolderOpen size={26}/><p>Nenhuma pasta Dropbox vinculada.</p></div>}
     </div>
@@ -293,6 +297,8 @@ export function DropboxConnectionPanel({projects,selectedProjectId,onLinkedFolde
    onLink={linkFolders} onLinkCurrent={folder=>linkFolders([folder])}
    onConnect={()=>void start()}/>}
 
+  {unlinkTarget&&<DriveUnlinkConfirm name={unlinkTarget.folderName} busy={busy}
+    onCancel={()=>setUnlinkTarget(null)} onConfirm={()=>void unlink(unlinkTarget)}/>}
   {preview&&viewing&&<DropboxPreview file={preview} link={viewing} onClose={()=>setPreview(null)}
     onPrevious={previewIndex>0?()=>setPreview(previewList[previewIndex-1]):undefined}
     onNext={previewIndex>=0&&previewIndex<previewList.length-1?()=>setPreview(previewList[previewIndex+1]):undefined}/>}
