@@ -68,7 +68,7 @@ export async function verifyDropboxDescendant(env:Env,uid:string,connectionId:st
  return {path:target?.path_display||'',name:target?.name||'Meu Dropbox',mimeType:'application/vnd.roteiva.folder'};
 }
 export async function verifyDropboxFile(env:Env,uid:string,connectionId:string,linkedId:string,
- fileId:string):Promise<{name:string;mimeType:string;size:number}>{
+ fileId:string,ownerDocumentPreview=false):Promise<{name:string;mimeType:string;size:number}>{
  if(!validStorageFileId('dropbox',fileId))throw new ApiError(400,'dropbox_invalid_file');
  const folder=linkedId==='root'?null:await dropboxMetadata(env,uid,connectionId,linkedId);
  const file=await dropboxMetadata(env,uid,connectionId,fileId);
@@ -78,7 +78,10 @@ export async function verifyDropboxFile(env:Env,uid:string,connectionId:string,l
  if(typeof root!=='string'||typeof p!=='string'||!p.startsWith(norm(root)+'/')||
    p===norm(root)+'/')throw new ApiError(403,'review_file_denied');
  const normalized=dropboxNormalize(file);
- if(!normalized||!/^(image|video|audio)\//.test(normalized.mimeType)&&normalized.mimeType!=='application/pdf')
+ const supportedDocument=ownerDocumentPreview&&normalized&&
+  /\.(pptx?|ppsx?|docx?|rtf|odp|odt)$/i.test(normalized.name);
+ if(!normalized||!/^(image|video|audio)\//.test(normalized.mimeType)&&
+   normalized.mimeType!=='application/pdf'&&!supportedDocument)
   throw new ApiError(415,'review_media_unsupported');
  return {name:normalized.name,mimeType:normalized.mimeType,size:Number(file.size)||0};
 }
