@@ -581,12 +581,15 @@ test('Dropbox: PDF acima de 8 MiB usa todos os ranges e PPTX gera prévia em PDF
   const folderId='id:AAAAAAABBBBBBBBCCCCCCCC';
   const pdfId='id:BBBBBBBBCCCCCCCCDDDDDDDD';
   const pptId='id:CCCCCCCCDDDDDDDDEEEEEEEE';
+  const unavailablePdfId='id:DDDDDDDDEEEEEEEEFFFFFFFF';
   const chunkSize=8*1024*1024,pdfSize=chunkSize+17;
   const pdfBytes=Buffer.alloc(pdfSize,32);
   pdfBytes.write('%PDF-1.7\n',0,'ascii');
   pdfBytes.write('%%EOF\n',pdfSize-6,'ascii');
   const officeBytes=Buffer.from('%PDF-1.7\n1 0 obj << /Type /Catalog >> endobj\n%%EOF\n');
   const ranges:string[]=[];
+  const thumbnailRequests:string[]=[];
+  let previewTickets=0;
   const environment=await initializeTestEnvironment({projectId:'demo-roteiva',firestore:{host:'127.0.0.1',port:8080}});
   try{
     await environment.withSecurityRulesDisabled(async admin=>{
@@ -619,11 +622,21 @@ test('Dropbox: PDF acima de 8 MiB usa todos os ranges e PPTX gera prévia em PDF
     }]});
     if(path.endsWith('/items'))return json({folder:{id:folderId,name:'Materiais da produção'},
       files:[
-        {id:pdfId,name:'Roteiro grande.pdf',mimeType:'application/pdf',size:String(pdfSize)},
+        {id:pdfId,name:'Roteiro grande.pdf',mimeType:'application/pdf',size:String(pdfSize),thumbnailFallback:true},
+        {id:unavailablePdfId,name:'Sem miniatura.pdf',mimeType:'application/pdf',size:'98304',thumbnailFallback:true},
         {id:pptId,name:'Apresentação.pptx',
          mimeType:'application/vnd.openxmlformats-officedocument.presentationml.presentation',size:'120'}
       ],nextPageToken:null});
+    if(path.endsWith('/thumbnail')){
+      const fileId=decodeURIComponent(path.split('/')[5]);
+      thumbnailRequests.push(fileId);
+      if(fileId===unavailablePdfId)return route.fulfill({status:204,headers});
+      if(fileId!==pdfId)throw Error('Only PDF files request native Dropbox thumbnails');
+      const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO8aRs0AAAAASUVORK5CYII=','base64');
+      return route.fulfill({status:200,headers:{...headers,'Content-Type':'image/png'},body:png});
+    }
     if(path.endsWith('/preview-ticket')){
+      previewTickets++;
       const fileId=(req.postDataJSON() as {fileId:string}).fileId;
       return json({url:api+'/integrations/dropbox/media?ticket='+(fileId===pdfId?'pdf':'office'),
         mimeType:'application/pdf',size:fileId===pdfId?pdfSize:120,expiresAt:Date.now()+60000});
@@ -649,6 +662,14 @@ test('Dropbox: PDF acima de 8 MiB usa todos os ranges e PPTX gera prévia em PDF
   const library=page.getByRole('region',{name:'Biblioteca Dropbox'});
   await expect(library.locator('.rl-file-open').filter({hasText:'Roteiro grande.pdf'})).toBeVisible();
   await library.getByRole('button',{name:'Visualização em lista'}).click();
+  const pdfCard=library.locator('.rl-file-open').filter({hasText:'Roteiro grande.pdf'});
+  const missingThumb=library.locator('.rl-file-open').filter({hasText:'Sem miniatura.pdf'});
+  await expect(pdfCard.locator('[data-thumbnail-state]')).toHaveAttribute('data-thumbnail-state','loaded');
+  await expect(missingThumb.locator('[data-thumbnail-state]')).toHaveAttribute('data-thumbnail-state','unavailable');
+  await expect(missingThumb.locator('[data-extension="pdf"]')).toBeVisible();
+  await expect(library.locator('[data-extension="pptx"]')).toBeVisible();
+  expect(previewTickets).toBe(0);
+  expect(thumbnailRequests.sort()).toEqual([pdfId,unavailablePdfId].sort());
   await library.locator('.rl-file-open').filter({hasText:'Roteiro grande.pdf'}).click();
   const pdfDialog=page.getByRole('dialog',{name:'Prévia de Roteiro grande.pdf'});
   await expect(pdfDialog.locator('iframe')).toHaveAttribute('src',/^blob:/);
@@ -660,6 +681,12 @@ test('Dropbox: PDF acima de 8 MiB usa todos os ranges e PPTX gera prévia em PDF
   await expect(pptDialog.locator('iframe')).toHaveAttribute('src',/^blob:/);
   await pptDialog.getByRole('button',{name:'Fechar'}).click();
   await library.getByRole('button',{name:'Visualização em grade'}).click();
-  await expect(library.getByLabel('Miniatura de Apresentação.pptx').locator('iframe'))
-    .toHaveAttribute('src',/^blob:/);
+  await expect(library.locator('.rl-file-open').filter({hasText:'Apresentação.pptx'})
+    .locator('[data-extension="pptx"]')).toBeVisible();
+  await expect(library.locator('.rl-file-open').filter({hasText:'Roteiro grande.pdf'})
+    .locator('[data-thumbnail-state]')).toHaveAttribute('data-thumbnail-state','loaded');
+  await expect(library.locator('.rl-file-open').filter({hasText:'Sem miniatura.pdf'})
+    .locator('[data-extension="pdf"]')).toBeVisible();
+  expect(thumbnailRequests.length).toBe(2); // Native + unsupported cached across view switches.
+  expect(previewTickets).toBe(2); // Nothing downloaded for presentation thumbnails.
 });
