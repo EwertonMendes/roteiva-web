@@ -1,4 +1,5 @@
 import { AppSelect } from "../ui/AppSelect";
+import { FolderActionsMenu } from "./FolderActionsMenu";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronDown, Cloud, FolderOpen, Link2, MoreHorizontal, Plus, RefreshCw, ShieldCheck, Unplug } from "lucide-react";
 import { useAuth } from "../auth/AuthProvider";
@@ -404,10 +405,8 @@ export function DriveConnectionPanel({
             <button className="rl-folder-button" type="button" title={link.folderName} onClick={()=>void openFiles(link)} aria-current={viewing?.id===link.id?"true":undefined}>
               <FolderOpen size={18}/><span><b>{link.folderName}</b><small>{projects.find(p=>p.id===link.projectId)?.name||"Projeto indisponível"}</small></span>
             </button>
-            <details className="rl-menu"><summary aria-label={"Opções da pasta "+link.folderName}><MoreHorizontal size={18}/></summary>
-              <div className="rl-menu-items"><button type="button" onClick={()=>void openFiles(link)}>Abrir pasta</button>
-                <button type="button" disabled={busy} onClick={()=>setUnlinkTarget(link)}>Desvincular do projeto</button>
-              </div></details>
+            <FolderActionsMenu name={link.folderName} disabled={busy}
+              onOpen={()=>void openFiles(link)} onUnlink={()=>setUnlinkTarget(link)}/>
           </div>)}
           {!relevant.length&&<div className="rl-state"><FolderOpen size={27}/><p>Nenhuma pasta vinculada {selectedProjectId?"a este projeto":"aos projetos"}.</p>
             <button type="button" className="secondary-button" disabled={!ready||busy} onClick={chooseFolders}>Vincular pasta</button></div>}
