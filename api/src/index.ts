@@ -128,7 +128,7 @@ export async function handle(request: Request, env: Env): Promise<Response> {
       const uid=await identity(request,env);await assertActiveAccess(env,uid);
       const parts=url.pathname.split('/');
       response=await dropboxList(env,uid,parts[3],parts.length>5?decodeURIComponent(parts[5]):url.searchParams.get('parentId')||'root',
-       url.searchParams.get('pageToken'),url.searchParams.get('search'));
+       url.searchParams.get('pageToken'),url.searchParams.get('search'),url.searchParams.get('changesCursor'));
     } else if (/^\/integrations\/dropbox\/[^/]+\/metadata$/.test(url.pathname) && request.method==='GET') {
       dropboxEnabled(env);
       const uid=await identity(request,env);await assertActiveAccess(env,uid);
