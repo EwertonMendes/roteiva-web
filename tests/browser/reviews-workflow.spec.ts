@@ -539,6 +539,9 @@ test('Dropbox: vincular pasta funciona com Todos os projetos, sem mudar o filtro
   await expect(library.getByRole('button',{name:'Materiais Dropbox',exact:true})).toBeVisible();
   // A folder action popup must escape the scrolling sidebar on every viewport.
   const options=library.getByRole('button',{name:'Opções da pasta Materiais Dropbox'});
+  // Mobile uses a master/detail explorer: reveal the folder list before
+  // testing its action menu, rather than clicking an intentionally hidden row.
+  if(!(await options.isVisible()))await library.getByRole('button',{name:'Voltar para as pastas'}).click();
   await options.click();
   const menu=page.getByRole('menu',{name:'Opções da pasta Materiais Dropbox'});
   await expect(menu.getByRole('menuitem',{name:'Abrir pasta'})).toBeVisible();
