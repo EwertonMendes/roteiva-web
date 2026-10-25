@@ -6,6 +6,7 @@ import {useAuth} from '../auth/AuthProvider';
 import {useDriveApi,messages} from '../drive/drive-api';
 import {DriveFileExplorer,StorageFolderPicker,DriveUnlinkConfirm,isStorageFolder,useOverlayFocus,type DriveItem,type DriveTrail} from '../drive/DriveLibraryUI';
 import {FolderActionsMenu} from '../drive/FolderActionsMenu';
+import {DropboxDocumentThumbnail,fetchDropboxDocument,isDropboxDocument} from './DropboxDocumentPreview';
 import {ReviewImageViewer} from '../reviews/ReviewImageViewer';
 import {dropboxWebUrl} from './dropbox-web-url';
 import {clearDriveThumbnailCache} from '../drive/DriveThumbnail';
@@ -22,16 +23,23 @@ function DropboxPreview({file,link,onClose,onNext,onPrevious}:{file:DriveItem;li
  const ref=useOverlayFocus(onClose);
  const [state,setState]=useState<{ticket:PreviewTicket|null;busy:boolean;error:string}>({ticket:null,busy:true,error:''});
  useEffect(()=>{
-  let live=true;
+  const controller=new AbortController();let createdUrl:string|null=null;
   setState({ticket:null,busy:true,error:''});
-  void call<PreviewTicket>('/integrations/dropbox/'+encodeURIComponent(link.connectionId)+'/preview-ticket','POST',{
-   fileId:file.id,projectId:link.projectId,linkedFolderId:link.folderId
-  }).then(ticket=>{if(live)setState({ticket,busy:false,error:''})})
-   .catch(e=>{if(live)setState({ticket:null,busy:false,error:e instanceof Error?e.message:'Prévia indisponível.'})});
-  return()=>{live=false};
- },[call,file.id,link.connectionId,link.folderId,link.projectId]);
+  const load=isDropboxDocument(file)
+   ?fetchDropboxDocument(call,link,file,controller.signal).then(blob=>{
+     createdUrl=URL.createObjectURL(blob);
+     return {url:createdUrl,mimeType:'application/pdf',size:blob.size,expiresAt:0};
+   })
+   :call<PreviewTicket>('/integrations/dropbox/'+encodeURIComponent(link.connectionId)+'/preview-ticket','POST',{
+     fileId:file.id,projectId:link.projectId,linkedFolderId:link.folderId
+   });
+  void load.then(ticket=>{if(!controller.signal.aborted)setState({ticket,busy:false,error:''})})
+   .catch(e=>{if(!controller.signal.aborted)setState({ticket:null,busy:false,
+     error:e instanceof Error?e.message:'Prévia indisponível.'})});
+  return()=>{controller.abort();if(createdUrl)URL.revokeObjectURL(createdUrl)};
+ },[call,file.id,file.name,link.connectionId,link.folderId,link.projectId]);
  const media=state.ticket?.url;
- const kind=file.mimeType;
+ const kind=state.ticket?.mimeType||file.mimeType;
  return <div className="rl-overlay rl-preview-overlay" onMouseDown={e=>{if(e.target===e.currentTarget)onClose()}}>
   <section className="rl-preview db-preview" ref={ref} role="dialog" aria-modal="true" tabIndex={-1} aria-label={'Prévia de '+file.name}>
    <header><div className="rl-preview-title"><strong title={file.name}>{file.name}</strong><small>Dropbox · Prévia protegida pelo Roteiva</small></div>
@@ -44,7 +52,7 @@ function DropboxPreview({file,link,onClose,onNext,onPrevious}:{file:DriveItem;li
      media&&kind.startsWith('image/')?<ReviewImageViewer src={media} name={file.name}/>:
      media&&kind.startsWith('video/')?<video key={media} src={media} controls playsInline preload="metadata" controlsList="nodownload" disablePictureInPicture/>:
      media&&kind.startsWith('audio/')?<audio key={media} src={media} controls preload="metadata" controlsList="nodownload"/>:
-     media&&kind==='application/pdf'?<iframe title={'PDF '+file.name} src={media} referrerPolicy="no-referrer"/>:
+     media&&kind==='application/pdf'?<iframe key={media} title={'PDF '+file.name} src={media+'#toolbar=0&navpanes=0'} referrerPolicy="no-referrer"/>:
      <div className="rl-state">Este arquivo não possui prévia integrada.</div>}
     {onNext&&<button className="rl-preview-nav rl-preview-nav-next" onClick={onNext} aria-label="Próximo arquivo"><ChevronRight size={19}/></button>}
    </div>
@@ -226,7 +234,7 @@ export function DropboxConnectionPanel({projects,selectedProjectId,onLinkedFolde
  const openItem=(file:DriveItem)=>isStorageFolder(file.mimeType)?
   viewing&&void load(viewing,file.id,[...path,{id:file.id,name:file.name}]):setPreview(file);
  const previewList=displayed.filter(f=>f.mimeType.startsWith('image/')||f.mimeType.startsWith('video/')||
-  f.mimeType.startsWith('audio/')||f.mimeType==='application/pdf');
+  f.mimeType.startsWith('audio/')||isDropboxDocument(f));
  const previewIndex=preview?previewList.findIndex(f=>f.id===preview.id):-1;
  return <section className="rl-library" aria-label="Biblioteca Dropbox">
   <header className="rl-toolbar">
@@ -277,6 +285,7 @@ export function DropboxConnectionPanel({projects,selectedProjectId,onLinkedFolde
    <DriveFileExplorer provider="dropbox" externalUrl={dropboxWebUrl} folderName={viewing?.folderName}
     path={path} files={items} loading={fileBusy} hasMore={search.trim().length>=2?!!remote?.next:!!filesPage}
     thumbnailScope={(user?.uid||'')+':'+(viewing?.connectionId||account?.id||'')} getThumbnail={getThumbnail}
+    renderDocumentThumbnail={viewing?file=>isDropboxDocument(file)?<DropboxDocumentThumbnail file={file} link={viewing}/>:null:undefined}
     searchResults={remote?.folder===currentFolder?remote.files:undefined} searchTerm={remote?.term}
     searchLoading={searchBusy} onSearchChange={setSearch}
     onBack={()=>{setViewing(null);setItems([]);setPath([])}}
