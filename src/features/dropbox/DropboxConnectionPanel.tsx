@@ -141,7 +141,7 @@ export function DropboxConnectionPanel({projects,selectedProjectId,onLinkedFolde
   };
   try{
    if(!append&&!force&&cached&&Date.now()-cached.fetchedAt<FRESH_MS)return;
-   if(!append&&!force&&cached?.complete&&cached.syncCursor){
+   if(!append&&cached?.complete&&cached.syncCursor){
     let cursorValue=cached.syncCursor;
     const changes:NonNullable<DropboxDelta['changes']>=[];
     let fullyRead=false,reset=false;
@@ -375,7 +375,11 @@ export function DropboxConnectionPanel({projects,selectedProjectId,onLinkedFolde
         <button type="button" className="secondary-button" disabled={busy} onClick={()=>void disconnect()}>Confirmar desconexão</button></>:
         <button type="button" className="secondary-button" disabled={busy} onClick={()=>setConfirmId(account?.id||'')}><Unplug size={15}/> Desconectar</button>}
       </div></details>:null}
-    <button className="secondary-button" disabled={busy||disabled} onClick={()=>void refresh().catch(e=>setError(e instanceof Error?e.message:'Falha ao atualizar.'))}><RefreshCw size={16}/></button>
+    <button className="secondary-button" type="button" aria-label="Atualizar Dropbox"
+      disabled={busy||disabled||fileBusy} onClick={()=>void refresh().then(()=>{
+       if(viewing)void load(viewing,currentFolder,path,undefined,false,true);
+      }).catch(e=>setError(e instanceof Error?e.message:'Falha ao atualizar.'))}>
+      <RefreshCw size={16}/></button>
     {validAccounts.length>0?<button type="button" className="primary-button" disabled={disabled||busy||!projects.length}
       onClick={()=>{
        setPickerProjectId(selectedProjectId&&projects.some(project=>project.id===selectedProjectId)
