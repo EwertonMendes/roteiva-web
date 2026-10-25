@@ -284,7 +284,6 @@ export function DropboxConnectionPanel({projects,selectedProjectId,onLinkedFolde
    projectId={pickerProjectId||undefined} onProjectChange={value=>setPickerProjectId(Number(value)||0)}
    folders={pickerItems.filter(item=>isStorageFolder(item.mimeType))} path={pickerPath}
    loading={pickerBusy} working={busy} canRead={!!account} hasMore={!!pickerPage}
-   mode="root" onModeChange={()=>{}}
    linkedIds={new Set(links.filter(l=>l.projectId===pickerProjectId&&l.connectionId===account?.id).map(l=>l.folderId))}
    error={pickerError}
    onClose={()=>{++pickerId.current;setPicker(false);setPickerError('');}}
