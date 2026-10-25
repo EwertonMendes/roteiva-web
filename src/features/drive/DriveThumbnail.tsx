@@ -1,6 +1,7 @@
 import {useEffect, useRef, useState} from "react";
 import {LoaderCircle, Play} from "lucide-react";
-import {driveKindIcon, type DriveItem} from "./DriveLibraryUI";
+import {driveKindIcon,isStorageFolder, type DriveItem} from "./DriveLibraryUI";
+import {FileTypeArtwork,fileArtwork} from "./FileTypeArtwork";
 import {hasDriveThumbnailSource} from "./drive-thumbnail-source";
 
 type GetThumbnail = (item:DriveItem,signal?:AbortSignal,accountId?:string)=>Promise<Blob|null>;
@@ -8,6 +9,8 @@ type Phase = "idle"|"loading"|"loaded"|"unavailable";
 type ThumbnailState={key:string;phase:Phase;src:string|null};
 const MAX_CACHE=64;
 const MAX_CONCURRENT=6;
+const NEGATIVE_TTL=10*60*1000;
+const unsupported=new Map<string,number>();
 const cache=new Map<string,string>();
 const pending=new Map<string,Promise<string|null>>();
 type Queued={key:string;priority:number;run:()=>void;cancel:()=>void;controller:AbortController};
@@ -45,11 +48,13 @@ export function clearDriveThumbnailCache(){
   tasks.splice(0);
   for(const controller of active)controller.abort();
   for(const url of cache.values())URL.revokeObjectURL(url);
-  cache.clear();pending.clear();
+  cache.clear();pending.clear();unsupported.clear();
 }
 
 function resolveThumbnail(key:string,item:DriveItem,getThumbnail:GetThumbnail,accountId:string):Promise<string|null>{
   if(cache.has(key))return Promise.resolve(cache.get(key)!);
+  if((unsupported.get(key)||0)>Date.now())return Promise.resolve(null);
+  unsupported.delete(key);
   const existing=pending.get(key);
   if(existing)return existing;
   const epoch=generation;
@@ -57,7 +62,15 @@ function resolveThumbnail(key:string,item:DriveItem,getThumbnail:GetThumbnail,ac
     if(epoch!==generation)return null;
     try {
       const blob=await getThumbnail(item,signal,accountId);
-      if(epoch!==generation || !blob || blob.size===0 || blob.size>1024*1024 || !blob.type.startsWith("image/"))return null;
+      if(epoch!==generation)return null;
+      if(!blob){
+        // A provider with no thumbnail should not be retried on every toggle.
+        // File revisions have their own cache identity via modifiedTime.
+        unsupported.set(key,Date.now()+NEGATIVE_TTL);
+        if(unsupported.size>128)unsupported.delete(unsupported.keys().next().value!);
+        return null;
+      }
+      if(blob.size===0 || blob.size>1024*1024 || !blob.type.startsWith("image/"))return null;
       const objectUrl=URL.createObjectURL(blob);
       cache.set(key,objectUrl);
       if(cache.size>MAX_CACHE){
@@ -81,6 +94,7 @@ function initialState(key:string,available:boolean):ThumbnailState{
  * assets without ephemeral tickets; it never embeds Google's private URL. */
 export function DriveThumbnail({item,scope,getThumbnail}:{item:DriveItem;scope:string;getThumbnail:GetThumbnail}){
   const Icon=driveKindIcon(item.mimeType);
+  const artwork=!isStorageFolder(item.mimeType)?fileArtwork(item.name):null;
   const ref=useRef<HTMLSpanElement>(null);
   const key=scope+":"+item.id+":"+(item.modifiedTime||"");
   const available=hasDriveThumbnailSource(item);
@@ -90,7 +104,7 @@ export function DriveThumbnail({item,scope,getThumbnail}:{item:DriveItem;scope:s
   useEffect(()=>{
     const cached=initialState(key,available);
     setState(cached);
-    if(!available || cached.phase==="loaded")return;
+    if(!available || cached.phase==="loaded" || cached.phase==="unavailable")return;
     let active=true;
     let started=false;
     const load=()=>{
@@ -134,7 +148,7 @@ export function DriveThumbnail({item,scope,getThumbnail}:{item:DriveItem;scope:s
       ? <span className="rl-thumb-loading" aria-hidden="true"><LoaderCircle size={19} className="rl-thumb-loading-spin"/><span>Carregando prévia</span></span>
       :current.src
         ? <img src={current.src} alt="" loading="lazy" decoding="async" onError={handleImageError}/>
-        :<Icon size={20}/>}
+         :artwork?<FileTypeArtwork name={item.name}/>:<Icon size={20}/>}
     {current.phase!=="loading" && item.mimeType.startsWith("video/") &&
       <span className="rl-video-mark" aria-hidden="true"><Play size={11} fill="currentColor"/></span>}
   </span>;
