@@ -10,13 +10,17 @@ import {fetchDropboxDocument,isDropboxDocument} from './DropboxDocumentPreview';
 import {ReviewImageViewer} from '../reviews/ReviewImageViewer';
 import {dropboxWebUrl} from './dropbox-web-url';
 import {clearDriveThumbnailCache} from '../drive/DriveThumbnail';
+import {cacheKey,getCachedFolder,setCachedFolder,onceFolderRequest,clearStorageFolderCache,invalidateStorageFolderCache} from '../drive/storage-folder-cache';
+import {applyDropboxChanges,type DropboxDelta} from './dropbox-folder-delta';
 import {useDriveTransfers} from '../drive/DriveTransfersProvider';
 import {dropboxFolderLinkId,linkDropboxFolder,readDropboxLinks,unlinkDropboxFolder,type DropboxFolderLink} from '../../data/dropbox-folder-links';
 import '../drive/drive-library.css';
 import './dropbox.css';
 const API='https://roteiva-api-dev.ewertonmendes9.workers.dev';
 type Connection={id:string;email:string;status:'connected'|'reconnect_required'|'revocation_pending';scopes:string};
-type Page={folder:{id:string;name:string};files:DriveItem[];nextPageToken:string|null};
+type Page={folder:{id:string;name:string};files:DriveItem[];nextPageToken:string|null;syncCursor?:string|null};
+const FRESH_MS=30_000;
+const MAX_DELTA_PAGES=12;
 type PreviewTicket={url:string;mimeType:string;expiresAt:number;size:number};
 function DropboxPreview({file,link,onClose,onNext,onPrevious}:{file:DriveItem;link:DropboxFolderLink;onClose:()=>void;onNext?:()=>void;onPrevious?:()=>void}){
  const call=useDriveApi();
@@ -83,6 +87,12 @@ export function DropboxConnectionPanel({projects,selectedProjectId,onLinkedFolde
  const currentFolder=path.at(-1)?.id||viewing?.folderId||'';
  const requestId=useRef(0),pickerId=useRef(0),searchId=useRef(0);
  const autoOpened=useRef('');
+ const previousScope=useRef('');
+ useEffect(()=>{
+  const next=user?.uid&&account?.id?user.uid+':'+account.id:'';
+  if(previousScope.current&&previousScope.current!==next)clearStorageFolderCache('dropbox');
+  previousScope.current=next;
+ },[user?.uid,account?.id]);
  const refresh=useCallback(async()=>{
   if(!user)return;
   const [next,linked]=await Promise.all([
@@ -98,7 +108,7 @@ export function DropboxConnectionPanel({projects,selectedProjectId,onLinkedFolde
     'A integração Dropbox ainda não foi habilitada neste ambiente.':'Não foi possível carregar as contas Dropbox.');}
  }finally{if(live)setReady(true)}})();return()=>{live=false}},[refresh]);
  useEffect(()=>{onLinkedFolderCountChange?.(links.length)},[links.length,onLinkedFolderCountChange]);
- useEffect(()=>{setViewing(null);setItems([]);setPath([]);setPreview(null);setSearch('');},[selectedProjectId]);
+ useEffect(()=>{++requestId.current;++searchId.current;setViewing(null);setItems([]);setPath([]);setPreview(null);setSearch('');},[selectedProjectId]);
  const start=async()=>{
   setBusy(true);setError('');
   try{
@@ -109,18 +119,80 @@ export function DropboxConnectionPanel({projects,selectedProjectId,onLinkedFolde
   }catch(e){setError(e instanceof Error?e.message:'Não foi possível conectar o Dropbox.');setBusy(false)}
  };
  const callback=new URLSearchParams(window.location.search).get('dropbox');
- const load=useCallback(async(folder:DropboxFolderLink,folderId:string,nextPath:DriveTrail[],cursor?:string,append=false)=>{
-  const request=++requestId.current;setFileBusy(true);setError('');
-  if(!append){setItems([]);setFilesPage(null);setSearch('');setRemote(null);setViewing(folder);setPath(nextPath)}
-  try{
-   const params=new URLSearchParams();if(cursor)params.set('pageToken',cursor);
-   const response=await call<Page>('/integrations/dropbox/'+encodeURIComponent(folder.connectionId)+'/folders/'+encodeURIComponent(folderId)+'/items?'+params);
+ const load=useCallback(async(folder:DropboxFolderLink,folderId:string,nextPath:DriveTrail[],cursor?:string,append=false,force=false)=>{
+  if(!user)return;
+  const request=++requestId.current;
+  const key=cacheKey(user.uid,folder.connectionId,folderId,'','','dropbox');
+  const cached=getCachedFolder(key);
+  setFileBusy(append||!cached);setError('');
+  if(!append){
+   ++searchId.current;setSearch('');setRemote(null);setSearchBusy(false);
+   setViewing(folder);setPath(nextPath);
+   setItems(cached?.files||[]);setFilesPage(cached?.nextPageToken||null);
+  }
+  const uri='/integrations/dropbox/'+encodeURIComponent(folder.connectionId)+
+    '/folders/'+encodeURIComponent(folderId)+'/items';
+  const show=(files:DriveItem[],page:string|null)=>{
    if(request!==requestId.current)return;
-   setItems(old=>append?[...old,...response.files.filter(f=>!old.some(x=>x.id===f.id))]:response.files);
-   setFilesPage(response.nextPageToken);setViewing(folder);setPath(nextPath);
-  }catch(e){if(request===requestId.current)setError(e instanceof Error?e.message:'Não foi possível carregar a pasta.')}
-  finally{if(request===requestId.current)setFileBusy(false)}
- },[call]);
+   setItems(files);setFilesPage(page);
+   setViewing(folder);setPath(nextPath);
+  };
+  try{
+   if(!append&&!force&&cached&&Date.now()-cached.fetchedAt<FRESH_MS)return;
+   if(!append&&!force&&cached?.complete&&cached.syncCursor){
+    let cursorValue=cached.syncCursor;
+    const changes:NonNullable<DropboxDelta['changes']>=[];
+    let fullyRead=false,reset=false;
+    for(let n=0;n<MAX_DELTA_PAGES;n++){
+     const value=cursorValue;
+     const response=await onceFolderRequest(
+       cacheKey(user.uid,folder.connectionId,folderId,'__delta__',value,'dropbox'),
+       ()=>call<DropboxDelta>(uri+'?changesCursor='+encodeURIComponent(value))
+     );
+     if(request!==requestId.current)return;
+     if(response.reset){reset=true;break;}
+     if(!Array.isArray(response.changes)||!response.syncCursor||
+        typeof response.hasMore!=='boolean')throw Error('Resposta de sincronização inválida.');
+     changes.push(...response.changes);
+     cursorValue=response.syncCursor;
+     if(!response.hasMore){fullyRead=true;break;}
+    }
+    if(fullyRead){
+     const files=applyDropboxChanges(cached.files,changes);
+     setCachedFolder(key,{files,nextPageToken:null,syncCursor:cursorValue,complete:true});
+     show(files,null);
+     return;
+    }
+    // Expired cursor or exceptionally large change backlog: return to a normal
+    // paginated listing rather than apply an incomplete delta snapshot.
+    if(reset||!fullyRead)invalidateStorageFolderCache('dropbox',user.uid,folder.connectionId,folderId);
+   }
+   const params=new URLSearchParams();if(cursor)params.set('pageToken',cursor);
+   const next=await onceFolderRequest(
+     cacheKey(user.uid,folder.connectionId,folderId,'__list__',cursor||'first','dropbox'),
+     ()=>call<Page>(uri+'?'+params)
+   );
+   if(request!==requestId.current)return;
+   const previous=append?getCachedFolder(key):undefined;
+   const files=append?[...(previous?.files||items)].concat(
+     next.files.filter(f=>!(previous?.files||items).some(existing=>existing.id===f.id))
+   ):next.files;
+   const complete=!next.nextPageToken;
+   setCachedFolder(key,{files,nextPageToken:next.nextPageToken,
+     syncCursor:complete?next.syncCursor||null:null,complete});
+   show(files,next.nextPageToken);
+  }catch(e){
+   if(request!==requestId.current)return;
+   const code=(e as {code?:string}).code;
+   if(code==='dropbox_reconnect_required'||code==='authentication_required'||
+      code==='dropbox_file_not_found'||code==='dropbox_connection_not_found'){
+    invalidateStorageFolderCache('dropbox',user.uid,folder.connectionId,folderId);
+    show([],null);
+   }
+   setError(cached?'Não foi possível atualizar a pasta. Os arquivos exibidos podem estar desatualizados.':
+     e instanceof Error?e.message:'Não foi possível carregar a pasta.');
+  }finally{if(request===requestId.current)setFileBusy(false);}
+ },[call,user?.uid]);
  useEffect(()=>{
   const first=relevant[0];
   if(!ready||!first||viewing||picker||disabled)return;
