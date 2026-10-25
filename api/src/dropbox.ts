@@ -263,7 +263,12 @@ function mime(name:string):string{
  const map:Record<string,string>={
   png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',webp:'image/webp',gif:'image/gif',bmp:'image/bmp',svg:'image/svg+xml',
   mp4:'video/mp4',webm:'video/webm',mov:'video/quicktime',m4v:'video/x-m4v',mkv:'video/x-matroska',
-  mp3:'audio/mpeg',wav:'audio/wav',ogg:'audio/ogg',flac:'audio/flac',m4a:'audio/mp4',pdf:'application/pdf'
+  mp3:'audio/mpeg',wav:'audio/wav',ogg:'audio/ogg',flac:'audio/flac',m4a:'audio/mp4',pdf:'application/pdf',
+  ppt:'application/vnd.ms-powerpoint',pptx:'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  pps:'application/vnd.ms-powerpoint',ppsx:'application/vnd.openxmlformats-officedocument.presentationml.slideshow',
+  doc:'application/msword',docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  odt:'application/vnd.oasis.opendocument.text',odp:'application/vnd.oasis.opendocument.presentation',
+  rtf:'application/rtf'
  };
  return map[ext||'']||'application/octet-stream';
 }
@@ -324,6 +329,25 @@ export async function dropboxMedia(env:Env,uid:string,connectionId:string,fileId
  if(response.status>=300&&response.status<400){await response.body?.cancel();throw new ApiError(502,'media_unavailable');}
  if(!response.ok){const st=response.status;await response.body?.cancel();
   throw new ApiError(st===416?416:st===404||st===409?404:502,'media_unavailable');}
+ return response;
+}
+
+/** Official Dropbox document conversion: produces a PDF for supported Office
+ * and presentation formats. Unlike get_thumbnail_v2 (images only), this API
+ * is designed for documents. The owner-only signed ticket is checked upstream. */
+export async function dropboxDocumentPreview(env:Env,uid:string,connectionId:string,fileId:string,fetcher:typeof fetch=fetch):Promise<Response>{
+ if(!validStorageFileId('dropbox',fileId))throw new ApiError(404,'dropbox_file_not_found');
+ const row=await dropboxConnection(env,uid,connectionId);
+ const bearer=await dropboxAccess(env,row,fetcher);
+ let response:Response;
+ try{response=await fetcher(CONTENT+'files/get_preview',{
+  method:'POST',redirect:'manual',signal:AbortSignal.timeout(30000),
+  headers:{Authorization:'Bearer '+bearer,'Dropbox-API-Arg':JSON.stringify({path:fileId})}
+ });}catch{throw new ApiError(502,'document_preview_unavailable')}
+ if(!response.ok||response.status>=300&&response.status<400){
+  const status=response.status;await response.body?.cancel();
+  throw new ApiError(status===409||status===415?415:502,'document_preview_unavailable');
+ }
  return response;
 }
 
