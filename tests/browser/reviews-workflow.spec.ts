@@ -537,6 +537,26 @@ test('Dropbox: vincular pasta funciona com Todos os projetos, sem mudar o filtro
   await dialog.getByRole('button',{name:'Vincular 1 pasta',exact:true}).click();
   await expect(dialog).not.toBeVisible();
   await expect(library.getByRole('button',{name:'Materiais Dropbox',exact:true})).toBeVisible();
+  // A folder action popup must escape the scrolling sidebar on every viewport.
+  const options=library.getByRole('button',{name:'Opções da pasta Materiais Dropbox'});
+  await options.click();
+  const menu=page.getByRole('menu',{name:'Opções da pasta Materiais Dropbox'});
+  await expect(menu.getByRole('menuitem',{name:'Abrir pasta'})).toBeVisible();
+  await expect(menu.getByRole('menuitem',{name:'Desvincular do projeto'})).toBeVisible();
+  const geometry=await menu.evaluate(el=>{
+    const r=el.getBoundingClientRect(),sidebar=document.querySelector('.rl-folder-list')?.getBoundingClientRect();
+    return {top:r.top,bottom:r.bottom,left:r.left,right:r.right,
+      viewportWidth:innerWidth,viewportHeight:innerHeight,sidebarBottom:sidebar?.bottom||0};
+  });
+  expect(geometry.top).toBeGreaterThanOrEqual(0);
+  expect(geometry.bottom).toBeLessThanOrEqual(geometry.viewportHeight);
+  expect(geometry.right).toBeLessThanOrEqual(geometry.viewportWidth);
+  expect(geometry.left).toBeGreaterThanOrEqual(0);
+  await menu.getByRole('menuitem',{name:'Desvincular do projeto'}).click();
+  await expect(page.getByRole('dialog',{name:'Desvincular pasta'})).toBeVisible();
+  await page.getByRole('button',{name:'Manter pasta'}).click();
+  await expect(library.getByRole('button',{name:'Opções da pasta Materiais Dropbox'})).toBeVisible();
+
   const env=await initializeTestEnvironment({projectId:'demo-roteiva',firestore:{host:'127.0.0.1',port:8080}});
   try{await env.withSecurityRulesDisabled(async admin=>{
     const db=admin.firestore();
