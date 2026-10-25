@@ -572,3 +572,94 @@ test('Dropbox: vincular pasta funciona com Todos os projetos, sem mudar o filtro
     });
   });}finally{await env.cleanup();}
 });
+
+
+test('Dropbox: PDF acima de 8 MiB usa todos os ranges e PPTX gera prévia em PDF',async({page,context},info)=>{
+  const email='dropbox-preview-'+info.project.name+'@example.com';
+  const {projectId}=await prepare(page,email);
+  const connectionId='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  const folderId='id:AAAAAAABBBBBBBBCCCCCCCC';
+  const pdfId='id:BBBBBBBBCCCCCCCCDDDDDDDD';
+  const pptId='id:CCCCCCCCDDDDDDDDEEEEEEEE';
+  const chunkSize=8*1024*1024,pdfSize=chunkSize+17;
+  const pdfBytes=Buffer.alloc(pdfSize,32);
+  pdfBytes.write('%PDF-1.7\n',0,'ascii');
+  pdfBytes.write('%%EOF\n',pdfSize-6,'ascii');
+  const officeBytes=Buffer.from('%PDF-1.7\n1 0 obj << /Type /Catalog >> endobj\n%%EOF\n');
+  const ranges:string[]=[];
+  const environment=await initializeTestEnvironment({projectId:'demo-roteiva',firestore:{host:'127.0.0.1',port:8080}});
+  try{
+    await environment.withSecurityRulesDisabled(async admin=>{
+      const db=admin.firestore();
+      const users=await getDocs(query(collection(db,'users'),where('email','==',email)));
+      expect(users.size).toBe(1);
+      const uid=users.docs[0].id;
+      await setDoc(doc(db,'users',uid,'dropboxFolders',projectId+'_'+connectionId+'_'+folderId),{
+        id:projectId+'_'+connectionId+'_'+folderId,
+        ownerUid:uid,schemaVersion:1,provider:'dropbox',projectId,connectionId,
+        folderId,folderName:'Materiais da produção',createdAt:Timestamp.now()
+      });
+    });
+  }finally{await environment.cleanup();}
+  await context.route(api+'/integrations/dropbox**',async route=>{
+    const req=route.request(),url=new URL(req.url()),path=url.pathname;
+    const headers={
+      'Access-Control-Allow-Origin':root,
+      'Access-Control-Allow-Methods':'GET,POST,OPTIONS',
+      'Access-Control-Allow-Headers':'Authorization,Content-Type,Range,Accept',
+      'Access-Control-Expose-Headers':'Content-Length,Content-Range',
+      'Cache-Control':'no-store'
+    };
+    if(req.method()==='OPTIONS')return route.fulfill({status:204,headers});
+    const json=(value:unknown)=>route.fulfill({status:200,headers,
+      contentType:'application/json',body:JSON.stringify(value)});
+    if(path==='/integrations/dropbox')return json({connections:[{
+      id:connectionId,email:'qa-dropbox@example.com',status:'connected',
+      scopes:'account_info.read files.metadata.read files.content.read files.content.write'
+    }]});
+    if(path.endsWith('/items'))return json({folder:{id:folderId,name:'Materiais da produção'},
+      files:[
+        {id:pdfId,name:'Roteiro grande.pdf',mimeType:'application/pdf',size:String(pdfSize)},
+        {id:pptId,name:'Apresentação.pptx',
+         mimeType:'application/vnd.openxmlformats-officedocument.presentationml.presentation',size:'120'}
+      ],nextPageToken:null});
+    if(path.endsWith('/preview-ticket')){
+      const fileId=(req.postDataJSON() as {fileId:string}).fileId;
+      return json({url:api+'/integrations/dropbox/media?ticket='+(fileId===pdfId?'pdf':'office'),
+        mimeType:'application/pdf',size:fileId===pdfId?pdfSize:120,expiresAt:Date.now()+60000});
+    }
+    if(path==='/integrations/dropbox/media'){
+      if(url.searchParams.get('ticket')==='office')
+        return route.fulfill({status:200,headers:{...headers,'Content-Type':'application/pdf'},
+          body:officeBytes});
+      const range=req.headers().range||'';
+      ranges.push(range);
+      const match=/^bytes=(\d+)-(\d+)$/.exec(range);
+      if(!match)return route.fulfill({status:416,headers,body:'Missing range'});
+      const first=Number(match[1]),last=Number(match[2]);
+      if(last>=pdfSize||first>last)return route.fulfill({status:416,headers,body:'Invalid range'});
+      return route.fulfill({status:206,headers:{...headers,'Content-Type':'application/pdf',
+        'Content-Range':`bytes ${first}-${last}/${pdfSize}`},
+        body:pdfBytes.subarray(first,last+1)});
+    }
+    return route.fallback();
+  });
+  await page.goto(root+'/biblioteca?driveE2E=1');
+  await page.getByRole('tab',{name:'Dropbox'}).click();
+  const library=page.getByRole('region',{name:'Biblioteca Dropbox'});
+  await expect(library.locator('.rl-file-open').filter({hasText:'Roteiro grande.pdf'})).toBeVisible();
+  await library.getByRole('button',{name:'Visualização em lista'}).click();
+  await library.locator('.rl-file-open').filter({hasText:'Roteiro grande.pdf'}).click();
+  const pdfDialog=page.getByRole('dialog',{name:'Prévia de Roteiro grande.pdf'});
+  await expect(pdfDialog.locator('iframe')).toHaveAttribute('src',/^blob:/);
+  expect(ranges).toEqual(['bytes=0-'+(chunkSize-1),'bytes='+chunkSize+'-'+(pdfSize-1)]);
+  await pdfDialog.getByRole('button',{name:'Fechar'}).click();
+
+  await library.locator('.rl-file-open').filter({hasText:'Apresentação.pptx'}).click();
+  const pptDialog=page.getByRole('dialog',{name:'Prévia de Apresentação.pptx'});
+  await expect(pptDialog.locator('iframe')).toHaveAttribute('src',/^blob:/);
+  await pptDialog.getByRole('button',{name:'Fechar'}).click();
+  await library.getByRole('button',{name:'Visualização em grade'}).click();
+  await expect(library.getByLabel('Miniatura de Apresentação.pptx').locator('iframe'))
+    .toHaveAttribute('src',/^blob:/);
+});
