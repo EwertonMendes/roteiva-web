@@ -5,7 +5,7 @@ import {useDriveUploads,type UploadDestination,type StorageUploadSession} from '
 import {sendToDropbox} from '../dropbox/dropbox-upload-client';
 import {DriveUploadQueue} from './DriveUploadQueue';
 import {preparePicker,pickUploadFolder,type PickerConfig} from './google-picker';
-import {invalidateDriveFolderCache} from './storage-folder-cache';
+import {invalidateStorageFolderCache} from './storage-folder-cache';
 import {sendToDrive,type UploadSession,type UploadedFile} from './drive-upload-client';
 import './drive-library.css';
 type Completion=(file:UploadedFile,destination:UploadDestination)=>void;
@@ -69,7 +69,7 @@ function DriveTransfersSession({children}:{children:ReactNode}){
   const completed=useCallback<Completion>((file,dest)=>{
     if(!user)return;
     setResult('');
-    invalidateDriveFolderCache(user.uid,dest.connectionId,dest.targetFolderId);
+    invalidateStorageFolderCache(dest.provider,user.uid,dest.connectionId,dest.targetFolderId);
     subscribers.current.forEach(callback=>callback(file,dest));
   },[user]);
   const uploads=useDriveUploads(createUpload,confirmUpload,completed,user?.uid||'',send);
