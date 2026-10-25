@@ -4,7 +4,7 @@ import { ChevronDown, Cloud, FolderOpen, Link2, MoreHorizontal, Plus, RefreshCw,
 import { useAuth } from "../auth/AuthProvider";
 import { driveFolderLinkId, linkDriveFolder, readDriveLinks, unlinkDriveFolder, type DriveFolderLink } from "../../data/drive-folder-links";
 import type { Project } from "../../domain/workspace";
-import { DRIVE_FOLDER, DriveFileExplorer, DriveFolderPicker, DrivePreview, DriveUnlinkConfirm, driveFileUrl, isPreviewable, type DriveItem, type DriveTrail } from "./DriveLibraryUI";
+import { DRIVE_FOLDER, DriveFileExplorer, StorageFolderPicker, DrivePreview, DriveUnlinkConfirm, driveFileUrl, isPreviewable, type DriveItem, type DriveTrail } from "./DriveLibraryUI";
 import {clearDriveThumbnailCache} from "./DriveThumbnail";
 import {useDriveThumbnailFetch} from "./useDriveThumbnailFetch";
 import {cacheKey,getCachedFolder,setCachedFolder,clearDriveFolderCache} from "./drive-folder-cache";
@@ -426,7 +426,7 @@ export function DriveConnectionPanel({
           else if(viewing&&filePage)void openFiles(viewing,filePage,true,viewPath.at(-1)?.id||viewing.folderId,viewPath);
         }}/>
     </div>
-    {picker&&<DriveFolderPicker projects={projects} projectId={selectedProjectId} onProjectChange={onSelectProject}
+    {picker&&<StorageFolderPicker projects={projects} projectId={selectedProjectId} onProjectChange={onSelectProject}
       folders={folderList} path={trail} loading={folderBusy} working={busy} canRead={!!connection}
       hasMore={!!folderPage} mode={rootMode} onModeChange={mode=>void browse(mode,[{id:mode,name:mode==="root"?"Meu Drive":"Todas as pastas"}],null,false,mode)} linkedIds={linkedIds} error={error} onClose={closePicker}
       onNavigate={(id,path)=>void browse(id,path)} onMore={()=>void browse(trail.at(-1)?.id||"root",trail,folderPage,true)}
