@@ -124,6 +124,9 @@
 .rl-picker-empty {display:flex;align-items:center;justify-content:center;flex:1;min-height:150px;gap:12px;flex-direction:column;text-align:center;padding:24px;color:var(--rl-muted);font-size:.875rem;}
 .rl-picker-empty p {max-width:340px;margin:0;}
 .rl-error {margin:4px 20px 10px;border:1px solid var(--rl-border);border-radius:9px;padding:10px 12px;color:var(--rl-ink);font-size:.875rem;}
+.rl-picker-error{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.rl-picker-error span{flex:1;min-width:170px;overflow-wrap:anywhere}
+.rl-picker-error button{flex:0 0 auto}
 .rl-preview-overlay {justify-content:center;align-items:center;}
 .rl-preview {display:flex;flex-direction:column;min-width:0;width:min(1060px,100%);height:min(850px,calc(100dvh - 32px));border-radius:15px;background:var(--paper,#fff);color:var(--ink);border:1px solid var(--line);overflow:hidden;outline:0;}
 .rl-preview header {min-height:63px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 16px;}
