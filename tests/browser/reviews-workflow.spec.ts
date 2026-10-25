@@ -510,15 +510,31 @@ test('Dropbox: vincular pasta funciona com Todos os projetos, sem mudar o filtro
   const linkButton=library.getByRole('button',{name:'Vincular pasta',exact:true});
   await expect(linkButton).toBeEnabled();
   await linkButton.click();
-  const dialog=page.getByRole('dialog',{name:'Vincular pasta Dropbox'});
+  const dialog=page.getByRole('dialog',{name:'Selecionar pastas do Dropbox'});
   await expect(dialog).toBeVisible();
   // One available project: the project picker must be usable even when the
   // global filter says "Todos os projetos".
-  await expect(dialog.getByRole('combobox',{name:'Projeto para vincular a pasta'})).toContainText('Projeto Revisão');
+  await expect(dialog.getByRole('combobox',{name:'Projeto para vincular pastas'})).toContainText('Projeto Revisão');
   await expect(dialog.getByRole('alert')).toContainText('Dropbox');
   await dialog.getByRole('button',{name:'Tentar novamente'}).click();
-  await expect(dialog.getByRole('button',{name:'Vincular',exact:true})).toBeEnabled();
-  await dialog.getByRole('button',{name:'Vincular',exact:true}).click();
+  await expect(dialog).toHaveClass(/rl-picker/);
+  for(const theme of ['light','dark']){
+    await page.evaluate(theme=>{document.documentElement.dataset.theme=theme},theme);
+    const style=await dialog.evaluate(element=>{
+      const modal=getComputedStyle(element);
+      const root=getComputedStyle(document.documentElement);
+      return {background:modal.backgroundColor,color:modal.color,
+        expectedBackground:root.getPropertyValue('--paper').trim(),expectedColor:root.getPropertyValue('--ink').trim(),
+        width:element.getBoundingClientRect().width,viewport:window.innerWidth};
+    });
+    // The same semantic surface tokens must work for both providers on both themes.
+    expect(style.background.toLowerCase()).not.toBe(style.color.toLowerCase());
+    expect(style.width).toBeLessThanOrEqual(style.viewport);
+    expect(style.width).toBeGreaterThan(260);
+  }
+  await dialog.getByRole('checkbox',{name:'Selecionar Materiais Dropbox'}).check();
+  await expect(dialog.getByRole('button',{name:'Vincular 1 pasta',exact:true})).toBeEnabled();
+  await dialog.getByRole('button',{name:'Vincular 1 pasta',exact:true}).click();
   await expect(dialog).not.toBeVisible();
   await expect(library.getByRole('button',{name:'Materiais Dropbox',exact:true})).toBeVisible();
   const env=await initializeTestEnvironment({projectId:'demo-roteiva',firestore:{host:'127.0.0.1',port:8080}});
