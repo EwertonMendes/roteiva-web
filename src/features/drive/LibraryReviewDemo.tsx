@@ -1,7 +1,7 @@
 import { AppSelect } from "../ui/AppSelect";
 import { useState } from "react";
 import { Check, ChevronDown, FolderOpen, MoreHorizontal, Plus, ShieldCheck } from "lucide-react";
-import { DRIVE_FOLDER, DriveFileExplorer, DriveFolderPicker, type DriveItem, type DriveTrail } from "./DriveLibraryUI";
+import { DRIVE_FOLDER, DriveFileExplorer, StorageFolderPicker, type DriveItem, type DriveTrail } from "./DriveLibraryUI";
 import "./drive-library.css";
 
 /** Compile-time, no-auth UX review. Never connects to Firebase, Drive, or the Worker. */
@@ -100,7 +100,7 @@ export function LibraryReviewDemo() {
         onOpen={file=>file.mimeType===DRIVE_FOLDER?openFolder(file.id,file.name):setNotice("Prévia de arquivo indisponível neste exemplo. No sistema conectado, o arquivo original é aberto pelo Google Drive.")}
         onMore={()=>{}}/>
     </div>
-    {picker&&<DriveFolderPicker projects={projects} projectId={project} onProjectChange={changeProject}
+    {picker&&<StorageFolderPicker projects={projects} projectId={project} onProjectChange={changeProject}
       folders={pickerPath.length===1?folders:examples[pickerPath.at(-1)?.id||""]?.filter(f=>f.mimeType===DRIVE_FOLDER)||[]}
       path={pickerPath} mode="root" onModeChange={mode=>setPickerPath([{id:mode,name:mode==="root"?"Meu Drive":"Todas as pastas"}])}
       loading={false} working={false} canRead={true} hasMore={false} error=""
