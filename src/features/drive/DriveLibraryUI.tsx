@@ -77,7 +77,11 @@ export function useOverlayFocus(onClose:()=>void,enabled=true,overlayKey?:string
   return dialogRef;
 }
 
-type FolderPickerProps={
+export type FolderPickerProps={
+  /** Provider-specific actions; theme and structure are shared. */
+  provider?:'google_drive'|'dropbox';
+  onRetry?:()=>void;
+  onLinkCurrent?:(folder:DriveItem)=>Promise<boolean>;
   projects:readonly {id:number;name:string}[];
   projectId?:number;
   onProjectChange:(id:string)=>void;
@@ -97,37 +101,46 @@ type FolderPickerProps={
   onConnect:()=>void;
   onClose:()=>void;
 };
-export function DriveFolderPicker({projects,projectId,onProjectChange,folders,path,loading,working,canRead,hasMore,mode,onModeChange,linkedIds,error,onNavigate,onMore,onLink,onConnect,onClose}:FolderPickerProps){
+export function DriveFolderPicker({provider='google_drive',projects,projectId,onProjectChange,folders,path,loading,working,canRead,hasMore,mode,onModeChange,linkedIds,error,onNavigate,onMore,onLink,onConnect,onClose,onRetry,onLinkCurrent}:FolderPickerProps){
+  const providerName=provider==='dropbox'?'Dropbox':'Google Drive';
   const [chosen,setChosen]=useState<Record<string,DriveItem>>({});
   const [filter,setFilter]=useState("");
   const [submitting,setSubmitting]=useState(false);
   const ref=useOverlayFocus(()=>{if(!working&&!submitting)onClose();});
   useEffect(()=>{setChosen({});setFilter("");},[projectId]);
   const selected=Object.values(chosen).filter(f=>!linkedIds.has(f.id));
+  const currentFolder=path.at(-1);
+  const canLinkCurrent=provider==='dropbox'&&!!onLinkCurrent&&!!projectId&&!!currentFolder&&!linkedIds.has(currentFolder.id);
   const visible=folders.filter(f=>f.name.toLocaleLowerCase("pt-BR").includes(filter.toLocaleLowerCase("pt-BR")));
   async function commit(){
-    if(!selected.length || !projectId || submitting)return;
+    if(!selected.length || !projectId || submitting || working || loading)return;
     setSubmitting(true);
     try{if(await onLink(selected)) onClose();}finally{setSubmitting(false);}
   }
+  async function linkCurrent(){
+    if(!canLinkCurrent||!currentFolder||!onLinkCurrent||submitting||working||loading)return;
+    setSubmitting(true);
+    try{if(await onLinkCurrent({...currentFolder,mimeType:DROPBOX_FOLDER}))onClose();}
+    finally{setSubmitting(false);}
+  }
   return <div className="rl-overlay" onMouseDown={event=>{if(event.target===event.currentTarget && !working && !submitting)onClose();}}>
-    <div className="rl-picker" ref={ref} role="dialog" aria-modal="true" aria-label="Selecionar pastas do Google Drive" tabIndex={-1}>
-      <header className="rl-picker-head"><div><h2>Vincular pastas</h2><p>Escolha as pastas que deseja organizar no projeto.</p></div>
-        <button className="rl-icon-button" type="button" onClick={onClose} aria-label="Fechar seletor" disabled={submitting}><X size={18}/></button></header>
+    <div className="rl-picker" ref={ref} role="dialog" aria-modal="true" aria-label={"Selecionar pastas do "+providerName} tabIndex={-1}>
+      <header className="rl-picker-head"><div><h2>Vincular pastas</h2><p>Escolha as pastas que deseja organizar no projeto. Os arquivos continuam no {providerName}.</p></div>
+        <button className="rl-icon-button" type="button" onClick={onClose} aria-label="Fechar seletor" disabled={working||submitting}><X size={18}/></button></header>
       <div className="rl-picker-context">
         <label htmlFor="rl-picker-project">Projeto de destino</label>
-        <AppSelect id="rl-picker-project" aria-label="Projeto para vincular pastas" value={projectId??""} onValueChange={value=>onProjectChange(value)} disabled={submitting}>
+        <AppSelect id="rl-picker-project" aria-label="Projeto para vincular pastas" value={projectId??""} onValueChange={value=>onProjectChange(value)} disabled={working||submitting}>
           <option value="">Selecione um projeto</option>{projects.map(project=><option key={project.id} value={project.id}>{project.name}</option>)}
         </AppSelect>
       </div>
-      {!projectId?<div className="rl-picker-empty"><FolderOpen size={30}/><p>Escolha um projeto para carregar suas pastas do Google Drive.</p></div>
+      {!projectId?<div className="rl-picker-empty"><FolderOpen size={30}/><p>Escolha um projeto para carregar suas pastas do {providerName}.</p></div>
       :!canRead?<div className="rl-picker-empty"><Link2 size={30}/><p>É necessário autorizar a leitura das pastas existentes na sua conta Google.</p><button className="primary-button" type="button" onClick={onConnect} disabled={working}>Autorizar Google Drive</button></div>
       :<>
-        <div className="rl-picker-modes" role="group" aria-label="Local de pesquisa">
+        {provider==='google_drive'&&<div className="rl-picker-modes" role="group" aria-label="Local de pesquisa">
           <button type="button" aria-pressed={mode==="root"} onClick={()=>onModeChange("root")} disabled={loading}>Meu Drive</button>
           <button type="button" aria-pressed={mode==="all"} onClick={()=>onModeChange("all")} disabled={loading}>Todas as pastas</button>
-        </div>
-        <nav className="rl-breadcrumbs" aria-label="Localização no Google Drive">{path.map((entry,i)=><span key={entry.id}>
+        </div>}
+        <nav className="rl-breadcrumbs" aria-label={"Localização no "+providerName}>{path.map((entry,i)=><span key={entry.id}>
           {i>0&&<ChevronRight size={13}/>}
           <button type="button" onClick={()=>onNavigate(entry.id,path.slice(0,i+1))} disabled={loading}>{entry.name}</button>
         </span>)}</nav>
@@ -153,10 +166,11 @@ export function DriveFolderPicker({projects,projectId,onProjectChange,folders,pa
         </div>
         <p className="rl-picker-note">A seleção permanece ao navegar entre pastas. O filtro considera apenas os resultados carregados.</p>
       </>}
-      {error&&<p role="alert" className="rl-error">{error}</p>}
+      {error&&<div role="alert" className="rl-error rl-picker-error"><span>{error}</span>{onRetry&&<button type="button" className="secondary-button" onClick={onRetry} disabled={loading||working||submitting}>Tentar novamente</button>}</div>}
       <footer className="rl-picker-footer"><span>{selected.length} {selected.length===1?"pasta selecionada":"pastas selecionadas"}</span>
-        <div><button type="button" className="secondary-button" onClick={onClose} disabled={submitting}>Cancelar</button>
-          <button type="button" className="primary-button" onClick={()=>void commit()} disabled={!selected.length||!canRead||working||submitting}>{submitting?"Vinculando…":selected.length?`Vincular ${selected.length} ${selected.length===1?"pasta":"pastas"}`:"Vincular pastas"}</button>
+        <div><button type="button" className="secondary-button" onClick={onClose} disabled={working||submitting}>Cancelar</button>
+           {canLinkCurrent&&<button type="button" className="secondary-button" onClick={()=>void linkCurrent()} disabled={loading||working||submitting}>Vincular pasta atual</button>}
+          <button type="button" className="primary-button" onClick={()=>void commit()} disabled={!projectId||!selected.length||!canRead||working||submitting||loading}>{submitting?"Vinculando…":selected.length?`Vincular ${selected.length} ${selected.length===1?"pasta":"pastas"}`:"Vincular pastas"}</button>
         </div>
       </footer>
     </div>
