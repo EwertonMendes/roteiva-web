@@ -278,43 +278,90 @@ export function dropboxNormalize(meta:DropboxMeta){
  if(!folder&&meta['.tag']!=='file')return null;
  return {id:meta.id,name:meta.name,mimeType:folder?'application/vnd.roteiva.folder':mime(meta.name),
    isFolder:folder,size:folder?undefined:String(meta.size||0),modifiedTime:meta.server_modified,
-   pathDisplay:meta.path_display,thumbnailFallback:!folder&&/\.(jpe?g|png|gif|webp|bmp|tiff?|pdf)$/i.test(meta.name)};
+   pathDisplay:meta.path_display,pathLower:meta.path_lower,thumbnailFallback:!folder&&/\.(jpe?g|png|gif|webp|bmp|tiff?|pdf)$/i.test(meta.name)};
 }
 export async function dropboxMetadata(env:Env,uid:string,connectionId:string,fileId:string):Promise<DropboxMeta>{
  if(!validStorageFileId('dropbox',fileId))throw new ApiError(400,'dropbox_invalid_file');
  const row=await dropboxConnection(env,uid,connectionId);
  return await jsonDropbox(env,row,'files/get_metadata',{path:fileId}) as DropboxMeta;
 }
-export async function dropboxList(env:Env,uid:string,connectionId:string,folderId:string,page:string|null,search:string|null):Promise<Response>{
+/**
+ * A final Dropbox list_folder cursor is reusable for future changes. The cursor
+ * during pagination is NOT a complete snapshot, so callers must never use it as
+ * a synchronization cursor until has_more becomes false.
+ */
+export async function dropboxList(env:Env,uid:string,connectionId:string,folderId:string,
+ page:string|null,search:string|null,changesCursor:string|null=null):Promise<Response>{
  if(!validStorageFolderId('dropbox',folderId,true))throw new ApiError(400,'dropbox_invalid_folder');
- if(page&&(!/^[A-Za-z0-9_\-]{1,2048}$/.test(page)))throw new ApiError(400,'dropbox_invalid_cursor');
+ const validCursor=(value:string)=>value.length<=2048&&/^[A-Za-z0-9_-]+$/.test(value);
+ if(page&&!validCursor(page)||changesCursor&&!validCursor(changesCursor))
+   throw new ApiError(400,'dropbox_invalid_cursor');
  if(search&&(search.length>100||/[\x00-\x1f]/.test(search)))throw new ApiError(400,'invalid_search');
+ if(changesCursor&&(page||search))throw new ApiError(400,'dropbox_invalid_cursor');
  const row=await dropboxConnection(env,uid,connectionId);
  if(row.status!=='connected')throw new ApiError(409,'dropbox_reconnect_required');
- const root=folderId==='root',folder=root?{id:'root',name:'Meu Dropbox'}:
-  (()=>null as unknown as {id:string;name:string})();
- let actualFolder=folder;
- if(!root){
-  const meta=await jsonDropbox(env,row,'files/get_metadata',{path:folderId}) as DropboxMeta;
-  if(meta['.tag']!=='folder'||meta.id!==folderId)throw new ApiError(404,'dropbox_file_not_found');
-  actualFolder={id:meta.id!,name:meta.name!};
+
+ if(changesCursor){
+   // Only one bounded delta page per request. Never use longpoll or background
+   // polling: navigation initiates changes when the short-lived cache is stale.
+   const credential=await dropboxAccess(env,row);
+   const upstream=await requestDropbox(env,credential,'files/list_folder/continue',{cursor:changesCursor});
+   if(!upstream.ok){
+     if(upstream.status===409){
+       const payload=await upstream.json().catch(()=>null) as
+         {error?:{'.tag'?:string};error_summary?:string}|null;
+       if(payload?.error?.['.tag']==='reset'||payload?.error_summary?.startsWith('reset/'))
+         return Response.json({reset:true});
+       if(payload?.error?.['.tag']==='path')throw new ApiError(404,'dropbox_file_not_found');
+     }else await upstream.body?.cancel();
+     if(upstream.status===401)throw new ApiError(409,'dropbox_reconnect_required');
+     if(upstream.status===429)throw new ApiError(429,'dropbox_rate_limited');
+     throw new ApiError(502,'dropbox_unavailable');
+   }
+   const data=await upstream.json().catch(()=>null) as
+     {entries?:DropboxMeta[];cursor?:string;has_more?:boolean}|null;
+   if(!data||!Array.isArray(data.entries)||typeof data.cursor!=='string'||
+      !validCursor(data.cursor)||typeof data.has_more!=='boolean')
+      throw new ApiError(502,'dropbox_invalid_response');
+   const changes=data.entries.map(entry=>
+     entry['.tag']==='deleted'&&typeof entry.path_lower==='string'?
+       {deleted:true,pathLower:entry.path_lower}:
+       dropboxNormalize(entry)).filter(Boolean);
+   return Response.json({reset:false,changes,syncCursor:data.cursor,hasMore:data.has_more});
  }
- let data:Record<string,unknown>;
+
+ const root=folderId==='root';
+ // Metadata ownership/type verification and listing are independent Dropbox
+ // calls. Execute concurrently to remove one round-trip without skipping checks.
+ const metaPromise=root?Promise.resolve(null):
+   jsonDropbox(env,row,'files/get_metadata',{path:folderId}) as Promise<DropboxMeta|null>;
+ let dataPromise:Promise<Record<string,unknown>>;
  if(search&&search.trim().length>=2){
-  if(page) data=await jsonDropbox(env,row,'files/search/continue_v2',{cursor:page});
-  else data=await jsonDropbox(env,row,'files/search_v2',{query:search.trim(),
-     options:{path:root?'':folderId,max_results:MAX_PAGE,filename_only:true,file_status:'active'}});
-  const matches=Array.isArray(data.matches)?data.matches as {metadata?:{metadata?:DropboxMeta}}[]:[];
-  return Response.json({folder:actualFolder,files:matches.map(a=>dropboxNormalize(a.metadata?.metadata as DropboxMeta)).filter(Boolean),
-    nextPageToken:data.has_more===true&&typeof data.cursor==='string'?data.cursor:null});
+   dataPromise=page?jsonDropbox(env,row,'files/search/continue_v2',{cursor:page}):
+     jsonDropbox(env,row,'files/search_v2',{query:search.trim(),
+       options:{path:root?'':folderId,max_results:MAX_PAGE,filename_only:true,file_status:'active'}});
+ }else{
+   dataPromise=page?jsonDropbox(env,row,'files/list_folder/continue',{cursor:page}):
+     jsonDropbox(env,row,'files/list_folder',{path:root?'':folderId,recursive:false,limit:MAX_PAGE,
+       include_mounted_folders:true,include_non_downloadable_files:false});
  }
- if(page)data=await jsonDropbox(env,row,'files/list_folder/continue',{cursor:page});
- else data=await jsonDropbox(env,row,'files/list_folder',{path:root?'':folderId,recursive:false,limit:MAX_PAGE,
-    include_mounted_folders:true,include_non_downloadable_files:false});
+ const [meta,data]=await Promise.all([metaPromise,dataPromise]);
+ if(meta&&(meta['.tag']!=='folder'||meta.id!==folderId))
+   throw new ApiError(404,'dropbox_file_not_found');
+ const folder=root?{id:'root',name:'Meu Dropbox'}:{id:meta!.id!,name:meta!.name!};
+ if(search&&search.trim().length>=2){
+   const matches=Array.isArray(data.matches)?data.matches as {metadata?:{metadata?:DropboxMeta}}[]:[];
+   return Response.json({folder,files:matches.map(a=>dropboxNormalize(a.metadata?.metadata as DropboxMeta)).filter(Boolean),
+     nextPageToken:data.has_more===true&&typeof data.cursor==='string'?data.cursor:null,
+     syncCursor:null});
+ }
  const entries=Array.isArray(data.entries)?data.entries as DropboxMeta[]:[];
- return Response.json({folder:actualFolder,files:entries.map(dropboxNormalize).filter(Boolean),
-   nextPageToken:data.has_more===true&&typeof data.cursor==='string'?data.cursor:null});
+ const more=data.has_more===true;
+ return Response.json({folder,files:entries.map(dropboxNormalize).filter(Boolean),
+   nextPageToken:more&&typeof data.cursor==='string'?data.cursor:null,
+   syncCursor:!more&&typeof data.cursor==='string'?data.cursor:null});
 }
+
 /** Dropbox content-download uses POST with Dropbox-API-Arg; never expose OAuth bearer. */
 export async function dropboxMedia(env:Env,uid:string,connectionId:string,fileId:string,range?:string,fetcher:typeof fetch=fetch):Promise<Response>{
  if(!validStorageFileId('dropbox',fileId))throw new ApiError(404,'dropbox_file_not_found');
