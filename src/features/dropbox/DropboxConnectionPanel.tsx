@@ -329,7 +329,7 @@ export function DropboxConnectionPanel({projects,selectedProjectId,onLinkedFolde
   if(!viewing||!user||!remote?.next||searchBusy)return;
   const previous=remote;
   const reqId=searchId.current;
-  const qs=new URLSearchParams({search:previous.term,pageToken:previous.next});
+  const qs=new URLSearchParams({search:previous.term,pageToken:previous.next!});
   setSearchBusy(true);
   try{
    const response=await onceFolderRequest(
