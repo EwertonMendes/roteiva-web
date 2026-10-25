@@ -690,3 +690,81 @@ test('Dropbox: PDF acima de 8 MiB usa todos os ranges e PPTX gera prévia em PDF
   expect(thumbnailRequests.length).toBe(2); // Native + unsupported cached across view switches.
   expect(previewTickets).toBe(2); // Nothing downloaded for presentation thumbnails.
 });
+
+
+test('Dropbox: voltar à pasta usa cache e atualizar aplica somente alterações do cursor',async({page,context},info)=>{
+ const email='dropbox-cache-'+info.project.name+'@example.com';
+ const {projectId}=await prepare(page,email);
+ const connectionId='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+ const folderId='id:AAAAAAAAAAAAAAABBBBBBBB';
+ const childId='id:BBBBBBBBBBBBBBBBCCCCCCCC';
+ const oldId='id:CCCCCCCCCCCCCCCCDDDDDDDD';
+ const newId='id:DDDDDDDDDDDDDDDDFFFFFFFF';
+ const userEnv=await initializeTestEnvironment({projectId:'demo-roteiva',firestore:{host:'127.0.0.1',port:8080}});
+ try{await userEnv.withSecurityRulesDisabled(async admin=>{
+  const db=admin.firestore();
+  const matches=await getDocs(query(collection(db,'users'),where('email','==',email)));
+  expect(matches.size).toBe(1);
+  const uid=matches.docs[0].id;
+  await setDoc(doc(db,'users',uid,'dropboxFolders',projectId+'_'+connectionId+'_'+folderId),{
+   ownerUid:uid,schemaVersion:1,projectId,connectionId,folderId,
+   folderName:'Materiais',createdAt:Timestamp.now()
+  });
+ });}finally{await userEnv.cleanup();}
+ const calls={root:0,child:0,delta:0};
+ await context.route(api+'/integrations/dropbox**',async route=>{
+  const request=route.request(),url=new URL(request.url()),path=decodeURIComponent(url.pathname);
+  const headers={'Access-Control-Allow-Origin':root,
+   'Access-Control-Allow-Methods':'GET,POST,OPTIONS',
+   'Access-Control-Allow-Headers':'Authorization,Content-Type','Cache-Control':'no-store'};
+  if(request.method()==='OPTIONS')return route.fulfill({status:204,headers});
+  const json=(body:unknown)=>route.fulfill({status:200,headers,contentType:'application/json',body:JSON.stringify(body)});
+  if(path==='/integrations/dropbox')return json({connections:[{
+   id:connectionId,email:'qa@example.com',status:'connected',
+   scopes:'account_info.read files.metadata.read files.content.read files.content.write'
+  }]});
+  if(path.endsWith('/items')){
+   if(url.searchParams.has('changesCursor')){
+    calls.delta++;
+    expect(url.searchParams.get('changesCursor')).toBe('ROOT1');
+    return json({reset:false,changes:[
+     {deleted:true,pathLower:'/materiais/antigo.pdf'},
+     {id:newId,name:'Novo.pdf',mimeType:'application/pdf',size:'51000',
+      pathLower:'/materiais/novo.pdf',pathDisplay:'/Materiais/Novo.pdf'}
+    ],syncCursor:'ROOT2',hasMore:false});
+   }
+   if(path.includes(childId)){
+    calls.child++;
+    return json({folder:{id:childId,name:'Subpasta'},files:[
+     {id:'id:EEEEEEEEEEEEEEEEFFFFFFFF',name:'Notas.txt',mimeType:'text/plain',size:'300'}
+    ],nextPageToken:null,syncCursor:'CHILD1'});
+   }
+   calls.root++;
+   return json({folder:{id:folderId,name:'Materiais'},files:[
+    {id:childId,name:'Subpasta',mimeType:'application/vnd.roteiva.folder',size:'0'},
+    {id:oldId,name:'Antigo.pdf',mimeType:'application/pdf',size:'50000',
+     pathLower:'/materiais/antigo.pdf',pathDisplay:'/Materiais/Antigo.pdf'}
+   ],nextPageToken:null,syncCursor:'ROOT1'});
+  }
+  return route.fallback();
+ });
+ await page.goto(root+'/biblioteca?driveE2E=1');
+ await page.getByRole('tab',{name:'Dropbox'}).click();
+ const library=page.getByRole('region',{name:'Biblioteca Dropbox'});
+ await expect(library.locator('.rl-file-open').filter({hasText:'Antigo.pdf'})).toBeVisible();
+ const sub=library.locator('.rl-file-open').filter({hasText:'Subpasta'});
+ await sub.click();
+ await expect(library.locator('.rl-file-open').filter({hasText:'Notas.txt'})).toBeVisible();
+ const breadcrumb=library.getByRole('navigation',{name:'Caminho da pasta'});
+ await breadcrumb.getByRole('button',{name:'Materiais'}).click();
+ await expect(library.locator('.rl-file-open').filter({hasText:'Antigo.pdf'})).toBeVisible();
+ expect(calls.root).toBe(1); // No second Worker/Dropbox listing for cached folder.
+ await library.getByRole('button',{name:'Atualizar Dropbox'}).click();
+ await expect(library.locator('.rl-file-open').filter({hasText:'Novo.pdf'})).toBeVisible();
+ await expect(library.locator('.rl-file-open').filter({hasText:'Antigo.pdf'})).toHaveCount(0);
+ expect(calls.root).toBe(1);
+ expect(calls.delta).toBe(1);
+ await library.locator('.rl-file-open').filter({hasText:'Subpasta'}).click();
+ await expect(library.locator('.rl-file-open').filter({hasText:'Notas.txt'})).toBeVisible();
+ expect(calls.child).toBe(1);
+});
