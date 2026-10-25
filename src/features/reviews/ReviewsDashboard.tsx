@@ -11,7 +11,7 @@ import {dropboxWebUrl} from '../dropbox/dropbox-web-url';
 import {driveFileUrl,isStorageFolder,readableFileType,type DriveItem,useOverlayFocus} from "../drive/DriveLibraryUI";
 import {DriveThumbnail} from "../drive/DriveThumbnail";
 import {useDriveThumbnailFetch} from "../drive/useDriveThumbnailFetch";
-import {cacheKey,getCachedFolder,setCachedFolder} from "../drive/drive-folder-cache";
+import {cacheKey,getCachedFolder,setCachedFolder} from "../drive/storage-folder-cache";
 import {useDriveTransfers} from "../drive/DriveTransfersProvider";
 import type {UploadDestination} from "../drive/useDriveUploads";
 import "./reviews.css";
