@@ -41,9 +41,9 @@ export function readableFileType(mime:string){
   if(mime==="application/vnd.google-apps.document")return "Documento Google";
   if(mime==="application/vnd.google-apps.spreadsheet")return "Planilha Google";
   if(mime==="application/vnd.google-apps.presentation")return "Apresentação Google";
-  if(mime.includes("presentation"))return "Apresentação";
+  if(mime.includes("presentation")||mime.includes("powerpoint"))return "Apresentação";
   if(mime.includes("spreadsheet")||mime.includes("excel"))return "Planilha";
-  if(mime.includes("document")||mime.includes("word"))return "Documento";
+  if(mime.includes("document")||mime.includes("word")||mime==="application/msword"||mime==="application/rtf")return "Documento";
   return "Arquivo";
 }
 
