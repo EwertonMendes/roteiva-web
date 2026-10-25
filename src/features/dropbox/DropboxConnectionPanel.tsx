@@ -87,6 +87,8 @@ export function DropboxConnectionPanel({projects,selectedProjectId,onLinkedFolde
  const currentFolder=path.at(-1)?.id||viewing?.folderId||'';
  const requestId=useRef(0),pickerId=useRef(0),searchId=useRef(0);
  const autoOpened=useRef('');
+ const itemsRef=useRef<DriveItem[]>([]);
+ useEffect(()=>{itemsRef.current=items;},[items]);
  const previousScope=useRef('');
  useEffect(()=>{
   const next=user?.uid&&account?.id?user.uid+':'+account.id:'';
@@ -128,13 +130,13 @@ export function DropboxConnectionPanel({projects,selectedProjectId,onLinkedFolde
   if(!append){
    ++searchId.current;setSearch('');setRemote(null);setSearchBusy(false);
    setViewing(folder);setPath(nextPath);
-   setItems(cached?.files||[]);setFilesPage(cached?.nextPageToken||null);
+   itemsRef.current=cached?.files||[];setItems(itemsRef.current);setFilesPage(cached?.nextPageToken||null);
   }
   const uri='/integrations/dropbox/'+encodeURIComponent(folder.connectionId)+
     '/folders/'+encodeURIComponent(folderId)+'/items';
   const show=(files:DriveItem[],page:string|null)=>{
    if(request!==requestId.current)return;
-   setItems(files);setFilesPage(page);
+   itemsRef.current=files;setItems(files);setFilesPage(page);
    setViewing(folder);setPath(nextPath);
   };
   try{
@@ -174,8 +176,8 @@ export function DropboxConnectionPanel({projects,selectedProjectId,onLinkedFolde
    );
    if(request!==requestId.current)return;
    const previous=append?getCachedFolder(key):undefined;
-   const files=append?[...(previous?.files||items)].concat(
-     next.files.filter(f=>!(previous?.files||items).some(existing=>existing.id===f.id))
+   const files=append?[...(previous?.files||itemsRef.current)].concat(
+     next.files.filter(f=>!(previous?.files||itemsRef.current).some(existing=>existing.id===f.id))
    ):next.files;
    const complete=!next.nextPageToken;
    setCachedFolder(key,{files,nextPageToken:next.nextPageToken,
@@ -202,18 +204,32 @@ export function DropboxConnectionPanel({projects,selectedProjectId,onLinkedFolde
   void load(first,first.folderId,[{id:first.folderId,name:first.folderName}]);
  },[ready,relevant,viewing,picker,disabled,load,selectedProjectId]);
  const browsePicker=useCallback(async(folderId:string,nextPath:DriveTrail[],cursor?:string,append=false)=>{
-  if(!account)return;
-  const request=++pickerId.current;setPickerBusy(true);setPickerError('');
-  if(!append){setPickerItems([]);setPickerPage(null);setPickerPath(nextPath)}
+  if(!account||!user)return;
+  const request=++pickerId.current;
+  const key=cacheKey(user.uid,account.id,folderId,'__picker__','','dropbox');
+  const cached=getCachedFolder(key);
+  setPickerBusy(append||!cached);setPickerError('');
+  if(!append){
+   setPickerItems(cached?.files||[]);
+   setPickerPage(cached?.nextPageToken||null);
+   setPickerPath(nextPath);
+  }
   try{
-   const params=new URLSearchParams({parentId:folderId});if(cursor)params.set('pageToken',cursor);
-   const response=await call<Page>('/integrations/dropbox/'+encodeURIComponent(account.id)+'/folders?'+params);
+   if(!append&&cached&&Date.now()-cached.fetchedAt<FRESH_MS)return;
+   const params=new URLSearchParams({parentId:folderId});
+   if(cursor)params.set('pageToken',cursor);
+   const response=await onceFolderRequest(
+     cacheKey(user.uid,account.id,folderId,'__picker_list__',cursor||'first','dropbox'),
+     ()=>call<Page>('/integrations/dropbox/'+encodeURIComponent(account.id)+'/folders?'+params)
+   );
    if(request!==pickerId.current)return;
-   setPickerItems(old=>append?[...old,...response.files.filter(f=>!old.some(x=>x.id===f.id))]:response.files);
-   setPickerPage(response.nextPageToken);setPickerPath(nextPath);
+   const earlier=append?getCachedFolder(key)?.files||[]:[];
+   const files=append?[...earlier,...response.files.filter(f=>!earlier.some(x=>x.id===f.id))]:response.files;
+   setCachedFolder(key,{files,nextPageToken:response.nextPageToken});
+   setPickerItems(files);setPickerPage(response.nextPageToken);setPickerPath(nextPath);
   }catch(e){if(request===pickerId.current)setPickerError(e instanceof Error?e.message:'Não foi possível navegar pelas pastas.')}
   finally{if(request===pickerId.current)setPickerBusy(false)}
- },[account?.id,call]);
+ },[account?.id,user?.uid,call]);
  useEffect(()=>{if(picker&&account)void browsePicker('root',[{id:'root',name:'Meu Dropbox'}]);},[picker,account?.id,browsePicker]);
  async function linkFolders(folders:DriveItem[]):Promise<boolean>{
   const projectId=pickerProjectId;
@@ -254,7 +270,8 @@ export function DropboxConnectionPanel({projects,selectedProjectId,onLinkedFolde
   setBusy(true);setError('');
   try{await unlinkDropboxFolder(user.uid,link.id);
    setLinks(prev=>prev.filter(x=>x.id!==link.id));
-   if(viewing?.id===link.id){setViewing(null);setItems([])}
+   clearStorageFolderCache('dropbox',user.uid,link.connectionId);
+   if(viewing?.id===link.id){++requestId.current;setViewing(null);setItems([])}
    setUnlinkTarget(null);
    setResult('Vínculo removido. Os arquivos continuam no Dropbox.');
   }catch(e){setError(e instanceof Error?e.message:'Não foi possível desvincular a pasta.')}finally{setBusy(false)}
@@ -264,7 +281,9 @@ export function DropboxConnectionPanel({projects,selectedProjectId,onLinkedFolde
   transfers.cancelAll(account.id);setBusy(true);setError('');
   try{
    await call('/integrations/dropbox/'+encodeURIComponent(account.id)+'/disconnect','POST');
-   clearDriveThumbnailCache();setViewing(null);setItems([]);setConfirmId('');setPicker(false);
+   clearDriveThumbnailCache();clearStorageFolderCache('dropbox',user?.uid,account.id);
+   ++requestId.current;++searchId.current;++pickerId.current;
+   setViewing(null);setItems([]);setConfirmId('');setPicker(false);
    await refresh();setResult('Dropbox desconectado. Seus arquivos permanecem na conta.');
   }catch(e){setError(e instanceof Error?e.message:'Não foi possível desconectar.')}finally{setBusy(false)}
  }
@@ -312,7 +331,7 @@ export function DropboxConnectionPanel({projects,selectedProjectId,onLinkedFolde
   if(dest.provider!=='dropbox'||!viewing||dest.connectionId!==viewing.connectionId||
      dest.projectId!==viewing.projectId||dest.targetFolderId!==currentFolder)return;
   setItems(old=>[{id:uploaded.id,name:uploaded.name,mimeType:uploaded.mimeType,size:uploaded.size},...old.filter(f=>f.id!==uploaded.id)]);
- }),[transfers.subscribe,viewing,currentFolder]);
+ }),[transfers.subscribe,user?.uid,viewing,currentFolder]);
  const displayed=items.filter(f=>!isStorageFolder(f.mimeType));
  const openItem=(file:DriveItem)=>isStorageFolder(file.mimeType)?
   viewing&&void load(viewing,file.id,[...path,{id:file.id,name:file.name}]):setPreview(file);
@@ -374,7 +393,7 @@ export function DropboxConnectionPanel({projects,selectedProjectId,onLinkedFolde
      // Explicit navigation overrides the initial auto-selection, even when a
      // newly linked folder was opened before the initial effect could run.
      autoOpened.current=(selectedProjectId||'all')+':'+(relevant[0]?.id||'');
-     ++requestId.current;setViewing(null);setItems([]);setPath([]);
+     ++requestId.current;++searchId.current;setViewing(null);setItems([]);setPath([]);
     }}
     onNavigate={(id,next)=>{if(viewing)void load(viewing,id,next)}}
     onOpen={openItem} onUploadFiles={upload} uploadDisabled={!viewing||busy||fileBusy}
