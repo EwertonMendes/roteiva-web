@@ -202,7 +202,11 @@ export function DropboxConnectionPanel({projects,selectedProjectId,onLinkedFolde
   const token=await user.getIdToken();
   const res=await fetch(API+'/integrations/dropbox/'+encodeURIComponent(conn)+'/files/'+encodeURIComponent(file.id)+'/thumbnail',
    {method:'GET',cache:'no-store',signal,headers:{Authorization:'Bearer '+token}});
-  return res.ok&&res.status!==204?res.blob():null;
+  if(res.status===204)return null;
+  if(!res.ok)throw new Error('Não foi possível carregar a miniatura do Dropbox.');
+  if(!res.headers.get('Content-Type')?.startsWith('image/'))
+   throw new Error('Resposta de miniatura inválida.');
+  return res.blob();
  },[user,viewing?.connectionId]);
  useEffect(()=>{
   const id=++searchId.current,term=search.trim();
