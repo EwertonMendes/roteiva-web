@@ -1,7 +1,7 @@
 import { AppSelect } from "../ui/AppSelect";
 import { FolderActionsMenu } from "./FolderActionsMenu";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronDown, Cloud, FolderOpen, Link2, MoreHorizontal, Plus, RefreshCw, ShieldCheck, Unplug } from "lucide-react";
+import { ChevronDown, Cloud, FolderOpen, Link2, Plus, RefreshCw, ShieldCheck, Unplug } from "lucide-react";
 import { useAuth } from "../auth/AuthProvider";
 import { driveFolderLinkId, linkDriveFolder, readDriveLinks, unlinkDriveFolder, type DriveFolderLink } from "../../data/drive-folder-links";
 import type { Project } from "../../domain/workspace";
