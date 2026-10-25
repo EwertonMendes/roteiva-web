@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {database} from './helpers/database.mjs';
 import {encrypt,context,base64url} from '../src/crypto.ts';
-import {dropboxAccess,dropboxConnection,dropboxList,dropboxStart,dropboxLaunch,dropboxCallback} from '../src/dropbox.ts';
+import {dropboxAccess,dropboxConnection,dropboxList,dropboxStart,dropboxLaunch,dropboxCallback,dropboxNormalize} from '../src/dropbox.ts';
 import {startDropboxUpload,appendDropboxUpload,finishDropboxUpload} from '../src/dropbox-uploads.ts';
 import {issueDropboxPreview,streamDropboxPreview} from '../src/dropbox-preview.ts';
 
@@ -105,6 +105,48 @@ test('signed library media tickets reject tampering and account reconnection',as
  assert.equal(media.status,206);assert.equal(media.headers.get('Content-Type'),'video/mp4');
  f.sql.prepare('UPDATE dropbox_connections SET revision=revision+1 WHERE id=?').run(conn);
  await assert.rejects(()=>streamDropboxPreview(f.env,new Request(url),new URL(url)),e=>e.status===404);
+});
+
+test('Dropbox Office previews convert to protected PDF; native PDF is streamed without conversion',async t=>{
+ const f=await fixture(t),original=global.fetch,log=[];
+ t.after(()=>{global.fetch=original});
+ let filename='Slides.ppt';
+ global.fetch=async(url,init={})=>{
+  const path=new URL(url).pathname;log.push(path);
+  if(path.includes('/dropboxFolders/'))return Response.json({fields:{
+   ownerUid:{stringValue:uid},connectionId:{stringValue:conn},
+   projectId:{integerValue:String(projectId)},folderId:{stringValue:folder}
+  }});
+  if(path.includes('/projects/17'))return Response.json({fields:{ownerUid:{stringValue:uid}}});
+  if(path.endsWith('/files/get_metadata'))return Response.json({
+   '.tag':'file',id,name:filename,path_lower:'/slides/'+filename.toLowerCase(),
+   path_display:'/Slides/'+filename,is_downloadable:true,size:200000
+  });
+  if(path.endsWith('/files/get_preview'))return new Response('%PDF-1.7 preview',{status:200,
+   headers:{'Content-Type':'application/pdf'}});
+  if(path.endsWith('/files/download'))return new Response('%PDF-1.7 original',{status:200,
+   headers:{'Content-Type':'application/octet-stream'}});
+  throw Error('Unexpected '+path);
+ };
+ assert.equal(dropboxNormalize({'.tag':'file',id,name:filename,size:8}).mimeType,'application/vnd.ms-powerpoint');
+ const office=await (await issueDropboxPreview(f.env,uid,conn,request({
+  projectId,linkedFolderId:folder,fileId:id
+ }))).json();
+ assert.equal(office.mimeType,'application/pdf');
+ const converted=await streamDropboxPreview(f.env,new Request(office.url),new URL(office.url));
+ assert.equal(converted.status,200);
+ assert.equal(converted.headers.get('Content-Type'),'application/pdf');
+ assert.match(await converted.text(),/PDF-1.7 preview/);
+ assert.equal(log.filter(x=>x.endsWith('/files/get_preview')).length,1);
+ filename='Document.pdf';log.length=0;
+ const originalTicket=await (await issueDropboxPreview(f.env,uid,conn,request({
+  projectId,linkedFolderId:folder,fileId:id
+ }))).json();
+ const pdf=await streamDropboxPreview(f.env,new Request(originalTicket.url),new URL(originalTicket.url));
+ assert.equal(pdf.status,200);
+ assert.equal(pdf.headers.get('Content-Type'),'application/pdf');
+ assert.match(await pdf.text(),/PDF-1.7 original/);
+ assert.equal(log.filter(x=>x.endsWith('/files/get_preview')).length,0);
 });
 
 test('Dropbox OAuth launch is one-use, short-lived and never returns credentials',async t=>{
