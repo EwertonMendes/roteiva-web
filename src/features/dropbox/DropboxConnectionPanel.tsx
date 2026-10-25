@@ -295,7 +295,12 @@ export function DropboxConnectionPanel({projects,selectedProjectId,onLinkedFolde
     renderDocumentThumbnail={viewing?file=>isDropboxDocument(file)?<DropboxDocumentThumbnail file={file} link={viewing}/>:null:undefined}
     searchResults={remote?.folder===currentFolder?remote.files:undefined} searchTerm={remote?.term}
     searchLoading={searchBusy} onSearchChange={setSearch}
-    onBack={()=>{setViewing(null);setItems([]);setPath([])}}
+    onBack={()=>{
+     // Explicit navigation overrides the initial auto-selection, even when a
+     // newly linked folder was opened before the initial effect could run.
+     autoOpened.current=(selectedProjectId||'all')+':'+(relevant[0]?.id||'');
+     ++requestId.current;setViewing(null);setItems([]);setPath([]);
+    }}
     onNavigate={(id,next)=>{if(viewing)void load(viewing,id,next)}}
     onOpen={openItem} onUploadFiles={upload} uploadDisabled={!viewing||busy||fileBusy}
     onMore={()=>{if(search.trim().length>=2)void moreSearch();else if(viewing&&filesPage)void load(viewing,currentFolder,path,filesPage,true)}}/>
