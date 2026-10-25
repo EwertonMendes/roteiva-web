@@ -106,6 +106,57 @@ test('Dropbox only advertises native thumbnails for image/PDF, and unsupported P
  assert.equal(attempts,2);
 });
 
+
+test('Dropbox folder cursors distinguish pagination from deltas, tombstones and reset',async t=>{
+ const fixtureData=await fixture(t),original=global.fetch,paths=[];
+ t.after(()=>{global.fetch=original});
+ const source='id:a4ayc_80_OEAAAAAAAAAAAa',child='id:a4ayc_80_OEAAAAAAAAAAAb';
+ global.fetch=async(url,init={})=>{
+  const endpoint=new URL(url).pathname,body=JSON.parse(init.body||'{}');
+  paths.push({endpoint,body});
+  if(endpoint.endsWith('/files/get_metadata'))
+   return Response.json({'.tag':'folder',id:source,name:'Materiais',path_lower:'/materiais'});
+  if(endpoint.endsWith('/files/list_folder'))
+   return Response.json({entries:[{'.tag':'file',id:child,name:'Antigo.pdf',
+    path_lower:'/materiais/antigo.pdf',path_display:'/Materiais/Antigo.pdf',size:123}],
+    cursor:'PAGE1',has_more:true});
+  if(endpoint.endsWith('/files/list_folder/continue')){
+   if(body.cursor==='PAGE1')return Response.json({entries:[],cursor:'SYNC1',has_more:false});
+   if(body.cursor==='SYNC1')return Response.json({entries:[
+    {'.tag':'deleted',path_lower:'/materiais/antigo.pdf',name:'Antigo.pdf'},
+    {'.tag':'file',id:child,name:'Renomeado.pdf',
+     path_lower:'/materiais/renomeado.pdf',path_display:'/Materiais/Renomeado.pdf',size:133}],
+    cursor:'SYNC2',has_more:false});
+   if(body.cursor==='SYNC2')return Response.json({entries:[],cursor:'SYNC3',has_more:false});
+   if(body.cursor==='BAD')return Response.json({
+    error:{'.tag':'reset'},error_summary:'reset/...'}, {status:409});
+  }
+  throw Error('unexpected Dropbox route '+endpoint);
+ };
+ const first=await (await dropboxList(fixtureData.env,uid,conn,source,null,null)).json();
+ assert.equal(first.nextPageToken,'PAGE1');
+ assert.equal(first.syncCursor,null);
+ assert.equal(first.files.length,1);
+ assert.equal(first.files[0].pathLower,'/materiais/antigo.pdf');
+ const second=await (await dropboxList(fixtureData.env,uid,conn,source,'PAGE1',null)).json();
+ assert.equal(second.nextPageToken,null);
+ assert.equal(second.syncCursor,'SYNC1');
+ const delta=await (await dropboxList(fixtureData.env,uid,conn,source,null,null,'SYNC1')).json();
+ assert.equal(delta.reset,false);
+ assert.equal(delta.hasMore,false);
+ assert.equal(delta.syncCursor,'SYNC2');
+ assert.deepEqual(delta.changes[0],{deleted:true,pathLower:'/materiais/antigo.pdf'});
+ assert.equal(delta.changes[1].name,'Renomeado.pdf');
+ const noChange=await (await dropboxList(fixtureData.env,uid,conn,source,null,null,'SYNC2')).json();
+ assert.deepEqual(noChange.changes,[]);
+ assert.equal(noChange.syncCursor,'SYNC3');
+ const reset=await (await dropboxList(fixtureData.env,uid,conn,source,null,null,'BAD')).json();
+ assert.equal(reset.reset,true);
+ // No get_metadata request is made for any incremental follow-up.
+ assert.equal(paths.filter(x=>x.endpoint.endsWith('/files/get_metadata')).length,2);
+ assert.equal(paths.filter(x=>x.endpoint.endsWith('/files/list_folder')).length,1);
+});
+
 test('Dropbox resumable upload validates immutable linked project and avoids a second commit',async t=>{
  const f=await fixture(t);const old=global.fetch;const log=[];global.fetch=fetchStub(log);
  t.after(()=>{global.fetch=old});
