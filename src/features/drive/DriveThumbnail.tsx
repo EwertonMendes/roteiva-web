@@ -86,7 +86,8 @@ function resolveThumbnail(key:string,item:DriveItem,getThumbnail:GetThumbnail,ac
 
 function initialState(key:string,available:boolean):ThumbnailState{
   const src=available?cache.get(key)||null:null;
-  return {key,src,phase:src?"loaded":available?"idle":"unavailable"};
+  const missing=(unsupported.get(key)||0)>Date.now();
+  return {key,src,phase:src?"loaded":available&&!missing?"idle":"unavailable"};
 }
 
 /** Keep an icon when offscreen; display a spinner only during the actual request.
