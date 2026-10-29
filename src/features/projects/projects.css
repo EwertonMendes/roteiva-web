@@ -107,7 +107,7 @@
  line-height:1.55;
  max-width:70ch;
 }
-.pc-editor-body--picker .pc-picker-results{padding:2px 1px 8px;scrollbar-gutter:stable}
+.pc-editor-body--picker .pc-picker-results{padding:2px 1px 8px;scrollbar-gutter:stable both-edges}
 .pc-editor-body--picker .pc-folder-trail{flex:0 0 auto;margin:0 0 18px}
 .pc-editor-body--picker .pc-image-grid{align-content:start;gap:14px}
 .pc-editor-body--picker .pc-empty{margin:14px 0;padding:28px 16px;line-height:1.5}
