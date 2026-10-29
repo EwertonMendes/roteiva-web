@@ -3,7 +3,7 @@ import {useAuth} from '../auth/AuthProvider';
 import {useDriveApi} from '../drive/drive-api';
 import type {ProjectCover} from '../../domain/workspace';
 export type CoverConnection={id:string;google_email:string;status:string;scopes:string;provider:'google_drive'|'dropbox'};
-type Context={connections:CoverConnection[];error:string;uid:string;load:(cover:ProjectCover,signal:AbortSignal,thumbnail?:boolean)=>Promise<Blob>};
+type Context={connections:CoverConnection[];error:string;loadingConnections:boolean;retryConnections:()=>void;uid:string;load:(cover:ProjectCover,signal:AbortSignal,thumbnail?:boolean)=>Promise<Blob>};
 const CoverContext=createContext<Context|null>(null);
 function imageQueue(){
  let running=0;const waiters:(()=>void)[]=[];
@@ -20,21 +20,40 @@ function imageQueue(){
 const API='https://roteiva-api-dev.ewertonmendes9.workers.dev';
 export function DriveCoversProvider({children,includeDropbox=false}:{children:ReactNode;includeDropbox?:boolean}){
  const {user}=useAuth();const call=useDriveApi();const [acquire]=useState(imageQueue);
- const [connections,setConnections]=useState<CoverConnection[]>([]),[error,setError]=useState('');
- useEffect(()=>{const controller=new AbortController();setConnections([]);setError('');
-  const sources:Promise<CoverConnection[]>[]=[
-   call<{connections:{id:string;google_email:string;status:string;scopes:string}[]}>('/integrations/drive','GET',undefined,controller.signal)
-     .then(data=>data.connections.filter(c=>c.status==='connected').map(c=>({...c,provider:'google_drive' as const}))),
-   ...(includeDropbox?[call<{connections:{id:string;email:string;status:string;scopes:string}[]}>('/integrations/dropbox','GET',undefined,controller.signal)
-     .then(data=>data.connections.filter(c=>c.status==='connected').map(c=>({id:c.id,google_email:c.email,status:c.status,scopes:c.scopes,provider:'dropbox' as const})))]:[]),
-  ];
-  void Promise.allSettled(sources).then(results=>{
+ const [connections,setConnections]=useState<CoverConnection[]>([]);
+ const [error,setError]=useState('');
+ const [loadingConnections,setLoadingConnections]=useState(true);
+ const [refreshKey,refreshConnections]=useState(0);
+ const retryConnections=useCallback(()=>refreshConnections(value=>value+1),[]);
+ useEffect(()=>{
+  const controller=new AbortController();
+  setLoadingConnections(true);setError('');
+  // Keep a successful provider even if the other request fails. Never silently
+  // hide an unavailable connection; present a recoverable status to the user.
+  const drive=call<{connections:{id:string;google_email:string;status:string;scopes:string}[]}>('/integrations/drive','GET',undefined,controller.signal)
+   .then(result=>result.connections.filter(c=>c.status==='connected').map(c=>({...c,provider:'google_drive' as const})));
+  const dropbox=includeDropbox
+   ?call<{connections:{id:string;email:string;status:string;scopes:string}[]}>('/integrations/dropbox','GET',undefined,controller.signal)
+    .then(result=>result.connections.filter(c=>c.status==='connected').map(c=>({id:c.id,google_email:c.email,status:c.status,scopes:c.scopes,provider:'dropbox' as const})))
+   :null;
+  const tasks:Promise<CoverConnection[]>[]=dropbox?[drive,dropbox]:[drive];
+  void Promise.allSettled(tasks).then(results=>{
    if(controller.signal.aborted)return;
-   setConnections(results.flatMap(result=>result.status==='fulfilled'?result.value:[]));
-   if(results.every(result=>result.status==='rejected'))setError('Não foi possível consultar as conexões de armazenamento.');
+   // Preserve prior connected accounts while a provider is temporarily unreachable,
+   // but never carry them between users (auth change remounts the provider).
+   const successful=results.flatMap(result=>result.status==='fulfilled'?result.value:[]);
+   const failedProviders=results.flatMap((result,index)=>result.status==='rejected'
+     ?[index===0?'Google Drive':'Dropbox']:[]);
+   setConnections(current=>{
+     const safePrevious=current.filter(c=>failedProviders.includes(c.provider==='google_drive'?'Google Drive':'Dropbox'));
+     const unique=new Map([...safePrevious,...successful].map(c=>[c.provider+':'+c.id,c]));
+     return [...unique.values()];
+   });
+   setError(failedProviders.length?'Não foi possível consultar '+failedProviders.join(' e ')+'. Atualize as conexões para tentar novamente.':'');
+   setLoadingConnections(false);
   });
   return ()=>controller.abort();
- },[call,user?.uid,includeDropbox]);
+ },[call,user?.uid,includeDropbox,refreshKey]);
  const load=useCallback(async(cover:ProjectCover,signal:AbortSignal,thumbnail=false)=>{
   if(!user)throw Error('Entre novamente para carregar a capa.');
   const release=await acquire(signal);try{
@@ -50,7 +69,7 @@ export function DriveCoversProvider({children,includeDropbox=false}:{children:Re
   const blob=await response.blob();if(!blob.size||blob.size>8*1024*1024)throw Error('A imagem excede o limite de 8 MB.');return blob;
   }finally{release();}
  },[user,acquire]);
- return <CoverContext.Provider value={{connections,error,uid:user?.uid||'',load}}>{children}</CoverContext.Provider>;
+ return <CoverContext.Provider value={{connections,error,loadingConnections,retryConnections,uid:user?.uid||'',load}}>{children}</CoverContext.Provider>;
 }
 export const useDriveCovers=()=>useContext(CoverContext);
 export function useCoverImage(cover:ProjectCover|undefined,visible=true,thumbnail=false){
