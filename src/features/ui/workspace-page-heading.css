@@ -1,0 +1,21 @@
+/*
+ * Shared visual contract for every internal workspace page heading.
+ * Projects is the reference: title, subtitle and position are centralized here.
+ * Overview/dashboard has its own intentionally distinct visual language.
+ * The markup is already reused by DashboardClient for every workspace route.
+ */
+.app-shell:not(.app-view-overview) .page > .page-heading {
+  align-items: center;
+  margin-bottom: 26px;
+}
+.app-shell:not(.app-view-overview) .page > .page-heading > div:first-child > .eyebrow {
+  display: none;
+}
+.app-shell:not(.app-view-overview) .page > .page-heading h1 {
+  font-size: clamp(2rem, 3.3vw, 3.5rem);
+  letter-spacing: -.045em;
+  margin: 0 0 10px;
+}
+.app-shell:not(.app-view-overview) .page > .page-heading p {
+  font-size: var(--type-body);
+}
