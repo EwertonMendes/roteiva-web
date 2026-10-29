@@ -101,3 +101,22 @@
 .pc-editor-preview { position:relative; }
 .pc-editor-preview > .pc-loading-fill { position:absolute; inset:0; min-height:0; }
 
+
+/* Storage picker guidance has its own rhythm between the toolbar and gallery.
+   Consistent with the same editor on project covers and client portraits. */
+.pc-editor-body--picker .pc-picker-guidance{
+ display:block;flex:0 0 auto;
+ margin:20px 0 22px;
+ padding:0 2px;
+ line-height:1.55;
+ max-width:70ch;
+}
+.pc-editor-body--picker .pc-picker-results{padding:2px 1px 8px;scrollbar-gutter:stable}
+.pc-editor-body--picker .pc-folder-trail{flex:0 0 auto;margin:0 0 18px}
+.pc-editor-body--picker .pc-image-grid{align-content:start;gap:14px}
+.pc-editor-body--picker .pc-empty{margin:14px 0;padding:28px 16px;line-height:1.5}
+.pc-editor-body--picker .pc-image-more{padding:22px 0 10px}
+@media(max-width:600px){
+ .pc-editor-body--picker .pc-picker-guidance{margin:18px 0 20px}
+ .pc-editor-body--picker .pc-image-grid{gap:12px}
+}
