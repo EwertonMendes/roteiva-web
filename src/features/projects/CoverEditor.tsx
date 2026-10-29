@@ -19,8 +19,7 @@ export function CoverEditor({project,client,onClose,onSave}:{project?:Project;cl
  const context=useDriveCovers()!;const call=useDriveApi();const getDriveThumbnail=useDriveThumbnailFetch();
  const {user}=useAuth();
  const choices=context.connections.filter(c=>client||c.provider==='google_drive');
- const stored=subject.photo&&client?subject.photo:project?.cover;
- const storedProvider=stored?.provider||'google_drive';
+ const stored=client?.photo||project?.cover;
  const dialog=useRef<HTMLDialogElement>(null);
  const [account,setAccount]=useState(stored?.connectionId||'');
  const [cover,setCover]=useState<ProjectCover|undefined>(stored);
