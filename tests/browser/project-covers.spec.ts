@@ -28,7 +28,7 @@ test('project covers require Drive, persist crop, cancel safely and support remo
  png=Buffer.from(await page.evaluate(()=>{const c=document.createElement('canvas');c.width=1200;c.height=800;const ctx=c.getContext('2d')!;const g=ctx.createLinearGradient(0,0,1200,800);g.addColorStop(0,'#08527d');g.addColorStop(.5,'#d88229');g.addColorStop(1,'#18182c');ctx.fillStyle=g;ctx.fillRect(0,0,1200,800);ctx.fillStyle='#ffffff30';for(let x=50;x<1200;x+=100)ctx.fillRect(x,100,20,600);return c.toDataURL('image/png').split(',')[1];}),'base64');
  connected=true;await page.reload();if(info.project.name==='desktop'){await page.getByRole('button',{name:'Opções da conta',exact:true}).click();await page.getByRole('button',{name:'Ativar modo escuro',exact:true}).click();}await page.getByRole('button',{name:'Adicionar capa',exact:true}).click();
  const modal=page.locator('.pc-dialog');
- const accountSelect=modal.getByRole('combobox',{name:'Conta do Drive'});
+ const accountSelect=modal.getByRole('combobox',{name:'Conta de armazenamento'});
  await expect(accountSelect).toBeVisible();
  await accountSelect.click();
  const accountOption=modal.getByRole('option',{name:'qa@example.com'});
