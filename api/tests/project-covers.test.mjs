@@ -18,7 +18,7 @@ async function setup(){
 }
 test('cover search is private, escaped, paginated and filters unsupported/oversized files',async()=>{
  const {env,db,fetcher}=await setup();try{
-  const load=fetcher(url=>{assert.match(url.searchParams.get('q'),/name contains 'bob\\'s'/);assert.equal(url.searchParams.get('pageToken'),'next');assert.equal(url.searchParams.get('pageSize'),'40');return Response.json({files:[{id:fileId,name:'photo.jpg',mimeType:'image/jpeg',size:'3'},{id:'oversize_123456',mimeType:'image/jpeg',size:String(MAX_COVER_BYTES+1)},{id:'svg_1234567890',mimeType:'image/svg+xml',size:'3'}],nextPageToken:'page2'});});
+  const load=fetcher(url=>{assert.match(url.searchParams.get('q'),/name contains 'bob\\'s'/);assert.equal(url.searchParams.get('pageToken'),'next');assert.equal(url.searchParams.get('pageSize'),'60');return Response.json({files:[{id:fileId,name:'photo.jpg',mimeType:'image/jpeg',size:'3'},{id:'oversize_123456',mimeType:'image/jpeg',size:String(MAX_COVER_BYTES+1)},{id:'svg_1234567890',mimeType:'image/svg+xml',size:'3'}],nextPageToken:'page2'});});
   const data=await(await listCoverImages(env,'alice',id,new URLSearchParams({search:"bob's",pageToken:'next'}),load)).json();assert.equal(data.files.length,1);assert.equal(data.nextPageToken,'page2');
   await assert.rejects(listCoverImages(env,'bob',id,new URLSearchParams(),load));
   await assert.rejects(listCoverImages(env,'alice',id,new URLSearchParams({pageToken:'bad token'}),load));
@@ -56,3 +56,31 @@ test('cover HTTP routes require a signed identity, active entitlement and connec
  }finally{globalThis.fetch=original;db.close();}
 });
 
+
+test('client image picker includes Drive folders, scopes to parent and skips empty image-only pages',async()=>{
+ const {env,db,fetcher}=await setup();
+ try{
+  let calls=0;
+  const load=fetcher(url=>{
+   calls++;
+   assert.match(url.searchParams.get('q'),/trashed = false/);
+   assert.match(url.searchParams.get('q'),/'root' in parents/);
+   assert.match(url.searchParams.get('q'),/application\\/vnd.google-apps.folder/);
+   if(calls===1)return Response.json({files:[{id:'oversize_123456',mimeType:'image/jpeg',name:'oversize.jpg',size:String(MAX_COVER_BYTES+1)}],nextPageToken:'next-page'});
+   assert.equal(url.searchParams.get('pageToken'),'next-page');
+   return Response.json({files:[
+    {id:'folder_123456789',mimeType:'application/vnd.google-apps.folder',name:'Fotografias'},
+    {id:'image_987654321',mimeType:'image/png',name:'Retrato',size:'3000'}
+   ],nextPageToken:null});
+  });
+  const result=await(await listCoverImages(env,'alice',id,new URLSearchParams(),load)).json();
+  assert.equal(calls,2);
+  assert.deepEqual(result.files.map(x=>x.name),['Fotografias','Retrato']);
+  assert.equal(result.nextPageToken,null);
+  assert.equal(result.files[0].thumbnailTicket,undefined);
+  const sub=await(await listCoverImages(env,'alice',id,new URLSearchParams({parentId:'folder_123456789',search:''}),
+   fetcher(url=>{assert.match(url.searchParams.get('q'),/'folder_123456789' in parents/);return Response.json({files:[]});}))).json();
+  assert.deepEqual(sub.files,[]);
+  await assert.rejects(listCoverImages(env,'alice',id,new URLSearchParams({parentId:'../invalid'}),load));
+ }finally{db.close();}
+});
