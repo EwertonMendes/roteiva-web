@@ -44,7 +44,12 @@ export function WorkspaceTools({workspace, status, onNotify,loadWorkspace}: {wor
     }catch{onNotify("Não foi possível carregar os registros para exportação");}
     finally{setDownloading(false);}
   }
-  return <div className="workspace-tools"><span role="status">{status}</span><button className="secondary-button" title="Exporta os cadastros e lançamentos carregados; arquivos de mídia não estão incluídos." onClick={()=>void download()} disabled={downloading}><Download size={15}/> {downloading?"Preparando cópia…":"Exportar cópia"}</button></div>;
+  // Cloud persistence is automatic. Keep the toolbar focused on actions, not
+  // a permanent success/idle label; only surface failures requiring attention.
+  const needsAttention = status === "Alterações não confirmadas" ||
+    status === "Falha ao salvar · exporte seus dados" ||
+    status === "Demonstração · armazenamento local indisponível";
+  return <div className="workspace-tools">{needsAttention && <span role="alert">{status}</span>}<button className="secondary-button" title="Exporta os cadastros e lançamentos carregados; arquivos de mídia não estão incluídos." onClick={()=>void download()} disabled={downloading}><Download size={15}/> {downloading?"Preparando cópia…":"Exportar cópia"}</button></div>;
 }
 export function ClientDetail({client, projects, entries, onBack, onEdit, onProject, onSave, onReview}: {onReview?:()=>void;onSave: (client:Client) => void; client: Client; projects: Project[]; entries: FinanceEntry[]; onBack: () => void; onEdit: (c: Client) => void; onProject: (id:number) => void}) {
   const linked = projects.filter(p => p.clientId === client.id || (!p.clientId && p.client === client.name));
