@@ -45,7 +45,7 @@ test('project covers require Drive, persist crop, cancel safely and support remo
   const first=await spinner.evaluate(el=>getComputedStyle(el).transform);await expect.poll(()=>spinner.evaluate(el=>getComputedStyle(el).transform)).not.toBe(first);
  }
  await centeredLoading('.pc-picker-results .pc-loading-fill','.pc-picker-results');await page.screenshot({path:info.outputPath('picker-loading.png')});releaseList();
- const more=page.getByRole('button',{name:'Carregar mais imagens',exact:true});
+ const more=page.getByRole('button',{name:'Carregar mais itens',exact:true});
  await expect(more.locator('svg')).toHaveCount(1);await stableModal();
  await more.hover();
  await expect(page.locator('html')).not.toHaveAttribute('data-roteiva-cursor','on');
