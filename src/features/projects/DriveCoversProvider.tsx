@@ -39,6 +39,9 @@ export function DriveCoversProvider({children,includeDropbox=false}:{children:Re
   const tasks:Promise<CoverConnection[]>[]=dropbox?[drive,dropbox]:[drive];
   void Promise.allSettled(tasks).then(results=>{
    if(controller.signal.aborted)return;
+   const successful=results.flatMap(result=>result.status==='fulfilled'?result.value:[]);
+   const failedProviders=results.flatMap((result,index)=>result.status==='rejected'
+     ?[index===0?'Google Drive':'Dropbox']:[]);
    // Do not retain another account's connections after an auth switch.
    setConnections(successful);
    setError(failedProviders.length?'Não foi possível consultar '+failedProviders.join(' e ')+'. Atualize as conexões para tentar novamente.':'');
