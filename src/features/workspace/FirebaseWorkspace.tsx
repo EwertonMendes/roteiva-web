@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import DashboardClient from "../../dashboard-client";
 import { firebaseServices } from "../../lib/firebase";
 import { FirestoreWorkspace, dataErrorMessage } from "../../data/firestore-workspace";
@@ -11,12 +11,30 @@ import type { WorkspaceCommand } from "../../data/firestore-commands";
 import { useAuth } from "../auth/AuthProvider";
 import { useRegistrationProfile } from "../auth/RegistrationGate";
 import { retryFirestoreRead,transientFirestoreRead,firestoreCode } from "../../data/firestore-recovery";
+import {isTheme,readStoredTheme,resolveTheme,systemTheme,themeStorageKey,writeStoredTheme,type Theme} from "../../lib/theme-preference";
 
 export function FirebaseWorkspace() {
   const {user,logout,busy,error:authError}=useAuth();
   const profileContext=useRegistrationProfile();
   const repository=useMemo(()=>new FirestoreWorkspace(firebaseServices().db,user!.uid),[user!.uid]);
-  const [initial,setInitial]=useState<{workspace:WorkspaceData;theme:"light"|"dark"}>();
+  const [initial,setInitial]=useState<{workspace:WorkspaceData}>();
+  const preferenceKey=themeStorageKey(user!.uid);
+  const [theme,setTheme]=useState<Theme>(()=>readStoredTheme(preferenceKey) ?? systemTheme());
+  // A user action or another tab's selection takes precedence over an in-flight
+  // cloud read. Workspace refreshes never reset this independent preference.
+  const themeRevision=useRef(0);
+  useLayoutEffect(()=>{
+    document.documentElement.setAttribute("data-theme",theme);
+  },[theme]);
+  useEffect(()=>{
+    const onStorage=(event:StorageEvent)=>{
+      if(event.key!==preferenceKey || !isTheme(event.newValue))return;
+      themeRevision.current++;
+      setTheme(event.newValue);
+    };
+    window.addEventListener("storage",onStorage);
+    return ()=>window.removeEventListener("storage",onStorage);
+  },[preferenceKey]);
   const [businessLoaded,setBusinessLoaded]=useState(false);
   const [loadingBusiness,setLoadingBusiness]=useState(false);
   const [overviewMetrics,setOverviewMetrics]=useState<Awaited<ReturnType<FirestoreWorkspace["overviewMetrics"]>>>();
@@ -51,7 +69,8 @@ export function FirebaseWorkspace() {
       await retryFirestoreRead(async()=>{
       const route=routeFromLocation(window.location,{base:import.meta.env.BASE_URL,useHash:false});
       const domains=domainsForRoute(route);
-      const [workspaceState,theme]=await Promise.all([
+      const themeReadRevision=themeRevision.current;
+      const [workspaceState,cloudTheme]=await Promise.all([
         (async()=>{
           if (domains.length) await repository.load(domains);
           if(route.view==="overview" || (route.view==="projects" && !route.projectId)){
@@ -99,7 +118,12 @@ export function FirebaseWorkspace() {
           setFinancePeriod(key);setFinanceBars({key:year+"-",bars});
         }
         if("calendar" in workspaceState && workspaceState.calendar)setCalendarPeriod(workspaceState.calendar);
-        setInitial({workspace:workspaceState.workspace,theme:theme || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark":"light")});
+        if(themeReadRevision===themeRevision.current){
+          const preferred=resolveTheme(cloudTheme,readStoredTheme(preferenceKey),systemTheme());
+          setTheme(preferred);
+          writeStoredTheme(preferenceKey,preferred);
+        }
+        setInitial({workspace:workspaceState.workspace});
       }
       },{isCurrent:()=>active});
     })().catch(reason=>{
@@ -131,7 +155,7 @@ export function FirebaseWorkspace() {
     const online=()=>{if(active && !ready){clearTimeout(retryTimer);setVersion(value=>value+1);}};
     window.addEventListener("online",online);
     return ()=>{active=false;clearTimeout(retryTimer);window.removeEventListener("online",online);};
-  },[repository,version]);
+  },[repository,version,preferenceKey]);
   // Revalidate only when returning to the app, not on every screen navigation.
   useEffect(() => {
     if (!initial) return;
@@ -325,7 +349,12 @@ export function FirebaseWorkspace() {
   },[]);
   // Theme changes share the write queue and error handling, but must not make
   // the focused account menu inert while the preference is being persisted.
-  const saveTheme=useCallback((theme:"light"|"dark")=>enqueue(()=>repository.saveTheme(theme),{blocksInteraction:false}),[repository,enqueue]);
+  const saveTheme=useCallback((next:Theme)=>{
+    themeRevision.current++;
+    setTheme(next);
+    writeStoredTheme(preferenceKey,next); // Synchronous mirror also notifies other tabs.
+    enqueue(()=>repository.saveTheme(next),{blocksInteraction:false});
+  },[repository,enqueue,preferenceKey]);
   const executeCommands=useCallback((commands:readonly WorkspaceCommand[])=>enqueue(async()=>{
     const parsed=financePeriod?.split("-")||[];
     const year=Number(parsed[0]),clientId=Number(parsed[2])||undefined;
@@ -364,7 +393,7 @@ export function FirebaseWorkspace() {
     {loadingBusiness && !error && <main className="studio-loading" role="status">Carregando os dados do seu espaço…</main>}
     {initial && (overviewMetrics || routeFromLocation(window.location,{base:import.meta.env.BASE_URL,useHash:false}).view!=="overview") && <div inert={!!error || remoteChanges || loadingBusiness} aria-busy={saving}>
       <DashboardClient key={user.uid+"-"+version} firstName={profileContext?.profile.displayName || user.displayName || "Profissional"} profile={profileContext?.profile || null} onSaveProfile={profileContext?.saveProfile} email={user.email || ""} photoURL={user.photoURL || undefined}
-        initialWorkspace={initial.workspace} initialTheme={initial.theme} onCommands={businessLoaded ? executeCommands : undefined} onLoadWorkspace={repository.hasLoaded(collections) ? undefined : ensureFullWorkspace} onRouteChange={onRouteChange}
+        initialWorkspace={initial.workspace} initialTheme={theme} onCommands={businessLoaded ? executeCommands : undefined} onLoadWorkspace={repository.hasLoaded(collections) ? undefined : ensureFullWorkspace} onRouteChange={onRouteChange}
         canValidateProjectLink={repository.hasLoaded(domainsForRoute({view:"projects",projectId:1}))}
         canValidateClientLink={repository.hasLoaded(domainsForRoute({view:"clients",clientId:1}))}
         projectPage={repository.hasLoaded(["projects","tasks"])?undefined:projectPage}
