@@ -194,7 +194,7 @@ test("repository: empty new account, CRUD, cents, refresh and conflict",async()=
   assert.equal(restored.calendarEvents[0].date,"2026-10-16");
   assert.equal(restored.projects[0].tasks[0].title,"Editar");
   assert.equal(restored.clients[0].monthlyFee,99.99);
-  await b.saveTheme("dark"); assert.equal(await a.loadTheme(),"dark");
+  await b.saveTheme("dark"); assert.equal((await a.loadTheme())?.theme,"dark");
   const taskBefore=(await getDoc(doc(db,"users/charlie/tasks/30"))).data().revision;
   workspace.clients[0].name="Editado";
   await a.save(workspace);
