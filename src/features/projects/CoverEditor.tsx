@@ -62,7 +62,7 @@ export function CoverEditor({project,client,onClose,onSave}:{project?:Project;cl
    const base='/integrations/drive/'+encodeURIComponent(account);
    const parent=folderTrail.length?folderTrail[folderTrail.length-1].id:'root';
    const knownVersion=driveBrowserVersion.current.get(account);
-   const filter=term.length>=2?{search:term}:{};
+   const filter:Record<string,string>=term.length>=2?{search:term}:{};
    // Transitional capability detection: the currently deployed Worker may
    // support image search but not folder browsing on that same endpoint.
    if(knownVersion===1&&parent!=='root'){
