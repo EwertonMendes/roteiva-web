@@ -19,6 +19,7 @@ import "./demo.css";
 import "./features/auth/auth.css";
 import "./features/settings/settings.css";
 import "./typography.css";
+import "./features/ui/workspace-page-heading.css";
 import "./features/ui/semantic-icons.css";
 import "./features/dashboard/dashboard.css";
 import "./features/ui/AppSelect.css";

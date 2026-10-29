@@ -194,7 +194,7 @@ test("repository: empty new account, CRUD, cents, refresh and conflict",async()=
   assert.equal(restored.calendarEvents[0].date,"2026-10-16");
   assert.equal(restored.projects[0].tasks[0].title,"Editar");
   assert.equal(restored.clients[0].monthlyFee,99.99);
-  await b.saveTheme("dark"); assert.equal(await a.loadTheme(),"dark");
+  await b.saveTheme("dark"); assert.equal((await a.loadTheme())?.theme,"dark");
   const taskBefore=(await getDoc(doc(db,"users/charlie/tasks/30"))).data().revision;
   workspace.clients[0].name="Editado";
   await a.save(workspace);
@@ -639,4 +639,25 @@ test('project covers validate create/update, require complete fields and preserv
  await assertSucceeds(updateDoc(ref,{coverX:0,coverY:100,coverZoom:3,revision:2,updatedAt:serverTimestamp()}));
  const removed=Object.fromEntries(Object.keys(cover).map(k=>[k,deleteField()]));
  await assertSucceeds(updateDoc(ref,{...removed,revision:3,updatedAt:serverTimestamp()}));
+});
+
+test('private client photos validate provider, crop, complete metadata and owner access',async()=>{
+ const alice=dbFor('alice'),bob=dbFor('bob');
+ const ref=doc(alice,'users/alice/clients/10');
+ const base={...client,...meta('alice')};
+ const drive={photoProvider:'google_drive',photoConnectionId:'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa',
+   photoFileId:'photo_123456789',photoName:'Retrato.jpg',photoX:50,photoY:50,photoZoom:1};
+ const dropbox={...drive,photoProvider:'dropbox',photoFileId:'id:abcdefghijk'};
+ const invalid=[
+   {photoFileId:'photo_123456789'}, {...drive,photoZoom:4}, {...drive,photoX:-1},
+   {...drive,photoY:101}, {...drive,photoName:'x'.repeat(251)}, {...dropbox,photoFileId:'https://evil.test'},
+   {...dropbox,photoConnectionId:'not-a-uuid'}, {...drive,photoProvider:'random'},
+   {...drive,photoFileId:'id:abcdefghijk'}, {...dropbox,photoFileId:'photo_123456789'}
+ ];
+ for(const photo of invalid)await assertFails(setDoc(ref,{...base,...photo}));
+ await assertSucceeds(setDoc(ref,{...base,...drive}));
+ await assertFails(updateDoc(doc(bob,'users/alice/clients/10'),{photoX:20,revision:2,updatedAt:serverTimestamp()}));
+ await assertSucceeds(updateDoc(ref,{...dropbox,revision:2,updatedAt:serverTimestamp()}));
+ const gone=Object.fromEntries(Object.keys(dropbox).map(key=>[key,deleteField()]));
+ await assertSucceeds(updateDoc(ref,{...gone,revision:3,updatedAt:serverTimestamp()}));
 });

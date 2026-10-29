@@ -20,7 +20,7 @@ test('project covers require Drive, persist crop, cancel safely and support remo
   const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Allow-Methods':'GET, OPTIONS'};
   if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
   if(path.endsWith('/cover')){await imageGate;return route.fulfill({status:200,headers,contentType:'image/png',body:png});}
-  if(path.endsWith('/cover-images')){await listGate;const more=new URL(route.request().url()).searchParams.has('pageToken');return route.fulfill({headers,json:{files:[{id:more?'photo_987654321':'photo_123456789',name:more?'Campanha 2.png':'Campanha.png',mimeType:'image/png'}],nextPageToken:more?null:'page2'}});}
+  if(path.endsWith('/cover-images')){await listGate;const more=new URL(route.request().url()).searchParams.has('pageToken');return route.fulfill({headers,json:{browserVersion:2,files:[{id:more?'photo_987654321':'photo_123456789',name:more?'Campanha 2.png':'Campanha.png',mimeType:'image/png',size:'3000'}],nextPageToken:more?null:'page2'}});}
   return route.fulfill({headers,json:{connections:connected?[{id:activeConnectionId,google_email:'qa@example.com',status:'connected',scopes:'https://www.googleapis.com/auth/drive.readonly'}]:[]}});
  });
  await register(page,'cover-'+info.project.name+'@example.com');
@@ -28,7 +28,7 @@ test('project covers require Drive, persist crop, cancel safely and support remo
  png=Buffer.from(await page.evaluate(()=>{const c=document.createElement('canvas');c.width=1200;c.height=800;const ctx=c.getContext('2d')!;const g=ctx.createLinearGradient(0,0,1200,800);g.addColorStop(0,'#08527d');g.addColorStop(.5,'#d88229');g.addColorStop(1,'#18182c');ctx.fillStyle=g;ctx.fillRect(0,0,1200,800);ctx.fillStyle='#ffffff30';for(let x=50;x<1200;x+=100)ctx.fillRect(x,100,20,600);return c.toDataURL('image/png').split(',')[1];}),'base64');
  connected=true;await page.reload();if(info.project.name==='desktop'){await page.getByRole('button',{name:'Opções da conta',exact:true}).click();await page.getByRole('button',{name:'Ativar modo escuro',exact:true}).click();}await page.getByRole('button',{name:'Adicionar capa',exact:true}).click();
  const modal=page.locator('.pc-dialog');
- const accountSelect=modal.getByRole('combobox',{name:'Conta do Drive'});
+ const accountSelect=modal.getByRole('combobox',{name:'Conta de armazenamento'});
  await expect(accountSelect).toBeVisible();
  await accountSelect.click();
  const accountOption=modal.getByRole('option',{name:'qa@example.com'});
@@ -45,7 +45,7 @@ test('project covers require Drive, persist crop, cancel safely and support remo
   const first=await spinner.evaluate(el=>getComputedStyle(el).transform);await expect.poll(()=>spinner.evaluate(el=>getComputedStyle(el).transform)).not.toBe(first);
  }
  await centeredLoading('.pc-picker-results .pc-loading-fill','.pc-picker-results');await page.screenshot({path:info.outputPath('picker-loading.png')});releaseList();
- const more=page.getByRole('button',{name:'Carregar mais imagens',exact:true});
+ const more=page.getByRole('button',{name:'Carregar mais itens',exact:true});
  await expect(more.locator('svg')).toHaveCount(1);await stableModal();
  await more.hover();
  await expect(page.locator('html')).not.toHaveAttribute('data-roteiva-cursor','on');

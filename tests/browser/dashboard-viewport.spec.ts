@@ -81,3 +81,37 @@ test("mobile overview remains naturally scrollable and uses Ubuntu",async({page}
   expect(result.font).toContain("Ubuntu");
   expect(result.horizontal).toBeLessThanOrEqual(2);
 });
+
+test("workspace page headings share Projects typography and coordinates without changing Dashboard",async({page},info)=>{
+ await createWorkspace(page,"page-heading-"+info.project.name+"@example.com");
+ const style=async()=>page.locator(".page > .page-heading").evaluate(element=>{
+  const title=element.querySelector("h1")!;
+  const subtitle=element.querySelector("p")!;
+  const heading=element.getBoundingClientRect();
+  const titleBox=title.getBoundingClientRect();
+  const subtitleBox=subtitle.getBoundingClientRect();
+  const a=getComputedStyle(title),b=getComputedStyle(subtitle),h=getComputedStyle(element);
+  return {
+   headingTop:heading.top,headingLeft:heading.left,
+   titleTop:titleBox.top,titleLeft:titleBox.left,subtitleTop:subtitleBox.top,
+   titleFont:a.fontSize,titleWeight:a.fontWeight,titleSpacing:a.letterSpacing,
+   titleLineHeight:a.lineHeight,titleMargin:a.marginBottom,
+   subtitleFont:b.fontSize,subtitleLineHeight:b.lineHeight,
+   alignItems:h.alignItems,marginBottom:h.marginBottom,
+  };
+ });
+ const dashboard=await style();
+ await page.goto(base+"/projetos");
+ await expect(page.locator(".page > .page-heading h1")).toHaveText("Projetos");
+ const projects=await style();
+ await page.goto(base+"/clientes");
+ await expect(page.locator(".page > .page-heading h1")).toHaveText("Clientes");
+ const clients=await style();
+ for(const property of ["titleFont","titleWeight","titleSpacing","titleLineHeight",
+  "titleMargin","subtitleFont","subtitleLineHeight","alignItems","marginBottom"] as const)
+  expect(clients[property],property+" matches Projects on "+info.project.name).toBe(projects[property]);
+ for(const property of ["headingTop","headingLeft","titleTop","titleLeft","subtitleTop"] as const)
+  expect(Math.abs(clients[property]-projects[property]),property+" matches Projects").toBeLessThanOrEqual(1);
+ expect(dashboard.titleFont).not.toBe(projects.titleFont);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth)).toBeLessThanOrEqual(2);
+});

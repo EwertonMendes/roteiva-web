@@ -46,8 +46,11 @@ test("semantic icon labels remain accessible, responsive and functional", async 
   await expect(filters.getByRole("button", { name: "Em aprovação", exact: true })).toHaveAttribute("aria-pressed", "true");
 
   await page.goto(app + "/clientes");
-  await expect(page.locator(".client-summary > div")).toHaveCount(3);
-  await expect(page.locator(".client-summary .client-summary-label svg[aria-hidden='true']")).toHaveCount(3);
+  // New client directory uses text-first accessible stats (without decorative icons).
+  const stats=page.locator(".cd-summary > div");
+  await expect(stats).toHaveCount(3);
+  for(const label of ["CLIENTES CADASTRADOS","CLIENTES RECORRENTES","CLIENTES AVULSOS"])
+    await expect(stats.getByText(label,{exact:true})).toBeVisible();
   await expect(page.getByText("Carteira de clientes", { exact: true })).toBeVisible();
 
   await page.goto(app + "/financeiro");

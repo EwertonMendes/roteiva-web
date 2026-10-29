@@ -1,9 +1,11 @@
 export type View = "overview" | "projects" | "clients" | "reviews" | "finance" | "calendar" | "library" | "settings";
 export type Status = "Em produção" | "Em aprovação" | "Ajustes" | "Aprovado";
-export type ProjectCover = {connectionId:string;fileId:string;name:string;x:number;y:number;zoom:number};
+export type StorageImage = {provider?:"google_drive"|"dropbox";connectionId:string;fileId:string;name:string;x:number;y:number;zoom:number};
+export type ProjectCover = StorageImage; // Existing project images are Google Drive by default.
+export type ClientPhoto = StorageImage;
 export type Project = { cover?:ProjectCover; clientId?: number; dueDate?: string; description?: string; tasks?: { id: number; title: string; done: boolean }[]; template?: string;  id: number; name: string; client: string; status: Status; due: string; progress: number; files: number; color: string; initials: string };
 export type ClientType = "Recorrente" | "Avulso";
-export type Client = { deliveries?: { id:number; title:string; month:string; done:boolean }[];  packageTitle?: string; monthlyDeliverables?: number; monthlyFee?: number;  id: number; name: string; contact: string; email?: string; phone?: string; projects: number; active: number; color: string; initials: string; type: ClientType; since: string };
+export type Client = { photo?:ClientPhoto; deliveries?: { id:number; title:string; month:string; done:boolean }[];  packageTitle?: string; monthlyDeliverables?: number; monthlyFee?: number;  id: number; name: string; contact: string; email?: string; phone?: string; projects: number; active: number; color: string; initials: string; type: ClientType; since: string };
 export type FinanceEntry = { projectId?: number; kind?: "income" | "expense";  id: number; project: string; client: string; clientId?: number; amount: number; date: string; status: "Recebido" | "A receber" };
 export type CalendarEvent = { endTime?: string; autoDeadline?: boolean; projectId?: number;  id: number; title: string; date: string; time: string; type: "Produção" | "Entrega" | "Reunião" | "Aprovação"; client: string };
 export type AssetKind = "Vídeo" | "Imagem" | "Áudio" | "Documento";

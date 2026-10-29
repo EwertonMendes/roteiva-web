@@ -218,7 +218,7 @@ test("Direct routes, refresh and browser Back/Forward preserve each user's scree
   await page.getByLabel("Contato principal",{exact:true}).fill("Contato de teste");
   await page.getByRole("button",{name:"Salvar cliente"}).click();await settled(page);
   await expect(page.locator(".workspace-tools")).toContainText("Salvo na nuvem");
-  await page.locator(".client-list button").filter({hasText:"Cliente com URL"}).click();
+  await page.locator("button.cd-client-name").filter({hasText:"Cliente com URL"}).click();
   await expect(page).toHaveURL(new RegExp("/clientes/[1-9][0-9]*$"));
   const clientURL=page.url();
   await page.reload();await settled(page);

@@ -1,3 +1,4 @@
+import {formatPhoneInput,formatPhoneDisplay,phoneDigits,validBrazilPhone} from '../src/lib/brazil-phone.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {coverGeometry,dragCover,transformCover,coverGesture} from '../src/features/projects/cover-geometry.ts';
@@ -33,4 +34,34 @@ test('gesture zoom keeps its image anchor fixed and clamps every edge without bl
  }
  assert.deepEqual(coverGesture([{x:20,y:40},{x:80,y:40}]),{center:{x:50,y:40},distance:60});
  assert.deepEqual(transformCover(cover,0,0,100,100,2,from),cover);
+});
+
+test('client profile photo round-trips for both storage providers without exposing a URL',()=>{
+ const workspace=emptyWorkspace();
+ const base={id:33,name:'Cliente',contact:'Contato',email:'',phone:'',projects:0,active:0,color:'blue',initials:'CL',type:'Recorrente',since:'out 2026'};
+ for(const provider of ['google_drive','dropbox']){
+  const photo={provider,connectionId:cover.connectionId,fileId:provider==='dropbox'?'id:abcdefghijk':cover.fileId,name:'Retrato.jpg',x:34,y:59,zoom:2.1};
+  workspace.clients=[{...base,photo}];
+  const records=encodeWorkspace(workspace),stored=records.get('clients/33');
+  assert.equal(stored.photoProvider,provider);
+  assert.equal(stored.photoFileId,photo.fileId);
+  assert.ok(!Object.keys(stored).some(key=>/url|token|byte/i.test(key)));
+  assert.deepEqual(decodeWorkspace(records).clients[0].photo,photo);
+ }
+ delete workspace.clients[0].photo;
+ const bare=encodeWorkspace(workspace);
+ assert.equal(bare.get('clients/33').photoFileId,undefined);
+ assert.equal(decodeWorkspace(bare).clients[0].photo,undefined);
+});
+
+test('Brazilian DDD phone mask supports existing numbers and pasted +55, rejects incomplete fields',()=>{
+ assert.equal(formatPhoneInput('21999999999'),'(21) 99999-9999');
+ assert.equal(formatPhoneInput('2133334444'),'(21) 3333-4444');
+ assert.equal(formatPhoneInput('21999'),'(21) 999');
+ assert.equal(formatPhoneInput('+55 21 99999-9999'),'(21) 99999-9999');
+ assert.equal(phoneDigits('(21) 99999-9999'),'21999999999');
+ assert.equal(formatPhoneDisplay('21999999999'),'(21) 99999-9999');
+ assert.equal(formatPhoneDisplay('número antigo'),'número antigo');
+ assert.equal(validBrazilPhone('21999999999'),true);
+ assert.equal(validBrazilPhone('21999999'),false);
 });

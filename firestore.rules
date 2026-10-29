@@ -50,8 +50,21 @@ service cloud.firestore {
       return d.createdAt==resource.data.createdAt && d.ownerUid==resource.data.ownerUid &&
         d.schemaVersion==resource.data.schemaVersion && d.revision==resource.data.revision+1;
     }
+    function valid_clientPhoto(d) {
+      let fields = ["photoProvider","photoConnectionId","photoFileId","photoName","photoX","photoY","photoZoom"];
+      return !d.keys().hasAny(fields) || (d.keys().hasAll(fields) &&
+        d.photoProvider in ["google_drive","dropbox"] &&
+        text(d.photoConnectionId,36,36) && d.photoConnectionId.matches('^[a-zA-Z0-9-]{36}$') &&
+        text(d.photoFileId,10,200) &&
+        ((d.photoProvider=="google_drive" && d.photoFileId.matches('^[A-Za-z0-9_-]+$')) ||
+         (d.photoProvider=="dropbox" && d.photoFileId.matches('^id:[A-Za-z0-9_-]+$'))) &&
+        text(d.photoName,1,250) &&
+        d.photoX is number && d.photoX>=0 && d.photoX<=100 &&
+        d.photoY is number && d.photoY>=0 && d.photoY<=100 &&
+        d.photoZoom is number && d.photoZoom>=1 && d.photoZoom<=3);
+    }
     function valid_clients(d,uid,id) {
-      return d.keys().hasAll(["ownerUid","schemaVersion","revision","createdAt","updatedAt","id","name","contact","email","phone","color","initials","type","since","packageTitle","monthlyDeliverables","monthlyFeeCents"]) && d.keys().hasOnly(["ownerUid","schemaVersion","revision","createdAt","updatedAt","id","name","contact","email","phone","color","initials","type","since","packageTitle","monthlyDeliverables","monthlyFeeCents"]) &&
+      return d.keys().hasAll(["ownerUid","schemaVersion","revision","createdAt","updatedAt","id","name","contact","email","phone","color","initials","type","since","packageTitle","monthlyDeliverables","monthlyFeeCents"]) && d.keys().hasOnly(["ownerUid","schemaVersion","revision","createdAt","updatedAt","id","name","contact","email","phone","color","initials","type","since","packageTitle","monthlyDeliverables","monthlyFeeCents","photoProvider","photoConnectionId","photoFileId","photoName","photoX","photoY","photoZoom"]) &&
         metadata(d,uid) &&
         d.id is int && d.id>0 && d.id<=9007199254740991 && string(d.id)==id &&
         text(d.name,1,200) &&
@@ -64,7 +77,8 @@ service cloud.firestore {
         text(d.since,0,80) &&
         text(d.packageTitle,0,500) &&
         d.monthlyDeliverables is int && d.monthlyDeliverables>=0 && d.monthlyDeliverables<=100 &&
-        d.monthlyFeeCents is int && d.monthlyFeeCents>=0 && d.monthlyFeeCents<=100000000000;
+        d.monthlyFeeCents is int && d.monthlyFeeCents>=0 && d.monthlyFeeCents<=100000000000 &&
+        valid_clientPhoto(d);
     }
     function valid_projectCover(d) {
       let fields = ["coverConnectionId","coverFileId","coverName","coverX","coverY","coverZoom"];

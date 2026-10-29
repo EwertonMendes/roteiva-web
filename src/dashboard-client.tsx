@@ -2,6 +2,9 @@ import { AppSelect } from "./features/ui/AppSelect";
 import {ProjectDetail} from './features/projects/ProjectDetail';
 import {SidebarAccountMenu} from "./features/ui/SidebarAccountMenu";
 import {ProjectsView} from "./features/projects/ProjectsView";
+import {ClientDirectory} from "./features/clients/ClientDirectory";
+import {ClientFormDialog} from "./features/clients/ClientFormDialog";
+import {phoneDigits,validBrazilPhone} from "./lib/brazil-phone";
 "use client";
 
 import {
@@ -12,7 +15,7 @@ import {
   MoreHorizontal, Pencil, Plus, ReceiptText, Search, Trash2,
   UserRoundPlus, Users, WalletCards, X, Upload, Image as ImageIcon,
   FileVideo, FileAudio, FileText, HardDrive, ChevronLeft, Settings2,
-  UsersRound, Repeat2, ContactRound, type LucideIcon,
+  type LucideIcon,
 } from "lucide-react";
 import { ClientDetail, StudioReviews, WorkspaceTools, FinancePanel, projectTemplates } from "./studio-features";
 import {ReviewsDashboard} from "./features/reviews/ReviewsDashboard";
@@ -301,19 +304,33 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     notifyChange("Projeto criado com sucesso");
   }
 
+  function saveClientPhoto(id:number,photo:Client["photo"]){
+    const client=clientList.find(item=>item.id===id);
+    if(!client)return;
+    const updated={...client,photo};
+    setClientList(current=>current.map(item=>item.id===id?updated:item));
+    commitCommands([{kind:"saveClient",client:updated}]);
+    notify(photo?"Foto do cliente atualizada":"Foto do cliente removida");
+  }
   function addClient(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const name = String(form.get("name") || "Novo cliente").trim();
     const contact = String(form.get("contact") || "Contato não informado").trim();
     const email = String(form.get("email") || "").trim();
-    const phone = String(form.get("phone") || "").trim();
+    const typedPhone=String(form.get("phone") || "").trim();
+    if(typedPhone&&!validBrazilPhone(typedPhone)){
+      event.currentTarget.elements.namedItem('phone') instanceof HTMLInputElement &&
+        (event.currentTarget.elements.namedItem('phone') as HTMLInputElement).reportValidity();
+      return;
+    }
+    const phone=typedPhone?phoneDigits(typedPhone):"";
     const type = String(form.get("type") || "Avulso") as ClientType;
     const since = new Date().toLocaleDateString("pt-BR", { month: "short", year: "numeric" }).replace(" de ", " ").replace(".", "");
     const monthlyDeliverables = Math.max(0, Number(form.get("monthlyDeliverables")) || 0);
     const monthlyFee = Math.max(0, parseMoney(String(form.get("monthlyFee") || "0")) || 0);
     const packageTitle = String(form.get("packageTitle") || "").trim();
-    const updated: Client = { deliveries: editingClient?.deliveries || [], id: editingClient?.id || newId(), name, contact, email, phone, projects: editingClient?.projects || 0, active: 0, color: type === "Recorrente" ? "violet" : "blue", initials: name.slice(0, 2).toUpperCase(), type, since: editingClient?.since || since, monthlyDeliverables, monthlyFee, packageTitle };
+    const updated: Client = { photo:editingClient?.photo, deliveries: editingClient?.deliveries || [], id: editingClient?.id || newId(), name, contact, email, phone, projects: editingClient?.projects || 0, active: editingClient?.active || 0, color: type === "Recorrente" ? "violet" : "blue", initials: name.slice(0, 2).toUpperCase(), type, since: editingClient?.since || since, monthlyDeliverables:type==="Recorrente"?monthlyDeliverables:0, monthlyFee:type==="Recorrente"?monthlyFee:0, packageTitle:type==="Recorrente"?packageTitle:"" };
     setClientList(current => editingClient ? current.map(c => c.id === updated.id ? updated : c) : [updated, ...current]);
     if (editingClient) {
       setProjects(current => current.map(p => p.clientId === updated.id ? {...p, client: name} : p));
@@ -489,7 +506,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
   if (!dataReady) return <main className="studio-loading" role="status">Carregando seu estúdio…</main>;
 
   return (
-    <div className={`app-shell app-view-${view}`} inert={saving || undefined}>
+    <div className={`app-shell app-view-${view}${view==="clients"&&!selectedClient?" app-client-directory":""}`} inert={saving || undefined}>
       <aside className={`sidebar ${mobileOpen ? "mobile-open" : ""}`}>
         <div className="brand-lockup">
           <img src={`${import.meta.env.BASE_URL}${theme === "light" ? "roteiva-logo-black.png" : "roteiva-logo-white.png"}`} alt="Roteiva" />
@@ -530,7 +547,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
                 : view === "reviews" ? null : <button className="primary-button" onClick={startProject}><Plus size={17} /> Criar projeto</button>}
             </div>
           </div>
-          {((view === "projects" && !selectedProject) || (view === "clients" && !selectedClient)) && <label className="page-search"><Search size={17}/><input aria-label={view === "projects" ? "Buscar projetos" : "Buscar clientes"} value={query} onChange={e => { const value=e.target.value; setQuery(value); if(value.trim()){ if(view === "projects")onSearchProjects?.(); else onSearchClients?.(); } }} placeholder={view === "projects" ? "Buscar projetos" : "Buscar clientes"}/></label>}
+          {((view === "projects" && !selectedProject) || (view === "clients" && !selectedClient && (clientPage?.total??clientList.length)>=5 || view === "clients" && !selectedClient && !!query.trim())) && <label className="page-search"><Search size={17}/><input aria-label={view === "projects" ? "Buscar projetos" : "Buscar clientes"} value={query} onChange={e => { const value=e.target.value; setQuery(value); if(value.trim()){ if(view === "projects")onSearchProjects?.(); else onSearchClients?.(); } }} placeholder={view === "projects" ? "Buscar projetos" : "Buscar clientes"}/></label>}
           {view === "settings" && <SettingsPage profile={profile} email={email} photoURL={photoURL} theme={theme} toggleTheme={toggleTheme} onSaveProfile={onSaveProfile} />}
           {view === "overview" && <TodayStudio clients={clientList} projects={projects} entries={financeEntries} events={calendarEvents} activities={activities} onView={changeView} onOpenActivity={() => setActivityOpen(true)} overviewMetrics={overviewMetrics} />}
           {view === "projects" && (selectedProject && projects.some(p => p.id === selectedProject) ? <ProjectDetail key={selectedProject} project={projects.find(p => p.id === selectedProject)!} clients={clientList} entries={financeEntries} assets={libraryAssets} events={calendarEvents} onSave={updateProject} onBack={() => changeView("projects")} onRevenue={addLinkedRevenue} onEditRevenue={openFinanceModal} onMaterials={()=>{setLibraryProject(String(selectedProject));changeView("library");}} onEditEvent={(event)=>openEvent(event)} onEvent={(p) => { openEvent(null, p.dueDate); }} onReview={()=>{setReviewStart({clientId:projects.find(p=>p.id===selectedProject)?.clientId,projectId:selectedProject||undefined});changeView("reviews");}} /> : <ProjectsView projects={filtered.map(p => ({...p, files: libraryAssets.filter(a => a.projectId === p.id).length}))}
@@ -540,8 +557,8 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
                   }} onOpen={openProject}
                   total={projectPage && !query.trim()?projectPage.total:undefined}
                   hasMore={!!projectPage?.hasMore&&!query.trim()} onMore={onMoreProjects} />)}
-          {view === "clients" && (selectedClient && clientList.some(c => c.id === selectedClient) ? <ClientDetail client={clientList.find(c => c.id === selectedClient)!} projects={projects} entries={financeEntries} onBack={() => changeView("clients")} onEdit={(client) => { setEditingClient(client); setClientModalOpen(true); }} onSave={saveClientPackage} onProject={openProject} onReview={()=>{setReviewStart({clientId:selectedClient||undefined});changeView("reviews");}} /> : <ClientsView clients={clientList.filter(c => `${c.name} ${c.email} ${c.phone}`.toLowerCase().includes(query.toLowerCase())).map(c => ({...c, projects: projects.filter(p => p.clientId === c.id).length, active: projects.filter(p => p.clientId === c.id && p.status !== "Aprovado").length}))}
-                  onOpen={openClient} onAdd={() => {setEditingClient(null);setClientModalOpen(true);}}
+          {view === "clients" && (selectedClient && clientList.some(c => c.id === selectedClient) ? <ClientDetail client={clientList.find(c => c.id === selectedClient)!} projects={projects} entries={financeEntries} onBack={() => changeView("clients")} onEdit={(client) => { setEditingClient(client); setClientModalOpen(true); }} onSave={saveClientPackage} onProject={openProject} onReview={()=>{setReviewStart({clientId:selectedClient||undefined});changeView("reviews");}} /> : <ClientDirectory clients={clientList.filter(c => `${c.name} ${c.email} ${c.phone}`.toLowerCase().includes(query.toLowerCase())).map(c => ({...c, projects: projects.filter(p => p.clientId === c.id).length, active: projects.filter(p => p.clientId === c.id && p.status !== "Aprovado").length}))}
+                  onOpen={openClient} onAdd={() => {setEditingClient(null);setClientModalOpen(true);}} onSavePhoto={saveClientPhoto}
                   totalCount={clientPage && !query.trim()?clientPage.total:undefined}
                   recurringCount={clientPage && !query.trim()?clientPage.recurring:undefined}
                   activeProjectsCount={clientPage && !query.trim()?projects.filter(p=>p.status!=="Aprovado" && !!p.clientId).length:undefined}
@@ -564,19 +581,8 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
           </form>
         </div>
       )}
-      {clientModalOpen && (
-        <div className="modal-backdrop" onMouseDown={() => setClientModalOpen(false)}>
-          <form key={editingClient?.id || "new-client"} className="project-modal" onSubmit={addClient} onMouseDown={(event) => event.stopPropagation()}>
-            <div className="modal-head"><div><span>{editingClient ? "EDITAR CLIENTE" : "NOVO CLIENTE"}</span><h2>{editingClient ? "Atualize o cadastro" : "Cadastre um relacionamento"}</h2><p>Defina o perfil para acompanhar recorrência e histórico de trabalhos.</p></div><button type="button" onClick={() => setClientModalOpen(false)}><X size={19} /></button></div>
-            <label>Nome do cliente<input name="name" required autoFocus defaultValue={editingClient?.name} placeholder="Ex.: Estúdio Aurora" /></label>
-            <div className="form-grid"><label>Contato principal<input name="contact" defaultValue={editingClient?.contact} required placeholder="Nome do contato" /></label><label>Telefone<input name="phone" defaultValue={editingClient?.phone} type="tel" inputMode="tel" placeholder="(11) 99999-9999" /></label></div>
-            <label>E-mail<input name="email" defaultValue={editingClient?.email} type="email" placeholder="contato@empresa.com" /></label>
-            <fieldset className="client-type-field"><legend>Tipo de relacionamento</legend><label><input type="radio" name="type" value="Recorrente" defaultChecked={!editingClient || editingClient.type === "Recorrente"} /><span><Building2 size={18} /><b>Recorrente</b><small>Cliente com trabalhos contínuos</small></span></label><label><input type="radio" name="type" value="Avulso" defaultChecked={editingClient?.type === "Avulso"} /><span><ReceiptText size={18} /><b>Avulso</b><small>Um trabalho ou projeto pontual</small></span></label></fieldset>
-            <label>Pacote mensal (opcional)<input name="packageTitle" defaultValue={editingClient?.packageTitle} placeholder="Ex.: Conteúdo para redes sociais" /></label><div className="form-grid"><label>Entregas por mês<input name="monthlyDeliverables" type="number" min="0" defaultValue={editingClient?.monthlyDeliverables || ""} /></label><label>Valor mensal combinado<input name="monthlyFee" inputMode="decimal" defaultValue={editingClient?.monthlyFee || ""} placeholder="0,00" /></label></div>
-            <div className="modal-actions"><button type="button" className="secondary-button" onClick={() => setClientModalOpen(false)}>Cancelar</button><button className="primary-button" type="submit">Salvar cliente <ChevronRight size={16} /></button></div>
-          </form>
-        </div>
-      )}
+      {clientModalOpen && <ClientFormDialog key={editingClient?.id||"new"} client={editingClient}
+        onClose={()=>{setClientModalOpen(false);setEditingClient(null);}} onSubmit={addClient}/>}
       {financeModalOpen && (
         <div className="modal-backdrop" onMouseDown={closeFinanceModal}>
           <form key={editingFinanceEntry?.id || "new-revenue"} className="project-modal finance-modal" onSubmit={addFinanceEntry} onMouseDown={(event) => event.stopPropagation()}>
@@ -643,22 +649,6 @@ function ProjectRow({ project, onOpen }: { project: Project; onOpen: () => void 
     <StatusBadge status={project.status} /><div className="progress-cell"><span><i style={{ width: `${project.progress}%` }} /></span><small>{project.progress}%</small></div>
     <div className="due-cell"><small>Prazo</small><b>{project.due}</b></div><ChevronRight size={16} />
   </button>;
-}
-
-function ClientsView({ clients, onOpen, onAdd,totalCount,recurringCount,activeProjectsCount,hasMore,onMore }: {
-  clients:Client[];onOpen:(id:number)=>void;onAdd:()=>void;
-  totalCount?:number;recurringCount?:number;activeProjectsCount?:number;
-  hasMore?:boolean;onMore?:()=>void;
-}) {
-  const recurring = recurringCount ?? clients.filter(client=>client.type==="Recorrente").length;
-  const total = totalCount ?? clients.length;
-  const activeProjects = activeProjectsCount ?? clients.reduce((n,client)=>n+client.active,0);
-  return <div className="panel full-panel client-panel">
-    <div className="client-summary"><div><span className="client-summary-label"><IconLabel icon={UsersRound} size={18}>CLIENTES CADASTRADOS</IconLabel></span><strong>{total}</strong><small>{activeProjects} {activeProjects === 1 ? "projeto em produção" : "projetos em produção"}</small></div><div><span className="client-summary-label"><IconLabel icon={Repeat2} size={18}>CLIENTES RECORRENTES</IconLabel></span><strong>{recurring}</strong><small className="positive">{Math.round(recurring / Math.max(1, total) * 100)}% da carteira</small></div><div><span className="client-summary-label"><IconLabel icon={UserRound} size={18}>CLIENTES AVULSOS</IconLabel></span><strong>{total - recurring}</strong><small>Trabalhos pontuais</small></div></div>
-    <div className="client-toolbar"><div><b><IconLabel icon={ContactRound}>Carteira de clientes</IconLabel></b><small>{total>clients.length?`${clients.length} de ${total} carregados · `:""}Classifique cada relacionamento para entender melhor sua receita.</small></div><button className="secondary-button" onClick={onAdd}><UserRoundPlus size={15} /> Adicionar cliente</button></div>
-    <div className="client-list-head"><span>Cliente</span><span>Relacionamento</span><span>Contato</span><span>Projetos</span><span>Desde</span><span /></div>
-    <div className="client-list">{clients.map((client) => <button key={client.id} onClick={() => onOpen(client.id)}><div><BrandAvatar initials={client.initials} color={client.color} /><b>{client.name}</b></div><span><i className={`client-type ${client.type === "Recorrente" ? "recurring" : "one-off"}`}>{client.type === "Recorrente" ? <><Building2 size={12} /> Recorrente</> : <><ReceiptText size={12} /> Avulso</>}</i></span><span className="client-contact-meta"><b>{client.contact}</b><small>{client.phone || client.email || "Sem telefone ou e-mail"}</small>{client.phone && client.email && <small>{client.email}</small>}</span><span>{client.projects}</span><span>{client.since}</span><ChevronRight size={16} /></button>)}{!clients.length && <div className="empty-state"><Users size={30} /><h3>Nenhum cliente cadastrado</h3><p>Adicione o primeiro cliente e defina se o relacionamento é recorrente ou avulso.</p><button className="primary-button" onClick={onAdd}>Adicionar primeiro cliente</button></div>}</div>{hasMore&&<div className="modal-actions"><button type="button" className="secondary-button" onClick={onMore}>Carregar mais clientes <ChevronDown size={16}/></button></div>}
-  </div>;
 }
 
 function formatCurrency(value: number) {
