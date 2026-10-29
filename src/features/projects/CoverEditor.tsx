@@ -32,6 +32,7 @@ export function CoverEditor({project,client,onClose,onSave}:{project?:Project;cl
  const [search,setSearch]=useState('');const [term,setTerm]=useState('');
  const [page,setPage]=useState<Page>({files:[],nextPageToken:null});const [busy,setBusy]=useState(true),[error,setError]=useState('');
  const [moreToken,setMoreToken]=useState('');const [retry,setRetry]=useState(0);const {src,error:imageError}=useCoverImage(cover);
+ const storedConnectionAvailable=!cover||choices.some(c=>c.id===cover.connectionId&&c.provider===(cover.provider||'google_drive'));
  const currentAccount=choices.find(c=>c.id===account);
  const provider=currentAccount?.provider||'google_drive';
  const canRead=provider==='dropbox'||currentAccount?.scopes.split(' ').includes('https://www.googleapis.com/auth/drive.readonly');
@@ -89,7 +90,7 @@ export function CoverEditor({project,client,onClose,onSave}:{project?:Project;cl
     </>}
    </>:cover?<>
     <button type="button" className="pc-text-button" onClick={()=>setChoosing(true)}><ArrowLeft size={16}/>Escolher outra imagem</button>
-    <div className="pc-crop-content"><div className={'pc-editor-preview'+(client?' pc-editor-preview--portrait':'')} aria-busy={!src&&!imageError}>{src?<CoverFrame src={src} cover={cover} onChange={setCover}/>:imageError?<p className="pc-preview-error" role="alert">{imageError}</p>:<CoverLoading>Carregando imagem…</CoverLoading>}</div>
+    <div className="pc-crop-content"><div className={'pc-editor-preview'+(client?' pc-editor-preview--portrait':'')} aria-busy={!src&&!imageError}>{src?<CoverFrame src={src} cover={cover} onChange={setCover}/>:!storedConnectionAvailable?<p className="pc-preview-error" role="status">A conexão dessa imagem não está mais disponível. Escolha outra imagem ou reconecte sua conta na Biblioteca.</p>:imageError?<p className="pc-preview-error" role="alert">{imageError}</p>:<CoverLoading>Carregando imagem…</CoverLoading>}</div>
     <p id="pc-gesture-help" className="pc-helper pc-gesture-help">Arraste para reposicionar. Use a roda do mouse ou faça pinça para ajustar o zoom.<span> No teclado, use as setas para mover, + e − para ampliar e Home para redefinir.</span></p></div>
    </>:null}
   </div>
