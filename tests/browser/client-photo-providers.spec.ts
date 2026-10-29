@@ -30,7 +30,7 @@ test('client photo selector recovers Drive discovery and shows both connected pr
   }
   if(path.endsWith('/cover-images')){
    const parent=new URL(route.request().url()).searchParams.get('parentId');
-   return route.fulfill({headers,json:{
+   return route.fulfill({headers,json:{browserVersion:2,
     files:parent==='folder_123456789'
       ?[{id:'photo_123456789',name:'Foto do Drive.png',mimeType:'image/png',size:'1000'}]
       :[{id:'folder_123456789',name:'Fotografias',mimeType:'application/vnd.google-apps.folder'}],
