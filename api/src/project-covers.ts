@@ -70,7 +70,7 @@ export async function listCoverImages(env:Env,uid:string,id:string,params:URLSea
        ?await sealThumbnailTicket(env,uid,id,row.revision,String(file.id),file.thumbnailLink):undefined
    })};
  }));
- return Response.json({files:safe,nextPageToken,incompleteSearch});
+ return Response.json({browserVersion:2,files:safe,nextPageToken,incompleteSearch});
 }
 /** Private original image. No arbitrary URL, redirect, public grant or durable media token. */
 export async function coverImage(env:Env,uid:string,id:string,fileId:string,fetcher:typeof fetch=fetch){
