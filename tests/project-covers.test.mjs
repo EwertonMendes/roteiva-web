@@ -1,3 +1,4 @@
+import {formatPhoneInput,formatPhoneDisplay,phoneDigits,validBrazilPhone} from '../src/lib/brazil-phone.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {coverGeometry,dragCover,transformCover,coverGesture} from '../src/features/projects/cover-geometry.ts';
@@ -51,4 +52,16 @@ test('client profile photo round-trips for both storage providers without exposi
  const bare=encodeWorkspace(workspace);
  assert.equal(bare.get('clients/33').photoFileId,undefined);
  assert.equal(decodeWorkspace(bare).clients[0].photo,undefined);
+});
+
+test('Brazilian DDD phone mask supports existing numbers and pasted +55, rejects incomplete fields',()=>{
+ assert.equal(formatPhoneInput('21999999999'),'(21) 99999-9999');
+ assert.equal(formatPhoneInput('2133334444'),'(21) 3333-4444');
+ assert.equal(formatPhoneInput('21999'),'(21) 999');
+ assert.equal(formatPhoneInput('+55 21 99999-9999'),'(21) 99999-9999');
+ assert.equal(phoneDigits('(21) 99999-9999'),'21999999999');
+ assert.equal(formatPhoneDisplay('21999999999'),'(21) 99999-9999');
+ assert.equal(formatPhoneDisplay('número antigo'),'número antigo');
+ assert.equal(validBrazilPhone('21999999999'),true);
+ assert.equal(validBrazilPhone('21999999'),false);
 });
