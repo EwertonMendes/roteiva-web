@@ -499,7 +499,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
   if (!dataReady) return <main className="studio-loading" role="status">Carregando seu estúdio…</main>;
 
   return (
-    <div className={`app-shell app-view-${view}`} inert={saving || undefined}>
+    <div className={`app-shell app-view-${view}${view==="clients"&&!selectedClient?" app-client-directory":""}`} inert={saving || undefined}>
       <aside className={`sidebar ${mobileOpen ? "mobile-open" : ""}`}>
         <div className="brand-lockup">
           <img src={`${import.meta.env.BASE_URL}${theme === "light" ? "roteiva-logo-black.png" : "roteiva-logo-white.png"}`} alt="Roteiva" />
@@ -540,7 +540,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
                 : view === "reviews" ? null : <button className="primary-button" onClick={startProject}><Plus size={17} /> Criar projeto</button>}
             </div>
           </div>
-          {((view === "projects" && !selectedProject) || (view === "clients" && !selectedClient)) && <label className="page-search"><Search size={17}/><input aria-label={view === "projects" ? "Buscar projetos" : "Buscar clientes"} value={query} onChange={e => { const value=e.target.value; setQuery(value); if(value.trim()){ if(view === "projects")onSearchProjects?.(); else onSearchClients?.(); } }} placeholder={view === "projects" ? "Buscar projetos" : "Buscar clientes"}/></label>}
+          {((view === "projects" && !selectedProject) || (view === "clients" && !selectedClient && (clientPage?.total??clientList.length)>=5 || view === "clients" && !selectedClient && !!query.trim())) && <label className="page-search"><Search size={17}/><input aria-label={view === "projects" ? "Buscar projetos" : "Buscar clientes"} value={query} onChange={e => { const value=e.target.value; setQuery(value); if(value.trim()){ if(view === "projects")onSearchProjects?.(); else onSearchClients?.(); } }} placeholder={view === "projects" ? "Buscar projetos" : "Buscar clientes"}/></label>}
           {view === "settings" && <SettingsPage profile={profile} email={email} photoURL={photoURL} theme={theme} toggleTheme={toggleTheme} onSaveProfile={onSaveProfile} />}
           {view === "overview" && <TodayStudio clients={clientList} projects={projects} entries={financeEntries} events={calendarEvents} activities={activities} onView={changeView} onOpenActivity={() => setActivityOpen(true)} overviewMetrics={overviewMetrics} />}
           {view === "projects" && (selectedProject && projects.some(p => p.id === selectedProject) ? <ProjectDetail key={selectedProject} project={projects.find(p => p.id === selectedProject)!} clients={clientList} entries={financeEntries} assets={libraryAssets} events={calendarEvents} onSave={updateProject} onBack={() => changeView("projects")} onRevenue={addLinkedRevenue} onEditRevenue={openFinanceModal} onMaterials={()=>{setLibraryProject(String(selectedProject));changeView("library");}} onEditEvent={(event)=>openEvent(event)} onEvent={(p) => { openEvent(null, p.dueDate); }} onReview={()=>{setReviewStart({clientId:projects.find(p=>p.id===selectedProject)?.clientId,projectId:selectedProject||undefined});changeView("reviews");}} /> : <ProjectsView projects={filtered.map(p => ({...p, files: libraryAssets.filter(a => a.projectId === p.id).length}))}
