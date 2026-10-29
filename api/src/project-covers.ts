@@ -15,23 +15,62 @@ async function authorized(env:Env,uid:string,id:string){
  if(!row.scopes.split(' ').includes(DRIVE_READ_SCOPE))throw new ApiError(409,'drive_read_permission_missing');
  return row;
 }
-/** Bounded, paginated image search using the account's existing read grant. */
+/** Paginated image/folder browsing using the account's existing read grant.
+ * Keep filtering on the server; never expose arbitrary Drive metadata or files
+ * outside the permitted image types. Child folders are shown at the current level.
+ * Search can match names across accessible Drive content.
+ */
 export async function listCoverImages(env:Env,uid:string,id:string,params:URLSearchParams,fetcher:typeof fetch=fetch){
  const row=await authorized(env,uid,id);
- const term=(params.get('search')||'').trim(),page=params.get('pageToken')||'';
- if(term.length>100||/[\x00-\x1f\x7f]/.test(term)||page.length>2048||/[\x00-\x20\x7f]/.test(page))throw new ApiError(400,'invalid_search');
+ const term=(params.get('search')||'').trim();
+ const page=params.get('pageToken')||'';
+ const parent=params.get('parentId')||'root';
+ if(term.length>100||/[\x00-\x1f\x7f]/.test(term)||
+    page.length>2048||/[\x00-\x20\x7f]/.test(page)||
+    (parent!=='root'&&!ID.test(parent)))throw new ApiError(400,'invalid_search');
  const quote=(v:string)=>v.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
- const url=new URL('https://www.googleapis.com/drive/v3/files');
- url.searchParams.set('q',`trashed = false and (${COVER_TYPES.map(t=>`mimeType = '${t}'`).join(' or ')})`+(term?` and name contains '${quote(term)}'`:''));
- url.searchParams.set('fields','nextPageToken,incompleteSearch,files(id,name,mimeType,size,thumbnailLink)');
- url.searchParams.set('pageSize','40');url.searchParams.set('orderBy','modifiedTime desc');
- url.searchParams.set('supportsAllDrives','true');url.searchParams.set('includeItemsFromAllDrives','true');
- if(page)url.searchParams.set('pageToken',page);
- const data=await driveJson(env,row,url,fetcher,'drive_unavailable');
- if(!Array.isArray(data.files))throw new ApiError(502,'invalid_google_response');
- const files=await Promise.all(data.files.filter((f:Record<string,unknown>)=>typeof f.id==='string'&&ID.test(f.id)&&COVER_TYPES.includes(String(f.mimeType))&&Number(f.size)>0&&Number(f.size)<=MAX_COVER_BYTES)
- .map(async(f:Record<string,unknown>)=>({id:f.id,name:String(f.name).slice(0,250),mimeType:f.mimeType,thumbnailTicket:await sealThumbnailTicket(env,uid,id,row.revision,String(f.id),f.thumbnailLink)})));
- return Response.json({files,nextPageToken:typeof data.nextPageToken==='string'?data.nextPageToken:null,incompleteSearch:data.incompleteSearch===true});
+ const allowed=`(mimeType = 'application/vnd.google-apps.folder' or ${COVER_TYPES.map(t=>`mimeType = '${t}'`).join(' or ')})`;
+ const query=[`trashed = false`,allowed];
+ if(term)query.push(`name contains '${quote(term)}'`);
+ else query.push(`'${parent}' in parents`);
+ const files:Record<string,unknown>[]=[];
+ let nextPageToken:string|null=page||null,incompleteSearch=false;
+ // A Drive page can consist solely of oversized images. Try a bounded number
+ // of pages for useful entries, while preserving an explicit continuation token.
+ for(let attempt=0;attempt<3;attempt++){
+  const url=new URL('https://www.googleapis.com/drive/v3/files');
+  url.searchParams.set('q',query.join(' and '));
+  url.searchParams.set('fields','nextPageToken,incompleteSearch,files(id,name,mimeType,size,thumbnailLink)');
+  url.searchParams.set('pageSize','60');
+  url.searchParams.set('orderBy',term?'modifiedTime desc':'folder,name');
+  url.searchParams.set('supportsAllDrives','true');
+  url.searchParams.set('includeItemsFromAllDrives','true');
+  if(nextPageToken)url.searchParams.set('pageToken',nextPageToken);
+  const data=await driveJson(env,row,url,fetcher,'drive_unavailable');
+  if(!Array.isArray(data.files))throw new ApiError(502,'invalid_google_response');
+  for(const file of data.files as Record<string,unknown>[]){
+   const mime=String(file.mimeType);
+   if(typeof file.id!=='string'||!ID.test(file.id)||typeof file.name!=='string')continue;
+   if(mime==='application/vnd.google-apps.folder'||
+     (COVER_TYPES.includes(mime)&&Number.isSafeInteger(Number(file.size))&&Number(file.size)>0&&Number(file.size)<=MAX_COVER_BYTES)){
+      files.push(file);
+   }
+  }
+  incompleteSearch||=data.incompleteSearch===true;
+  nextPageToken=typeof data.nextPageToken==='string'?data.nextPageToken:null;
+  if(files.length||!nextPageToken)break;
+ }
+ // The signed thumbnail ticket is only generated for valid images, not folders.
+ const safe=await Promise.all(files.map(async file=>{
+  const mime=String(file.mimeType);
+  return {id:file.id,name:String(file.name).slice(0,250),mimeType:mime,
+   ...(mime==='application/vnd.google-apps.folder'?{}:{
+     size:String(file.size),
+     thumbnailTicket:typeof file.thumbnailLink==='string'
+       ?await sealThumbnailTicket(env,uid,id,row.revision,String(file.id),file.thumbnailLink):undefined
+   })};
+ }));
+ return Response.json({files:safe,nextPageToken,incompleteSearch});
 }
 /** Private original image. No arbitrary URL, redirect, public grant or durable media token. */
 export async function coverImage(env:Env,uid:string,id:string,fileId:string,fetcher:typeof fetch=fetch){
