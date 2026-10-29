@@ -1,7 +1,3 @@
-.app-view-projects .page > .page-heading .eyebrow { display:none; }
-.app-view-projects .page > .page-heading h1 { font-size:clamp(2rem,3.3vw,3.5rem); letter-spacing:-.045em; margin:0 0 10px; }
-.app-view-projects .page > .page-heading { align-items:center; margin-bottom:26px; }
-.app-view-projects .page > .page-heading p { font-size:var(--type-body); }
 .app-view-projects .page-search { max-width:400px; padding:10px 14px; }
 .pc-panel { border:1px solid var(--line); border-radius:24px; background:var(--card); overflow:hidden; min-height:380px; }
 .pc-filter-bar { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px; padding:16px 20px; border-bottom:1px solid var(--line); }
