@@ -25,6 +25,7 @@ export function CoverEditor({project,client,onClose,onSave}:{project?:Project;cl
  const [cover,setCover]=useState<ProjectCover|undefined>(stored);
  const [choosing,setChoosing]=useState(!stored);
  const [folderTrail,setFolderTrail]=useState<{id:string;name:string}[]>([]);
+ const driveBrowserVersion=useRef(new Map<string,number>());
  useEffect(()=>{
    if(!choices.length)return;
    if(!choices.some(c=>c.id===account))setAccount(choices[0].id);
@@ -51,16 +52,52 @@ export function CoverEditor({project,client,onClose,onSave}:{project?:Project;cl
  useEffect(()=>{
   if(!choosing||!account||!canRead)return;
   const controller=new AbortController();setBusy(true);setError('');
-  const path=provider==='dropbox'
-     ?'/integrations/dropbox/'+encodeURIComponent(account)+(folderTrail.length?'/folders/'+encodeURIComponent(folderTrail[folderTrail.length-1].id)+'/items':'/folders')+'?'+new URLSearchParams({
-        ...(folderTrail.length?{}:{parentId:'root'}),...(term.length>=2?{search:term}:{}),...(moreToken?{pageToken:moreToken}:{})
-       })
-     :'/integrations/drive/'+encodeURIComponent(account)+'/cover-images?'+new URLSearchParams({
-        parentId:folderTrail.length?folderTrail[folderTrail.length-1].id:'root',
-        ...(term.length>=2?{search:term}:{}),...(moreToken?{pageToken:moreToken}:{})
-       });
-  void call<Page>(path,'GET',undefined,controller.signal).then(data=>{
-    if(!controller.signal.aborted)setPage(old=>({...data,files:moreToken?[...old.files,...data.files.filter(f=>!old.files.some(p=>p.id===f.id))]:data.files}));
+  const request=async():Promise<Page>=>{
+   if(provider==='dropbox'){
+    const path='/integrations/dropbox/'+encodeURIComponent(account)+(folderTrail.length?'/folders/'+encodeURIComponent(folderTrail[folderTrail.length-1].id)+'/items':'/folders')+'?'+new URLSearchParams({
+     ...(folderTrail.length?{}:{parentId:'root'}),...(term.length>=2?{search:term}:{}),...(moreToken?{pageToken:moreToken}:{})
+    });
+    return call<Page>(path,'GET',undefined,controller.signal);
+   }
+   const base='/integrations/drive/'+encodeURIComponent(account);
+   const parent=folderTrail.length?folderTrail[folderTrail.length-1].id:'root';
+   const knownVersion=driveBrowserVersion.current.get(account);
+   const filter=term.length>=2?{search:term}:{};
+   // Transitional capability detection: the currently deployed Worker may
+   // support image search but not folder browsing on that same endpoint.
+   if(knownVersion===1&&parent!=='root'){
+    return call<Page>(base+'/folders/'+encodeURIComponent(parent)+'/items?'+new URLSearchParams({...filter,...(moreToken?{pageToken:moreToken}:{})}),'GET',undefined,controller.signal);
+   }
+   const tokenSet=knownVersion===1&&moreToken&&parent==='root'
+     ?JSON.parse(moreToken) as {images:string|null;folders:string|null}
+     :null;
+   const needsImages=!tokenSet||!!tokenSet.images;
+   const result=needsImages
+     ?await call<Page&{browserVersion?:number}>(base+'/cover-images?'+new URLSearchParams({
+       parentId:parent,...filter,...(tokenSet?.images?{pageToken:tokenSet.images}:!tokenSet&&moreToken?{pageToken:moreToken}:{})
+      }),'GET',undefined,controller.signal)
+     :{files:[],nextPageToken:null};
+   if('browserVersion' in result&&result.browserVersion===2){
+    driveBrowserVersion.current.set(account,2);
+    return result;
+   }
+   driveBrowserVersion.current.set(account,1);
+   if(parent!=='root'){
+    return call<Page>(base+'/folders/'+encodeURIComponent(parent)+'/items?'+new URLSearchParams({...filter,...(moreToken?{pageToken:moreToken}:{})}),'GET',undefined,controller.signal);
+   }
+   const folders=(!tokenSet||tokenSet.folders)
+    ?await call<{folders:DriveItem[];nextPageToken:string|null}>(base+'/folders?'+new URLSearchParams({
+       parentId:'root',...(tokenSet?.folders?{pageToken:tokenSet.folders}:{})
+      }),'GET',undefined,controller.signal)
+    :{folders:[],nextPageToken:null};
+   const items=[...folders.folders.filter(f=>!term||f.name.toLowerCase().includes(term.toLowerCase())),...result.files];
+   const unique=[...new Map(items.map(f=>[f.id,f])).values()];
+   const next={images:result.nextPageToken,folders:folders.nextPageToken};
+   return {files:unique,nextPageToken:next.images||next.folders?JSON.stringify(next):null,
+    incompleteSearch:result.incompleteSearch};
+  };
+  void request().then(data=>{
+   if(!controller.signal.aborted)setPage(old=>({...data,files:moreToken?[...old.files,...data.files.filter(f=>!old.files.some(p=>p.id===f.id))]:data.files}));
   }).catch(e=>{if(!controller.signal.aborted)setError(e.message);}).finally(()=>{if(!controller.signal.aborted)setBusy(false);});
   return ()=>controller.abort();
  },[account,provider,canRead,choosing,term,moreToken,folderTrail,call,retry]);
