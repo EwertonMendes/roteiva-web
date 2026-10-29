@@ -3,7 +3,7 @@ import {useAuth} from '../auth/AuthProvider';
 import {useDriveApi} from '../drive/drive-api';
 import type {ProjectCover} from '../../domain/workspace';
 export type CoverConnection={id:string;google_email:string;status:string;scopes:string;provider:'google_drive'|'dropbox'};
-type Context={connections:CoverConnection[];error:string;uid:string;load:(cover:ProjectCover,signal:AbortSignal)=>Promise<Blob>};
+type Context={connections:CoverConnection[];error:string;uid:string;load:(cover:ProjectCover,signal:AbortSignal,thumbnail?:boolean)=>Promise<Blob>};
 const CoverContext=createContext<Context|null>(null);
 function imageQueue(){
  let running=0;const waiters:(()=>void)[]=[];
@@ -35,17 +35,17 @@ export function DriveCoversProvider({children,includeDropbox=false}:{children:Re
   });
   return ()=>controller.abort();
  },[call,user?.uid,includeDropbox]);
- const load=useCallback(async(cover:ProjectCover,signal:AbortSignal)=>{
+ const load=useCallback(async(cover:ProjectCover,signal:AbortSignal,thumbnail=false)=>{
   if(!user)throw Error('Entre novamente para carregar a capa.');
   const release=await acquire(signal);try{
   const provider=cover.provider==='dropbox'?'dropbox':'drive';
-  const path=API+'/integrations/'+provider+'/'+encodeURIComponent(cover.connectionId)+'/files/'+encodeURIComponent(cover.fileId)+'/cover';
+  const path=API+'/integrations/'+provider+'/'+encodeURIComponent(cover.connectionId)+'/files/'+encodeURIComponent(cover.fileId)+(thumbnail?'/thumbnail':'/cover');
   let response:Response|undefined;
   for(let attempt=0;attempt<2;attempt++){
    const token=await user.getIdToken(attempt===1);
    response=await fetch(path,{headers:{Authorization:'Bearer '+token},cache:'no-store',signal});if(response.status!==401)break;
   }
-  if(!response?.ok)throw Error('A imagem está indisponível. Confira o arquivo e a conexão do Drive.');
+  if(!response?.ok || response.status===204)throw Error('Imagem indisponível. Confira o arquivo e a conexão de armazenamento.');
   if(!['image/jpeg','image/png','image/webp','image/avif'].includes(response.headers.get('Content-Type')?.split(';')[0]||''))throw Error('Formato de imagem não suportado.');
   const blob=await response.blob();if(!blob.size||blob.size>8*1024*1024)throw Error('A imagem excede o limite de 8 MB.');return blob;
   }finally{release();}
@@ -53,16 +53,16 @@ export function DriveCoversProvider({children,includeDropbox=false}:{children:Re
  return <CoverContext.Provider value={{connections,error,uid:user?.uid||'',load}}>{children}</CoverContext.Provider>;
 }
 export const useDriveCovers=()=>useContext(CoverContext);
-export function useCoverImage(cover:ProjectCover|undefined,visible=true){
+export function useCoverImage(cover:ProjectCover|undefined,visible=true,thumbnail=false){
  const context=useDriveCovers();const [state,setState]=useState({key:'',src:'',error:''});
- const load=context?.load;const key=[context?.uid,cover?.provider||'google_drive',cover?.connectionId,cover?.fileId].join(':');
+ const load=context?.load;const key=[context?.uid,cover?.provider||'google_drive',cover?.connectionId,cover?.fileId,thumbnail?'thumb':'full'].join(':');
  const current=useRef(cover);current.current=cover;
  const connected=!!context?.connections.some(c=>c.id===cover?.connectionId&&c.provider===(cover?.provider||'google_drive'));
  useEffect(()=>{
   if(!load||!current.current||!visible||!connected)return;
   const controller=new AbortController();let src='';setState({key,src:'',error:''});
-  void load(current.current,controller.signal).then(blob=>{if(controller.signal.aborted)return;src=URL.createObjectURL(blob);setState({key,src,error:''});}).catch(e=>{if(!controller.signal.aborted)setState({key,src:'',error:e.message});});
+  void load(current.current,controller.signal,thumbnail).then(blob=>{if(controller.signal.aborted)return;src=URL.createObjectURL(blob);setState({key,src,error:''});}).catch(e=>{if(!controller.signal.aborted)setState({key,src:'',error:e.message});});
   return ()=>{controller.abort();if(src)URL.revokeObjectURL(src);};
- },[load,key,visible,connected]);
+ },[load,key,visible,connected,thumbnail]);
  return connected&&state.key===key?state:{key,src:'',error:''};
 }
