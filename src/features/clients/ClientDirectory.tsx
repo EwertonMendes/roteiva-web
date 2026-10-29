@@ -70,5 +70,5 @@ function ClientDirectoryContent({clients,onOpen,onAdd,onSavePhoto,totalCount,rec
   </section>;
 }
 export function ClientDirectory(props:Props){
- return isDemo?<ClientDirectoryContent {...props}/>:<DriveCoversProvider><ClientDirectoryContent {...props}/></DriveCoversProvider>;
+ return isDemo?<ClientDirectoryContent {...props}/>:<DriveCoversProvider includeDropbox><ClientDirectoryContent {...props}/></DriveCoversProvider>;
 }
