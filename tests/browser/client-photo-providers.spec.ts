@@ -28,8 +28,14 @@ test('client photo selector recovers Drive discovery and shows both connected pr
    if(failDriveOnce){failDriveOnce=false;return route.fulfill({status:429,headers,json:{error:{code:'rate_limited'}}});}
    return route.fulfill({headers,json:{connections:[{id:driveId,google_email:'drive@example.com',status:'connected',scopes:'https://www.googleapis.com/auth/drive.readonly'}]}});
   }
-  if(path.endsWith('/cover-images'))return route.fulfill({headers,json:{
-   files:[{id:'photo_123456789',name:'Foto do Drive.png',mimeType:'image/png',size:'1000'}],nextPageToken:null}});
+  if(path.endsWith('/cover-images')){
+   const parent=new URL(route.request().url()).searchParams.get('parentId');
+   return route.fulfill({headers,json:{
+    files:parent==='folder_123456789'
+      ?[{id:'photo_123456789',name:'Foto do Drive.png',mimeType:'image/png',size:'1000'}]
+      :[{id:'folder_123456789',name:'Fotografias',mimeType:'application/vnd.google-apps.folder'}],
+    nextPageToken:null}});
+  }
   return route.fulfill({headers,json:{}});
  });
  await page.route('https://roteiva-api-dev.ewertonmendes9.workers.dev/integrations/dropbox**',route=>{
@@ -56,6 +62,8 @@ test('client photo selector recovers Drive discovery and shows both connected pr
  await expect(dialog.getByRole('option',{name:'Dropbox · dropbox@example.com'})).toBeVisible();
  await dialog.getByRole('option',{name:'Drive · drive@example.com'}).click();
  await expect(dialog.getByText('Buscar imagens no Drive')).toBeVisible();
+ await dialog.getByRole('button',{name:'Fotografias'}).click();
  await expect(dialog.getByRole('button',{name:'Foto do Drive.png'})).toBeVisible();
+ await expect(dialog.getByRole('navigation',{name:'Pasta de imagens'})).toContainText('Fotografias');
  expect(await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth)).toBeLessThanOrEqual(2);
 });
