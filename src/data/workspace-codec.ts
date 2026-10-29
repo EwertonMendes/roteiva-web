@@ -9,7 +9,9 @@ export function encodeWorkspace(workspace: WorkspaceData, scope?: ReadonlySet<Co
   const records: Records = new Map();
   const put = (collection: string, id: number | string, data: Data) => records.set(collection + "/" + id, data);
   for (const c of workspace.clients) {
-    if (accepts("clients")) put("clients", c.id, {id:c.id,name:c.name,contact:c.contact,email:c.email || "",phone:c.phone || "",color:c.color,initials:c.initials,type:c.type,since:c.since,packageTitle:c.packageTitle || "",monthlyDeliverables:c.monthlyDeliverables || 0,monthlyFeeCents:Math.round((c.monthlyFee || 0)*100)});
+    if (accepts("clients")) put("clients", c.id, {id:c.id,name:c.name,contact:c.contact,email:c.email || "",phone:c.phone || "",color:c.color,initials:c.initials,type:c.type,since:c.since,packageTitle:c.packageTitle || "",monthlyDeliverables:c.monthlyDeliverables || 0,monthlyFeeCents:Math.round((c.monthlyFee || 0)*100),
+      ...(c.photo?{photoProvider:c.photo.provider||"google_drive",photoConnectionId:c.photo.connectionId,photoFileId:c.photo.fileId,
+        photoName:c.photo.name,photoX:c.photo.x,photoY:c.photo.y,photoZoom:c.photo.zoom}:{})});
     for (const d of c.deliveries || []) if (accepts("deliveries")) put("deliveries",d.id,{...d,clientId:c.id});
   }
   for (const p of workspace.projects) {
@@ -32,7 +34,11 @@ export function decodeWorkspace(records: Records): WorkspaceData {
     const collection = path.split("/")[0];
     if (collection === "clients") {
       const {monthlyFeeCents, ...rest} = d;
-      workspace.clients.push({...rest,monthlyFee:Number(monthlyFeeCents)/100,projects:0,active:0,deliveries:[]} as unknown as Client);
+      workspace.clients.push({...rest,
+        ...(typeof d.photoFileId==="string"?{photo:{provider:d.photoProvider==="dropbox"?"dropbox":"google_drive",
+          connectionId:String(d.photoConnectionId),fileId:d.photoFileId,name:String(d.photoName),
+          x:Number(d.photoX),y:Number(d.photoY),zoom:Number(d.photoZoom)}}:{}),
+        monthlyFee:Number(monthlyFeeCents)/100,projects:0,active:0,deliveries:[]} as unknown as Client);
     }
     if (collection === "projects") workspace.projects.push({...d,...(typeof d.coverFileId==="string"?{cover:{connectionId:d.coverConnectionId,fileId:d.coverFileId,name:d.coverName,x:d.coverX,y:d.coverY,zoom:d.coverZoom}}:{}),due:d.dueDate ? new Date(d.dueDate+"T12:00:00").toLocaleDateString("pt-BR",{day:"2-digit",month:"short"}) : "Sem prazo",tasks:[],progress:0,files:0} as unknown as Project);
     if (collection === "events") workspace.calendarEvents.push(d as unknown as WorkspaceData["calendarEvents"][number]);
