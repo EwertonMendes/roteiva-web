@@ -13,7 +13,7 @@ function ProjectCard({project,onOpen,onEdit}:{project:Project;onOpen:()=>void;on
  const context=useDriveCovers();const box=useRef<HTMLElement>(null);const [visible,setVisible]=useState(false);
  useEffect(()=>{const observer=new IntersectionObserver(([entry])=>{if(entry.isIntersecting){setVisible(true);observer.disconnect();}},{rootMargin:'100px'});if(box.current)observer.observe(box.current);return ()=>observer.disconnect();},[]);
  const {src,error}=useCoverImage(project.cover,visible);
- const canEdit=!!context?.connections.length;
+ const canEdit=!!context?.connections.some(c=>c.provider==='google_drive');
  const showImage=canEdit&&!!project.cover&&context!.connections.some(c=>c.id===project.cover!.connectionId);
  return <article className="pc-card" ref={box}>
   {showImage&&<div className="pc-photo">{src?<CoverFrame src={src} cover={project.cover!}/>:<div className="pc-image-unavailable"><ImagePlus size={28}/><span>{error?'Capa indisponível':'Carregando capa…'}</span></div>}<button type="button" className="pc-edit-overlay" onClick={onEdit}><Pencil size={16}/>Editar capa</button><span className="pc-files-overlay"><Film size={17}/>{project.files} {project.files===1?'arquivo':'arquivos'}</span><button className="pc-open-overlay" type="button" aria-label={'Abrir projeto '+project.name} onClick={onOpen}><ChevronRight size={23}/></button></div>}
@@ -39,7 +39,7 @@ function ProjectsGrid({projects,statusFilter,setStatusFilter,onOpen,onSaveCover,
    {!projects.length&&<div className="empty-state"><FolderOpen size={32}/><h3>{statusFilter==='Todos'?'Nenhum projeto encontrado':'Nenhum projeto nesta situação'}</h3><p>{statusFilter==='Todos'?'Crie um projeto ou ajuste sua busca para continuar.':'Selecione outra situação para ver seus projetos.'}</p></div>}
    {hasMore&&<div className="pc-more"><button type="button" className="secondary-button" onClick={onMore}>Carregar mais projetos<ChevronDown size={16}/></button></div>}
   </section>
-  {project&&context?.connections.length?<CoverEditor key={project.id} project={project} onClose={()=>setEditing(null)} onSave={cover=>onSaveCover(project.id,cover)}/>:null}
+  {project&&context?.connections.some(c=>c.provider==='google_drive')?<CoverEditor key={project.id} project={project} onClose={()=>setEditing(null)} onSave={cover=>onSaveCover(project.id,cover)}/>:null}
  </>;
 }
 export function ProjectsView(props:Props){return isDemo?<ProjectsGrid {...props}/>:<DriveCoversProvider><ProjectsGrid {...props}/></DriveCoversProvider>;}
