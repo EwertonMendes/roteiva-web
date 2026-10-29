@@ -4,6 +4,7 @@ import {SidebarAccountMenu} from "./features/ui/SidebarAccountMenu";
 import {ProjectsView} from "./features/projects/ProjectsView";
 import {ClientDirectory} from "./features/clients/ClientDirectory";
 import {ClientFormDialog} from "./features/clients/ClientFormDialog";
+import {phoneDigits,validBrazilPhone} from "./lib/brazil-phone";
 "use client";
 
 import {
@@ -317,7 +318,13 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     const name = String(form.get("name") || "Novo cliente").trim();
     const contact = String(form.get("contact") || "Contato não informado").trim();
     const email = String(form.get("email") || "").trim();
-    const phone = String(form.get("phone") || "").trim();
+    const typedPhone=String(form.get("phone") || "").trim();
+    if(typedPhone&&!validBrazilPhone(typedPhone)){
+      event.currentTarget.elements.namedItem('phone') instanceof HTMLInputElement &&
+        (event.currentTarget.elements.namedItem('phone') as HTMLInputElement).reportValidity();
+      return;
+    }
+    const phone=typedPhone?phoneDigits(typedPhone):"";
     const type = String(form.get("type") || "Avulso") as ClientType;
     const since = new Date().toLocaleDateString("pt-BR", { month: "short", year: "numeric" }).replace(" de ", " ").replace(".", "");
     const monthlyDeliverables = Math.max(0, Number(form.get("monthlyDeliverables")) || 0);
