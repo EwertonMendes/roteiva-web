@@ -1,6 +1,7 @@
 import {useEffect,useRef,useState,type FormEvent} from "react";
 import {Building2,ChevronRight,ReceiptText,X} from "lucide-react";
 import type {Client,ClientType} from "../../domain/workspace";
+import {BrazilPhoneInput} from "../ui/BrazilPhoneInput";
 
 type Props={client:Client|null;onClose:()=>void;onSubmit:(event:FormEvent<HTMLFormElement>)=>void};
 export function ClientFormDialog({client,onClose,onSubmit}:Props){
@@ -27,7 +28,7 @@ export function ClientFormDialog({client,onClose,onSubmit}:Props){
      <div className="cd-form-fields">
       <label>Nome do cliente<input name="name" maxLength={200} required autoFocus defaultValue={client?.name} placeholder="Ex.: Estúdio Aurora"/></label>
       <div className="cd-form-grid"><label>Contato principal<input name="contact" maxLength={500} defaultValue={client?.contact} placeholder="Nome do contato"/></label>
-        <label>Telefone<input name="phone" type="tel" inputMode="tel" maxLength={50} autoComplete="tel" defaultValue={client?.phone} placeholder="(11) 99999-9999"/></label></div>
+        <label>Telefone<BrazilPhoneInput name="phone" defaultValue={client?.phone} placeholder="(11) 99999-9999" /></label></div>
       <label>E-mail<input name="email" type="email" autoComplete="email" maxLength={254} defaultValue={client?.email} placeholder="contato@empresa.com"/></label>
       <fieldset className="cd-form-types"><legend>Tipo de relacionamento</legend>
        <label><input type="radio" name="type" value="Recorrente" checked={type==="Recorrente"} onChange={()=>setType("Recorrente")}/>
