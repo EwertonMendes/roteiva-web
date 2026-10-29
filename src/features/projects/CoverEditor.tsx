@@ -70,7 +70,7 @@ export function CoverEditor({project,client,onClose,onSave}:{project?:Project;cl
      setPage({files:[],nextPageToken:null});setMoreToken('');return;
    }
    if(!['image/jpeg','image/png','image/webp',...(provider==='google_drive'?['image/avif']:[])].includes(file.mimeType))return;
-   if(Number(file.size)>8*1024*1024)return;
+   if(file.size!==undefined && (!Number.isFinite(Number(file.size))||Number(file.size)>8*1024*1024))return;
    setCover({provider,connectionId:account,fileId:file.id,name:file.name,x:50,y:50,zoom:1});setChoosing(false);
  };
  return <dialog data-native-cursor ref={dialog} className="pc-dialog" aria-labelledby="pc-editor-title" onCancel={e=>{e.preventDefault();onClose();}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
@@ -87,7 +87,7 @@ export function CoverEditor({project,client,onClose,onSave}:{project?:Project;cl
      <div className="pc-picker-results" aria-busy={busy}>
      {error&&<p role="alert">{error} <button type="button" className="secondary-button" onClick={()=>{setRetry(n=>n+1);}}>Tentar novamente</button></p>}
      {busy&&!page.files.length?<CoverLoading>Carregando imagens…</CoverLoading>:<>
-     <div className="pc-image-grid">{page.files.filter(file=>isStorageFolder(file.mimeType)||(['image/jpeg','image/png','image/webp',...(provider==='google_drive'?['image/avif']:[])].includes(file.mimeType)&&Number(file.size)<=8*1024*1024)).map(file=><button type="button" key={file.id} onClick={()=>chooseFile(file)} title={file.name}>{isStorageFolder(file.mimeType)?<span className="pc-folder-icon"><Folder size={30}/></span>:<DriveThumbnail item={file} scope={context.uid+':'+account} getThumbnail={thumbnail}/>}<span>{file.name}</span></button>)}</div>
+     <div className="pc-image-grid">{page.files.filter(file=>isStorageFolder(file.mimeType)||(['image/jpeg','image/png','image/webp',...(provider==='google_drive'?['image/avif']:[])].includes(file.mimeType)&&(file.size===undefined&&provider==='google_drive'||Number(file.size)>0&&Number(file.size)<=8*1024*1024))).map(file=><button type="button" key={file.id} onClick={()=>chooseFile(file)} title={file.name}>{isStorageFolder(file.mimeType)?<span className="pc-folder-icon"><Folder size={30}/></span>:<DriveThumbnail item={file} scope={context.uid+':'+account} getThumbnail={thumbnail}/>}<span>{file.name}</span></button>)}</div>
      {!page.files.length&&!error&&!busy&&<p className="pc-empty">{page.nextPageToken?'Nenhuma imagem compatível nesta página. Carregue mais itens para continuar.':'Nenhuma pasta ou imagem compatível encontrada. Tente outra pasta ou pesquisa.'}</p>}
      </>}
      {page.incompleteSearch&&<p role="status">O Drive retornou resultados parciais. Refine a busca pelo nome.</p>}
