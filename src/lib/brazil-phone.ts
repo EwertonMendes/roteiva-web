@@ -1,9 +1,11 @@
 /** Brazilian national telephone numbers. Pure, safe for legacy stored values. */
-export function phoneDigits(value:string):string {
+function nationalDigits(value:string):string {
  const digits=value.replace(/\D/g,'');
  // Permit pasted +55 with an area code; do not confuse an ordinary DDD 55.
- const national=digits.startsWith('55')&&digits.length>=12&&digits.length<=13?digits.slice(2):digits;
- return national.slice(0,11);
+ return digits.startsWith('55')&&digits.length>=12&&digits.length<=13?digits.slice(2):digits;
+}
+export function phoneDigits(value:string):string {
+ return nationalDigits(value).slice(0,11);
 }
 export function formatPhoneInput(value:string):string {
  const digits=phoneDigits(value);
@@ -20,6 +22,6 @@ export function formatPhoneDisplay(value:string):string {
  return digits.length===10||digits.length===11?formatPhoneInput(digits):value.trim();
 }
 export function validBrazilPhone(value:string):boolean {
- const digits=phoneDigits(value);
+ const digits=nationalDigits(value);
  return digits.length===10||digits.length===11;
 }
