@@ -24,7 +24,7 @@ function ClientAvatar({client}:{client:Client}){
   observer.observe(element.current);
   return ()=>observer.disconnect();
  },[]);
- const {src}=useCoverImage(client.photo,visible);
+ const {src}=useCoverImage(client.photo,visible,true);
  return <span className={"cd-avatar "+(src?"cd-avatar--loaded":"")} ref={element} aria-hidden="true">
   {src&&client.photo?<CoverFrame src={src} cover={client.photo}/>:<span className="cd-avatar-fallback">{client.initials||client.name.slice(0,2).toUpperCase()}</span>}
  </span>;
