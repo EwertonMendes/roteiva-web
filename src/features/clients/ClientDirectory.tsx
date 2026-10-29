@@ -6,6 +6,7 @@ import {DriveCoversProvider,useCoverImage} from "../projects/DriveCoversProvider
 import {CoverFrame} from "../projects/CoverFrame";
 import {CoverEditor} from "../projects/CoverEditor";
 import "./clients.css";
+import {formatPhoneDisplay} from "../../lib/brazil-phone";
 
 type Props={
  clients:Client[];onOpen:(id:number)=>void;onAdd:()=>void;
@@ -55,7 +56,7 @@ function ClientDirectoryContent({clients,onOpen,onAdd,onSavePhoto,totalCount,rec
      </div>
      <span className="cd-relationship"><span className="cd-type">{client.type==="Recorrente"?<Building2 size={18}/>:<ReceiptText size={18}/>} {client.type}</span></span>
      <span className="cd-contact"><strong>{client.contact||"Sem contato principal"}</strong>
-       {client.phone&&<small>{client.phone}</small>}
+       {client.phone&&<small>{formatPhoneDisplay(client.phone)}</small>}
        {client.email&&<small>{client.email}</small>}
        {!client.phone&&!client.email&&<small>Contato não informado</small>}
      </span>
