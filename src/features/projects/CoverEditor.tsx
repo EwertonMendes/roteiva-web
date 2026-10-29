@@ -72,7 +72,7 @@ export function CoverEditor({project,client,onClose,onSave}:{project?:Project;cl
      ?JSON.parse(moreToken) as {images:string|null;folders:string|null}
      :null;
    const needsImages=!tokenSet||!!tokenSet.images;
-   const result=needsImages
+   const result:Page&{browserVersion?:number}=needsImages
      ?await call<Page&{browserVersion?:number}>(base+'/cover-images?'+new URLSearchParams({
        parentId:parent,...filter,...(tokenSet?.images?{pageToken:tokenSet.images}:!tokenSet&&moreToken?{pageToken:moreToken}:{})
       }),'GET',undefined,controller.signal)
