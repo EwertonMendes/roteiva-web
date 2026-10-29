@@ -197,7 +197,8 @@ test("Direct routes, refresh and browser Back/Forward preserve each user's scree
   await page.getByLabel("Nome do projeto",{exact:true}).fill("Projeto com URL");
   await page.locator("form.project-modal").getByRole("button",{name:"Criar projeto",exact:true}).click();
   await settled(page);
-  await expect(page.locator(".workspace-tools")).toContainText("Salvo na nuvem");
+  await expect(page.locator(".workspace-tools")).not.toContainText("Salvo na nuvem");
+   await expect(page.locator(".workspace-tools").getByRole("button",{name:"Exportar cópia"})).toBeVisible();
   await expect(page).toHaveURL(new RegExp("/projetos/[1-9][0-9]*$"));
   const projectURL=page.url();
   await expect(page.getByLabel("Nova tarefa",{exact:true})).toBeVisible();
@@ -217,7 +218,8 @@ test("Direct routes, refresh and browser Back/Forward preserve each user's scree
   await page.getByLabel("Nome do cliente",{exact:true}).fill("Cliente com URL");
   await page.getByLabel("Contato principal",{exact:true}).fill("Contato de teste");
   await page.getByRole("button",{name:"Salvar cliente"}).click();await settled(page);
-  await expect(page.locator(".workspace-tools")).toContainText("Salvo na nuvem");
+  await expect(page.locator(".workspace-tools")).not.toContainText("Salvo na nuvem");
+   await expect(page.locator(".workspace-tools").getByRole("button",{name:"Exportar cópia"})).toBeVisible();
   await page.locator("button.cd-client-name").filter({hasText:"Cliente com URL"}).click();
   await expect(page).toHaveURL(new RegExp("/clientes/[1-9][0-9]*$"));
   const clientURL=page.url();
@@ -362,4 +364,15 @@ test("temporary read disconnection recovers without asking for manual reload",as
   await expect(page.locator(".app-shell")).toBeVisible({timeout:45000});
   await settled(page);
   await expect(page.getByRole("heading",{name:"Clientes",exact:true})).toBeVisible();
+});
+
+test("automatic cloud success labels stay out of workspace headers on all routes",async({page},info)=>{
+  await page.goto(cloud+"/clientes");
+  await login(page,"quiet-cloud-"+info.project.name+"@example.com");
+  for(const route of ["/","/projetos","/clientes","/aprovacoes","/financeiro","/calendario","/biblioteca"]){
+    await page.goto(cloud+route);
+    await settled(page);
+    await expect(page.getByText("Salvo na nuvem",{exact:true})).toHaveCount(0);
+    await expect(page.getByText("Dados na nuvem",{exact:true})).toHaveCount(0);
+  }
 });
