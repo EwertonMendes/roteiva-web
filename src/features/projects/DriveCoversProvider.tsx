@@ -18,15 +18,15 @@ function imageQueue(){
  };
 }
 const API='https://roteiva-api-dev.ewertonmendes9.workers.dev';
-export function DriveCoversProvider({children}:{children:ReactNode}){
+export function DriveCoversProvider({children,includeDropbox=false}:{children:ReactNode;includeDropbox?:boolean}){
  const {user}=useAuth();const call=useDriveApi();const [acquire]=useState(imageQueue);
  const [connections,setConnections]=useState<CoverConnection[]>([]),[error,setError]=useState('');
  useEffect(()=>{const controller=new AbortController();setConnections([]);setError('');
   const sources=[
    call<{connections:{id:string;google_email:string;status:string;scopes:string}[]}>('/integrations/drive','GET',undefined,controller.signal)
      .then(data=>data.connections.filter(c=>c.status==='connected').map(c=>({...c,provider:'google_drive' as const}))),
-   call<{connections:{id:string;email:string;status:string;scopes:string}[]}>('/integrations/dropbox','GET',undefined,controller.signal)
-     .then(data=>data.connections.filter(c=>c.status==='connected').map(c=>({id:c.id,google_email:c.email,status:c.status,scopes:c.scopes,provider:'dropbox' as const}))),
+   ...(includeDropbox?[call<{connections:{id:string;email:string;status:string;scopes:string}[]}>('/integrations/dropbox','GET',undefined,controller.signal)
+     .then(data=>data.connections.filter(c=>c.status==='connected').map(c=>({id:c.id,google_email:c.email,status:c.status,scopes:c.scopes,provider:'dropbox' as const})))]:[]),
   ];
   void Promise.allSettled(sources).then(results=>{
    if(controller.signal.aborted)return;
@@ -34,7 +34,7 @@ export function DriveCoversProvider({children}:{children:ReactNode}){
    if(results.every(result=>result.status==='rejected'))setError('Não foi possível consultar as conexões de armazenamento.');
   });
   return ()=>controller.abort();
- },[call,user?.uid]);
+ },[call,user?.uid,includeDropbox]);
  const load=useCallback(async(cover:ProjectCover,signal:AbortSignal)=>{
   if(!user)throw Error('Entre novamente para carregar a capa.');
   const release=await acquire(signal);try{
