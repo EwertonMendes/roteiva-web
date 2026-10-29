@@ -39,16 +39,8 @@ export function DriveCoversProvider({children,includeDropbox=false}:{children:Re
   const tasks:Promise<CoverConnection[]>[]=dropbox?[drive,dropbox]:[drive];
   void Promise.allSettled(tasks).then(results=>{
    if(controller.signal.aborted)return;
-   // Preserve prior connected accounts while a provider is temporarily unreachable,
-   // but never carry them between users (auth change remounts the provider).
-   const successful=results.flatMap(result=>result.status==='fulfilled'?result.value:[]);
-   const failedProviders=results.flatMap((result,index)=>result.status==='rejected'
-     ?[index===0?'Google Drive':'Dropbox']:[]);
-   setConnections(current=>{
-     const safePrevious=current.filter(c=>failedProviders.includes(c.provider==='google_drive'?'Google Drive':'Dropbox'));
-     const unique=new Map([...safePrevious,...successful].map(c=>[c.provider+':'+c.id,c]));
-     return [...unique.values()];
-   });
+   // Do not retain another account's connections after an auth switch.
+   setConnections(successful);
    setError(failedProviders.length?'Não foi possível consultar '+failedProviders.join(' e ')+'. Atualize as conexões para tentar novamente.':'');
    setLoadingConnections(false);
   });
