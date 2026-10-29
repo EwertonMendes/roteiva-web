@@ -22,8 +22,8 @@ export function BrazilPhoneInput({defaultValue='',...props}:Props){
   ref.current.setSelectionRange(position,position);
  },[value]);
  return <input {...props} ref={ref} type="tel" inputMode="numeric" autoComplete="tel-national"
-   value={value} maxLength={16}
-   pattern="\\(\\d{2}\\) \\d{4,5}-\\d{4}"
+   value={value} maxLength={24}
+   pattern={String.raw`\(\d{2}\) \d{4,5}-\d{4}`}
    title="Informe o DDD e o número, com 10 ou 11 dígitos."
    onChange={event=>{
     const selection=event.currentTarget.selectionStart??event.currentTarget.value.length;
