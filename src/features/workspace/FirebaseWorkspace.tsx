@@ -11,7 +11,7 @@ import type { WorkspaceCommand } from "../../data/firestore-commands";
 import { useAuth } from "../auth/AuthProvider";
 import { useRegistrationProfile } from "../auth/RegistrationGate";
 import { retryFirestoreRead,transientFirestoreRead,firestoreCode } from "../../data/firestore-recovery";
-import {isTheme,readStoredTheme,resolveTheme,systemTheme,themeStorageKey,writeStoredTheme,type Theme} from "../../lib/theme-preference";
+import {chooseThemePreference,parseThemePreference,readStoredPreference,systemTheme,themeStorageKey,writeStoredPreference,type Theme} from "../../lib/theme-preference";
 
 export function FirebaseWorkspace() {
   const {user,logout,busy,error:authError}=useAuth();
@@ -19,7 +19,7 @@ export function FirebaseWorkspace() {
   const repository=useMemo(()=>new FirestoreWorkspace(firebaseServices().db,user!.uid),[user!.uid]);
   const [initial,setInitial]=useState<{workspace:WorkspaceData}>();
   const preferenceKey=themeStorageKey(user!.uid);
-  const [theme,setTheme]=useState<Theme>(()=>readStoredTheme(preferenceKey) ?? systemTheme());
+  const [theme,setTheme]=useState<Theme>(()=>readStoredPreference(preferenceKey)?.theme ?? systemTheme());
   // A user action or another tab's selection takes precedence over an in-flight
   // cloud read. Workspace refreshes never reset this independent preference.
   const themeRevision=useRef(0);
@@ -28,9 +28,11 @@ export function FirebaseWorkspace() {
   },[theme]);
   useEffect(()=>{
     const onStorage=(event:StorageEvent)=>{
-      if(event.key!==preferenceKey || !isTheme(event.newValue))return;
+      if(event.key!==preferenceKey)return;
+      const incoming=parseThemePreference(event.newValue);
+      if(!incoming)return;
       themeRevision.current++;
-      setTheme(event.newValue);
+      setTheme(incoming.theme);
     };
     window.addEventListener("storage",onStorage);
     return ()=>window.removeEventListener("storage",onStorage);
@@ -119,9 +121,10 @@ export function FirebaseWorkspace() {
         }
         if("calendar" in workspaceState && workspaceState.calendar)setCalendarPeriod(workspaceState.calendar);
         if(themeReadRevision===themeRevision.current){
-          const preferred=resolveTheme(cloudTheme,readStoredTheme(preferenceKey),systemTheme());
-          setTheme(preferred);
-          writeStoredTheme(preferenceKey,preferred);
+          const preferred=chooseThemePreference(cloudTheme,readStoredPreference(preferenceKey),systemTheme());
+          setTheme(preferred.theme);
+          // Do not broadcast a stale server value over a newer selection in another tab.
+          writeStoredPreference(preferenceKey,preferred);
         }
         setInitial({workspace:workspaceState.workspace});
       }
@@ -352,7 +355,7 @@ export function FirebaseWorkspace() {
   const saveTheme=useCallback((next:Theme)=>{
     themeRevision.current++;
     setTheme(next);
-    writeStoredTheme(preferenceKey,next); // Synchronous mirror also notifies other tabs.
+    writeStoredPreference(preferenceKey,{theme:next,changedAt:Date.now()}); // Cross-tab mirror.
     enqueue(()=>repository.saveTheme(next),{blocksInteraction:false});
   },[repository,enqueue,preferenceKey]);
   const executeCommands=useCallback((commands:readonly WorkspaceCommand[])=>enqueue(async()=>{
