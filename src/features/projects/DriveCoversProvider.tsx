@@ -22,7 +22,7 @@ export function DriveCoversProvider({children,includeDropbox=false}:{children:Re
  const {user}=useAuth();const call=useDriveApi();const [acquire]=useState(imageQueue);
  const [connections,setConnections]=useState<CoverConnection[]>([]),[error,setError]=useState('');
  useEffect(()=>{const controller=new AbortController();setConnections([]);setError('');
-  const sources=[
+  const sources:Promise<CoverConnection[]>[]=[
    call<{connections:{id:string;google_email:string;status:string;scopes:string}[]}>('/integrations/drive','GET',undefined,controller.signal)
      .then(data=>data.connections.filter(c=>c.status==='connected').map(c=>({...c,provider:'google_drive' as const}))),
    ...(includeDropbox?[call<{connections:{id:string;email:string;status:string;scopes:string}[]}>('/integrations/dropbox','GET',undefined,controller.signal)
