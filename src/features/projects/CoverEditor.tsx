@@ -55,14 +55,17 @@ export function CoverEditor({project,client,onClose,onSave}:{project?:Project;cl
      ?'/integrations/dropbox/'+encodeURIComponent(account)+(folderTrail.length?'/folders/'+encodeURIComponent(folderTrail[folderTrail.length-1].id)+'/items':'/folders')+'?'+new URLSearchParams({
         ...(folderTrail.length?{}:{parentId:'root'}),...(term.length>=2?{search:term}:{}),...(moreToken?{pageToken:moreToken}:{})
        })
-     :'/integrations/drive/'+encodeURIComponent(account)+'/cover-images?'+new URLSearchParams({search:term,...(moreToken?{pageToken:moreToken}:{})});
+     :'/integrations/drive/'+encodeURIComponent(account)+'/cover-images?'+new URLSearchParams({
+        parentId:folderTrail.length?folderTrail[folderTrail.length-1].id:'root',
+        ...(term.length>=2?{search:term}:{}),...(moreToken?{pageToken:moreToken}:{})
+       });
   void call<Page>(path,'GET',undefined,controller.signal).then(data=>{
     if(!controller.signal.aborted)setPage(old=>({...data,files:moreToken?[...old.files,...data.files.filter(f=>!old.files.some(p=>p.id===f.id))]:data.files}));
   }).catch(e=>{if(!controller.signal.aborted)setError(e.message);}).finally(()=>{if(!controller.signal.aborted)setBusy(false);});
   return ()=>controller.abort();
  },[account,provider,canRead,choosing,term,moreToken,folderTrail,call,retry]);
  const chooseFile=(file:DriveItem)=>{
-   if(isStorageFolder(file.mimeType)&&provider==='dropbox'){
+   if(isStorageFolder(file.mimeType)){
      setFolderTrail(current=>[...current,{id:file.id,name:file.name}]);setTerm('');setSearch('');
      setPage({files:[],nextPageToken:null});setMoreToken('');return;
    }
@@ -78,17 +81,17 @@ export function CoverEditor({project,client,onClose,onSave}:{project?:Project;cl
     {context.error&&<div className="pc-connection-status pc-connection-status--warning" role="alert"><span>{context.error}</span><button type="button" className="secondary-button" disabled={context.loadingConnections} onClick={context.retryConnections}>Atualizar conexões</button></div>}
     {!context.loadingConnections&&!choices.length&&!context.error&&<p className="pc-connection-status" role="status">Nenhuma conta com acesso ativo. Conecte o Google Drive ou Dropbox na <a href="/biblioteca">Biblioteca</a>.</p>}
     <div className="pc-picker-tools"><label>Armazenamento<AppSelect aria-label="Conta de armazenamento" value={account} onValueChange={value=>{setAccount(value);setFolderTrail([]);setPage({files:[],nextPageToken:null});setMoreToken('');}}>{choices.map(c=><option key={c.id} value={c.id}>{c.provider==='dropbox'?'Dropbox · ':'Drive · '}{c.google_email}</option>)}</AppSelect></label><label className="pc-image-search"><span>Buscar imagens {provider==='dropbox'?'no Dropbox':'no Drive'}</span><div><Search size={18}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Nome da imagem" maxLength={100}/></div></label></div>
-    <p className="pc-helper">JPG, PNG, WebP{provider==='google_drive'?' ou AVIF':''}, até 8 MB. A imagem permanece privada no armazenamento escolhido.</p>
-    {provider==='dropbox'&&folderTrail.length>0&&<nav className="pc-folder-trail" aria-label="Pasta de imagens"><button type="button" onClick={()=>{setFolderTrail([]);setPage({files:[],nextPageToken:null});setMoreToken('');}}>Meu Dropbox</button>{folderTrail.map((folder,i)=><span key={folder.id}><ChevronRight size={14}/><button type="button" onClick={()=>{setFolderTrail(current=>current.slice(0,i+1));setPage({files:[],nextPageToken:null});setMoreToken('');}}>{folder.name}</button></span>)}</nav>}
+    <p className="pc-helper pc-picker-guidance">Escolha uma pasta ou uma imagem. JPG, PNG, WebP{provider==='google_drive'?' ou AVIF':''}, até 8 MB. Seus arquivos permanecem privados.</p>
+    {folderTrail.length>0&&<nav className="pc-folder-trail" aria-label="Pasta de imagens"><button type="button" onClick={()=>{setFolderTrail([]);setPage({files:[],nextPageToken:null});setMoreToken('');}}>Meu {provider==='dropbox'?'Dropbox':'Drive'}</button>{folderTrail.map((folder,i)=><span key={folder.id}><ChevronRight size={14}/><button type="button" onClick={()=>{setFolderTrail(current=>current.slice(0,i+1));setPage({files:[],nextPageToken:null});setMoreToken('');}}>{folder.name}</button></span>)}</nav>}
     {!currentAccount?null:!canRead?<p role="status">Esta conexão do Google Drive não possui permissão de leitura de imagens. Reconecte a conta na <a href="/biblioteca">Biblioteca</a> e autorize o acesso de leitura.</p>:<>
      <div className="pc-picker-results" aria-busy={busy}>
      {error&&<p role="alert">{error} <button type="button" className="secondary-button" onClick={()=>{setRetry(n=>n+1);}}>Tentar novamente</button></p>}
      {busy&&!page.files.length?<CoverLoading>Carregando imagens…</CoverLoading>:<>
      <div className="pc-image-grid">{page.files.filter(file=>isStorageFolder(file.mimeType)||(['image/jpeg','image/png','image/webp',...(provider==='google_drive'?['image/avif']:[])].includes(file.mimeType)&&Number(file.size)<=8*1024*1024)).map(file=><button type="button" key={file.id} onClick={()=>chooseFile(file)} title={file.name}>{isStorageFolder(file.mimeType)?<span className="pc-folder-icon"><Folder size={30}/></span>:<DriveThumbnail item={file} scope={context.uid+':'+account} getThumbnail={thumbnail}/>}<span>{file.name}</span></button>)}</div>
-     {!page.files.length&&!error&&<p className="pc-empty">Nenhuma imagem encontrada. Tente outro nome ou confira os formatos e tamanhos.</p>}
+     {!page.files.length&&!error&&!busy&&<p className="pc-empty">{page.nextPageToken?'Nenhuma imagem compatível nesta página. Carregue mais itens para continuar.':'Nenhuma pasta ou imagem compatível encontrada. Tente outra pasta ou pesquisa.'}</p>}
      </>}
      {page.incompleteSearch&&<p role="status">O Drive retornou resultados parciais. Refine a busca pelo nome.</p>}
-     {page.nextPageToken&&<div className="pc-image-more"><button className="secondary-button" type="button" disabled={busy} onClick={()=>setMoreToken(page.nextPageToken!)}>{busy?<LoaderCircle size={18} className="pc-spin" aria-hidden="true"/>:<ChevronDown size={18} aria-hidden="true"/>}{busy?"Carregando imagens…":"Carregar mais imagens"}</button></div>}
+     {page.nextPageToken&&<div className="pc-image-more"><button className="secondary-button" type="button" disabled={busy} onClick={()=>setMoreToken(page.nextPageToken!)}>{busy?<LoaderCircle size={18} className="pc-spin" aria-hidden="true"/>:<ChevronDown size={18} aria-hidden="true"/>}{busy?"Carregando itens…":"Carregar mais itens"}</button></div>}
      </div>
     </>}
    </>:cover?<>
