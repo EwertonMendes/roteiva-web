@@ -49,7 +49,7 @@
 .pc-folder-trail{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:8px 0 14px;font-size:var(--type-support)}
 .pc-folder-trail>span{display:inline-flex;align-items:center;gap:5px}
 .pc-folder-trail button{color:var(--ink);background:none;border:0;padding:4px}
-.pc-editor-preview--portrait{aspect-ratio:1;width:min(330px,100%);margin:12px auto}
+.pc-editor-preview.pc-editor-preview--portrait{aspect-ratio:1;width:min(330px,100%);margin:12px auto}
 .pc-editor-preview--portrait>.pc-cover-frame{aspect-ratio:1;height:100%}
 @media(max-width:1180px){
  .cd-table-head,.cd-row{grid-template-columns:minmax(175px,1.4fr) minmax(120px,.8fr) minmax(150px,1.2fr) 65px 25px;gap:12px}
