@@ -568,9 +568,12 @@ export class FirestoreWorkspace {
     return !current || [...new Set([...this.loadedDomains,...this.pagedDomains])].some(name=>this.stamp!.domains[name]!==current.domains[name]);
   }
 
-  async loadTheme(): Promise<"light"|"dark"|undefined> {
+  async loadTheme(): Promise<{theme:"light"|"dark";changedAt:number}|undefined> {
     const snap=await getDocFromServer(this.ref("preferences/ui"));
-    return snap.exists() ? snap.data().theme as "light"|"dark" : undefined;
+    if(!snap.exists())return undefined;
+    const {theme,updatedAt}=snap.data();
+    if(theme!=="light" && theme!=="dark")return undefined;
+    return {theme,changedAt:typeof updatedAt?.toMillis==="function"?updatedAt.toMillis():0};
   }
   /**
    * Server aggregations avoid downloading every finance entry or client
