@@ -65,7 +65,7 @@ test('client image picker includes Drive folders, scopes to parent and skips emp
    calls++;
    assert.match(url.searchParams.get('q'),/trashed = false/);
    assert.match(url.searchParams.get('q'),/'root' in parents/);
-   assert.match(url.searchParams.get('q'),/application\\/vnd.google-apps.folder/);
+   assert.ok(url.searchParams.get('q').includes('application/vnd.google-apps.folder'));
    if(calls===1)return Response.json({files:[{id:'oversize_123456',mimeType:'image/jpeg',name:'oversize.jpg',size:String(MAX_COVER_BYTES+1)}],nextPageToken:'next-page'});
    assert.equal(url.searchParams.get('pageToken'),'next-page');
    return Response.json({files:[
