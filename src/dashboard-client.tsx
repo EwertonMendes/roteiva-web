@@ -33,6 +33,7 @@ import googleDriveMark from "./assets/brand/google-drive.svg";
 import dropboxMark from "./assets/brand/dropbox.svg";
 import { LibraryReviewDemo } from "./features/drive/LibraryReviewDemo";
 import type { RoteivaProfile, ProfileChanges } from "./data/firestore-workspace";
+import {isTheme, readStoredTheme, systemTheme, themeStorageKey, writeStoredTheme, type Theme} from "./lib/theme-preference";
 import type { WorkspaceCommand } from "./data/firestore-commands";
 import type { FirestoreUsage } from "./data/firestore-usage";
 import { newId, type WorkspaceData, type Activity, type View, type Project, type Client, type ClientType, type AssetKind, type FinanceEntry, type CalendarEvent, type LibraryAsset, type Status } from "./domain/workspace";
@@ -103,7 +104,8 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
   const [deletingFinanceEntry, setDeletingFinanceEntry] = useState<FinanceEntry | null>(null);
   const [eventModalOpen, setEventModalOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [demoTheme, setDemoTheme] = useState<Theme>(()=>readStoredTheme(themeStorageKey()) ?? systemTheme());
+  const theme = isDemo ? demoTheme : (initialTheme ?? "light");
   const [toast, setToast] = useState("");
   const [reviewState, setReviewState] = useState<"pending" | "changes" | "approved">("pending");
   
@@ -209,22 +211,31 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
   useEffect(() => {
     if (!isDemo) {
       if (initialWorkspace) restoreWorkspace(initialWorkspace);
-      const preferred=initialTheme || "light";
-      setTheme(preferred);
-      document.documentElement.setAttribute("data-theme",preferred);
       setDataReady(true);
       return;
     }
     try {
-      const saved=localStorage.getItem("roteiva-theme");
-      const preferred=saved==="dark"||saved==="light" ? saved : window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark":"light";
-      setTheme(preferred); document.documentElement.setAttribute("data-theme",preferred);
       const local=localStorage.getItem(storageKey);
       if(local)restoreWorkspace(JSON.parse(local));
       setSaveStatus("Demonstração · dados somente neste navegador");
     } catch { setSaveStatus("Demonstração · armazenamento local indisponível"); }
     setDataReady(true);
-  },[restoreWorkspace,initialWorkspace,initialTheme]);
+  },[restoreWorkspace,initialWorkspace]);
+
+  // Theme is not part of the business-data hydration lifecycle. A new page
+  // snapshot must never reset a theme explicitly selected by the user.
+  useLayoutEffect(() => {
+    if (isDemo) document.documentElement.setAttribute("data-theme", demoTheme);
+  },[demoTheme]);
+
+  useEffect(() => {
+    if (!isDemo) return;
+    const onStorage=(event:StorageEvent)=>{
+      if(event.key===themeStorageKey() && isTheme(event.newValue)) setDemoTheme(event.newValue);
+    };
+    window.addEventListener("storage",onStorage);
+    return ()=>window.removeEventListener("storage",onStorage);
+  },[]);
 
   // The Pages demo preserves its existing browser-only snapshot contract.
   // Firebase never persists a render/effect: business mutations call commands.
@@ -247,10 +258,10 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
 
   function toggleTheme() {
     const next = theme === "light" ? "dark" : "light";
-    setTheme(next);
-    if (isDemo) { try { localStorage.setItem("roteiva-theme", next); } catch { /* Theme still works in memory. */ } }
-    else onThemeChange?.(next);
-    document.documentElement.setAttribute("data-theme", next);
+    if (isDemo) {
+      setDemoTheme(next);
+      writeStoredTheme(themeStorageKey(),next);
+    } else onThemeChange?.(next);
   }
 
   const notify = useCallback((message: string) => {
