@@ -20,7 +20,7 @@ test('project covers require Drive, persist crop, cancel safely and support remo
   const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Allow-Methods':'GET, OPTIONS'};
   if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
   if(path.endsWith('/cover')){await imageGate;return route.fulfill({status:200,headers,contentType:'image/png',body:png});}
-  if(path.endsWith('/cover-images')){await listGate;const more=new URL(route.request().url()).searchParams.has('pageToken');return route.fulfill({headers,json:{files:[{id:more?'photo_987654321':'photo_123456789',name:more?'Campanha 2.png':'Campanha.png',mimeType:'image/png',size:'3000'}],nextPageToken:more?null:'page2'}});}
+  if(path.endsWith('/cover-images')){await listGate;const more=new URL(route.request().url()).searchParams.has('pageToken');return route.fulfill({headers,json:{browserVersion:2,files:[{id:more?'photo_987654321':'photo_123456789',name:more?'Campanha 2.png':'Campanha.png',mimeType:'image/png',size:'3000'}],nextPageToken:more?null:'page2'}});}
   return route.fulfill({headers,json:{connections:connected?[{id:activeConnectionId,google_email:'qa@example.com',status:'connected',scopes:'https://www.googleapis.com/auth/drive.readonly'}]:[]}});
  });
  await register(page,'cover-'+info.project.name+'@example.com');
