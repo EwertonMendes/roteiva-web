@@ -1,5 +1,5 @@
 import {useEffect,useRef,useState} from "react";
-import {Building2,Camera,ChevronDown,ChevronRight,ContactRound,ReceiptText,UserRound,UserRoundPlus,UsersRound} from "lucide-react";
+import {Building2,Camera,ChevronDown,ChevronRight,Pencil,ReceiptText,UserRoundPlus,UsersRound} from "lucide-react";
 import type {Client,ClientPhoto} from "../../domain/workspace";
 import {isDemo} from "../../lib/firebase";
 import {DriveCoversProvider,useCoverImage} from "../projects/DriveCoversProvider";
@@ -48,7 +48,7 @@ function ClientDirectoryContent({clients,onOpen,onAdd,onSavePhoto,totalCount,rec
    <div className="cd-table-head" aria-hidden="true"><span>CLIENTE</span><span>RELACIONAMENTO</span><span>CONTATO</span><span>PROJETOS</span><span>DESDE</span><span/></div>
    <div className="cd-list">{clients.map(client=><article key={client.id} className="cd-row">
      <div className="cd-identity">
-      <ClientAvatar client={client}/>
+      <span className="cd-photo-wrap"><ClientAvatar client={client}/>{!isDemo&&client.photo&&<button className="cd-avatar-edit" type="button" aria-label={`Alterar foto de ${client.name}`} onClick={()=>setEditingPhoto(client.id)}><Pencil size={16}/></button>}</span>
       <div className="cd-identity-copy"><button type="button" className="cd-client-name" onClick={()=>onOpen(client.id)}>{client.name}</button>
        {!isDemo&&<button type="button" className="cd-change-photo" onClick={()=>setEditingPhoto(client.id)}><Camera size={16}/>{client.photo?"Alterar foto":"Adicionar foto"}</button>}
       </div>
