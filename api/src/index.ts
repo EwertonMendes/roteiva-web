@@ -1,4 +1,4 @@
-import {listCoverImages,coverImage} from './project-covers.ts';
+import {listCoverImages,coverImage,dropboxCoverImage} from './project-covers.ts';
 import { ApiError, type Env } from './types.ts';
 import { reviewRouter,cleanupExpiredReviews } from './reviews.ts';
 import { identity,verifiedTrialPrincipal } from './auth.ts';
@@ -108,6 +108,12 @@ export async function handle(request: Request, env: Env): Promise<Response> {
       dropboxEnabled(env);
       if(!(await env.API_THUMB_LIMIT.limit({key:'dev:media:'+sourceIp.slice(0,64)})).success)throw new ApiError(429,'rate_limited');
       response=await streamDropboxPreview(env,request,url);
+    } else if (/^\/integrations\/dropbox\/[^/]+\/files\/[^/]+\/cover$/.test(url.pathname) && request.method==='GET') {
+       dropboxEnabled(env);
+       const uid=await identity(request,env);await assertActiveAccess(env,uid);
+       if(!(await env.API_THUMB_LIMIT.limit({key:'dev:thumb:'+uid})).success)throw new ApiError(429,'rate_limited');
+       const parts=url.pathname.split('/');
+       response=await dropboxCoverImage(env,uid,parts[3],decodeURIComponent(parts[5]));
     } else if (/^\/integrations\/dropbox\/[^/]+\/files\/[^/]+\/thumbnail$/.test(url.pathname) && request.method==='GET') {
       dropboxEnabled(env);
       const uid=await identity(request,env);await assertActiveAccess(env,uid);
