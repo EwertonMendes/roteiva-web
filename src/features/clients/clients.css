@@ -1,8 +1,4 @@
 /* Client directory — isolated from legacy dashboard/table styling. */
-.app-view-clients .page-heading .eyebrow{display:none}
-.app-view-clients .page-heading h1{font-size:clamp(2rem,3.3vw,3.5rem);letter-spacing:-.045em;margin:0 0 9px}
-.app-view-clients .page-heading p{font-size:var(--type-body)}
-.app-view-clients .page-heading{align-items:center;margin-bottom:26px}
 .app-view-clients .page-search{max-width:400px}
 .cd-panel{border:1px solid var(--line);background:var(--card);border-radius:25px;overflow:hidden;box-shadow:var(--glass-shadow)}
 .cd-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-bottom:1px solid var(--line)}
@@ -70,7 +66,6 @@
  .cd-summary>div{padding:20px}
 }
 @media(max-width:600px){
- .app-view-clients .page-heading{align-items:stretch}
  .app-view-clients .page-search{max-width:none}
  .cd-panel{border-radius:19px}
  .cd-summary>div{padding:17px 11px}
