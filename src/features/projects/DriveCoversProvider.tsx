@@ -2,7 +2,7 @@ import {createContext,useContext,useCallback,useEffect,useRef,useState,type Reac
 import {useAuth} from '../auth/AuthProvider';
 import {useDriveApi} from '../drive/drive-api';
 import type {ProjectCover} from '../../domain/workspace';
-export type CoverConnection={id:string;google_email:string;status:string;scopes:string};
+export type CoverConnection={id:string;google_email:string;status:string;scopes:string;provider:'google_drive'|'dropbox'};
 type Context={connections:CoverConnection[];error:string;uid:string;load:(cover:ProjectCover,signal:AbortSignal)=>Promise<Blob>};
 const CoverContext=createContext<Context|null>(null);
 function imageQueue(){
@@ -22,13 +22,24 @@ export function DriveCoversProvider({children}:{children:ReactNode}){
  const {user}=useAuth();const call=useDriveApi();const [acquire]=useState(imageQueue);
  const [connections,setConnections]=useState<CoverConnection[]>([]),[error,setError]=useState('');
  useEffect(()=>{const controller=new AbortController();setConnections([]);setError('');
-  void call<{connections:CoverConnection[]}>('/integrations/drive','GET',undefined,controller.signal).then(data=>{if(!controller.signal.aborted)setConnections(data.connections.filter(c=>c.status==='connected'));}).catch(e=>{if(!controller.signal.aborted)setError(e.message);});
+  const sources=[
+   call<{connections:{id:string;google_email:string;status:string;scopes:string}[]}>('/integrations/drive','GET',undefined,controller.signal)
+     .then(data=>data.connections.filter(c=>c.status==='connected').map(c=>({...c,provider:'google_drive' as const}))),
+   call<{connections:{id:string;email:string;status:string;scopes:string}[]}>('/integrations/dropbox','GET',undefined,controller.signal)
+     .then(data=>data.connections.filter(c=>c.status==='connected').map(c=>({id:c.id,google_email:c.email,status:c.status,scopes:c.scopes,provider:'dropbox' as const}))),
+  ];
+  void Promise.allSettled(sources).then(results=>{
+   if(controller.signal.aborted)return;
+   setConnections(results.flatMap(result=>result.status==='fulfilled'?result.value:[]));
+   if(results.every(result=>result.status==='rejected'))setError('Não foi possível consultar as conexões de armazenamento.');
+  });
   return ()=>controller.abort();
  },[call,user?.uid]);
  const load=useCallback(async(cover:ProjectCover,signal:AbortSignal)=>{
   if(!user)throw Error('Entre novamente para carregar a capa.');
   const release=await acquire(signal);try{
-  const path=API+'/integrations/drive/'+encodeURIComponent(cover.connectionId)+'/files/'+encodeURIComponent(cover.fileId)+'/cover';
+  const provider=cover.provider==='dropbox'?'dropbox':'drive';
+  const path=API+'/integrations/'+provider+'/'+encodeURIComponent(cover.connectionId)+'/files/'+encodeURIComponent(cover.fileId)+'/cover';
   let response:Response|undefined;
   for(let attempt=0;attempt<2;attempt++){
    const token=await user.getIdToken(attempt===1);
@@ -44,9 +55,9 @@ export function DriveCoversProvider({children}:{children:ReactNode}){
 export const useDriveCovers=()=>useContext(CoverContext);
 export function useCoverImage(cover:ProjectCover|undefined,visible=true){
  const context=useDriveCovers();const [state,setState]=useState({key:'',src:'',error:''});
- const load=context?.load;const key=[context?.uid,cover?.connectionId,cover?.fileId].join(':');
+ const load=context?.load;const key=[context?.uid,cover?.provider||'google_drive',cover?.connectionId,cover?.fileId].join(':');
  const current=useRef(cover);current.current=cover;
- const connected=!!context?.connections.some(c=>c.id===cover?.connectionId);
+ const connected=!!context?.connections.some(c=>c.id===cover?.connectionId&&c.provider===(cover?.provider||'google_drive'));
  useEffect(()=>{
   if(!load||!current.current||!visible||!connected)return;
   const controller=new AbortController();let src='';setState({key,src:'',error:''});
