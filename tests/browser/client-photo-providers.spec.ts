@@ -48,8 +48,12 @@ test('client photo selector recovers Drive discovery and shows both connected pr
  await page.goto(base+'/clientes');
  await page.getByRole('button',{name:'Novo cliente',exact:true}).click();
  await page.getByLabel('Nome do cliente',{exact:true}).fill('Cliente Storage QA');
+ const phone=page.getByLabel('Telefone',{exact:true});
+ await phone.fill('21999999999');
+ await expect(phone).toHaveValue('(21) 99999-9999');
  await page.getByRole('button',{name:'Salvar cliente'}).click();
  await expect(page.getByRole('button',{name:'Cliente Storage QA'})).toBeVisible();
+ await expect(page.getByText('(21) 99999-9999')).toBeVisible();
  await page.getByRole('button',{name:'Adicionar foto',exact:true}).click();
  const dialog=page.locator('.pc-dialog');
  await expect(dialog).toBeVisible();
