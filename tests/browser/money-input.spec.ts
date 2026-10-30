@@ -31,6 +31,21 @@ test('money fields shift cents on desktop and mobile, paste reais, persist and e
   await amount.pressSequentially('123456');
   await expect(amount).toHaveValue('1.234,56');
   await expect(amount).toHaveAttribute('inputmode','numeric');
+  // Composite field must not have a second border, outline or inset focus ring.
+  const financialFocus=await amount.evaluate(element=>{
+    const input=getComputedStyle(element);
+    const wrapper=getComputedStyle(element.parentElement!);
+    const normal=getComputedStyle(document.querySelector<HTMLInputElement>('form.finance-modal input[name="project"]')!);
+    return {border:input.borderTopWidth,outline:input.outlineStyle,shadow:input.boxShadow,
+      surface:wrapper.backgroundColor,normalSurface:normal.backgroundColor,
+      wrapperShadow:wrapper.boxShadow,wrapperOutline:wrapper.outlineStyle};
+  });
+  expect(financialFocus.border).toBe('0px');
+  expect(financialFocus.outline).toBe('none');
+  expect(financialFocus.shadow).toBe('none');
+  expect(financialFocus.wrapperShadow).not.toBe('none');
+  expect(financialFocus.wrapperOutline).toBe('none');
+  expect(financialFocus.surface).toBe(financialFocus.normalSurface);
   await amount.press('Backspace');
   await expect(amount).toHaveValue('123,45');
   await amount.press('ControlOrMeta+A');
@@ -69,4 +84,30 @@ test('money fields shift cents on desktop and mobile, paste reais, persist and e
   await page.getByText('Cliente com pacote',{exact:true}).first().click();
   await page.getByRole('button',{name:'Editar cliente'}).click();
   await expect(page.getByLabel('Valor mensal combinado')).toHaveValue('87,50');
+  const recurringFee=page.getByLabel('Valor mensal combinado');
+  // Check that the shared field and its neighbouring input have exactly the same
+  // height/vertical alignment, background, and a single subtle focus halo.
+  for(const theme of ['light','dark'] as const){
+    await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;},theme);
+    await recurringFee.focus();
+    const visual=await recurringFee.evaluate(element=>{
+      const outer=element.parentElement!;
+      const neighbour=document.querySelector<HTMLInputElement>('.cd-form-fields input[name="monthlyDeliverables"]')!;
+      const a=outer.getBoundingClientRect(),b=neighbour.getBoundingClientRect();
+      const style=getComputedStyle(outer),other=getComputedStyle(neighbour);
+      const inner=getComputedStyle(element);
+      return {dy:Math.abs(a.y-b.y),dh:Math.abs(a.height-b.height),
+        surface:style.backgroundColor,otherSurface:other.backgroundColor,
+        ring:style.boxShadow,outerOutline:style.outlineStyle,
+        border:inner.borderTopWidth,outline:inner.outlineStyle,innerShadow:inner.boxShadow};
+    });
+    expect(visual.dy).toBeLessThan(1);
+    expect(visual.dh).toBeLessThan(1);
+    expect(visual.surface).toBe(visual.otherSurface);
+    expect(visual.border).toBe('0px');
+    expect(visual.outline).toBe('none');
+    expect(visual.innerShadow).toBe('none');
+    expect(visual.outerOutline).toBe('none');
+    expect(visual.ring).not.toBe('none');
+  }
 });
