@@ -22,7 +22,6 @@
 .account-delete-dialog footer{display:flex;justify-content:flex-end;gap:9px;flex-wrap:wrap;margin-top:20px}
 .account-delete-danger{border:1px solid transparent;border-radius:10px;background:#a32530;color:white;display:flex;justify-content:center;align-items:center;gap:8px;padding:10px 15px;cursor:pointer;font:inherit;font-size:.875rem}
 .account-delete-danger:disabled{opacity:.4;cursor:not-allowed}
-.account-delete-dialog button:focus-visible,.account-delete-dialog input:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 .account-delete-spin{animation:account-delete-rotate 1s linear infinite}
 @keyframes account-delete-rotate{to{transform:rotate(360deg)}}
 @media(max-width:560px){
