@@ -37,13 +37,13 @@
   box-shadow: 0 0 0 3px var(--field-focus-ring);
 }
 /* A native input hidden inside a composite control never gets its own ring. */
-:root :is(.money-input,.page-search,.review-drive-search,.pc-image-search,.reviews-search,.rl-search,.review-time-input,.review-video-time-field) input:focus {
+:root :is(.money-input,.page-search,.review-drive-search,.pc-image-search,.reviews-search,.rl-search,.rowner-gallery-search,.review-time-input,.review-video-time-field) input:focus {
   outline: none;
   border-color: transparent;
   box-shadow: none;
 }
 /* Composite inputs expose exactly one border and a soft halo. */
-:root :is(.money-input,.page-search,.review-drive-search,.pc-image-search,.reviews-search,.rl-search,.review-time-input):focus-within {
+:root :is(.money-input,.page-search,.review-drive-search,.pc-image-search,.reviews-search,.rl-search,.rowner-gallery-search,.review-time-input):focus-within {
   border-color: var(--field-focus-border);
   box-shadow: 0 0 0 3px var(--field-focus-ring);
   outline: none;
