@@ -40,11 +40,9 @@ test('shared controls preserve forms, custom select, lime focus and modal on des
   await name.focus();
   const focus=await name.evaluate(el=>{
    const style=getComputedStyle(el);
-   const root=getComputedStyle(document.documentElement);
-   return {color:root.getPropertyValue('--field-focus-border').trim(),
-     shadow:style.boxShadow,outline:style.outlineStyle};
+   return {color:style.borderTopColor,shadow:style.boxShadow,outline:style.outlineStyle};
   });
-  expect(focus.color).toBe(theme==='dark'?'var(--rt-brand-lime)':'#779c0a');
+  expect(focus.color).toBe(theme==='dark'?'rgb(207, 255, 71)':'rgb(119, 156, 10)');
   expect(focus.shadow).not.toBe('none');
   expect(focus.outline).toBe('none');
  }
