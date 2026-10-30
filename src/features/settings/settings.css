@@ -30,7 +30,6 @@
 .settings-field>span{color:var(--ink);font-size: var(--type-support);font-weight:700;display:flex;align-items:center;gap:7px}
 .settings-field em{font-style:normal;color:var(--muted);font-size: var(--type-support);font-weight:400}
 .settings-field input{width:100%;height:49px;min-width:0;border:1px solid var(--line);border-radius:11px;padding:11px 14px;background:var(--paper);color:var(--ink);outline:none;font-size: var(--type-support);transition:border-color .18s ease,box-shadow .18s ease}
-.settings-field input:focus-visible{border-color:var(--ink);box-shadow:0 0 0 3px #a7c87935}
 .settings-field input:disabled{opacity:.56;cursor:not-allowed}
 .settings-field input[readonly]{color:var(--muted);cursor:default}
 .settings-field small{font-size: var(--type-support);line-height:1.5;color:var(--muted)}
