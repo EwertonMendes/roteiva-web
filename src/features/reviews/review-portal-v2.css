@@ -16,7 +16,6 @@
   min-height:100dvh;font-family:Manrope,system-ui,sans-serif;
 }
 .review-portal :where(button,input,textarea){font:inherit}
-.review-portal :where(button,a,input,textarea):focus-visible{outline:2px solid var(--r-ink);outline-offset:3px}
 .review-portal-header{
   padding:14px max(24px,calc((100vw - 1190px)/2));background:var(--r-card);
   border-color:var(--r-border);min-height:73px
@@ -112,7 +111,6 @@
   border-radius:10px;font-size:.84rem}
 .review-portal :is(input,textarea)::placeholder{color:var(--r-muted);opacity:1}
 .review-portal textarea{resize:vertical;min-height:98px;line-height:1.5}
-.review-portal :is(input,textarea):focus{border-color:var(--r-ink)}
 .review-time-field-heading{display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap}
 .review-time-field-heading label{color:var(--r-ink);font-size:.77rem;font-weight:700}
 .review-time-field-heading label span{color:var(--r-muted);font-weight:450}
