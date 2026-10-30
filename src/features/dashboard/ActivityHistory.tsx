@@ -1,3 +1,4 @@
+import {AppButton} from "../ui/AppButton";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarDays, CircleDollarSign, FolderKanban, History, ReceiptText, UserRound, Wallet, X } from "lucide-react";
 import type { Activity } from "../../domain/workspace";
@@ -59,7 +60,7 @@ export function ActivityPreview({activities,onOpen}:{activities:readonly Activit
   const latest=useMemo(()=>sortedActivityItems(activities).slice(0,2),[activities]);
   return <section className="flow-activity-preview" aria-label="Atividade recente">
     <div className="flow-activity-header"><span><History size={18} aria-hidden="true"/> Atividade recente</span>
-      <button className="flow-activity-open" type="button" onClick={onOpen}>Ver histórico completo <span aria-hidden="true">→</span></button>
+      <AppButton className="flow-activity-open" type="button" onClick={onOpen}>Ver histórico completo <span aria-hidden="true">→</span></AppButton>
     </div>
     {latest.length ? <div className="flow-activity-rows">{latest.map((item,index)=><ActivityRow item={item} compact key={item.id||`${item.when}-${index}`}/>)}</div>
       : <p className="flow-activity-empty">Suas próximas movimentações aparecerão aqui.</p>}
@@ -111,14 +112,14 @@ export function ActivityHistoryDrawer({activities,onClose}:{activities:readonly 
     };
   },[onClose]);
   return <div className="activity-history-overlay">
-    <button type="button" className="activity-history-backdrop" onClick={onClose} aria-label="Fechar histórico de atividades"/>
+    <AppButton type="button" className="activity-history-backdrop" onClick={onClose} aria-label="Fechar histórico de atividades"/>
     <section id="activity-history-drawer" ref={panelRef} role="dialog" aria-modal="true" aria-labelledby="activity-history-title" className="activity-history-drawer">
       <header className="activity-drawer-heading"><div><h2 id="activity-history-title">Histórico de atividades</h2><p>Acompanhe as movimentações do seu espaço.</p></div>
-        <button ref={closeRef} type="button" className="activity-drawer-close" onClick={onClose} aria-label="Fechar histórico"><X size={20}/></button>
+        <AppButton ref={closeRef} type="button" className="activity-drawer-close" onClick={onClose} aria-label="Fechar histórico"><X size={20}/></AppButton>
       </header>
       <div className="activity-drawer-filters" role="group" aria-label="Filtrar atividades">
-        {options.map(option=><button key={option.value} type="button" className={filter===option.value?"selected":""}
-          aria-pressed={filter===option.value} onClick={()=>setFilter(option.value)}>{option.label}</button>)}
+        {options.map(option=><AppButton key={option.value} type="button" className={filter===option.value?"selected":""}
+          aria-pressed={filter===option.value} onClick={()=>setFilter(option.value)}>{option.label}</AppButton>)}
       </div>
       <div className="activity-drawer-content">
         {!groups.length ? <div className="activity-drawer-empty"><History size={26}/><strong>Nenhuma atividade por aqui</strong><p>{filter==="all"?"As movimentações do seu espaço aparecerão neste histórico.":"Ainda não existem registros nessa categoria."}</p></div>

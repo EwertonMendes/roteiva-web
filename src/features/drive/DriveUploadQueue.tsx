@@ -1,3 +1,4 @@
+import {AppButton} from "../ui/AppButton";
 import {useState} from "react";
 import {CheckCircle2,CloudUpload,LoaderCircle,RotateCcw,X,AlertCircle,ChevronDown,ChevronUp} from "lucide-react";
 import type {UploadEntry} from "./useDriveUploads";
@@ -13,7 +14,7 @@ export function DriveUploadQueue({uploads,onCancel,onRetry,onDismiss}:{
   if(!uploads.length)return null;
   const running=uploads.filter(u=>active.has(u.status)).length;
   return <aside className="rl-upload-queue" aria-label="Transferências para a nuvem">
-    <header className="rl-upload-heading"><span><CloudUpload size={17}/> Transferências</span><div className="rl-upload-heading-actions"><small aria-live="polite">{running?running+" em andamento":uploads.length+" arquivo(s)"}</small><button type="button" aria-label={collapsed?"Expandir transferências":"Recolher transferências"} aria-expanded={!collapsed} onClick={()=>setCollapsed(value=>!value)}>{collapsed?<ChevronUp size={17}/>:<ChevronDown size={17}/>}</button></div></header>
+    <header className="rl-upload-heading"><span><CloudUpload size={17}/> Transferências</span><div className="rl-upload-heading-actions"><small aria-live="polite">{running?running+" em andamento":uploads.length+" arquivo(s)"}</small><AppButton type="button" aria-label={collapsed?"Expandir transferências":"Recolher transferências"} aria-expanded={!collapsed} onClick={()=>setCollapsed(value=>!value)}>{collapsed?<ChevronUp size={17}/>:<ChevronDown size={17}/>}</AppButton></div></header>
     {!collapsed&&<div className="rl-upload-items">
       {uploads.map(upload=>{
         const pct=upload.status==="completed"?100:Math.min(99,Math.floor(100*upload.sent/upload.size));
@@ -34,10 +35,10 @@ export function DriveUploadQueue({uploads,onCancel,onRetry,onDismiss}:{
               <small>Destino: {upload.destination.folderName}</small>
             </div>
             {upload.status==="verifying"?null:active.has(upload.status)
-              ?<button type="button" onClick={()=>onCancel(upload.id)} title={"Cancelar envio de "+upload.name} aria-label={"Cancelar envio de "+upload.name}><X size={16}/></button>
+              ?<AppButton type="button" onClick={()=>onCancel(upload.id)} title={"Cancelar envio de "+upload.name} aria-label={"Cancelar envio de "+upload.name}><X size={16}/></AppButton>
               :<div className="rl-upload-actions">
-                {(upload.status==="failed"||upload.canVerify||upload.canResume)&&<button type="button" onClick={()=>onRetry(upload.id)} title={upload.canVerify?'Verificar conclusão':upload.canResume?'Retomar envio':'Tentar novamente'} aria-label={(upload.canVerify?'Verificar conclusão de ':upload.canResume?'Retomar envio de ':'Tentar novamente ')+upload.name}><RotateCcw size={15}/></button>}
-                <button type="button" onClick={()=>onDismiss(upload.id)} title="Dispensar" aria-label={"Dispensar "+upload.name}><X size={15}/></button>
+                {(upload.status==="failed"||upload.canVerify||upload.canResume)&&<AppButton type="button" onClick={()=>onRetry(upload.id)} title={upload.canVerify?'Verificar conclusão':upload.canResume?'Retomar envio':'Tentar novamente'} aria-label={(upload.canVerify?'Verificar conclusão de ':upload.canResume?'Retomar envio de ':'Tentar novamente ')+upload.name}><RotateCcw size={15}/></AppButton>}
+                <AppButton type="button" onClick={()=>onDismiss(upload.id)} title="Dispensar" aria-label={"Dispensar "+upload.name}><X size={15}/></AppButton>
               </div>}
           </div>
           {active.has(upload.status)&&<div className="rl-upload-progress" role="progressbar" aria-label={"Progresso de "+upload.name} aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>

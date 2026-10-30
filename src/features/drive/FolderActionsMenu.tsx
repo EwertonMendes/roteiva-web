@@ -1,3 +1,4 @@
+import {AppButton} from "../ui/AppButton";
 import {useCallback,useLayoutEffect,useRef,useState} from "react";
 import {createPortal} from "react-dom";
 import {MoreHorizontal} from "lucide-react";
@@ -50,14 +51,14 @@ export function FolderActionsMenu({name,onOpen,onUnlink,disabled=false}:Props){
  },[open,update]);
  const choose=(action:()=>void)=>{setOpen(false);action();};
  return <>
-  <button ref={trigger} className="rl-folder-actions-trigger" type="button" aria-label={'Opções da pasta '+name}
+  <AppButton ref={trigger} className="rl-folder-actions-trigger" type="button" aria-label={'Opções da pasta '+name}
    aria-haspopup="menu" aria-expanded={open} disabled={disabled} onClick={()=>setOpen(v=>!v)}>
    <MoreHorizontal size={18}/>
-  </button>
+  </AppButton>
   {open&&createPortal(<div ref={panel} role="menu" aria-label={'Opções da pasta '+name}
    className="rl-menu-items rl-folder-actions-popup" style={position??{top:0,left:0,visibility:'hidden'}}>
-   <button role="menuitem" type="button" onClick={()=>choose(onOpen)}>Abrir pasta</button>
-   <button role="menuitem" type="button" onClick={()=>choose(onUnlink)}>Desvincular do projeto</button>
+   <AppButton role="menuitem" type="button" onClick={()=>choose(onOpen)}>Abrir pasta</AppButton>
+   <AppButton role="menuitem" type="button" onClick={()=>choose(onUnlink)}>Desvincular do projeto</AppButton>
   </div>,document.body)}
  </>;
 }

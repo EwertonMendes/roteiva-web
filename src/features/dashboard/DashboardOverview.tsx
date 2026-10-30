@@ -1,3 +1,4 @@
+import {AppButton} from "../ui/AppButton";
 import { useState } from "react";
 import { CalendarDays, Eye, EyeOff } from "lucide-react";
 import { PROJECT_STATUS_ICONS } from "../ui/project-status";
@@ -49,21 +50,21 @@ export function TodayStudio({projects,clients,entries,events,activities,onView,o
       <span className="flow-total">{projectCount} {projectCount === 1 ? "projeto" : "projetos"} no total</span>
     </header>
     <div className="flow-numbers">
-      <button type="button" onClick={() => onView("projects")}><span>Projetos ativos</span><strong>{active}</strong><small>Em produção e revisão</small></button>
-      <button type="button" onClick={() => onView("reviews")}><span>Em revisão</span><strong>{pending}</strong><small>Aprovações e ajustes</small></button>
-      <button type="button" onClick={() => onView("clients")}><span>Clientes</span><strong>{overviewMetrics?.clientCount ?? clients.length}</strong><small>Na sua carteira</small></button>
+      <AppButton type="button" onClick={() => onView("projects")}><span>Projetos ativos</span><strong>{active}</strong><small>Em produção e revisão</small></AppButton>
+      <AppButton type="button" onClick={() => onView("reviews")}><span>Em revisão</span><strong>{pending}</strong><small>Aprovações e ajustes</small></AppButton>
+      <AppButton type="button" onClick={() => onView("clients")}><span>Clientes</span><strong>{overviewMetrics?.clientCount ?? clients.length}</strong><small>Na sua carteira</small></AppButton>
       <div className="flow-metric-finance">
-        <div className="flow-finance-top"><button type="button" onClick={() => onView("finance")}>Saldo em caixa</button>
-          <button type="button" className="flow-balance-visibility" onClick={() => setShowBalance(value => !value)}
+        <div className="flow-finance-top"><AppButton type="button" onClick={() => onView("finance")}>Saldo em caixa</AppButton>
+          <AppButton type="button" className="flow-balance-visibility" onClick={() => setShowBalance(value => !value)}
             aria-label={showBalance ? "Ocultar valores financeiros" : "Mostrar valores financeiros"}
             aria-pressed={!showBalance} title={showBalance ? "Ocultar valores" : "Mostrar valores"}>
             {showBalance ? <Eye size={18} /> : <EyeOff size={18} />}
-          </button>
+          </AppButton>
         </div>
-        <button className="flow-finance-amount" type="button" onClick={() => onView("finance")}>
+        <AppButton className="flow-finance-amount" type="button" onClick={() => onView("finance")}>
           <strong className="flow-money">{showBalance ? money(balance) : "••••••"}</strong>
           <small>Valor a receber <b>{showBalance ? money(receivable) : "••••"}</b></small>
-        </button>
+        </AppButton>
       </div>
     </div>
     <div className="flow-progress">
@@ -75,7 +76,7 @@ export function TodayStudio({projects,clients,entries,events,activities,onView,o
     </div>
     <footer className="flow-next"><CalendarDays size={22} aria-hidden="true"/><div><span>Próximo compromisso</span>
       <p>{next ? <><b>{next.title}</b> · {next.date.split("-").reverse().join("/")} · {eventRange(next)}</> : "Sua agenda está livre. Adicione a próxima produção."}</p>
-    </div><button className="secondary-button" type="button" onClick={() => onView("calendar")}>Ver agenda</button></footer>
+    </div><AppButton className="secondary-button" type="button" onClick={() => onView("calendar")}>Ver agenda</AppButton></footer>
     <ActivityPreview activities={activities} onOpen={onOpenActivity}/>
   </section>;
 }
