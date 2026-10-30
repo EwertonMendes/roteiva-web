@@ -9,6 +9,7 @@ import { thumbnail } from './thumbnails.ts';
 import { startUpload, completeUpload, authorizeUploadFolder, cleanupUploads } from './uploads.ts';
 import { verifyPickerToken } from './picker.ts';
 import { deletionStatus, requestDeletion, runPendingDeletions, runDeletionMaintenance } from './account-deletion.ts';
+import { monitorDeletionBacklog } from './deletion-monitor.ts';
 import { ensureAccess, assertActiveAccess } from './access.ts';
 import { backfillAccess } from './access-backfill.ts';
 import {dropboxEnabled,dropboxStart,dropboxLaunch,dropboxCallback,dropboxConnections,dropboxList,dropboxMetadata,dropboxRevoke,dropboxThumbnail} from './dropbox.ts';
@@ -252,6 +253,8 @@ export default {fetch:handle, scheduled(controller:ScheduledController,env:Env,c
       await runPendingDeletions(env);
       try{await cleanupExpiredReviews(env);}catch{console.error(JSON.stringify({event:'review_revocation_retry'}));}
     }else if(controller.cron==='*/15 * * * *'){
+      // D1 security backlog is observed inside the Worker; GitHub never polls it.
+      try{await monitorDeletionBacklog(env);}catch{console.error(JSON.stringify({event:'security_backlog_monitor_failed'}));}
       try{await runDeletionMaintenance(env);}catch{console.error(JSON.stringify({event:'deletion_maintenance_retry'}));}
       try{await backfillAccess(env);}catch(error){console.error(JSON.stringify({event:'access_backfill_retry',code:error instanceof ApiError?error.code:'dependency_failure'}));}
       try{await cleanupUploads(env);}catch{console.error(JSON.stringify({event:'drive_upload_retention_retry'}));}
