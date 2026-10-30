@@ -47,7 +47,8 @@ test('shared controls preserve forms, custom select, lime focus and modal on des
   expect(focus.outline).toBe('none');
  }
  const radio=dialog.getByRole('radio',{name:/Avulso/});
- await radio.check();
+ // The native radio is visually hidden behind its selectable card; click the label.
+ await dialog.getByText('Avulso',{exact:true}).click();
  await expect(radio).toBeChecked();
  await dialog.getByRole('button',{name:'Salvar cliente'}).click();
  await expect(dialog).not.toBeVisible();
