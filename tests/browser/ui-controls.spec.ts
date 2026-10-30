@@ -58,7 +58,8 @@ test('shared controls preserve forms, custom select, lime focus and modal on des
  await page.locator('.sidebar nav').getByRole('button',{name:/^Financeiro/}).click();
  const selects=page.locator('.finance-filters .rt-select-trigger');
  await expect(selects).toHaveCount(4);
- await selects.nth(3).press('Enter');
+ // Keyboard handling is covered by semantic-icons.spec; here verify click-after-navigation.
+ await selects.nth(3).click();
  const popup=page.getByRole('listbox');
  await expect(popup).toBeVisible();
  await expect(page.getByRole('option',{name:'Recebido'})).toBeVisible();
