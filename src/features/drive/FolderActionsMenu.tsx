@@ -2,6 +2,7 @@ import {AppButton} from "../ui/AppButton";
 import {useCallback,useLayoutEffect,useRef,useState} from "react";
 import {createPortal} from "react-dom";
 import {MoreHorizontal} from "lucide-react";
+import {useDismissibleLayer} from "../ui/useDismissibleLayer";
 
 type Props={
  name:string;
@@ -30,25 +31,16 @@ export function FolderActionsMenu({name,onOpen,onUnlink,disabled=false}:Props){
  useLayoutEffect(()=>{
   if(!open)return;
   update();
-  const click=(event:PointerEvent)=>{
-   if(!panel.current?.contains(event.target as Node)&&!trigger.current?.contains(event.target as Node))setOpen(false);
-  };
-  const key=(event:KeyboardEvent)=>{
-   if(event.key==='Escape'){event.preventDefault();setOpen(false);trigger.current?.focus();}
-  };
   window.addEventListener('scroll',update,true);
   window.addEventListener('resize',update);
-  document.addEventListener('pointerdown',click);
-  document.addEventListener('keydown',key);
   const raf=requestAnimationFrame(()=>{update();panel.current?.querySelector<HTMLButtonElement>('button')?.focus();});
   return()=>{
    cancelAnimationFrame(raf);
    window.removeEventListener('scroll',update,true);
    window.removeEventListener('resize',update);
-   document.removeEventListener('pointerdown',click);
-   document.removeEventListener('keydown',key);
   };
  },[open,update]);
+ useDismissibleLayer(open,[trigger,panel],()=>setOpen(false),{restoreFocus:trigger});
  const choose=(action:()=>void)=>{setOpen(false);action();};
  return <>
   <AppButton ref={trigger} className="rl-folder-actions-trigger" type="button" aria-label={'Opções da pasta '+name}

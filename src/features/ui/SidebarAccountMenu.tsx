@@ -2,6 +2,7 @@ import {AppButton} from "./AppButton";
 import {useEffect,useId,useRef,useState} from 'react';
 import {LogOut,MoreHorizontal,Moon,Sun} from 'lucide-react';
 import './sidebar-account-menu.css';
+import {useDismissibleLayer} from './useDismissibleLayer';
 export function SidebarAccountMenu({theme,onToggleTheme,onLogout}:{theme:'light'|'dark';onToggleTheme:()=>void;onLogout?:()=>void}){
  const [phase,setPhase]=useState<'closed'|'open'|'closing'>('closed');
  const open=phase==='open';
@@ -10,9 +11,9 @@ export function SidebarAccountMenu({theme,onToggleTheme,onLogout}:{theme:'light'
  useEffect(()=>{
   if(!open)return;
   root.current?.querySelector<HTMLButtonElement>('.sidebar-account-popover button')?.focus();
-  const outside=(event:PointerEvent)=>{if(!root.current?.contains(event.target as Node))close();};
-  document.addEventListener('pointerdown',outside);return ()=>document.removeEventListener('pointerdown',outside);
+  // Click-away is shared; this effect handles only opening focus.
  },[open]);
+ useDismissibleLayer(open,[root],close,{escape:false});
  function closeAndRestore(){close();trigger.current?.focus();}
  return <div className="sidebar-account-menu" ref={root} onBlur={e=>{if(!e.currentTarget.contains(e.relatedTarget))close();}} onKeyDown={e=>{if(e.key==='Escape'&&open){e.preventDefault();e.stopPropagation();closeAndRestore();}}}>
   <AppButton ref={trigger} type="button" className="icon-button sidebar-account-trigger" aria-label="Opções da conta" title="Opções da conta" aria-expanded={open} aria-controls={phase==='closed'?undefined:id} onClick={()=>open?close():setPhase('open')}><MoreHorizontal size={19}/></AppButton>

@@ -1,6 +1,7 @@
 import {AppInput} from "../ui/AppInput";
 import {AppButton} from "../ui/AppButton";
-import {useEffect,useRef,useState,type FormEvent} from "react";
+import {useState,type FormEvent} from "react";
+import {AppDialog} from "../ui/AppDialog";
 import {Building2,ChevronRight,ReceiptText,X} from "lucide-react";
 import type {Client,ClientType} from "../../domain/workspace";
 import {BrazilPhoneInput} from "../ui/BrazilPhoneInput";
@@ -8,19 +9,9 @@ import {MoneyInput} from "../ui/MoneyInput";
 
 type Props={client:Client|null;onClose:()=>void;onSubmit:(event:FormEvent<HTMLFormElement>)=>void};
 export function ClientFormDialog({client,onClose,onSubmit}:Props){
- const dialog=useRef<HTMLDialogElement>(null);
  const [type,setType]=useState<ClientType>(client?.type||"Recorrente");
- useEffect(()=>{
-  const element=dialog.current!;
-  element.showModal();
-  const previous=document.body.style.overflow;
-  document.body.style.overflow="hidden";
-  return ()=>{document.body.style.overflow=previous;element.close();};
- },[]);
- return <dialog ref={dialog} className="cd-form-dialog" data-native-cursor
-  aria-labelledby="cd-form-title" aria-describedby="cd-form-description"
-  onCancel={event=>{event.preventDefault();onClose();}}
-  onClick={event=>{if(event.target===event.currentTarget)onClose();}}>
+ return <AppDialog className="cd-form-dialog" data-native-cursor onCloseRequest={onClose}
+  aria-labelledby="cd-form-title" aria-describedby="cd-form-description">
    <form className="cd-form" onSubmit={onSubmit}>
      <header className="cd-form-header"><div>
        <span className="eyebrow">{client?"EDITAR CLIENTE":"NOVO CLIENTE"}</span>
@@ -49,5 +40,5 @@ export function ClientFormDialog({client,onClose,onSubmit}:Props){
        <AppButton type="submit" className="primary-button">Salvar cliente <ChevronRight size={18}/></AppButton>
      </footer>
    </form>
- </dialog>;
+ </AppDialog>;
 }

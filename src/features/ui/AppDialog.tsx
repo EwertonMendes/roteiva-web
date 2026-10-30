@@ -24,7 +24,7 @@ export const AppDialog=forwardRef<HTMLDialogElement,Props>(function AppDialog({
     localRef.current=element;
     if(typeof ref==="function")ref(element);
     else if(ref)ref.current=element;
-  }} onCancel={event=>{onCancel?.(event);event.preventDefault();if(!event.defaultPrevented)return;onCloseRequest();}}
+  }} onCancel={event=>{onCancel?.(event);event.preventDefault();onCloseRequest();}}
     onClick={event=>{onClick?.(event);if(!event.defaultPrevented&&event.target===event.currentTarget)onCloseRequest();}}>
     {children}
   </dialog>;
