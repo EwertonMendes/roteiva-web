@@ -8,7 +8,9 @@ function environment(){
   const sql=[];
   const DB={prepare(query){
     sql.push(query);
-    const stmt={bind(){return stmt;},first:async()=>null,all:async()=>({results:[]}),
+    const stmt={bind(){return stmt;},first:async()=>query.includes('AS oauth_without_token')?{
+      manual_review:0,stalled:0,oauth_without_token:0,oauth_with_token:0}:null,
+      all:async()=>({results:[]}),
       run:async()=>({meta:{changes:0}})};
     return stmt;
   }};
@@ -36,16 +38,16 @@ test('one-minute cron preserves revocation and deletion checks but skips routine
   assert.ok(sql.some(x=>x.includes('review_requests')));
   assert.equal(sql.some(x=>x.includes('drive_upload_attempts')),false);
   assert.equal(sql.some(x=>x.includes('access_rollout')),false);
-  assert.equal(sql.some(x=>x.includes("COUNT(*) AS total")),false);
+  assert.equal(sql.some(x=>x.includes('AS oauth_without_token')),false);
 });
 test('15-minute cron executes retention, monitoring, backfill and upload cleanup only',async()=>{
   const {env,sql}=environment();
   await run('*/15 * * * *',env);
   assert.ok(sql.some(x=>x.includes('drive_upload_attempts')));
   assert.ok(sql.some(x=>x.includes('access_rollout')));
-  assert.ok(sql.some(x=>x.includes("COUNT(*) AS total")));
+  assert.ok(sql.some(x=>x.includes('AS oauth_without_token')));
   assert.equal(sql.some(x=>x.includes('review_requests')),false);
-  assert.equal(sql.some(x=>x.includes('oauth_exchange_guards')),false);
+  assert.ok(sql.some(x=>x.includes('oauth_exchange_guards')));
 });
 test('unknown Cron schedule fails closed without touching D1',async()=>{
   const {env,sql}=environment();
