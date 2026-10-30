@@ -247,6 +247,39 @@ async function integration(t){
     mode:'link',driveShareEnabled:true,expiresInDays:14,assets:[{fileId:file,connectionId:account,linkedFolderId:folder}]};
   return {f,env,send,payload,alice,bob,jwt,acl,imageAcl,calls,hooks};
 }
+test('owner dashboard paginates only after 15 reviews and summarizes all statuses per owner',async t=>{
+  const x=await integration(t);
+  for(let i=0;i<15;i++)await inserted(x.f);
+  const exact=await x.send('GET','/reviews?page=0',x.alice);
+  assert.equal(exact.status,200);
+  const first=await exact.json();
+  assert.equal(first.reviews.length,15);
+  assert.equal(first.hasMore,false,'exactly 15 records must not show a next page');
+  assert.deepEqual(first.summary,{pending:15,changes:0,approved:0});
+
+  await inserted(x.f,{status:'changes'});
+  await inserted(x.f,{status:'approved',uid:'bob'});
+  const sixteen=await (await x.send('GET','/reviews?page=0',x.alice)).json();
+  assert.equal(sixteen.reviews.length,15);
+  assert.equal(sixteen.hasMore,true);
+  assert.deepEqual(sixteen.summary,{pending:15,changes:1,approved:0},
+    'statuses must count all of the owner reviews, never other accounts');
+
+  const second=await (await x.send('GET','/reviews?page=1',x.alice)).json();
+  assert.equal(second.reviews.length,1);
+  assert.equal(second.hasMore,false);
+  assert.deepEqual(second.summary,sixteen.summary,'summary must not depend on the current page');
+
+  const filtered=await (await x.send('GET','/reviews?status=changes',x.alice)).json();
+  assert.equal(filtered.reviews.length,1);
+  assert.equal(filtered.hasMore,false);
+  assert.deepEqual(filtered.summary,sixteen.summary,'summary must not change with filters');
+  const noMatches=await (await x.send('GET','/reviews?q=not-a-match',x.alice)).json();
+  assert.equal(noMatches.reviews.length,0);
+  assert.equal(noMatches.hasMore,false);
+  assert.deepEqual(noMatches.summary,sixteen.summary);
+});
+
 test('owner image preview requires owning Firebase account, selected image and active review',async t=>{
   const x=await integration(t);
   const selected=[...x.payload.assets,{fileId:imageFile,connectionId:account,linkedFolderId:'PARENT_FOLDER_12345'}];

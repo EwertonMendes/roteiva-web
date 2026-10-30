@@ -19,3 +19,19 @@
 .app-shell:not(.app-view-overview) .page > .page-heading p {
   font-size: var(--type-body);
 }
+
+/* Approval room retains the global Projects heading scale and coordinates,
+   while matching the reference's softer subtitle and breathing room. */
+.app-shell.app-view-reviews .page > .page-heading {
+  margin-bottom: 36px;
+}
+.app-shell.app-view-reviews .page > .page-heading p {
+  color: var(--muted);
+  font-size: var(--type-card);
+  font-weight: var(--type-weight-regular);
+  line-height: 1.45;
+}
+@media (max-width: 820px) {
+  .app-shell.app-view-reviews .page > .page-heading { margin-bottom: 24px; }
+  .app-shell.app-view-reviews .page > .page-heading p { font-size: var(--type-body); }
+}

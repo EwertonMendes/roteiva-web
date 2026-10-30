@@ -145,7 +145,9 @@ test('profissional cria, cliente comenta/pede ajustes, V2 aprovada e encerrament
       const all=[...([file,second].map(f=>({...f,id:f.fileId}))),...(uploadConfirmed?[uploaded]:[])];
       return json({files:term?all.filter(f=>f.name.toLowerCase().includes(term.toLowerCase())):all,nextPageToken:null});
     }
-    if(path==='/reviews'&&req.method()==='GET')return json({reviews:created?[review]:[],hasMore:false});
+    if(path==='/reviews'&&req.method()==='GET')return json({reviews:created?[review]:[],hasMore:false,
+      summary:{pending:created&&review.status==='pending'?1:0,changes:created&&review.status==='changes'?1:0,
+        approved:created&&review.status==='approved'?1:0}});
     if(path==='/reviews'&&req.method()==='POST'){
       const body=req.postDataJSON();expect(body.clientId).toBe(clientId);expect(body.projectId).toBe(projectId);
       expect(uploadConfirmed).toBe(true);
@@ -317,7 +319,7 @@ test('galeria de aprovação mantém miniaturas e filtros rápidos com mais de 2
     if(path.endsWith('/metadata'))return route.fulfill({status:200,headers,contentType:'application/json',
       body:JSON.stringify({file:{parents:[folder]}})});
     if(path==='/reviews')return route.fulfill({status:200,headers,contentType:'application/json',
-      body:JSON.stringify({reviews:[data.review],hasMore:false})});
+      body:JSON.stringify({reviews:[data.review],hasMore:false,summary:{pending:1,changes:0,approved:0}})});
     if(path==='/reviews/review-many')return route.fulfill({status:200,headers,contentType:'application/json',
       body:JSON.stringify(data)});
     return route.fallback();
