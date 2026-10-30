@@ -9,7 +9,6 @@
 .storage-providers button:hover{background:#e5e7e2;color:#242822}
 .storage-providers button.active,.storage-providers button[aria-selected="true"]{background:#fff;color:#161a17;border-color:#d6d9d1;box-shadow:0 1px 5px #00000014}
 .storage-providers button img{display:block;object-fit:contain;flex:0 0 20px;width:20px;height:20px}
-.storage-providers button:focus-visible{outline:2px solid #5085ec;outline-offset:2px}
 [data-theme="dark"] .storage-providers{background:#161714;border-color:#35362f}
 [data-theme="dark"] .storage-providers button{color:#b6b8b0}
 [data-theme="dark"] .storage-providers button:hover{background:#252720;color:#f1f2ea}
