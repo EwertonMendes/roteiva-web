@@ -96,12 +96,15 @@ test('money fields shift cents on desktop and mobile, paste reais, persist and e
       const a=outer.getBoundingClientRect(),b=neighbour.getBoundingClientRect();
       const style=getComputedStyle(outer),other=getComputedStyle(neighbour);
       const inner=getComputedStyle(element);
-      return {dy:Math.abs(a.y-b.y),dh:Math.abs(a.height-b.height),
+      return {stacked:window.matchMedia('(max-width:600px)').matches,
+        dy:Math.abs(a.y-b.y),dw:Math.abs(a.width-b.width),dh:Math.abs(a.height-b.height),
         surface:style.backgroundColor,otherSurface:other.backgroundColor,
         ring:style.boxShadow,outerOutline:style.outlineStyle,
         border:inner.borderTopWidth,outline:inner.outlineStyle,innerShadow:inner.boxShadow};
     });
-    expect(visual.dy).toBeLessThan(1);
+    // At mobile sizes the form intentionally stacks fields; at desktop they share a row.
+    if(visual.stacked){expect(visual.dy).toBeGreaterThan(30);expect(visual.dw).toBeLessThan(1);}
+    else expect(visual.dy).toBeLessThan(1);
     expect(visual.dh).toBeLessThan(1);
     expect(visual.surface).toBe(visual.otherSurface);
     expect(visual.border).toBe('0px');
