@@ -1,3 +1,5 @@
+import {AppButton} from "./AppButton";
+import {useDismissibleLayer} from "./useDismissibleLayer";
 import { Children, isValidElement, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type OptionHTMLAttributes, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Check, ChevronDown } from "lucide-react";
@@ -76,6 +78,7 @@ export function AppSelect({
     const option = options[index];
     if (!option || option.disabled) return;
     if (!controlled) setUncontrolled(option.value);
+    setRequiredInvalid(false);
     if (option.value !== current) onValueChange?.(option.value);
     closeMenu();
     triggerRef.current?.focus();
@@ -116,15 +119,21 @@ export function AppSelect({
     };
   }, [open, options.length]);
 
-  useEffect(() => {
-    if (!open) return;
-    const outside = (event: PointerEvent) => {
-      if (!(event.target instanceof Node)) return;
-      if (!triggerRef.current?.contains(event.target) && !popupRef.current?.contains(event.target)) closeMenu();
+  useDismissibleLayer(open,[triggerRef,popupRef],closeMenu,{escape:false});
+  const [requiredInvalid,setRequiredInvalid]=useState(false);
+  useEffect(()=>{
+    if(!required||disabled)return;
+    const form=triggerRef.current?.closest("form");
+    if(!form)return;
+    const validate=(event:Event)=>{
+      if(current!==""&&selected&&!selected.disabled)return;
+      event.preventDefault();
+      setRequiredInvalid(true);
+      triggerRef.current?.focus();
     };
-    document.addEventListener("pointerdown", outside);
-    return () => document.removeEventListener("pointerdown", outside);
-  }, [open]);
+    form.addEventListener("submit",validate,true);
+    return()=>form.removeEventListener("submit",validate,true);
+  },[required,disabled,current,selected]);
 
   useEffect(() => {
     if (!open) return;
@@ -177,12 +186,12 @@ export function AppSelect({
 
   return <div className={`rt-select ${className}`.trim()} data-open={open || undefined} data-disabled={disabled || undefined}>
     {name && <input type="hidden" name={name} value={current} disabled={disabled} />}
-    <button
+    <AppButton
       type="button" id={controlId} ref={triggerRef} role="combobox" aria-haspopup="listbox"
       aria-expanded={open} aria-controls={open ? menuId : undefined}
       aria-activedescendant={open ? `${menuId}-option-${active}` : undefined}
       aria-label={ariaLabel} aria-labelledby={labelledBy} aria-describedby={describedBy}
-      aria-invalid={invalid}
+      aria-invalid={invalid || requiredInvalid || undefined}
       aria-required={required || undefined}
       className="rt-select-trigger" disabled={disabled}
       onClick={() => open ? closeMenu() : openMenu()}
@@ -192,7 +201,7 @@ export function AppSelect({
         {selected?.label ?? placeholder}
       </span>
       <ChevronDown className="rt-select-chevron" aria-hidden="true" size={16} />
-    </button>
+    </AppButton>
     {open && createPortal(<div
       id={menuId} role="listbox" aria-label={ariaLabel ?? selected?.text ?? placeholder}
       className="rt-select-menu" ref={popupRef}

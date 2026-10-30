@@ -1,3 +1,4 @@
+import {AppButton} from "../ui/AppButton";
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { ArrowRight } from "lucide-react";
 import { FirestoreWorkspace, dataErrorMessage, type RoteivaProfile, type ProfileChanges } from "../../data/firestore-workspace";
@@ -76,7 +77,7 @@ export function RegistrationGate({children}: {children: ReactNode}) {
   if(status==="deleting")return <AccountDeletionPending/>;
   if(status==="error")return <AuthLayout section="CONEXÃO" title="Não foi possível consultar seu cadastro." description="Não vamos criar uma nova conta enquanto não for possível confirmar o estado do seu espaço.">
     <p className="auth-error" role="alert">{error}</p>
-    <div className="auth-row-actions"><button className="auth-primary" onClick={()=>setAttempt(n=>n+1)}>Tentar novamente <ArrowRight size={16}/></button><button className="auth-link" onClick={()=>void logout()} disabled={busy}>Trocar conta</button></div>
+    <div className="auth-row-actions"><AppButton className="auth-primary" onClick={()=>setAttempt(n=>n+1)}>Tentar novamente <ArrowRight size={16}/></AppButton><AppButton className="auth-link" onClick={()=>void logout()} disabled={busy}>Trocar conta</AppButton></div>
   </AuthLayout>;
   if(showForm)return <RegistrationPage user={user} submitting={creating} error={error} onSubmit={register} onExit={()=>void logout()}/>;
   return <AuthLayout section="02 — PRIMEIRO ACESSO" title="Ainda não encontramos seu espaço." description="Sua identidade Google foi confirmada, mas você ainda não concluiu o cadastro no Roteiva.">
@@ -85,7 +86,7 @@ export function RegistrationGate({children}: {children: ReactNode}) {
       <div><strong>{user.displayName||"Conta Google"}</strong><span>{user.email}</span></div>
     </div>
     <p className="auth-invitation">Se quiser começar, vamos cadastrar seu perfil e preparar um espaço privado.</p>
-    <button className="auth-primary" type="button" onClick={()=>setShowForm(true)}>Criar meu espaço <ArrowRight size={17}/></button>
-    <button className="auth-link" type="button" onClick={()=>void logout()} disabled={busy}>Voltar e usar outra conta</button>
+    <AppButton className="auth-primary" type="button" onClick={()=>setShowForm(true)}>Criar meu espaço <ArrowRight size={17}/></AppButton>
+    <AppButton className="auth-link" type="button" onClick={()=>void logout()} disabled={busy}>Voltar e usar outra conta</AppButton>
   </AuthLayout>;
 }

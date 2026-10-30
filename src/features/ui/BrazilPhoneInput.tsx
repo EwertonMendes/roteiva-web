@@ -1,3 +1,4 @@
+import {AppInput} from "./AppInput";
 import {useLayoutEffect,useRef,useState,type InputHTMLAttributes} from 'react';
 import {formatPhoneInput,phoneDigits} from '../../lib/brazil-phone';
 
@@ -21,7 +22,7 @@ export function BrazilPhoneInput({defaultValue='',...props}:Props){
   if(wanted===0)position=0;
   ref.current.setSelectionRange(position,position);
  },[value]);
- return <input {...props} ref={ref} type="tel" inputMode="numeric" autoComplete="tel-national"
+ return <AppInput {...props} ref={ref} type="tel" inputMode="numeric" autoComplete="tel-national"
    value={value} maxLength={24}
    pattern={String.raw`\(\d{2}\) \d{4,5}-\d{4}`}
    title="Informe o DDD e o número, com 10 ou 11 dígitos."

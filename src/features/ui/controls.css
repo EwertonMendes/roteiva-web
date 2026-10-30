@@ -1,0 +1,46 @@
+/* Design tokens are owned by the shared control layer. Feature layouts should
+ * change spacing through variables rather than redefine input focus/borders. */
+:root {
+  --rt-control-height:44px;
+  --rt-control-radius:10px;
+  --rt-control-padding:12px;
+}
+:where(.rt-input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]):not([type="range"]),.rt-textarea){
+  box-sizing:border-box;
+  max-width:100%;
+  min-width:0;
+  font:inherit;
+  color:var(--ink);
+  background:var(--subtle);
+  border:1px solid var(--line);
+  border-radius:var(--rt-control-radius);
+}
+:where(.rt-input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]):not([type="range"])){min-height:var(--rt-control-height);padding:0 var(--rt-control-padding);}
+:where(.rt-textarea){padding:var(--rt-control-padding);resize:vertical;}
+:where(.rt-input,.rt-textarea):disabled{cursor:not-allowed;opacity:.55;}
+:where(.rt-input,.rt-textarea)[aria-invalid="true"]{border-color:var(--field-error-border,#bc4d4d);}
+.rt-form-field{display:flex;flex-direction:column;gap:6px;min-width:0;}
+.rt-field-label{font-size:var(--type-support);font-weight:600;color:var(--ink);}
+.rt-field-hint{font-size:var(--type-caption);color:var(--muted);}
+.rt-field-error{font-size:var(--type-caption);color:var(--field-error-border,#bc4d4d);}
+.rt-input-frame{
+  display:flex;align-items:stretch;min-width:0;width:100%;
+  border:1px solid var(--line);border-radius:var(--rt-control-radius);
+  background:var(--subtle);overflow:hidden;
+}
+.rt-input-frame>.rt-input{flex:1;min-width:0;width:100%;border:0;border-radius:0;background:transparent;box-shadow:none;outline:0;}
+.rt-input-adornment{display:grid;place-items:center;flex:none;padding:0 12px;color:var(--muted);}
+.rt-input-frame:focus-within{border-color:var(--field-focus-border);box-shadow:0 0 0 3px var(--field-focus-ring);}
+.rt-input-frame>.rt-input:focus{border:0;outline:0;box-shadow:none;}
+.rt-input-frame[data-disabled]{opacity:.55;}
+.rt-button{display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  border-radius:10px;border:1px solid var(--line);font:inherit;font-weight:600;min-height:42px;
+  cursor:pointer;transition:background-color .15s,border-color .15s,opacity .15s;}
+.rt-button--primary{background:var(--accent);color:var(--on-accent);border-color:transparent;padding:0 16px;}
+.rt-button--secondary{background:var(--subtle);color:var(--ink);padding:0 16px;}
+.rt-button--ghost{background:transparent;color:var(--ink);border-color:transparent;padding:0 12px;}
+.rt-button--danger{background:var(--field-error-border,#bc4d4d);color:white;border-color:transparent;padding:0 16px;}
+.rt-button:disabled{opacity:.55;cursor:not-allowed;}
+.rt-button[data-control-size="sm"]{min-height:34px;}
+.rt-button[data-control-size="lg"]{min-height:49px;}
+@media(prefers-reduced-motion:reduce){.rt-button{transition:none;}}

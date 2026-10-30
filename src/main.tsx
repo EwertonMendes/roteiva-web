@@ -1,3 +1,4 @@
+import {AppButton} from "./features/ui/AppButton";
 import React, { Component, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import DashboardClient from "./dashboard-client";
@@ -25,12 +26,13 @@ import "./features/dashboard/dashboard.css";
 import "./features/ui/AppSelect.css";
 // Last: shared field dimensions and a single focus treatment for every theme.
 import "./features/ui/form-controls.css";
+import "./features/ui/controls.css";
 
 class AppErrorBoundary extends Component<{children:ReactNode},{error:string}> {
   state={error:""};
   static getDerivedStateFromError(error:Error) { return {error:error.message}; }
   render() {
-    return this.state.error ? <main className="auth-page"><section className="panel auth-card" role="alert"><h1>Não foi possível iniciar o Roteiva</h1><p>{this.state.error}</p><button className="primary-button" onClick={()=>window.location.reload()}>Tentar novamente</button></section></main> : this.props.children;
+    return this.state.error ? <main className="auth-page"><section className="panel auth-card" role="alert"><h1>Não foi possível iniciar o Roteiva</h1><p>{this.state.error}</p><AppButton className="primary-button" onClick={()=>window.location.reload()}>Tentar novamente</AppButton></section></main> : this.props.children;
   }
 }
 const review=window.location.pathname.replace(/\/+$/, "").endsWith("/review");

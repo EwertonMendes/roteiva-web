@@ -1,3 +1,4 @@
+import {AppButton} from "../ui/AppButton";
 import { AppSelect } from "../ui/AppSelect";
 import { FolderActionsMenu } from "./FolderActionsMenu";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -379,37 +380,37 @@ export function DriveConnectionPanel({
           <div className="rl-account-panel"><div><strong>Google Drive conectado</strong><p>{currentAccount?.google_email}</p></div>
             {authorized.length>1&&<AppSelect aria-label="Selecionar conta Google Drive" value={connection?.id||""} onValueChange={value=>setSelectedAccount(value)}>
               {authorized.map(c=><option key={c.id} value={c.id}>{c.google_email}</option>)}</AppSelect>}
-            <button className="secondary-button" type="button" disabled={busy} onClick={()=>void refresh().catch(e=>setError(e instanceof Error?e.message:"Não foi possível atualizar."))}><RefreshCw size={15}/> Atualizar conexão</button>
+            <AppButton className="secondary-button" type="button" disabled={busy} onClick={()=>void refresh().catch(e=>setError(e instanceof Error?e.message:"Não foi possível atualizar."))}><RefreshCw size={15}/> Atualizar conexão</AppButton>
             {confirmId?<><p>Desconectar esta conta? As pastas vinculadas não serão apagadas.</p>
-              <button className="secondary-button" type="button" disabled={busy} onClick={()=>setConfirmId("")}>Cancelar</button>
-              <button className="secondary-button" type="button" disabled={busy} onClick={()=>void disconnect(confirmId)}><Unplug size={15}/> Confirmar desconexão</button></>:
-              <button className="secondary-button" type="button" disabled={busy} onClick={()=>setConfirmId(currentAccount?.id||"")}><Unplug size={15}/> Desconectar</button>}
+              <AppButton className="secondary-button" type="button" disabled={busy} onClick={()=>setConfirmId("")}>Cancelar</AppButton>
+              <AppButton className="secondary-button" type="button" disabled={busy} onClick={()=>void disconnect(confirmId)}><Unplug size={15}/> Confirmar desconexão</AppButton></>:
+              <AppButton className="secondary-button" type="button" disabled={busy} onClick={()=>setConfirmId(currentAccount?.id||"")}><Unplug size={15}/> Desconectar</AppButton>}
           </div></details>:null}
-        <button className="primary-button" type="button" disabled={!ready||busy||accountFailed} onClick={chooseFolders}><Plus size={16}/>{connected.length?"Vincular pasta":"Conectar Drive"}</button>
+        <AppButton className="primary-button" type="button" disabled={!ready||busy||accountFailed} onClick={chooseFolders}><Plus size={16}/>{connected.length?"Vincular pasta":"Conectar Drive"}</AppButton>
       </div>
     </header>
     {!ready?<div className="rl-status" role="status">Carregando Biblioteca…</div>:null}
     {callback==="connected"&&<div className="rl-status" role="status"><ShieldCheck size={17}/><p>Google Drive autorizado.</p></div>}
     {callback==="cancelled"&&<div className="rl-status" role="status">Autorização cancelada.</div>}
     {oauthError(callback)&&<div className="rl-status" role="alert">{oauthError(callback)}</div>}
-    {error&&<div className="rl-status" role="alert"><p>{error}</p>{accountFailed&&<button className="rl-retry" type="button" onClick={()=>void refresh().catch(e=>setError(e instanceof Error?e.message:"Falha ao atualizar."))}>Tentar novamente</button>}</div>}
-    {linkError&&<div className="rl-status" role="alert"><p>{linkError}</p><button className="rl-retry" type="button" onClick={()=>void refresh().catch(e=>setError(e instanceof Error?e.message:"Falha ao atualizar."))}>Atualizar</button></div>}
+    {error&&<div className="rl-status" role="alert"><p>{error}</p>{accountFailed&&<AppButton className="rl-retry" type="button" onClick={()=>void refresh().catch(e=>setError(e instanceof Error?e.message:"Falha ao atualizar."))}>Tentar novamente</AppButton>}</div>}
+    {linkError&&<div className="rl-status" role="alert"><p>{linkError}</p><AppButton className="rl-retry" type="button" onClick={()=>void refresh().catch(e=>setError(e instanceof Error?e.message:"Falha ao atualizar."))}>Atualizar</AppButton></div>}
     {result&&<div className="rl-status" role="status">{result}</div>}
     {ready&&!connected.length&&!accountFailed?<div className="rl-status"><Cloud size={18}/><p>Conecte sua conta Google para escolher pastas dos projetos. Os arquivos continuarão armazenados no seu Drive.</p></div>:null}
-    {ready&&connected.length>0&&!authorized.length?<div className="rl-status" role="alert"><p>É necessário autorizar a leitura das pastas existentes.</p><button type="button" className="rl-retry" onClick={()=>void connect(selectedProjectId)}>Autorizar acesso</button></div>:null}
+    {ready&&connected.length>0&&!authorized.length?<div className="rl-status" role="alert"><p>É necessário autorizar a leitura das pastas existentes.</p><AppButton type="button" className="rl-retry" onClick={()=>void connect(selectedProjectId)}>Autorizar acesso</AppButton></div>:null}
     <div className="rl-explorer" data-mobile-detail={!!viewing}>
       <aside className="rl-folders" aria-label="Pastas vinculadas">
         <div className="rl-folders-header"><h3>Pastas {selectedProjectId?"do projeto":"dos projetos"}</h3><small>{relevant.length}</small></div>
         <div className="rl-folder-list">
           {relevant.map(link=><div className="rl-folder-entry" data-active={viewing?.id===link.id} key={link.id}>
-            <button className="rl-folder-button" type="button" title={link.folderName} onClick={()=>void openFiles(link)} aria-current={viewing?.id===link.id?"true":undefined}>
+            <AppButton className="rl-folder-button" type="button" title={link.folderName} onClick={()=>void openFiles(link)} aria-current={viewing?.id===link.id?"true":undefined}>
               <FolderOpen size={18}/><span><b>{link.folderName}</b><small>{projects.find(p=>p.id===link.projectId)?.name||"Projeto indisponível"}</small></span>
-            </button>
+            </AppButton>
             <FolderActionsMenu name={link.folderName} disabled={busy}
               onOpen={()=>void openFiles(link)} onUnlink={()=>setUnlinkTarget(link)}/>
           </div>)}
           {!relevant.length&&<div className="rl-state"><FolderOpen size={27}/><p>Nenhuma pasta vinculada {selectedProjectId?"a este projeto":"aos projetos"}.</p>
-            <button type="button" className="secondary-button" disabled={!ready||busy} onClick={chooseFolders}>Vincular pasta</button></div>}
+            <AppButton type="button" className="secondary-button" disabled={!ready||busy} onClick={chooseFolders}>Vincular pasta</AppButton></div>}
         </div>
       </aside>
       <DriveFileExplorer folderName={viewing?.folderName} path={viewPath} files={files} loading={fileBusy} hasMore={searchText.trim().length>=2

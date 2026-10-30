@@ -1,3 +1,4 @@
+import {AppButton} from "../ui/AppButton";
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {Check,ChevronDown,ChevronRight,Cloud,ExternalLink,FolderOpen,LoaderCircle,Plus,RefreshCw,ShieldCheck,Unplug,X} from 'lucide-react';
 import type {Project} from '../../domain/workspace';
@@ -48,9 +49,9 @@ function DropboxPreview({file,link,onClose,onNext,onPrevious}:{file:DriveItem;li
   <section className="rl-preview db-preview" ref={ref} role="dialog" aria-modal="true" tabIndex={-1} aria-label={'Prévia de '+file.name}>
    <header><div className="rl-preview-title"><strong title={file.name}>{file.name}</strong><small>Dropbox · Prévia protegida pelo Roteiva</small></div>
     <div><a href={dropboxWebUrl(file)} target="_blank" rel="noreferrer" className="secondary-button"><ExternalLink size={15}/> Abrir Dropbox</a>
-     <button type="button" className="rl-icon-button" aria-label="Fechar" onClick={onClose}><X size={17}/></button></div></header>
+     <AppButton type="button" className="rl-icon-button" aria-label="Fechar" onClick={onClose}><X size={17}/></AppButton></div></header>
    <div className="rl-preview-body db-preview-body">
-    {onPrevious&&<button className="rl-preview-nav rl-preview-nav-prev" onClick={onPrevious} aria-label="Arquivo anterior"><ChevronRight size={19} style={{transform:'rotate(180deg)'}}/></button>}
+    {onPrevious&&<AppButton className="rl-preview-nav rl-preview-nav-prev" onClick={onPrevious} aria-label="Arquivo anterior"><ChevronRight size={19} style={{transform:'rotate(180deg)'}}/></AppButton>}
     {state.busy?<div role="status" className="rl-state"><LoaderCircle className="rl-spin" size={22}/> Preparando prévia…</div>:
      state.error?<div role="alert" className="rl-state">{state.error}</div>:
      media&&kind.startsWith('image/')?<ReviewImageViewer src={media} name={file.name}/>:
@@ -58,7 +59,7 @@ function DropboxPreview({file,link,onClose,onNext,onPrevious}:{file:DriveItem;li
      media&&kind.startsWith('audio/')?<audio key={media} src={media} controls preload="metadata" controlsList="nodownload"/>:
      media&&kind==='application/pdf'?<iframe key={media} title={'PDF '+file.name} src={media+'#toolbar=0&navpanes=0'} referrerPolicy="no-referrer"/>:
      <div className="rl-state">Este arquivo não possui prévia integrada.</div>}
-    {onNext&&<button className="rl-preview-nav rl-preview-nav-next" onClick={onNext} aria-label="Próximo arquivo"><ChevronRight size={19}/></button>}
+    {onNext&&<AppButton className="rl-preview-nav rl-preview-nav-next" onClick={onNext} aria-label="Próximo arquivo"><ChevronRight size={19}/></AppButton>}
    </div>
    <p>A visualização respeita as permissões do Roteiva. O arquivo original continua armazenado no Dropbox.</p>
   </section>
@@ -371,22 +372,22 @@ export function DropboxConnectionPanel({projects,selectedProjectId,onLinkedFolde
        <AppSelect aria-label="Conta Dropbox" value={account?.id||''} onValueChange={setSelectedConn}>
         {validAccounts.map(c=><option key={c.id} value={c.id}>{c.email}</option>)}</AppSelect>
        {confirmId===account?.id?<><p>Desconectar esta conta? O Roteiva não apagará arquivos.</p>
-        <button type="button" className="secondary-button" onClick={()=>setConfirmId('')}>Cancelar</button>
-        <button type="button" className="secondary-button" disabled={busy} onClick={()=>void disconnect()}>Confirmar desconexão</button></>:
-        <button type="button" className="secondary-button" disabled={busy} onClick={()=>setConfirmId(account?.id||'')}><Unplug size={15}/> Desconectar</button>}
+        <AppButton type="button" className="secondary-button" onClick={()=>setConfirmId('')}>Cancelar</AppButton>
+        <AppButton type="button" className="secondary-button" disabled={busy} onClick={()=>void disconnect()}>Confirmar desconexão</AppButton></>:
+        <AppButton type="button" className="secondary-button" disabled={busy} onClick={()=>setConfirmId(account?.id||'')}><Unplug size={15}/> Desconectar</AppButton>}
       </div></details>:null}
-    <button className="secondary-button" type="button" aria-label="Atualizar Dropbox"
+    <AppButton className="secondary-button" type="button" aria-label="Atualizar Dropbox"
       disabled={busy||disabled||fileBusy} onClick={()=>void refresh().then(()=>{
        if(viewing)void load(viewing,currentFolder,path,undefined,false,true);
       }).catch(e=>setError(e instanceof Error?e.message:'Falha ao atualizar.'))}>
-      <RefreshCw size={16}/></button>
-    {validAccounts.length>0?<button type="button" className="primary-button" disabled={disabled||busy||!projects.length}
+      <RefreshCw size={16}/></AppButton>
+    {validAccounts.length>0?<AppButton type="button" className="primary-button" disabled={disabled||busy||!projects.length}
       onClick={()=>{
        setPickerProjectId(selectedProjectId&&projects.some(project=>project.id===selectedProjectId)
          ?selectedProjectId:projects.length===1?projects[0].id:0);
        setPickerError('');setResult('');setPicker(true);
-      }}><Plus size={16}/> Vincular pasta</button>:
-      <button className="primary-button" disabled={disabled||busy||!ready} onClick={()=>void start()}><Cloud size={16}/> Conectar Dropbox</button>}
+      }}><Plus size={16}/> Vincular pasta</AppButton>:
+      <AppButton className="primary-button" disabled={disabled||busy||!ready} onClick={()=>void start()}><Cloud size={16}/> Conectar Dropbox</AppButton>}
    </div>
   </header>
   {!ready&&<div className="rl-status" role="status"><LoaderCircle className="rl-spin" size={16}/> Carregando Dropbox…</div>}
@@ -402,9 +403,9 @@ export function DropboxConnectionPanel({projects,selectedProjectId,onLinkedFolde
     <div className="rl-folders-header"><h3>Pastas {selectedProjectId?'do projeto':'dos projetos'}</h3><small>{relevant.length}</small></div>
     <div className="rl-folder-list">
      {relevant.map(link=><div className="rl-folder-entry" key={link.id} data-active={viewing?.id===link.id}>
-      <button type="button" className="rl-folder-button" onClick={()=>void load(link,link.folderId,[{id:link.folderId,name:link.folderName}])}>
+      <AppButton type="button" className="rl-folder-button" onClick={()=>void load(link,link.folderId,[{id:link.folderId,name:link.folderName}])}>
        <FolderOpen size={18}/><span><b>{link.folderName}</b><small>{projects.find(p=>p.id===link.projectId)?.name||'Projeto'}</small></span>
-      </button>
+      </AppButton>
       <FolderActionsMenu name={link.folderName} disabled={busy}
         onOpen={()=>void load(link,link.folderId,[{id:link.folderId,name:link.folderName}])}
         onUnlink={()=>setUnlinkTarget(link)}/>

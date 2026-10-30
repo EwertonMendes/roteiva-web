@@ -1,3 +1,4 @@
+import {AppButton} from "../ui/AppButton";
 import { AppSelect } from "../ui/AppSelect";
 import { useState } from "react";
 import { Check, ChevronDown, FolderOpen, MoreHorizontal, Plus, ShieldCheck } from "lucide-react";
@@ -71,7 +72,7 @@ export function LibraryReviewDemo() {
       <div className="rl-title"><span className="rl-title-icon"><FolderOpen size={20}/></span><div><h2>Arquivos dos projetos</h2><p>Explore as pastas vinculadas ao seu Google Drive.</p></div></div>
       <div className="rl-toolbar-actions">
         <div className="rl-review-account"><ShieldCheck size={16}/> Drive de exemplo <ChevronDown size={14}/></div>
-        <button className="primary-button" type="button" onClick={()=>{setPickerPath([root]);setPicker(true);}}><Plus size={16}/> Vincular pasta</button>
+        <AppButton className="primary-button" type="button" onClick={()=>{setPickerPath([root]);setPicker(true);}}><Plus size={16}/> Vincular pasta</AppButton>
       </div>
     </header>
     <div className="rl-review-project">
@@ -80,18 +81,18 @@ export function LibraryReviewDemo() {
         {projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
       </AppSelect>
     </div>
-    {notice&&<p className="rl-status" role="status"><Check size={16}/>{notice}<button type="button" className="rl-retry" onClick={()=>setNotice("")}>Fechar</button></p>}
+    {notice&&<p className="rl-status" role="status"><Check size={16}/>{notice}<AppButton type="button" className="rl-retry" onClick={()=>setNotice("")}>Fechar</AppButton></p>}
     <div className="rl-explorer" data-mobile-detail={!!active}>
       <aside className="rl-folders" aria-label="Pastas vinculadas">
         <div className="rl-folders-header"><h3>Pastas do projeto</h3><small>{selected.length}</small></div>
         <div className="rl-folder-list">{selected.map(f=><div className="rl-folder-entry" data-active={active===f.id} key={f.id}>
-          <button className="rl-folder-button" type="button" title={f.name} onClick={()=>openFolder(f.id,f.name)}>
+          <AppButton className="rl-folder-button" type="button" title={f.name} onClick={()=>openFolder(f.id,f.name)}>
             <FolderOpen size={18}/><span><b>{f.name}</b><small>{projects.find(p=>p.id===project)?.name}</small></span>
-          </button>
+          </AppButton>
           <details className="rl-menu"><summary aria-label={"Opções da pasta "+f.name}><MoreHorizontal size={17}/></summary>
-            <div className="rl-menu-items"><button type="button" onClick={()=>openFolder(f.id,f.name)}>Abrir pasta</button><button type="button" onClick={()=>setRemoveId(f.id)}>Desvincular do projeto</button></div></details>
+            <div className="rl-menu-items"><AppButton type="button" onClick={()=>openFolder(f.id,f.name)}>Abrir pasta</AppButton><AppButton type="button" onClick={()=>setRemoveId(f.id)}>Desvincular do projeto</AppButton></div></details>
         </div>)}
-        {!selected.length&&<div className="rl-state"><FolderOpen size={27}/><p>Nenhuma pasta vinculada a este projeto.</p><button type="button" className="secondary-button" onClick={()=>setPicker(true)}>Vincular pasta</button></div>}
+        {!selected.length&&<div className="rl-state"><FolderOpen size={27}/><p>Nenhuma pasta vinculada a este projeto.</p><AppButton type="button" className="secondary-button" onClick={()=>setPicker(true)}>Vincular pasta</AppButton></div>}
         </div>
       </aside>
       <DriveFileExplorer folderName={activeFolder?.name} path={path} files={folderContent} loading={false} hasMore={false}
@@ -108,7 +109,7 @@ export function LibraryReviewDemo() {
       onMore={()=>{}} onLink={linkMultiple} onConnect={()=>{}}/>}
     {removeId&&<div className="rl-overlay"><div className="rl-confirm" role="dialog" aria-modal="true" aria-label="Desvincular pasta">
       <h2>Desvincular “{folders.find(f=>f.id===removeId)?.name}”?</h2><p>A pasta não ficará mais vinculada neste exemplo. Nenhum arquivo é apagado.</p>
-      <footer><button type="button" className="secondary-button" onClick={()=>setRemoveId(null)}>Manter pasta</button><button type="button" className="primary-button" onClick={()=>unlink(removeId)}>Desvincular</button></footer>
+      <footer><AppButton type="button" className="secondary-button" onClick={()=>setRemoveId(null)}>Manter pasta</AppButton><AppButton type="button" className="primary-button" onClick={()=>unlink(removeId)}>Desvincular</AppButton></footer>
     </div></div>}
   </section>;
 }

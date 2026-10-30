@@ -1,3 +1,4 @@
+import {AppButton} from "../ui/AppButton";
 import {createContext,useContext,useCallback,useEffect,useRef,useState,type ReactNode} from 'react';
 import {useAuth} from '../auth/AuthProvider';
 import {useDriveApi} from './drive-api';
@@ -94,10 +95,10 @@ function DriveTransfersSession({children}:{children:ReactNode}){
   const authorizationNotice=(uploadGrant||error||result)&&<aside className={authorizationInline?'review-upload-authorization':'rl-upload-authorization'} aria-label="Autorização de envio">
         {error&&<p role="alert">{error}</p>}{result&&<p role="status">{result}</p>}
     {uploadGrant&&<div className="rl-status" role="status"><p>O Google precisa autorizar envios para {uploadGrant.destination.folderName}.</p>
-      <button type="button" className="secondary-button" disabled={busy} onClick={authorizeFolder}>Autorizar pasta no Google</button>
-      <button type="button" className="secondary-button" disabled={busy} onClick={()=>setUploadGrant(null)}>Agora não</button></div>}
+      <AppButton type="button" className="secondary-button" disabled={busy} onClick={authorizeFolder}>Autorizar pasta no Google</AppButton>
+      <AppButton type="button" className="secondary-button" disabled={busy} onClick={()=>setUploadGrant(null)}>Agora não</AppButton></div>}
 
-        {!busy&&<button type="button" className="secondary-button" onClick={()=>{setError('');setResult('');setUploadGrant(null);}}>Fechar aviso</button>}
+        {!busy&&<AppButton type="button" className="secondary-button" onClick={()=>{setError('');setResult('');setUploadGrant(null);}}>Fechar aviso</AppButton>}
       </aside>;
   return <TransfersContext.Provider value={{...uploads,cancelAll,subscribe,authorizationNotice,setAuthorizationInline}}>{children}
     <div className="rl-transfer-layer">

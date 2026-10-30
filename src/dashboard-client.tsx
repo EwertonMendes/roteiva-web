@@ -1,3 +1,6 @@
+import {AppInput} from "./features/ui/AppInput";
+import {AppTextarea} from "./features/ui/AppTextarea";
+import {AppButton} from "./features/ui/AppButton";
 import { AppSelect } from "./features/ui/AppSelect";
 import { MoneyInput } from "./features/ui/MoneyInput";
 import {ProjectDetail} from './features/projects/ProjectDetail';
@@ -511,44 +514,44 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
       <aside className={`sidebar ${mobileOpen ? "mobile-open" : ""}`}>
         <div className="brand-lockup">
           <img src={`${import.meta.env.BASE_URL}${theme === "light" ? "roteiva-logo-black.png" : "roteiva-logo-white.png"}`} alt="Roteiva" />
-          <button className="mobile-close" onClick={() => setMobileOpen(false)} aria-label="Fechar menu"><X size={18} /></button>
+          <AppButton className="mobile-close" onClick={() => setMobileOpen(false)} aria-label="Fechar menu"><X size={18} /></AppButton>
         </div>
         <nav>
           <small className="nav-label">ESPAÇO DE TRABALHO</small>
           {nav.map((item) => {
             const count = item.id === "projects" ? (overviewMetrics?.projectCount ?? projectPage?.total ?? projects.length) : undefined;
-            return <button key={item.id} className={view === item.id ? "active" : ""} onClick={() => changeView(item.id)}>
+            return <AppButton key={item.id} className={view === item.id ? "active" : ""} onClick={() => changeView(item.id)}>
               <AnimatedNavIcon icon={item.icon} hoverIcon={item.hoverIcon} kind={item.id} /><span>{item.label}</span>{count !== undefined && <em>{count}</em>}
-            </button>;
+            </AppButton>;
           })}
-          <button className={view === "calendar" ? "active" : ""} onClick={() => changeView("calendar")}><AnimatedNavIcon icon={CalendarDays} hoverIcon={CalendarCheck2} kind="calendar" /><span>Calendário</span><em>{eventCount ?? calendarEvents.length}</em></button>
-          <button className={view === "library" ? "active" : ""} onClick={() => changeView("library")}><AnimatedNavIcon icon={Grid2X2} hoverIcon={LibraryBig} kind="library" /><span>Biblioteca</span><em>{isDemo?libraryAssets.length:linkedFolderCount??"—"}</em></button>
-          <button className={view === "settings" ? "active" : ""} onClick={() => changeView("settings")}><AnimatedNavIcon icon={Settings2} hoverIcon={UserRound} kind="settings" /><span>Configurações</span></button>
+          <AppButton className={view === "calendar" ? "active" : ""} onClick={() => changeView("calendar")}><AnimatedNavIcon icon={CalendarDays} hoverIcon={CalendarCheck2} kind="calendar" /><span>Calendário</span><em>{eventCount ?? calendarEvents.length}</em></AppButton>
+          <AppButton className={view === "library" ? "active" : ""} onClick={() => changeView("library")}><AnimatedNavIcon icon={Grid2X2} hoverIcon={LibraryBig} kind="library" /><span>Biblioteca</span><em>{isDemo?libraryAssets.length:linkedFolderCount??"—"}</em></AppButton>
+          <AppButton className={view === "settings" ? "active" : ""} onClick={() => changeView("settings")}><AnimatedNavIcon icon={Settings2} hoverIcon={UserRound} kind="settings" /><span>Configurações</span></AppButton>
         </nav>
 
         <div className="sidebar-profile">
           {photoURL ? <img className="profile-photo" src={photoURL} alt="Foto do usuário" referrerPolicy="no-referrer" /> : <span>{firstName.slice(0, 2).toUpperCase()}</span>}<div><b>{firstName}</b><small>{email}</small></div><SidebarAccountMenu key={view} theme={theme} onToggleTheme={toggleTheme} onLogout={onLogout?signOut:undefined}/>
         </div>
       </aside>
-      {mobileOpen && <button className="mobile-scrim" aria-label="Fechar menu" onClick={() => setMobileOpen(false)} />}
+      {mobileOpen && <AppButton className="mobile-scrim" aria-label="Fechar menu" onClick={() => setMobileOpen(false)} />}
       {view === "overview" && activityOpen && <ActivityHistoryDrawer activities={activities} onClose={() => setActivityOpen(false)}/>}
 
       <main className="main">
         <section className="page">
           {isDemo ? <div className="pages-demo-notice" role="note"><b>Modo demonstração</b><span>Explore o Roteiva com dados salvos apenas neste navegador. Entre na sua conta para trabalhar com seus próprios projetos.</span></div> : null}
-          <button type="button" className="menu-button page-menu-button" onClick={() => setMobileOpen(true)} aria-label="Abrir menu" aria-expanded={mobileOpen}><Menu size={20} /></button>
+          <AppButton type="button" className="menu-button page-menu-button" onClick={() => setMobileOpen(true)} aria-label="Abrir menu" aria-expanded={mobileOpen}><Menu size={20} /></AppButton>
           <div className="page-heading">
             <div><span className="eyebrow">ROTEIVA / {view === "overview" ? "PAINEL" : pageTitles[view][0].toUpperCase()}</span><h1>{pageTitles[view][0]}</h1><p>{pageTitles[view][1]}</p></div>
             <div className="heading-actions">
               {view !== "settings" && view !== "library" && <WorkspaceTools workspace={workspace} loadWorkspace={onLoadWorkspace} status={isDemo ? saveStatus : cloudStatus || ""} onNotify={notify} />}
-              {view === "settings" ? null : view === "clients" ? <button className="primary-button" onClick={() => { setEditingClient(null); setClientModalOpen(true); }}><UserRoundPlus size={17} /> Novo cliente</button>
-                : view === "finance" ? <button className="primary-button" onClick={() => openFinanceModal()}><Plus size={17} /> Nova receita</button>
-                : view === "calendar" ? <button className="primary-button" onClick={() => openEvent()}><Plus size={17} /> Novo compromisso</button>
-                : view === "library" ? (isDemo && import.meta.env.VITE_LIBRARY_REVIEW === "true" ? null : <><AppSelect aria-label="Projeto dos arquivos" value={libraryProject} onValueChange={value=> setLibraryProject(value)}><option value="">Todos os projetos</option>{projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</AppSelect><details className="rl-page-more"><summary aria-label="Mais ações da Biblioteca" title="Mais ações da Biblioteca"><MoreHorizontal size={18}/></summary><div className="rl-page-more-content"><WorkspaceTools workspace={workspace} loadWorkspace={onLoadWorkspace} status={isDemo?saveStatus:cloudStatus||""} onNotify={notify}/></div></details>{isDemo && <label className="primary-button upload-button"><Upload size={17} /> {uploading ? "Enviando…" : "Adicionar arquivos"}<input type="file" disabled multiple onChange={(event) => { uploadAssets(event.target.files, Number(libraryProject) || undefined); event.target.value = ""; }} /></label>}</>)
-                : view === "reviews" ? null : <button className="primary-button" onClick={startProject}><Plus size={17} /> Criar projeto</button>}
+              {view === "settings" ? null : view === "clients" ? <AppButton className="primary-button" onClick={() => { setEditingClient(null); setClientModalOpen(true); }}><UserRoundPlus size={17} /> Novo cliente</AppButton>
+                : view === "finance" ? <AppButton className="primary-button" onClick={() => openFinanceModal()}><Plus size={17} /> Nova receita</AppButton>
+                : view === "calendar" ? <AppButton className="primary-button" onClick={() => openEvent()}><Plus size={17} /> Novo compromisso</AppButton>
+                : view === "library" ? (isDemo && import.meta.env.VITE_LIBRARY_REVIEW === "true" ? null : <><AppSelect aria-label="Projeto dos arquivos" value={libraryProject} onValueChange={value=> setLibraryProject(value)}><option value="">Todos os projetos</option>{projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</AppSelect><details className="rl-page-more"><summary aria-label="Mais ações da Biblioteca" title="Mais ações da Biblioteca"><MoreHorizontal size={18}/></summary><div className="rl-page-more-content"><WorkspaceTools workspace={workspace} loadWorkspace={onLoadWorkspace} status={isDemo?saveStatus:cloudStatus||""} onNotify={notify}/></div></details>{isDemo && <label className="primary-button upload-button"><Upload size={17} /> {uploading ? "Enviando…" : "Adicionar arquivos"}<AppInput type="file" disabled multiple onChange={(event) => { uploadAssets(event.target.files, Number(libraryProject) || undefined); event.target.value = ""; }} /></label>}</>)
+                : view === "reviews" ? null : <AppButton className="primary-button" onClick={startProject}><Plus size={17} /> Criar projeto</AppButton>}
             </div>
           </div>
-          {((view === "projects" && !selectedProject) || (view === "clients" && !selectedClient && (clientPage?.total??clientList.length)>=5 || view === "clients" && !selectedClient && !!query.trim())) && <label className="page-search"><Search size={17}/><input aria-label={view === "projects" ? "Buscar projetos" : "Buscar clientes"} value={query} onChange={e => { const value=e.target.value; setQuery(value); if(value.trim()){ if(view === "projects")onSearchProjects?.(); else onSearchClients?.(); } }} placeholder={view === "projects" ? "Buscar projetos" : "Buscar clientes"}/></label>}
+          {((view === "projects" && !selectedProject) || (view === "clients" && !selectedClient && (clientPage?.total??clientList.length)>=5 || view === "clients" && !selectedClient && !!query.trim())) && <label className="page-search"><Search size={17}/><AppInput aria-label={view === "projects" ? "Buscar projetos" : "Buscar clientes"} value={query} onChange={e => { const value=e.target.value; setQuery(value); if(value.trim()){ if(view === "projects")onSearchProjects?.(); else onSearchClients?.(); } }} placeholder={view === "projects" ? "Buscar projetos" : "Buscar clientes"}/></label>}
           {view === "settings" && <SettingsPage profile={profile} email={email} photoURL={photoURL} theme={theme} toggleTheme={toggleTheme} onSaveProfile={onSaveProfile} />}
           {view === "overview" && <TodayStudio clients={clientList} projects={projects} entries={financeEntries} events={calendarEvents} activities={activities} onView={changeView} onOpenActivity={() => setActivityOpen(true)} overviewMetrics={overviewMetrics} />}
           {view === "projects" && (selectedProject && projects.some(p => p.id === selectedProject) ? <ProjectDetail key={selectedProject} project={projects.find(p => p.id === selectedProject)!} clients={clientList} entries={financeEntries} assets={libraryAssets} events={calendarEvents} onSave={updateProject} onBack={() => changeView("projects")} onRevenue={addLinkedRevenue} onEditRevenue={openFinanceModal} onMaterials={()=>{setLibraryProject(String(selectedProject));changeView("library");}} onEditEvent={(event)=>openEvent(event)} onEvent={(p) => { openEvent(null, p.dueDate); }} onReview={()=>{setReviewStart({clientId:projects.find(p=>p.id===selectedProject)?.clientId,projectId:selectedProject||undefined});changeView("reviews");}} /> : <ProjectsView projects={filtered.map(p => ({...p, files: libraryAssets.filter(a => a.projectId === p.id).length}))}
@@ -574,11 +577,11 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
       {modalOpen && (
         <div className="modal-backdrop" onMouseDown={() => setModalOpen(false)}>
           <form className="project-modal" onSubmit={addProject} onMouseDown={(event) => event.stopPropagation()}>
-            <div className="modal-head"><div><span>NOVO PROJETO</span><h2>Comece uma nova produção</h2><p>Defina o essencial agora. A equipe completa os detalhes depois.</p></div><button type="button" onClick={() => setModalOpen(false)}><X size={19} /></button></div>
-            <label>Nome do projeto<input name="name" required autoFocus placeholder="Ex.: Campanha Primavera 2027" /></label>
-            <div className="form-grid"><label>Cliente cadastrado<AppSelect aria-label="Cliente cadastrado" name="clientId"><option value="">Sem cliente vinculado</option>{[...clientList].sort((a,b) => a.name.localeCompare(b.name, "pt-BR")).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</AppSelect></label><label>Prazo<input name="due" type="date" /></label></div>
-            <label>Modelo de produção<AppSelect aria-label="Modelo de produção" name="template">{Object.keys(projectTemplates).map(t => <option key={t}>{t}</option>)}</AppSelect></label><label>Descrição<textarea name="description" placeholder="Objetivo, formatos e contexto da produção…" /></label>
-            <div className="modal-actions"><button type="button" className="secondary-button" onClick={() => setModalOpen(false)}>Cancelar</button><button className="primary-button" type="submit">Criar projeto <ChevronRight size={16} /></button></div>
+            <div className="modal-head"><div><span>NOVO PROJETO</span><h2>Comece uma nova produção</h2><p>Defina o essencial agora. A equipe completa os detalhes depois.</p></div><AppButton type="button" onClick={() => setModalOpen(false)}><X size={19} /></AppButton></div>
+            <label>Nome do projeto<AppInput name="name" required autoFocus placeholder="Ex.: Campanha Primavera 2027" /></label>
+            <div className="form-grid"><label>Cliente cadastrado<AppSelect aria-label="Cliente cadastrado" name="clientId"><option value="">Sem cliente vinculado</option>{[...clientList].sort((a,b) => a.name.localeCompare(b.name, "pt-BR")).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</AppSelect></label><label>Prazo<AppInput name="due" type="date" /></label></div>
+            <label>Modelo de produção<AppSelect aria-label="Modelo de produção" name="template">{Object.keys(projectTemplates).map(t => <option key={t}>{t}</option>)}</AppSelect></label><label>Descrição<AppTextarea name="description" placeholder="Objetivo, formatos e contexto da produção…" /></label>
+            <div className="modal-actions"><AppButton type="button" className="secondary-button" onClick={() => setModalOpen(false)}>Cancelar</AppButton><AppButton className="primary-button" type="submit">Criar projeto <ChevronRight size={16} /></AppButton></div>
           </form>
         </div>
       )}
@@ -587,11 +590,11 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
       {financeModalOpen && (
         <div className="modal-backdrop" onMouseDown={closeFinanceModal}>
           <form key={editingFinanceEntry?.id || "new-revenue"} className="project-modal finance-modal" onSubmit={addFinanceEntry} onMouseDown={(event) => event.stopPropagation()}>
-            <div className="modal-head"><div><span>{editingFinanceEntry ? "EDITAR LANÇAMENTO" : "NOVO LANÇAMENTO"}</span><h2>{editingFinanceEntry ? "Atualize o lançamento" : "Registre uma entrada ou custo"}</h2><p>{editingFinanceEntry ? "Revise os dados e salve para atualizar os indicadores financeiros." : "Escolha a data para registrar a entrada ou o custo no mês correspondente."}</p></div><button type="button" onClick={closeFinanceModal}><X size={19} /></button></div>
-            <label>Tipo de lançamento<AppSelect aria-label="Tipo de lançamento" name="kind" value={financeKind} onValueChange={value=> setFinanceKind(value as "income" | "expense")}><option value="income">Receita</option><option value="expense">Despesa / custo de produção</option></AppSelect></label><label>Projeto vinculado<AppSelect aria-label="Projeto vinculado" name="projectId" defaultValue={editingFinanceEntry?.projectId || selectedProject || ""}><option value="">Sem projeto vinculado</option>{projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</AppSelect></label><label>Trabalho ou projeto <small className="field-hint">Opcional</small><input name="project" autoFocus defaultValue={editingFinanceEntry?.project === "Receita avulsa" ? "" : editingFinanceEntry?.project || ""} placeholder="Ex.: Filme institucional — Corte final" /></label>
+            <div className="modal-head"><div><span>{editingFinanceEntry ? "EDITAR LANÇAMENTO" : "NOVO LANÇAMENTO"}</span><h2>{editingFinanceEntry ? "Atualize o lançamento" : "Registre uma entrada ou custo"}</h2><p>{editingFinanceEntry ? "Revise os dados e salve para atualizar os indicadores financeiros." : "Escolha a data para registrar a entrada ou o custo no mês correspondente."}</p></div><AppButton type="button" onClick={closeFinanceModal}><X size={19} /></AppButton></div>
+            <label>Tipo de lançamento<AppSelect aria-label="Tipo de lançamento" name="kind" value={financeKind} onValueChange={value=> setFinanceKind(value as "income" | "expense")}><option value="income">Receita</option><option value="expense">Despesa / custo de produção</option></AppSelect></label><label>Projeto vinculado<AppSelect aria-label="Projeto vinculado" name="projectId" defaultValue={editingFinanceEntry?.projectId || selectedProject || ""}><option value="">Sem projeto vinculado</option>{projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</AppSelect></label><label>Trabalho ou projeto <small className="field-hint">Opcional</small><AppInput name="project" autoFocus defaultValue={editingFinanceEntry?.project === "Receita avulsa" ? "" : editingFinanceEntry?.project || ""} placeholder="Ex.: Filme institucional — Corte final" /></label>
             <div className="form-grid"><label>Cliente cadastrado<AppSelect aria-label="Cliente cadastrado" name="clientId" defaultValue={editingFinanceEntry?.clientId || projects.find(p => p.id === selectedProject)?.clientId || ""}><option value="">Sem cliente vinculado</option>{[...clientList].sort((a, b) => a.name.localeCompare(b.name, "pt-BR")).map((client) => <option key={client.id} value={client.id}>{client.name} · {client.type}</option>)}</AppSelect><small className="field-hint">{clientList.length ? `${clientList.length} ${clientList.length === 1 ? "cliente disponível" : "clientes disponíveis"}` : "Cadastre clientes para vinculá-los às receitas"}</small></label><label>Valor do trabalho<MoneyInput name="amount" required defaultValue={editingFinanceEntry?.amount} /></label></div>
-            <div className="form-grid"><label>{financeKind === "expense" ? "Vencimento do pagamento" : "Previsão de recebimento"}<input name="date" type="date" defaultValue={editingFinanceEntry ? editingFinanceEntry.date.split("/").reverse().join("-") : ""} /></label><label>Situação<AppSelect aria-label="Situação" name="status" defaultValue={editingFinanceEntry?.status || "A receber"}><option value="Recebido">{financeKind === "expense" ? "Pago" : "Recebido"}</option><option value="A receber">{financeKind === "expense" ? "A pagar" : "A receber"}</option></AppSelect></label></div>
-            <label>Parcelamento<AppSelect aria-label="Parcelamento" name="installments" defaultValue="1" disabled={!!editingFinanceEntry}>{[1,2,3,4,5,6,10,12,24].map(n => <option key={n} value={n}>{n === 1 ? "Pagamento único" : `${n} parcelas mensais (dividir o valor total)`}</option>)}</AppSelect><small className="field-hint">Ao parcelar, o valor informado é dividido entre os meses. Cada parcela pode ser editada depois.</small></label><div className="modal-actions"><button type="button" className="secondary-button" onClick={closeFinanceModal}>Cancelar</button><button className="primary-button" type="submit">{editingFinanceEntry ? "Salvar alterações" : "Adicionar lançamento"} <ArrowUpRight size={16} /></button></div>
+            <div className="form-grid"><label>{financeKind === "expense" ? "Vencimento do pagamento" : "Previsão de recebimento"}<AppInput name="date" type="date" defaultValue={editingFinanceEntry ? editingFinanceEntry.date.split("/").reverse().join("-") : ""} /></label><label>Situação<AppSelect aria-label="Situação" name="status" defaultValue={editingFinanceEntry?.status || "A receber"}><option value="Recebido">{financeKind === "expense" ? "Pago" : "Recebido"}</option><option value="A receber">{financeKind === "expense" ? "A pagar" : "A receber"}</option></AppSelect></label></div>
+            <label>Parcelamento<AppSelect aria-label="Parcelamento" name="installments" defaultValue="1" disabled={!!editingFinanceEntry}>{[1,2,3,4,5,6,10,12,24].map(n => <option key={n} value={n}>{n === 1 ? "Pagamento único" : `${n} parcelas mensais (dividir o valor total)`}</option>)}</AppSelect><small className="field-hint">Ao parcelar, o valor informado é dividido entre os meses. Cada parcela pode ser editada depois.</small></label><div className="modal-actions"><AppButton type="button" className="secondary-button" onClick={closeFinanceModal}>Cancelar</AppButton><AppButton className="primary-button" type="submit">{editingFinanceEntry ? "Salvar alterações" : "Adicionar lançamento"} <ArrowUpRight size={16} /></AppButton></div>
           </form>
         </div>
       )}
@@ -600,31 +603,31 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
           <section className="project-modal delete-revenue-modal" role="dialog" aria-modal="true" aria-labelledby="delete-revenue-title" onMouseDown={(event) => event.stopPropagation()}>
             <span className="delete-revenue-icon"><Trash2 size={22} /></span>
             <div><span className="eyebrow">EXCLUIR LANÇAMENTO</span><h2 id="delete-revenue-title">Remover este lançamento?</h2><p><b>{deletingFinanceEntry.project}</b>, no valor de <b>{formatCurrency(deletingFinanceEntry.amount)}</b>, será removido do financeiro e dos indicadores do mês.</p></div>
-            <div className="modal-actions"><button type="button" className="secondary-button" onClick={() => setDeletingFinanceEntry(null)}>Manter lançamento</button><button type="button" className="danger-button" onClick={deleteFinanceEntry}>Excluir lançamento <Trash2 size={15} /></button></div>
+            <div className="modal-actions"><AppButton type="button" className="secondary-button" onClick={() => setDeletingFinanceEntry(null)}>Manter lançamento</AppButton><AppButton type="button" className="danger-button" onClick={deleteFinanceEntry}>Excluir lançamento <Trash2 size={15} /></AppButton></div>
           </section>
         </div>
       )}
       {eventModalOpen && (
         <div className="modal-backdrop" onMouseDown={() => setEventModalOpen(false)}>
           <form key={editingEvent?.id || eventDate || "new-event"} className="project-modal calendar-event-modal" role="dialog" aria-modal="true" aria-labelledby="event-title" onSubmit={addCalendarEvent} onMouseDown={(event) => event.stopPropagation()}>
-            <div className="modal-head"><div><span>{editingEvent ? "EDITAR COMPROMISSO" : "NOVO COMPROMISSO"}</span><h2 id="event-title">{editingEvent ? "Atualize sua agenda" : "Reserve um horário"}</h2><p>Defina o intervalo de cada trabalho e visualize sua disponibilidade.</p></div><button type="button" onClick={() => setEventModalOpen(false)}><X size={19} /></button></div>
-            <label>Título<input name="title" defaultValue={editingEvent?.title} required autoFocus placeholder="Ex.: Gravação externa — campanha verão" /></label>
-            <label>Data do trabalho<input name="date" type="date" required defaultValue={eventDraft.date} onInput={e=>{const value=e.currentTarget.value;setEventDraft(d=>({...d,date:value}));setEventError("");}} /></label>
-            <div className="form-grid time-range-fields"><label>Horário de início<input name="time" type="time" required defaultValue={eventDraft.time} onInput={e=>{const value=e.currentTarget.value;setEventDraft(d=>({...d,time:value}));setEventError("");}} /></label><label>Horário de término<input name="endTime" type="time" required defaultValue={eventDraft.endTime} onInput={e=>{const value=e.currentTarget.value;setEventDraft(d=>({...d,endTime:value}));setEventError("");}} /></label></div>
+            <div className="modal-head"><div><span>{editingEvent ? "EDITAR COMPROMISSO" : "NOVO COMPROMISSO"}</span><h2 id="event-title">{editingEvent ? "Atualize sua agenda" : "Reserve um horário"}</h2><p>Defina o intervalo de cada trabalho e visualize sua disponibilidade.</p></div><AppButton type="button" onClick={() => setEventModalOpen(false)}><X size={19} /></AppButton></div>
+            <label>Título<AppInput name="title" defaultValue={editingEvent?.title} required autoFocus placeholder="Ex.: Gravação externa — campanha verão" /></label>
+            <label>Data do trabalho<AppInput name="date" type="date" required defaultValue={eventDraft.date} onInput={e=>{const value=e.currentTarget.value;setEventDraft(d=>({...d,date:value}));setEventError("");}} /></label>
+            <div className="form-grid time-range-fields"><label>Horário de início<AppInput name="time" type="time" required defaultValue={eventDraft.time} onInput={e=>{const value=e.currentTarget.value;setEventDraft(d=>({...d,time:value}));setEventError("");}} /></label><label>Horário de término<AppInput name="endTime" type="time" required defaultValue={eventDraft.endTime} onInput={e=>{const value=e.currentTarget.value;setEventDraft(d=>({...d,endTime:value}));setEventError("");}} /></label></div>
             {eventError && <p className="event-form-error" role="alert">{eventError}</p>}
             {validTimeRange(eventDraft.time,eventDraft.endTime) && <div className={`event-availability ${overlappingEvents.length ? "has-overlap" : ""}`} role="status"><Clock3 size={16}/><div><b>{eventDuration(eventDraft)} de duração{overlappingEvents.length ? " · atenção ao horário" : " · horário disponível"}</b><span>{overlappingEvents.length ? `Coincide com: ${overlappingEvents.map(e=>`${e.title} (${eventRange(e)})`).join("; ")}. Você pode salvar se os trabalhos forem simultâneos.` : "Nenhum outro compromisso com duração definida neste intervalo."}</span></div></div>}
-            <div className="form-grid"><label>Tipo<AppSelect aria-label="Tipo" name="type" defaultValue={editingEvent?.type || "Produção"}><option>Produção</option><option>Entrega</option><option>Reunião</option><option>Aprovação</option></AppSelect></label><label>Cliente<input name="client" defaultValue={editingEvent?.client} placeholder="Nome do cliente ou Interno" /></label></div>
+            <div className="form-grid"><label>Tipo<AppSelect aria-label="Tipo" name="type" defaultValue={editingEvent?.type || "Produção"}><option>Produção</option><option>Entrega</option><option>Reunião</option><option>Aprovação</option></AppSelect></label><label>Cliente<AppInput name="client" defaultValue={editingEvent?.client} placeholder="Nome do cliente ou Interno" /></label></div>
             <label>Projeto vinculado<AppSelect aria-label="Projeto vinculado" name="projectId" defaultValue={editingEvent?.projectId || selectedProject || ""}><option value="">Sem projeto</option>{projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</AppSelect></label>
-            <div className="modal-actions"><button type="button" className="secondary-button" onClick={() => setEventModalOpen(false)}>Cancelar</button><button className="primary-button" type="submit">Salvar compromisso <CalendarDays size={16} /></button></div>
+            <div className="modal-actions"><AppButton type="button" className="secondary-button" onClick={() => setEventModalOpen(false)}>Cancelar</AppButton><AppButton className="primary-button" type="submit">Salvar compromisso <CalendarDays size={16} /></AppButton></div>
           </form>
         </div>
       )}
       <nav className="mobile-bottom-nav" aria-label="Navegação no celular">
-        <button className={view === "overview" ? "active" : ""} aria-current={view === "overview" ? "page" : undefined} onClick={()=>changeView("overview")}><LayoutDashboard size={20}/><span>Início</span></button>
-        <button className={view === "projects" ? "active" : ""} aria-current={view === "projects" ? "page" : undefined} onClick={()=>changeView("projects")}><Folder size={20}/><span>Projetos</span></button>
-        <button className={view === "calendar" ? "active" : ""} aria-current={view === "calendar" ? "page" : undefined} onClick={()=>changeView("calendar")}><CalendarDays size={20}/><span>Agenda</span></button>
-        <button className={view === "finance" ? "active" : ""} aria-current={view === "finance" ? "page" : undefined} onClick={()=>changeView("finance")}><WalletCards size={20}/><span>Financeiro</span></button>
-        <button className={["clients","reviews","library"].includes(view) ? "active" : ""} aria-label="Mais opções de navegação" onClick={()=>setMobileOpen(true)}><Menu size={20}/><span>Mais</span></button>
+        <AppButton className={view === "overview" ? "active" : ""} aria-current={view === "overview" ? "page" : undefined} onClick={()=>changeView("overview")}><LayoutDashboard size={20}/><span>Início</span></AppButton>
+        <AppButton className={view === "projects" ? "active" : ""} aria-current={view === "projects" ? "page" : undefined} onClick={()=>changeView("projects")}><Folder size={20}/><span>Projetos</span></AppButton>
+        <AppButton className={view === "calendar" ? "active" : ""} aria-current={view === "calendar" ? "page" : undefined} onClick={()=>changeView("calendar")}><CalendarDays size={20}/><span>Agenda</span></AppButton>
+        <AppButton className={view === "finance" ? "active" : ""} aria-current={view === "finance" ? "page" : undefined} onClick={()=>changeView("finance")}><WalletCards size={20}/><span>Financeiro</span></AppButton>
+        <AppButton className={["clients","reviews","library"].includes(view) ? "active" : ""} aria-label="Mais opções de navegação" onClick={()=>setMobileOpen(true)}><Menu size={20}/><span>Mais</span></AppButton>
       </nav>
       {toast && <div className="toast"><Check size={16} /> {toast}</div>}
     </div>
@@ -635,8 +638,8 @@ function Overview({ projects, setView, onOpenProject }: { projects: Project[]; s
   return <>
     <div className="dashboard-grid">
       <div className="panel projects-panel">
-        <div className="panel-head"><div><span>EM ANDAMENTO</span><h2>Projetos recentes</h2></div><button onClick={() => setView("projects")}>Ver todos <ChevronRight size={15} /></button></div>
-        <div className="project-list">{projects.slice(0, 4).map((project) => <ProjectRow project={project} key={project.id} onOpen={() => onOpenProject(project.id)} />)}{!projects.length && <div className="empty-state compact"><FolderOpen size={27} /><h3>Seu espaço está pronto</h3><p>Crie o primeiro projeto para começar a organizar sua produção.</p><button className="primary-button" onClick={() => setView("projects")}>Começar agora</button></div>}</div>
+        <div className="panel-head"><div><span>EM ANDAMENTO</span><h2>Projetos recentes</h2></div><AppButton onClick={() => setView("projects")}>Ver todos <ChevronRight size={15} /></AppButton></div>
+        <div className="project-list">{projects.slice(0, 4).map((project) => <ProjectRow project={project} key={project.id} onOpen={() => onOpenProject(project.id)} />)}{!projects.length && <div className="empty-state compact"><FolderOpen size={27} /><h3>Seu espaço está pronto</h3><p>Crie o primeiro projeto para começar a organizar sua produção.</p><AppButton className="primary-button" onClick={() => setView("projects")}>Começar agora</AppButton></div>}</div>
       </div>
 
     </div>
@@ -645,11 +648,11 @@ function Overview({ projects, setView, onOpenProject }: { projects: Project[]; s
 }
 
 function ProjectRow({ project, onOpen }: { project: Project; onOpen: () => void }) {
-  return <button className="project-row" onClick={onOpen}>
+  return <AppButton className="project-row" onClick={onOpen}>
     <BrandAvatar initials={project.initials} color={project.color} /><div className="project-name"><b>{project.name}</b><small>{project.client} · {project.files} arquivos</small></div>
     <StatusBadge status={project.status} /><div className="progress-cell"><span><i style={{ width: `${project.progress}%` }} /></span><small>{project.progress}%</small></div>
     <div className="due-cell"><small>Prazo</small><b>{project.due}</b></div><ChevronRight size={16} />
-  </button>;
+  </AppButton>;
 }
 
 function formatCurrency(value: number) {
@@ -686,16 +689,16 @@ function CalendarView({ events, onAdd, onEdit, onDelete, onMonthChange }: { even
 
   return <div className="calendar-layout">
     <section className="panel calendar-panel">
-      <div className="calendar-toolbar"><div><button aria-label="Mês anterior" onClick={() => setCursor(new Date(year, month - 1, 1))}><ChevronLeft size={17} /></button><button aria-label="Próximo mês" onClick={() => setCursor(new Date(year, month + 1, 1))}><ChevronRight size={17} /></button></div><h2>{calendarMonthNames[month]} <span>{year}</span></h2><button className="secondary-button" onClick={() => { const current = new Date(); setCursor(new Date(current.getFullYear(), current.getMonth(), 1)); setSelectedDate(dateKey(current.getFullYear(), current.getMonth(), current.getDate())); }}>Hoje</button></div>
+      <div className="calendar-toolbar"><div><AppButton aria-label="Mês anterior" onClick={() => setCursor(new Date(year, month - 1, 1))}><ChevronLeft size={17} /></AppButton><AppButton aria-label="Próximo mês" onClick={() => setCursor(new Date(year, month + 1, 1))}><ChevronRight size={17} /></AppButton></div><h2>{calendarMonthNames[month]} <span>{year}</span></h2><AppButton className="secondary-button" onClick={() => { const current = new Date(); setCursor(new Date(current.getFullYear(), current.getMonth(), 1)); setSelectedDate(dateKey(current.getFullYear(), current.getMonth(), current.getDate())); }}>Hoje</AppButton></div>
       <div className="calendar-week">{weekNames.map((name) => <span key={name}>{name}</span>)}</div>
       <div className="calendar-grid">{cells.map((cell) => {
         const dayEvents = events.filter((event) => event.date === cell.key);
-        return <button key={cell.key} className={`${cell.current ? "" : "outside"} ${selectedDate === cell.key ? "selected" : ""}`} onClick={() => { setSelectedDate(cell.key); if (!cell.current) setCursor(new Date(`${cell.key}T12:00:00`)); }}><b>{cell.day}</b><div>{dayEvents.slice(0, 2).map((event) => <span className={`event-chip ${event.type.toLowerCase().replace("ã", "a")}`} key={event.id}><i />{event.time}{event.endTime ? `–${event.endTime}` : ""} {event.title}</span>)}{dayEvents.length > 2 && <small>+{dayEvents.length - 2} compromissos</small>}</div></button>;
+        return <AppButton key={cell.key} className={`${cell.current ? "" : "outside"} ${selectedDate === cell.key ? "selected" : ""}`} onClick={() => { setSelectedDate(cell.key); if (!cell.current) setCursor(new Date(`${cell.key}T12:00:00`)); }}><b>{cell.day}</b><div>{dayEvents.slice(0, 2).map((event) => <span className={`event-chip ${event.type.toLowerCase().replace("ã", "a")}`} key={event.id}><i />{event.time}{event.endTime ? `–${event.endTime}` : ""} {event.title}</span>)}{dayEvents.length > 2 && <small>+{dayEvents.length - 2} compromissos</small>}</div></AppButton>;
       })}</div>
     </section>
     <aside className="panel agenda-panel">
-      <div className="panel-head"><div><span>AGENDA DO DIA</span><h2>{new Date(`${selectedDate}T12:00:00`).toLocaleDateString("pt-BR", { day: "2-digit", month: "long" })}</h2></div><button aria-label="Adicionar compromisso neste dia" onClick={() => onAdd(selectedDate)}><Plus size={17} /></button></div>
-      <div className="day-agenda">{selectedEvents.length ? selectedEvents.map((event) => <article key={event.id}><time><b>{event.time}</b><span>{event.endTime || "Sem término"}</span></time><div><i className={event.type.toLowerCase().replace("ã", "a")} /><b>{event.title}</b><small>{event.client} · {event.type}{eventDuration(event) ? ` · ${eventDuration(event)}` : ""}</small>{selectedEvents.some(other=>overlaps(event,other)) && <span className="overlap-label">Horário sobreposto</span>}<span className="revenue-actions"><button aria-label={`Editar ${event.title}`} onClick={() => onEdit(event)}><Pencil size={15}/></button><button aria-label={`Excluir ${event.title}`} onClick={() => onDelete(event)}><Trash2 size={15}/></button></span></div></article>) : <div className="agenda-empty"><CalendarDays size={28} /><b>Dia livre</b><span>Nenhum compromisso nesta data.</span><button onClick={() => onAdd(selectedDate)}>Adicionar compromisso</button></div>}</div>
+      <div className="panel-head"><div><span>AGENDA DO DIA</span><h2>{new Date(`${selectedDate}T12:00:00`).toLocaleDateString("pt-BR", { day: "2-digit", month: "long" })}</h2></div><AppButton aria-label="Adicionar compromisso neste dia" onClick={() => onAdd(selectedDate)}><Plus size={17} /></AppButton></div>
+      <div className="day-agenda">{selectedEvents.length ? selectedEvents.map((event) => <article key={event.id}><time><b>{event.time}</b><span>{event.endTime || "Sem término"}</span></time><div><i className={event.type.toLowerCase().replace("ã", "a")} /><b>{event.title}</b><small>{event.client} · {event.type}{eventDuration(event) ? ` · ${eventDuration(event)}` : ""}</small>{selectedEvents.some(other=>overlaps(event,other)) && <span className="overlap-label">Horário sobreposto</span>}<span className="revenue-actions"><AppButton aria-label={`Editar ${event.title}`} onClick={() => onEdit(event)}><Pencil size={15}/></AppButton><AppButton aria-label={`Excluir ${event.title}`} onClick={() => onDelete(event)}><Trash2 size={15}/></AppButton></span></div></article>) : <div className="agenda-empty"><CalendarDays size={28} /><b>Dia livre</b><span>Nenhum compromisso nesta data.</span><AppButton onClick={() => onAdd(selectedDate)}>Adicionar compromisso</AppButton></div>}</div>
       <div className="upcoming-list"><span>PRÓXIMOS COMPROMISSOS</span>{upcoming.map((event) => <article key={event.id}><div><b>{new Date(`${event.date}T12:00:00`).getDate()}</b><small>{monthLabels[new Date(`${event.date}T12:00:00`).getMonth()]}</small></div><p><b>{event.title}</b><small>{eventRange(event)} · {event.client}</small></p></article>)}</div>
     </aside>
   </div>;
@@ -726,18 +729,18 @@ function LibraryView({ assets, query, onUpload, projects, selectedProjectId, onS
   return <div className="library-layout">
     {!isDemo && (!useEmulators || (import.meta.env.MODE === "emulator" && new URLSearchParams(window.location.search).get("driveE2E") === "1")) && <>
       {dropboxEnabled&&<nav className="storage-providers" aria-label="Provedor de armazenamento" role="tablist">
-        <button type="button" role="tab" aria-selected={provider==='google_drive'} aria-controls="storage-drive-panel"
+        <AppButton type="button" role="tab" aria-selected={provider==='google_drive'} aria-controls="storage-drive-panel"
           className={provider==='google_drive'?'active':''}
           onClick={()=>setProvider('google_drive')}>
           <img src={googleDriveMark} alt="" aria-hidden="true" width="20" height="20"/>
           <span>Google Drive</span>
-        </button>
-        <button type="button" role="tab" aria-selected={provider==='dropbox'} aria-controls="storage-dropbox-panel"
+        </AppButton>
+        <AppButton type="button" role="tab" aria-selected={provider==='dropbox'} aria-controls="storage-dropbox-panel"
           className={provider==='dropbox'?'active':''}
           onClick={()=>setProvider('dropbox')}>
           <img src={dropboxMark} alt="" aria-hidden="true" width="20" height="20"/>
           <span>Dropbox</span>
-        </button>
+        </AppButton>
       </nav>}
       <div id="storage-drive-panel" role="tabpanel" hidden={dropboxEnabled&&provider!=='google_drive'}>
         <DriveConnectionPanel projects={projects} selectedProjectId={selectedProjectId} onSelectProject={onSelectProject}
@@ -751,10 +754,10 @@ function LibraryView({ assets, query, onUpload, projects, selectedProjectId, onS
     {(isDemo || assets.length>0) && <>
     <div className="library-summary"><article><span><HardDrive size={18} /></span><div><small>ARQUIVOS</small><b>{assets.length}</b></div></article><article><span><Film size={18} /></span><div><small>ARMAZENAMENTO</small><b>{totalMb >= 1024 ? `${(totalMb / 1024).toFixed(1)} GB` : `${Math.round(totalMb)} MB`}</b></div></article><article><span><CalendarDays size={18} /></span><div><small>ADICIONADOS ESTE MÊS</small><b>{assets.filter(a => toISOAdded(a.addedAt).slice(0,7) === new Date().toLocaleDateString("en-CA").slice(0,7)).length}</b></div></article></div>
     <section className="panel library-panel">
-      <div className="library-toolbar"><div className="filter-pills">{kinds.map((item) => <button key={item} className={kind === item ? "active" : ""} onClick={() => setKind(item)}>{item}</button>)}</div><div><AppSelect aria-label="Ordenar arquivos" value={sort} onValueChange={value=> setSort(value)}><option value="recent">Mais recentes</option><option value="name">Nome A–Z</option></AppSelect><button className={`view-button ${layout === "grid" ? "active" : ""}`} onClick={() => setLayout("grid")}><Grid2X2 size={16} /></button><button className={`view-button ${layout === "list" ? "active" : ""}`} onClick={() => setLayout("list")}><ListFilter size={16} /></button></div></div>
+      <div className="library-toolbar"><div className="filter-pills">{kinds.map((item) => <AppButton key={item} className={kind === item ? "active" : ""} onClick={() => setKind(item)}>{item}</AppButton>)}</div><div><AppSelect aria-label="Ordenar arquivos" value={sort} onValueChange={value=> setSort(value)}><option value="recent">Mais recentes</option><option value="name">Nome A–Z</option></AppSelect><AppButton className={`view-button ${layout === "grid" ? "active" : ""}`} onClick={() => setLayout("grid")}><Grid2X2 size={16} /></AppButton><AppButton className={`view-button ${layout === "list" ? "active" : ""}`} onClick={() => setLayout("list")}><ListFilter size={16} /></AppButton></div></div>
       <div className={`asset-collection ${layout}`}>{filteredAssets.map((asset) => { const Icon = assetIcon(asset.kind); return <article className="asset-card" key={asset.id}><div className={`asset-preview ${asset.color}`} style={asset.kind === "Imagem" && asset.url ? { backgroundImage: `url(${asset.url})` } : undefined}><Icon size={30} /><span>{asset.kind.toUpperCase()}</span></div><div className="asset-copy"><Icon size={17} /><div><b title={asset.name}>{asset.url ? <a href={asset.url} target="_blank" rel="noreferrer">{asset.name}</a> : asset.name}</b><small>{asset.project} · V{asset.version || 1}</small></div><span>{asset.size}</span><time>{asset.addedAt}</time><span>{asset.url ? <a href={`${asset.url}&download=1`} className="secondary-button" download>Baixar</a> : <small>Reenvie o arquivo</small>}</span></div></article>; })}</div>
       {!filteredAssets.length && <div className="library-empty"><FolderOpen size={34} /><h3>Nenhum arquivo encontrado</h3><p>Altere o filtro ou adicione novos materiais à biblioteca.</p></div>}
-      <label className="library-drop"><Upload size={22} /><b>Clique para enviar arquivos</b><span>Vídeo, áudio, imagens, PDFs e documentos</span><input type="file" multiple onChange={(event) => { onUpload(event.target.files); event.target.value = ""; }} /></label>
+      <label className="library-drop"><Upload size={22} /><b>Clique para enviar arquivos</b><span>Vídeo, áudio, imagens, PDFs e documentos</span><AppInput type="file" multiple onChange={(event) => { onUpload(event.target.files); event.target.value = ""; }} /></label>
     </section>
     </>}
   </div>;

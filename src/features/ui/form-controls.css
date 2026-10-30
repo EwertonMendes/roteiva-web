@@ -6,24 +6,25 @@
  * their outer surface, never on their internal input.
  */
 :root {
-  --field-focus-border: #8f7abb;
-  --field-focus-ring: rgba(115, 92, 176, .16);
-  --focus-outline: #9885c2;
+  --rt-brand-lime: #cfff47;
+  --field-focus-border: #779c0a;
+  --field-focus-ring: rgba(177, 227, 44, .27);
+  --focus-outline: #739600;
 }
 :root[data-theme="dark"] {
-  --field-focus-border: #ae9ad3;
-  --field-focus-ring: rgba(171, 150, 216, .18);
-  --focus-outline: #b7a6d7;
+  --field-focus-border: var(--rt-brand-lime);
+  --field-focus-ring: rgba(207, 255, 71, .20);
+  --focus-outline: var(--rt-brand-lime);
 }
 .review-portal[data-theme="light"] {
-  --field-focus-border: #858cad;
-  --field-focus-ring: rgba(100, 112, 156, .15);
-  --focus-outline: #858cad;
+  --field-focus-border: #779c0a;
+  --field-focus-ring: rgba(177, 227, 44, .27);
+  --focus-outline: #739600;
 }
 .review-portal[data-theme="dark"] {
-  --field-focus-border: #a8b4cb;
-  --field-focus-ring: rgba(168, 180, 203, .17);
-  --focus-outline: #a8b4cb;
+  --field-focus-border: var(--rt-brand-lime);
+  --field-focus-ring: rgba(207, 255, 71, .20);
+  --focus-outline: var(--rt-brand-lime);
 }
 /* Buttons, links, menus and other keyboard targets retain a visible outline. */
 :root :is(button,a,summary,[role="button"]):focus-visible {

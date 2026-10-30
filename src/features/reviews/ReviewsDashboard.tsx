@@ -1,3 +1,6 @@
+import {AppInput} from "../ui/AppInput";
+import {AppTextarea} from "../ui/AppTextarea";
+import {AppButton} from "../ui/AppButton";
 import { AppSelect } from "../ui/AppSelect";
 import {useCallback,useEffect,useMemo,useRef,useState} from "react";
 import {createPortal} from "react-dom";
@@ -351,29 +354,29 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
       </article>)}
     </section>
     <div className="reviews-toolbar">
-      <label className="reviews-search"><Search size={16}/><input aria-label="Buscar aprovações" placeholder="Cliente, projeto ou material" value={search}
+      <label className="reviews-search"><Search size={16}/><AppInput aria-label="Buscar aprovações" placeholder="Cliente, projeto ou material" value={search}
         onChange={e=>{setSearch(e.target.value);setPage(0);}}/></label>
       <AppSelect aria-label="Filtrar aprovações" value={status} onValueChange={value=>{setStatus(value);setPage(0);}}>
         <option value="">Todas as situações</option>
         {(["draft","pending","changes","approved","closed"] as const).map(s=><option key={s} value={s}>{statusText[s]}</option>)}
       </AppSelect>
-      <button className="primary-button" onClick={newReview}><Plus size={16}/> Nova aprovação</button>
+      <AppButton className="primary-button" onClick={newReview}><Plus size={16}/> Nova aprovação</AppButton>
     </div>
-    {error&&<div className="reviews-warning" role="alert">{error}<button aria-label="Dispensar mensagem" onClick={()=>setError("")}><X size={14}/></button></div>}
+    {error&&<div className="reviews-warning" role="alert">{error}<AppButton aria-label="Dispensar mensagem" onClick={()=>setError("")}><X size={14}/></AppButton></div>}
     {loading?<p role="status"><LoaderCircle size={17} className="rl-spin"/> Carregando aprovações…</p>:
       <div className="reviews-list">
         {!rows.length&&<div className="reviews-empty"><ShieldCheck size={32}/><h3>Nenhuma aprovação encontrada</h3><p>Selecione um projeto e envie o primeiro material para revisão.</p></div>}
-        {rows.map(r=><button type="button" className="reviews-list-item" key={r.id} onClick={()=>void openDetail(r.id)}>
+        {rows.map(r=><AppButton type="button" className="reviews-list-item" key={r.id} onClick={()=>void openDetail(r.id)}>
           <span className="reviews-initial">{r.clientName.slice(0,2).toUpperCase()}</span>
           <span className="reviews-list-copy"><strong>{r.title}</strong><small>{r.clientName} · {r.projectName} · V{r.version}</small></span>
           <span className={"reviews-status status-"+r.status}>{statusText[r.status]}</span>
           <ChevronRight size={17}/>
-        </button>)}
+        </AppButton>)}
       </div>}
     {!loading&&(page>0||hasMore)&&<nav className="reviews-pagination" aria-label="Paginação das aprovações">
-      <button type="button" className="secondary-button" disabled={page===0} onClick={()=>setPage(n=>Math.max(0,n-1))}>Anterior</button>
+      <AppButton type="button" className="secondary-button" disabled={page===0} onClick={()=>setPage(n=>Math.max(0,n-1))}>Anterior</AppButton>
       <span aria-live="polite">Página {page+1}</span>
-      <button type="button" className="secondary-button" disabled={!hasMore} onClick={()=>setPage(n=>n+1)}>Próxima</button>
+      <AppButton type="button" className="secondary-button" disabled={!hasMore} onClick={()=>setPage(n=>n+1)}>Próxima</AppButton>
     </nav>}
 
     {opened&&!composer&&createPortal(<div className="review-modal-backdrop" ref={dialogRef} tabIndex={-1} onMouseDown={e=>{if(e.target===e.currentTarget&&!working)setOpened(null);}}>
@@ -397,7 +400,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
         <header><div><span className="eyebrow">APROVAÇÕES / {replacement?"NOVA VERSÃO":"NOVA SOLICITAÇÃO"}</span>
           <h2>{replacement?"Selecione os novos arquivos":"Enviar para aprovação"}</h2>
           <p>{replacement?"Escolha os arquivos da nova versão.":"Configure o acesso e selecione os materiais, sem perder o contexto."}</p></div>
-          <button className="review-icon" disabled={working} onClick={resetComposer} aria-label="Fechar"><X size={20}/></button></header>
+          <AppButton className="review-icon" disabled={working} onClick={resetComposer} aria-label="Fechar"><X size={20}/></AppButton></header>
         {!replacement&&<div className="review-composer-steps" aria-label="Etapas da nova aprovação">
           <span className={"review-composer-step"+(composerStep==="details"?" active":" complete")}>
             <span className="review-step-number">{composerStep==="materials"?<Check size={14}/>:1}</span>
@@ -425,8 +428,8 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
                 setProjectId(Number(value));setFiles([]);setSelectedFolder(null);setTrail([]);setItems([]);
               }}><option value={0}>Selecionar projeto</option>{relevantProjects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</AppSelect></label>
             {!replacement&&<>
-              <label>Título da aprovação<input maxLength={180} required value={title} onChange={e=>setTitle(e.target.value)} placeholder="Ex.: Primeiro corte da campanha"/></label>
-              <label>Mensagem (opcional)<textarea maxLength={1500} rows={2} value={message} onChange={e=>setMessage(e.target.value)} placeholder="O que o cliente deve avaliar?"/></label>
+              <label>Título da aprovação<AppInput maxLength={180} required value={title} onChange={e=>setTitle(e.target.value)} placeholder="Ex.: Primeiro corte da campanha"/></label>
+              <label>Mensagem (opcional)<AppTextarea maxLength={1500} rows={2} value={message} onChange={e=>setMessage(e.target.value)} placeholder="O que o cliente deve avaliar?"/></label>
               <label>Tipo de acesso<AppSelect aria-label="Tipo de acesso" value={mode} onValueChange={value=>{setMode(value as Mode);setShareDirect(false);setRestrictPublic(false);}}>
                 <option value="link">Acesso por link de aprovação</option><option value="google">Acesso restrito com conta Google</option>
               </AppSelect></label>
@@ -435,11 +438,11 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
                   <h3>Participantes Google</h3>
                   <p className="reviews-muted">Somente os e-mails indicados poderão entrar nesta aprovação do Roteiva. Isso não altera a privacidade dos arquivos originais no Google Drive. Separe os e-mails por vírgulas ou linhas diferentes.</p>
                   <label>Revisores · podem comentar, aprovar ou solicitar ajustes
-                    <textarea required rows={3} value={recipient} onChange={e=>setRecipient(e.target.value)}
+                    <AppTextarea required rows={3} value={recipient} onChange={e=>setRecipient(e.target.value)}
                       placeholder={"revisor1@gmail.com\nrevisor2@gmail.com"}/>
                   </label>
                   <label>Leitores · podem visualizar materiais, comentários e decisões
-                    <textarea rows={3} value={viewers} onChange={e=>setViewers(e.target.value)}
+                    <AppTextarea rows={3} value={viewers} onChange={e=>setViewers(e.target.value)}
                       placeholder={"diretoria@gmail.com\nobservador@gmail.com"}/>
                   </label>
                   <p className="reviews-info">A aprovação só fica concluída depois que todos os revisores aprovarem. Um pedido de ajustes devolve a versão ao estúdio. Leitores nunca podem enviar comentários ou decisões.</p>
@@ -452,7 +455,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
                       <strong>Permitir abrir também pelo Google Drive</strong>
                       <small>Em arquivos privados, concede permissão de <b>Leitor</b> aos e-mails quando o Drive autorizar. Se o arquivo já for público, reutiliza o acesso existente sem modificar a pasta. Os papéis de revisor e leitor continuam protegidos no Roteiva.</small>
                     </span>
-                    <input type="checkbox" disabled={files.some(f=>f.provider==='dropbox')} checked={shareDirect}
+                    <AppInput type="checkbox" disabled={files.some(f=>f.provider==='dropbox')} checked={shareDirect}
                       onChange={e=>{setShareDirect(e.target.checked);if(!e.target.checked)setRestrictPublic(false);}}/>
                     <span className="review-sharing-switch" aria-hidden="true"/>
                   </label>
@@ -461,7 +464,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
                       <strong><AlertTriangle size={16} aria-hidden="true"/> Remover acesso público existente no Drive</strong>
                       <small>Remove apenas permissões públicas <b>diretas</b> dos arquivos, quando autorizado pelo Google. <b>Links antigos podem parar de funcionar.</b> Pastas públicas, grupos e domínios permanecem sob controle do proprietário.</small>
                     </span>
-                    <input type="checkbox" checked={restrictPublic} onChange={e=>setRestrictPublic(e.target.checked)}/>
+                    <AppInput type="checkbox" checked={restrictPublic} onChange={e=>setRestrictPublic(e.target.checked)}/>
                     <span className="review-sharing-switch" aria-hidden="true"/>
                   </label>}
                   <p className="review-sharing-footnote">O acesso à aprovação é protegido por conta Google mesmo se o Drive original for público. Para tornar os arquivos originais privados, ajuste também as permissões no Drive.</p>
@@ -479,9 +482,9 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
                <strong>{title}</strong>
                <span>{mode==="google"?"Somente participantes com Google":"Acesso por link"} · {days} dias</span>
              </div>
-             <button type="button" className="secondary-button" onClick={()=>{setComposerStep("details");setError("");composerBodyRef.current?.scrollTo({top:0});}}>
+             <AppButton type="button" className="secondary-button" onClick={()=>{setComposerStep("details");setError("");composerBodyRef.current?.scrollTo({top:0});}}>
                Editar configuração
-             </button>
+             </AppButton>
            </div>}
            <div className="review-materials-heading">
              <h3>Arquivos dos projetos <span>({files.length}/8)</span></h3>
@@ -490,19 +493,19 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
           {!projectId?<p className="reviews-muted">Selecione um projeto para explorar os arquivos vinculados.</p>:
            linksLoading?<p className="reviews-muted" role="status"><LoaderCircle size={16} className="rl-spin"/> Carregando pastas do projeto…</p>:
            !links.length?<div className="reviews-empty"><Folder size={26}/><p>Este projeto ainda não possui pastas vinculadas.</p>
-            <button className="secondary-button" onClick={()=>{resetComposer();onLibrary();}}>Vincular pasta na Biblioteca</button></div>:
+            <AppButton className="secondary-button" onClick={()=>{resetComposer();onLibrary();}}>Vincular pasta na Biblioteca</AppButton></div>:
           <>
-            <div className="review-folder-tabs">{links.map(l=><button type="button" key={l.id} className={selectedFolder?.id===l.id?"active":""}
-              onClick={()=>pickFolder(l)}><Folder size={15}/>{l.folderName} · {l.provider==='dropbox'?'Dropbox':'Drive'}</button>)}</div>
-            {selectedFolder&&<div className="review-breadcrumbs">{trail.map((node,i)=><button key={node.id}
+            <div className="review-folder-tabs">{links.map(l=><AppButton type="button" key={l.id} className={selectedFolder?.id===l.id?"active":""}
+              onClick={()=>pickFolder(l)}><Folder size={15}/>{l.folderName} · {l.provider==='dropbox'?'Dropbox':'Drive'}</AppButton>)}</div>
+            {selectedFolder&&<div className="review-breadcrumbs">{trail.map((node,i)=><AppButton key={node.id}
               onClick={()=>void browse(selectedFolder,node.id,trail.slice(0,i+1))}>
-                {i>0&&<ChevronRight size={12}/>} {node.name}</button>)}</div>}
+                {i>0&&<ChevronRight size={12}/>} {node.name}</AppButton>)}</div>}
             {selectedFolder&&<div className="review-file-tools">
               <label className="review-drive-search"><Search size={16}/>
-                <input type="search" aria-label="Buscar arquivos na pasta"
+                <AppInput type="search" aria-label="Buscar arquivos na pasta"
                   placeholder="Buscar arquivos nesta pasta" value={fileSearch}
                   onChange={e=>setFileSearch(e.target.value)}/>
-                {fileSearch&&<button type="button" aria-label="Limpar busca" onClick={()=>setFileSearch("")}><X size={14}/></button>}
+                {fileSearch&&<AppButton type="button" aria-label="Limpar busca" onClick={()=>setFileSearch("")}><X size={14}/></AppButton>}
               </label>
               <a className="review-drive-external" target="_blank" rel="noopener noreferrer"
                 href={selectedFolder?.provider==='dropbox'?'https://www.dropbox.com/home':
@@ -514,7 +517,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
               onDrop={event=>{if(!Array.from(event.dataTransfer.types).includes("Files"))return;
                 event.preventDefault();uploadNew(Array.from(event.dataTransfer.files));}}>
               <label className="secondary-button">Adicionar arquivos do dispositivo
-                <input type="file" multiple accept="video/*,image/*,audio/*,application/pdf"
+                <AppInput type="file" multiple accept="video/*,image/*,audio/*,application/pdf"
                   onChange={event=>{uploadNew(Array.from(event.target.files||[]));event.target.value="";}}/></label>
               <span>Ou arraste arquivos aqui. Envio direto para o provedor selecionado.</span>
             </div>}
@@ -527,10 +530,10 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
               <span>{entry.name} · {Math.floor(100*entry.sent/entry.size)}%</span>
               {entry.error&&<small role="alert">{entry.error}</small>}
               {["queued","starting","uploading","verifying"].includes(entry.status)?
-                <button type="button" className="secondary-button" disabled={entry.status==="verifying"} onClick={()=>transfers.cancel(entry.id)}>Cancelar envio</button>:
-                <><button type="button" className="secondary-button" disabled={entry.status!=="failed"&&!entry.canVerify&&!entry.canResume}
-                  onClick={()=>transfers.retry(entry.id)}>Tentar novamente</button>
-                <button type="button" className="secondary-button" onClick={()=>transfers.dismiss(entry.id)}>Remover da aprovação</button></>}
+                <AppButton type="button" className="secondary-button" disabled={entry.status==="verifying"} onClick={()=>transfers.cancel(entry.id)}>Cancelar envio</AppButton>:
+                <><AppButton type="button" className="secondary-button" disabled={entry.status!=="failed"&&!entry.canVerify&&!entry.canResume}
+                  onClick={()=>transfers.retry(entry.id)}>Tentar novamente</AppButton>
+                <AppButton type="button" className="secondary-button" onClick={()=>transfers.dismiss(entry.id)}>Remover da aprovação</AppButton></>}
             </div>)}
             {folderError&&<p className="reviews-warning" role="alert">{folderError}</p>}
             <div className="review-files" aria-label="Arquivos disponíveis">
@@ -540,12 +543,12 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
                 <p className="reviews-muted">{fileSearch?"Nenhum arquivo encontrado nesta pasta.":"Esta pasta está vazia."}</p>}
               {displayedItems.map(f=><div className="review-picker-row" key={f.id}>
                 {isStorageFolder(f.mimeType)?
-                  <button type="button" className="review-picker-main" onClick={()=>{
+                  <AppButton type="button" className="review-picker-main" onClick={()=>{
                     if(selectedFolder)void browse(selectedFolder,f.id,[...trail,{id:f.id,name:f.name}]);}}>
                     <Folder size={19}/><span className="review-picker-name">{f.name}<small>Subpasta</small></span><ChevronRight size={16}/>
-                  </button>:
+                  </AppButton>:
                   <label className={"review-picker-main"+(!supported(f)?" unsupported":"")}>
-                    <input type="checkbox" disabled={!supported(f)} aria-label={"Selecionar "+f.name}
+                    <AppInput type="checkbox" disabled={!supported(f)} aria-label={"Selecionar "+f.name}
                       checked={files.some(a=>a.fileId===f.id&&a.connectionId===selectedFolder?.connectionId)} onChange={()=>addFile(f)}/>
                     {selectedFolder&&user&&<DriveThumbnail item={f} scope={user.uid+":"+selectedFolder.connectionId}
                       getThumbnail={getStorageThumbnail}/>}
@@ -561,14 +564,14 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
               </div>)}
             </div>
             {fileSearch.trim().length===1&&<p className="reviews-muted">Digite mais uma letra para pesquisar em todos os itens da pasta, não apenas os carregados.</p>}
-            {(fileSearch.trim().length>=2?(searchActive&&!!remote?.page):!!nextToken)&&selectedFolder&&<button type="button" className="secondary-button"
+            {(fileSearch.trim().length>=2?(searchActive&&!!remote?.page):!!nextToken)&&selectedFolder&&<AppButton type="button" className="secondary-button"
               disabled={folderBusy||searchBusy} onClick={()=>fileSearch.trim().length>=2?
                 void loadMoreSearch():void browse(selectedFolder,activeFolderId,trail,true,nextToken!)}>
-              Carregar mais arquivos</button>}
+              Carregar mais arquivos</AppButton>}
           </>}
           {files.length>0&&<div className="reviews-selected"><h3>Selecionados</h3>
             {files.map(f=><div key={f.fileId}><Check size={14}/><span>{f.name}</span>
-              <button onClick={()=>setFiles(x=>x.filter(a=>a.fileId!==f.fileId))} aria-label={"Remover "+f.name}><X size={15}/></button></div>)}</div>}
+              <AppButton onClick={()=>setFiles(x=>x.filter(a=>a.fileId!==f.fileId))} aria-label={"Remover "+f.name}><X size={15}/></AppButton></div>)}</div>}
           <p className="reviews-muted">Os envios usam a mesma fila segura da Biblioteca. Aguarde a confirmação do provedor antes de compartilhar.</p>
            </>}
          </div>
@@ -583,16 +586,16 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
            </div>
            <div className="review-composer-actions">
              {!replacement&&composerStep==="materials"?
-               <button className="secondary-button" disabled={working} onClick={()=>{setComposerStep("details");setError("");composerBodyRef.current?.scrollTo({top:0});}}>
+               <AppButton className="secondary-button" disabled={working} onClick={()=>{setComposerStep("details");setError("");composerBodyRef.current?.scrollTo({top:0});}}>
                  <ChevronLeft size={16}/> Voltar
-               </button>:
-               <button className="secondary-button" disabled={working} onClick={resetComposer}>Cancelar</button>}
+               </AppButton>:
+               <AppButton className="secondary-button" disabled={working} onClick={resetComposer}>Cancelar</AppButton>}
              {!replacement&&composerStep==="details"?
-               <button className="primary-button" disabled={working} onClick={goToMaterials}>
+               <AppButton className="primary-button" disabled={working} onClick={goToMaterials}>
                  Selecionar materiais <ChevronRight size={16}/>
-               </button>:
-               <button className="primary-button" disabled={working||pendingUploads.length>0||!files.length}
-                 onClick={()=>void submit()}>{working?"Preparando…":replacement?"Enviar nova versão":"Gerar aprovação"} <Send size={16}/></button>}
+               </AppButton>:
+               <AppButton className="primary-button" disabled={working||pendingUploads.length>0||!files.length}
+                 onClick={()=>void submit()}>{working?"Preparando…":replacement?"Enviar nova versão":"Gerar aprovação"} <Send size={16}/></AppButton>}
            </div>
          </footer>
       </section>

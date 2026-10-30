@@ -1,3 +1,4 @@
+import {AppButton} from "../ui/AppButton";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import DashboardClient from "../../dashboard-client";
 import { firebaseServices } from "../../lib/firebase";
@@ -381,16 +382,16 @@ export function FirebaseWorkspace() {
     {remoteChanges && !error && <section className="cloud-recovery" role="status">
       <h2>Há alterações em outro dispositivo</h2>
       <p>Seus dados foram modificados em outra aba ou dispositivo. Atualize para consultar a versão mais recente antes de continuar editando.</p>
-      <button className="primary-button" disabled={saving} onClick={()=>setVersion(v=>v+1)}>Atualizar dados</button>
+      <AppButton className="primary-button" disabled={saving} onClick={()=>setVersion(v=>v+1)}>Atualizar dados</AppButton>
     </section>}
     {syncWarning && !error && <p className="cloud-banner" role="status">{syncWarning}</p>}
     {error && <section className="cloud-recovery" role="alert">
       <h2>Não foi possível confirmar o acesso à nuvem</h2><p>{error}</p>
       {failedWrite
         ? <><p>Essa gravação não foi confirmada. Para evitar duplicações, ela não será repetida automaticamente. Ao recuperar os dados confirmados, alterações locais não salvas serão descartadas.</p>
-            <button className="primary-button" disabled={saving} onClick={()=>setVersion(v=>v+1)}>Recarregar dados da nuvem</button></>
+            <AppButton className="primary-button" disabled={saving} onClick={()=>setVersion(v=>v+1)}>Recarregar dados da nuvem</AppButton></>
         : <p>Entre novamente para continuar. Seus dados já salvos permanecem na sua conta.</p>}
-      <button className="secondary-button" disabled={saving||busy} onClick={()=>void logout()}>Sair da conta</button>
+      <AppButton className="secondary-button" disabled={saving||busy} onClick={()=>void logout()}>Sair da conta</AppButton>
     </section>}
     {!initial && !error && <main className="studio-loading" role="status">Sincronizando seu espaço…</main>}
     {loadingBusiness && !error && <main className="studio-loading" role="status">Carregando os dados do seu espaço…</main>}

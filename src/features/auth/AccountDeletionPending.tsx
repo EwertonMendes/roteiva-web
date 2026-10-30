@@ -1,3 +1,4 @@
+import {AppButton} from "../ui/AppButton";
 import {useEffect,useState} from 'react';
 import {AuthLayout} from './AuthLayout';
 import {useAuth} from './AuthProvider';
@@ -33,6 +34,6 @@ export function AccountDeletionPending(){
       ?'A exclusão está demorando mais que o esperado. Não é necessário repetir o pedido.'
       :unavailable?'Não conseguimos atualizar o andamento agora. Você pode voltar mais tarde para conferir.'
       :'Você não precisa manter esta página aberta. A exclusão é definitiva.'}</p>
-    <button type="button" className="auth-primary" onClick={()=>void logout()} disabled={busy}>Sair da conta</button>
+    <AppButton type="button" className="auth-primary" onClick={()=>void logout()} disabled={busy}>Sair da conta</AppButton>
   </AuthLayout>;
 }
