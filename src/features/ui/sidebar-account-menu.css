@@ -4,7 +4,6 @@
 .sidebar-account-popover button:hover { background:var(--subtle); }
 .app-shell .sidebar-account-popover button svg { color:var(--muted); flex-shrink:0; }
 .sidebar-account-divider { height:1px; margin:5px 7px; background:var(--line); }
-.sidebar-account-menu button:focus-visible { outline:2px solid var(--ink); outline-offset:2px; }
 
 :root[data-theme="dark"] .sidebar-account-popover { background:#242426; border-color:#48484c; box-shadow:0 16px 44px #0009,0 2px 8px #0006; }
 :root[data-theme="dark"] .sidebar-account-popover button:hover { background:#343438; }

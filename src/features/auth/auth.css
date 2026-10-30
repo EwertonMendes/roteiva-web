@@ -94,14 +94,12 @@
 .auth-field em {font-size: var(--type-support);font-style:normal;color:var(--muted);font-weight:400;margin-left:5px;}
 .auth-field input {width:100%;min-height:50px;background:var(--card);border:1px solid var(--line);color:var(--ink);border-radius:11px;padding:12px 15px;font-size: var(--type-support);outline:none;transition:border-color .16s ease,box-shadow .16s ease;}
 .auth-field input::placeholder {color:#96998f;}
-.auth-field input:focus-visible {border-color:var(--ink);box-shadow:0 0 0 3px #cfff4740;}
 .auth-type-field {border:0;margin:0;padding:0;min-width:0;}
 .auth-type-field legend {margin-bottom:12px;}
 .auth-type-grid {display:grid;grid-template-columns:1fr 1fr;gap:9px;}
 .auth-type-option {position:relative;display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0;cursor:pointer;border:1px solid var(--line);border-radius:12px;background:var(--card);padding:14px;transition:border-color .16s ease,background .16s ease;}
 .auth-type-option.selected {border-color:color-mix(in srgb,var(--ink) 75%,transparent);background:color-mix(in srgb,var(--card) 88%,#d5e7ad);}
 .auth-type-option input {position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer;}
-.auth-type-option:focus-within {outline:2px solid var(--ink);outline-offset:2px;}
 .auth-type-option>span:nth-child(2) {display:flex;flex-direction:column;gap:5px;min-width:0;}
 .auth-type-option strong {font-size: var(--type-support);font-weight:700;}
 .auth-type-option small {font-size: var(--type-support);line-height:1.4;color:var(--muted);}
@@ -116,7 +114,6 @@
 .auth-data-note p {color:var(--muted);line-height:1.7;font-size: var(--type-support);margin:12px 0 0;}
 .register-form .auth-primary {margin-top:4px;}
 .register-form .auth-link {align-self:center;margin-top:0;}
-.auth-content :is(button,input,summary):focus-visible {outline:2px solid var(--ink);outline-offset:3px;}
 .profile-photo{width:36px;height:36px;border-radius:50%;object-fit:cover}
 .cloud-banner{display:flex;gap:16px;align-items:center;padding:12px 16px;border:1px solid var(--line,#ddd);border-radius:12px;margin-bottom:20px;font-size: var(--type-support)}
 .cloud-recovery{position:fixed;z-index:2000;inset:0;background:var(--paper,#fff);padding:clamp(24px,7vw,96px);display:flex;flex-direction:column;justify-content:center;gap:20px}

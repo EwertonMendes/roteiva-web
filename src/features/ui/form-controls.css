@@ -1,0 +1,130 @@
+/*
+ * Global focus contract.
+ * A single subtle, WCAG-visible focus appearance in light/dark modes.
+ * Inputs have one ring (border + shadow); keyboard-only actions have an outline.
+ * Composite inputs (MoneyInput, search and custom selects) expose one ring on
+ * their outer surface, never on their internal input.
+ */
+:root {
+  --field-focus-border: #8f7abb;
+  --field-focus-ring: rgba(115, 92, 176, .16);
+  --focus-outline: #9885c2;
+}
+:root[data-theme="dark"] {
+  --field-focus-border: #ae9ad3;
+  --field-focus-ring: rgba(171, 150, 216, .18);
+  --focus-outline: #b7a6d7;
+}
+.review-portal[data-theme="light"] {
+  --field-focus-border: #858cad;
+  --field-focus-ring: rgba(100, 112, 156, .15);
+  --focus-outline: #858cad;
+}
+.review-portal[data-theme="dark"] {
+  --field-focus-border: #a8b4cb;
+  --field-focus-ring: rgba(168, 180, 203, .17);
+  --focus-outline: #a8b4cb;
+}
+/* Buttons, links, menus and other keyboard targets retain a visible outline. */
+:root :is(button,a,summary,[role="button"]):focus-visible {
+  outline: 2px solid var(--focus-outline);
+  outline-offset: 2px;
+}
+/* Standard text, date, numeric, e-mail and multiline fields. */
+:root :where(input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="file"]):not([type="range"]),textarea,select):focus {
+  outline: none;
+  border-color: var(--field-focus-border);
+  box-shadow: 0 0 0 3px var(--field-focus-ring);
+}
+/* A native input hidden inside a composite control never gets its own ring. */
+:root :is(.money-input,.page-search,.review-drive-search,.pc-image-search,.reviews-search,.rl-search,.rowner-gallery-search,.review-time-input,.review-video-time-field) input:focus {
+  outline: none;
+  border-color: transparent;
+  box-shadow: none;
+}
+/* Composite inputs expose exactly one border and a soft halo. */
+:root :is(.money-input,.page-search,.review-drive-search,.pc-image-search,.reviews-search,.rl-search,.rowner-gallery-search,.review-time-input):focus-within {
+  border-color: var(--field-focus-border);
+  box-shadow: 0 0 0 3px var(--field-focus-ring);
+  outline: none;
+}
+/* One focus style for every native-looking custom select. */
+:root .rt-select .rt-select-trigger:focus-visible,
+:root .rt-select[data-open] .rt-select-trigger {
+  outline: none;
+  border-color: var(--field-focus-border);
+  box-shadow: 0 0 0 3px var(--field-focus-ring);
+}
+/* Radio / checkbox cards show focus on their visible selection surface. */
+:root :is(.cd-form-types,.client-type-field) input:focus-visible + span,
+:root .auth-type-option:focus-within,
+:root .review-fields .review-participants-config label.review-sharing-option:focus-within,
+:root .review-upload-zone label:focus-within,
+:root .project-detail .pd-task input:focus-visible + .pd-check {
+  outline: 2px solid var(--focus-outline);
+  outline-offset: 2px;
+}
+/* Accessible BRL field, visually identical to other fields in each form. */
+.money-input {
+  --money-field-height: 44px;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  align-items: stretch;
+  width: 100%;
+  min-width: 0;
+  height: var(--money-field-height);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--subtle);
+  color: var(--ink);
+  transition: border-color .16s ease, box-shadow .16s ease;
+}
+.cd-form-fields .money-input {
+  --money-field-height: 49px;
+  border-radius: 12px;
+}
+.money-input > span {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  border-right: 1px solid var(--line);
+  color: var(--muted);
+  background: transparent;
+  font-size: var(--type-support);
+  font-weight: 500;
+  user-select: none;
+}
+/* Deliberately beat inherited form selectors that re-add a second border,
+ * opaque fill and independent focus shadow to the nested input. */
+:root .project-modal .money-input > input,
+:root .cd-form-fields .money-input > input {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  min-height: 0;
+  padding: 0 12px;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
+  box-shadow: none;
+  outline: none;
+  text-align: left;
+  font-family: inherit;
+  font-size: var(--type-body);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+:root .cd-form-fields .money-input > input { font-size: var(--type-support); }
+:root .project-modal .money-input > input:focus,
+:root .cd-form-fields .money-input > input:focus {
+  border: 0;
+  outline: none;
+  box-shadow: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .money-input { transition: none; }
+}

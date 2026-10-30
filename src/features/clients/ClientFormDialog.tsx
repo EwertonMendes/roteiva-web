@@ -2,6 +2,7 @@ import {useEffect,useRef,useState,type FormEvent} from "react";
 import {Building2,ChevronRight,ReceiptText,X} from "lucide-react";
 import type {Client,ClientType} from "../../domain/workspace";
 import {BrazilPhoneInput} from "../ui/BrazilPhoneInput";
+import {MoneyInput} from "../ui/MoneyInput";
 
 type Props={client:Client|null;onClose:()=>void;onSubmit:(event:FormEvent<HTMLFormElement>)=>void};
 export function ClientFormDialog({client,onClose,onSubmit}:Props){
@@ -39,7 +40,7 @@ export function ClientFormDialog({client,onClose,onSubmit}:Props){
       {type==="Recorrente"&&<div className="cd-form-recurring">
         <label>Pacote mensal (opcional)<input name="packageTitle" maxLength={500} defaultValue={client?.packageTitle} placeholder="Ex.: Conteúdo para redes sociais"/></label>
         <div className="cd-form-grid"><label>Entregas por mês<input name="monthlyDeliverables" type="number" min="0" max="100" step="1" defaultValue={client?.monthlyDeliverables||""} placeholder="0"/></label>
-          <label>Valor mensal combinado<input name="monthlyFee" inputMode="decimal" defaultValue={client?.monthlyFee?client.monthlyFee.toFixed(2).replace(".",","):""} placeholder="0,00"/></label></div>
+          <label>Valor mensal combinado<MoneyInput name="monthlyFee" defaultValue={client?.monthlyFee}/></label></div>
        </div>}
      </div>
      <footer className="cd-form-actions"><button type="button" className="secondary-button" onClick={onClose}>Cancelar</button>
