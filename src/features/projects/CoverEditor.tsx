@@ -36,6 +36,12 @@ export function CoverEditor({project,client,onClose,onSave}:{project?:Project;cl
  const [page,setPage]=useState<Page>({files:[],nextPageToken:null});const [busy,setBusy]=useState(true),[error,setError]=useState('');
  const [moreToken,setMoreToken]=useState('');const [retry,setRetry]=useState(0);const {src,error:imageError}=useCoverImage(cover);
  const storedConnectionAvailable=!cover||choices.some(c=>c.id===cover.connectionId&&c.provider===(cover.provider||'google_drive'));
+ // When the account that owns an existing cover is disconnected, open the
+ // picker for a replacement instead of trapping the editor on an unavailable
+ // crop. Keep the saved cover intact until the user explicitly saves a new one.
+ useEffect(()=>{
+   if(!context.loadingConnections&&stored&&!storedConnectionAvailable)setChoosing(true);
+ },[context.loadingConnections,stored?.connectionId,stored?.provider,storedConnectionAvailable]);
  const currentAccount=choices.find(c=>c.id===account);
  const provider=currentAccount?.provider||'google_drive';
  const canRead=provider==='dropbox'||currentAccount?.scopes.split(' ').includes('https://www.googleapis.com/auth/drive.readonly');
