@@ -28,7 +28,7 @@
 .project-detail .pd-task label > span:last-child { overflow-wrap:anywhere; }
 .project-detail .pd-task input { position:absolute; opacity:0; width:26px; height:26px; margin:0; }
 .project-detail .pd-check { width:26px; height:26px; border:2px solid var(--muted); border-radius:50%; display:grid; place-items:center; flex-shrink:0; }
-.project-detail .pd-task input:focus-visible + .pd-check { outline:2px solid var(--ink); outline-offset:4px; }
+
 .project-detail .pd-task[data-done="true"] label { color:var(--pd-success); font-weight:500; }
 .project-detail .pd-task[data-done="true"] .pd-check { background:var(--pd-success); border-color:var(--pd-success); color:var(--paper); }
 .project-detail .pd-remove { display:grid; place-items:center; background:transparent; border:0; border-radius:9px; color:var(--muted); cursor:pointer; width:40px; min-height:44px; flex-shrink:0; }
