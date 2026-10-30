@@ -51,6 +51,57 @@ async function prepare(page:Page,email:string){
   return {projectId,clientId};
 }
 
+test('Sala de aprovação keeps mockup status cards and hides pagination until 16 results',async({page,context},info)=>{
+  await prepare(page,'reviews-overview-'+info.project.name+'@example.com');
+  const records=Array.from({length:16},(_,index)=>({
+    id:'review-page-'+index,clientId:7,projectId:17,clientName:'Cliente QA',
+    projectName:'Projeto QA',studioName:'Estúdio QA',title:'Material '+String(index+1),
+    message:'',recipientEmail:'',mode:'link',status:index%2?'approved':'pending',
+    version:1,expiresAt:Date.now()+86400000,createdAt:Date.now(),updatedAt:Date.now()
+  }));
+  let total=15;
+  await context.route(api+'/**',route=>{
+    const url=new URL(route.request().url());
+    if(url.pathname!=='/reviews'||route.request().method()!=='GET')return route.fallback();
+    const pageNumber=Number(url.searchParams.get('page')||0);
+    const current=records.slice(0,total);
+    return route.fulfill({status:200,
+      headers:{'Access-Control-Allow-Origin':root,'Cache-Control':'no-store'},
+      contentType:'application/json',
+      body:JSON.stringify({reviews:current.slice(pageNumber*15,(pageNumber+1)*15),
+        hasMore:(pageNumber+1)*15<total,
+        summary:{pending:Math.ceil(total/2),changes:0,approved:Math.floor(total/2)}})});
+  });
+  await page.goto(root+'/aprovacoes');
+  await expect(page.getByRole('heading',{name:'Sala de aprovação'})).toBeVisible();
+  const overview=page.getByRole('region',{name:'Resumo das aprovações'});
+  await expect(overview.locator('.reviews-stat')).toHaveCount(3);
+  await expect(overview.getByText('Aguardando cliente',{exact:true})).toBeVisible();
+  await expect(overview.getByText('Ajustes solicitados',{exact:true})).toBeVisible();
+  await expect(overview.getByText('Aprovado',{exact:true})).toBeVisible();
+  await expect(overview.locator('.reviews-stat-dot.status-pending')).toHaveCSS('background-color','rgb(255, 191, 54)');
+  await expect(overview.locator('.reviews-stat-dot.status-changes')).toHaveCSS('background-color','rgb(136, 100, 246)');
+  await expect(overview.locator('.reviews-stat-dot.status-approved')).toHaveCSS('background-color','rgb(79, 214, 109)');
+  await expect(overview.locator('.reviews-stat').first().locator('strong')).toHaveText('8');
+  await expect(page.getByRole('navigation',{name:'Paginação das aprovações'})).toHaveCount(0);
+  const bounds=await overview.locator('.reviews-stat').first().boundingBox();
+  expect(bounds).toBeTruthy();
+  expect(bounds!.height).toBeGreaterThanOrEqual(info.project.name==='mobile'?100:140);
+  if(info.project.name==='mobile'){
+    const next=await overview.locator('.reviews-stat').nth(1).boundingBox();
+    expect(next).toBeTruthy();expect(next!.y).toBeGreaterThan(bounds!.y);
+  }
+  total=16;
+  await page.reload();
+  const pagination=page.getByRole('navigation',{name:'Paginação das aprovações'});
+  await expect(pagination).toBeVisible();
+  await expect(overview.locator('.reviews-stat').first().locator('strong')).toHaveText('8');
+  await pagination.getByRole('button',{name:'Próxima'}).click();
+  await expect(pagination).toContainText('Página 2');
+  await expect(page.getByRole('button',{name:/Material 16/})).toBeVisible();
+  await expect(pagination.getByRole('button',{name:'Próxima'})).toBeDisabled();
+});
+
 test('profissional cria, cliente comenta/pede ajustes, V2 aprovada e encerramento bloqueia link',async({page,context},info)=>{
   const {projectId,clientId}=await prepare(page,'reviews-cycle-'+info.project.name+'@example.com');
   const review={id:'review-e2e',clientId,projectId,clientName:'Cliente Revisão',projectName:'Projeto Revisão',
@@ -145,7 +196,9 @@ test('profissional cria, cliente comenta/pede ajustes, V2 aprovada e encerrament
       const all=[...([file,second].map(f=>({...f,id:f.fileId}))),...(uploadConfirmed?[uploaded]:[])];
       return json({files:term?all.filter(f=>f.name.toLowerCase().includes(term.toLowerCase())):all,nextPageToken:null});
     }
-    if(path==='/reviews'&&req.method()==='GET')return json({reviews:created?[review]:[],hasMore:false});
+    if(path==='/reviews'&&req.method()==='GET')return json({reviews:created?[review]:[],hasMore:false,
+      summary:{pending:created&&review.status==='pending'?1:0,changes:created&&review.status==='changes'?1:0,
+        approved:created&&review.status==='approved'?1:0}});
     if(path==='/reviews'&&req.method()==='POST'){
       const body=req.postDataJSON();expect(body.clientId).toBe(clientId);expect(body.projectId).toBe(projectId);
       expect(uploadConfirmed).toBe(true);
@@ -317,7 +370,7 @@ test('galeria de aprovação mantém miniaturas e filtros rápidos com mais de 2
     if(path.endsWith('/metadata'))return route.fulfill({status:200,headers,contentType:'application/json',
       body:JSON.stringify({file:{parents:[folder]}})});
     if(path==='/reviews')return route.fulfill({status:200,headers,contentType:'application/json',
-      body:JSON.stringify({reviews:[data.review],hasMore:false})});
+      body:JSON.stringify({reviews:[data.review],hasMore:false,summary:{pending:1,changes:0,approved:0}})});
     if(path==='/reviews/review-many')return route.fulfill({status:200,headers,contentType:'application/json',
       body:JSON.stringify(data)});
     return route.fallback();

@@ -282,13 +282,23 @@ async function createReview(request:Request,env:Env,uid:string):Promise<Response
     created_at:ts,updated_at:ts
   }),url:reviewLink(secret)}},{status:201});
 }
+const REVIEW_PAGE_SIZE=15;
 async function ownerList(env:Env,uid:string,url:URL):Promise<Response>{
   const search=inputText(url.searchParams.get('q')||'',80).toLowerCase();
   const condition=['draft','pending','changes','approved','closed'].includes(url.searchParams.get('status')||'')
     ?url.searchParams.get('status')!:'';
-  const rows=await env.DB.prepare("SELECT * FROM review_requests WHERE owner_uid=? AND (LOWER(client_name) LIKE ? OR LOWER(project_name) LIKE ? OR LOWER(title) LIKE ?) AND (?='' OR status=?) ORDER BY updated_at DESC LIMIT 25 OFFSET ?")
-    .bind(uid,'%'+search+'%','%'+search+'%','%'+search+'%',condition,condition,pages(url.searchParams)*25).all<Review>();
-  return Response.json({reviews:rows.results.map(showReview),hasMore:rows.results.length===25});
+  // Fetch one extra entry to distinguish a full final page from a page with more results.
+  // The summary is owner-scoped and intentionally independent of list search/filters.
+  const [list,counts]=await Promise.all([
+    env.DB.prepare("SELECT * FROM review_requests WHERE owner_uid=? AND (LOWER(client_name) LIKE ? OR LOWER(project_name) LIKE ? OR LOWER(title) LIKE ?) AND (?='' OR status=?) ORDER BY updated_at DESC, id DESC LIMIT ? OFFSET ?")
+      .bind(uid,'%'+search+'%','%'+search+'%','%'+search+'%',condition,condition,REVIEW_PAGE_SIZE+1,pages(url.searchParams)*REVIEW_PAGE_SIZE).all<Review>(),
+    env.DB.prepare("SELECT status, COUNT(*) AS total FROM review_requests WHERE owner_uid=? AND status IN ('pending','changes','approved') GROUP BY status")
+      .bind(uid).all<{status:'pending'|'changes'|'approved';total:number}>()
+  ]);
+  const summary={pending:0,changes:0,approved:0};
+  for(const row of counts.results)summary[row.status]=row.total;
+  return Response.json({reviews:list.results.slice(0,REVIEW_PAGE_SIZE).map(showReview),
+    hasMore:list.results.length>REVIEW_PAGE_SIZE,summary});
 }
 function permissionUrl(fileId:string,permissionId?:string):URL {
   const u=new URL('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(fileId)+'/permissions'+

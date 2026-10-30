@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { ArrowRight } from "lucide-react";
 import { FirestoreWorkspace, dataErrorMessage, type RoteivaProfile, type ProfileChanges } from "../../data/firestore-workspace";
 import { firebaseServices } from "../../lib/firebase";
+import { retryFirestoreRead } from "../../data/firestore-recovery";
 import { useAuth } from "./AuthProvider";
 import { AuthLayout } from "./AuthLayout";
 import { RegistrationPage, type RegistrationValues } from "./RegistrationPage";
@@ -30,8 +31,11 @@ export function RegistrationGate({children}: {children: ReactNode}) {
     let active=true;
     setStatus("checking");
     setError("");
-    repository.loadProfile()
-      .then(async result=>{
+    // A temporary Firestore outage must not be confused with a missing profile.
+    // Retry server-only reads (never registration writes), bounded and cancellable.
+    retryFirestoreRead(()=>repository.loadProfile(),{
+      attempts:4,delaysMs:[300,900,2000],isCurrent:()=>active
+    }).then(async result=>{
         // The profile is removed before Auth. A durable job still closes the
         // workspace while the final identity step is being retried.
         const deleting=result?.deletionState==='deleting'||(!result&&(await fetchAccountDeletionStatus()).operation!==null);

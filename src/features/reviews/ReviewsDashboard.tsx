@@ -23,6 +23,9 @@ type Selection={fileId:string;connectionId:string;linkedFolderId:string;name:str
 const supported=(file:DriveItem)=>/^(video|image|audio)\//.test(file.mimeType)||file.mimeType==="application/pdf";
 const splitEmails=(raw:string)=>raw.split(/[\n,;]+/).map(v=>v.trim().toLowerCase()).filter(Boolean);
 const validEmail=(value:string)=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+type ReviewSummary={pending:number;changes:number;approved:number};
+type ReviewListResult={reviews:Review[];hasMore:boolean;summary:ReviewSummary};
+const summaryStatuses=['pending','changes','approved'] as const;
 export function ReviewsDashboard({clients,projects,studioName,onLibrary,startProjectId,startClientId}:{
   clients:Client[];projects:Project[];studioName:string;onLibrary:()=>void;startProjectId?:number;startClientId?:number
 }){
@@ -32,6 +35,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
   const [search,setSearch]=useState(""),[debouncedSearch,setDebouncedSearch]=useState("");
   const [status,setStatus]=useState(""),[page,setPage]=useState(0);
   const [hasMore,setHasMore]=useState(false),[refresh,setRefresh]=useState(0);
+  const [summary,setSummary]=useState<ReviewSummary>({pending:0,changes:0,approved:0});
   const [loading,setLoading]=useState(true),[working,setWorking]=useState(false),[error,setError]=useState("");
   const [opened,setOpened]=useState<Detail|null>(null);
   const [composer,setComposer]=useState(false),[replacement,setReplacement]=useState<string|null>(null);
@@ -80,8 +84,8 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
     const sequence=++listSequence.current;
     setLoading(true);
     try{
-      const result=await call<{reviews:Review[];hasMore:boolean}>("/reviews?"+new URLSearchParams({page:String(page),q:debouncedSearch,status}),"GET",undefined,signal);
-      if(sequence===listSequence.current){setRows(result.reviews);setHasMore(result.hasMore);}
+      const result=await call<ReviewListResult>("/reviews?"+new URLSearchParams({page:String(page),q:debouncedSearch,status}),"GET",undefined,signal);
+      if(sequence===listSequence.current){setRows(result.reviews);setHasMore(result.hasMore);setSummary(result.summary);}
     }catch(e){if(!signal?.aborted&&sequence===listSequence.current)setError(e instanceof Error?e.message:"Não foi possível carregar as aprovações.");}
     finally{if(!signal?.aborted&&sequence===listSequence.current)setLoading(false);}
   },[call,page,refresh,debouncedSearch,status]);
@@ -337,11 +341,15 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
         provider:selectedFolder.provider,connectionId:selectedFolder.connectionId,linkedFolderId:selectedFolder.folderId}]);
   };
   return <div className="reviews-panel">
-    <div className="reviews-summary">
-      {(["pending","changes","approved"] as const).map(s=><div key={s} className="reviews-stat">
-        <span>{statusText[s]} na página</span><strong>{rows.filter(r=>r.status===s).length}</strong>
-      </div>)}
-    </div>
+    <section className="reviews-summary" aria-label="Resumo das aprovações">
+      {summaryStatuses.map(s=><article key={s} className="reviews-stat">
+        <div className="reviews-stat-heading">
+          <span className={`reviews-stat-dot status-${s}`} aria-hidden="true"/>
+          <span>{statusText[s]}</span>
+        </div>
+        <strong>{summary[s]}</strong>
+      </article>)}
+    </section>
     <div className="reviews-toolbar">
       <label className="reviews-search"><Search size={16}/><input aria-label="Buscar aprovações" placeholder="Cliente, projeto ou material" value={search}
         onChange={e=>{setSearch(e.target.value);setPage(0);}}/></label>
@@ -362,11 +370,11 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
           <ChevronRight size={17}/>
         </button>)}
       </div>}
-    <div className="reviews-pagination">
-      <button className="secondary-button" disabled={page===0||loading} onClick={()=>setPage(n=>n-1)}>Anterior</button>
-      <span>Página {page+1}</span>
-      <button className="secondary-button" disabled={!hasMore||loading} onClick={()=>setPage(n=>n+1)}>Próxima</button>
-    </div>
+    {!loading&&(page>0||hasMore)&&<nav className="reviews-pagination" aria-label="Paginação das aprovações">
+      <button type="button" className="secondary-button" disabled={page===0} onClick={()=>setPage(n=>Math.max(0,n-1))}>Anterior</button>
+      <span aria-live="polite">Página {page+1}</span>
+      <button type="button" className="secondary-button" disabled={!hasMore} onClick={()=>setPage(n=>n+1)}>Próxima</button>
+    </nav>}
 
     {opened&&!composer&&createPortal(<div className="review-modal-backdrop" ref={dialogRef} tabIndex={-1} onMouseDown={e=>{if(e.target===e.currentTarget&&!working)setOpened(null);}}>
       <section role="dialog" aria-modal="true" aria-label="Detalhes da revisão" className="review-dialog rowner-dialog">
