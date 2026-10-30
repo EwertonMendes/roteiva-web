@@ -1,3 +1,4 @@
+import {AppButton} from "../ui/AppButton";
 import {useEffect,useRef,useState} from "react";
 import {Building2,Camera,ChevronDown,ChevronRight,Pencil,ReceiptText,UserRoundPlus,UsersRound} from "lucide-react";
 import type {Client,ClientPhoto} from "../../domain/workspace";
@@ -44,14 +45,14 @@ function ClientDirectoryContent({clients,onOpen,onAdd,onSavePhoto,totalCount,rec
    </div>
    <header className="cd-toolbar">
     <div><h2>Carteira de clientes</h2><p>{total>clients.length?`${clients.length} de ${total} carregados · `:""}Classifique cada relacionamento para entender melhor sua receita.</p></div>
-    <button type="button" className="secondary-button" onClick={onAdd}><UserRoundPlus size={18}/>Adicionar cliente</button>
+    <AppButton type="button" className="secondary-button" onClick={onAdd}><UserRoundPlus size={18}/>Adicionar cliente</AppButton>
    </header>
    <div className="cd-table-head" aria-hidden="true"><span>CLIENTE</span><span>RELACIONAMENTO</span><span>CONTATO</span><span>PROJETOS</span><span>DESDE</span><span/></div>
    <div className="cd-list">{clients.map(client=><article key={client.id} className="cd-row">
      <div className="cd-identity">
-      <span className="cd-photo-wrap"><ClientAvatar client={client}/>{!isDemo&&client.photo&&<button className="cd-avatar-edit" type="button" aria-label={`Alterar foto de ${client.name}`} onClick={()=>setEditingPhoto(client.id)}><Pencil size={16}/></button>}</span>
-      <div className="cd-identity-copy"><button type="button" className="cd-client-name" onClick={()=>onOpen(client.id)}>{client.name}</button>
-       {!isDemo&&<button type="button" className="cd-change-photo" onClick={()=>setEditingPhoto(client.id)}><Camera size={16}/>{client.photo?"Alterar foto":"Adicionar foto"}</button>}
+      <span className="cd-photo-wrap"><ClientAvatar client={client}/>{!isDemo&&client.photo&&<AppButton className="cd-avatar-edit" type="button" aria-label={`Alterar foto de ${client.name}`} onClick={()=>setEditingPhoto(client.id)}><Pencil size={16}/></AppButton>}</span>
+      <div className="cd-identity-copy"><AppButton type="button" className="cd-client-name" onClick={()=>onOpen(client.id)}>{client.name}</AppButton>
+       {!isDemo&&<AppButton type="button" className="cd-change-photo" onClick={()=>setEditingPhoto(client.id)}><Camera size={16}/>{client.photo?"Alterar foto":"Adicionar foto"}</AppButton>}
       </div>
      </div>
      <span className="cd-relationship"><span className="cd-type">{client.type==="Recorrente"?<Building2 size={18}/>:<ReceiptText size={18}/>} {client.type}</span></span>
@@ -62,11 +63,11 @@ function ClientDirectoryContent({clients,onOpen,onAdd,onSavePhoto,totalCount,rec
      </span>
      <span className="cd-projects"><span className="cd-mobile-label">Projetos</span>{client.projects}</span>
      <span className="cd-since"><span className="cd-mobile-label">Desde</span>{client.since}</span>
-     <button className="cd-open" type="button" aria-label={`Abrir cliente ${client.name}`} onClick={()=>onOpen(client.id)}><ChevronRight size={21}/></button>
+     <AppButton className="cd-open" type="button" aria-label={`Abrir cliente ${client.name}`} onClick={()=>onOpen(client.id)}><ChevronRight size={21}/></AppButton>
     </article>)}
     {!clients.length&&<div className="cd-empty"><UsersRound size={42} strokeWidth={1.65}/><h3>Nenhum cliente cadastrado</h3><p>Adicione o primeiro cliente e defina se o relacionamento é recorrente ou avulso.</p></div>}
    </div>
-   {hasMore&&<div className="cd-more"><button className="secondary-button" type="button" onClick={onMore}>Carregar mais clientes <ChevronDown size={17}/></button></div>}
+   {hasMore&&<div className="cd-more"><AppButton className="secondary-button" type="button" onClick={onMore}>Carregar mais clientes <ChevronDown size={17}/></AppButton></div>}
    {current&&<CoverEditor key={current.id} client={current} onClose={()=>setEditingPhoto(null)} onSave={photo=>onSavePhoto(current.id,photo)}/>}
   </section>;
 }

@@ -1,3 +1,5 @@
+import {AppInput} from "../ui/AppInput";
+import {AppButton} from "../ui/AppButton";
 import { useState, type FormEvent } from "react";
 import { ArrowRight, Check, ChevronLeft, CircleHelp, UserRound } from "lucide-react";
 import type { User } from "firebase/auth";
@@ -32,30 +34,30 @@ export function RegistrationPage({user,submitting,error,onSubmit,onExit}:{
     <form className="register-form" onSubmit={submit} noValidate>
       <label className="auth-field" htmlFor="registration-name">
         <span>Como podemos chamar você? <b>*</b></span>
-        <input id="registration-name" name="displayName" autoComplete="name" maxLength={120} minLength={2} required value={displayName} onChange={e=>setDisplayName(e.target.value)} placeholder="Seu nome profissional"/>
+        <AppInput id="registration-name" name="displayName" autoComplete="name" maxLength={120} minLength={2} required value={displayName} onChange={e=>setDisplayName(e.target.value)} placeholder="Seu nome profissional"/>
       </label>
       <label className="auth-field" htmlFor="registration-studio">
         <span>Nome do estúdio ou marca <em>opcional</em></span>
-        <input id="registration-studio" name="studioName" autoComplete="organization" maxLength={120} value={studioName} onChange={e=>setStudioName(e.target.value)} placeholder="Ex.: Estúdio Aurora"/>
+        <AppInput id="registration-studio" name="studioName" autoComplete="organization" maxLength={120} value={studioName} onChange={e=>setStudioName(e.target.value)} placeholder="Ex.: Estúdio Aurora"/>
       </label>
       <fieldset className="auth-type-field">
         <legend>Como você trabalha?</legend>
         <div className="auth-type-grid">
           {types.map(type=><label key={type.value} className={professionalType===type.value?"auth-type-option selected":"auth-type-option"}>
-            <input type="radio" name="professionalType" value={type.value} checked={professionalType===type.value} onChange={()=>setProfessionalType(type.value)}/>
+            <AppInput type="radio" name="professionalType" value={type.value} checked={professionalType===type.value} onChange={()=>setProfessionalType(type.value)}/>
             <span><strong>{type.label}</strong><small>{type.description}</small></span>
             <span className="auth-radio-mark" aria-hidden="true">{professionalType===type.value&&<Check size={12}/>}</span>
           </label>)}
         </div>
       </fieldset>
       <label className="auth-confirmation">
-        <input type="checkbox" name="dataAcknowledgement" checked={acknowledged} onChange={e=>setAcknowledged(e.target.checked)} required/>
+        <AppInput type="checkbox" name="dataAcknowledgement" checked={acknowledged} onChange={e=>setAcknowledged(e.target.checked)} required/>
         <span>Concordo com o uso dos meus dados para criar minha conta e organizar meu espaço no Roteiva. <b>*</b></span>
       </label>
       <details className="auth-data-note"><summary><CircleHelp size={15}/> Como meus dados são usados?</summary><p>Seu nome, e-mail e foto do Google identificam sua conta. Os dados de clientes e projetos ficam no seu espaço privado. Para impedir testes gratuitos repetidos após a exclusão, preservamos um marcador criptográfico pseudonimizado da identidade Google/e-mail verificado, sem guardar o e-mail nesse marcador. Ele é mantido após a exclusão enquanto essa oferta existir, somente para prevenir sua reutilização. A conexão com o Google Drive é opcional, e seus arquivos continuam na sua conta Google.</p></details>
       {error&&<p className="auth-error" role="alert">{error}</p>}
-      <button className="auth-primary" type="submit" disabled={!valid||submitting}>{submitting?"Criando seu espaço…":"Criar meu espaço de trabalho"}<ArrowRight size={17}/></button>
-      <button className="auth-link" type="button" disabled={submitting} onClick={onExit}><ChevronLeft size={16}/> Sair sem criar conta</button>
+      <AppButton className="auth-primary" type="submit" disabled={!valid||submitting}>{submitting?"Criando seu espaço…":"Criar meu espaço de trabalho"}<ArrowRight size={17}/></AppButton>
+      <AppButton className="auth-link" type="button" disabled={submitting} onClick={onExit}><ChevronLeft size={16}/> Sair sem criar conta</AppButton>
     </form>
   </AuthLayout>;
 }
