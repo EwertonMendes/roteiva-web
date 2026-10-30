@@ -31,7 +31,7 @@
   outline-offset: 2px;
 }
 /* Standard text, date, numeric, e-mail and multiline fields. */
-:root :is(input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="file"]):not([type="range"]),textarea,select):focus {
+:root :where(input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="file"]):not([type="range"]),textarea,select):focus {
   outline: none;
   border-color: var(--field-focus-border);
   box-shadow: 0 0 0 3px var(--field-focus-ring);
@@ -113,9 +113,12 @@
   box-shadow: none;
   outline: none;
   text-align: left;
-  font: inherit;
+  font-family: inherit;
+  font-size: var(--type-body);
+  font-weight: 400;
   font-variant-numeric: tabular-nums;
 }
+:root .cd-form-fields .money-input > input { font-size: var(--type-support); }
 :root .project-modal .money-input > input:focus,
 :root .cd-form-fields .money-input > input:focus {
   border: 0;
