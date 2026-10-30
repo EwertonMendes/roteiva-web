@@ -36,7 +36,8 @@ test('money fields shift cents on desktop and mobile, paste reais, persist and e
   await amount.press('ControlOrMeta+A');
   await amount.pressSequentially('10001');
   await expect(amount).toHaveValue('100,01');
-  await page.getByLabel('Previsão de recebimento',{exact:true}).fill('2026-10-30');
+  const today=await page.evaluate(()=>{const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');});
+  await page.getByLabel('Previsão de recebimento',{exact:true}).fill(today);
   await page.locator('form.finance-modal').getByRole('button',{name:'Adicionar lançamento'}).click();
   await expect(page.locator('.finance-table')).toContainText('100,01');
 
