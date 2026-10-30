@@ -1,3 +1,4 @@
+import {AppInput} from "./AppInput";
 import {useLayoutEffect,useRef,useState,type InputHTMLAttributes} from 'react';
 import {
   formatMoneyDigits,moneyDigitsFromPaste,moneyDigitsFromValue,
@@ -37,7 +38,7 @@ export function MoneyInput({defaultValue,onValueChange,onKeyDown,onFocus,placeho
 
   return <div className="money-input">
     <span aria-hidden="true">R$</span>
-    <input {...props} ref={input} type="text" inputMode="numeric"
+    <AppInput {...props} ref={input} type="text" inputMode="numeric"
       autoComplete="off" placeholder={placeholder} value={displayed}
       onFocus={event=>{event.currentTarget.select();onFocus?.(event);}}
       onKeyDown={event=>{

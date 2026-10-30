@@ -1,3 +1,4 @@
+import {AppButton} from "./AppButton";
 import {useEffect,useId,useRef,useState} from 'react';
 import {LogOut,MoreHorizontal,Moon,Sun} from 'lucide-react';
 import './sidebar-account-menu.css';
@@ -14,12 +15,12 @@ export function SidebarAccountMenu({theme,onToggleTheme,onLogout}:{theme:'light'
  },[open]);
  function closeAndRestore(){close();trigger.current?.focus();}
  return <div className="sidebar-account-menu" ref={root} onBlur={e=>{if(!e.currentTarget.contains(e.relatedTarget))close();}} onKeyDown={e=>{if(e.key==='Escape'&&open){e.preventDefault();e.stopPropagation();closeAndRestore();}}}>
-  <button ref={trigger} type="button" className="icon-button sidebar-account-trigger" aria-label="Opções da conta" title="Opções da conta" aria-expanded={open} aria-controls={phase==='closed'?undefined:id} onClick={()=>open?close():setPhase('open')}><MoreHorizontal size={19}/></button>
+  <AppButton ref={trigger} type="button" className="icon-button sidebar-account-trigger" aria-label="Opções da conta" title="Opções da conta" aria-expanded={open} aria-controls={phase==='closed'?undefined:id} onClick={()=>open?close():setPhase('open')}><MoreHorizontal size={19}/></AppButton>
   {phase!=='closed'&&<div id={id} className="sidebar-account-popover" data-state={phase} role="group" aria-label="Opções da conta" aria-hidden={!open} inert={!open} onAnimationEnd={event=>{
    if(event.target===event.currentTarget&&event.animationName==='account-panel-out')setPhase(current=>current==='closing'?'closed':current);
   }}>
-   <button type="button" className="sidebar-account-theme" aria-label={theme==='dark'?'Ativar modo claro':'Ativar modo escuro'} onClick={onToggleTheme}>{theme==='dark'?<Sun size={18}/>:<Moon size={18}/>}<span>{theme==='dark'?'Modo claro':'Modo escuro'}</span></button>
-   {onLogout&&<><div className="sidebar-account-divider"/><button type="button" className="sidebar-account-logout" onClick={()=>{close();onLogout();}}><LogOut size={18}/><span>Sair da conta</span></button></>}
+   <AppButton type="button" className="sidebar-account-theme" aria-label={theme==='dark'?'Ativar modo claro':'Ativar modo escuro'} onClick={onToggleTheme}>{theme==='dark'?<Sun size={18}/>:<Moon size={18}/>}<span>{theme==='dark'?'Modo claro':'Modo escuro'}</span></AppButton>
+   {onLogout&&<><div className="sidebar-account-divider"/><AppButton type="button" className="sidebar-account-logout" onClick={()=>{close();onLogout();}}><LogOut size={18}/><span>Sair da conta</span></AppButton></>}
   </div>}
  </div>;
 }
