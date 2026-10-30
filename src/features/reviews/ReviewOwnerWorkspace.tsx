@@ -1,3 +1,5 @@
+import {AppInput} from "../ui/AppInput";
+import {AppButton} from "../ui/AppButton";
 import { AppSelect } from "../ui/AppSelect";
 import {useCallback,useEffect,useMemo,useRef,useState} from "react";
 import {CheckCircle2,ChevronRight,Clock3,Copy,ExternalLink,FileAudio,FileImage,FileText,
@@ -33,11 +35,11 @@ function ShareArea({detail}:{detail:Detail}){
       <small>Válido até {fmt(expiresAt)}</small>
     </div>
     <div className="rowner-share-controls">
-      <input type="text" readOnly aria-label="Link da revisão" value={url} onFocus={e=>e.currentTarget.select()}/>
-      <button className="rowner-share-copy" disabled={!url} onClick={async()=>{
+      <AppInput type="text" readOnly aria-label="Link da revisão" value={url} onFocus={e=>e.currentTarget.select()}/>
+      <AppButton className="rowner-share-copy" disabled={!url} onClick={async()=>{
         try{await navigator.clipboard.writeText(url);setCopied(true);}
         catch{window.prompt("Copie o link:",url);}
-      }}><Copy size={15}/>{copied?"Copiado!":"Copiar link"}</button>
+      }}><Copy size={15}/>{copied?"Copiado!":"Copiar link"}</AppButton>
       <a href={"https://wa.me/?text="+encodeURIComponent(content)} target="_blank" rel="noopener noreferrer"
         aria-label="Compartilhar aprovação por WhatsApp">WhatsApp <ExternalLink size={14}/></a>
       <a href={"mailto:?subject="+encodeURIComponent("Material para aprovação · "+title)+"&body="+encodeURIComponent(content)}
@@ -53,12 +55,12 @@ function CommentCard({comment,asset,selected,onSelect}:{comment:Comment;asset:As
     <div className="rowner-comment-header"><span className="rowner-avatar" aria-hidden="true">{comment.author_name.trim().slice(0,1).toUpperCase()||"C"}</span>
       <div className="rowner-comment-by"><strong>{comment.author_name}</strong><small>{longDate(comment.created_at)}</small></div></div>
     <p>{comment.body}</p>
-    {asset&&<button type="button" className="rowner-comment-file" onClick={onSelect}
+    {asset&&<AppButton type="button" className="rowner-comment-file" onClick={onSelect}
       aria-label={"Ver material "+asset.name+(comment.seconds!==null?" no minuto "+formatReviewTime(comment.seconds):"")}>
       <Glyph mime={asset.mimeType}/><span title={asset.name}>{asset.name}</span>
       {comment.seconds!==null&&<span className="rowner-timestamp"><Clock3 size={12}/>{formatReviewTime(comment.seconds)}</span>}
       <ChevronRight size={14}/>
-    </button>}
+    </AppButton>}
   </article>;
 }
 export function ReviewOwnerWorkspace({detail,working,error,onClose,onRevise,onPublish,onRotate,onEnd,onResume,onCompleteClose}:{
@@ -171,7 +173,7 @@ export function ReviewOwnerWorkspace({detail,working,error,onClose,onRevise,onPu
         <h2>{review.title}</h2>
         <p>{review.projectName} <span aria-hidden="true">·</span> {review.clientName}</p>
       </div>
-      <button type="button" className="review-icon" disabled={working} aria-label="Fechar" onClick={onClose}><X size={20}/></button>
+      <AppButton type="button" className="review-icon" disabled={working} aria-label="Fechar" onClick={onClose}><X size={20}/></AppButton>
     </header>
     <div className="review-dialog-body rowner-body">
       {error&&<div className="reviews-warning" role="alert">{error}</div>}
@@ -222,16 +224,16 @@ export function ReviewOwnerWorkspace({detail,working,error,onClose,onRevise,onPu
           <div className="rowner-gallery-toolbar">
             <span className="rowner-gallery-count">{currentAssets.length} {currentAssets.length===1?"arquivo":"arquivos"}</span>
             <div className="rowner-gallery-layout" role="group" aria-label="Visualização dos materiais">
-              <button type="button" aria-label="Ver materiais em grade" aria-pressed={galleryView==="grid"}
-                onClick={()=>setGalleryView("grid")}><Grid2X2 size={16}/></button>
-              <button type="button" aria-label="Ver materiais em lista" aria-pressed={galleryView==="list"}
-                onClick={()=>setGalleryView("list")}><List size={17}/></button>
+              <AppButton type="button" aria-label="Ver materiais em grade" aria-pressed={galleryView==="grid"}
+                onClick={()=>setGalleryView("grid")}><Grid2X2 size={16}/></AppButton>
+              <AppButton type="button" aria-label="Ver materiais em lista" aria-pressed={galleryView==="list"}
+                onClick={()=>setGalleryView("list")}><List size={17}/></AppButton>
             </div>
           </div>
           {currentAssets.length>=5&&<div className="rowner-gallery-filters">
             <label className="rowner-gallery-search">
               <Search size={16} aria-hidden="true"/>
-              <input aria-label="Buscar materiais por nome" type="search" placeholder="Buscar arquivo…"
+              <AppInput aria-label="Buscar materiais por nome" type="search" placeholder="Buscar arquivo…"
                 value={fileSearch} onChange={e=>{setFileSearch(e.target.value);setVisibleLimit(6);}}/>
             </label>
             <AppSelect aria-label="Filtrar materiais por tipo" value={typeFilter}
@@ -242,7 +244,7 @@ export function ReviewOwnerWorkspace({detail,working,error,onClose,onRevise,onPu
             </AppSelect>
           </div>}
           <div className="rowner-file-list" data-view={galleryView} aria-label="Galeria de materiais">
-            {visibleAssets.map(a=><button type="button" key={a.fileId}
+            {visibleAssets.map(a=><AppButton type="button" key={a.fileId}
               className={"rowner-file"+(active?.fileId===a.fileId?" is-active":"")}
               aria-pressed={active?.fileId===a.fileId} aria-label={"Selecionar arquivo "+a.name}
               title={a.name} onClick={()=>{setSelectedFile(a.fileId);setNotice("");}}>
@@ -259,13 +261,13 @@ export function ReviewOwnerWorkspace({detail,working,error,onClose,onRevise,onPu
               <span className="rowner-file-name"><strong>{a.name}</strong>
                 <small>{fileKindLabel(a.mimeType)}</small>
               </span>
-            </button>)}
+            </AppButton>)}
           </div>
           {!filteredAssets.length&&<p className="rowner-gallery-empty">Nenhum arquivo corresponde aos filtros.
-            <button type="button" onClick={()=>{setFileSearch("");setTypeFilter("all");setVisibleLimit(6);}}>Limpar filtros</button>
+            <AppButton type="button" onClick={()=>{setFileSearch("");setTypeFilter("all");setVisibleLimit(6);}}>Limpar filtros</AppButton>
           </p>}
-          {remainingAssets>0&&<button type="button" className="rowner-gallery-more"
-            onClick={()=>setVisibleLimit(v=>v+6)}>Mostrar mais {Math.min(6,remainingAssets)} de {remainingAssets} arquivos <ChevronRight size={15}/></button>}
+          {remainingAssets>0&&<AppButton type="button" className="rowner-gallery-more"
+            onClick={()=>setVisibleLimit(v=>v+6)}>Mostrar mais {Math.min(6,remainingAssets)} de {remainingAssets} arquivos <ChevronRight size={15}/></AppButton>}
           {currentAssets.length>=5&&<p className="rowner-gallery-summary">
             Exibindo {visibleAssets.length} de {filteredAssets.length} {filteredAssets.length===1?"resultado":"resultados"}
           </p>}
@@ -316,10 +318,10 @@ export function ReviewOwnerWorkspace({detail,working,error,onClose,onRevise,onPu
             <small>{currentComments.length? "Comentários dos materiais enviados":"Aguardando observações do cliente"}</small></div>
             <span className="rowner-comment-total">{currentComments.length}</span></div>
           {currentAssets.length>1&&currentComments.length>0&&<div className="rowner-feedback-filter" role="group" aria-label="Filtrar comentários">
-            <button type="button" className={feedbackAll?"is-active":""} aria-pressed={feedbackAll}
-              onClick={()=>setFeedbackAll(true)}>Todos ({currentComments.length})</button>
-            <button type="button" className={!feedbackAll?"is-active":""} aria-pressed={!feedbackAll}
-              onClick={()=>setFeedbackAll(false)}>Arquivo selecionado ({fileCounts.get(active?.fileId||"")||0})</button></div>}
+            <AppButton type="button" className={feedbackAll?"is-active":""} aria-pressed={feedbackAll}
+              onClick={()=>setFeedbackAll(true)}>Todos ({currentComments.length})</AppButton>
+            <AppButton type="button" className={!feedbackAll?"is-active":""} aria-pressed={!feedbackAll}
+              onClick={()=>setFeedbackAll(false)}>Arquivo selecionado ({fileCounts.get(active?.fileId||"")||0})</AppButton></div>}
           <div className="rowner-comment-list">
             {displayedComments.length?displayedComments.map(c=><CommentCard key={c.id} comment={c} selected={active?.fileId===c.file_id}
               asset={currentAssets.find(a=>a.fileId===c.file_id)||null} onSelect={()=>focusMaterial(c)}/>):
@@ -351,14 +353,14 @@ export function ReviewOwnerWorkspace({detail,working,error,onClose,onRevise,onPu
       <span className="rowner-footer-state">{working?<LoaderCircle size={15} className="rl-spin"/>:<ShieldCheck size={15}/>}
         {working?"Atualizando…":statusText[review.status]}</span>
       <div className="rowner-footer-actions">
-        {["draft","publishing"].includes(review.status)&&<button className="primary-button" disabled={working} onClick={onPublish}>Ativar compartilhamento</button>}
-        {review.status==="changes"&&<button className="primary-button" disabled={working} onClick={onRevise}>Enviar nova versão <Send size={15}/></button>}
-        {review.status==="replacing"&&<button className="primary-button" disabled={working}
+        {["draft","publishing"].includes(review.status)&&<AppButton className="primary-button" disabled={working} onClick={onPublish}>Ativar compartilhamento</AppButton>}
+        {review.status==="changes"&&<AppButton className="primary-button" disabled={working} onClick={onRevise}>Enviar nova versão <Send size={15}/></AppButton>}
+        {review.status==="replacing"&&<AppButton className="primary-button" disabled={working}
           onClick={()=>onResume(!assets.some(a=>a.version===review.version+1))}>
-          {assets.some(a=>a.version===review.version+1)?"Concluir troca de versão":"Retomar seleção de arquivos"}</button>}
-        {review.status==="closing"&&<button className="primary-button" disabled={working} onClick={onCompleteClose}>Concluir revogação</button>}
-        {["pending","changes","approved","draft"].includes(review.status)&&<button className="secondary-button" disabled={working} onClick={onRotate}><RotateCcw size={14}/> Renovar link</button>}
-        {review.status!=="closed"&&<button className="secondary-button rowner-end" disabled={working} onClick={onEnd}>Encerrar revisão</button>}
+          {assets.some(a=>a.version===review.version+1)?"Concluir troca de versão":"Retomar seleção de arquivos"}</AppButton>}
+        {review.status==="closing"&&<AppButton className="primary-button" disabled={working} onClick={onCompleteClose}>Concluir revogação</AppButton>}
+        {["pending","changes","approved","draft"].includes(review.status)&&<AppButton className="secondary-button" disabled={working} onClick={onRotate}><RotateCcw size={14}/> Renovar link</AppButton>}
+        {review.status!=="closed"&&<AppButton className="secondary-button rowner-end" disabled={working} onClick={onEnd}>Encerrar revisão</AppButton>}
       </div>
     </footer>
   </>;

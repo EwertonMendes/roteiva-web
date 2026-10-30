@@ -1,3 +1,6 @@
+import {AppInput} from "../ui/AppInput";
+import {AppTextarea} from "../ui/AppTextarea";
+import {AppButton} from "../ui/AppButton";
 import {useCallback,useEffect,useRef,useState} from "react";
 import {Check,CheckCircle2,Clock3,ExternalLink,FileAudio,FileImage,FileText,FileVideo,
   LoaderCircle,MessageSquare,Moon,Pause,Play,Send,ShieldCheck,Sun,Video,X} from "lucide-react";
@@ -208,11 +211,11 @@ export function ReviewPortal({token}:{token:string}){
       <a href="/" aria-label="Ir para Roteiva"><img src={theme==="dark"?"/roteiva-logo-white.png":"/roteiva-logo-black.png"} alt="Roteiva"/></a>
       <div className="review-portal-topactions">
         <span className="review-portal-security"><ShieldCheck size={15}/> Espaço de aprovação</span>
-        <button className="review-theme-button" aria-label={theme==="dark"?"Ativar tema claro":"Ativar tema escuro"}
+        <AppButton className="review-theme-button" aria-label={theme==="dark"?"Ativar tema claro":"Ativar tema escuro"}
           title={theme==="dark"?"Tema claro":"Tema escuro"} type="button"
           onClick={()=>setTheme(current=>current==="dark"?"light":"dark")}>
           {theme==="dark"?<Sun size={19}/>:<Moon size={19}/>}
-        </button>
+        </AppButton>
       </div>
     </header>
     <div className="review-portal-content">
@@ -220,10 +223,10 @@ export function ReviewPortal({token}:{token:string}){
       !data?<section className="review-portal-state">
         <ShieldCheck size={30}/><h1>{needsGoogle?"Acesso restrito":"Material indisponível"}</h1>
         <p>{error}</p>
-        {needsGoogle&&<><button className="review-action-primary" disabled={authBusy} onClick={()=>void login()}>
-          {user?"Trocar conta Google":"Entrar com Google"}</button>
+        {needsGoogle&&<><AppButton className="review-action-primary" disabled={authBusy} onClick={()=>void login()}>
+          {user?"Trocar conta Google":"Entrar com Google"}</AppButton>
           {authError&&<p role="alert">{authError}</p>}{user&&<small>Conta atual: {user.email}</small>}</>}
-        <button className="review-action-secondary" onClick={()=>void reload()}>Tentar novamente</button>
+        <AppButton className="review-action-secondary" onClick={()=>void reload()}>Tentar novamente</AppButton>
       </section>:
       <>
         <div className="review-portal-intro">
@@ -272,7 +275,7 @@ export function ReviewPortal({token}:{token:string}){
                 {previewMode==="error"&&<div className="review-private-preview-error" role="alert">
                   <FileImage size={26}/><strong>Não foi possível mostrar a prévia</strong>
                   <p>{previewError}</p>
-                  <button type="button" onClick={()=>setPreviewRetry(n=>n+1)}>Tentar novamente</button>
+                  <AppButton type="button" onClick={()=>setPreviewRetry(n=>n+1)}>Tentar novamente</AppButton>
                 </div>}
                 {!active&&<p>Nenhum material disponível.</p>}
               </div>
@@ -287,16 +290,16 @@ export function ReviewPortal({token}:{token:string}){
               <div className="review-capture-bar">
                 <div><span className="review-live-label"><span/> TEMPO ATUAL</span>
                   <strong>{formatReviewTime(playhead)}{duration!==null&&<small> / {formatReviewTime(duration)}</small>}</strong></div>
-                <button type="button" className="review-capture-button" onClick={markNow}>
-                  <Pause size={16}/> Marcar este instante e comentar</button>
+                <AppButton type="button" className="review-capture-button" onClick={markNow}>
+                  <Pause size={16}/> Marcar este instante e comentar</AppButton>
               </div>}
             <nav className="review-portal-assets" aria-label="Arquivos da aprovação">
               <div className="review-portal-assets-label"><span>Materiais para revisar</span><span>{data.assets.length} arquivos</span></div>
-              {data.assets.map((a,i)=><button type="button" key={a.fileId} aria-current={i===selected}
+              {data.assets.map((a,i)=><AppButton type="button" key={a.fileId} aria-current={i===selected}
                 onClick={()=>switchFile(i)}>
                 <FileGlyph mime={a.mimeType}/><span>{a.name}</span>
                 {data.comments.some(c=>c.file_id===a.fileId)&&<span className="review-asset-count">{data.comments.filter(c=>c.file_id===a.fileId).length}</span>}
-                {i===selected&&<Check size={15}/>}</button>)}
+                {i===selected&&<Check size={15}/>}</AppButton>)}
             </nav>
           </div>
           <section className="review-portal-comments" aria-label="Comentários">
@@ -310,19 +313,19 @@ export function ReviewPortal({token}:{token:string}){
               {comments.map(c=><article className="review-portal-comment" key={c.id}>
                 <div className="review-comment-top"><strong>{c.author_name}</strong>
                   <small>{new Date(c.created_at).toLocaleString("pt-BR")}</small></div>
-                {isVideo&&c.seconds!==null&&<button type="button" className="review-time-link"
-                  onClick={()=>jumpTo(c.seconds!)}><Play size={12}/> {formatReviewTime(c.seconds)}</button>}
+                {isVideo&&c.seconds!==null&&<AppButton type="button" className="review-time-link"
+                  onClick={()=>jumpTo(c.seconds!)}><Play size={12}/> {formatReviewTime(c.seconds)}</AppButton>}
                 <p>{c.body}</p>
               </article>)}
             </div>
             {!done&&!isReader&&<div className="review-portal-commentform">
-              <label>Seu nome<input maxLength={100} value={name} placeholder="Como podemos chamar você?"
+              <label>Seu nome<AppInput maxLength={100} value={name} placeholder="Como podemos chamar você?"
                 onChange={e=>setName(e.target.value)}/></label>
               {isVideo&&<div className="review-video-time-field">
                 <div className="review-time-field-heading"><label htmlFor="review-video-second">Instante do vídeo <span>(opcional)</span></label>
-                  {playableVideo&&<button type="button" onClick={markNow} className="review-use-time">
-                    <Clock3 size={14}/> Usar tempo atual</button>}</div>
-                <div className="review-time-input"><Clock3 size={16}/><input id="review-video-second"
+                  {playableVideo&&<AppButton type="button" onClick={markNow} className="review-use-time">
+                    <Clock3 size={14}/> Usar tempo atual</AppButton>}</div>
+                <div className="review-time-input"><Clock3 size={16}/><AppInput id="review-video-second"
                   value={minutes} placeholder="Ex.: 01:25" inputMode="numeric"
                   aria-invalid={invalidTime} aria-describedby="review-time-hint"
                   onChange={e=>setMinutes(maskReviewTime(e.target.value))}
@@ -331,11 +334,11 @@ export function ReviewPortal({token}:{token:string}){
                   {invalidTime?"Informe mm:ss válido, dentro da duração do vídeo.":playableVideo?
                     "Pause no momento desejado e capture o instante com um clique.":"Digite mm:ss (ex.: 01:25). A prévia do Drive não informa o tempo automaticamente."}</small>
               </div>}
-              <label>Seu comentário<textarea ref={commentRef} maxLength={1500} rows={4} value={body}
+              <label>Seu comentário<AppTextarea ref={commentRef} maxLength={1500} rows={4} value={body}
                 placeholder="O que você gostaria de comentar?" onChange={e=>setBody(e.target.value)}/></label>
               <div className="review-send-row"><span>{body.length}/1500</span>
-                <button className="review-action-primary" disabled={busy||invalidTime||!body.trim()||!name.trim()}
-                  onClick={()=>void action("comment")}><Send size={16}/>{busy?"Enviando…":"Adicionar comentário"}</button></div>
+                <AppButton className="review-action-primary" disabled={busy||invalidTime||!body.trim()||!name.trim()}
+                  onClick={()=>void action("comment")}><Send size={16}/>{busy?"Enviando…":"Adicionar comentário"}</AppButton></div>
             </div>}
           </section>
         </div>
@@ -347,10 +350,10 @@ export function ReviewPortal({token}:{token:string}){
               {data.review.approvalsReceived||0} de {data.review.approvalsRequired||1} revisores aprovaram.
             </p>}</div>
           <div className="review-portal-buttons">
-            <button type="button" className="review-action-secondary" onClick={()=>setDecision("changes")}>
-              <MessageSquare size={17}/> Solicitar ajustes</button>
-            <button type="button" className="review-action-primary" onClick={()=>setDecision("approved")}>
-              <CheckCircle2 size={18}/> Aprovar material</button>
+            <AppButton type="button" className="review-action-secondary" onClick={()=>setDecision("changes")}>
+              <MessageSquare size={17}/> Solicitar ajustes</AppButton>
+            <AppButton type="button" className="review-action-primary" onClick={()=>setDecision("approved")}>
+              <CheckCircle2 size={18}/> Aprovar material</AppButton>
           </div>
         </section>:<section className="review-portal-done"><CheckCircle2 size={24}/>
           <div><h2>{isReader?"Acompanhamento somente leitura":data.review.status==="approved"?"Material aprovado":data.review.status==="pending"?"Sua decisão foi registrada":"Feedback enviado"}</h2>
@@ -367,17 +370,17 @@ export function ReviewPortal({token}:{token:string}){
     <footer className="review-portal-footer"><ShieldCheck size={13}/> Revisão realizada através do <strong>Roteiva</strong></footer>
     {decision&&<div className="review-modal-backdrop" ref={dialogRef} tabIndex={-1}>
       <section className="review-portal-confirm" role="dialog" aria-modal="true" aria-label="Confirmar decisão">
-        <button className="review-icon" aria-label="Fechar" disabled={busy} onClick={()=>setDecision(null)}><X size={19}/></button>
+        <AppButton className="review-icon" aria-label="Fechar" disabled={busy} onClick={()=>setDecision(null)}><X size={19}/></AppButton>
         {decision==="approved"?<><CheckCircle2 size={31}/><h2>Confirmar aprovação?</h2>
           <p>Você confirma que revisou os materiais da versão {data?.review.version} e que estão aprovados?</p></>:
           <><MessageSquare size={31}/><h2>Quais ajustes são necessários?</h2>
             <p>Explique as mudanças para que o profissional possa preparar a próxima versão.</p>
-            <textarea rows={4} maxLength={1500} value={decisionText} onChange={e=>setDecisionText(e.target.value)}
+            <AppTextarea rows={4} maxLength={1500} value={decisionText} onChange={e=>setDecisionText(e.target.value)}
               placeholder="Descreva os ajustes desejados…"/></>}
-        <label>Seu nome<input value={name} maxLength={100} onChange={e=>setName(e.target.value)} placeholder="Seu nome"/></label>
-        <div className="review-portal-buttons"><button className="review-action-secondary" onClick={()=>setDecision(null)} disabled={busy}>Cancelar</button>
-          <button className="review-action-primary" disabled={busy||!name.trim()||(decision==="changes"&&!decisionText.trim())}
-            onClick={()=>void action("decide",decision)}>{busy?"Registrando…":"Confirmar decisão"}</button></div>
+        <label>Seu nome<AppInput value={name} maxLength={100} onChange={e=>setName(e.target.value)} placeholder="Seu nome"/></label>
+        <div className="review-portal-buttons"><AppButton className="review-action-secondary" onClick={()=>setDecision(null)} disabled={busy}>Cancelar</AppButton>
+          <AppButton className="review-action-primary" disabled={busy||!name.trim()||(decision==="changes"&&!decisionText.trim())}
+            onClick={()=>void action("decide",decision)}>{busy?"Registrando…":"Confirmar decisão"}</AppButton></div>
         {notice&&<p role="alert">{notice}</p>}
       </section>
     </div>}

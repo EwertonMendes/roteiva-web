@@ -1,3 +1,4 @@
+import {AppButton} from "../ui/AppButton";
 import {useEffect,useRef,useState} from 'react';
 import {CalendarDays,ChevronDown,ChevronRight,Film,FolderOpen,LayoutGrid,ImagePlus,Pencil} from 'lucide-react';
 import type {Project,ProjectCover,Status} from '../../domain/workspace';
@@ -16,10 +17,10 @@ function ProjectCard({project,onOpen,onEdit}:{project:Project;onOpen:()=>void;on
  const canEdit=!!context?.connections.some(c=>c.provider==='google_drive');
  const showImage=canEdit&&!!project.cover&&context!.connections.some(c=>c.id===project.cover!.connectionId);
  return <article className="pc-card" ref={box}>
-  {showImage&&<div className="pc-photo">{src?<CoverFrame src={src} cover={project.cover!}/>:<div className="pc-image-unavailable"><ImagePlus size={28}/><span>{error?'Capa indisponível':'Carregando capa…'}</span></div>}<button type="button" className="pc-edit-overlay" onClick={onEdit}><Pencil size={16}/>Editar capa</button><span className="pc-files-overlay"><Film size={17}/>{project.files} {project.files===1?'arquivo':'arquivos'}</span><button className="pc-open-overlay" type="button" aria-label={'Abrir projeto '+project.name} onClick={onOpen}><ChevronRight size={23}/></button></div>}
+  {showImage&&<div className="pc-photo">{src?<CoverFrame src={src} cover={project.cover!}/>:<div className="pc-image-unavailable"><ImagePlus size={28}/><span>{error?'Capa indisponível':'Carregando capa…'}</span></div>}<AppButton type="button" className="pc-edit-overlay" onClick={onEdit}><Pencil size={16}/>Editar capa</AppButton><span className="pc-files-overlay"><Film size={17}/>{project.files} {project.files===1?'arquivo':'arquivos'}</span><AppButton className="pc-open-overlay" type="button" aria-label={'Abrir projeto '+project.name} onClick={onOpen}><ChevronRight size={23}/></AppButton></div>}
   <div className="pc-card-body">
-   <div className="pc-card-top"><span className="pc-status"><StatusIcon status={project.status}/>{project.status}</span>{canEdit&&!showImage&&<button type="button" className="pc-add-cover" onClick={onEdit}><ImagePlus size={16}/>{project.cover?'Editar capa':'Adicionar capa'}</button>}</div>
-   <h2><button type="button" onClick={onOpen}>{project.name}{!showImage&&<ChevronRight size={20}/>}</button></h2><p>{project.clientId?project.client:'Sem cliente vinculado'}</p>
+   <div className="pc-card-top"><span className="pc-status"><StatusIcon status={project.status}/>{project.status}</span>{canEdit&&!showImage&&<AppButton type="button" className="pc-add-cover" onClick={onEdit}><ImagePlus size={16}/>{project.cover?'Editar capa':'Adicionar capa'}</AppButton>}</div>
+   <h2><AppButton type="button" onClick={onOpen}>{project.name}{!showImage&&<ChevronRight size={20}/>}</AppButton></h2><p>{project.clientId?project.client:'Sem cliente vinculado'}</p>
    {!showImage&&<span className="pc-files"><Film size={16}/>{project.files} {project.files===1?'arquivo':'arquivos'}</span>}
    <div className="pc-progress" aria-label={'Progresso de '+project.name} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={project.progress}><span><i style={{width:project.progress+'%'}}/></span><b>{project.progress}%</b></div>
    <footer><span><CalendarDays size={19}/>{project.due||'Sem prazo'}</span><span>{project.template||'Produção'}</span></footer>
@@ -34,10 +35,10 @@ function ProjectsGrid({projects,statusFilter,setStatusFilter,onOpen,onSaveCover,
  return <>
   {context?.error&&<p className="pc-connection-notice" role="status">Não foi possível verificar a conexão do Drive. As capas estão temporariamente indisponíveis. Atualize a página para tentar novamente.</p>}
   <section className="pc-panel" aria-label="Lista de projetos">
-   <div className="pc-filter-bar"><div className="pc-filters" aria-label="Filtrar projetos por situação">{filters.map(filter=><button type="button" key={filter} aria-pressed={filter===statusFilter} className={filter===statusFilter?'active':''} onClick={()=>setStatusFilter(filter)}>{filter==='Todos'?<LayoutGrid size={18} aria-hidden="true"/>:<StatusIcon status={filter}/>}<span>{filter}</span></button>)}</div><span className="pc-result-count">{total!==undefined&&total>projects.length?`${projects.length} de ${total} projetos`:`${projects.length} ${projects.length===1?'projeto encontrado':'projetos encontrados'}`}</span></div>
+   <div className="pc-filter-bar"><div className="pc-filters" aria-label="Filtrar projetos por situação">{filters.map(filter=><AppButton type="button" key={filter} aria-pressed={filter===statusFilter} className={filter===statusFilter?'active':''} onClick={()=>setStatusFilter(filter)}>{filter==='Todos'?<LayoutGrid size={18} aria-hidden="true"/>:<StatusIcon status={filter}/>}<span>{filter}</span></AppButton>)}</div><span className="pc-result-count">{total!==undefined&&total>projects.length?`${projects.length} de ${total} projetos`:`${projects.length} ${projects.length===1?'projeto encontrado':'projetos encontrados'}`}</span></div>
    <div className="pc-cards">{projects.map(project=><ProjectCard key={project.id} project={project} onOpen={()=>onOpen(project.id)} onEdit={()=>setEditing(project.id)}/>)}</div>
    {!projects.length&&<div className="empty-state"><FolderOpen size={32}/><h3>{statusFilter==='Todos'?'Nenhum projeto encontrado':'Nenhum projeto nesta situação'}</h3><p>{statusFilter==='Todos'?'Crie um projeto ou ajuste sua busca para continuar.':'Selecione outra situação para ver seus projetos.'}</p></div>}
-   {hasMore&&<div className="pc-more"><button type="button" className="secondary-button" onClick={onMore}>Carregar mais projetos<ChevronDown size={16}/></button></div>}
+   {hasMore&&<div className="pc-more"><AppButton type="button" className="secondary-button" onClick={onMore}>Carregar mais projetos<ChevronDown size={16}/></AppButton></div>}
   </section>
   {project&&context?.connections.some(c=>c.provider==='google_drive')?<CoverEditor key={project.id} project={project} onClose={()=>setEditing(null)} onSave={cover=>onSaveCover(project.id,cover)}/>:null}
  </>;

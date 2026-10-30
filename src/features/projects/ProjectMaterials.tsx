@@ -1,3 +1,4 @@
+import {AppButton} from "../ui/AppButton";
 import {useEffect,useState} from 'react';
 import {ExternalLink,FolderOpen,Link2,Pencil} from 'lucide-react';
 import {useAuth} from '../auth/AuthProvider';
@@ -22,18 +23,18 @@ export function ProjectMaterials({projectId,onManage}:{projectId:number;onManage
   return()=>{active=false};
  },[user?.uid,projectId,attempt]);
  if(state.loading)return <p role="status">Carregando materiais vinculados…</p>;
- if(state.error)return <div className="pd-material-empty" role="alert"><p>Não foi possível carregar os materiais.</p><button className="secondary-button" onClick={()=>setAttempt(value=>value+1)}>Tentar novamente</button></div>;
+ if(state.error)return <div className="pd-material-empty" role="alert"><p>Não foi possível carregar os materiais.</p><AppButton className="secondary-button" onClick={()=>setAttempt(value=>value+1)}>Tentar novamente</AppButton></div>;
  return <>{state.links.map(link=><article className="pd-material" key={link.provider+':'+link.id}>
    <span className="pd-material-icon" aria-hidden="true"><Link2 size={25}/></span><div className="pd-folder-copy">
     <b>{link.folderName}</b><p>Pasta vinculada ao projeto · {link.provider==='dropbox'?'Dropbox':'Google Drive'}</p>
     <a href={link.provider==='dropbox'?'https://www.dropbox.com/home':
      'https://drive.google.com/drive/folders/'+encodeURIComponent(link.folderId)}
      target="_blank" rel="noreferrer">Abrir {link.provider==='dropbox'?'Dropbox':'link'}<ExternalLink size={15} aria-hidden="true"/></a>
-   </div><button className="secondary-button" onClick={onManage} aria-label={'Gerenciar material '+link.folderName}>
-     <Pencil size={16} aria-hidden="true"/>Gerenciar</button>
+   </div><AppButton className="secondary-button" onClick={onManage} aria-label={'Gerenciar material '+link.folderName}>
+     <Pencil size={16} aria-hidden="true"/>Gerenciar</AppButton>
   </article>)}{!state.links.length&&<div className="pd-material-empty">
    <FolderOpen size={23} aria-hidden="true"/>
    <p>Vincule pastas do Google Drive ou Dropbox na Biblioteca deste projeto.</p>
-   <button className="secondary-button" onClick={onManage}>Abrir Biblioteca<ExternalLink size={16} aria-hidden="true"/></button>
+   <AppButton className="secondary-button" onClick={onManage}>Abrir Biblioteca<ExternalLink size={16} aria-hidden="true"/></AppButton>
   </div>}</>;
 }

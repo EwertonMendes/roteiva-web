@@ -1,3 +1,5 @@
+import {AppInput} from "../ui/AppInput";
+import {AppButton} from "../ui/AppButton";
 import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, LoaderCircle, ShieldAlert, Trash2, X } from "lucide-react";
 import { GoogleAuthProvider, reauthenticateWithPopup, signOut } from "firebase/auth";
@@ -110,9 +112,9 @@ export function AccountDeletionAction(){
       <div><strong><Trash2 size={16}/> Excluir minha conta</strong>
         <p>Exclusão permanente da conta e dos dados armazenados no Roteiva. Seus arquivos originais no Google Drive serão preservados. Um marcador pseudonimizado de uso do teste gratuito será mantido para impedir reutilização.</p>
       </div>
-      <button type="button" className="secondary-button" disabled={!ready||!available||!!progress} onClick={()=>{setError("");setText("");setChecked(false);setNeedsIdentityConfirmation(false);setOpened(true);}}>
+      <AppButton type="button" className="secondary-button" disabled={!ready||!available||!!progress} onClick={()=>{setError("");setText("");setChecked(false);setNeedsIdentityConfirmation(false);setOpened(true);}}>
         <Trash2 size={15}/> Excluir conta
-      </button>
+      </AppButton>
     </div>
     {ready&&!available&&<p className="settings-note">Não foi possível solicitar a exclusão agora. Tente novamente mais tarde.</p>}
     {progress&&<div role="status" className="account-delete-state"><ShieldAlert size={17}/>
@@ -120,21 +122,21 @@ export function AccountDeletionAction(){
         :progress.status==="completed"?"Sua conta foi excluída.":"Recebemos seu pedido de exclusão. Você pode fechar esta página."}</div>}
     {opened&&<div className="account-delete-overlay" onMouseDown={e=>{if(e.target===e.currentTarget)dismiss();}}>
       <div className="account-delete-dialog" ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="delete-title" aria-describedby="delete-desc" tabIndex={-1}>
-        <header><div><AlertTriangle size={22}/><h2 id="delete-title">Excluir sua conta?</h2></div><button type="button" disabled={busy} onClick={dismiss} aria-label="Fechar"><X size={19}/></button></header>
+        <header><div><AlertTriangle size={22}/><h2 id="delete-title">Excluir sua conta?</h2></div><AppButton type="button" disabled={busy} onClick={dismiss} aria-label="Fechar"><X size={19}/></AppButton></header>
         <p id="delete-desc">Esta ação é <strong>permanente</strong>. Seu perfil, projetos, clientes, agenda, financeiro e demais informações no Roteiva serão eliminados. Não será possível recuperá-los. Um marcador pseudonimizado da identidade utilizada no teste gratuito será preservado para evitar novas concessões gratuitas.</p>
         {user?.email&&<p>Você está excluindo a conta <strong>{user.email}</strong>.</p>}
         <div className="account-delete-preserve"><CheckCircle2 size={17}/><span>Os arquivos originais do seu Google Drive não serão apagados.</span></div>
         <p>Se precisar de uma cópia dos seus registros, cancele e exporte os dados antes de continuar.</p>
         <label htmlFor="delete-confirm">Digite <strong>{CONFIRM}</strong> para confirmar:</label>
-        <input id="delete-confirm" value={text} onChange={e=>setText(e.target.value)} placeholder={CONFIRM} autoComplete="off" spellCheck={false} disabled={busy}/>
-        <label className="account-delete-check"><input type="checkbox" checked={checked} disabled={busy} onChange={e=>setChecked(e.target.checked)}/>
+        <AppInput id="delete-confirm" value={text} onChange={e=>setText(e.target.value)} placeholder={CONFIRM} autoComplete="off" spellCheck={false} disabled={busy}/>
+        <label className="account-delete-check"><AppInput type="checkbox" checked={checked} disabled={busy} onChange={e=>setChecked(e.target.checked)}/>
           <span>Entendo que esta exclusão é irreversível.</span>
         </label>
         {error&&<p className="account-delete-error" role="alert">{error}</p>}
-        <footer><button type="button" className="secondary-button" disabled={busy} onClick={dismiss}>Cancelar</button>
-          <button type="button" className="account-delete-danger" disabled={!canConfirm} onClick={()=>void request()}>
+        <footer><AppButton type="button" className="secondary-button" disabled={busy} onClick={dismiss}>Cancelar</AppButton>
+          <AppButton type="button" className="account-delete-danger" disabled={!canConfirm} onClick={()=>void request()}>
             {busy?<><LoaderCircle size={16} className="account-delete-spin"/> Confirmando…</>:<><Trash2 size={16}/> {needsIdentityConfirmation?'Confirmar com Google':'Excluir definitivamente'}</>}
-          </button></footer>
+          </AppButton></footer>
       </div>
     </div>}
   </div>;
