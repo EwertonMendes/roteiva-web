@@ -49,7 +49,6 @@
 .settings-theme-choices{display:inline-flex;gap:5px;padding:5px;border:1px solid var(--line);background:var(--paper);border-radius:13px;flex:none}
 .settings-theme-choices button{display:flex;align-items:center;gap:8px;border:0;border-radius:9px;padding:10px 13px;background:transparent;color:var(--muted);font-size: var(--type-support);font-weight:700}
 .settings-theme-choices button.selected{background:var(--card);color:var(--ink);box-shadow:0 2px 7px #00000012}
-.settings-theme-choices button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 .settings-privacy-row .workspace-tools{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex:none}
 .settings-privacy-row .workspace-tools button{white-space:nowrap}
 .settings-privacy-row .workspace-tools>span{font-size: var(--type-support);color:var(--muted)}
