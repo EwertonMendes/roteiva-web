@@ -206,3 +206,10 @@
 .cd-avatar-edit:hover{background:var(--paper);color:var(--ink)}
 .cd-avatar-edit:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 @media(max-width:600px){.cd-avatar-edit{width:31px;height:31px;right:-7px;bottom:-5px}}
+
+/* The shared money control inherits the client form dimensions in both themes. */
+.cd-form-fields .money-input{width:100%;min-height:49px;border-radius:12px;background:var(--subtle)}
+.cd-form-fields .money-input>span{width:44px;flex:none}
+.cd-form-fields .money-input input{width:100%;min-width:0;height:47px;border:0;border-radius:0;outline:0;box-shadow:none;background:transparent}
+.cd-form-fields .money-input input:focus-visible{border:0;outline:0;box-shadow:none}
+.cd-form-fields .money-input:focus-within{border-color:var(--muted);outline:2px solid var(--ink);outline-offset:1px}
