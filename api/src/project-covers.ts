@@ -40,7 +40,7 @@ export async function listCoverImages(env:Env,uid:string,id:string,params:URLSea
  for(let attempt=0;attempt<3;attempt++){
   const url=new URL('https://www.googleapis.com/drive/v3/files');
   url.searchParams.set('q',query.join(' and '));
-  url.searchParams.set('fields','nextPageToken,incompleteSearch,files(id,name,mimeType,size,thumbnailLink)');
+  url.searchParams.set('fields','nextPageToken,incompleteSearch,files(id,name,mimeType,size,modifiedTime,thumbnailLink)');
   url.searchParams.set('pageSize','60');
   url.searchParams.set('orderBy',term?'modifiedTime desc':'folder,name');
   url.searchParams.set('supportsAllDrives','true');
@@ -66,6 +66,7 @@ export async function listCoverImages(env:Env,uid:string,id:string,params:URLSea
   return {id:file.id,name:String(file.name).slice(0,250),mimeType:mime,
    ...(mime==='application/vnd.google-apps.folder'?{}:{
      size:String(file.size),
+     ...(typeof file.modifiedTime==='string'?{modifiedTime:file.modifiedTime}:{}),
      thumbnailTicket:typeof file.thumbnailLink==='string'
        ?await sealThumbnailTicket(env,uid,id,row.revision,String(file.id),file.thumbnailLink):undefined
    })};
