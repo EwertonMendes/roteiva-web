@@ -8,7 +8,7 @@ import {cachedMediaUrl,invalidateStorageFile,loadStorageImage,mediaKey,type Medi
 type GetThumbnail=(item:DriveItem,signal?:AbortSignal,accountId?:string)=>Promise<Blob|null>;
 type Phase="idle"|"loading"|"loaded"|"unavailable";
 type ThumbnailState={key:string;phase:Phase;src:string|null};
-const NEGATIVE_TTL=5*60*1000;
+const NEGATIVE_TTL=30*1000;
 const unsupported=new Map<string,number>();
 export function clearDriveThumbnailCache(){unsupported.clear();}
 
@@ -46,7 +46,7 @@ export function DriveThumbnail({item,scope,getThumbnail,provider="google_drive"}
     const blob=await getThumbnail(item,signal,identity.connectionId);
     if(!blob)throw Error("Miniatura não disponível.");
     return blob;
-   },{persist:true,priority:1}).then(src=>{
+   },{persist:item.mimeType.startsWith("image/"),priority:1}).then(src=>{
     if(active)setState({key,src,phase:"loaded"});
    }).catch(()=>{
     unsupported.set(key,Date.now()+NEGATIVE_TTL);
