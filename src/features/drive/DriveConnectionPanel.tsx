@@ -41,6 +41,7 @@ export function DriveConnectionPanel({
   onLinkedFolderCountChange?:(count:number)=>void;
 }) {
   const {user}=useAuth();
+  const storage=useStorageConnections();
   const [connections,setConnections]=useState<Connection[]>([]);
   const [links,setLinks]=useState<DriveFolderLink[]>([]);
   const [ready,setReady]=useState(false);
