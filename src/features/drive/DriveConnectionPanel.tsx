@@ -140,7 +140,7 @@ export function DriveConnectionPanel({
       .then(folders=>{setLinks(folders);setLinksLoaded(true);})
       .catch(()=>{setLinksLoaded(false);setLinkError("Não foi possível atualizar as pastas vinculadas. Tente atualizar novamente.");});
     let accounts:{connections:Connection[]};
-    try{const state=await storage.refresh(force);accounts={connections:state.drive.map(c=>({id:c.id,google_email:c.email,status:c.status as Connection["status"],scopes:c.scopes}))};}
+    try{const state=await storage.refresh(force);if(state.failed.includes("google_drive"))throw Error("Não foi possível consultar o Google Drive. Tente novamente.");accounts={connections:state.drive.map(c=>({id:c.id,google_email:c.email,status:c.status as Connection["status"],scopes:c.scopes}))};}
     catch(cause){setAccountFailed(true);throw cause;}
     finally{void linksRequest;}
     setConnections(accounts.connections);
