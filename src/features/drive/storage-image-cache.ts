@@ -15,6 +15,10 @@ type DiskEntry={key:string;uid:string;blob:Blob;bytes:number;at:number;last:numb
 const memory=new Map<string,Cached>();
 const flights=new Map<string,Promise<string>>();
 const controllers=new Set<AbortController>();
+const connectionEpochs=new Map<string,number>();
+function connectionScope(media:Pick<MediaIdentity,"uid"|"provider"|"connectionId">){
+ return JSON.stringify([media.uid,media.provider,media.connectionId]);
+}
 const queue:Array<{priority:number;start:()=>void;cancel:()=>void}>=[];
 let used=0,running=0,generation=0;
 let database:Promise<IDBDatabase|null>|undefined;
@@ -75,9 +79,9 @@ async function readDisk(key:string):Promise<DiskEntry|null>{
     }catch{resolve(null);}
   });
 }
-async function writeDisk(key:string,uid:string,blob:Blob,epoch:number):Promise<void>{
-  if(generation!==epoch)return;
-  const db=await openDb();if(!db||generation!==epoch)return;
+async function writeDisk(key:string,uid:string,blob:Blob,epoch:number,scope:string,scopeEpoch:number):Promise<void>{
+  if(generation!==epoch||(connectionEpochs.get(scope)||0)!==scopeEpoch)return;
+  const db=await openDb();if(!db||generation!==epoch||(connectionEpochs.get(scope)||0)!==scopeEpoch)return;
   try{
     await new Promise<void>(resolve=>{
       const tx=db.transaction("images","readwrite");
@@ -135,8 +139,10 @@ export function loadStorageImage(
   if(existing)return Promise.resolve(existing);
   const pending=flights.get(key);if(pending)return pending;
   const epoch=generation;
+  const scope=connectionScope(identity),scopeEpoch=connectionEpochs.get(scope)||0;
+  const revoked=()=>epoch!==generation||(connectionEpochs.get(scope)||0)!==scopeEpoch;
   const promise=schedule(options.priority??1,async()=>{
-    if(epoch!==generation)throw new Error("Sessão de imagens alterada.");
+    if(revoked())throw new Error("Sessão de imagens alterada.");
     if(options.persist&&identity.variant==="thumbnail"){
       const stored=await readDisk(key);
       if(epoch!==generation)throw new Error("Sessão de imagens alterada.");
@@ -145,13 +151,13 @@ export function loadStorageImage(
     const controller=new AbortController();controllers.add(controller);
     try{
       const blob=await fetchImage(controller.signal);
-      if(epoch!==generation||controller.signal.aborted)throw new Error("Sessão de imagens alterada.");
+      if(revoked()||controller.signal.aborted)throw new Error("Sessão de imagens alterada.");
       if(!blob.size||blob.size>8*1024*1024||!["image/jpeg","image/png","image/webp","image/avif"].includes(blob.type))
         throw new Error("Imagem inválida ou muito grande.");
       const url=remember(key,blob);
-      if(options.persist&&identity.variant==="thumbnail"&&blob.size<=1024*1024){
+      if(options.persist&&identity.variant==="thumbnail"&&blob.size<=1024*1024&&!revoked()){
         // Never delay displaying an image for IndexedDB writes.
-        void writeDisk(key,identity.uid,blob,epoch);
+        void writeDisk(key,identity.uid,blob,epoch,scope,scopeEpoch);
       }
       return url;
     }finally{controllers.delete(controller);}
@@ -185,8 +191,9 @@ export async function clearStorageImageCache(uid?:string,clearDisk=true):Promise
   });
 }
 export async function invalidateStorageConnection(uid:string,provider:MediaProvider,connectionId:string):Promise<void>{
-  // A disconnected grant must also cancel downloads started under that grant.
-  await clearStorageImageCache(uid,false);
+  // Reject in-flight results from this grant without disrupting another connected provider.
+  const scope=JSON.stringify([uid,provider,connectionId]);
+  connectionEpochs.set(scope,(connectionEpochs.get(scope)||0)+1);
   const prefix=JSON.stringify([uid,provider,connectionId]).slice(0,-1)+",";
   for(const [key,entry] of memory){
     if(!key.startsWith(prefix))continue;
