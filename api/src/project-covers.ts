@@ -66,6 +66,7 @@ export async function listCoverImages(env:Env,uid:string,id:string,params:URLSea
   return {id:file.id,name:String(file.name).slice(0,250),mimeType:mime,
    ...(mime==='application/vnd.google-apps.folder'?{}:{
      size:String(file.size),
+     ...(typeof file.modifiedTime==='string'?{modifiedTime:file.modifiedTime}:{}),
      thumbnailTicket:typeof file.thumbnailLink==='string'
        ?await sealThumbnailTicket(env,uid,id,row.revision,String(file.id),file.thumbnailLink):undefined
    })};
