@@ -44,6 +44,21 @@ test("independent revisions and providers never reuse an unrelated image",async(
  assert.equal(cachedMediaUrl({...media(),provider:"dropbox"}),null);
  await clearStorageImageCache(undefined,false);
 });
+test("disconnect invalidates only the selected account and drops its in-flight result",async()=>{
+ await clearStorageImageCache(undefined,false);
+ const other={...media(),connectionId:"conn-other"};
+ const otherSrc=await loadStorageImage(other,async()=>jpeg(),{persist:false});
+ let release;
+ const gate=new Promise(resolve=>{release=resolve;});
+ const active=loadStorageImage(media(),async()=>{await gate;return jpeg();},{persist:false});
+ await new Promise(resolve=>setTimeout(resolve,0));
+ await invalidateStorageConnection("alpha","google_drive","conn-1");
+ release();
+ await assert.rejects(active,/Sessão de imagens alterada/);
+ assert.equal(cachedMediaUrl(media()),null);
+ assert.equal(cachedMediaUrl(other),otherSrc);
+ await clearStorageImageCache(undefined,false);
+});
 test("rejects invalid media and does not cache it",async()=>{
  await clearStorageImageCache(undefined,false);
  await assert.rejects(loadStorageImage(media(),async()=>new Blob(["<html/>"],{type:"text/html"}),{persist:false}),/Imagem inválida/);
