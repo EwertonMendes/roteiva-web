@@ -13,6 +13,8 @@ import {cacheKey,getCachedFolder,setCachedFolder,clearDriveFolderCache} from "./
 import type {UploadDestination} from "./useDriveUploads";
 import {useDriveTransfers} from "./DriveTransfersProvider";
 import {useDriveApi,messages} from "./drive-api";
+import {useStorageConnections} from "./StorageConnectionsProvider";
+import {invalidateStorageConnection} from "./storage-image-cache";
 import type {UploadedFile} from "./drive-upload-client";
 import "./drive-library.css";
 
@@ -129,7 +131,7 @@ export function DriveConnectionPanel({
     setError(rejected?rejected+" arquivo(s) não foram adicionados. Confira os tamanhos e o limite de 100 arquivos na fila.":"");
   }
 
-  const refresh=useCallback(async()=>{
+  const refresh=useCallback(async(force=false)=>{
     if(!user)return [];
     setLinkError("");
     // Connection and folder links have independent failure boundaries.
@@ -137,13 +139,13 @@ export function DriveConnectionPanel({
       .then(folders=>{setLinks(folders);setLinksLoaded(true);})
       .catch(()=>{setLinksLoaded(false);setLinkError("Não foi possível atualizar as pastas vinculadas. Tente atualizar novamente.");});
     let accounts:{connections:Connection[]};
-    try{accounts=await call<{connections:Connection[]}>("/integrations/drive");}
+    try{const state=await storage.refresh(force);accounts={connections:state.drive.map(c=>({id:c.id,google_email:c.email,status:c.status as Connection["status"],scopes:c.scopes}))};}
     catch(cause){setAccountFailed(true);throw cause;}
     finally{void linksRequest;}
     setConnections(accounts.connections);
     setAccountFailed(false);
     return accounts.connections;
-  },[call,user]);
+  },[storage.refresh,user]);
 
   useEffect(()=>{
     if(linksLoaded)countCallback.current?.(links.length);
@@ -356,9 +358,10 @@ export function DriveConnectionPanel({
     setBusy(true);setError("");
     try{
       await call("/integrations/drive/"+encodeURIComponent(id)+"/disconnect","POST");
+      if(user)await invalidateStorageConnection(user.uid,"google_drive",id);
       clearDriveThumbnailCache();clearDriveFolderCache();
       setConfirmId("");setPicker(false);setViewing(null);++fileRequest.current;
-      await refresh();
+      await refresh(true);
       setResult("Conta desconectada. Seus arquivos permanecem no Google Drive.");
     }catch(e){setError(e instanceof Error?e.message:"Não foi possível desconectar.");}
     finally{setBusy(false);}
@@ -380,7 +383,7 @@ export function DriveConnectionPanel({
           <div className="rl-account-panel"><div><strong>Google Drive conectado</strong><p>{currentAccount?.google_email}</p></div>
             {authorized.length>1&&<AppSelect aria-label="Selecionar conta Google Drive" value={connection?.id||""} onValueChange={value=>setSelectedAccount(value)}>
               {authorized.map(c=><option key={c.id} value={c.id}>{c.google_email}</option>)}</AppSelect>}
-            <AppButton className="secondary-button" type="button" disabled={busy} onClick={()=>void refresh().catch(e=>setError(e instanceof Error?e.message:"Não foi possível atualizar."))}><RefreshCw size={15}/> Atualizar conexão</AppButton>
+            <AppButton className="secondary-button" type="button" disabled={busy} onClick={()=>void refresh(true).catch(e=>setError(e instanceof Error?e.message:"Não foi possível atualizar."))}><RefreshCw size={15}/> Atualizar conexão</AppButton>
             {confirmId?<><p>Desconectar esta conta? As pastas vinculadas não serão apagadas.</p>
               <AppButton className="secondary-button" type="button" disabled={busy} onClick={()=>setConfirmId("")}>Cancelar</AppButton>
               <AppButton className="secondary-button" type="button" disabled={busy} onClick={()=>void disconnect(confirmId)}><Unplug size={15}/> Confirmar desconexão</AppButton></>:
