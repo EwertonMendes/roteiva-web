@@ -116,7 +116,7 @@ export function CoverEditor({project,client,onClose,onSave}:{project?:Project;cl
    }
    if(!['image/jpeg','image/png','image/webp',...(provider==='google_drive'?['image/avif']:[])].includes(file.mimeType))return;
    if(file.size!==undefined && (!Number.isFinite(Number(file.size))||Number(file.size)>8*1024*1024))return;
-   setCover({provider,connectionId:account,fileId:file.id,name:file.name,x:50,y:50,zoom:1});setChoosing(false);
+   setCover({provider,connectionId:account,fileId:file.id,name:file.name,x:50,y:50,zoom:1,...(file.modifiedTime?{modifiedTime:file.modifiedTime}:{})});setChoosing(false);
  };
  return <dialog data-native-cursor ref={dialog} className="pc-dialog" aria-labelledby="pc-editor-title" onCancel={e=>{e.preventDefault();onClose();}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
   <header><div><span className="eyebrow">{client?'FOTO DO CLIENTE':'CAPA DO PROJETO'}</span><h2 id="pc-editor-title">{choosing?'Escolha uma imagem':'Encontre o melhor enquadramento'}</h2><p>{subject.name}</p></div><AppButton className="icon-button" type="button" onClick={onClose} aria-label="Fechar editor de capa"><X size={20}/></AppButton></header>
