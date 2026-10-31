@@ -1,5 +1,16 @@
 # Arquitetura do Roteiva — MVP SaaS
 
+## Performance de armazenamento e miniaturas privadas — 30/10/2026 (PR em validação)
+
+**DECISÃO TOMADA / IMPLEMENTAÇÃO EM TESTES:** conexões OAuth de Drive e Dropbox são descobertas por um provider React global após autenticação e autorização do usuário. Biblioteca, Projetos e Clientes reaproveitam o mesmo estado e refrescam depois de desconectar/reconectar. Nenhuma tela precisa ser visitada para iniciar descoberta; o bootstrap não bloqueia a leitura do workspace.
+
+**Imagens:** capas dos cartões e fotos de clientes solicitam somente miniaturas autenticadas; editor de recorte continua usando o original privado. Um serviço compartilhado deduplica downloads, prioriza imagens solicitadas e mantém LRU por bytes em memória. Apenas miniaturas privadas pequenas podem ser gravadas no IndexedDB (50 MiB totais, TTL 30 min, chave com UID/provedor/conexão/arquivo/variante/revisão). Se IndexedDB falhar, o download funciona sem persistência. Referências Firestore ganham coverModifiedTime / photoModifiedTime opcionais, com regras compatíveis com registros antigos.
+
+**Segurança e limitações:** o Worker continua verificando JWT, acesso, conexão e MIME a cada requisição, sem entregar tokens Google/Dropbox. O Cache-Control: no-store permanece; a persistência local é uma decisão explícita e restrita às miniaturas de uso interno. Logout, troca de identidade e desconexão limpam entradas; mudanças externas ficam limitadas pelo TTL e atualização de versão, não têm revogação instantânea das cópias locais. Originais, mídias de aprovação e tickets restritos nunca vão para IndexedDB. Uma miniatura já entregue ao navegador pode ser copiada por um usuário com acesso ao dispositivo: cache em disco aumenta esse risco residual e exige dispositivos confiáveis. Não adicionar cache persistente a mídia de terceiros/revisões sem nova análise de ameaça.
+
+**Validação pendente:** CI frontend, Firestore em emulador, API e ensaio real em DEV incluindo troca de usuário, thumbnails nas duas contas, reconexão, offline, primeira visita, navegação repetida e mobile. Não classificar as metas de latência como medidas reais até coletar p50/p95 e taxa de cache hit.
+
+
 ## Guardas da página de aprovação — 22/10/2026
 
 `src/features/reviews/useReviewBrowserGuards.ts` usa efeito de montagem/desmontagem de `ReviewPortal`, com um único listener em captura de `contextmenu` no documento e `keydown` no window. Cobre o layout público e o Google-restrito, inclusive áreas vazias fora do quadro da mídia, overlay, formulários e cabeçalho. Intercepta F12 e combinações usuais de DevTools/fonte/salvar/imprimir, mantendo teclas de edição e navegação. Essa é uma **conveniência de interface/dissuasão de cópias casuais**, nunca um controle de acesso; browser chrome, ferramentas externas, atalhos privilegiados e requisições HTTP independentes não estão sujeitos à página. O Worker continua sendo o único ponto de autorização do stream e o risco residual de cópia dos bytes já recebidos permanece.
