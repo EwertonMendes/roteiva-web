@@ -31,7 +31,7 @@ test("preview has keyboard navigation and keeps Drive fallback",()=>{
 });
 
 test("thumbnail shows progress during fetch and falls back on unavailable media",()=>{
-  assert.match(loader,/type Phase = "idle"\|"loading"\|"loaded"\|"unavailable"/);
+  assert.match(loader,/type Phase\s*=\s*"idle"\|"loading"\|"loaded"\|"unavailable"/);
   assert.match(loader,/data-thumbnail-state=\{current.phase\}/);
   assert.match(loader,/setState\(\{key,src:null,phase:"loading"\}\)/);
   assert.match(loader,/phase:"loaded"/);
