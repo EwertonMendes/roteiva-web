@@ -63,11 +63,13 @@ async function readDisk(key:string):Promise<DiskEntry|null>{
   const db=await openDb();if(!db)return null;
   return new Promise(resolve=>{
     try{
-      const tx=db.transaction("images","readonly");
-      const request=tx.objectStore("images").get(key);
+      const tx=db.transaction("images","readwrite"),store=tx.objectStore("images");
+      const request=store.get(key);
       request.onsuccess=()=>{
         const item=request.result as DiskEntry|undefined;
-        resolve(item&&item.blob instanceof Blob&&item.bytes>0&&item.bytes<=1024*1024&&Date.now()-item.at<DISK_MAX_AGE?item:null);
+        const valid=item&&item.blob instanceof Blob&&item.bytes>0&&item.bytes<=1024*1024&&Date.now()-item.at<DISK_MAX_AGE?item:null;
+        if(valid)store.put({...valid,last:Date.now()});
+        resolve(valid);
       };
       request.onerror=()=>resolve(null);
     }catch{resolve(null);}
@@ -183,6 +185,8 @@ export async function clearStorageImageCache(uid?:string,clearDisk=true):Promise
   });
 }
 export async function invalidateStorageConnection(uid:string,provider:MediaProvider,connectionId:string):Promise<void>{
+  // A disconnected grant must also cancel downloads started under that grant.
+  await clearStorageImageCache(uid,false);
   const prefix=JSON.stringify([uid,provider,connectionId]).slice(0,-1)+",";
   for(const [key,entry] of memory){
     if(!key.startsWith(prefix))continue;
