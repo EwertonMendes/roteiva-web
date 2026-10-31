@@ -11,6 +11,7 @@ import { ProtectedRoute } from "./features/auth/ProtectedRoute";
 import { RegistrationGate } from "./features/auth/RegistrationGate";
 import { AccessGate } from "./features/access/AccessGate";
 import {DriveTransfersProvider} from "./features/drive/DriveTransfersProvider";
+import {StorageConnectionsProvider} from "./features/drive/StorageConnectionsProvider";
 import { FirebaseWorkspace } from "./features/workspace/FirebaseWorkspace";
 import "./globals.css";
 import "./responsive.css";
@@ -40,6 +41,6 @@ const publicToken=/^\/review\/([A-Za-z0-9_-]{43})\/?$/.exec(window.location.path
 createRoot(document.getElementById("root")!).render(<React.StrictMode>
   <SiteExperience />
   <AppErrorBoundary>{isDemo ? review ? <ReviewUnavailable /> : <DashboardClient firstName="Visitante" email="demo@roteiva.local" /> :
-    <AuthProvider>{publicToken ? <ReviewPortal token={publicToken}/> : <ProtectedRoute><RegistrationGate><AccessGate>{review ? <ReviewUnavailable /> : <DriveTransfersProvider><FirebaseWorkspace /></DriveTransfersProvider>}</AccessGate></RegistrationGate></ProtectedRoute>}</AuthProvider>}
+    <AuthProvider>{publicToken ? <ReviewPortal token={publicToken}/> : <ProtectedRoute><RegistrationGate><AccessGate>{review ? <ReviewUnavailable /> : <DriveTransfersProvider><StorageConnectionsProvider><FirebaseWorkspace /></StorageConnectionsProvider></DriveTransfersProvider>}</AccessGate></RegistrationGate></ProtectedRoute>}</AuthProvider>}
   </AppErrorBoundary>
 </React.StrictMode>);
