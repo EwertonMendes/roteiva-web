@@ -16,7 +16,7 @@ test("list/grid mode is explicit and stored as a nonprivate local preference",()
 test("thumbnail binary is authenticated, lazy and never loaded from an untrusted link in an image tag",()=>{
   assert.match(loader,/IntersectionObserver/);
   assert.match(loader,/loadStorageImage/);
-  assert.match(loader,/persist:true/);
+  assert.ok(loader.includes('persist:item.mimeType.startsWith("image/")'));
   assert.match(fetcher,/\/files\/".encodeURIComponent\(file.id\)."\/thumbnail"/);
   assert.match(fetcher,/getIdToken/);
   assert.match(parent,/useDriveThumbnailFetch/);
