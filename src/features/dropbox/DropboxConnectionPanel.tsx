@@ -102,7 +102,7 @@ export function DropboxConnectionPanel({projects,selectedProjectId,onLinkedFolde
  const refresh=useCallback(async(force=false)=>{
   if(!user)return;
   const [next,linked]=await Promise.all([
-   storage.refresh(force).then(result=>({connections:result.dropbox.map(c=>({id:c.id,email:c.email,status:c.status as Connection['status'],scopes:c.scopes}))})),
+   storage.refresh(force).then(result=>{if(result.failed.includes('dropbox'))throw Error('O Dropbox não respondeu. Tente atualizar.');return {connections:result.dropbox.map(c=>({id:c.id,email:c.email,status:c.status as Connection['status'],scopes:c.scopes}))};}),
    readDropboxLinks(user.uid)
   ]);
   setConnections(next.connections);setLinks(linked);setReady(true);setDisabled(false);
