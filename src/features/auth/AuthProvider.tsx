@@ -21,9 +21,14 @@ export function AuthProvider({children}: {children: ReactNode}) {
   useEffect(() => {
     const {auth} = firebaseServices();
     let active=true, unsubscribe=()=>{};
+    let previousUid:string|null=null;
     setPersistence(auth,browserLocalPersistence).then(()=>{
       if (!active) return;
-      unsubscribe=onAuthStateChanged(auth,next=>{setUser(next);setLoading(false);},reason=>{
+      unsubscribe=onAuthStateChanged(auth,next=>{
+        if(previousUid&&previousUid!==next?.uid)void clearStorageImageCache();
+        previousUid=next?.uid||null;
+        setUser(next);setLoading(false);
+      },reason=>{
         setUser(null);setError(authErrorMessage(reason));setLoading(false);
       });
     }).catch(reason=>{if(active){setError(authErrorMessage(reason));setLoading(false);}});
