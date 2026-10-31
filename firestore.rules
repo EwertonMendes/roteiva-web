@@ -51,8 +51,8 @@ service cloud.firestore {
         d.schemaVersion==resource.data.schemaVersion && d.revision==resource.data.revision+1;
     }
     function valid_clientPhoto(d) {
-      let fields = ["photoProvider","photoConnectionId","photoFileId","photoName","photoX","photoY","photoZoom","photoModifiedTime"];
-      return !d.keys().hasAny(fields) || (d.keys().hasAll(fields) &&
+      let fields = ["photoProvider","photoConnectionId","photoFileId","photoName","photoX","photoY","photoZoom"];
+      return (!d.keys().hasAny(fields) && !d.keys().hasAny(["photoModifiedTime"])) || (d.keys().hasAll(fields) &&
         d.photoProvider in ["google_drive","dropbox"] &&
         text(d.photoConnectionId,36,36) && d.photoConnectionId.matches('^[a-zA-Z0-9-]{36}$') &&
         text(d.photoFileId,10,200) &&
@@ -82,8 +82,8 @@ service cloud.firestore {
         valid_clientPhoto(d);
     }
     function valid_projectCover(d) {
-      let fields = ["coverConnectionId","coverFileId","coverName","coverX","coverY","coverZoom","coverModifiedTime"];
-      return !d.keys().hasAny(fields) || (d.keys().hasAll(fields) &&
+      let fields = ["coverConnectionId","coverFileId","coverName","coverX","coverY","coverZoom"];
+      return (!d.keys().hasAny(fields) && !d.keys().hasAny(["coverModifiedTime"])) || (d.keys().hasAll(fields) &&
         text(d.coverConnectionId,36,36) && d.coverConnectionId.matches('^[a-zA-Z0-9-]{36}$') &&
         text(d.coverFileId,10,200) && d.coverFileId.matches('^[A-Za-z0-9_-]+$') &&
         text(d.coverName,1,250) &&
