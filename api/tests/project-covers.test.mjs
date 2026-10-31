@@ -18,8 +18,8 @@ async function setup(){
 }
 test('cover search is private, escaped, paginated and filters unsupported/oversized files',async()=>{
  const {env,db,fetcher}=await setup();try{
-  const load=fetcher(url=>{assert.match(url.searchParams.get('q'),/name contains 'bob\\'s'/);assert.equal(url.searchParams.get('pageToken'),'next');assert.equal(url.searchParams.get('pageSize'),'60');return Response.json({files:[{id:fileId,name:'photo.jpg',mimeType:'image/jpeg',size:'3'},{id:'oversize_123456',mimeType:'image/jpeg',size:String(MAX_COVER_BYTES+1)},{id:'svg_1234567890',mimeType:'image/svg+xml',size:'3'}],nextPageToken:'page2'});});
-  const data=await(await listCoverImages(env,'alice',id,new URLSearchParams({search:"bob's",pageToken:'next'}),load)).json();assert.equal(data.files.length,1);assert.equal(data.nextPageToken,'page2');
+  const load=fetcher(url=>{assert.match(url.searchParams.get('q'),/name contains 'bob\\'s'/);assert.equal(url.searchParams.get('pageToken'),'next');assert.equal(url.searchParams.get('pageSize'),'60');assert.match(url.searchParams.get('fields'),/modifiedTime/);return Response.json({files:[{id:fileId,name:'photo.jpg',mimeType:'image/jpeg',size:'3',modifiedTime:'2026-10-30T21:00:00.000Z'},{id:'oversize_123456',mimeType:'image/jpeg',size:String(MAX_COVER_BYTES+1)},{id:'svg_1234567890',mimeType:'image/svg+xml',size:'3'}],nextPageToken:'page2'});});
+  const data=await(await listCoverImages(env,'alice',id,new URLSearchParams({search:"bob's",pageToken:'next'}),load)).json();assert.equal(data.files.length,1);assert.equal(data.files[0].modifiedTime,'2026-10-30T21:00:00.000Z');assert.equal(data.nextPageToken,'page2');
   await assert.rejects(listCoverImages(env,'bob',id,new URLSearchParams(),load));
   await assert.rejects(listCoverImages(env,'alice',id,new URLSearchParams({pageToken:'bad token'}),load));
  }finally{db.close();}
