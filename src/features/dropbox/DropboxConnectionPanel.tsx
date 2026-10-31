@@ -5,6 +5,8 @@ import type {Project} from '../../domain/workspace';
 import {AppSelect} from '../ui/AppSelect';
 import {useAuth} from '../auth/AuthProvider';
 import {useDriveApi,messages} from '../drive/drive-api';
+import {useStorageConnections} from '../drive/StorageConnectionsProvider';
+import {invalidateStorageConnection} from '../drive/storage-image-cache';
 import {DriveFileExplorer,StorageFolderPicker,DriveUnlinkConfirm,isStorageFolder,useOverlayFocus,type DriveItem,type DriveTrail} from '../drive/DriveLibraryUI';
 import {FolderActionsMenu} from '../drive/FolderActionsMenu';
 import {fetchDropboxDocument,isDropboxDocument} from './DropboxDocumentPreview';
@@ -69,6 +71,7 @@ export function DropboxConnectionPanel({projects,selectedProjectId,onLinkedFolde
  projects:readonly Project[];selectedProjectId?:number;onSelectProject:(id:string)=>void;onLinkedFolderCountChange?:(count:number)=>void;
 }){
  const {user}=useAuth(),call=useDriveApi(),transfers=useDriveTransfers();
+ const storage=useStorageConnections();
  const [connections,setConnections]=useState<Connection[]>([]);
  const [links,setLinks]=useState<DropboxFolderLink[]>([]);
  const [ready,setReady]=useState(false),[busy,setBusy]=useState(false),[disabled,setDisabled]=useState(false);
@@ -96,15 +99,15 @@ export function DropboxConnectionPanel({projects,selectedProjectId,onLinkedFolde
   if(previousScope.current&&previousScope.current!==next)clearStorageFolderCache('dropbox');
   previousScope.current=next;
  },[user?.uid,account?.id]);
- const refresh=useCallback(async()=>{
+ const refresh=useCallback(async(force=false)=>{
   if(!user)return;
   const [next,linked]=await Promise.all([
-   call<{connections:Connection[]}>('/integrations/dropbox'),
+   storage.refresh(force).then(result=>{if(result.failed.includes('dropbox'))throw Error('O Dropbox não respondeu. Tente atualizar.');return {connections:result.dropbox.map(c=>({id:c.id,email:c.email,status:c.status as Connection['status'],scopes:c.scopes}))};}),
    readDropboxLinks(user.uid)
   ]);
   setConnections(next.connections);setLinks(linked);setReady(true);setDisabled(false);
   setSelectedConn(old=>next.connections.some(c=>c.id===old)?old:next.connections.find(c=>c.status==='connected')?.id||'');
- },[call,user]);
+ },[storage.refresh,user]);
  useEffect(()=>{let live=true;(async()=>{try{await refresh()}catch(e){
   if(live){setDisabled((e as {code?:string})?.code==='dropbox_not_configured');
    setError((e as {code?:string})?.code==='dropbox_not_configured'?
@@ -285,7 +288,8 @@ export function DropboxConnectionPanel({projects,selectedProjectId,onLinkedFolde
    clearDriveThumbnailCache();clearStorageFolderCache('dropbox',user?.uid,account.id);
    ++requestId.current;++searchId.current;++pickerId.current;
    setViewing(null);setItems([]);setConfirmId('');setPicker(false);
-   await refresh();setResult('Dropbox desconectado. Seus arquivos permanecem na conta.');
+   if(user)await invalidateStorageConnection(user.uid,"dropbox",account.id);
+    await refresh(true);setResult('Dropbox desconectado. Seus arquivos permanecem na conta.');
   }catch(e){setError(e instanceof Error?e.message:'Não foi possível desconectar.')}finally{setBusy(false)}
  }
  const getThumbnail=useCallback(async(file:DriveItem,signal?:AbortSignal,accountId?:string):Promise<Blob|null>=>{
@@ -377,7 +381,7 @@ export function DropboxConnectionPanel({projects,selectedProjectId,onLinkedFolde
         <AppButton type="button" className="secondary-button" disabled={busy} onClick={()=>setConfirmId(account?.id||'')}><Unplug size={15}/> Desconectar</AppButton>}
       </div></details>:null}
     <AppButton className="secondary-button" type="button" aria-label="Atualizar Dropbox"
-      disabled={busy||disabled||fileBusy} onClick={()=>void refresh().then(()=>{
+      disabled={busy||disabled||fileBusy} onClick={()=>void refresh(true).then(()=>{
        if(viewing)void load(viewing,currentFolder,path,undefined,false,true);
       }).catch(e=>setError(e instanceof Error?e.message:'Falha ao atualizar.'))}>
       <RefreshCw size={16}/></AppButton>

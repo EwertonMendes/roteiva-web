@@ -1,82 +1,70 @@
-import {createContext,useContext,useCallback,useEffect,useRef,useState,type ReactNode} from 'react';
-import {useAuth} from '../auth/AuthProvider';
-import {useDriveApi} from '../drive/drive-api';
-import type {ProjectCover} from '../../domain/workspace';
-export type CoverConnection={id:string;google_email:string;status:string;scopes:string;provider:'google_drive'|'dropbox'};
-type Context={connections:CoverConnection[];error:string;loadingConnections:boolean;retryConnections:()=>void;uid:string;load:(cover:ProjectCover,signal:AbortSignal,thumbnail?:boolean)=>Promise<Blob>};
+import {createContext,useContext,useCallback,useEffect,useRef,useState,type ReactNode} from "react";
+import {useAuth} from "../auth/AuthProvider";
+import {useStorageConnections,type StorageConnection} from "../drive/StorageConnectionsProvider";
+import {cachedMediaUrl,loadStorageImage,type MediaIdentity} from "../drive/storage-image-cache";
+import type {ProjectCover} from "../../domain/workspace";
+
+export type CoverConnection={id:string;google_email:string;status:string;scopes:string;provider:"google_drive"|"dropbox"};
+type Context={
+ connections:CoverConnection[];error:string;loadingConnections:boolean;
+ retryConnections:()=>void;uid:string;
+ load:(cover:ProjectCover,thumbnail?:boolean)=>Promise<string>;
+};
 const CoverContext=createContext<Context|null>(null);
-function imageQueue(){
- let running=0;const waiters:(()=>void)[]=[];
- return async(signal:AbortSignal)=>{
-  if(signal.aborted)throw signal.reason;
-  await new Promise<void>((resolve,reject)=>{
-   const start=()=>{signal.removeEventListener('abort',abort);running++;resolve();};
-   const abort=()=>{const index=waiters.indexOf(start);if(index>=0)waiters.splice(index,1);reject(signal.reason);};
-   if(running<3)start();else{waiters.push(start);signal.addEventListener('abort',abort,{once:true});}
-  });
-  return ()=>{running--;waiters.shift()?.();};
- };
+const API="https://roteiva-api-dev.ewertonmendes9.workers.dev";
+function coverIdentity(uid:string,cover:ProjectCover,thumbnail:boolean):MediaIdentity{
+ return {uid,provider:cover.provider==="dropbox"?"dropbox":"google_drive",
+  connectionId:cover.connectionId,fileId:cover.fileId,
+  revision:cover.modifiedTime,variant:thumbnail?"thumbnail":"original"};
 }
-const API='https://roteiva-api-dev.ewertonmendes9.workers.dev';
 export function DriveCoversProvider({children,includeDropbox=false}:{children:ReactNode;includeDropbox?:boolean}){
- const {user}=useAuth();const call=useDriveApi();const [acquire]=useState(imageQueue);
- const [connections,setConnections]=useState<CoverConnection[]>([]);
- const [error,setError]=useState('');
- const [loadingConnections,setLoadingConnections]=useState(true);
- const [refreshKey,refreshConnections]=useState(0);
- const retryConnections=useCallback(()=>refreshConnections(value=>value+1),[]);
- useEffect(()=>{
-  const controller=new AbortController();
-  setLoadingConnections(true);setError('');
-  // Keep a successful provider even if the other request fails. Never silently
-  // hide an unavailable connection; present a recoverable status to the user.
-  const drive=call<{connections:{id:string;google_email:string;status:string;scopes:string}[]}>('/integrations/drive','GET',undefined,controller.signal)
-   .then(result=>result.connections.filter(c=>c.status==='connected').map(c=>({...c,provider:'google_drive' as const})));
-  const dropbox=includeDropbox
-   ?call<{connections:{id:string;email:string;status:string;scopes:string}[]}>('/integrations/dropbox','GET',undefined,controller.signal)
-    .then(result=>result.connections.filter(c=>c.status==='connected').map(c=>({id:c.id,google_email:c.email,status:c.status,scopes:c.scopes,provider:'dropbox' as const})))
-   :null;
-  const tasks:Promise<CoverConnection[]>[]=dropbox?[drive,dropbox]:[drive];
-  void Promise.allSettled(tasks).then(results=>{
-   if(controller.signal.aborted)return;
-   const successful=results.flatMap(result=>result.status==='fulfilled'?result.value:[]);
-   const failedProviders=results.flatMap((result,index)=>result.status==='rejected'
-     ?[index===0?'Google Drive':'Dropbox']:[]);
-   // Do not retain another account's connections after an auth switch.
-   setConnections(successful);
-   setError(failedProviders.length?'Não foi possível consultar '+failedProviders.join(' e ')+'. Atualize as conexões para tentar novamente.':'');
-   setLoadingConnections(false);
-  });
-  return ()=>controller.abort();
- },[call,user?.uid,includeDropbox,refreshKey]);
- const load=useCallback(async(cover:ProjectCover,signal:AbortSignal,thumbnail=false)=>{
-  if(!user)throw Error('Entre novamente para carregar a capa.');
-  const release=await acquire(signal);try{
-  const provider=cover.provider==='dropbox'?'dropbox':'drive';
-  const path=API+'/integrations/'+provider+'/'+encodeURIComponent(cover.connectionId)+'/files/'+encodeURIComponent(cover.fileId)+(thumbnail?'/thumbnail':'/cover');
-  let response:Response|undefined;
-  for(let attempt=0;attempt<2;attempt++){
-   const token=await user.getIdToken(attempt===1);
-   response=await fetch(path,{headers:{Authorization:'Bearer '+token},cache:'no-store',signal});if(response.status!==401)break;
-  }
-  if(!response?.ok || response.status===204)throw Error('Imagem indisponível. Confira o arquivo e a conexão de armazenamento.');
-  if(!['image/jpeg','image/png','image/webp','image/avif'].includes(response.headers.get('Content-Type')?.split(';')[0]||''))throw Error('Formato de imagem não suportado.');
-  const blob=await response.blob();if(!blob.size||blob.size>8*1024*1024)throw Error('A imagem excede o limite de 8 MB.');return blob;
-  }finally{release();}
- },[user,acquire]);
- return <CoverContext.Provider value={{connections,error,loadingConnections,retryConnections,uid:user?.uid||'',load}}>{children}</CoverContext.Provider>;
+ const {user}=useAuth();
+ const storage=useStorageConnections();
+ const connections:CoverConnection[]=storage.connections
+  .filter(c=>c.status==="connected"&&(includeDropbox||c.provider==="google_drive"))
+  .map((c:StorageConnection)=>({id:c.id,google_email:c.email,status:c.status,scopes:c.scopes,provider:c.provider}));
+ const retryConnections=useCallback(()=>{void storage.refresh(true);},[storage.refresh]);
+ const load=useCallback(async(cover:ProjectCover,thumbnail=false)=>{
+  if(!user)throw new Error("Entre novamente para carregar a imagem.");
+  const identity=coverIdentity(user.uid,cover,thumbnail);
+  return loadStorageImage(identity,async signal=>{
+   const provider=identity.provider==="dropbox"?"dropbox":"drive";
+   const path=API+"/integrations/"+provider+"/"+encodeURIComponent(cover.connectionId)+
+    "/files/"+encodeURIComponent(cover.fileId)+(thumbnail?"/thumbnail":"/cover");
+   let response:Response|undefined;
+   for(let attempt=0;attempt<2;attempt++){
+    const token=await user.getIdToken(attempt===1);
+    response=await fetch(path,{headers:{Authorization:"Bearer "+token},cache:"no-store",signal});
+    if(response.status!==401)break;
+   }
+   if(!response?.ok||response.status===204)throw Error("Imagem indisponível. Confira o arquivo e a conexão de armazenamento.");
+   const mime=(response.headers.get("Content-Type")||"").split(";")[0].toLowerCase();
+   if(!["image/jpeg","image/png","image/webp","image/avif"].includes(mime))
+    throw Error("Formato de imagem não suportado.");
+   const blob=await response.blob();
+   return blob.type===mime?blob:new Blob([blob],{type:mime});
+  },{persist:thumbnail,priority:thumbnail?1:2});
+ },[user]);
+ return <CoverContext.Provider value={{connections,error:storage.error&&(includeDropbox||storage.error.includes("Google Drive"))?("Não foi possível consultar "+storage.error+"."): "",
+  loadingConnections:storage.loading,retryConnections,uid:user?.uid||"",load}}>{children}</CoverContext.Provider>;
 }
 export const useDriveCovers=()=>useContext(CoverContext);
 export function useCoverImage(cover:ProjectCover|undefined,visible=true,thumbnail=false){
- const context=useDriveCovers();const [state,setState]=useState({key:'',src:'',error:''});
- const load=context?.load;const key=[context?.uid,cover?.provider||'google_drive',cover?.connectionId,cover?.fileId,thumbnail?'thumb':'full'].join(':');
- const current=useRef(cover);current.current=cover;
- const connected=!!context?.connections.some(c=>c.id===cover?.connectionId&&c.provider===(cover?.provider||'google_drive'));
+ const context=useDriveCovers();
+ const identity=cover&&context?.uid?coverIdentity(context.uid,cover,thumbnail):null;
+ const key=identity?JSON.stringify(identity):"";
+ const [state,setState]=useState({key:"",src:"",error:""});
+ const load=context?.load;
+ const selected=useRef(cover);selected.current=cover;
+ const connected=!!context?.connections.some(c=>c.id===cover?.connectionId&&c.provider===(cover?.provider||"google_drive"));
+ const cached=identity&&connected?cachedMediaUrl(identity):null;
  useEffect(()=>{
-  if(!load||!current.current||!visible||!connected)return;
-  const controller=new AbortController();let src='';setState({key,src:'',error:''});
-  void load(current.current,controller.signal,thumbnail).then(blob=>{if(controller.signal.aborted)return;src=URL.createObjectURL(blob);setState({key,src,error:''});}).catch(e=>{if(!controller.signal.aborted)setState({key,src:'',error:e.message});});
-  return ()=>{controller.abort();if(src)URL.revokeObjectURL(src);};
+  if(!load||!selected.current||!visible||!connected)return;
+  let active=true;
+  setState({key,src:cachedMediaUrl(coverIdentity(context!.uid,selected.current,thumbnail))||"",error:""});
+  void load(selected.current,thumbnail).then(src=>{if(active)setState({key,src,error:""});})
+   .catch(e=>{if(active)setState({key,src:"",error:e instanceof Error?e.message:"Imagem indisponível."});});
+  return ()=>{active=false;};
  },[load,key,visible,connected,thumbnail]);
- return connected&&state.key===key?state:{key,src:'',error:''};
+ return connected?state.key===key?state:{key,src:cached||"",error:""}:{key,src:"",error:context?.loadingConnections?"":"Conexão indisponível."};
 }

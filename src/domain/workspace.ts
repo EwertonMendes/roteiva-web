@@ -1,6 +1,6 @@
 export type View = "overview" | "projects" | "clients" | "reviews" | "finance" | "calendar" | "library" | "settings";
 export type Status = "Em produção" | "Em aprovação" | "Ajustes" | "Aprovado";
-export type StorageImage = {provider?:"google_drive"|"dropbox";connectionId:string;fileId:string;name:string;x:number;y:number;zoom:number};
+export type StorageImage = {provider?:"google_drive"|"dropbox";connectionId:string;fileId:string;name:string;x:number;y:number;zoom:number;modifiedTime?:string};
 export type ProjectCover = StorageImage; // Existing project images are Google Drive by default.
 export type ClientPhoto = StorageImage;
 export type Project = { cover?:ProjectCover; clientId?: number; dueDate?: string; description?: string; tasks?: { id: number; title: string; done: boolean }[]; template?: string;  id: number; name: string; client: string; status: Status; due: string; progress: number; files: number; color: string; initials: string };

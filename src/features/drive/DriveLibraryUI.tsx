@@ -223,7 +223,7 @@ export function DriveFileExplorer({folderName,path,files,loading,hasMore,thumbna
     const isFolder=isStorageFolder(file.mimeType);
     return <div className="rl-file-row" key={file.id}>
       <AppButton type="button" className="rl-file-open" title={file.name} onClick={()=>onOpen(file)} disabled={loading}>
-        <DriveThumbnail item={file} scope={thumbnailScope} getThumbnail={getThumbnail}/>
+        <DriveThumbnail item={file} scope={thumbnailScope} provider={provider} getThumbnail={getThumbnail}/>
         <span className="rl-file-name">{file.name}<small>{isFolder?"Subpasta":readableFileType(file.mimeType)}{!isFolder&&readableSize(file.size)?" · "+readableSize(file.size):""}</small></span>
       </AppButton>
       <time>{file.modifiedTime?new Date(file.modifiedTime).toLocaleDateString("pt-BR"):"—"}</time>

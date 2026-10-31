@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import { browserLocalPersistence, GoogleAuthProvider, onAuthStateChanged, setPersistence, signInWithPopup, signOut, type User } from "firebase/auth";
 import { firebaseServices, persistentCacheEnabled, purgePrivateCache } from "../../lib/firebase";
 import { authErrorMessage } from "./errors";
+import {clearStorageImageCache} from "../drive/storage-image-cache";
 
 export type AuthIntent = "login" | "register";
 type AuthState = { user: User | null; loading: boolean; busy: boolean; error: string; intent: AuthIntent; login: (intent?: AuthIntent) => Promise<void>; logout: () => Promise<void> };
@@ -20,9 +21,14 @@ export function AuthProvider({children}: {children: ReactNode}) {
   useEffect(() => {
     const {auth} = firebaseServices();
     let active=true, unsubscribe=()=>{};
+    let previousUid:string|null=null;
     setPersistence(auth,browserLocalPersistence).then(()=>{
       if (!active) return;
-      unsubscribe=onAuthStateChanged(auth,next=>{setUser(next);setLoading(false);},reason=>{
+      unsubscribe=onAuthStateChanged(auth,next=>{
+        if(previousUid&&previousUid!==next?.uid)void clearStorageImageCache();
+        previousUid=next?.uid||null;
+        setUser(next);setLoading(false);
+      },reason=>{
         setUser(null);setError(authErrorMessage(reason));setLoading(false);
       });
     }).catch(reason=>{if(active){setError(authErrorMessage(reason));setLoading(false);}});
@@ -44,6 +50,7 @@ export function AuthProvider({children}: {children: ReactNode}) {
     setBusy(true); setError("");
     try {
       await signOut(firebaseServices().auth);
+      await clearStorageImageCache();
       setUser(null);setIntent("login");
       if (persistentCacheEnabled()) {
         await purgePrivateCache();
