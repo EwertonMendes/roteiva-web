@@ -145,7 +145,7 @@ export function loadStorageImage(
     if(revoked())throw new Error("Sessão de imagens alterada.");
     if(options.persist&&identity.variant==="thumbnail"){
       const stored=await readDisk(key);
-      if(epoch!==generation)throw new Error("Sessão de imagens alterada.");
+      if(revoked())throw new Error("Sessão de imagens alterada.");
       if(stored)return remember(key,stored.blob,stored.at);
     }
     const controller=new AbortController();controllers.add(controller);
