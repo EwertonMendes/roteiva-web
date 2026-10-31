@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import { browserLocalPersistence, GoogleAuthProvider, onAuthStateChanged, setPersistence, signInWithPopup, signOut, type User } from "firebase/auth";
 import { firebaseServices, persistentCacheEnabled, purgePrivateCache } from "../../lib/firebase";
 import { authErrorMessage } from "./errors";
+import {clearStorageImageCache} from "../drive/storage-image-cache";
 
 export type AuthIntent = "login" | "register";
 type AuthState = { user: User | null; loading: boolean; busy: boolean; error: string; intent: AuthIntent; login: (intent?: AuthIntent) => Promise<void>; logout: () => Promise<void> };
@@ -44,6 +45,7 @@ export function AuthProvider({children}: {children: ReactNode}) {
     setBusy(true); setError("");
     try {
       await signOut(firebaseServices().auth);
+      await clearStorageImageCache();
       setUser(null);setIntent("login");
       if (persistentCacheEnabled()) {
         await purgePrivateCache();
