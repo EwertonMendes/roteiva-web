@@ -7,8 +7,8 @@
 - [x] Código: usar miniaturas para capas da listagem, com download compartilhado e cache em memória/IndexedDB limitado; manter originais no editor.
 - [x] Código: versões opcionais de imagens no Firestore, com leitura retrocompatível e regras restritivas.
 - [x] Código: invalidar entradas após desconexão e logout; não gravar originais/revisões em disco.
-- [ ] Validar CI frontend, Worker e regras Firestore em emulador (A/B), sem alterar dados reais.
-- [ ] Validar implantação coordenada das regras e do Worker em DEV antes de habilitar o frontend de PR.
+- [x] Validar CI frontend, Worker e regras Firestore em emulador (A/B), sem alterar dados reais. Evidências: frontend [CI](https://github.com/EwertonMendes/roteiva-web/actions/runs/41149989007), API [CI](https://github.com/EwertonMendes/roteiva-web/actions/runs/41149989013), Firestore [CI](https://github.com/EwertonMendes/roteiva-web/actions/runs/41149989055) e navegador isolado [CI](https://github.com/EwertonMendes/roteiva-web/actions/runs/41149989034).
+- [x] Publicar regras Firestore, frontend e Worker em DEV: [regras](https://github.com/EwertonMendes/roteiva-web/actions/runs/41149995975), [frontend PR #100](https://github.com/EwertonMendes/roteiva-web/actions/runs/41150412238), [Worker PR #101 mergeado na master](https://github.com/EwertonMendes/roteiva-web/actions/runs/41151477328). QA pública anterior passou; nova verificação pública pós-Worker disparada.
 - [ ] Medir desempenho real (primeira abertura e cache quente), navegação, imagens alteradas externamente e troca de conta.
 - [ ] Homologação manual com Chrome/mobile, Google Drive e Dropbox; sem merge antes do aceite visual.
 
