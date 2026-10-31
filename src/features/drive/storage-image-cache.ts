@@ -15,7 +15,7 @@ type DiskEntry={key:string;uid:string;blob:Blob;bytes:number;at:number;last:numb
 const memory=new Map<string,Cached>();
 const flights=new Map<string,Promise<string>>();
 const controllers=new Set<AbortController>();
-const queue:Array<{priority:number;start:()=>void}>=[];
+const queue:Array<{priority:number;start:()=>void;cancel:()=>void}>=[];
 let used=0,running=0,generation=0;
 let database:Promise<IDBDatabase|null>|undefined;
 export function mediaKey(media:MediaIdentity):string{
@@ -73,8 +73,9 @@ async function readDisk(key:string):Promise<DiskEntry|null>{
     }catch{resolve(null);}
   });
 }
-async function writeDisk(key:string,uid:string,blob:Blob):Promise<void>{
-  const db=await openDb();if(!db)return;
+async function writeDisk(key:string,uid:string,blob:Blob,epoch:number):Promise<void>{
+  if(generation!==epoch)return;
+  const db=await openDb();if(!db||generation!==epoch)return;
   try{
     await new Promise<void>(resolve=>{
       const tx=db.transaction("images","readwrite");
@@ -114,7 +115,7 @@ function schedule<T>(priority:number,run:()=>Promise<T>):Promise<T>{
       running++;
       void run().then(resolve,reject).finally(()=>{running--;pump();});
     };
-    queue.push({priority,start});pump();
+    queue.push({priority,start,cancel:()=>reject(new Error("Sessão de imagens alterada."))});pump();
   });
 }
 function pump(){
@@ -148,7 +149,7 @@ export function loadStorageImage(
       const url=remember(key,blob);
       if(options.persist&&identity.variant==="thumbnail"&&blob.size<=1024*1024){
         // Never delay displaying an image for IndexedDB writes.
-        void writeDisk(key,identity.uid,blob);
+        void writeDisk(key,identity.uid,blob,epoch);
       }
       return url;
     }finally{controllers.delete(controller);}
@@ -161,7 +162,7 @@ export function loadStorageImage(
 export async function clearStorageImageCache(uid?:string,clearDisk=true):Promise<void>{
   generation++;
   for(const controller of controllers)controller.abort();
-  controllers.clear();flights.clear();queue.splice(0);
+  controllers.clear();flights.clear();for(const item of queue)item.cancel();queue.splice(0);
   for(const [key,entry] of memory){
     if(uid&&!key.startsWith('["'+uid+'",'))continue;
     URL.revokeObjectURL(entry.url);memory.delete(key);used-=entry.bytes;
