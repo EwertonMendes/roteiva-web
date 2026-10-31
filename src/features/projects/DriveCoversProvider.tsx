@@ -45,7 +45,7 @@ export function DriveCoversProvider({children,includeDropbox=false}:{children:Re
    return blob.type===mime?blob:new Blob([blob],{type:mime});
   },{persist:thumbnail,priority:thumbnail?1:2});
  },[user]);
- return <CoverContext.Provider value={{connections,error:storage.error?("Não foi possível consultar "+storage.error+"."): "",
+ return <CoverContext.Provider value={{connections,error:storage.error&&(includeDropbox||storage.error.includes("Google Drive"))?("Não foi possível consultar "+storage.error+"."): "",
   loadingConnections:storage.loading,retryConnections,uid:user?.uid||"",load}}>{children}</CoverContext.Provider>;
 }
 export const useDriveCovers=()=>useContext(CoverContext);
