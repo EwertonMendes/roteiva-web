@@ -13,7 +13,7 @@ function StatusIcon({status}:{status:Status}){const Icon=PROJECT_STATUS_ICONS[st
 function ProjectCard({project,onOpen,onEdit,eager=false}:{project:Project;onOpen:()=>void;onEdit:()=>void;eager?:boolean}){
  const context=useDriveCovers();const box=useRef<HTMLElement>(null);const [visible,setVisible]=useState(eager);
  useEffect(()=>{if(eager||visible)return;const observer=new IntersectionObserver(([entry])=>{if(entry.isIntersecting){setVisible(true);observer.disconnect();}},{rootMargin:'320px'});if(box.current)observer.observe(box.current);return ()=>observer.disconnect();},[eager,visible]);
- const {src,error,loading}=useCoverImage(project.cover,visible,true,true);
+ const {src,error,loading}=useCoverImage(project.cover,eager||visible,true,true);
  const canEdit=!!context?.connections.some(c=>c.provider==='google_drive');
  const hasCover=!!project.cover;
  return <article className="pc-card" ref={box}>
