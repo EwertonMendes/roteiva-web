@@ -39,7 +39,7 @@ test("PR smoke is bounded while manual/nightly browser and security coverage rem
   for (const path of [
     "access-isolated-e2e.spec.ts", "reviews.spec.ts", "reviews-workflow.spec.ts",
     "drive-folders.spec.ts", "project-covers.spec.ts"
-  ]) assert.match(read("tests/browser/" + path), /tag:\\s*['"]@ci-smoke['"]/, path);
+  ]) assert.match(read("tests/browser/" + path), /tag:\s*['"]@ci-smoke['"]/, path);
 });
 
 test("admin Firestore remains disabled for public Actions and never reuses deployment identity", () => {
