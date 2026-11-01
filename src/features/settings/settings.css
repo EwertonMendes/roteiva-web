@@ -4,8 +4,11 @@
   display: grid;
   gap: 17px;
   width: 100%;
-  max-width: 1060px;
+  /* Follow the workspace page's available content width rather than
+     leaving an empty right gutter on large monitors. */
+  max-width: 100%;
   min-width: 0;
+  box-sizing: border-box;
   padding-bottom: 38px;
 }
 .settings-identity,
@@ -267,7 +270,9 @@
 [data-theme="dark"] .settings-theme-choices button.selected:last-child { border-left-color: #a4b6a6; }
 [data-theme="dark"] .access-settings .access-settings-detail { background: #202820; border-color: #39483b; }
 [data-theme="dark"] .settings-monogram { background: #090909; }
-@media(max-width:900px) {
+/* A desktop sidebar reduces the workspace width long before the viewport
+   reaches tablet sizes. Reflow the studio form while fields are still usable. */
+@media(max-width:1250px) {
   .settings-editor { padding: 23px 24px; }
   .settings-studio-controls { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .settings-save-button { grid-column: 1 / -1; justify-self: end; }
