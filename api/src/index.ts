@@ -1,4 +1,4 @@
-import {listCoverImages,coverImage,dropboxCoverImage} from './project-covers.ts';
+import {listCoverImages,coverImage,dropboxCoverImage,fastCoverPreview} from './project-covers.ts';
 import { ApiError, type Env } from './types.ts';
 import { reviewRouter,cleanupExpiredReviews } from './reviews.ts';
 import { identity,verifiedTrialPrincipal } from './auth.ts';
@@ -167,13 +167,15 @@ export async function handle(request: Request, env: Env): Promise<Response> {
       response=parts.length===5
         ? await listFolders(env,uid,parts[3],url.searchParams.get('parentId')||'root',url.searchParams.get('pageToken'))
         : await listFolderItems(env,uid,parts[3],parts[5],url.searchParams.get('pageToken'),fetch,url.searchParams.get('search'));
-    } else if (/^\/integrations\/drive\/[^/]+\/(?:cover-images|files\/[^/]+\/cover)$/.test(url.pathname) && request.method==='GET') {
+    } else if (/^\/integrations\/drive\/[^/]+\/(?:cover-images|files\/[^/]+\/(?:cover|preview))$/.test(url.pathname) && request.method==='GET') {
       enabled(env);
       const uid=await identity(request,env);
       await assertActiveAccess(env,uid);
       if(!(await env.API_THUMB_LIMIT.limit({key:'dev:uid:'+uid})).success)throw new ApiError(429,'rate_limited');
       const parts=url.pathname.split('/');
-      response=parts[4]==='cover-images'?await listCoverImages(env,uid,parts[3],url.searchParams):await coverImage(env,uid,parts[3],parts[5]);
+      response=parts[4]==='cover-images'?await listCoverImages(env,uid,parts[3],url.searchParams)
+       :parts[6]==='preview'?await fastCoverPreview(env,uid,parts[3],parts[5])
+       :await coverImage(env,uid,parts[3],parts[5]);
     } else if (/^\/integrations\/drive\/[^/]+\/picker\/verify$/.test(url.pathname) && request.method==='POST') {
       enabled(env);
       if(origin!==env.FRONTEND_ORIGIN)throw new ApiError(403,'origin_required');
