@@ -3,7 +3,7 @@
 export type MediaProvider = "google_drive" | "dropbox";
 export type MediaIdentity = {
   uid:string; provider:MediaProvider; connectionId:string; fileId:string;
-  variant:"thumbnail"|"original"; revision?:string;
+  variant:"thumbnail"|"display"|"original"; revision?:string;
 };
 const MEMORY_LIMIT=32*1024*1024;
 const DISK_LIMIT=50*1024*1024;
@@ -143,7 +143,7 @@ export function loadStorageImage(
   const revoked=()=>epoch!==generation||(connectionEpochs.get(scope)||0)!==scopeEpoch;
   const promise=schedule(options.priority??1,async()=>{
     if(revoked())throw new Error("Sessão de imagens alterada.");
-    if(options.persist&&identity.variant==="thumbnail"){
+    if(options.persist&&identity.variant!=="original"){
       const stored=await readDisk(key);
       if(revoked())throw new Error("Sessão de imagens alterada.");
       if(stored)return remember(key,stored.blob,stored.at);
@@ -155,7 +155,7 @@ export function loadStorageImage(
       if(!blob.size||blob.size>8*1024*1024||!["image/jpeg","image/png","image/webp","image/avif"].includes(blob.type))
         throw new Error("Imagem inválida ou muito grande.");
       const url=remember(key,blob);
-      if(options.persist&&identity.variant==="thumbnail"&&blob.size<=1024*1024&&!revoked()){
+      if(options.persist&&identity.variant!=="original"&&blob.size<=1024*1024&&!revoked()){
         // Never delay displaying an image for IndexedDB writes.
         void writeDisk(key,identity.uid,blob,epoch,scope,scopeEpoch);
       }
