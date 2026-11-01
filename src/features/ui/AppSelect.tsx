@@ -147,8 +147,12 @@ export function AppSelect({
 
   const move = (direction: 1 | -1) => {
     if (!available.length) return;
-    const at = available.indexOf(active);
-    setActive(available[(at + direction + available.length) % available.length]);
+    // Sequential Home/Arrow/Enter key events can batch React updates. Derive
+    // from the queued state, never the active index captured by an old render.
+    setActive(previous => {
+      const at = available.indexOf(previous);
+      return available[(at + direction + available.length) % available.length];
+    });
   };
   const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (disabled) return;
