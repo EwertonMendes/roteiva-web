@@ -8,7 +8,7 @@ async function register(page:Page,email:string){
  await page.goto(base+'/projetos');await expect(page.getByRole('heading',{name:'Projetos',exact:true})).toBeVisible();
  await page.locator('.heading-actions').getByRole('button',{name:'Criar projeto',exact:true}).click();await page.getByLabel('Nome do projeto',{exact:true}).fill('Campanha com capa');await page.locator('form.project-modal').getByRole('button',{name:'Criar projeto',exact:true}).click();await expect(page.locator('form.project-modal')).toHaveCount(0);await expect(page.locator('[aria-busy]').first()).toHaveAttribute('aria-busy','false');await page.goto(base+'/projetos');await expect(page.locator('.pc-card')).toHaveCount(1);
 }
-test('project covers require Drive, persist crop, cancel safely and support removal',async({page},info)=>{
+test('project covers require Drive, persist crop, cancel safely and support removal',{tag:'@ci-smoke'},async({page},info)=>{
  await page.emulateMedia({reducedMotion:'no-preference'});
  const connectionId='aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa';let activeConnectionId=connectionId;let connected=false;
  let png=Buffer.alloc(0);
