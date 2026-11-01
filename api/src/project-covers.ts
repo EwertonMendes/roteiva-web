@@ -97,6 +97,55 @@ export async function coverImage(env:Env,uid:string,id:string,fileId:string,fetc
  return new Response(bytes,{headers:{'Content-Type':String(info.mimeType),'Content-Length':String(received),'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}});
 }
 
+
+/** High-fidelity list-card preview using one private Google media read.
+ * Unlike the crop editor's coverImage, avoids an extra Drive metadata request.
+ * The authenticated Worker still owns access, MIME/size checks, byte validation,
+ * redirect policy and a final connection-revision check before returning bytes.
+ * Never persist originals on the server or expose upstream links/tokens. */
+export async function fastCoverPreview(env:Env,uid:string,id:string,fileId:string,fetcher:typeof fetch=fetch){
+ if(!ID.test(fileId))throw new ApiError(400,'invalid_file_id');
+ const row=await authorized(env,uid,id);
+ const token=await accessCredential(env,row,fetcher);
+ const url=new URL('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(fileId));
+ url.searchParams.set('alt','media');
+ url.searchParams.set('supportsAllDrives','true');
+ let response:Response;
+ try{response=await fetcher(url,{headers:{Authorization:'Bearer '+token.value},
+  redirect:'manual',signal:AbortSignal.timeout(15000)});}
+ catch{throw new ApiError(502,'cover_unavailable');}
+ if(response.status!==200){await response.body?.cancel();throw new ApiError(502,'cover_unavailable');}
+ const mime=(response.headers.get('Content-Type')||'').split(';')[0].toLowerCase();
+ const reported=Number(response.headers.get('Content-Length')||0);
+ if(!COVER_TYPES.includes(mime)||!Number.isFinite(reported)||reported<0||reported>MAX_COVER_BYTES){
+  await response.body?.cancel();throw new ApiError(400,'invalid_cover_image');
+ }
+ const reader=response.body?.getReader();
+ if(!reader)throw new ApiError(502,'cover_unavailable');
+ const chunks:Uint8Array[]=[];let length=0;
+ try{
+  for(;;){const {done,value}=await reader.read();if(done)break;
+   length+=value.byteLength;
+   if(length>MAX_COVER_BYTES)throw new ApiError(413,'cover_too_large');
+   chunks.push(value);
+  }
+ }catch(e){await reader.cancel().catch(()=>{});throw e;}
+ if(!length||(reported&&length!==reported))throw new ApiError(502,'cover_unavailable');
+ const bytes=new Uint8Array(length);let cursor=0;
+ for(const chunk of chunks){bytes.set(chunk,cursor);cursor+=chunk.byteLength;}
+ const ascii=(offset:number,size:number)=>String.fromCharCode(...bytes.slice(offset,offset+size));
+ const valid=mime==='image/jpeg'?bytes.length>=3&&bytes[0]===0xff&&bytes[1]===0xd8&&bytes[2]===0xff
+  :mime==='image/png'?bytes.length>=8&&[137,80,78,71,13,10,26,10].every((v,i)=>bytes[i]===v)
+  :mime==='image/webp'?bytes.length>=12&&ascii(0,4)==='RIFF'&&ascii(8,4)==='WEBP'
+  :bytes.length>=12&&ascii(4,4)==='ftyp'&&['avif','avis'].includes(ascii(8,4));
+ if(!valid)throw new ApiError(400,'invalid_cover_image');
+ const latest=await authorized(env,uid,id);
+ if(latest.revision!==row.revision)throw new ApiError(409,'connection_changed');
+ return new Response(bytes,{headers:{'Content-Type':mime,'Content-Length':String(length),
+  'Cache-Control':'private, no-store','Content-Disposition':'inline',
+  'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer'}});
+}
+
 /** Private Dropbox original, specifically for an authenticated account's image UI.
  * No public sharing link, persistent access ticket, or copy into Firestore. */
 export async function dropboxCoverImage(env:Env,uid:string,id:string,fileId:string){
