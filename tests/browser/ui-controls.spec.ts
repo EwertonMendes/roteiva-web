@@ -110,8 +110,14 @@ test('access loading uses the authenticated theme before the workspace mounts',a
    let release!:()=>void;
    const paused=new Promise<void>(resolve=>{release=resolve;});
    await page.route('https://roteiva-api-dev.ewertonmendes9.workers.dev/access/ensure',async route=>{
+     // The account was already registered by login(). Simulate only the
+     // pending access request: no real Worker access or new trial writes.
      await paused;
-     await route.fallback();
+     await route.fulfill({status:200,contentType:'application/json',body:'{}',headers:{
+       'Access-Control-Allow-Origin':'http://127.0.0.1:4173',
+       'Access-Control-Allow-Methods':'POST, OPTIONS',
+       'Access-Control-Allow-Headers':'Authorization, Content-Type',
+     }});
    });
    try{
      await page.reload();
@@ -126,8 +132,7 @@ test('access loading uses the authenticated theme before the workspace mounts',a
      expect(appearance.rootTheme).toBe(theme);
      expect(appearance.background).toBe(theme==='dark'?'rgb(16, 16, 16)':'rgb(245, 245, 245)');
      expect(appearance.text).toBe(theme==='dark'?'rgb(241, 241, 241)':'rgb(25, 25, 25)');
-     // Let the queued request reach the emulator fixture before removing this
-     // route; removing it early can leak the request to the real DEV endpoint.
+     // Release the simulated request before resetting the route.
      release();
      await expect(page.locator('.app-shell')).toBeVisible();
    }finally{
