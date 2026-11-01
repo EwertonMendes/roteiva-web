@@ -109,8 +109,8 @@ export function AccountDeletionAction(){
   }
   return <div className="account-delete">
     <div className="settings-privacy-row">
-      <div><strong><Trash2 size={16}/> Excluir minha conta</strong>
-        <p>Exclusão permanente da conta e dos dados armazenados no Roteiva. Seus arquivos originais no Google Drive serão preservados. Um marcador pseudonimizado de uso do teste gratuito será mantido para impedir reutilização.</p>
+      <div><strong>Excluir conta</strong>
+        <p>Exclusão permanente dos dados do Roteiva. Arquivos originais no Google Drive serão preservados.</p>
       </div>
       <AppButton type="button" className="secondary-button" disabled={!ready||!available||!!progress} onClick={()=>{setError("");setText("");setChecked(false);setNeedsIdentityConfirmation(false);setOpened(true);}}>
         <Trash2 size={15}/> Excluir conta
