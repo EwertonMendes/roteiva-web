@@ -1,5 +1,13 @@
 # Roadmap vivo — Roteiva MVP
 
+## Configurações — fidelidade ao mockup (01/11/2026)
+
+- [x] Implementar layout com cartões para identidade, perfil, estúdio, tema, acesso e zona de perigo em claro/escuro, incluindo mobile sem compressão dos campos e uso uniforme da largura disponível no desktop, sem gutter artificial à direita.
+- [x] Preservar funções existentes: salvar dados válidos de perfil/estúdio, seletor compartilhado, identidade Google somente leitura, tema persistente, validade real de acesso e exclusão segura com confirmação.
+- [x] Criar testes Playwright para desktop/mobile e adicionar `settings-layout.spec.ts` ao QA seletivo `controls`.
+- [ ] Validar build/checks do PR, QA de navegador em emuladores, publicação DEV e aceite visual no navegador/dispositivo real. Nenhum dado real deve ser modificado para realizar QA automatizado.
+
+
 ## Performance das pipelines — 01/11/2026
 
 - [x] Diagnosticar execuções reais: PR E2E isolado levou 6m04s (57 aprovados, 3 ignorados); preparação ~40s e suíte ~5m18s. [Execução de referência](https://github.com/EwertonMendes/roteiva-web/actions/runs/41355533603).

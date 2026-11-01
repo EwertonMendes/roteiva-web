@@ -1,7 +1,7 @@
 import {AppButton} from "../ui/AppButton";
 import {createContext,useContext,useEffect,useState,type ReactNode} from "react";
 import {watchAccess,type AccessInfo} from "../../data/access-watch";
-import {Clock3,ShieldAlert,ArrowRight,RefreshCw,LogOut} from "lucide-react";
+import {ArrowRight,Crown,Gift,ShieldAlert,RefreshCw,LogOut} from "lucide-react";
 import {firebaseServices} from "../../lib/firebase";
 import {useAuth} from "../auth/AuthProvider";
 import {AuthLayout} from "../auth/AuthLayout";
@@ -70,18 +70,20 @@ export function AccessGate({children}:{children:ReactNode}){
 export function AccessSummary(){
   const access=useAccess();
   if(!access)return null;
-  const title=access.unlimited?"Acesso cortesia sem prazo de expiração":
+  const title=access.unlimited?"Acesso de cortesia":
     access.source==="trial"?"Período de teste gratuito":
-    access.source==="complimentary"?"Acesso de cortesia":"Acesso ao Roteiva";
-  return <section className="settings-editor access-settings" aria-label="Condição do acesso">
-    <div className="settings-section-head"><div>
-      <span className="settings-index">04 / SUA ASSINATURA</span>
-      <h3>Seu acesso</h3>
-      <p>Uma única assinatura com todas as ferramentas do Roteiva.</p>
-    </div><Clock3 size={20}/></div>
+    access.source==="complimentary"?"Acesso de cortesia":"Seu acesso";
+  return <section className="settings-editor access-settings" aria-labelledby="settings-access-title">
+    <header className="settings-section-head">
+      <span className="settings-index"><Crown size={18} aria-hidden="true"/> 04 / SEU ACESSO</span>
+      <h3 id="settings-access-title">{title}</h3>
+      <p>Você tem acesso completo ao Roteiva.</p>
+    </header>
     <div className="access-settings-detail">
-      <strong>{title}</strong>
-      <span>{access.unlimited?"Sem vencimento programado":`Disponível até ${access.accessUntil.toLocaleDateString("pt-BR",{day:"2-digit",month:"long",year:"numeric"})}`}</span>
+      <span className="access-settings-gift" aria-hidden="true"><Gift size={22}/></span>
+      <span className="access-settings-divider" aria-hidden="true"/>
+      <span>{access.unlimited?"Sem vencimento programado":
+        `Disponível até ${access.accessUntil.toLocaleDateString("pt-BR",{day:"numeric",month:"long",year:"numeric"})}.`}</span>
     </div>
     {access.source==="trial"&&!access.unlimited&&<p className="settings-note">Seu teste gratuito dura 7 dias e não exige cartão. Não haverá cobrança automática quando ele terminar.</p>}
   </section>;
