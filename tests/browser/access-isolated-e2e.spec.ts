@@ -120,7 +120,7 @@ test("isolated E2E: trial expiry locks UI and Firestore; retries and refresh can
   expect(after?.unlimited).toBe(false);
 });
 
-test("isolated E2E: two real emulator Google sessions cannot access each other's records",async({page},info)=>{
+test("isolated E2E: two real emulator Google sessions cannot access each other's records",{tag:"@ci-smoke"},async({page},info)=>{
   const first="isolated-first-"+info.project.name+"@example.com";
   const second="isolated-second-"+info.project.name+"@example.com";
   await register(page,first);

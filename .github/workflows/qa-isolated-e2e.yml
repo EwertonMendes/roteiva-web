@@ -10,8 +10,6 @@ on:
       - 'tests/browser/drive-folders.spec.ts'
       - 'tests/browser/project-covers.spec.ts'
       - '.github/workflows/qa-isolated-e2e.yml'
-  schedule:
-    - cron: '17 6 * * *'
   pull_request:
     branches: [master]
     paths:
@@ -60,24 +58,32 @@ jobs:
           distribution: temurin
           java-version: '21'
       - run: pnpm install --frozen-lockfile
-      # API DEV and Firestore security DEV already verify Worker/D1 and rules
-      # on every PR. Do not repeat their full tests inside the browser job.
+      # API DEV and Firestore security DEV validate Worker/D1 and security rules.
+      # PRs and master run the tagged smoke tests. Full browser + rules coverage
+      # is retained in qa-regression.yml (nightly/manual), and manually here.
+      - name: Cache browser and Firestore emulator binaries (never user data)
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/ms-playwright
+            ~/.cache/firebase/emulators
+          key: ${{ runner.os }}-browser-emulators-${{ hashFiles('pnpm-lock.yaml') }}
       - name: Compile exclusively for Firebase emulators
         run: |
-          pnpm exec playwright install --with-deps chromium
+          pnpm exec playwright install chromium
           pnpm build:emulator
           pnpm build:demo
       - name: Fast approval/access/Drive smoke — desktop and mobile
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' || github.event_name == 'push'
         env:
           CI: 'true'
         run: >
           pnpm exec firebase emulators:exec --project demo-roteiva --only auth,firestore
           "pnpm exec playwright test tests/browser/reviews.spec.ts tests/browser/reviews-workflow.spec.ts
           tests/browser/access-isolated-e2e.spec.ts tests/browser/drive-folders.spec.ts
-          tests/browser/project-covers.spec.ts --workers=1 --reporter=line"
-      - name: Full desktop/mobile regression and Firebase Rules — master / nightly / manual
-        if: github.event_name != 'pull_request'
+          tests/browser/project-covers.spec.ts --grep @ci-smoke --workers=2 --reporter=line"
+      - name: Full desktop/mobile regression and Firebase Rules — manual only
+        if: github.event_name == 'workflow_dispatch'
         env:
           CI: 'true'
         run: pnpm test:firebase

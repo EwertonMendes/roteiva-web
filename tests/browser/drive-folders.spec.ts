@@ -122,7 +122,7 @@ test("folder picker links multiple folders, explorer opens files in one click an
   await expect(libraryNav.locator("em")).toHaveCount(0);
 });
 
-test("account retrieval error never shows a fake disconnected state and retries safely",async({page},info)=>{
+test("account retrieval error never shows a fake disconnected state and retries safely",{tag:"@ci-smoke"},async({page},info)=>{
   let available=false;
   await mockDrive(page,()=>available);
   await signUp(page,"drive-retry-"+info.project.name+"@example.com");

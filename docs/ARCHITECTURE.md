@@ -1,5 +1,8 @@
 # Arquitetura do Roteiva — MVP SaaS
 
+**Decisão CI/CD (01/11/2026):** validações de navegador disparadas por PR/push são um subconjunto *smoke* nomeado `@ci-smoke`, com fluxo de autorização, isolamento entre contas, revisão pública/restrita e Drive (capas permanecem na regressão integral). O check exigido por promoções DEV conserva seu nome. A regressão integral de Playwright + regras de segurança permanece agendada em `qa-regression.yml` e disponível manualmente; E2E isolado não agenda uma segunda regressão idêntica. Mudanças críticas continuam exigindo execução integral manual antes do merge. Cache versionado armazena apenas executáveis de navegador/emulador, não dados, tokens ou artefatos privados. Sem mudanças de runtime, Firestore, D1, OAuth ou deploy.
+
+
 ## Performance de armazenamento e miniaturas privadas — 30/10/2026 (PR em validação)
 
 **DECISÃO TOMADA / IMPLEMENTAÇÃO EM TESTES:** conexões OAuth de Drive e Dropbox são descobertas por um provider React global após autenticação e autorização do usuário. Biblioteca, Projetos e Clientes reaproveitam o mesmo estado e refrescam depois de desconectar/reconectar. Nenhuma tela precisa ser visitada para iniciar descoberta; o bootstrap não bloqueia a leitura do workspace.

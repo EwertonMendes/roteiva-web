@@ -419,7 +419,7 @@ test('galeria de aprovação mantém miniaturas e filtros rápidos com mais de 2
   await page.screenshot({path:info.outputPath('review-thumbnail-gallery.png'),fullPage:true});
 });
 
-test('Google-only review renders private images in both themes without third-party Drive cookies',async({page,context},info)=>{
+test('Google-only review renders private images in both themes without third-party Drive cookies',{tag:'@ci-smoke'},async({page,context},info)=>{
   await page.emulateMedia({colorScheme:'light'});
   await prepare(page,'reviews-private-preview-'+info.project.name+'@example.com');
   const first={fileId:'REVIEW_IMAGE_12345678',name:'Arte.png',mimeType:'image/png'};

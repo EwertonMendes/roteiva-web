@@ -41,7 +41,7 @@ function publicApi(page:import("@playwright/test").Page){
     await route.fulfill({status:code,headers,contentType:"application/json",body:JSON.stringify(result)});
   });
 }
-test("cliente sem conta deixa comentário e aprova em desktop/mobile",async({page})=>{
+test("cliente sem conta deixa comentário e aprova em desktop/mobile",{tag:"@ci-smoke"},async({page})=>{
   await publicApi(page);
   await page.goto(ROOT+"/review/"+TOKEN);
   await expect(page.getByRole("heading",{name:"Corte institucional"})).toBeVisible();
