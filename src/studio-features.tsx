@@ -5,7 +5,7 @@ import {formatPhoneDisplay} from "./lib/brazil-phone";
 "use client";
 import { AppSelect } from "./features/ui/AppSelect";
 
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import {
   ArrowLeft, CalendarDays, Plus, Download, Pencil, Trash2,
   CalendarRange, UsersRound, ListFilter, TrendingUp, CircleCheck, Receipt,
@@ -29,6 +29,7 @@ export const projectTemplates: Record<string, string[]> = {
   "Evento": ["Confirmar programação e local", "Conferir equipamentos", "Captar evento", "Fazer backup", "Editar highlights", "Aprovar e entregar"],
   "Casamento": ["Reunião com o casal", "Confirmar cronograma", "Preparar equipamentos", "Captar cerimônia e festa", "Fazer backup", "Editar teaser", "Editar filme completo", "Aprovar e entregar"],
 };
+function Empty({children}: {children: ReactNode}) { return <p className="studio-empty">{children}</p>; }
 function Back({onClick}: {onClick: () => void}) { return <AppButton className="secondary-button" onClick={onClick}><ArrowLeft size={16}/> Voltar</AppButton>; }
 export function ClientDetail({client, projects, entries, onBack, onEdit, onProject, onSave, onReview}: {onReview?:()=>void;onSave: (client:Client) => void; client: Client; projects: Project[]; entries: FinanceEntry[]; onBack: () => void; onEdit: (c: Client) => void; onProject: (id:number) => void}) {
   const linked = projects.filter(p => p.clientId === client.id || (!p.clientId && p.client === client.name));
