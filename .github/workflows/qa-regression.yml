@@ -36,6 +36,13 @@ jobs:
           distribution: temurin
           java-version: '21'
       - run: pnpm install --frozen-lockfile
+      - name: Cache browser and Firestore emulator binaries (never user data)
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/ms-playwright
+            ~/.cache/firebase/emulators
+          key: ${{ runner.os }}-browser-emulators-${{ hashFiles('pnpm-lock.yaml') }}
       - run: npm ci --ignore-scripts --prefix api
       - name: Install browser and compile isolated emulator/demo modes
         run: |
