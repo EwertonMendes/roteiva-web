@@ -33,12 +33,11 @@ function oauthError(code:string|null):string {
 
 
 export function DriveConnectionPanel({
-  projects,selectedProjectId,onSelectProject,onLinkedFolderCountChange,
+  projects,selectedProjectId,onSelectProject,
 }:{
   projects:readonly Project[];
   selectedProjectId?:number;
   onSelectProject:(id:string)=>void;
-  onLinkedFolderCountChange?:(count:number)=>void;
 }) {
   const {user}=useAuth();
   const storage=useStorageConnections();
@@ -74,8 +73,6 @@ export function DriveConnectionPanel({
   const folderRequest=useRef(0);
   const fileRequest=useRef(0);
   const autoOpened=useRef("");
-  const countCallback=useRef(onLinkedFolderCountChange);
-  countCallback.current=onLinkedFolderCountChange;
   const connected=connections.filter(c=>c.status==="connected");
   const authorized=connected.filter(c=>c.scopes.split(/\s+/).includes(READ));
   const connection=authorized.find(c=>c.id===selectedAccount)||authorized[0];
@@ -147,10 +144,6 @@ export function DriveConnectionPanel({
     setAccountFailed(false);
     return accounts.connections;
   },[storage.refresh,user]);
-
-  useEffect(()=>{
-    if(linksLoaded)countCallback.current?.(links.length);
-  },[links,linksLoaded]);
 
   useEffect(()=>{
     let active=true;

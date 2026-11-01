@@ -67,8 +67,8 @@ function DropboxPreview({file,link,onClose,onNext,onPrevious}:{file:DriveItem;li
   </section>
  </div>;
 }
-export function DropboxConnectionPanel({projects,selectedProjectId,onLinkedFolderCountChange}:{
- projects:readonly Project[];selectedProjectId?:number;onSelectProject:(id:string)=>void;onLinkedFolderCountChange?:(count:number)=>void;
+export function DropboxConnectionPanel({projects,selectedProjectId}:{
+ projects:readonly Project[];selectedProjectId?:number;onSelectProject:(id:string)=>void;
 }){
  const {user}=useAuth(),call=useDriveApi(),transfers=useDriveTransfers();
  const storage=useStorageConnections();
@@ -113,7 +113,6 @@ export function DropboxConnectionPanel({projects,selectedProjectId,onLinkedFolde
    setError((e as {code?:string})?.code==='dropbox_not_configured'?
     'A integração Dropbox ainda não foi habilitada neste ambiente.':'Não foi possível carregar as contas Dropbox.');}
  }finally{if(live)setReady(true)}})();return()=>{live=false}},[refresh]);
- useEffect(()=>{onLinkedFolderCountChange?.(links.length)},[links.length,onLinkedFolderCountChange]);
  useEffect(()=>{++requestId.current;++searchId.current;setViewing(null);setItems([]);setPath([]);setPreview(null);setSearch('');},[selectedProjectId]);
  const start=async()=>{
   setBusy(true);setError('');

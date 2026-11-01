@@ -128,7 +128,6 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
   const [eventError, setEventError] = useState("");
   const [demoStorageWarning, setDemoStorageWarning] = useState(false);
   const [libraryProject, setLibraryProject] = useState("");
-  const [linkedFolderCount, setLinkedFolderCount] = useState<number|null>(null);
   const [uploading, setUploading] = useState(false);
   const storageKey = "roteiva-pages-demo-workspace-v1";
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -524,7 +523,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
             </AppButton>;
           })}
           <AppButton className={view === "calendar" ? "active" : ""} onClick={() => changeView("calendar")}><AnimatedNavIcon icon={CalendarDays} hoverIcon={CalendarCheck2} kind="calendar" /><span>Calendário</span><em>{eventCount ?? calendarEvents.length}</em></AppButton>
-          <AppButton className={view === "library" ? "active" : ""} onClick={() => changeView("library")}><AnimatedNavIcon icon={Grid2X2} hoverIcon={LibraryBig} kind="library" /><span>Biblioteca</span><em>{isDemo?libraryAssets.length:linkedFolderCount??"—"}</em></AppButton>
+          <AppButton className={view === "library" ? "active" : ""} onClick={() => changeView("library")}><AnimatedNavIcon icon={Grid2X2} hoverIcon={LibraryBig} kind="library" /><span>Biblioteca</span></AppButton>
           <AppButton className={view === "settings" ? "active" : ""} onClick={() => changeView("settings")}><AnimatedNavIcon icon={Settings2} hoverIcon={UserRound} kind="settings" /><span>Configurações</span></AppButton>
         </nav>
 
@@ -569,7 +568,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
           {view === "reviews" && (isDemo ? <StudioReviews /> : <ReviewsDashboard key={reviewStart?.projectId||reviewStart?.clientId||"reviews"} clients={clientList} projects={projects} studioName={workspaceName} onLibrary={()=>changeView("library")} startClientId={reviewStart?.clientId} startProjectId={reviewStart?.projectId} />)}
           {view === "finance" && <FinancePanel entries={financeEntries} clients={clientList} onPeriodChange={onFinancePeriodChange} serverBars={financeBars} onAdd={() => openFinanceModal()} onEdit={(entry) => openFinanceModal(entry)} onDelete={setDeletingFinanceEntry} />}
           {view === "calendar" && <CalendarView events={calendarEvents} onMonthChange={onCalendarMonthChange} onAdd={(date) => openEvent(null, date)} onEdit={(entry) => openEvent(entry)} onDelete={(entry) => { if (window.confirm(`Excluir o compromisso “${entry.title}”?`)) { commitCommands([{kind:"deleteEvent",id:entry.id}]); setCalendarEvents(current => current.filter(e => e.id !== entry.id)); logActivity(`Compromisso excluído: ${entry.title}`); } }} />}
-          {view === "library" && <LibraryView assets={libraryAssets} query={query} onUpload={(files) => uploadAssets(files, Number(libraryProject) || undefined)} projects={projects} selectedProjectId={Number(libraryProject)||undefined} onSelectProject={setLibraryProject} onLinkedFolderCountChange={setLinkedFolderCount} />}
+          {view === "library" && <LibraryView assets={libraryAssets} query={query} onUpload={(files) => uploadAssets(files, Number(libraryProject) || undefined)} projects={projects} selectedProjectId={Number(libraryProject)||undefined} onSelectProject={setLibraryProject} />}
         </section>
       </main>
 
@@ -707,16 +706,10 @@ function assetIcon(kind: AssetKind) {
   return kind === "Vídeo" ? FileVideo : kind === "Imagem" ? ImageIcon : kind === "Áudio" ? FileAudio : FileText;
 }
 
-function LibraryView({ assets, query, onUpload, projects, selectedProjectId, onSelectProject, onLinkedFolderCountChange }: { assets: LibraryAsset[]; query: string; onUpload: (files: FileList | null) => void; projects: readonly Project[]; selectedProjectId?:number; onSelectProject:(id:string)=>void; onLinkedFolderCountChange?:(count:number)=>void }) {
+function LibraryView({ assets, query, onUpload, projects, selectedProjectId, onSelectProject }: { assets: LibraryAsset[]; query: string; onUpload: (files: FileList | null) => void; projects: readonly Project[]; selectedProjectId?:number; onSelectProject:(id:string)=>void }) {
   const dropboxEnabled=import.meta.env.VITE_DROPBOX_ENABLED==='true';
   const [provider,setProvider]=useState<'google_drive'|'dropbox'>(()=>dropboxEnabled&&
     new URLSearchParams(window.location.search).has('dropbox')?'dropbox':'google_drive');
-  const folderCounts=useRef({google_drive:0,dropbox:0});
-  const updateFolderCount=(type:'google_drive'|'dropbox',count:number)=>{
-    if(folderCounts.current[type]===count)return;
-    folderCounts.current[type]=count;
-    onLinkedFolderCountChange?.(folderCounts.current.google_drive+folderCounts.current.dropbox);
-  };
   const [kind, setKind] = useState<AssetKind | "Todos">("Todos");
   const [layout, setLayout] = useState<"grid" | "list">("grid");
   const [sort, setSort] = useState("recent");
@@ -743,11 +736,11 @@ function LibraryView({ assets, query, onUpload, projects, selectedProjectId, onS
       </nav>}
       <div id="storage-drive-panel" role="tabpanel" hidden={dropboxEnabled&&provider!=='google_drive'}>
         <DriveConnectionPanel projects={projects} selectedProjectId={selectedProjectId} onSelectProject={onSelectProject}
-          onLinkedFolderCountChange={count=>updateFolderCount('google_drive',count)} />
+          />
       </div>
       {dropboxEnabled&&<div id="storage-dropbox-panel" role="tabpanel" hidden={provider!=='dropbox'}>
         <DropboxConnectionPanel projects={projects} selectedProjectId={selectedProjectId} onSelectProject={onSelectProject}
-          onLinkedFolderCountChange={count=>updateFolderCount('dropbox',count)} />
+          />
       </div>}
     </>}
     {(isDemo || assets.length>0) && <>
