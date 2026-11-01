@@ -26,7 +26,7 @@ function ClientAvatar({client,eager=false}:{client:Client;eager?:boolean}){
   observer.observe(element.current);
   return ()=>observer.disconnect();
  },[eager,visible]);
- const {src,error,loading}=useCoverImage(client.photo,visible,true);
+ const {src,error,loading}=useCoverImage(client.photo,eager||visible,true);
  return <span className={"cd-avatar "+(src?"cd-avatar--loaded":"")} ref={element} aria-hidden="true"
   data-photo-state={!client.photo?"empty":src?"loaded":error?"unavailable":loading?"loading":"pending"}>
   {src&&client.photo?<CoverFrame src={src} cover={client.photo}/>:client.photo&&!error?
