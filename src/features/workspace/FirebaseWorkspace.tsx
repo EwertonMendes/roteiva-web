@@ -11,7 +11,7 @@ import type { WorkspaceCommand } from "../../data/firestore-commands";
 import { useAuth } from "../auth/AuthProvider";
 import { useRegistrationProfile } from "../auth/RegistrationGate";
 import { retryFirestoreRead,transientFirestoreRead,firestoreCode } from "../../data/firestore-recovery";
-import {chooseThemePreference,parseThemePreference,readStoredPreference,systemTheme,themeStorageKey,writeStoredPreference,type Theme} from "../../lib/theme-preference";
+import {applyTheme,chooseThemePreference,parseThemePreference,readStoredPreference,systemTheme,themeStorageKey,writeStoredPreference,type Theme} from "../../lib/theme-preference";
 
 export function FirebaseWorkspace() {
   const {user,logout,busy,error:authError}=useAuth();
@@ -24,7 +24,7 @@ export function FirebaseWorkspace() {
   // cloud read. Workspace refreshes never reset this independent preference.
   const themeRevision=useRef(0);
   useLayoutEffect(()=>{
-    document.documentElement.setAttribute("data-theme",theme);
+    applyTheme(theme);
   },[theme]);
   useEffect(()=>{
     const onStorage=(event:StorageEvent)=>{

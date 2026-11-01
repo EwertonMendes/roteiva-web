@@ -2,7 +2,7 @@ import {test} from "node:test";
 import assert from "node:assert/strict";
 import {
   chooseThemePreference, parseThemePreference, readStoredPreference,
-  readStoredTheme, themeStorageKey, writeStoredPreference, writeStoredTheme,
+  applyTheme,readStoredTheme, themeBootstrapKey, themeStorageKey, writeStoredPreference, writeStoredTheme,
 } from "../src/lib/theme-preference.ts";
 
 function browserStorage() {
@@ -51,4 +51,23 @@ test("legacy demo values work and malformed or denied storage is harmless", () =
   const denied = {getItem(){throw Error("SecurityError");},setItem(){throw Error("SecurityError");}};
   assert.doesNotThrow(()=>writeStoredPreference("key",{theme:"dark",changedAt:1},denied));
   assert.equal(readStoredPreference("key",denied),undefined);
+});
+
+test("bootstrap mirrors only the active palette, without account information", () => {
+  const storage=browserStorage();
+  assert.equal(themeBootstrapKey,"roteiva-theme:bootstrap");
+  assert.doesNotThrow(()=>applyTheme("dark",storage));
+  assert.equal(storage.getItem(themeBootstrapKey),"dark");
+  assert.doesNotThrow(()=>applyTheme("light",storage));
+  assert.equal(storage.getItem(themeBootstrapKey),"light");
+  assert.equal(storage.getItem(themeStorageKey("user-a")),null);
+  assert.doesNotThrow(()=>applyTheme("dark",{setItem(){throw Error("SecurityError");}}));
+});
+
+test("initial HTML sets the palette before the React entrypoint is loaded", async () => {
+  const {readFileSync}=await import("node:fs");
+  const html=readFileSync(new URL("../index.html",import.meta.url),"utf8");
+  assert.ok(html.indexOf("roteiva-theme:bootstrap")>=0);
+  assert.ok(html.indexOf("roteiva-theme:bootstrap")<html.indexOf('<script type="module"'));
+  assert.match(html,/document\.documentElement\.dataset\.theme = theme/);
 });

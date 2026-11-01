@@ -40,7 +40,7 @@ import googleDriveMark from "./assets/brand/google-drive.svg";
 import dropboxMark from "./assets/brand/dropbox.svg";
 import { LibraryReviewDemo } from "./features/drive/LibraryReviewDemo";
 import type { RoteivaProfile, ProfileChanges } from "./data/firestore-workspace";
-import {isTheme, readStoredTheme, systemTheme, themeStorageKey, writeStoredTheme, type Theme} from "./lib/theme-preference";
+import {applyTheme, isTheme, readStoredTheme, systemTheme, themeStorageKey, writeStoredTheme, type Theme} from "./lib/theme-preference";
 import type { WorkspaceCommand } from "./data/firestore-commands";
 import type { FirestoreUsage } from "./data/firestore-usage";
 import { newId, type WorkspaceData, type Activity, type View, type Project, type Client, type ClientType, type AssetKind, type FinanceEntry, type CalendarEvent, type LibraryAsset, type Status } from "./domain/workspace";
@@ -230,7 +230,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
   // Theme is not part of the business-data hydration lifecycle. A new page
   // snapshot must never reset a theme explicitly selected by the user.
   useLayoutEffect(() => {
-    if (isDemo) document.documentElement.setAttribute("data-theme", demoTheme);
+    if (isDemo) applyTheme(demoTheme);
   },[demoTheme]);
 
   useEffect(() => {

@@ -4,6 +4,16 @@ export type ThemePreference = {theme: Theme; changedAt: number};
 
 export const isTheme = (value: unknown): value is Theme => value === "light" || value === "dark";
 
+// Palette only: the bootstrap mirror carries no user identity or cloud data.
+// It lets index.html choose the correct colors before React/Firebase are ready.
+export const themeBootstrapKey = "roteiva-theme:bootstrap";
+
+/** Keep loading screens and the next browser paint consistent with the active theme. */
+export function applyTheme(theme: Theme, storage?: Pick<Storage, "setItem">): void {
+  if (typeof document !== "undefined") document.documentElement.dataset.theme = theme;
+  writeStoredTheme(themeBootstrapKey,theme,storage);
+}
+
 /** Keep authenticated preferences isolated by Firebase UID; the demo has its own key. */
 export function themeStorageKey(uid?: string): string {
   return uid ? `roteiva-theme:${uid}` : "roteiva-theme";

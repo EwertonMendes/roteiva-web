@@ -97,3 +97,39 @@ test('library navigation has no badge and empty financial table stays centered i
  if(await opener.isVisible())await opener.click();
  await expect(page.locator('.sidebar nav').getByRole('button',{name:'Biblioteca',exact:true}).locator('em')).toHaveCount(0);
 });
+
+test('access loading uses the authenticated theme before the workspace mounts',async({page},info)=>{
+ await login(page,'access-palette-'+info.project.name+'@example.com');
+ const key=await page.evaluate(()=>Object.keys(localStorage).find(k=>k.startsWith('roteiva-theme:')&&k!=='roteiva-theme:bootstrap'));
+ expect(key).toBeTruthy();
+ for(const theme of ['dark','light'] as const){
+   await page.evaluate(({key,theme})=>{
+     localStorage.setItem(key,JSON.stringify({theme,changedAt:Date.now()+3600000}));
+     localStorage.setItem('roteiva-theme:bootstrap',theme);
+   },{key:key!,theme});
+   let release!:()=>void;
+   const paused=new Promise<void>(resolve=>{release=resolve;});
+   await page.route('https://roteiva-api-dev.ewertonmendes9.workers.dev/access/ensure',async route=>{
+     await paused;
+     await route.fallback();
+   });
+   try{
+     await page.reload();
+     const loading=page.getByRole('status').filter({hasText:'Confirmando seu acesso ao Roteiva…'});
+     await expect(loading).toBeVisible();
+     await expect(page.locator('html')).toHaveAttribute('data-theme',theme);
+     const appearance=await loading.evaluate(node=>{
+       const style=getComputedStyle(node),root=getComputedStyle(document.documentElement);
+       return {background:style.backgroundColor,text:style.color,paper:root.getPropertyValue('--paper').trim(),
+         ink:root.getPropertyValue('--ink').trim(),rootTheme:document.documentElement.dataset.theme};
+     });
+     expect(appearance.rootTheme).toBe(theme);
+     expect(appearance.background).toBe(theme==='dark'?'rgb(16, 16, 16)':'rgb(245, 245, 245)');
+     expect(appearance.text).toBe(theme==='dark'?'rgb(241, 241, 241)':'rgb(25, 25, 25)');
+   }finally{
+     release();
+     await page.unroute('https://roteiva-api-dev.ewertonmendes9.workers.dev/access/ensure');
+   }
+   await expect(page.locator('.app-shell')).toBeVisible();
+ }
+});
