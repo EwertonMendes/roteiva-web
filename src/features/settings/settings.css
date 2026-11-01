@@ -133,11 +133,15 @@
 .settings-studio-controls {
   display: grid;
   grid-template-columns: minmax(0,1.15fr) minmax(0,1fr) auto;
-  align-items: end;
+  align-items: stretch;
   gap: 18px;
   margin-top: 20px;
 }
+.settings-studio-controls .settings-field { height: 100%; }
+.settings-studio-controls .settings-field > .rt-input,
+.settings-studio-controls .settings-field > .rt-select { margin-top: auto; }
 .settings-save-button {
+  align-self: end;
   display: inline-flex;
   align-items: center;
   justify-content: center;
