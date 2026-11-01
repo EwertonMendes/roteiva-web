@@ -2,7 +2,7 @@ import {AppInput} from "../ui/AppInput";
 import {AppButton} from "../ui/AppButton";
 import { AppSelect } from "../ui/AppSelect";
 import { useEffect, useState, type FormEvent } from "react";
-import { AlertTriangle, Building2, Check, Gift, Info, LockKeyhole, Mail, Moon, Save, Settings2, ShieldCheck, Store, Sun, Tag, UserRound, Video } from "lucide-react";
+import { AlertTriangle, Check, Info, LockKeyhole, Mail, Moon, Save, Settings2, ShieldCheck, Store, Sun, Tag, UserRound, Video } from "lucide-react";
 import type { ProfileChanges, ProfessionalType, RoteivaProfile } from "../../data/firestore-workspace";
 import { dataErrorMessage } from "../../data/firestore-workspace";
 import { AccountDeletionAction } from "./AccountDeletionAction";
