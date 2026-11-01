@@ -126,10 +126,13 @@ test('access loading uses the authenticated theme before the workspace mounts',a
      expect(appearance.rootTheme).toBe(theme);
      expect(appearance.background).toBe(theme==='dark'?'rgb(16, 16, 16)':'rgb(245, 245, 245)');
      expect(appearance.text).toBe(theme==='dark'?'rgb(241, 241, 241)':'rgb(25, 25, 25)');
+     // Let the queued request reach the emulator fixture before removing this
+     // route; removing it early can leak the request to the real DEV endpoint.
+     release();
+     await expect(page.locator('.app-shell')).toBeVisible();
    }finally{
      release();
      await page.unroute('https://roteiva-api-dev.ewertonmendes9.workers.dev/access/ensure');
    }
-   await expect(page.locator('.app-shell')).toBeVisible();
  }
 });
