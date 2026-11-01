@@ -218,7 +218,7 @@ export function AppSelect({
         className="rt-select-option" data-active={index === active || undefined}
         data-selected={option.value === current || undefined}
         title={option.text}
-        onMouseEnter={() => { if (!option.disabled) setActive(index); }}
+        onPointerMove={event => { if (event.pointerType === "mouse" && !option.disabled) setActive(index); }}
         onMouseDown={event => event.preventDefault()}
         onClick={() => commit(index)}
       ><span className="rt-select-option-label">{option.label}</span>{option.value === current && <Check size={16} aria-hidden="true" className="rt-select-check"/>}</div>)}
