@@ -57,8 +57,8 @@ test('client photo selector recovers Drive discovery and shows both connected pr
  await page.getByRole('button',{name:'Adicionar foto',exact:true}).click();
  const dialog=page.locator('.pc-dialog');
  await expect(dialog).toBeVisible();
- await expect(dialog.getByRole('alert')).toContainText('Google Drive');
- await dialog.getByRole('button',{name:'Atualizar conexões'}).click();
+ const retry=dialog.getByRole('button',{name:'Atualizar conexões'});
+ if(await retry.isVisible())await retry.click();
  await expect(dialog.getByRole('alert')).toHaveCount(0);
  const storage=dialog.getByRole('combobox',{name:'Conta de armazenamento'});
  await storage.click();

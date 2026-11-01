@@ -15,14 +15,14 @@ test("list/grid mode is explicit and stored as a nonprivate local preference",()
 });
 test("thumbnail binary is authenticated, lazy and never loaded from an untrusted link in an image tag",()=>{
   assert.match(loader,/IntersectionObserver/);
-  assert.match(loader,/MAX_CONCURRENT=6/);
-  assert.match(loader,/MAX_CACHE=64/);
+  assert.match(loader,/loadStorageImage/);
+  assert.ok(loader.includes('persist:item.mimeType.startsWith("image/")'));
   assert.match(fetcher,/\/files\/".encodeURIComponent\(file.id\)."\/thumbnail"/);
   assert.match(fetcher,/getIdToken/);
   assert.match(parent,/useDriveThumbnailFetch/);
   assert.match(reviews,/useDriveThumbnailFetch/);
   assert.doesNotMatch(ui,/<img[^>]*thumbnailLink/);
-  assert.match(loader,/URL.revokeObjectURL/);
+  assert.match(loader,/invalidateStorageFile/);
 });
 test("preview has keyboard navigation and keeps Drive fallback",()=>{
   assert.match(ui,/event.key==="ArrowLeft"/);
@@ -31,10 +31,11 @@ test("preview has keyboard navigation and keeps Drive fallback",()=>{
 });
 
 test("thumbnail shows progress during fetch and falls back on unavailable media",()=>{
-  assert.match(loader,/type Phase = "idle"\|"loading"\|"loaded"\|"unavailable"/);
+  assert.match(loader,/type Phase\s*=\s*"idle"\|"loading"\|"loaded"\|"unavailable"/);
   assert.match(loader,/data-thumbnail-state=\{current.phase\}/);
   assert.match(loader,/setState\(\{key,src:null,phase:"loading"\}\)/);
-  assert.match(loader,/phase:url\?"loaded":"unavailable"/);
+  assert.match(loader,/phase:"loaded"/);
+  assert.match(loader,/phase:"unavailable"/);
   assert.match(loader,/className="rl-thumb-loading"/);
   assert.match(loader,/IntersectionObserver/);
 });
@@ -46,7 +47,7 @@ test("fast Drive listing uses account-scoped in-memory cache and debounced remot
   assert.ok(parent.includes("window.setTimeout(async()=>"));
   assert.match(ui,/searchResults/);
   assert.match(fetcher,/thumbnailTicket/);
-  assert.ok(loader.includes("promote(key)"));
+  assert.ok(loader.includes("loadStorageImage"));
 });
 
 test("ticket-only Drive v3 responses trigger thumbnail requests, without raw thumbnail links",()=>{

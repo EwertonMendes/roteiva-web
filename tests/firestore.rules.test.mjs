@@ -630,14 +630,15 @@ test('missing or corrupt entitlement denies business access but retains own prof
 test('project covers validate create/update, require complete fields and preserve account isolation',async()=>{
  const alice=dbFor('alice'),bob=dbFor('bob');const ref=doc(alice,'users/alice/projects/10');
  const cover={coverConnectionId:'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa',coverFileId:'photo_123456789',coverName:'Capa.jpg',coverX:50,coverY:50,coverZoom:1};
- for(const invalid of [{coverX:50},{...cover,coverX:-1},{...cover,coverY:101},{...cover,coverZoom:4},{...cover,coverZoom:'1'},{...cover,coverFileId:'https://evil.test/image'},{...cover,coverName:'x'.repeat(251)}])await assertFails(setDoc(ref,{...project,...invalid,...meta('alice')}));
+ for(const invalid of [{coverX:50},{coverModifiedTime:'2026-10-30T20:00:00Z'},{...cover,coverX:-1},{...cover,coverY:101},{...cover,coverZoom:4},{...cover,coverZoom:'1'},{...cover,coverFileId:'https://evil.test/image'},{...cover,coverName:'x'.repeat(251)}])await assertFails(setDoc(ref,{...project,...invalid,...meta('alice')}));
  await assertSucceeds(setDoc(ref,{...project,...cover,...meta('alice')}));
  await assertFails(getDoc(doc(bob,'users/alice/projects/10')));
  await assertFails(updateDoc(doc(bob,'users/alice/projects/10'),{coverX:20,revision:2,updatedAt:serverTimestamp()}));
  await assertFails(updateDoc(ref,{coverZoom:0,revision:2,updatedAt:serverTimestamp()}));
  await assertFails(updateDoc(ref,{coverName:deleteField(),revision:2,updatedAt:serverTimestamp()}));
- await assertSucceeds(updateDoc(ref,{coverX:0,coverY:100,coverZoom:3,revision:2,updatedAt:serverTimestamp()}));
- const removed=Object.fromEntries(Object.keys(cover).map(k=>[k,deleteField()]));
+ await assertFails(updateDoc(ref,{coverModifiedTime:'x'.repeat(81),revision:2,updatedAt:serverTimestamp()}));
+  await assertSucceeds(updateDoc(ref,{coverX:0,coverY:100,coverZoom:3,coverModifiedTime:'2026-10-30T20:00:00Z',revision:2,updatedAt:serverTimestamp()}));
+ const removed={...Object.fromEntries(Object.keys(cover).map(k=>[k,deleteField()])),coverModifiedTime:deleteField()};
  await assertSucceeds(updateDoc(ref,{...removed,revision:3,updatedAt:serverTimestamp()}));
 });
 
@@ -657,7 +658,8 @@ test('private client photos validate provider, crop, complete metadata and owner
  for(const photo of invalid)await assertFails(setDoc(ref,{...base,...photo}));
  await assertSucceeds(setDoc(ref,{...base,...drive}));
  await assertFails(updateDoc(doc(bob,'users/alice/clients/10'),{photoX:20,revision:2,updatedAt:serverTimestamp()}));
- await assertSucceeds(updateDoc(ref,{...dropbox,revision:2,updatedAt:serverTimestamp()}));
- const gone=Object.fromEntries(Object.keys(dropbox).map(key=>[key,deleteField()]));
+ await assertFails(updateDoc(ref,{photoModifiedTime:'x'.repeat(81),revision:2,updatedAt:serverTimestamp()}));
+  await assertSucceeds(updateDoc(ref,{...dropbox,photoModifiedTime:'2026-10-30T20:00:00Z',revision:2,updatedAt:serverTimestamp()}));
+ const gone={...Object.fromEntries(Object.keys(dropbox).map(key=>[key,deleteField()])),photoModifiedTime:deleteField()};
  await assertSucceeds(updateDoc(ref,{...gone,revision:3,updatedAt:serverTimestamp()}));
 });

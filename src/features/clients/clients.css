@@ -202,3 +202,9 @@
 .cd-avatar-edit:hover{background:var(--paper);color:var(--ink)}
 @media(max-width:600px){.cd-avatar-edit{width:31px;height:31px;right:-7px;bottom:-5px}}
 
+
+/* Portrait media has its own visible loading state; avoid an initials-to-photo pop. */
+.cd-avatar-loading{display:grid;place-items:center;position:absolute;inset:0;background:var(--subtle);color:var(--muted)}
+.cd-avatar-spin{animation:cd-avatar-rotate .9s linear infinite}
+@keyframes cd-avatar-rotate{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.cd-avatar-spin{animation:none}}

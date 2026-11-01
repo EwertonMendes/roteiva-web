@@ -116,3 +116,17 @@
  .pc-editor-body--picker .pc-picker-guidance{margin:18px 0 20px}
  .pc-editor-body--picker .pc-image-grid{gap:12px}
 }
+
+/* Stable media slot: a card without a cover has exactly the same media geometry. */
+.pc-photo{isolation:isolate}
+.pc-photo--empty{background:color-mix(in srgb,var(--subtle) 85%,var(--card))}
+.pc-photo--empty .pc-image-unavailable{padding:3px 10px 38px;gap:3px}
+.pc-photo--empty .pc-image-unavailable > svg{width:20px;height:20px}
+.pc-photo--empty .pc-add-cover{border:1px solid var(--line);border-radius:9px;background:var(--card);color:var(--ink);padding:4px 10px;min-height:30px}
+.pc-photo--empty .pc-files-overlay{background:color-mix(in srgb,var(--ink) 80%,transparent)}
+.pc-photo--empty .pc-open-overlay{background:color-mix(in srgb,var(--ink) 80%,transparent)}
+.pc-cover-loading{background:linear-gradient(105deg,var(--subtle) 25%,color-mix(in srgb,var(--subtle) 65%,var(--card)) 50%,var(--subtle) 75%);background-size:200% 100%;animation:pc-cover-shimmer 1.6s linear infinite}
+.pc-cover-loading .pc-spin{animation:pc-spin .9s linear infinite}
+@keyframes pc-cover-shimmer{to{background-position-x:-200%}}
+@keyframes pc-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.pc-cover-loading,.pc-cover-loading .pc-spin{animation:none}}

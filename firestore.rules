@@ -52,7 +52,7 @@ service cloud.firestore {
     }
     function valid_clientPhoto(d) {
       let fields = ["photoProvider","photoConnectionId","photoFileId","photoName","photoX","photoY","photoZoom"];
-      return !d.keys().hasAny(fields) || (d.keys().hasAll(fields) &&
+      return (!d.keys().hasAny(fields) && !d.keys().hasAny(["photoModifiedTime"])) || (d.keys().hasAll(fields) &&
         d.photoProvider in ["google_drive","dropbox"] &&
         text(d.photoConnectionId,36,36) && d.photoConnectionId.matches('^[a-zA-Z0-9-]{36}$') &&
         text(d.photoFileId,10,200) &&
@@ -61,10 +61,11 @@ service cloud.firestore {
         text(d.photoName,1,250) &&
         d.photoX is number && d.photoX>=0 && d.photoX<=100 &&
         d.photoY is number && d.photoY>=0 && d.photoY<=100 &&
-        d.photoZoom is number && d.photoZoom>=1 && d.photoZoom<=3);
+        d.photoZoom is number && d.photoZoom>=1 && d.photoZoom<=3 &&
+         (!d.keys().hasAny(["photoModifiedTime"]) || text(d.photoModifiedTime,1,80)));
     }
     function valid_clients(d,uid,id) {
-      return d.keys().hasAll(["ownerUid","schemaVersion","revision","createdAt","updatedAt","id","name","contact","email","phone","color","initials","type","since","packageTitle","monthlyDeliverables","monthlyFeeCents"]) && d.keys().hasOnly(["ownerUid","schemaVersion","revision","createdAt","updatedAt","id","name","contact","email","phone","color","initials","type","since","packageTitle","monthlyDeliverables","monthlyFeeCents","photoProvider","photoConnectionId","photoFileId","photoName","photoX","photoY","photoZoom"]) &&
+      return d.keys().hasAll(["ownerUid","schemaVersion","revision","createdAt","updatedAt","id","name","contact","email","phone","color","initials","type","since","packageTitle","monthlyDeliverables","monthlyFeeCents"]) && d.keys().hasOnly(["ownerUid","schemaVersion","revision","createdAt","updatedAt","id","name","contact","email","phone","color","initials","type","since","packageTitle","monthlyDeliverables","monthlyFeeCents","photoProvider","photoConnectionId","photoFileId","photoName","photoX","photoY","photoZoom","photoModifiedTime"]) &&
         metadata(d,uid) &&
         d.id is int && d.id>0 && d.id<=9007199254740991 && string(d.id)==id &&
         text(d.name,1,200) &&
@@ -82,16 +83,17 @@ service cloud.firestore {
     }
     function valid_projectCover(d) {
       let fields = ["coverConnectionId","coverFileId","coverName","coverX","coverY","coverZoom"];
-      return !d.keys().hasAny(fields) || (d.keys().hasAll(fields) &&
+      return (!d.keys().hasAny(fields) && !d.keys().hasAny(["coverModifiedTime"])) || (d.keys().hasAll(fields) &&
         text(d.coverConnectionId,36,36) && d.coverConnectionId.matches('^[a-zA-Z0-9-]{36}$') &&
         text(d.coverFileId,10,200) && d.coverFileId.matches('^[A-Za-z0-9_-]+$') &&
         text(d.coverName,1,250) &&
         d.coverX is number && d.coverX>=0 && d.coverX<=100 &&
         d.coverY is number && d.coverY>=0 && d.coverY<=100 &&
-        d.coverZoom is number && d.coverZoom>=1 && d.coverZoom<=3);
+        d.coverZoom is number && d.coverZoom>=1 && d.coverZoom<=3 &&
+         (!d.keys().hasAny(["coverModifiedTime"]) || text(d.coverModifiedTime,1,80)));
     }
     function valid_projects(d,uid,id) {
-      return d.keys().hasAll(["ownerUid","schemaVersion","revision","createdAt","updatedAt","id","name","clientId","client","status","dueDate","description","template","color","initials"]) && d.keys().hasOnly(["ownerUid","schemaVersion","revision","createdAt","updatedAt","id","name","clientId","client","status","dueDate","description","template","color","initials","coverConnectionId","coverFileId","coverName","coverX","coverY","coverZoom"]) &&
+      return d.keys().hasAll(["ownerUid","schemaVersion","revision","createdAt","updatedAt","id","name","clientId","client","status","dueDate","description","template","color","initials"]) && d.keys().hasOnly(["ownerUid","schemaVersion","revision","createdAt","updatedAt","id","name","clientId","client","status","dueDate","description","template","color","initials","coverConnectionId","coverFileId","coverName","coverX","coverY","coverZoom","coverModifiedTime"]) &&
         metadata(d,uid) &&
         d.id is int && d.id>0 && d.id<=9007199254740991 && string(d.id)==id &&
         text(d.name,1,200) &&

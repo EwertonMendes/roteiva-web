@@ -11,11 +11,11 @@ export function encodeWorkspace(workspace: WorkspaceData, scope?: ReadonlySet<Co
   for (const c of workspace.clients) {
     if (accepts("clients")) put("clients", c.id, {id:c.id,name:c.name,contact:c.contact,email:c.email || "",phone:c.phone || "",color:c.color,initials:c.initials,type:c.type,since:c.since,packageTitle:c.packageTitle || "",monthlyDeliverables:c.monthlyDeliverables || 0,monthlyFeeCents:Math.round((c.monthlyFee || 0)*100),
       ...(c.photo?{photoProvider:c.photo.provider||"google_drive",photoConnectionId:c.photo.connectionId,photoFileId:c.photo.fileId,
-        photoName:c.photo.name,photoX:c.photo.x,photoY:c.photo.y,photoZoom:c.photo.zoom}:{})});
+        photoName:c.photo.name,photoX:c.photo.x,photoY:c.photo.y,photoZoom:c.photo.zoom,...(c.photo.modifiedTime?{photoModifiedTime:c.photo.modifiedTime}:{})}:{})});
     for (const d of c.deliveries || []) if (accepts("deliveries")) put("deliveries",d.id,{...d,clientId:c.id});
   }
   for (const p of workspace.projects) {
-    if (accepts("projects")) put("projects",p.id,{id:p.id,name:p.name,clientId:p.clientId || 0,client:p.client,status:p.status,dueDate:p.dueDate || "",description:p.description || "",template:p.template || "Livre",color:p.color,initials:p.initials,...(p.cover?{coverConnectionId:p.cover.connectionId,coverFileId:p.cover.fileId,coverName:p.cover.name,coverX:p.cover.x,coverY:p.cover.y,coverZoom:p.cover.zoom}:{})});
+    if (accepts("projects")) put("projects",p.id,{id:p.id,name:p.name,clientId:p.clientId || 0,client:p.client,status:p.status,dueDate:p.dueDate || "",description:p.description || "",template:p.template || "Livre",color:p.color,initials:p.initials,...(p.cover?{coverConnectionId:p.cover.connectionId,coverFileId:p.cover.fileId,coverName:p.cover.name,coverX:p.cover.x,coverY:p.cover.y,coverZoom:p.cover.zoom,...(p.cover.modifiedTime?{coverModifiedTime:p.cover.modifiedTime}:{})}:{})});
     for (const t of p.tasks || []) if (accepts("tasks")) put("tasks",t.id,{...t,projectId:p.id});
   }
   for (const e of workspace.calendarEvents) if (accepts("events")) put("events",e.id,{...e,projectId:e.projectId || 0,endTime:e.endTime || "",autoDeadline:!!e.autoDeadline});
@@ -37,10 +37,10 @@ export function decodeWorkspace(records: Records): WorkspaceData {
       workspace.clients.push({...rest,
         ...(typeof d.photoFileId==="string"?{photo:{provider:d.photoProvider==="dropbox"?"dropbox":"google_drive",
           connectionId:String(d.photoConnectionId),fileId:d.photoFileId,name:String(d.photoName),
-          x:Number(d.photoX),y:Number(d.photoY),zoom:Number(d.photoZoom)}}:{}),
+          x:Number(d.photoX),y:Number(d.photoY),zoom:Number(d.photoZoom),...(typeof d.photoModifiedTime==="string"?{modifiedTime:d.photoModifiedTime}:{})}}:{}),
         monthlyFee:Number(monthlyFeeCents)/100,projects:0,active:0,deliveries:[]} as unknown as Client);
     }
-    if (collection === "projects") workspace.projects.push({...d,...(typeof d.coverFileId==="string"?{cover:{connectionId:d.coverConnectionId,fileId:d.coverFileId,name:d.coverName,x:d.coverX,y:d.coverY,zoom:d.coverZoom}}:{}),due:d.dueDate ? new Date(d.dueDate+"T12:00:00").toLocaleDateString("pt-BR",{day:"2-digit",month:"short"}) : "Sem prazo",tasks:[],progress:0,files:0} as unknown as Project);
+    if (collection === "projects") workspace.projects.push({...d,...(typeof d.coverFileId==="string"?{cover:{connectionId:d.coverConnectionId,fileId:d.coverFileId,name:d.coverName,x:d.coverX,y:d.coverY,zoom:d.coverZoom,...(typeof d.coverModifiedTime==="string"?{modifiedTime:d.coverModifiedTime}:{})}}:{}),due:d.dueDate ? new Date(d.dueDate+"T12:00:00").toLocaleDateString("pt-BR",{day:"2-digit",month:"short"}) : "Sem prazo",tasks:[],progress:0,files:0} as unknown as Project);
     if (collection === "events") workspace.calendarEvents.push(d as unknown as WorkspaceData["calendarEvents"][number]);
     if (collection === "financeEntries") {
       const {amountCents, ...rest} = d;

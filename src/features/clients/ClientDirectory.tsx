@@ -1,6 +1,6 @@
 import {AppButton} from "../ui/AppButton";
 import {useEffect,useRef,useState} from "react";
-import {Building2,Camera,ChevronDown,ChevronRight,Pencil,ReceiptText,UserRoundPlus,UsersRound} from "lucide-react";
+import {Building2,Camera,ChevronDown,ChevronRight,Pencil,ReceiptText,UserRoundPlus,UsersRound,LoaderCircle} from "lucide-react";
 import type {Client,ClientPhoto} from "../../domain/workspace";
 import {isDemo} from "../../lib/firebase";
 import {DriveCoversProvider,useCoverImage} from "../projects/DriveCoversProvider";
@@ -14,21 +14,24 @@ type Props={
  onSavePhoto:(id:number,photo:ClientPhoto|undefined)=>void;
  totalCount?:number;recurringCount?:number;activeProjectsCount?:number;hasMore?:boolean;onMore?:()=>void;
 };
-function ClientAvatar({client}:{client:Client}){
+function ClientAvatar({client,eager=false}:{client:Client;eager?:boolean}){
  const element=useRef<HTMLSpanElement>(null);
- const [visible,setVisible]=useState(false);
+ const [visible,setVisible]=useState(eager);
  useEffect(()=>{
-  if(!element.current)return;
+  if(eager||visible||!element.current)return;
   if(typeof IntersectionObserver==="undefined"){setVisible(true);return;}
   const observer=new IntersectionObserver(entries=>{
     if(entries.some(entry=>entry.isIntersecting)){setVisible(true);observer.disconnect();}
-  },{rootMargin:"100px"});
+  },{rootMargin:"260px"});
   observer.observe(element.current);
   return ()=>observer.disconnect();
- },[]);
- const {src}=useCoverImage(client.photo,visible,true);
- return <span className={"cd-avatar "+(src?"cd-avatar--loaded":"")} ref={element} aria-hidden="true">
-  {src&&client.photo?<CoverFrame src={src} cover={client.photo}/>:<span className="cd-avatar-fallback">{client.initials||client.name.slice(0,2).toUpperCase()}</span>}
+ },[eager,visible]);
+ const {src,error,loading}=useCoverImage(client.photo,eager||visible,true);
+ return <span className={"cd-avatar "+(src?"cd-avatar--loaded":"")} ref={element} aria-hidden="true"
+  data-photo-state={!client.photo?"empty":src?"loaded":error?"unavailable":loading?"loading":"pending"}>
+  {src&&client.photo?<CoverFrame src={src} cover={client.photo}/>:client.photo&&!error?
+   <span className="cd-avatar-loading"><LoaderCircle size={21} className="cd-avatar-spin"/></span>:
+   <span className="cd-avatar-fallback">{client.initials||client.name.slice(0,2).toUpperCase()}</span>}
  </span>;
 }
 function ClientDirectoryContent({clients,onOpen,onAdd,onSavePhoto,totalCount,recurringCount,activeProjectsCount,hasMore,onMore}:Props){
@@ -48,9 +51,9 @@ function ClientDirectoryContent({clients,onOpen,onAdd,onSavePhoto,totalCount,rec
     <AppButton type="button" className="secondary-button" onClick={onAdd}><UserRoundPlus size={18}/>Adicionar cliente</AppButton>
    </header>
    <div className="cd-table-head" aria-hidden="true"><span>CLIENTE</span><span>RELACIONAMENTO</span><span>CONTATO</span><span>PROJETOS</span><span>DESDE</span><span/></div>
-   <div className="cd-list">{clients.map(client=><article key={client.id} className="cd-row">
+   <div className="cd-list">{clients.map((client,index)=><article key={client.id} className="cd-row">
      <div className="cd-identity">
-      <span className="cd-photo-wrap"><ClientAvatar client={client}/>{!isDemo&&client.photo&&<AppButton className="cd-avatar-edit" type="button" aria-label={`Alterar foto de ${client.name}`} onClick={()=>setEditingPhoto(client.id)}><Pencil size={16}/></AppButton>}</span>
+      <span className="cd-photo-wrap"><ClientAvatar client={client} eager={index<10}/>{!isDemo&&client.photo&&<AppButton className="cd-avatar-edit" type="button" aria-label={`Alterar foto de ${client.name}`} onClick={()=>setEditingPhoto(client.id)}><Pencil size={16}/></AppButton>}</span>
       <div className="cd-identity-copy"><AppButton type="button" className="cd-client-name" onClick={()=>onOpen(client.id)}>{client.name}</AppButton>
        {!isDemo&&<AppButton type="button" className="cd-change-photo" onClick={()=>setEditingPhoto(client.id)}><Camera size={16}/>{client.photo?"Alterar foto":"Adicionar foto"}</AppButton>}
       </div>

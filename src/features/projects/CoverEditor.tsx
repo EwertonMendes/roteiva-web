@@ -116,7 +116,7 @@ export function CoverEditor({project,client,onClose,onSave}:{project?:Project;cl
    }
    if(!['image/jpeg','image/png','image/webp',...(provider==='google_drive'?['image/avif']:[])].includes(file.mimeType))return;
    if(file.size!==undefined && (!Number.isFinite(Number(file.size))||Number(file.size)>8*1024*1024))return;
-   setCover({provider,connectionId:account,fileId:file.id,name:file.name,x:50,y:50,zoom:1});setChoosing(false);
+   setCover({provider,connectionId:account,fileId:file.id,name:file.name,x:50,y:50,zoom:1,...(file.modifiedTime?{modifiedTime:file.modifiedTime}:{})});setChoosing(false);
  };
  return <dialog data-native-cursor ref={dialog} className="pc-dialog" aria-labelledby="pc-editor-title" onCancel={e=>{e.preventDefault();onClose();}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
   <header><div><span className="eyebrow">{client?'FOTO DO CLIENTE':'CAPA DO PROJETO'}</span><h2 id="pc-editor-title">{choosing?'Escolha uma imagem':'Encontre o melhor enquadramento'}</h2><p>{subject.name}</p></div><AppButton className="icon-button" type="button" onClick={onClose} aria-label="Fechar editor de capa"><X size={20}/></AppButton></header>
@@ -132,7 +132,7 @@ export function CoverEditor({project,client,onClose,onSave}:{project?:Project;cl
      <div className="pc-picker-results" aria-busy={busy}>
      {error&&<p role="alert">{error} <AppButton type="button" className="secondary-button" onClick={()=>{setRetry(n=>n+1);}}>Tentar novamente</AppButton></p>}
      {busy&&!page.files.length?<CoverLoading>Carregando imagens…</CoverLoading>:<>
-     <div className="pc-image-grid">{page.files.filter(file=>isStorageFolder(file.mimeType)||(['image/jpeg','image/png','image/webp',...(provider==='google_drive'?['image/avif']:[])].includes(file.mimeType)&&(file.size===undefined&&provider==='google_drive'||Number(file.size)>0&&Number(file.size)<=8*1024*1024))).map(file=><AppButton type="button" key={file.id} onClick={()=>chooseFile(file)} title={file.name}>{isStorageFolder(file.mimeType)?<span className="pc-folder-icon"><Folder size={30}/></span>:<DriveThumbnail item={file} scope={context.uid+':'+account} getThumbnail={thumbnail}/>}<span>{file.name}</span></AppButton>)}</div>
+     <div className="pc-image-grid">{page.files.filter(file=>isStorageFolder(file.mimeType)||(['image/jpeg','image/png','image/webp',...(provider==='google_drive'?['image/avif']:[])].includes(file.mimeType)&&(file.size===undefined&&provider==='google_drive'||Number(file.size)>0&&Number(file.size)<=8*1024*1024))).map(file=><AppButton type="button" key={file.id} onClick={()=>chooseFile(file)} title={file.name}>{isStorageFolder(file.mimeType)?<span className="pc-folder-icon"><Folder size={30}/></span>:<DriveThumbnail item={file} scope={context.uid+':'+account} provider={provider} getThumbnail={thumbnail}/>}<span>{file.name}</span></AppButton>)}</div>
      {!page.files.length&&!error&&!busy&&<p className="pc-empty">{page.nextPageToken?'Nenhuma imagem compatível nesta página. Carregue mais itens para continuar.':'Nenhuma pasta ou imagem compatível encontrada. Tente outra pasta ou pesquisa.'}</p>}
      </>}
      {page.incompleteSearch&&<p role="status">O Drive retornou resultados parciais. Refine a busca pelo nome.</p>}
