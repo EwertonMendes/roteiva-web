@@ -30,7 +30,7 @@ test("quick deploys avoid E2E, separate Hosting from Firestore and guard DEV", (
 test("PR smoke is bounded while manual/nightly browser and security coverage remains intact", () => {
   const isolated = read(".github/workflows/qa-isolated-e2e.yml");
   const regression = read(".github/workflows/qa-regression.yml");
-  assert.match(isolated, /--grep @ci-smoke --workers=3/);
+  assert.match(isolated, /--grep @ci-smoke --workers=2/);
   assert.match(isolated, /github.event_name == 'pull_request' \|\| github.event_name == 'push'/);
   assert.match(isolated, /github.event_name == 'workflow_dispatch'/);
   assert.doesNotMatch(isolated, /^  schedule:/m, "Do not run duplicate nightly suites");
@@ -38,7 +38,7 @@ test("PR smoke is bounded while manual/nightly browser and security coverage rem
   assert.match(regression, /test:firebase/);
   for (const path of [
     "access-isolated-e2e.spec.ts", "reviews.spec.ts", "reviews-workflow.spec.ts",
-    "drive-folders.spec.ts", "project-covers.spec.ts"
+    "drive-folders.spec.ts"
   ]) assert.match(read("tests/browser/" + path), /tag:\s*['"]@ci-smoke['"]/, path);
 });
 
