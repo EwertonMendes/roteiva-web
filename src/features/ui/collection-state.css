@@ -36,3 +36,15 @@
 .reviews-list > .rt-collection-state{width:100%;}
 @keyframes rt-collection-spin {to{transform:rotate(360deg);}}
 @media (prefers-reduced-motion:reduce){.rt-collection-state__spinner{animation:none;}}
+
+/* Center the whole blank result pane, not merely the text inside its first row. */
+.rl-picker-list:has(> .rt-collection-state):not(:has(> .rl-picker-row)),
+.rl-folder-list:has(> .rt-collection-state):not(:has(> .rl-folder-entry)),
+.rl-files[data-view="list"]:has(> .rt-collection-state):not(:has(> .rl-file-row)){
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+}
+.rl-files[data-view="grid"]:has(> .rt-collection-state):not(:has(> .rl-file-row)){
+  align-content:center;
+}

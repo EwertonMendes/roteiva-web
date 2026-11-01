@@ -66,3 +66,34 @@ test('shared controls preserve forms, custom select, lime focus and modal on des
  await selects.nth(3).press('Escape');
  await expect(popup).not.toBeVisible();
 });
+
+test('library navigation has no badge and empty financial table stays centered in both themes',async({page},info)=>{
+ await login(page,'collection-layout-'+info.project.name+'@example.com');
+ const opener=page.getByRole('button',{name:'Abrir menu',exact:true});
+ if(await opener.isVisible())await opener.click();
+ const library=page.locator('.sidebar nav').getByRole('button',{name:'Biblioteca',exact:true});
+ await expect(library).toBeVisible();
+ await expect(library.locator('em')).toHaveCount(0);
+ await page.locator('.sidebar nav').getByRole('button',{name:/^Financeiro/}).click();
+ const state=page.locator('.finance-table .rt-collection-state');
+ await expect(state).toContainText('Nenhum lançamento com os filtros selecionados.');
+ for(const theme of ['light','dark'] as const){
+   await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;},theme);
+   const bounds=await state.evaluate(node=>{
+     const parent=node.parentElement!.getBoundingClientRect();
+     const rect=node.getBoundingClientRect();
+     const msg=node.querySelector('.rt-collection-state__message')!.getBoundingClientRect();
+     return {horizontal:Math.abs(rect.x+rect.width/2-(parent.x+parent.width/2)),
+       vertical:Math.abs(msg.y+msg.height/2-(rect.y+rect.height/2)),
+       height:rect.height,layout:getComputedStyle(node).flexDirection};
+   });
+   expect(bounds.horizontal).toBeLessThan(2);
+   expect(bounds.vertical).toBeLessThan(8);
+   expect(bounds.height).toBeGreaterThanOrEqual(190);
+   expect(bounds.layout).toBe('column');
+ }
+ if(await opener.isVisible())await opener.click();
+ await page.locator('.sidebar nav').getByRole('button',{name:/^Biblioteca/}).click();
+ if(await opener.isVisible())await opener.click();
+ await expect(page.locator('.sidebar nav').getByRole('button',{name:'Biblioteca',exact:true}).locator('em')).toHaveCount(0);
+});

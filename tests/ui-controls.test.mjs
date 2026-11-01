@@ -59,3 +59,18 @@ test('retired workspace copy export has no frontend entrypoints, data fetcher, o
   const finance=readFileSync(new URL('studio-features.tsx',base),'utf8');
   assert.match(finance,/Exportar CSV/,'The separate financial CSV export must remain available');
 });
+
+test('library counter callback is retired and collection states are reused',()=>{
+  const base=new URL('../src/',import.meta.url);
+  const dash=readFileSync(new URL('dashboard-client.tsx',base),'utf8');
+  const drive=readFileSync(new URL('features/drive/DriveConnectionPanel.tsx',base),'utf8');
+  const dropbox=readFileSync(new URL('features/dropbox/DropboxConnectionPanel.tsx',base),'utf8');
+  assert.doesNotMatch(dash,/linkedFolderCount|onLinkedFolderCountChange|<span>Biblioteca<\/span><em>/);
+  assert.doesNotMatch(drive,/onLinkedFolderCountChange|countCallback/);
+  assert.doesNotMatch(dropbox,/onLinkedFolderCountChange/);
+  for(const path of ['studio-features.tsx','features/reviews/ReviewsDashboard.tsx',
+    'features/drive/DriveLibraryUI.tsx','features/drive/DriveConnectionPanel.tsx',
+    'features/dropbox/DropboxConnectionPanel.tsx']){
+    assert.match(readFileSync(new URL(path,base),'utf8'),/<CollectionState[\s>]/,path);
+  }
+});
