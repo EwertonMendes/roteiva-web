@@ -31,6 +31,8 @@ async function navigateSettings(page:Page){
 
 test('mockup settings keeps separate sections, responsive geometry and verified access',async({page},info)=>{
   await openSettings(page,'settings-layout-'+info.project.name+'@example.com');
+  // Catch fixed-width layouts that leave a large empty gutter on wide monitors.
+  if(info.project.name==='desktop')await page.setViewportSize({width:1728,height:960});
   for(const section of ['.settings-identity','.settings-profile','.settings-studio','.settings-preferences','.access-settings','.settings-danger-zone']){
     await expect(page.locator(section)).toBeVisible();
   }
@@ -42,12 +44,23 @@ test('mockup settings keeps separate sections, responsive geometry and verified 
   await expect(page.getByRole('textbox',{name:'E-mail de acesso'})).toHaveAttribute('readonly');
   const geometry=await page.evaluate(()=>{
     const panel=document.querySelector('.settings-studio-controls')!.getBoundingClientRect();
+    const pageElement=document.querySelector('.page')!;
+    const pageRect=pageElement.getBoundingClientRect();
+    const contentRight=pageRect.right-parseFloat(getComputedStyle(pageElement).paddingRight);
+    const cards=[...document.querySelectorAll('.settings-layout > .settings-identity, .settings-layout > .settings-editor, .settings-details > .settings-editor')].map(e=>e.getBoundingClientRect());
+    const layout=document.querySelector('.settings-layout')!.getBoundingClientRect();
     const fields=[...document.querySelectorAll('.settings-studio-controls .settings-field')].map(e=>e.getBoundingClientRect());
     const action=document.querySelector('.settings-save-button')!.getBoundingClientRect();
     return {viewport:window.innerWidth,document:document.documentElement.scrollWidth,panelRight:panel.right,
+      contentRight,layoutLeft:layout.left,layoutRight:layout.right,
+      cardWidths:cards.map(r=>r.width),cardRights:cards.map(r=>r.right),
       items:fields.map(r=>({top:r.top,right:r.right})),button:{top:action.top,right:action.right}};
   });
   expect(geometry.document).toBeLessThanOrEqual(geometry.viewport+2);
+  // Every card must use the full workspace content area and line up exactly.
+  expect(Math.abs(geometry.contentRight-geometry.layoutRight)).toBeLessThan(4);
+  for(const right of geometry.cardRights)expect(Math.abs(right-geometry.layoutRight)).toBeLessThan(4);
+  expect(Math.max(...geometry.cardWidths)-Math.min(...geometry.cardWidths)).toBeLessThan(4);
   expect(geometry.button.right).toBeLessThanOrEqual(geometry.panelRight+2);
   if(info.project.name==='mobile'){
     expect(geometry.items[1].top).toBeGreaterThan(geometry.items[0].top);
@@ -55,6 +68,21 @@ test('mockup settings keeps separate sections, responsive geometry and verified 
   }else{
     expect(Math.abs(geometry.items[0].top-geometry.items[1].top)).toBeLessThan(3);
     expect(geometry.button.top).toBeGreaterThan(geometry.items[0].top);
+    // With the fixed desktop sidebar, the studio form must reflow on medium screens.
+    await page.setViewportSize({width:1100,height:820});
+    const medium=await page.evaluate(()=>{
+      const fields=[...document.querySelectorAll('.settings-studio-controls .settings-field')].map(e=>e.getBoundingClientRect());
+      const action=document.querySelector('.settings-save-button')!.getBoundingClientRect();
+      const pageElement=document.querySelector('.page')!;
+      return {firstTop:fields[0].top,secondTop:fields[1].top,actionTop:action.top,
+        scrollWidth:document.documentElement.scrollWidth,viewport:innerWidth,
+        gap:pageElement.getBoundingClientRect().right-parseFloat(getComputedStyle(pageElement).paddingRight)-
+          document.querySelector('.settings-layout')!.getBoundingClientRect().right};
+    });
+    expect(medium.actionTop).toBeGreaterThan(medium.secondTop);
+    expect(Math.abs(medium.firstTop-medium.secondTop)).toBeLessThan(3);
+    expect(medium.gap).toBeLessThan(4);
+    expect(medium.scrollWidth).toBeLessThanOrEqual(medium.viewport+2);
   }
 });
 
