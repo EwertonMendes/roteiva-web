@@ -3,7 +3,7 @@
 ## Performance das pipelines — 01/11/2026
 
 - [x] Diagnosticar execuções reais: PR E2E isolado levou 6m04s (57 aprovados, 3 ignorados); preparação ~40s e suíte ~5m18s. [Execução de referência](https://github.com/EwertonMendes/roteiva-web/actions/runs/41355533603).
-- [x] Implementar subset de smoke desktop/mobile em PR e push; manter cobertura integral no agendamento/manual e impedir agendamento noturno duplicado. Testes de contrato e cache binário dos emuladores adicionados em branch `perf/ci-fast-e2e-20261101`.
+- [x] Implementar subset crítico de smoke desktop/mobile em PR e push; manter cobertura integral no agendamento/manual e impedir agendamento noturno duplicado. Testes de contrato e cache binário dos emuladores adicionados em branch `perf/ci-fast-e2e-20261101`.
 - [ ] Validar os checks reais do PR e medir duração após otimização; exigir regressão completa manual antes de merge de alterações sensíveis. Não há alteração em dados DEV/PROD.
 
 
