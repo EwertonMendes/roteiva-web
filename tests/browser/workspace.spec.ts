@@ -197,8 +197,7 @@ test("Direct routes, refresh and browser Back/Forward preserve each user's scree
   await page.getByLabel("Nome do projeto",{exact:true}).fill("Projeto com URL");
   await page.locator("form.project-modal").getByRole("button",{name:"Criar projeto",exact:true}).click();
   await settled(page);
-  await expect(page.locator(".workspace-tools")).not.toContainText("Salvo na nuvem");
-   await expect(page.locator(".workspace-tools").getByRole("button",{name:"Exportar cópia"})).toBeVisible();
+  await expect(page.getByRole("button",{name:/Exportar cópia/i})).toHaveCount(0);
   await expect(page).toHaveURL(new RegExp("/projetos/[1-9][0-9]*$"));
   const projectURL=page.url();
   await expect(page.getByLabel("Nova tarefa",{exact:true})).toBeVisible();
@@ -218,8 +217,7 @@ test("Direct routes, refresh and browser Back/Forward preserve each user's scree
   await page.getByLabel("Nome do cliente",{exact:true}).fill("Cliente com URL");
   await page.getByLabel("Contato principal",{exact:true}).fill("Contato de teste");
   await page.getByRole("button",{name:"Salvar cliente"}).click();await settled(page);
-  await expect(page.locator(".workspace-tools")).not.toContainText("Salvo na nuvem");
-   await expect(page.locator(".workspace-tools").getByRole("button",{name:"Exportar cópia"})).toBeVisible();
+  await expect(page.getByRole("button",{name:/Exportar cópia/i})).toHaveCount(0);
   await page.locator("button.cd-client-name").filter({hasText:"Cliente com URL"}).click();
   await expect(page).toHaveURL(new RegExp("/clientes/[1-9][0-9]*$"));
   const clientURL=page.url();
@@ -315,7 +313,7 @@ test("automatic persistent cache is isolated per UID, survives reload and clears
   await login(page,"cache-"+info.project.name+"@example.com");
   await page.goto(cloud+"/configuracoes");
   await expect(page.getByRole("heading",{name:"Zona de perigo"})).toBeVisible();
-  await expect(page.getByRole("button",{name:/Ativar cache|Desativar cache|Exportar cópia/})).toHaveCount(0);
+  await expect(page.getByRole("button",{name:/Ativar cache|Desativar cache/})).toHaveCount(0);
   // Legacy opt-out is deliberately ignored. Persistence is not a user setting.
   await page.evaluate(()=>localStorage.setItem("roteiva-private-cache","disabled"));
   await page.reload();await settled(page);
@@ -374,5 +372,17 @@ test("automatic cloud success labels stay out of workspace headers on all routes
     await settled(page);
     await expect(page.getByText("Salvo na nuvem",{exact:true})).toHaveCount(0);
     await expect(page.getByText("Dados na nuvem",{exact:true})).toHaveCount(0);
+  }
+});
+
+test("removed workspace copy action stays absent on every screen while financial CSV remains",async({page},info)=>{
+  await page.goto(cloud);
+  await login(page,"no-json-export-"+info.project.name+"@example.com");
+  for(const name of ["Visão geral","Projetos","Clientes","Aprovações","Financeiro","Calendário","Biblioteca","Configurações"]){
+    await navigate(page,name);
+    await expect(page.locator(".page-heading h1")).toBeVisible();
+    await expect(page.getByRole("button",{name:/Exportar cópia|Preparando cópia/i})).toHaveCount(0);
+    await expect(page.locator(".workspace-tools,.rl-page-more")).toHaveCount(0);
+    if(name==="Financeiro") await expect(page.getByRole("button",{name:"Exportar CSV"})).toBeVisible();
   }
 });

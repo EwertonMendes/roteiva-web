@@ -7,7 +7,6 @@ import { emptyWorkspace, type WorkspaceData } from "../../domain/workspace";
 import { routeFromLocation, type WorkspaceRoute } from "../../lib/workspace-routing";
 import { domainsForRoute } from "../../lib/workspace-scopes";
 import type { Domain } from "../../data/firestore-sync";
-import { collections } from "../../data/workspace-codec";
 import type { WorkspaceCommand } from "../../data/firestore-commands";
 import { useAuth } from "../auth/AuthProvider";
 import { useRegistrationProfile } from "../auth/RegistrationGate";
@@ -50,7 +49,6 @@ export function FirebaseWorkspace() {
   const [failedWrite,setFailedWrite]=useState(false);
   const [saving,setSaving]=useState(false);
   const [blockingWrites,setBlockingWrites]=useState(false);
-  const [status,setStatus]=useState("Dados na nuvem");
   const [version,setVersion]=useState(0);
   const [remoteChanges,setRemoteChanges]=useState(false);
   const [syncWarning,setSyncWarning]=useState("");
@@ -209,7 +207,6 @@ export function FirebaseWorkspace() {
       if (request===scopeRequest.current) setLoadingBusiness(false);
     }
   },[repository,initial]);
-  const ensureFullWorkspace=useCallback(()=>ensureDomains(["clients","projects","tasks","deliveries","events","financeEntries","activities"]),[ensureDomains]);
   const fetchProjectPage=useCallback(async(status:string,reset:boolean)=>{
     const request=++scopeRequest.current;
     setLoadingBusiness(true);
@@ -339,13 +336,12 @@ export function FirebaseWorkspace() {
   const enqueue=useCallback((operation:()=>Promise<unknown>,{blocksInteraction=true}={})=>{
     pending.current++;
     if(blocksInteraction){pendingBlocking.current++;setBlockingWrites(true);}
-    setSaving(true); setStatus("Salvando na nuvem…");
+    setSaving(true);
     queue.current=queue.current.then(async()=>{
       if (failed.current) return;
       await operation();
-      setStatus("Salvo na nuvem");
     }).catch(reason=>{
-      failed.current=true;setFailedWrite(true);setError(dataErrorMessage(reason));setStatus("Alterações não confirmadas");
+      failed.current=true;setFailedWrite(true);setError(dataErrorMessage(reason));
     }).finally(()=>{
       pending.current--;if(!pending.current)setSaving(false);
       if(blocksInteraction){pendingBlocking.current--;if(!pendingBlocking.current)setBlockingWrites(false);}
@@ -397,7 +393,7 @@ export function FirebaseWorkspace() {
     {loadingBusiness && !error && <main className="studio-loading" role="status">Carregando os dados do seu espaço…</main>}
     {initial && (overviewMetrics || routeFromLocation(window.location,{base:import.meta.env.BASE_URL,useHash:false}).view!=="overview") && <div inert={!!error || remoteChanges || loadingBusiness} aria-busy={saving}>
       <DashboardClient key={user.uid+"-"+version} firstName={profileContext?.profile.displayName || user.displayName || "Profissional"} profile={profileContext?.profile || null} onSaveProfile={profileContext?.saveProfile} email={user.email || ""} photoURL={user.photoURL || undefined}
-        initialWorkspace={initial.workspace} initialTheme={theme} onCommands={businessLoaded ? executeCommands : undefined} onLoadWorkspace={repository.hasLoaded(collections) ? undefined : ensureFullWorkspace} onRouteChange={onRouteChange}
+        initialWorkspace={initial.workspace} initialTheme={theme} onCommands={businessLoaded ? executeCommands : undefined} onRouteChange={onRouteChange}
         canValidateProjectLink={repository.hasLoaded(domainsForRoute({view:"projects",projectId:1}))}
         canValidateClientLink={repository.hasLoaded(domainsForRoute({view:"clients",clientId:1}))}
         projectPage={repository.hasLoaded(["projects","tasks"])?undefined:projectPage}
@@ -421,7 +417,7 @@ export function FirebaseWorkspace() {
           cashBalance:repository.hasLoaded(["financeEntries"])?undefined:overviewMetrics.cashBalance,
           projectCount:repository.hasLoaded(["projects"])?undefined:overviewMetrics.projectCount,
           projectStatuses:repository.hasLoaded(["projects"])?undefined:overviewMetrics.projectStatuses,
-        } : undefined} cloudStatus={status} saving={blockingWrites} onLogout={()=>void logout()} />
+        } : undefined} saving={blockingWrites} onLogout={()=>void logout()} />
     </div>}
   </>;
 }

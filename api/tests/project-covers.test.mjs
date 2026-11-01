@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {database} from './helpers/database.mjs';
 import {encrypt,base64url,context} from '../src/crypto.ts';
-import {listCoverImages,coverImage,MAX_COVER_BYTES} from '../src/project-covers.ts';
+import {listCoverImages,coverImage,fastCoverPreview,MAX_COVER_BYTES} from '../src/project-covers.ts';
 import {DRIVE_READ_SCOPE} from '../src/google.ts';
 const id='aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa',fileId='image_123456789';
 async function setup(){
@@ -18,8 +18,8 @@ async function setup(){
 }
 test('cover search is private, escaped, paginated and filters unsupported/oversized files',async()=>{
  const {env,db,fetcher}=await setup();try{
-  const load=fetcher(url=>{assert.match(url.searchParams.get('q'),/name contains 'bob\\'s'/);assert.equal(url.searchParams.get('pageToken'),'next');assert.equal(url.searchParams.get('pageSize'),'60');return Response.json({files:[{id:fileId,name:'photo.jpg',mimeType:'image/jpeg',size:'3'},{id:'oversize_123456',mimeType:'image/jpeg',size:String(MAX_COVER_BYTES+1)},{id:'svg_1234567890',mimeType:'image/svg+xml',size:'3'}],nextPageToken:'page2'});});
-  const data=await(await listCoverImages(env,'alice',id,new URLSearchParams({search:"bob's",pageToken:'next'}),load)).json();assert.equal(data.files.length,1);assert.equal(data.nextPageToken,'page2');
+  const load=fetcher(url=>{assert.match(url.searchParams.get('q'),/name contains 'bob\\'s'/);assert.equal(url.searchParams.get('pageToken'),'next');assert.equal(url.searchParams.get('pageSize'),'60');assert.match(url.searchParams.get('fields'),/modifiedTime/);return Response.json({files:[{id:fileId,name:'photo.jpg',mimeType:'image/jpeg',size:'3',modifiedTime:'2026-10-30T21:00:00.000Z'},{id:'oversize_123456',mimeType:'image/jpeg',size:String(MAX_COVER_BYTES+1)},{id:'svg_1234567890',mimeType:'image/svg+xml',size:'3'}],nextPageToken:'page2'});});
+  const data=await(await listCoverImages(env,'alice',id,new URLSearchParams({search:"bob's",pageToken:'next'}),load)).json();assert.equal(data.files.length,1);assert.equal(data.files[0].modifiedTime,'2026-10-30T21:00:00.000Z');assert.equal(data.nextPageToken,'page2');
   await assert.rejects(listCoverImages(env,'bob',id,new URLSearchParams(),load));
   await assert.rejects(listCoverImages(env,'alice',id,new URLSearchParams({pageToken:'bad token'}),load));
  }finally{db.close();}
@@ -82,5 +82,32 @@ test('client image picker includes Drive folders, scopes to parent and skips emp
    fetcher(url=>{assert.match(url.searchParams.get('q'),/'folder_123456789' in parents/);return Response.json({files:[]});}))).json();
   assert.deepEqual(sub.files,[]);
   await assert.rejects(listCoverImages(env,'alice',id,new URLSearchParams({parentId:'../invalid'}),load));
+ }finally{db.close();}
+});
+
+test('fast preview has a single Google media hop, validates bytes and rejects revoked access',async()=>{
+ const {env,db,fetcher}=await setup();
+ try{
+  let mediaCalls=0;
+  const jpeg=new Uint8Array([255,216,255,224,0,1,2,3]);
+  const read=fetcher(url=>{
+   mediaCalls++;
+   assert.equal(url.searchParams.get('alt'),'media');
+   assert.equal(url.searchParams.get('supportsAllDrives'),'true');
+   return new Response(jpeg,{headers:{'Content-Type':'image/jpeg','Content-Length':String(jpeg.byteLength)}});
+  });
+  const response=await fastCoverPreview(env,'alice',id,fileId,read);
+  assert.equal(response.status,200);
+  assert.equal(response.headers.get('Cache-Control'),'private, no-store');
+  assert.equal((await response.arrayBuffer()).byteLength,jpeg.length);
+  assert.equal(mediaCalls,1,'no extra Drive metadata roundtrip');
+  await assert.rejects(fastCoverPreview(env,'bob',id,fileId,read),{status:404});
+  assert.equal(mediaCalls,1);
+  await assert.rejects(fastCoverPreview(env,'alice',id,fileId,fetcher(()=>new Response('bad',{headers:{'Content-Type':'image/jpeg'}}))),{code:'invalid_cover_image'});
+  await assert.rejects(fastCoverPreview(env,'alice',id,fileId,fetcher(()=>new Response('bad',{headers:{'Content-Type':'text/html'}}))),{code:'invalid_cover_image'});
+  await assert.rejects(fastCoverPreview(env,'alice',id,fileId,fetcher(()=>new Response(null,{headers:{'Content-Type':'image/jpeg','Content-Length':String(MAX_COVER_BYTES+1)}}))),{code:'invalid_cover_image'});
+  await assert.rejects(fastCoverPreview(env,'alice',id,fileId,fetcher(()=>new Response(null,{status:302,headers:{Location:'https://other.test/'}}))),{code:'cover_unavailable'});
+  db.sql.prepare("UPDATE drive_connections SET status='reconnect_required'").run();
+  await assert.rejects(fastCoverPreview(env,'alice',id,fileId,read),{code:'reconnect_required'});
  }finally{db.close();}
 });
