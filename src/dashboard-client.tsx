@@ -16,12 +16,12 @@ import {
   ChevronRight, CirclePause, CirclePlay, Clock3, Film, Folder, FolderOpen,
   Grid2X2, LayoutDashboard, LibraryBig, ListFilter, Menu, PanelsTopLeft,
   ArrowUpRight, Building2, UserRound,
-  MoreHorizontal, Pencil, Plus, ReceiptText, Search, Trash2,
+  Pencil, Plus, ReceiptText, Search, Trash2,
   UserRoundPlus, Users, WalletCards, X, Upload, Image as ImageIcon,
   FileVideo, FileAudio, FileText, HardDrive, ChevronLeft, Settings2,
   type LucideIcon,
 } from "lucide-react";
-import { ClientDetail, StudioReviews, WorkspaceTools, FinancePanel, projectTemplates } from "./studio-features";
+import { ClientDetail, StudioReviews, FinancePanel, projectTemplates } from "./studio-features";
 import {ReviewsDashboard} from "./features/reviews/ReviewsDashboard";
 import { TodayStudio } from "./features/dashboard/DashboardOverview";
 import { ActivityHistoryDrawer } from "./features/dashboard/ActivityHistory";
@@ -80,16 +80,16 @@ type DashboardProps = {
   onSaveProfile?:(changes:ProfileChanges)=>Promise<void>;
   initialWorkspace?: WorkspaceData; initialTheme?: "light"|"dark";
   onThemeChange?:(theme:"light"|"dark")=>void;
-  onLoadWorkspace?:()=>Promise<WorkspaceData>; onRouteChange?:(route:WorkspaceRoute)=>void;
+  onRouteChange?:(route:WorkspaceRoute)=>void;
   onCommands?:(commands:readonly WorkspaceCommand[])=>void;
   overviewMetrics?:{clientCount?:number;receivableAmount?:number;cashBalance?:number;projectCount?:number;projectStatuses?:Record<Status,number>}; projectPage?:{total:number;hasMore:boolean;status:string};
   onMoreProjects?:()=>void;onProjectStatus?:(status:Status|"Todos")=>void;
   onSearchProjects?:()=>void; clientPage?:{total:number;recurring:number;hasMore:boolean};
   onFinancePeriodChange?:(year:number,month:number,clientId?:number)=>void;
   financeBars?:{key:string;bars:number[]};eventCount?:number;usage?:Readonly<FirestoreUsage>;onCalendarMonthChange?:(year:number,month:number)=>void;
-  onMoreClients?:()=>void;onSearchClients?:()=>void;onClientCreated?:(client:Client)=>void;canValidateProjectLink?:boolean;canValidateClientLink?:boolean; cloudStatus?:string; saving?:boolean; onLogout?:()=>void;
+  onMoreClients?:()=>void;onSearchClients?:()=>void;onClientCreated?:(client:Client)=>void;canValidateProjectLink?:boolean;canValidateClientLink?:boolean; saving?:boolean; onLogout?:()=>void;
 };
-export default function DashboardClient({ firstName, email, photoURL, profile, onSaveProfile, initialWorkspace, initialTheme, onThemeChange, onLoadWorkspace, onRouteChange, onCommands, overviewMetrics, projectPage, onMoreProjects, onProjectStatus, onSearchProjects, clientPage, onMoreClients, onSearchClients, onClientCreated, onFinancePeriodChange, financeBars, eventCount, usage, onCalendarMonthChange, canValidateProjectLink, canValidateClientLink, cloudStatus, saving, onLogout }: DashboardProps) {
+export default function DashboardClient({ firstName, email, photoURL, profile, onSaveProfile, initialWorkspace, initialTheme, onThemeChange, onRouteChange, onCommands, overviewMetrics, projectPage, onMoreProjects, onProjectStatus, onSearchProjects, clientPage, onMoreClients, onSearchClients, onClientCreated, onFinancePeriodChange, financeBars, eventCount, usage, onCalendarMonthChange, canValidateProjectLink, canValidateClientLink, saving, onLogout }: DashboardProps) {
   const routeEnvironment={base:import.meta.env.BASE_URL,useHash:isDemo};
   const initialRoute=()=>routeFromLocation(window.location,routeEnvironment);
   const [initialBrowserRoute]=useState<WorkspaceRoute>(initialRoute);
@@ -126,7 +126,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
   const [eventDate, setEventDate] = useState("");
   const [eventDraft, setEventDraft] = useState({date:"",time:"09:00",endTime:""});
   const [eventError, setEventError] = useState("");
-  const [saveStatus, setSaveStatus] = useState("Carregando dados…");
+  const [demoStorageWarning, setDemoStorageWarning] = useState(false);
   const [libraryProject, setLibraryProject] = useState("");
   const [linkedFolderCount, setLinkedFolderCount] = useState<number|null>(null);
   const [uploading, setUploading] = useState(false);
@@ -139,7 +139,6 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     // The demo retains its independent localStorage snapshot.
     if (!isDemo && onCommands && commands.length)onCommands(commands);
   }
-  const workspace = { projects, clients: clientList, financeEntries, monthlyRevenue, calendarEvents, libraryAssets: libraryAssets.map((asset) => ({ ...asset, preview: undefined })), comments, reviewState, activities };
   function logActivity(text: string) {
     const activity:Activity={id:crypto.randomUUID(),text,when:new Date().toISOString()};
     setActivities(current=>[activity,...current].slice(0,150));
@@ -224,8 +223,8 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     try {
       const local=localStorage.getItem(storageKey);
       if(local)restoreWorkspace(JSON.parse(local));
-      setSaveStatus("Demonstração · dados somente neste navegador");
-    } catch { setSaveStatus("Demonstração · armazenamento local indisponível"); }
+      setDemoStorageWarning(false);
+    } catch { setDemoStorageWarning(true); }
     setDataReady(true);
   },[restoreWorkspace,initialWorkspace]);
 
@@ -253,8 +252,8 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
       comments,reviewState,activities};
     try {
       localStorage.setItem(storageKey,JSON.stringify({...payload,monthlyRevenue}));
-      setSaveStatus("Demonstração · salvo neste navegador");
-    } catch {setSaveStatus("Falha ao salvar · exporte seus dados");}
+      setDemoStorageWarning(false);
+    } catch {setDemoStorageWarning(true);}
   },[projects,clientList,financeEntries,monthlyRevenue,calendarEvents,libraryAssets,comments,reviewState,activities,dataReady]);
 
   useEffect(() => {
@@ -543,11 +542,11 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
           <div className="page-heading">
             <div><span className="eyebrow">ROTEIVA / {view === "overview" ? "PAINEL" : pageTitles[view][0].toUpperCase()}</span><h1>{pageTitles[view][0]}</h1><p>{pageTitles[view][1]}</p></div>
             <div className="heading-actions">
-              {view !== "settings" && view !== "library" && <WorkspaceTools workspace={workspace} loadWorkspace={onLoadWorkspace} status={isDemo ? saveStatus : cloudStatus || ""} onNotify={notify} />}
+              {isDemo && demoStorageWarning && <p role="alert" className="workspace-save-warning">Não foi possível salvar os dados da demonstração neste navegador.</p>}
               {view === "settings" ? null : view === "clients" ? <AppButton className="primary-button" onClick={() => { setEditingClient(null); setClientModalOpen(true); }}><UserRoundPlus size={17} /> Novo cliente</AppButton>
                 : view === "finance" ? <AppButton className="primary-button" onClick={() => openFinanceModal()}><Plus size={17} /> Nova receita</AppButton>
                 : view === "calendar" ? <AppButton className="primary-button" onClick={() => openEvent()}><Plus size={17} /> Novo compromisso</AppButton>
-                : view === "library" ? (isDemo && import.meta.env.VITE_LIBRARY_REVIEW === "true" ? null : <><AppSelect aria-label="Projeto dos arquivos" value={libraryProject} onValueChange={value=> setLibraryProject(value)}><option value="">Todos os projetos</option>{projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</AppSelect><details className="rl-page-more"><summary aria-label="Mais ações da Biblioteca" title="Mais ações da Biblioteca"><MoreHorizontal size={18}/></summary><div className="rl-page-more-content"><WorkspaceTools workspace={workspace} loadWorkspace={onLoadWorkspace} status={isDemo?saveStatus:cloudStatus||""} onNotify={notify}/></div></details>{isDemo && <label className="primary-button upload-button"><Upload size={17} /> {uploading ? "Enviando…" : "Adicionar arquivos"}<AppInput type="file" disabled multiple onChange={(event) => { uploadAssets(event.target.files, Number(libraryProject) || undefined); event.target.value = ""; }} /></label>}</>)
+                : view === "library" ? (isDemo && import.meta.env.VITE_LIBRARY_REVIEW === "true" ? null : <><AppSelect aria-label="Projeto dos arquivos" value={libraryProject} onValueChange={value=> setLibraryProject(value)}><option value="">Todos os projetos</option>{projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</AppSelect>{isDemo && <label className="primary-button upload-button"><Upload size={17} /> {uploading ? "Enviando…" : "Adicionar arquivos"}<AppInput type="file" disabled multiple onChange={(event) => { uploadAssets(event.target.files, Number(libraryProject) || undefined); event.target.value = ""; }} /></label>}</>)
                 : view === "reviews" ? null : <AppButton className="primary-button" onClick={startProject}><Plus size={17} /> Criar projeto</AppButton>}
             </div>
           </div>

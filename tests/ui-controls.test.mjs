@@ -43,3 +43,19 @@ test('design system keeps branded focus and native input semantics',()=>{
  assert.match(input,/forwardRef<HTMLInputElement/);
  assert.match(input,/<input \{\.\.\.props\}/);
 });
+
+test('retired workspace copy export has no frontend entrypoints, data fetcher, or styles',()=>{
+  const base=new URL('../src/',import.meta.url);
+  const files=['dashboard-client.tsx','studio-features.tsx','features/workspace/FirebaseWorkspace.tsx',
+    'globals.css','responsive.css','features/drive/drive-library.css'];
+  for(const file of files){
+    const source=readFileSync(new URL(file,base),'utf8');
+    for(const removed of ['WorkspaceTools','Exportar cópia','Preparando cópia',
+      'Roteiva-backup-','ensureFullWorkspace','onLoadWorkspace','rl-page-more',
+      'workspace-tools','Falha ao salvar · exporte seus dados']){
+      assert.equal(source.includes(removed),false,file+' must not retain '+removed);
+    }
+  }
+  const finance=readFileSync(new URL('studio-features.tsx',base),'utf8');
+  assert.match(finance,/Exportar CSV/,'The separate financial CSV export must remain available');
+});
