@@ -48,7 +48,6 @@ export function DriveConnectionPanel({
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
   const [linkError,setLinkError]=useState("");
-  const [linksLoaded,setLinksLoaded]=useState(false);
   const [accountFailed,setAccountFailed]=useState(false);
   const [result,setResult]=useState("");
   const [confirmId,setConfirmId]=useState("");
@@ -135,8 +134,8 @@ export function DriveConnectionPanel({
     setLinkError("");
     // Connection and folder links have independent failure boundaries.
     const linksRequest=readDriveLinks(user.uid)
-      .then(folders=>{setLinks(folders);setLinksLoaded(true);})
-      .catch(()=>{setLinksLoaded(false);setLinkError("Não foi possível atualizar as pastas vinculadas. Tente atualizar novamente.");});
+      .then(folders=>{setLinks(folders);})
+      .catch(()=>{setLinkError("Não foi possível atualizar as pastas vinculadas. Tente atualizar novamente.");});
     let accounts:{connections:Connection[]};
     try{const state=await storage.refresh(force);if(state.failed.includes("google_drive"))throw Error("Não foi possível consultar o Google Drive. Tente novamente.");accounts={connections:state.drive.map(c=>({id:c.id,google_email:c.email,status:c.status as Connection["status"],scopes:c.scopes}))};}
     catch(cause){setAccountFailed(true);throw cause;}
