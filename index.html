@@ -2,6 +2,17 @@
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
+    <!-- Apply the last active palette before the CSS and React can paint a loading screen. -->
+    <script>
+      (() => {
+        let theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        try {
+          const saved = window.localStorage.getItem("roteiva-theme:bootstrap");
+          if (saved === "dark" || saved === "light") theme = saved;
+        } catch { /* Private/blocked storage still uses the operating-system theme. */ }
+        document.documentElement.dataset.theme = theme;
+      })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#10110f" />
     <meta name="description" content="Demonstração do Roteiva, plataforma de organização audiovisual para freelancers." />

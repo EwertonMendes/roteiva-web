@@ -147,8 +147,12 @@ export function AppSelect({
 
   const move = (direction: 1 | -1) => {
     if (!available.length) return;
-    const at = available.indexOf(active);
-    setActive(available[(at + direction + available.length) % available.length]);
+    // Sequential Home/Arrow/Enter key events can batch React updates. Derive
+    // from the queued state, never the active index captured by an old render.
+    setActive(previous => {
+      const at = available.indexOf(previous);
+      return available[(at + direction + available.length) % available.length];
+    });
   };
   const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (disabled) return;
@@ -214,7 +218,7 @@ export function AppSelect({
         className="rt-select-option" data-active={index === active || undefined}
         data-selected={option.value === current || undefined}
         title={option.text}
-        onMouseEnter={() => { if (!option.disabled) setActive(index); }}
+        onPointerMove={event => { if (event.pointerType === "mouse" && !option.disabled) setActive(index); }}
         onMouseDown={event => event.preventDefault()}
         onClick={() => commit(index)}
       ><span className="rt-select-option-label">{option.label}</span>{option.value === current && <Check size={16} aria-hidden="true" className="rt-select-check"/>}</div>)}

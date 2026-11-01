@@ -1,4 +1,5 @@
 import {AppButton} from "../ui/AppButton";
+import {CollectionState} from "../ui/CollectionState";
 import { AppSelect } from "../ui/AppSelect";
 import { FolderActionsMenu } from "./FolderActionsMenu";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -33,12 +34,11 @@ function oauthError(code:string|null):string {
 
 
 export function DriveConnectionPanel({
-  projects,selectedProjectId,onSelectProject,onLinkedFolderCountChange,
+  projects,selectedProjectId,onSelectProject,
 }:{
   projects:readonly Project[];
   selectedProjectId?:number;
   onSelectProject:(id:string)=>void;
-  onLinkedFolderCountChange?:(count:number)=>void;
 }) {
   const {user}=useAuth();
   const storage=useStorageConnections();
@@ -48,7 +48,6 @@ export function DriveConnectionPanel({
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
   const [linkError,setLinkError]=useState("");
-  const [linksLoaded,setLinksLoaded]=useState(false);
   const [accountFailed,setAccountFailed]=useState(false);
   const [result,setResult]=useState("");
   const [confirmId,setConfirmId]=useState("");
@@ -74,8 +73,6 @@ export function DriveConnectionPanel({
   const folderRequest=useRef(0);
   const fileRequest=useRef(0);
   const autoOpened=useRef("");
-  const countCallback=useRef(onLinkedFolderCountChange);
-  countCallback.current=onLinkedFolderCountChange;
   const connected=connections.filter(c=>c.status==="connected");
   const authorized=connected.filter(c=>c.scopes.split(/\s+/).includes(READ));
   const connection=authorized.find(c=>c.id===selectedAccount)||authorized[0];
@@ -137,8 +134,8 @@ export function DriveConnectionPanel({
     setLinkError("");
     // Connection and folder links have independent failure boundaries.
     const linksRequest=readDriveLinks(user.uid)
-      .then(folders=>{setLinks(folders);setLinksLoaded(true);})
-      .catch(()=>{setLinksLoaded(false);setLinkError("Não foi possível atualizar as pastas vinculadas. Tente atualizar novamente.");});
+      .then(folders=>{setLinks(folders);})
+      .catch(()=>{setLinkError("Não foi possível atualizar as pastas vinculadas. Tente atualizar novamente.");});
     let accounts:{connections:Connection[]};
     try{const state=await storage.refresh(force);if(state.failed.includes("google_drive"))throw Error("Não foi possível consultar o Google Drive. Tente novamente.");accounts={connections:state.drive.map(c=>({id:c.id,google_email:c.email,status:c.status as Connection["status"],scopes:c.scopes}))};}
     catch(cause){setAccountFailed(true);throw cause;}
@@ -147,10 +144,6 @@ export function DriveConnectionPanel({
     setAccountFailed(false);
     return accounts.connections;
   },[storage.refresh,user]);
-
-  useEffect(()=>{
-    if(linksLoaded)countCallback.current?.(links.length);
-  },[links,linksLoaded]);
 
   useEffect(()=>{
     let active=true;
@@ -413,8 +406,8 @@ export function DriveConnectionPanel({
             <FolderActionsMenu name={link.folderName} disabled={busy}
               onOpen={()=>void openFiles(link)} onUnlink={()=>setUnlinkTarget(link)}/>
           </div>)}
-          {!relevant.length&&<div className="rl-state"><FolderOpen size={27}/><p>Nenhuma pasta vinculada {selectedProjectId?"a este projeto":"aos projetos"}.</p>
-            <AppButton type="button" className="secondary-button" disabled={!ready||busy} onClick={chooseFolders}>Vincular pasta</AppButton></div>}
+          {!relevant.length&&<CollectionState icon={<FolderOpen size={27}/>} message={`Nenhuma pasta vinculada ${selectedProjectId?"a este projeto":"aos projetos"}.`}>
+            <AppButton type="button" className="secondary-button" disabled={!ready||busy} onClick={chooseFolders}>Vincular pasta</AppButton></CollectionState>}
         </div>
       </aside>
       <DriveFileExplorer folderName={viewing?.folderName} path={viewPath} files={files} loading={fileBusy} hasMore={searchText.trim().length>=2

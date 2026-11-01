@@ -1,9 +1,10 @@
 import {AppInput} from "../ui/AppInput";
 import {AppButton} from "../ui/AppButton";
+import {CollectionState} from "../ui/CollectionState";
 import { AppSelect } from "../ui/AppSelect";
 import { useEffect, useRef, useState } from "react";
 import {DriveThumbnail} from "./DriveThumbnail";
-import { ArrowLeft, Check, ChevronLeft, ChevronRight, Grid2X2, List, ExternalLink, File, FileAudio, FileImage, FileText, FileVideo, Folder, FolderOpen, Link2, LoaderCircle, Search, X, MoreHorizontal, Upload } from "lucide-react";
+import { ArrowLeft, Check, ChevronLeft, ChevronRight, Grid2X2, List, ExternalLink, File, FileAudio, FileImage, FileText, FileVideo, Folder, FolderOpen, Link2, Search, X, MoreHorizontal, Upload } from "lucide-react";
 
 export type DriveItem = {id:string;name:string;mimeType:string;size?:string;modifiedTime?:string;pathLower?:string;thumbnailLink?:string;thumbnailTicket?:string;thumbnailFallback?:boolean;webViewLink?:string;pathDisplay?:string};
 export type DriveTrail = {id:string;name:string};
@@ -148,7 +149,7 @@ export function StorageFolderPicker({provider='google_drive',projects,projectId,
         </span>)}</nav>
         <label className="rl-search"><Search size={17}/><AppInput aria-label="Filtrar pastas carregadas" placeholder="Filtrar pastas desta página" value={filter} onChange={e=>setFilter(e.target.value)}/>{filter&&<AppButton type="button" onClick={()=>setFilter("")} aria-label="Limpar filtro"><X size={15}/></AppButton>}</label>
         <div className="rl-picker-list" role="group" aria-label="Pastas disponíveis">
-          {loading && !folders.length ? <p className="rl-empty" role="status"><LoaderCircle size={18} className="rl-spin"/> Buscando pastas…</p> : null}
+          {loading && !folders.length ? <CollectionState loading compact message="Buscando pastas…"/> : null}
           {visible.map(folder=>{
             const linked=linkedIds.has(folder.id);
             return <div className="rl-picker-row" key={folder.id}>
@@ -163,7 +164,7 @@ export function StorageFolderPicker({provider='google_drive',projects,projectId,
               </label>}
             </div>;
           })}
-          {!loading&&!visible.length&&<p className="rl-empty">{filter?"Nenhuma pasta corresponde ao filtro nesta página.":"Nenhuma pasta encontrada nesta localização."}</p>}
+          {!loading&&!visible.length&&<CollectionState compact message={filter?"Nenhuma pasta corresponde ao filtro nesta página.":"Nenhuma pasta encontrada nesta localização."}/>}
           {hasMore&&<AppButton className="rl-load-more" type="button" disabled={loading} onClick={onMore}>Carregar mais pastas</AppButton>}
         </div>
         <p className="rl-picker-note">A seleção permanece ao navegar entre pastas. O filtro considera apenas os resultados carregados.</p>
@@ -267,13 +268,13 @@ export function DriveFileExplorer({folderName,path,files,loading,hasMore,thumbna
     </div>
     {view==="list"&&<div className="rl-file-head" aria-hidden="true"><span>Nome</span><span>Modificado</span><span>Tamanho</span><span/></div>}
     <div className="rl-files" data-view={view}>
-      {loading&&!files.length&&<div className="rl-state" role="status"><LoaderCircle size={23} className="rl-spin"/><p>Carregando arquivos…</p></div>}
-      {searchLoading&&<span className="rl-search-progress" role="status">Buscando no {providerName}…</span>}
+      {loading&&!files.length&&<CollectionState loading message="Carregando arquivos…"/>}
+      {searchLoading&&<CollectionState loading compact message={`Buscando no ${providerName}…`}/>}
       {visible.map(makeRow)}
-      {!loading&&!searchLoading&&!visible.length&&<div className="rl-state"><FolderOpen size={27}/><p>{filter?"Nenhum item corresponde à busca.":"Esta pasta está vazia."}</p></div>}
+      {!loading&&!searchLoading&&!visible.length&&<CollectionState icon={<FolderOpen size={27}/>} message={filter?"Nenhum item corresponde à busca.":"Esta pasta está vazia."}/>}
       {hasMore&&<AppButton type="button" className="rl-load-more" onClick={onMore} disabled={loading}>Carregar mais arquivos</AppButton>}
     </div>
-    </>:<div className="rl-state rl-intro"><FolderOpen size={32}/><h3>Selecione uma pasta</h3><p>Escolha uma pasta à esquerda para visualizar seus arquivos.</p></div>}
+    </>:<CollectionState icon={<FolderOpen size={32}/>} title="Selecione uma pasta" message="Escolha uma pasta à esquerda para visualizar seus arquivos."/>}
   </section>;
 }
 

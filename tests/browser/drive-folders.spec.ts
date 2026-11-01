@@ -116,7 +116,10 @@ test("folder picker links multiple folders, explorer opens files in one click an
   await page.reload();
   await expect(panel.getByTitle("Campanha de vídeos")).toBeVisible();
   await expect(panel.getByTitle("Documentos cliente")).toBeVisible();
-  await expect(page.getByRole("button",{name:/Biblioteca/}).first()).toContainText("2");
+  // Folder associations persist after reload; the sidebar no longer has a count badge.
+  const libraryNav=page.locator(".sidebar nav").getByRole("button",{name:"Biblioteca",exact:true});
+  await expect(libraryNav).toBeVisible();
+  await expect(libraryNav.locator("em")).toHaveCount(0);
 });
 
 test("account retrieval error never shows a fake disconnected state and retries safely",async({page},info)=>{
