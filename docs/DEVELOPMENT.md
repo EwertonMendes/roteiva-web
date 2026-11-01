@@ -108,7 +108,7 @@ O pipeline `firebase-infra.yml` faz deploy de rules/indexes somente quando um pu
 
 ### Otimização de CI para feedback rápido (01/11/2026)
 
-O workflow `.github/workflows/qa-isolated-e2e.yml` mantém **o mesmo nome do check de segurança** usado nas promoções controladas e executa, em PR e push na master, um smoke Playwright marcado com `@ci-smoke` (desktop e mobile, três workers). A seleção cobre separação entre contas Firebase emuladas, aprovação pública, prévia Google-restrita, recuperação do Drive e capas de projetos; os testes restantes **não foram removidos**.
+O workflow `.github/workflows/qa-isolated-e2e.yml` mantém **o mesmo nome do check de segurança** usado nas promoções controladas e executa, em PR e push na master, um smoke Playwright marcado com `@ci-smoke` (desktop e mobile, dois workers). A seleção cobre separação entre contas Firebase emuladas, aprovação pública, prévia Google-restrita, recuperação do Drive; os testes de capas e demais cenários **não foram removidos**, e permanecem na regressão integral.
 
 A regressão **completa** de regras Firestore e navegador continua em `.github/workflows/qa-regression.yml` (agendamento noturno ou `workflow_dispatch` com `suite=full`). O workflow de E2E isolado também permite execução completa via `workflow_dispatch`; seu agendamento duplicado foi removido para não executar a mesma regressão duas vezes por noite. Mudanças de autorização, exclusão de conta, OAuth, Firestore ou outras mudanças críticas exigem regressão completa manual verde antes de merge, além dos checks rápidos, conforme política de segurança abaixo.
 
