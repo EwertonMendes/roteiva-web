@@ -374,3 +374,15 @@ test("automatic cloud success labels stay out of workspace headers on all routes
     await expect(page.getByText("Dados na nuvem",{exact:true})).toHaveCount(0);
   }
 });
+
+test("removed workspace copy action stays absent on every screen while financial CSV remains",async({page},info)=>{
+  await page.goto(cloud);
+  await login(page,"no-json-export-"+info.project.name+"@example.com");
+  for(const name of ["Visão geral","Projetos","Clientes","Aprovações","Financeiro","Calendário","Biblioteca","Configurações"]){
+    await navigate(page,name);
+    await expect(page.locator(".page-heading h1")).toBeVisible();
+    await expect(page.getByRole("button",{name:/Exportar cópia|Preparando cópia/i})).toHaveCount(0);
+    await expect(page.locator(".workspace-tools,.rl-page-more")).toHaveCount(0);
+    if(name==="Financeiro") await expect(page.getByRole("button",{name:"Exportar CSV"})).toBeVisible();
+  }
+});
