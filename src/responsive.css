@@ -63,8 +63,6 @@
   .page-heading p { font-size: var(--type-support); line-height: 1.5; }
   .heading-actions { width: 100%; gap: 9px; flex-wrap: wrap; align-items: center; }
   .heading-actions > .primary-button { width: auto; min-height: 42px; padding: 0 15px; font-size: var(--type-support); flex-shrink: 0; }
-  .heading-actions .workspace-tools { width: auto; order: 3; margin-left: auto; }
-  .heading-actions .workspace-tools .secondary-button { font-size: var(--type-support); padding: 0 11px; }
   
   .primary-button,.secondary-button { min-height: 42px; font-size: var(--type-support); }
   .mobile-bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; display: grid; grid-template-columns: repeat(5,1fr); padding: 8px 8px calc(8px + env(safe-area-inset-bottom)); gap: 3px; z-index: 24; background: rgba(249,250,245,.93); backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px); border-top: 1px solid var(--line); }

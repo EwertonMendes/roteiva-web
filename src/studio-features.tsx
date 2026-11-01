@@ -6,7 +6,7 @@ import { AppSelect } from "./features/ui/AppSelect";
 
 import { useState, type FormEvent, type ReactNode } from "react";
 import {
-  ArrowLeft, CalendarDays, Plus, Download, Upload, Pencil, Trash2,
+  ArrowLeft, CalendarDays, Plus, Download, Pencil, Trash2,
   CalendarRange, UsersRound, ListFilter, TrendingUp, CircleCheck, Receipt,
   Scale, TriangleAlert, ChartColumnIncreasing, ChartPie, ListChecks,
   Phone, Mail, FolderKanban,
@@ -30,29 +30,6 @@ export const projectTemplates: Record<string, string[]> = {
 };
 function Empty({children}: {children: ReactNode}) { return <p className="studio-empty">{children}</p>; }
 function Back({onClick}: {onClick: () => void}) { return <AppButton className="secondary-button" onClick={onClick}><ArrowLeft size={16}/> Voltar</AppButton>; }
-export function WorkspaceTools({workspace, status, onNotify,loadWorkspace}: {workspace: object; status: string; onNotify: (s: string) => void;loadWorkspace?:()=>Promise<object>}) {
-  const [downloading,setDownloading]=useState(false);
-  async function download() {
-    setDownloading(true);
-    try {
-    const source=loadWorkspace ? await loadWorkspace() : workspace;
-    const url = URL.createObjectURL(new Blob([JSON.stringify(source, null, 2)], {type: "application/json"}));
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `Roteiva-backup-${today()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    onNotify("Cópia exportada");
-    }catch{onNotify("Não foi possível carregar os registros para exportação");}
-    finally{setDownloading(false);}
-  }
-  // Cloud persistence is automatic. Keep the toolbar focused on actions, not
-  // a permanent success/idle label; only surface failures requiring attention.
-  const needsAttention = status === "Alterações não confirmadas" ||
-    status === "Falha ao salvar · exporte seus dados" ||
-    status === "Demonstração · armazenamento local indisponível";
-  return <div className="workspace-tools">{needsAttention && <span role="alert">{status}</span>}<AppButton className="secondary-button" title="Exporta os cadastros e lançamentos carregados; arquivos de mídia não estão incluídos." onClick={()=>void download()} disabled={downloading}><Download size={15}/> {downloading?"Preparando cópia…":"Exportar cópia"}</AppButton></div>;
-}
 export function ClientDetail({client, projects, entries, onBack, onEdit, onProject, onSave, onReview}: {onReview?:()=>void;onSave: (client:Client) => void; client: Client; projects: Project[]; entries: FinanceEntry[]; onBack: () => void; onEdit: (c: Client) => void; onProject: (id:number) => void}) {
   const linked = projects.filter(p => p.clientId === client.id || (!p.clientId && p.client === client.name));
   const finances = entries.filter(e => e.clientId === client.id && e.kind !== "expense");
