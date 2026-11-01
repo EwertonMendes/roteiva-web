@@ -74,6 +74,12 @@ Textos de interface devem explicar o benefício, o estado confirmado e a próxim
 - Usar tokens `--card`, `--line`, `--subtle`, `--ink`, `--muted`; não fixar cores dependentes de tema. Garantir labels, foco visível, Escape, scroll de fundo bloqueado e redução de movimento.
 - Evitar representar pasta vinculada como arquivo importado no contador ou expor email/gestão da conta como conteúdo principal.
 
+## Configurações — layout do mockup (01/11/2026)
+
+Configurações mantém o cabeçalho global de Projetos e apresenta cartões independentes para identidade do estúdio, perfil profissional, dados do estúdio, aparência, acesso e exclusão de conta, nessa ordem. No desktop o formulário do estúdio distribui nome, tipo de atuação e salvar na mesma linha; no mobile empilha controles e expande a ação principal a 100%. O perfil exibe foto/nome/e-mail autenticados pelo Google, mantendo e-mail somente leitura; o estúdio só pode ser salvo com dados válidos e alterados. Preferências usam botões com `aria-pressed`. O acesso exibe estado e validade realmente recebidos de `AccessGate`, sem criar uma assinatura fictícia. A exclusão mantém confirmação explícita, reautenticação Google e segurança do backend.
+
+Usar Lucide já instalado, `AppInput`, `AppSelect`, `AppButton` e tokens atuais, com contrastes específicos para claro/escuro, foco global e reflow sem scroll horizontal no celular. O visual não autoriza alteração de dados, permissões ou regras. `tests/browser/settings-layout.spec.ts` cobre desktop/mobile e ações; a suíte manual `controls` inclui esse contrato.
+
 ## Layout das telas internas
 
 A barra global de estúdio, busca e ações e a faixa “Seu espaço / Dados na nuvem” foram removidas do layout compartilhado. As telas começam pelo conteúdo; a busca fica em Projetos e Clientes. No celular, um botão no conteúdo abre o menu lateral. Configurações permanece na navegação; tema e logout ficam no menu do perfil, e o histórico de atividades abre somente pelo dashboard. O aviso de demonstração e os alertas reais de sincronização permanecem.
