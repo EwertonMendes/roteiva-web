@@ -1,4 +1,5 @@
 import {AppButton} from "../ui/AppButton";
+import {CollectionState} from "../ui/CollectionState";
 import { AppSelect } from "../ui/AppSelect";
 import { FolderActionsMenu } from "./FolderActionsMenu";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -406,8 +407,8 @@ export function DriveConnectionPanel({
             <FolderActionsMenu name={link.folderName} disabled={busy}
               onOpen={()=>void openFiles(link)} onUnlink={()=>setUnlinkTarget(link)}/>
           </div>)}
-          {!relevant.length&&<div className="rl-state"><FolderOpen size={27}/><p>Nenhuma pasta vinculada {selectedProjectId?"a este projeto":"aos projetos"}.</p>
-            <AppButton type="button" className="secondary-button" disabled={!ready||busy} onClick={chooseFolders}>Vincular pasta</AppButton></div>}
+          {!relevant.length&&<CollectionState icon={<FolderOpen size={27}/>} message={`Nenhuma pasta vinculada ${selectedProjectId?"a este projeto":"aos projetos"}.`}>
+            <AppButton type="button" className="secondary-button" disabled={!ready||busy} onClick={chooseFolders}>Vincular pasta</AppButton></CollectionState>}
         </div>
       </aside>
       <DriveFileExplorer folderName={viewing?.folderName} path={viewPath} files={files} loading={fileBusy} hasMore={searchText.trim().length>=2

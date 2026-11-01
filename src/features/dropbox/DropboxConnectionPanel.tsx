@@ -1,4 +1,5 @@
 import {AppButton} from "../ui/AppButton";
+import {CollectionState} from "../ui/CollectionState";
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {Check,ChevronDown,ChevronRight,Cloud,ExternalLink,FolderOpen,LoaderCircle,Plus,RefreshCw,ShieldCheck,Unplug,X} from 'lucide-react';
 import type {Project} from '../../domain/workspace';
@@ -413,7 +414,7 @@ export function DropboxConnectionPanel({projects,selectedProjectId}:{
         onOpen={()=>void load(link,link.folderId,[{id:link.folderId,name:link.folderName}])}
         onUnlink={()=>setUnlinkTarget(link)}/>
      </div>)}
-     {!relevant.length&&<div className="rl-state"><FolderOpen size={26}/><p>Nenhuma pasta Dropbox vinculada.</p></div>}
+     {!relevant.length&&<CollectionState icon={<FolderOpen size={26}/>} message="Nenhuma pasta Dropbox vinculada."/>}
     </div>
    </aside>
    <DriveFileExplorer provider="dropbox" externalUrl={dropboxWebUrl} folderName={viewing?.folderName}

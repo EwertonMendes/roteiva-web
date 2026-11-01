@@ -1,10 +1,11 @@
 import {AppInput} from "../ui/AppInput";
 import {AppTextarea} from "../ui/AppTextarea";
 import {AppButton} from "../ui/AppButton";
+import {CollectionState} from "../ui/CollectionState";
 import { AppSelect } from "../ui/AppSelect";
 import {useCallback,useEffect,useMemo,useRef,useState} from "react";
 import {createPortal} from "react-dom";
-import {AlertTriangle,Check,ChevronLeft,ChevronRight,ExternalLink,Folder,LoaderCircle,Plus,Search,Send,ShieldCheck,X} from "lucide-react";
+import {AlertTriangle,Check,ChevronLeft,ChevronRight,ExternalLink,Folder,Plus,Search,Send,ShieldCheck,X} from "lucide-react";
 import type {Client,Project} from "../../domain/workspace";
 import {useAuth} from "../auth/AuthProvider";
 import {useDriveApi} from "../drive/drive-api";
@@ -363,16 +364,17 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
       <AppButton className="primary-button" onClick={newReview}><Plus size={16}/> Nova aprovação</AppButton>
     </div>
     {error&&<div className="reviews-warning" role="alert">{error}<AppButton aria-label="Dispensar mensagem" onClick={()=>setError("")}><X size={14}/></AppButton></div>}
-    {loading?<p role="status"><LoaderCircle size={17} className="rl-spin"/> Carregando aprovações…</p>:
-      <div className="reviews-list">
-        {!rows.length&&<div className="reviews-empty"><ShieldCheck size={32}/><h3>Nenhuma aprovação encontrada</h3><p>Selecione um projeto e envie o primeiro material para revisão.</p></div>}
+    <div className="reviews-list">
+      {loading?<CollectionState loading message="Carregando aprovações…"/>:<>
+        {!rows.length&&<CollectionState icon={<ShieldCheck size={32}/>} title="Nenhuma aprovação encontrada" message="Selecione um projeto e envie o primeiro material para revisão."/>}
         {rows.map(r=><AppButton type="button" className="reviews-list-item" key={r.id} onClick={()=>void openDetail(r.id)}>
           <span className="reviews-initial">{r.clientName.slice(0,2).toUpperCase()}</span>
           <span className="reviews-list-copy"><strong>{r.title}</strong><small>{r.clientName} · {r.projectName} · V{r.version}</small></span>
           <span className={"reviews-status status-"+r.status}>{statusText[r.status]}</span>
           <ChevronRight size={17}/>
         </AppButton>)}
-      </div>}
+      </>}
+    </div>
     {!loading&&(page>0||hasMore)&&<nav className="reviews-pagination" aria-label="Paginação das aprovações">
       <AppButton type="button" className="secondary-button" disabled={page===0} onClick={()=>setPage(n=>Math.max(0,n-1))}>Anterior</AppButton>
       <span aria-live="polite">Página {page+1}</span>
@@ -491,7 +493,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
              <p>Escolha pelo menos um arquivo. Você pode selecionar até 8 imagens, vídeos, áudios ou PDFs.</p>
            </div>
           {!projectId?<p className="reviews-muted">Selecione um projeto para explorar os arquivos vinculados.</p>:
-           linksLoading?<p className="reviews-muted" role="status"><LoaderCircle size={16} className="rl-spin"/> Carregando pastas do projeto…</p>:
+           linksLoading?<CollectionState loading compact message="Carregando pastas do projeto…"/>:
            !links.length?<div className="reviews-empty"><Folder size={26}/><p>Este projeto ainda não possui pastas vinculadas.</p>
             <AppButton className="secondary-button" onClick={()=>{resetComposer();onLibrary();}}>Vincular pasta na Biblioteca</AppButton></div>:
           <>
@@ -537,10 +539,10 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
             </div>)}
             {folderError&&<p className="reviews-warning" role="alert">{folderError}</p>}
             <div className="review-files" aria-label="Arquivos disponíveis">
-              {folderBusy&&!items.length&&<p role="status"><LoaderCircle size={16} className="rl-spin"/> Carregando arquivos…</p>}
-              {searchBusy&&<p className="reviews-muted" role="status"><LoaderCircle size={15} className="rl-spin"/> Buscando arquivos na pasta…</p>}
+              {folderBusy&&!items.length&&<CollectionState loading compact message="Carregando arquivos…"/>}
+              {searchBusy&&<CollectionState loading compact message="Buscando arquivos na pasta…"/>}
               {!folderBusy&&!searchBusy&&selectedFolder&&!displayedItems.length&&
-                <p className="reviews-muted">{fileSearch?"Nenhum arquivo encontrado nesta pasta.":"Esta pasta está vazia."}</p>}
+                <CollectionState compact message={fileSearch?"Nenhum arquivo encontrado nesta pasta.":"Esta pasta está vazia."}/>}
               {displayedItems.map(f=><div className="review-picker-row" key={f.id}>
                 {isStorageFolder(f.mimeType)?
                   <AppButton type="button" className="review-picker-main" onClick={()=>{
