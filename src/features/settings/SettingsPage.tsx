@@ -125,7 +125,7 @@ export function SettingsPage({profile,email,photoURL,theme,toggleTheme,onSavePro
 
     {onSaveProfile&&<AccessSummary/>}
 
-    {onSaveProfile&&<section className="settings-editor settings-danger-zone" aria-labelledby="settings-danger-title">
+    {onSaveProfile&&<section className="settings-editor settings-danger-zone" aria-label="Zona de perigo">
       <header className="settings-section-head">
         <span className="settings-index settings-danger-eyebrow"><AlertTriangle size={18} aria-hidden="true"/> 05 / ZONA DE PERIGO</span>
       </header>
