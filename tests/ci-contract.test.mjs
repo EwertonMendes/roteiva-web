@@ -3,6 +3,22 @@ import assert from "node:assert/strict";
 import {existsSync, readFileSync, readdirSync} from "node:fs";
 
 const read = (path) => readFileSync(path, "utf8");
+test("OS-native pointer has no global decorative cursor layer or forced invisibility", () => {
+  const experience=read("src/site-experience.tsx");
+  const styles=read("src/site-experience.css");
+  assert.match(experience, /brand-intro/); // Brand intro is deliberately preserved.
+  assert.doesNotMatch(experience, /studio-cursor|cursorPoint|cursorDialog|createPortal|requestAnimationFrame|data-roteiva-cursor/);
+  assert.doesNotMatch(experience, /addEventListener\(["']pointer(move|down|up)["']/);
+  assert.doesNotMatch(styles, /studio-cursor|data-roteiva-cursor|cursor\s*:\s*none/);
+  for(const path of ["src/features/projects/CoverEditor.tsx","src/features/projects/CoverFrame.tsx","src/features/clients/ClientFormDialog.tsx"])
+    assert.doesNotMatch(read(path), /data-native-cursor/, path);
+  assert.equal(existsSync("tests/browser/cursor-layer.spec.ts"), false);
+  const qa=read(".github/workflows/qa-regression.yml");
+  assert.match(qa, /tests\/browser\/native-pointer\.spec\.ts/);
+  assert.match(qa, /suite == 'pointer'/);
+  assert.doesNotMatch(qa, /cursor-layer\.spec/);
+});
+
 test("GitHub Pages and workflow_run coupling are removed", () => {
   for (const removed of [
     ".github/workflows/deploy-pages.yml",
