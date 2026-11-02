@@ -106,6 +106,10 @@ O pipeline `firebase-infra.yml` faz deploy de rules/indexes somente quando um pu
 
 **Preview reutilizável:** em Actions > Firebase preview (manual PR) > Run workflow, escolha `master` e informe o número de uma PR **interna** aberta contra master. O job de build valida o PR via GitHub, sem credenciais e publica o artefato; o job de deploy usa código confiável da master e o canal `pr-N`, que expira em 7 dias. Somente o frontend vai para o canal, nunca Worker, Firestore rules/indexes nem dados. Canais podem exigir autorização do domínio em Firebase Auth/CORS; preview não é certificação de integração Google Drive.
 
+### QA de gestão financeira (mockup 08 — 02/11/2026)
+
+Para validar o novo dashboard, usar `.github/workflows/qa-regression.yml` no `workflow_dispatch` com `suite=finance`: roda `tests/browser/finance-layout.spec.ts` e `money-input.spec.ts` em Chromium desktop/mobile com Firestore/Auth emulados, cobrindo light/dark, grid em 1600/1360/1100/390/320 px, filtros, edição e downloads. A suíte noturna `full` também inclui o novo spec. `tests/studio-finance.test.mjs` valida formato JSON carregado e aritmética. `src/features/finance/finance-export.ts` exporta apenas entradas financeiramente **carregadas**, sem tentar ler toda a conta; isso não é backup do workspace. Os testes com emuladores jamais acessam dados de produção.
+
 ### Cursores do sistema e QA de interações (02/11/2026)
 
 O cursor personalizado de `SiteExperience` foi removido para evitar trabalho contínuo de eventos e animações em máquinas simples e conflitos com o `dialog` top-layer. A abertura animada da marca continua independente. Não reintroduzir `data-roteiva-cursor`, `data-native-cursor`, `.studio-cursor-ring`, `.studio-cursor-dot`, listeners globais de movimento ou CSS `cursor:none` para desenho do ponteiro. O navegador preserva os cursores de texto, clique e arraste diretamente.
