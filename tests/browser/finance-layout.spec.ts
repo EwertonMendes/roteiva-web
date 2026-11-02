@@ -120,3 +120,32 @@ test("financial entries, export, edit and month selection survive the new layout
   await firstBar.click();
   await expect(page.locator(".bar-column").first()).toHaveAttribute("aria-pressed","true");
 });
+
+test("recurring revenue at 100% renders a continuous solid donut without a seam",async({page},info)=>{
+  await enterFinance(page,"finance-donut-"+info.project.name+"@example.com");
+  const mobileMenu=page.getByRole("button",{name:"Abrir menu",exact:true});
+  if(await mobileMenu.isVisible())await mobileMenu.click();
+  await page.locator(".sidebar nav").getByRole("button",{name:/^Clientes/}).click();
+  await page.getByRole("button",{name:"Novo cliente",exact:true}).click();
+  await page.getByLabel("Nome do cliente",{exact:true}).fill("Recorrente do financeiro");
+  await page.getByRole("button",{name:"Salvar cliente"}).click();
+  if(await mobileMenu.isVisible())await mobileMenu.click();
+  await page.locator(".sidebar nav").getByRole("button",{name:/^Financeiro/}).click();
+
+  await page.getByRole("button",{name:"Nova receita"}).click();
+  await page.locator('form.finance-modal .rt-select:has(input[name="clientId"]) .rt-select-trigger').click();
+  await page.getByRole("option",{name:"Recorrente do financeiro"}).click();
+  await page.getByLabel("Valor do trabalho").fill("30000");
+  await page.getByLabel("Previsão de recebimento").fill(await page.evaluate(()=>new Date().toLocaleDateString("en-CA")));
+  await page.locator("form.finance-modal").getByRole("button",{name:"Adicionar lançamento"}).click();
+  await expect(page.locator(".donut b")).toHaveText("100%");
+  for(const theme of ["light","dark"] as const){
+    await page.evaluate(value=>{document.documentElement.dataset.theme=value;},theme);
+    const appearance=await page.locator(".donut").evaluate(el=>{
+      const css=getComputedStyle(el);
+      return {image:css.backgroundImage,color:css.backgroundColor};
+    });
+    expect(appearance.image,"Full ring must not have a conic-gradient seam").toBe("none");
+    expect(appearance.color,"Solid full ring is consistently green in "+theme).toBe("rgb(110, 235, 145)");
+  }
+});
