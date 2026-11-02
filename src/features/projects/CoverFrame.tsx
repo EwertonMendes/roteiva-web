@@ -40,7 +40,7 @@ export function CoverFrame({src,cover,onChange}:{src:string;cover:ProjectCover;o
  function release(id:number){pointers.current.delete(id);rebase();}
  return <div className={'pc-cover-frame'+(onChange?' pc-crop-interactive':'')+(interacting?' pc-crop-active':'')} ref={box}
   tabIndex={onChange?0:undefined} role={onChange?'group':undefined} aria-label={onChange?'Enquadrar capa':undefined}
-  aria-describedby={onChange?'pc-gesture-help':undefined} data-native-cursor={onChange?'':undefined}
+  aria-describedby={onChange?'pc-gesture-help':undefined}
   onPointerDown={e=>{if(!onChange||e.button!==0||image.src!==src)return;e.preventDefault();e.currentTarget.focus({preventScroll:true});e.currentTarget.setPointerCapture(e.pointerId);pointers.current.set(e.pointerId,point(e.clientX,e.clientY));rebase();}}
   onPointerMove={e=>{if(!pointers.current.has(e.pointerId))return;pointers.current.set(e.pointerId,point(e.clientX,e.clientY));const start=gesture.current;if(!start)return;const next=coverGesture([...pointers.current.values()]);emit(transform(start.cover,start.distance>0?start.cover.zoom*next.distance/start.distance:start.cover.zoom,start.center,next.center));}}
   onPointerUp={e=>release(e.pointerId)} onPointerCancel={e=>release(e.pointerId)} onLostPointerCapture={e=>{if(pointers.current.has(e.pointerId))release(e.pointerId);}}
