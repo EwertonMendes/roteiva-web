@@ -57,9 +57,13 @@
 - [ ] **Fase necessária para não entregar cópias do arquivo original:** serviço de prévias derivadas para vídeo/imagem/áudio/PDF com limitação de resolução/qualidade, opcional identificação visual, original privado exclusivamente no Drive. Estudar custo e compatibilidade antes de implementar. Mesmo derivados podem ser capturados pelo receptor. Não declarar "impede F12": tecnicamente impossível no navegador.
 
 
-## Cursor personalizado sobre selects e modais — 22/10/2026
+## Cursor nativo, sem sobreposição decorativa — 02/11/2026
 
-**VALIDADO AUTOMATICAMENTE E PUBLICADO NO DEV PRINCIPAL em 22/10/2026 pela PR #85; aceite visual do proprietário pendente.** O cursor decorativo do Roteiva foi mantido, recebeu prioridade de camada superior aos popovers do `AppSelect` e portal para o diálogo nativo ativo, evitando desaparecer atrás do menu ou da top layer. `pointer-events:none` preserva os cliques; campos de texto, vídeos e o editor de capas com `data-native-cursor` continuam usando o cursor do sistema, bem como dispositivos touch e preferência por movimento reduzido. Teste em `tests/browser/cursor-layer.spec.ts` valida dropdown, seleção com clique, posicionamento no modal e retorno à página; integrações e dados não mudam. [CI frontend verde](https://github.com/EwertonMendes/roteiva-web/actions/runs/39861461197), [QA específica aprovada (2 testes desktop)](https://github.com/EwertonMendes/roteiva-web/actions/runs/39861473928), e [Hosting DEV principal publicado com cache validado](https://github.com/EwertonMendes/roteiva-web/actions/runs/39861714239) no commit `6dc837b`. Apenas Hosting atualizado; Firestore, D1 e Worker inalterados. Sem merge.
+**IMPLEMENTADO EM BRANCH PARA VALIDAÇÃO NO DEV:** solicitado remover por completo o cursor decorativo introduzido anteriormente (histórico PR #85). Eliminados listeners globais de `pointermove`/`pointerdown`/`pointerup`, agendamento `requestAnimationFrame`, portal para dialog e estado React do cursor, componentes DOM, regras `cursor: none !important` e opt-outs `data-native-cursor`. Mantida apenas a animação independente de abertura da marca. Cursores nativos (texto, pointer, grab/grabbing) continuam com seus feedbacks funcionais em menus e editor de capas. Substituído teste de implementação legado por `tests/browser/native-pointer.spec.ts` e mantida cobertura `tests/browser/project-covers.spec.ts`; suíte manual agora é `qa-regression.yml` com `suite=pointer`. Sem alteração de dados, Worker, D1, Firebase Auth ou segurança.
+
+- [x] Código da decoração removido e cobertura de cursor nativo adicionada.
+- [ ] Validar CI, QA desktop/mobile, deploy Hosting DEV e conferir experiência em dispositivo real.
+- [ ] Merge apenas após aceite da homologação.
 
 ## Select acessível e reutilizável — 22/10/2026
 
@@ -653,7 +657,7 @@ Evidências: api/tests/deletion-access.test.mjs (negativa para conta sem provisi
 
 ## Refinamento do editor de capas — cursor e gestos
 
-**IMPLEMENTADO:** cursor nativo nos modais, incluindo abertura com ponteiro parado; enquadramento direto por arraste, roda do mouse, pinça de dois toques e eventos de gesto Safari. Zoom com âncora, limites sem espaço vazio, suporte a teclado e controles compactos; sliders removidos. Paginação centralizada, com ícone e respiro. Evidências: `CoverFrame.tsx`, `cover-geometry.ts`, `site-experience.tsx/css`, testes de geometria e `tests/browser/project-covers.spec.ts`. TypeScript, 44 testes frontend e builds demo/emulador passaram; 4 E2E Edge desktop/mobile passaram (roda/ctrl+wheel, pinça por dois toques no Chromium, arraste, cursor, paginação e persistência); capturas revisadas. Caminho de GestureEvent Safari exercitado por eventos sintéticos, sem alegar teste em aparelho Safari. Nenhuma mudança de persistência, regras ou permissões. Homologação dos gestos em aparelhos físicos permanece pendente.
+**IMPLEMENTADO:** cursor nativo nos modais, incluindo abertura com ponteiro parado; enquadramento direto por arraste, roda do mouse, pinça de dois toques e eventos de gesto Safari. Zoom com âncora, limites sem espaço vazio, suporte a teclado e controles compactos; sliders removidos. Paginação centralizada, com ícone e respiro. Evidências: `CoverFrame.tsx`, `cover-geometry.ts`, testes de geometria e `tests/browser/project-covers.spec.ts`. TypeScript, 44 testes frontend e builds demo/emulador passaram; 4 E2E Edge desktop/mobile passaram (roda/ctrl+wheel, pinça por dois toques no Chromium, arraste, cursor, paginação e persistência); capturas revisadas. Caminho de GestureEvent Safari exercitado por eventos sintéticos, sem alegar teste em aparelho Safari. Nenhuma mudança de persistência, regras ou permissões. Homologação dos gestos em aparelhos físicos permanece pendente.
 
 ## Estabilidade do modal e loading de capas
 

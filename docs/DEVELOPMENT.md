@@ -106,6 +106,12 @@ O pipeline `firebase-infra.yml` faz deploy de rules/indexes somente quando um pu
 
 **Preview reutilizável:** em Actions > Firebase preview (manual PR) > Run workflow, escolha `master` e informe o número de uma PR **interna** aberta contra master. O job de build valida o PR via GitHub, sem credenciais e publica o artefato; o job de deploy usa código confiável da master e o canal `pr-N`, que expira em 7 dias. Somente o frontend vai para o canal, nunca Worker, Firestore rules/indexes nem dados. Canais podem exigir autorização do domínio em Firebase Auth/CORS; preview não é certificação de integração Google Drive.
 
+### Cursores do sistema e QA de interações (02/11/2026)
+
+O cursor personalizado de `SiteExperience` foi removido para evitar trabalho contínuo de eventos e animações em máquinas simples e conflitos com o `dialog` top-layer. A abertura animada da marca continua independente. Não reintroduzir `data-roteiva-cursor`, `data-native-cursor`, `.studio-cursor-ring`, `.studio-cursor-dot`, listeners globais de movimento ou CSS `cursor:none` para desenho do ponteiro. O navegador preserva os cursores de texto, clique e arraste diretamente.
+
+Para QA manual dos selects, diálogo nativo e enquadramento de capas, executar `.github/workflows/qa-regression.yml` com `suite=pointer` (substitui o antigo `suite=cursor`). O teste `tests/browser/native-pointer.spec.ts` verifica menus e modais, enquanto `tests/browser/project-covers.spec.ts` mantém gestos de edição e o cursor grab. A regressão noturna `full` continua executando ambos.
+
 ### Otimização de CI para feedback rápido (01/11/2026)
 
 O workflow `.github/workflows/qa-isolated-e2e.yml` mantém **o mesmo nome do check de segurança** usado nas promoções controladas e executa, em PR e push na master, um smoke Playwright marcado com `@ci-smoke` (desktop e mobile, dois workers). A seleção cobre separação entre contas Firebase emuladas, aprovação pública, prévia Google-restrita, recuperação do Drive; os testes de capas e demais cenários **não foram removidos**, e permanecem na regressão integral.

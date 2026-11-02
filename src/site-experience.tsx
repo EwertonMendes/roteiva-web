@@ -1,15 +1,10 @@
 "use client";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useRef, useState } from "react";
 
 /** Decorative effects stay outside the workspace state and never delay data requests. */
 export function SiteExperience() {
   const [intro, setIntro] = useState<"enter" | "exit" | "done">("enter");
   const bar = useRef<HTMLSpanElement>(null);
-  const ring = useRef<HTMLDivElement>(null);
-  const dot = useRef<HTMLDivElement>(null);
-  const [cursorDialog, setCursorDialog] = useState<HTMLDialogElement | null>(null);
-  const cursorPoint = useRef({x: 0, y: 0, visible: false, active: false, pressed: false});
 
   useEffect(() => {
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -46,95 +41,11 @@ export function SiteExperience() {
     return () => { live = false; timers.forEach(window.clearTimeout); window.removeEventListener("roteiva:ready", onReady); };
   }, []);
 
-  // Native modal dialogs live in the browser top layer. A cursor rendered only
-  // in the page can never cover them, regardless of its z-index.
-  useLayoutEffect(() => {
-    const {x, y, visible, active, pressed} = cursorPoint.current;
-    if (!visible) return;
-    if (ring.current) {
-      ring.current.style.transform = `translate3d(${x}px, ${y}px, 0)`;
-      ring.current.classList.toggle("is-visible", true);
-      ring.current.classList.toggle("is-active", active);
-      ring.current.classList.toggle("is-pressed", pressed);
-    }
-    if (dot.current) {
-      dot.current.style.transform = `translate3d(${x}px, ${y}px, 0)`;
-      dot.current.classList.add("is-visible");
-    }
-  }, [cursorDialog]);
-
-  useEffect(() => {
-    const fine = window.matchMedia("(hover: hover) and (pointer: fine)");
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const root = document.documentElement;
-    let enabled = fine.matches && !reduced.matches;
-    let frame: number | null = null;
-    let x = 0, y = 0, currentX = 0, currentY = 0;
-    let visible = false;
-    function hide() {
-      visible = false;
-      cursorPoint.current.visible = false;
-      root.removeAttribute("data-roteiva-cursor");
-      ring.current?.classList.remove("is-visible", "is-active", "is-pressed");
-      dot.current?.classList.remove("is-visible");
-      if (frame !== null) cancelAnimationFrame(frame);
-      frame = null;
-    }
-    function render() {
-      currentX += (x - currentX) * .23;
-      currentY += (y - currentY) * .23;
-      if (ring.current) ring.current.style.transform = `translate3d(${currentX}px, ${currentY}px, 0)`;
-      if (Math.abs(x-currentX) + Math.abs(y-currentY) > .15 && visible) frame = requestAnimationFrame(render);
-      else frame = null;
-    }
-    function move(event: PointerEvent) {
-      if (!enabled || event.pointerType === "touch") { hide(); return; }
-      const target = event.target instanceof Element ? event.target : null;
-      if (!target || target.closest('input:not([type="checkbox"]):not([type="radio"]), textarea, select, video, iframe, [contenteditable="true"], [data-native-cursor]')) { hide(); return; }
-      // Keep one visual cursor, moving it into the active modal only when the
-      // pointer is inside that dialog. A higher z-index alone cannot beat it.
-      const dialog = target.closest<HTMLDialogElement>("dialog:modal");
-      setCursorDialog(previous => previous === dialog ? previous : dialog);
-      x = event.clientX; y = event.clientY;
-      if (!visible) { currentX = x; currentY = y; }
-      visible = true;
-      if (dot.current) dot.current.style.transform = `translate3d(${x}px, ${y}px, 0)`;
-      ring.current?.classList.add("is-visible");
-      dot.current?.classList.add("is-visible");
-      const interactive = !!target.closest('button:not(:disabled), a, [role="button"], [role="option"], label, summary, input[type="checkbox"], input[type="radio"]');
-      cursorPoint.current = {x, y, visible: true, active: interactive, pressed: cursorPoint.current.pressed};
-      ring.current?.classList.toggle("is-active", interactive);
-      root.setAttribute("data-roteiva-cursor", "on");
-      if (frame === null) frame = requestAnimationFrame(render);
-    }
-    function down() { cursorPoint.current.pressed = true; ring.current?.classList.add("is-pressed"); }
-    function up() { cursorPoint.current.pressed = false; ring.current?.classList.remove("is-pressed"); }
-    function keyboard(event: KeyboardEvent) { if (event.key === "Tab" || event.key === "Escape") hide(); }
-    function updateMedia() { enabled = fine.matches && !reduced.matches; if (!enabled) hide(); }
-    window.addEventListener("pointermove", move, {passive:true});
-    window.addEventListener("pointerdown", down, {passive:true});
-    window.addEventListener("pointerup", up, {passive:true});
-    window.addEventListener("blur", hide);
-    document.addEventListener("pointerleave", hide);
-    window.addEventListener("keydown", keyboard);
-    fine.addEventListener("change", updateMedia);
-    reduced.addEventListener("change", updateMedia);
-    return () => {
-      hide(); window.removeEventListener("pointermove", move); window.removeEventListener("pointerdown", down); window.removeEventListener("pointerup", up);
-      window.removeEventListener("blur", hide); document.removeEventListener("pointerleave", hide); window.removeEventListener("keydown", keyboard);
-      fine.removeEventListener("change", updateMedia); reduced.removeEventListener("change", updateMedia);
-    };
-  }, []);
-
-  return <>
-    {intro !== "done" && <div className={`brand-intro brand-intro-${intro}`} aria-hidden="true">
-      <div className="brand-intro-corner"><span>ROTEIVA</span><span>SEU ESPAÇO DE PRODUÇÃO</span></div>
-      <div className="brand-intro-center"><div className="brand-intro-wordmark"><img src={`${import.meta.env.BASE_URL}roteiva-logo-white.png`} alt=""/></div><div className="brand-intro-track"><span ref={bar}/></div></div>
-      <div className="brand-intro-footer"><span>DA IDEIA À ENTREGA.</span><span>EM SINTONIA.</span></div>
-    </div>}
-    {createPortal(<>
-      <div ref={ring} className="studio-cursor-ring" aria-hidden="true"><i/></div>
-      <div ref={dot} className="studio-cursor-dot" aria-hidden="true"><i/></div>
-    </>, cursorDialog ?? document.body)}
-  </>;
+  // Intro animation is independent of the pointer: no global cursor events,
+  // animation loops, portals or native cursor overrides are installed.
+  return intro !== "done" ? <div className={`brand-intro brand-intro-${intro}`} aria-hidden="true">
+    <div className="brand-intro-corner"><span>ROTEIVA</span><span>SEU ESPAÇO DE PRODUÇÃO</span></div>
+    <div className="brand-intro-center"><div className="brand-intro-wordmark"><img src={`${import.meta.env.BASE_URL}roteiva-logo-white.png`} alt=""/></div><div className="brand-intro-track"><span ref={bar}/></div></div>
+    <div className="brand-intro-footer"><span>DA IDEIA À ENTREGA.</span><span>EM SINTONIA.</span></div>
+  </div> : null;
 }

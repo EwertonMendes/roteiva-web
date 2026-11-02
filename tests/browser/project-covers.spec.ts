@@ -52,9 +52,10 @@ test('project covers require Drive, persist crop, cancel safely and support remo
  const more=page.getByRole('button',{name:'Carregar mais itens',exact:true});
  await expect(more.locator('svg')).toHaveCount(1);await stableModal();
  await more.hover();
- await expect(page.locator('html')).not.toHaveAttribute('data-roteiva-cursor','on');
+ // The native pointer must remain visible even when the cover editor is a modal.
  expect(await more.evaluate(el=>getComputedStyle(el).cursor)).not.toBe('none');
- await expect(page.locator('.studio-cursor-ring')).toHaveCSS('opacity','0');
+ await expect(page.locator('.studio-cursor-ring,.studio-cursor-dot')).toHaveCount(0);
+ await expect(page.locator('html')).not.toHaveAttribute('data-roteiva-cursor','on');
  const spacing=await page.locator('.pc-image-more').evaluate(el=>{const grid=el.previousElementSibling!.getBoundingClientRect(),row=el.getBoundingClientRect(),button=el.querySelector('button')!.getBoundingClientRect();return {gap:button.top-grid.bottom,center:Math.abs(button.x+button.width/2-(row.x+row.width/2))};});
  expect(spacing.gap).toBeGreaterThanOrEqual(20);expect(spacing.center).toBeLessThan(2);
  await more.click();await expect(page.getByRole('button',{name:'Campanha 2.png',exact:true})).toBeVisible();
