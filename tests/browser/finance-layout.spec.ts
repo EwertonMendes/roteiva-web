@@ -46,11 +46,15 @@ test("financial mockup uses the viewport evenly in light/dark and on desktop/mob
           main:row.map(c=>({top:c.top,right:c.right})),
           surface:getComputedStyle(document.querySelector(".finance-filters")!).backgroundColor,
           donut:ring,
-          chartValueFontStyle:getComputedStyle(document.querySelector(".bar-column .bar-value")!).fontStyle};
+          chartValueFontStyle:getComputedStyle(document.querySelector(".bar-column .bar-value")!).fontStyle,
+          chartValueFontWeight:getComputedStyle(document.querySelector(".bar-column .bar-value")!).fontWeight,
+          selectedValueFontWeight:getComputedStyle(document.querySelector(".bar-column.current .bar-value")!).fontWeight};
       });
       expect(result.scrollWidth,width+" "+theme+" horizontal overflow").toBeLessThanOrEqual(result.viewport+2);
       expect(Math.abs(result.rightGap),width+" "+theme+" right gutter").toBeLessThan(4);
       expect(result.chartValueFontStyle,"Monthly revenue labels should never be italic").toBe("normal");
+      expect(result.chartValueFontWeight,"Monthly values should be medium weight").toBe("600");
+      expect(result.selectedValueFontWeight,"Selected month must not be heavier").toBe("600");
       expect(result.cards).toHaveLength(4);
       expect(result.main).toHaveLength(2);
       expect(result.donut,"No 0% donut seam in "+theme+" at "+width+"px").toBe("none");
