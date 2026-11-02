@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {parseMoney, splitInstallments, sumMoney, toISO} from '../src/studio-finance.ts';
+import {createLoadedFinanceCopy} from '../src/features/finance/finance-export.ts';
 assert.equal(parseMoney('1.234,56'),1234.56);
 assert.equal(parseMoney('1234.56'),1234.56);
 assert.ok(Number.isNaN(parseMoney('inválido')));
@@ -13,4 +14,12 @@ assert.equal(splitInstallments(2,2,new Date(2028,0,31,12))[1].date,'29/02/2028')
 assert.throws(()=>splitInstallments(.01,2,new Date()));
 assert.throws(()=>splitInstallments(5,0,new Date()));
 assert.equal(toISO('31/12/2026'),'2026-12-31');
-console.log('Financeiro: centavos, parcelas, fevereiro, ano bissexto e virada de ano OK');
+const source=[{id:12,project:"Entrega QA",client:"",amount:300,date:"24/10/2026",status:"A receber"}];
+const copy=createLoadedFinanceCopy(source,"2026-11-02T01:00:00.000Z");
+assert.equal(copy.scope,"loaded-entries");
+assert.equal(copy.version,1);
+assert.equal(copy.count,1);
+assert.equal(copy.entries[0].kind,"income");
+assert.equal(copy.entries[0].amount,300);
+assert.equal(copy.exportedAt,"2026-11-02T01:00:00.000Z");
+console.log('Financeiro: centavos, parcelas, fevereiro, exportação carregada e virada de ano OK');
