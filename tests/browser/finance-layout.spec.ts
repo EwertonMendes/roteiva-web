@@ -102,7 +102,8 @@ test("financial entries, export, edit and month selection survive the new layout
       scroll:{x:parent.x,y:parent.y,width:parent.width,height:parent.height},
       display:getComputedStyle(el).display,visibility:getComputedStyle(el).visibility};
   });
-  console.log("FINANCE_BAR_GEOMETRY",info.project.name,JSON.stringify(geometry));
+  expect(geometry.bar.width,"Every bar must remain touchable at mobile size").toBeGreaterThan(19);
+  expect(geometry.bar.height).toBeGreaterThan(40);
   await firstBar.click();
   await expect(page.locator(".bar-column").first()).toHaveAttribute("aria-pressed","true");
 });
