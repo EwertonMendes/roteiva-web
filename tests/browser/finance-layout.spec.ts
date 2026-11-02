@@ -45,10 +45,12 @@ test("financial mockup uses the viewport evenly in light/dark and on desktop/mob
           cards:cards.map(c=>({top:c.top,right:c.right,width:c.width})),
           main:row.map(c=>({top:c.top,right:c.right})),
           surface:getComputedStyle(document.querySelector(".finance-filters")!).backgroundColor,
-          donut:ring};
+          donut:ring,
+          chartValueFontStyle:getComputedStyle(document.querySelector(".bar-column .bar-value")!).fontStyle};
       });
       expect(result.scrollWidth,width+" "+theme+" horizontal overflow").toBeLessThanOrEqual(result.viewport+2);
       expect(Math.abs(result.rightGap),width+" "+theme+" right gutter").toBeLessThan(4);
+      expect(result.chartValueFontStyle,"Monthly revenue labels should never be italic").toBe("normal");
       expect(result.cards).toHaveLength(4);
       expect(result.main).toHaveLength(2);
       expect(result.donut,"No 0% donut seam in "+theme+" at "+width+"px").toBe("none");
