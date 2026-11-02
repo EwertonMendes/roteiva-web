@@ -546,7 +546,12 @@
   .app-view-finance .finance-metrics article > strong { font-size: clamp(1.18rem,5.2vw,1.9rem); white-space: normal; overflow-wrap: anywhere; }
   .app-view-finance .finance-metrics article > p { font-size: .78rem; }
   .app-view-finance .finance-layout .panel-head { padding-inline: 15px; }
-  .app-view-finance .revenue-chart { min-width: 560px; }
+  .app-view-finance .revenue-chart {
+    min-width: 560px;
+    /* The y-axis is hidden on phones: the bar plot must own the only column.
+       Otherwise the original 36px axis track collapses all twelve bars to 0px. */
+    grid-template-columns: minmax(0,1fr);
+  }
   .app-view-finance .finance-chart-scroll { position: relative; }
   .app-view-finance .revenue-chart-panel { min-height: 0; }
   .app-view-finance .finance-table article { padding: 15px; }
