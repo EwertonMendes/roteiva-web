@@ -286,6 +286,7 @@
   left: 50%;
   transform: translateX(-50%);
   pointer-events: none;
+  font-style: normal; /* The enclosing decorative <i> is italic by default. */
   font-weight: 780;
   font-size: clamp(.61rem,.76vw,.76rem);
   color: var(--finance-ink);
