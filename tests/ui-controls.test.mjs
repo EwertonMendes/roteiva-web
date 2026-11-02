@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync,readdirSync} from 'node:fs';
+import {readFileSync,readdirSync,existsSync} from 'node:fs';
 import {join,relative} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
@@ -50,7 +50,7 @@ test('retired workspace copy export has no frontend entrypoints, data fetcher, o
     'globals.css','responsive.css','features/drive/drive-library.css'];
   for(const file of files){
     const source=readFileSync(new URL(file,base),'utf8');
-    for(const removed of ['WorkspaceTools','Preparando cópia',
+    for(const removed of ['WorkspaceTools','Exportar cópia','Preparando cópia',
       'Roteiva-backup-','ensureFullWorkspace','onLoadWorkspace','rl-page-more',
       'workspace-tools','Falha ao salvar · exporte seus dados']){
       assert.equal(source.includes(removed),false,file+' must not retain '+removed);
@@ -59,10 +59,10 @@ test('retired workspace copy export has no frontend entrypoints, data fetcher, o
   const finance=readFileSync(new URL('features/finance/FinancePanel.tsx',base),'utf8');
   assert.match(finance,/Exportar CSV/,'The separate financial CSV export must remain available');
   const dash=readFileSync(new URL('dashboard-client.tsx',base),'utf8');
-  assert.match(dash,/finance-export-copy/,'Finance may provide a scoped local export, not a workspace backup');
-  const scoped=readFileSync(new URL('features/finance/finance-export.ts',base),'utf8');
-  assert.match(scoped,/scope:"loaded-entries"/);
-  assert.doesNotMatch(scoped,/ensureFullWorkspace|Roteiva-backup-/);
+  assert.doesNotMatch(dash,/finance-export-copy|downloadLoadedFinanceCopy|Exportar cópia/);
+  const css=readFileSync(new URL('features/finance/finance.css',base),'utf8');
+  assert.doesNotMatch(css,/finance-export-copy/);
+  assert.equal(existsSync(new URL('features/finance/finance-export.ts',base)),false,'Obsolete JSON-copy module must be deleted');
 });
 
 test('library counter callback is retired and collection states are reused',()=>{
