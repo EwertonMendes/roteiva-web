@@ -80,6 +80,14 @@ Configurações mantém o cabeçalho global de Projetos e apresenta cartões ind
 
 Usar Lucide já instalado, `AppInput`, `AppSelect`, `AppButton` e tokens atuais, com contrastes específicos para claro/escuro, foco global e reflow sem scroll horizontal no celular. O visual não autoriza alteração de dados, permissões ou regras. `tests/browser/settings-layout.spec.ts` cobre desktop/mobile e ações; a suíte manual `controls` inclui esse contrato.
 
+## Gestão financeira — mockup 08 (02/11/2026)
+
+A rota `/financeiro` utiliza `src/features/finance/FinancePanel.tsx` + `finance.css`, com layout encapsulado em `.app-view-finance` e herança dos controles compartilhados. Referência visual: título/subtítulo alinhados ao resto do workspace; ações “Exportar cópia” e “Nova receita” no cabeçalho; filtros Mês/Ano/Cliente/Situação/CSV em uma faixa; quatro indicadores; alerta de vencidos; gráfico anual em colunas selecionáveis; anel de recorrência; tabela com 6 colunas e ações de editar/excluir.
+
+Dark: cartões grafite, bordas discretas, barra atual neutra/branca e resultado positivo verde, com alerta âmbar. Light: cartões claros, texto escuro, bordas sutis e contraste consistente. Evitar background global negro hardcoded. Fonte Ubuntu e tokens globais; títulos dos cards 20–26 px, métricas até 36 px, legendas 12–15 px e controles clicáveis com altura mínima 44 px quando possível. O chart mobile rola **dentro** do cartão, sem scroll horizontal da página; tabelas viram cartões com rótulos de campo, sem esconder valores/status/ações.
+
+O download CSV continua filtrado pelo período/cliente/situação; a ação de cabeçalho baixa JSON **somente das linhas financeiras carregadas**, explicitado em title/arquivo/metadata. Isso não substitui exportação completa do workspace nem promete recuperar lançamentos fora da janela carregada. Não alterar totais/algoritmos do domínio, isolamento de dados ou regras do Firestore.
+
 ## Layout das telas internas
 
 A barra global de estúdio, busca e ações e a faixa “Seu espaço / Dados na nuvem” foram removidas do layout compartilhado. As telas começam pelo conteúdo; a busca fica em Projetos e Clientes. No celular, um botão no conteúdo abre o menu lateral. Configurações permanece na navegação; tema e logout ficam no menu do perfil, e o histórico de atividades abre somente pelo dashboard. O aviso de demonstração e os alertas reais de sincronização permanecem.
