@@ -108,7 +108,7 @@ O pipeline `firebase-infra.yml` faz deploy de rules/indexes somente quando um pu
 
 ### QA de gestão financeira (mockup 08 — 02/11/2026)
 
-Para validar o novo dashboard, usar `.github/workflows/qa-regression.yml` no `workflow_dispatch` com `suite=finance`: roda `tests/browser/finance-layout.spec.ts` e `money-input.spec.ts` em Chromium desktop/mobile com Firestore/Auth emulados, cobrindo light/dark, grid em 1600/1360/1100/390/320 px, filtros, edição e downloads. A suíte noturna `full` também inclui o novo spec. `tests/studio-finance.test.mjs` valida formato JSON carregado e aritmética. `src/features/finance/finance-export.ts` exporta apenas entradas financeiramente **carregadas**, sem tentar ler toda a conta; isso não é backup do workspace. Os testes com emuladores jamais acessam dados de produção.
+Para validar o novo dashboard, usar `.github/workflows/qa-regression.yml` no `workflow_dispatch` com `suite=finance`: roda `tests/browser/finance-layout.spec.ts` e `money-input.spec.ts` em Chromium desktop/mobile com Firestore/Auth emulados, cobrindo light/dark, grid em 1600/1360/1100/390/320 px, filtros, edição e downloads. A suíte noturna `full` também inclui o novo spec. `tests/studio-finance.test.mjs` valida a aritmética financeira. A exportação JSON “Exportar cópia” foi removida do código, dos testes e da interface; somente `Exportar CSV` permanece, usando os filtros correntes. Os testes de navegador também verificam rótulos acima do topo real das barras (inclusive meses zerados) e donut sólido nos extremos 0% e 100%, sem linha escura. Os testes com emuladores jamais acessam dados de produção.
 
 ### Cursores do sistema e QA de interações (02/11/2026)
 
