@@ -50,14 +50,19 @@ test('retired workspace copy export has no frontend entrypoints, data fetcher, o
     'globals.css','responsive.css','features/drive/drive-library.css'];
   for(const file of files){
     const source=readFileSync(new URL(file,base),'utf8');
-    for(const removed of ['WorkspaceTools','Exportar cópia','Preparando cópia',
+    for(const removed of ['WorkspaceTools','Preparando cópia',
       'Roteiva-backup-','ensureFullWorkspace','onLoadWorkspace','rl-page-more',
       'workspace-tools','Falha ao salvar · exporte seus dados']){
       assert.equal(source.includes(removed),false,file+' must not retain '+removed);
     }
   }
-  const finance=readFileSync(new URL('studio-features.tsx',base),'utf8');
+  const finance=readFileSync(new URL('features/finance/FinancePanel.tsx',base),'utf8');
   assert.match(finance,/Exportar CSV/,'The separate financial CSV export must remain available');
+  const dash=readFileSync(new URL('dashboard-client.tsx',base),'utf8');
+  assert.match(dash,/finance-export-copy/,'Finance may provide a scoped local export, not a workspace backup');
+  const scoped=readFileSync(new URL('features/finance/finance-export.ts',base),'utf8');
+  assert.match(scoped,/scope:"loaded-entries"/);
+  assert.doesNotMatch(scoped,/ensureFullWorkspace|Roteiva-backup-/);
 });
 
 test('library counter callback is retired and collection states are reused',()=>{
@@ -68,7 +73,7 @@ test('library counter callback is retired and collection states are reused',()=>
   assert.doesNotMatch(dash,/linkedFolderCount|onLinkedFolderCountChange|<span>Biblioteca<\/span><em>/);
   assert.doesNotMatch(drive,/onLinkedFolderCountChange|countCallback/);
   assert.doesNotMatch(dropbox,/onLinkedFolderCountChange/);
-  for(const path of ['studio-features.tsx','features/reviews/ReviewsDashboard.tsx',
+  for(const path of ['features/finance/FinancePanel.tsx','features/reviews/ReviewsDashboard.tsx',
     'features/drive/DriveLibraryUI.tsx','features/drive/DriveConnectionPanel.tsx',
     'features/dropbox/DropboxConnectionPanel.tsx']){
     assert.match(readFileSync(new URL(path,base),'utf8'),/<CollectionState[\s>]/,path);
