@@ -28,6 +28,15 @@
 - [ ] Homologação manual com Chrome/mobile, Google Drive e Dropbox; sem merge antes do aceite visual.
 
 
+## Mockup 08 — Gestão financeira (02/11/2026)
+
+**IMPLEMENTADO NA BRANCH; QA E HOMOLOGAÇÃO PENDENTES:** a tela financeira foi extraída do componente agregado `studio-features.tsx` para `features/finance/FinancePanel.tsx`, com CSS responsivo exclusivo por rota. Filtros, indicadores, pendências, receita anual, perfil do mês e tabela reproduzem o layout de referência em claro/escuro. Mobile possui colunas adaptativas, gráfico rolável apenas internamente e ações acessíveis. Abertura/edição/exclusão de lançamentos e exportação CSV continuam funcionais. Botão adicional “Exportar cópia” usa JSON com `scope=loaded-entries` para **não alegar backup completo** ao trabalhar com carregamento mensal/parcial.
+
+- [x] Estrutura/estilos, regra de responsividade e controles compartilhados implementados sem alterar Firestore/Worker/D1.
+- [x] Testes de exportação limitada e Playwright de geometria, temas, inclusão/edição e downloads, desktop/mobile.
+- [ ] Verificar checks do PR e suíte manual `qa-regression.yml` com `suite=finance`; publicar apenas Hosting DEV quando tudo passar.
+- [ ] Homologar visual real e mergear somente após autorização.
+
 ## Simplificação da tela cheia de vídeo — 23/10/2026
 
 - [x] Remover os botões redundantes "Ampliar vídeo" / "Fechar tela cheia" da página de aprovação
