@@ -449,9 +449,9 @@ Configuração e matriz: [DRIVE-UPLOAD.md](DRIVE-UPLOAD.md).
 **Decisão operacional do proprietário — 20/10/2026:** homologar a PR #55 diretamente no DEV existente e em suas contas/dados descartáveis. Worker, D1 e Hosting receberam o código validado antes do merge, com os segredos OAuth existentes. Não criar ambiente ou credenciais de QA adicionais para esse aceite. Pipeline automático permanece limitado à master; detalhes verificáveis em [REVIEWS-MVP.md](REVIEWS-MVP.md).
 
 
-### Decisão — apresentação financeira e cópia limitada (02/11/2026)
+### Decisão — apresentação financeira sem exportação JSON (02/11/2026)
 
-O domínio financeiro conserva os contratos de `FinanceEntry` e as leituras janeladas/agregações anuais; a nova view está desacoplada em `src/features/finance/FinancePanel.tsx` e um tema CSS escopado por `.app-view-finance`, sem mudar persistência, permissões ou a origem de totais. A ação do cabeçalho “Exportar cópia” cria JSON local com metadata `format=roteiva.finance.loaded-copy`, `scope=loaded-entries` e `count`, contendo **somente registros já hidratados no cliente**. Não deve ser usada como restauração integral do workspace; o CSV segue limitado aos filtros selecionados. Uma exportação completa exigiria serviço separado que percorra todos os dados autorizados do usuário. Não chamar rotas adicionais de Firestore para montar essa cópia.
+O domínio financeiro conserva os contratos de `FinanceEntry` e as leituras janeladas/agregações anuais; a nova view está desacoplada em `src/features/finance/FinancePanel.tsx` e um tema CSS escopado por `.app-view-finance`, sem mudar persistência, permissões ou a origem de totais. A opção “Exportar cópia” e seu módulo JSON foram descartados e removidos integralmente. **Exportar CSV**, já existente, permanece limitado aos filtros selecionados e não representa backup do workspace. Não chamar rotas adicionais de Firestore para montar exportações. O gráfico anual posiciona os rótulos relativos às barras e o donut usa preenchimento sólido nos percentuais extremos para evitar emendas de anti-aliasing.
 
 ### Decisão — performance e quotas Cloudflare Free (21/10/2026)
 
