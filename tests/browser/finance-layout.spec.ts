@@ -91,6 +91,18 @@ test("financial entries, export, edit and month selection survive the new layout
   await page.locator("form.finance-modal").getByRole("button",{name:"Salvar alterações"}).click();
   const active=page.locator(".bar-column[aria-pressed='true']");
   await expect(active).toHaveCount(1);
-  await page.locator(".bar-column").first().click();
+  const scroll=page.locator(".finance-chart-scroll");
+  await scroll.scrollIntoViewIfNeeded();
+  await scroll.evaluate(node=>{node.scrollLeft=0;});
+  const firstBar=page.locator(".bar-column").first();
+  const geometry=await firstBar.evaluate(el=>{
+    const bar=el.getBoundingClientRect();
+    const parent=el.closest(".finance-chart-scroll")!.getBoundingClientRect();
+    return {bar:{x:bar.x,y:bar.y,width:bar.width,height:bar.height},
+      scroll:{x:parent.x,y:parent.y,width:parent.width,height:parent.height},
+      display:getComputedStyle(el).display,visibility:getComputedStyle(el).visibility};
+  });
+  console.log("FINANCE_BAR_GEOMETRY",info.project.name,JSON.stringify(geometry));
+  await firstBar.click();
   await expect(page.locator(".bar-column").first()).toHaveAttribute("aria-pressed","true");
 });
