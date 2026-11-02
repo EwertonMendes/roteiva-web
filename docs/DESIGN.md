@@ -82,11 +82,11 @@ Usar Lucide já instalado, `AppInput`, `AppSelect`, `AppButton` e tokens atuais,
 
 ## Gestão financeira — mockup 08 (02/11/2026)
 
-A rota `/financeiro` utiliza `src/features/finance/FinancePanel.tsx` + `finance.css`, com layout encapsulado em `.app-view-finance` e herança dos controles compartilhados. Referência visual: título/subtítulo alinhados ao resto do workspace; ações “Exportar cópia” e “Nova receita” no cabeçalho; filtros Mês/Ano/Cliente/Situação/CSV em uma faixa; quatro indicadores; alerta de vencidos; gráfico anual em colunas selecionáveis; anel de recorrência; tabela com 6 colunas e ações de editar/excluir.
+A rota `/financeiro` utiliza `src/features/finance/FinancePanel.tsx` + `finance.css`, com layout encapsulado em `.app-view-finance` e herança dos controles compartilhados. Referência visual: título/subtítulo alinhados ao resto do workspace; ação “Nova receita” no cabeçalho; filtros Mês/Ano/Cliente/Situação/CSV em uma faixa; quatro indicadores; alerta de vencidos; gráfico anual em colunas selecionáveis; anel de recorrência; tabela com 6 colunas e ações de editar/excluir.
 
 Dark: cartões grafite, bordas discretas, barra atual neutra/branca e resultado positivo verde, com alerta âmbar. Light: cartões claros, texto escuro, bordas sutis e contraste consistente. Evitar background global negro hardcoded. Fonte Ubuntu e tokens globais; títulos dos cards 20–26 px, métricas até 36 px, legendas 12–15 px e controles clicáveis com altura mínima 44 px quando possível. O chart mobile rola **dentro** do cartão, sem scroll horizontal da página; tabelas viram cartões com rótulos de campo, sem esconder valores/status/ações.
 
-O download CSV continua filtrado pelo período/cliente/situação; a ação de cabeçalho baixa JSON **somente das linhas financeiras carregadas**, explicitado em title/arquivo/metadata. Isso não substitui exportação completa do workspace nem promete recuperar lançamentos fora da janela carregada. Não alterar totais/algoritmos do domínio, isolamento de dados ou regras do Firestore.
+O botão **Exportar cópia** e todo o código de exportação JSON foram removidos por decisão do produto. **Exportar CSV** permanece na barra de filtros, limitado ao período/cliente/situação selecionados. Os valores do gráfico anual devem ficar imediatamente acima do topo das respectivas barras; quando a receita é zero, os valores aparecem perto da linha de base, e não no teto do gráfico. O donut usa cor sólida nos casos 0% e 100% para evitar linhas de junção. Não alterar totais/algoritmos do domínio, isolamento de dados ou regras do Firestore.
 
 ## Layout das telas internas
 
