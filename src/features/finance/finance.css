@@ -287,7 +287,7 @@
   transform: translateX(-50%);
   pointer-events: none;
   font-style: normal; /* The enclosing decorative <i> is italic by default. */
-  font-weight: 780;
+  font-weight: 600;
   font-size: clamp(.61rem,.76vw,.76rem);
   color: var(--finance-ink);
   white-space: nowrap;
@@ -314,7 +314,7 @@
 }
 .app-view-finance .bar-column.current .bar-value {
   color: var(--finance-ink);
-  font-weight: 780;
+  font-weight: 600;
 }
 .app-view-finance .bar-column:focus-visible {
   outline: 2px solid var(--finance-green);
