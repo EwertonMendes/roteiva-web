@@ -35,7 +35,7 @@
 - [x] Estrutura/estilos, regra de responsividade e controles compartilhados implementados sem alterar Firestore/Worker/D1.
 - [x] Testes de exportação limitada e Playwright de geometria, temas, inclusão/edição e downloads, desktop/mobile.
 - [x] Frontend/TypeScript/build aprovados; suíte manual `qa-regression.yml` com `suite=finance` aprovada com **6 testes Playwright**, cobrindo desktop/mobile, claro/escuro, entradas, edição, downloads e gráfico. Evidência: [QA run 41378315996](https://github.com/EwertonMendes/roteiva-web/actions/runs/41378315996). O teste revelou e corrigiu uma barra com 0 px de largura no mobile, resolvida no CSS responsivo.
-- [ ] Publicar somente Hosting DEV do HEAD final para aceite visual.
+- [x] Publicado somente Firebase Hosting DEV, validação e cache aprovados: [Actions run 41378535594](https://github.com/EwertonMendes/roteiva-web/actions/runs/41378535594). Backend/Firestore/PROD não foram alterados.
 - [ ] Homologar visual real e mergear somente após autorização.
 
 ## Simplificação da tela cheia de vídeo — 23/10/2026
