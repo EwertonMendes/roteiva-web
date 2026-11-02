@@ -51,7 +51,7 @@ test("financial mockup uses the viewport evenly in light/dark and on desktop/mob
       expect(Math.abs(result.rightGap),width+" "+theme+" right gutter").toBeLessThan(4);
       expect(result.cards).toHaveLength(4);
       expect(result.main).toHaveLength(2);
-      expect(result.donut).toContain("conic-gradient");
+      expect(result.donut,"No 0% donut seam in "+theme+" at "+width+"px").toBe("none");
       if(width>=1360) {
         expect(Math.max(...result.cards.map(c=>c.top))-Math.min(...result.cards.map(c=>c.top))).toBeLessThan(3);
       } else {
@@ -67,15 +67,11 @@ test("financial mockup uses the viewport evenly in light/dark and on desktop/mob
   await expect(page.locator(".finance-metrics article")).toHaveCount(4);
   await expect(page.getByRole("button",{name:"Exportar CSV"})).toBeVisible();
   await expect(page.getByRole("button",{name:"Nova receita"})).toBeVisible();
-  await expect(page.getByRole("button",{name:"Exportar cópia"})).toBeVisible();
+  await expect(page.getByRole("button",{name:"Exportar cópia"})).toHaveCount(0);
 });
 
 test("financial entries, export, edit and month selection survive the new layout",async({page},info)=>{
   await enterFinance(page,"finance-actions-"+info.project.name+"@example.com");
-  const jsonPromise=page.waitForEvent("download");
-  await page.getByRole("button",{name:"Exportar cópia"}).click();
-  const json=await jsonPromise;
-  expect(json.suggestedFilename()).toMatch(/^roteiva-financeiro-carregado-\d{4}-\d{2}-\d{2}\.json$/);
   await page.getByRole("button",{name:"Nova receita"}).click();
   await page.getByLabel("Valor do trabalho").fill("30000");
   await page.getByLabel("Previsão de recebimento").fill(await page.evaluate(()=>new Date().toLocaleDateString("en-CA")));
@@ -89,6 +85,23 @@ test("financial entries, export, edit and month selection survive the new layout
   await page.locator(".finance-table .edit-revenue-button").first().click();
   await expect(page.getByLabel("Valor do trabalho")).toHaveValue("300,00");
   await page.locator("form.finance-modal").getByRole("button",{name:"Salvar alterações"}).click();
+  // Value labels follow their own bar tops, including a zero-value column,
+  // rather than occupying an unrelated heading row at the top of the chart.
+  const labelPosition=await page.evaluate(()=>{
+    const bars=[...document.querySelectorAll<HTMLElement>(".bar-column")];
+    const get=(button:HTMLElement)=>{
+      const column=button.querySelector<HTMLElement>("i")!;
+      const label=button.querySelector<HTMLElement>(".bar-value")!;
+      const a=column.getBoundingClientRect(),b=label.getBoundingClientRect();
+      return {barTop:a.top,barBottom:a.bottom,labelBottom:b.bottom};
+    };
+    return {zero:get(bars[0]),active:get(bars.find(b=>b.getAttribute("aria-pressed")==="true")!)};
+  });
+  for(const position of [labelPosition.zero,labelPosition.active]){
+    expect(position.barTop-position.labelBottom,"Value appears just above its own bar").toBeGreaterThan(2);
+    expect(position.barTop-position.labelBottom).toBeLessThan(13);
+  }
+  expect(labelPosition.zero.labelBottom,"Zero values sit near the baseline").toBeGreaterThan(labelPosition.active.labelBottom+35);
   const active=page.locator(".bar-column[aria-pressed='true']");
   await expect(active).toHaveCount(1);
   const scroll=page.locator(".finance-chart-scroll");
