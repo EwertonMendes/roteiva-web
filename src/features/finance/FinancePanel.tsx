@@ -55,7 +55,8 @@ export function FinancePanel({entries,clients,onAdd,onEdit,onDelete,onPeriodChan
     labels.map((_,i)=>sumMoney(yearly.filter(e=>e.kind!=="expense"&&Number(toISO(e.date).slice(5,7))===i+1)));
   const max=Math.max(...bars,100);
   const step=10**Math.floor(Math.log10(max));
-  const ceiling=Math.ceil(max/step)*step;
+  // Reserve headroom for value labels positioned directly above each column.
+  const ceiling=Math.ceil(max*1.2/step)*step;
   const overdue=monthly.filter(e=>e.status==="A receber"&&toISO(e.date)<today());
   const annual=bars.reduce((a,b)=>a+b,0);
 
@@ -134,8 +135,9 @@ export function FinancePanel({entries,clients,onAdd,onEdit,onDelete,onPeriodChan
                 className={"bar-column"+(i===month?" current":"")} aria-pressed={i===month}
                 aria-label={labels[i]+": "+formatMoney(value)} title={labels[i]+": "+formatMoney(value)}
                 onClick={()=>selectMonth(i)}>
-                <span className="bar-value">{formatMoney(value)}</span>
-                <i style={{height:Math.max(value/ceiling*100,0)+"%"}} aria-hidden="true"><em/></i>
+                <i style={{height:Math.max(value/ceiling*100,0)+"%"}} aria-hidden="true">
+                  <span className="bar-value">{formatMoney(value)}</span>
+                </i>
                 <small>{labels[i]}</small>
               </AppButton>)}</div>
             </div>
@@ -146,7 +148,8 @@ export function FinancePanel({entries,clients,onAdd,onEdit,onDelete,onPeriodChan
         <div className="panel-head"><div><span><IconLabel icon={ChartPie}>ORIGEM DAS RECEITAS</IconLabel></span><h2>Perfil do mês</h2></div></div>
         <div className="donut-wrap">
           <div className="donut" role="img" aria-label={percent+"% da receita prevista vem de clientes recorrentes"}
-            style={{background:"conic-gradient(var(--finance-green) 0 "+percent+"%, var(--finance-donut-track) "+percent+"% 100%)"}}>
+            style={{background:percent===100?"var(--finance-green)":percent===0?"var(--finance-donut-track)":
+              "conic-gradient(var(--finance-green) 0 "+percent+"%, var(--finance-donut-track) "+percent+"% 100%)"}}>
             <span><b>{percent}%</b><small>recorrente</small></span>
           </div>
         </div>
