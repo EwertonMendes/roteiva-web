@@ -28,6 +28,16 @@
 - [ ] Homologação manual com Chrome/mobile, Google Drive e Dropbox; sem merge antes do aceite visual.
 
 
+## Mockup 08 — Gestão financeira (02/11/2026)
+
+**IMPLEMENTADO E QA AUTOMATIZADA VALIDADA NA BRANCH; HOMOLOGAÇÃO VISUAL PENDENTE:** a tela financeira foi extraída do componente agregado `studio-features.tsx` para `features/finance/FinancePanel.tsx`, com CSS responsivo exclusivo por rota. Filtros, indicadores, pendências, receita anual, perfil do mês e tabela reproduzem o layout de referência em claro/escuro. Mobile possui colunas adaptativas, gráfico rolável apenas internamente e ações acessíveis. Abertura/edição/exclusão de lançamentos e exportação CSV continuam funcionais. O botão e a implementação de “Exportar cópia” foram **removidos integralmente**; permanece somente a exportação CSV filtrada. No gráfico, os valores seguem o topo de cada barra (zero próximo da base); o anel 0%/100% usa preenchimento sólido, sem linha escura de junção.
+
+- [x] Estrutura/estilos, regra de responsividade e controles compartilhados implementados sem alterar Firestore/Worker/D1.
+- [x] Playwright de geometria, temas, inclusão/edição, CSV, rótulos no topo de cada barra e anel 0%/100%, desktop/mobile. Testes e módulo de exportação JSON removidos.
+- [x] Frontend/TypeScript/build aprovados; suíte manual `qa-regression.yml` com `suite=finance` aprovada com **6 testes Playwright**, cobrindo desktop/mobile, claro/escuro, entradas, edição, downloads e gráfico. Evidência: [QA run 41378315996](https://github.com/EwertonMendes/roteiva-web/actions/runs/41378315996). O teste revelou e corrigiu uma barra com 0 px de largura no mobile, resolvida no CSS responsivo.
+- [x] Publicado somente Firebase Hosting DEV, validação e cache aprovados: [Actions run 41378535594](https://github.com/EwertonMendes/roteiva-web/actions/runs/41378535594). Backend/Firestore/PROD não foram alterados.
+- [ ] Homologar visual real e mergear somente após autorização.
+
 ## Simplificação da tela cheia de vídeo — 23/10/2026
 
 - [x] Remover os botões redundantes "Ampliar vídeo" / "Fechar tela cheia" da página de aprovação

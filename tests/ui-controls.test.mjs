@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync,readdirSync} from 'node:fs';
+import {readFileSync,readdirSync,existsSync} from 'node:fs';
 import {join,relative} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
@@ -56,8 +56,13 @@ test('retired workspace copy export has no frontend entrypoints, data fetcher, o
       assert.equal(source.includes(removed),false,file+' must not retain '+removed);
     }
   }
-  const finance=readFileSync(new URL('studio-features.tsx',base),'utf8');
+  const finance=readFileSync(new URL('features/finance/FinancePanel.tsx',base),'utf8');
   assert.match(finance,/Exportar CSV/,'The separate financial CSV export must remain available');
+  const dash=readFileSync(new URL('dashboard-client.tsx',base),'utf8');
+  assert.doesNotMatch(dash,/finance-export-copy|downloadLoadedFinanceCopy|Exportar cópia/);
+  const css=readFileSync(new URL('features/finance/finance.css',base),'utf8');
+  assert.doesNotMatch(css,/finance-export-copy/);
+  assert.equal(existsSync(new URL('features/finance/finance-export.ts',base)),false,'Obsolete JSON-copy module must be deleted');
 });
 
 test('library counter callback is retired and collection states are reused',()=>{
@@ -68,7 +73,7 @@ test('library counter callback is retired and collection states are reused',()=>
   assert.doesNotMatch(dash,/linkedFolderCount|onLinkedFolderCountChange|<span>Biblioteca<\/span><em>/);
   assert.doesNotMatch(drive,/onLinkedFolderCountChange|countCallback/);
   assert.doesNotMatch(dropbox,/onLinkedFolderCountChange/);
-  for(const path of ['studio-features.tsx','features/reviews/ReviewsDashboard.tsx',
+  for(const path of ['features/finance/FinancePanel.tsx','features/reviews/ReviewsDashboard.tsx',
     'features/drive/DriveLibraryUI.tsx','features/drive/DriveConnectionPanel.tsx',
     'features/dropbox/DropboxConnectionPanel.tsx']){
     assert.match(readFileSync(new URL(path,base),'utf8'),/<CollectionState[\s>]/,path);

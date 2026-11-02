@@ -449,6 +449,10 @@ Configuração e matriz: [DRIVE-UPLOAD.md](DRIVE-UPLOAD.md).
 **Decisão operacional do proprietário — 20/10/2026:** homologar a PR #55 diretamente no DEV existente e em suas contas/dados descartáveis. Worker, D1 e Hosting receberam o código validado antes do merge, com os segredos OAuth existentes. Não criar ambiente ou credenciais de QA adicionais para esse aceite. Pipeline automático permanece limitado à master; detalhes verificáveis em [REVIEWS-MVP.md](REVIEWS-MVP.md).
 
 
+### Decisão — apresentação financeira sem exportação JSON (02/11/2026)
+
+O domínio financeiro conserva os contratos de `FinanceEntry` e as leituras janeladas/agregações anuais; a nova view está desacoplada em `src/features/finance/FinancePanel.tsx` e um tema CSS escopado por `.app-view-finance`, sem mudar persistência, permissões ou a origem de totais. A opção “Exportar cópia” e seu módulo JSON foram descartados e removidos integralmente. **Exportar CSV**, já existente, permanece limitado aos filtros selecionados e não representa backup do workspace. Não chamar rotas adicionais de Firestore para montar exportações. O gráfico anual posiciona os rótulos relativos às barras e o donut usa preenchimento sólido nos percentuais extremos para evitar emendas de anti-aliasing.
+
 ### Decisão — performance e quotas Cloudflare Free (21/10/2026)
 
 Separação de manutenção por criticidade: exclusões e revogações de Drive/ACLs usam polling D1 de 1 minuto; retenção e backfill usam 15 minutos. Nenhum cache em memória de Worker é autoridade para status de revogação. Busca de aprovações possui debounce na interface, mantendo autorização real no backend. Miniaturas passam diretamente ao cliente via streaming apenas se a resposta do Google declarar comprimento válido (até 1 MiB) e não comprimido; tamanho divergente aborta a transmissão. Fallback existente continua para comprimento incerto. Nunca armazenar imagens privadas em cache público.

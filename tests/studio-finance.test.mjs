@@ -13,4 +13,4 @@ assert.equal(splitInstallments(2,2,new Date(2028,0,31,12))[1].date,'29/02/2028')
 assert.throws(()=>splitInstallments(.01,2,new Date()));
 assert.throws(()=>splitInstallments(5,0,new Date()));
 assert.equal(toISO('31/12/2026'),'2026-12-31');
-console.log('Financeiro: centavos, parcelas, fevereiro, ano bissexto e virada de ano OK');
+console.log('Financeiro: centavos, parcelas, fevereiro e virada de ano OK');
