@@ -10,7 +10,7 @@ import {MoneyInput} from "../ui/MoneyInput";
 type Props={client:Client|null;onClose:()=>void;onSubmit:(event:FormEvent<HTMLFormElement>)=>void};
 export function ClientFormDialog({client,onClose,onSubmit}:Props){
  const [type,setType]=useState<ClientType>(client?.type||"Recorrente");
- return <AppDialog className="cd-form-dialog" data-native-cursor onCloseRequest={onClose}
+ return <AppDialog className="cd-form-dialog" onCloseRequest={onClose}
   aria-labelledby="cd-form-title" aria-describedby="cd-form-description">
    <form className="cd-form" onSubmit={onSubmit}>
      <header className="cd-form-header"><div>
