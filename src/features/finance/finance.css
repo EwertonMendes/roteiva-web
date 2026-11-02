@@ -279,6 +279,8 @@
 .app-view-finance .bars { gap: clamp(4px,.7vw,12px); }
 .app-view-finance .bar-column { grid-template-rows: minmax(0,1fr) 27px; }
 .app-view-finance .bar-column > i .bar-value {
+  /* Legacy mobile CSS hides .bar-value; the financial chart always shows it. */
+  display: block;
   position: absolute;
   bottom: calc(100% + 6px);
   left: 50%;
