@@ -25,9 +25,9 @@ Materiais mostram as pastas realmente vinculadas ao projeto no Drive. Adicionar/
 
 ## Efeitos e usabilidade
 
-- Abertura com marca e cursor decorativo estão em `src/site-experience.tsx` e `src/site-experience.css`.
+- Abertura com marca permanece isolada em `src/site-experience.tsx` e `src/site-experience.css`.
 - A abertura nunca deve prender a pessoa; há saída de segurança e suporte a `prefers-reduced-motion`.
-- Cursor personalizado somente em dispositivos com mouse e sobre elementos compatíveis; campos de texto, vídeos e editores marcados com `data-native-cursor` preservam comportamento nativo. Dropdowns, opções e modais comuns mantêm o cursor personalizado acima de seu conteúdo, sem bloquear cliques; telas touch e movimento reduzido seguem usando cursor/gestos nativos.
+- O Roteiva utiliza exclusivamente os ponteiros nativos do navegador/sistema operacional. Não esconder o cursor globalmente, instalar listeners de movimentação para efeitos decorativos nem renderizar overlays ou portais de cursor. Preservar as indicações nativas de interação (texto, pointer, grab/grabbing, disabled) e o funcionamento em modais e dispositivos touch.
 - Desktop e mobile têm navegação adaptada; manter contraste, foco visível, teclado, textos completos e modais com rolagem adequada.
 
 ## Código e arquivos de estilo
