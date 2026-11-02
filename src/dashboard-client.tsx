@@ -18,10 +18,12 @@ import {
   ArrowUpRight, Building2, UserRound,
   Pencil, Plus, ReceiptText, Search, Trash2,
   UserRoundPlus, Users, WalletCards, X, Upload, Image as ImageIcon,
-  FileVideo, FileAudio, FileText, HardDrive, ChevronLeft, Settings2,
+  FileVideo, FileAudio, FileText, HardDrive, ChevronLeft, Settings2, Download,
   type LucideIcon,
 } from "lucide-react";
-import { ClientDetail, StudioReviews, FinancePanel, projectTemplates } from "./studio-features";
+import { ClientDetail, StudioReviews, projectTemplates } from "./studio-features";
+import {FinancePanel} from "./features/finance/FinancePanel";
+import {downloadLoadedFinanceCopy} from "./features/finance/finance-export";
 import {ReviewsDashboard} from "./features/reviews/ReviewsDashboard";
 import { TodayStudio } from "./features/dashboard/DashboardOverview";
 import { ActivityHistoryDrawer } from "./features/dashboard/ActivityHistory";
@@ -543,7 +545,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
             <div className="heading-actions">
               {isDemo && demoStorageWarning && <p role="alert" className="workspace-save-warning">Não foi possível salvar os dados da demonstração neste navegador.</p>}
               {view === "settings" ? null : view === "clients" ? <AppButton className="primary-button" onClick={() => { setEditingClient(null); setClientModalOpen(true); }}><UserRoundPlus size={17} /> Novo cliente</AppButton>
-                : view === "finance" ? <AppButton className="primary-button" onClick={() => openFinanceModal()}><Plus size={17} /> Nova receita</AppButton>
+                : view === "finance" ? <><AppButton type="button" className="secondary-button finance-export-copy" title="Exportar cópia JSON dos lançamentos carregados nesta sessão" onClick={()=>downloadLoadedFinanceCopy(financeEntries)}><Download size={18} aria-hidden="true"/> Exportar cópia</AppButton><AppButton className="primary-button finance-new-revenue" onClick={() => openFinanceModal()}><Plus size={19} aria-hidden="true"/> Nova receita</AppButton></>
                 : view === "calendar" ? <AppButton className="primary-button" onClick={() => openEvent()}><Plus size={17} /> Novo compromisso</AppButton>
                 : view === "library" ? (isDemo && import.meta.env.VITE_LIBRARY_REVIEW === "true" ? null : <><AppSelect aria-label="Projeto dos arquivos" value={libraryProject} onValueChange={value=> setLibraryProject(value)}><option value="">Todos os projetos</option>{projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</AppSelect>{isDemo && <label className="primary-button upload-button"><Upload size={17} /> {uploading ? "Enviando…" : "Adicionar arquivos"}<AppInput type="file" disabled multiple onChange={(event) => { uploadAssets(event.target.files, Number(libraryProject) || undefined); event.target.value = ""; }} /></label>}</>)
                 : view === "reviews" ? null : <AppButton className="primary-button" onClick={startProject}><Plus size={17} /> Criar projeto</AppButton>}
