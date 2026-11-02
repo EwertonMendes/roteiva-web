@@ -1,3 +1,7 @@
+import {AppInput} from "./features/ui/AppInput";
+import {AppButton} from "./features/ui/AppButton";
+import {formatPhoneDisplay} from "./lib/brazil-phone";
+import {useState,type ReactNode} from "react";
 import {ArrowLeft, Receipt, Phone, Mail, FolderKanban} from "lucide-react";
 import { IconLabel } from "./features/ui/IconLabel";
 import { newId } from "./domain/workspace";
