@@ -165,7 +165,7 @@ test("Account and studio settings persist without changing existing projects",as
   await page.getByLabel("Nome do estúdio ou marca",{exact:true}).fill("Estúdio dos Crias");
   await chooseAppSelect(page, page.getByLabel("Tipo de atuação"), "producer");
   await page.getByRole("button",{name:"Salvar alterações"}).click();
-  await expect(page.getByRole("status").filter({hasText:"Perfil e estúdio salvos na nuvem."})).toBeVisible();
+  await expect(page.getByRole("status").filter({hasText:"Perfil e estúdio atualizados com sucesso."})).toBeVisible();
   await expect(page.getByLabel("Nome do estúdio ou marca",{exact:true})).toHaveValue("Estúdio dos Crias");
   await page.screenshot({path:info.outputPath("settings.png"),fullPage:true});
   await page.getByRole("button",{name:"Escuro",exact:true}).click();
@@ -295,7 +295,7 @@ test("offline writing shows recovery, never a false cloud confirmation",async({p
   await page.getByRole("button",{name:"Salvar cliente"}).click();
   await expect(page.locator(".cloud-recovery")).toBeVisible({timeout:45000});
   await context.setOffline(false);
-  await page.getByRole("button",{name:"Recarregar dados da nuvem",exact:true}).click();
+  await page.getByRole("button",{name:"Recarregar dados",exact:true}).click();
   await expect(page.locator(".app-shell")).toBeVisible();await settled(page);
   await navigate(page,"Clientes");await expect(page.getByText("Não confirmado",{exact:true})).toHaveCount(0);
 });
@@ -312,7 +312,7 @@ test("automatic persistent cache is isolated per UID, survives reload and clears
   await page.goto(cloud);
   await login(page,"cache-"+info.project.name+"@example.com");
   await page.goto(cloud+"/configuracoes");
-  await expect(page.getByRole("heading",{name:"Zona de perigo"})).toBeVisible();
+  await expect(page.getByRole("region",{name:"Zona de perigo"})).toBeVisible();
   await expect(page.getByRole("button",{name:/Ativar cache|Desativar cache/})).toHaveCount(0);
   // Legacy opt-out is deliberately ignored. Persistence is not a user setting.
   await page.evaluate(()=>localStorage.setItem("roteiva-private-cache","disabled"));
@@ -332,7 +332,7 @@ test("automatic persistent cache is isolated per UID, survives reload and clears
   await expect(page.getByText("Cliente cache seguro",{exact:true})).toHaveCount(0);
 });
 
-test("danger zone is separate and red, no export or cache settings remain",async({page},info)=>{
+test("danger zone stays separate with explicit account deletion, no export or cache settings remain",async({page},info)=>{
   await page.goto(cloud);
   await login(page,"danger-zone-"+info.project.name+"@example.com");
   await page.goto(cloud+"/configuracoes");
@@ -344,7 +344,7 @@ test("danger zone is separate and red, no export or cache settings remain",async
   await expect(page.getByRole("button",{name:/Ativar cache|Desativar cache/})).toHaveCount(0);
   const button=zone.getByRole("button",{name:"Excluir conta",exact:true});
   await expect(button).toBeEnabled();
-  await expect(button).toHaveCSS("background-color","rgb(186, 37, 53)");
+  await expect(button).toHaveCSS("color","rgb(238, 96, 101)");
   await button.click();
   await expect(page.getByRole("dialog",{name:"Excluir sua conta?"})).toBeVisible();
   await page.getByRole("button",{name:"Cancelar"}).click();
@@ -386,3 +386,4 @@ test("removed workspace copy action stays absent on every screen while financial
     if(name==="Financeiro") await expect(page.getByRole("button",{name:"Exportar CSV"})).toBeVisible();
   }
 });
+

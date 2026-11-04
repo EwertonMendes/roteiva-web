@@ -9,6 +9,8 @@ test("native pointer works in shared dropdowns and top-layer dialogs without inj
   await expect(noOverlay).toHaveCount(0);
   await expect(page.locator("html")).not.toHaveAttribute("data-roteiva-cursor","on");
 
+  const menu=page.getByRole('button',{name:'Abrir menu',exact:true});
+  if(await menu.isVisible())await menu.click();
   await page.locator(".sidebar nav").getByRole("button",{name:"Financeiro"}).click();
   const select=page.locator(".finance-filters .rt-select-trigger").nth(3);
   await select.click();

@@ -9,6 +9,26 @@ const file={fileId:'REVIEW_FILE_12345678',name:'Corte.mp4',mimeType:'video/mp4'}
 const second={fileId:'REVIEW_FILE_22345678',name:'Corte final.mp4',mimeType:'video/mp4',thumbnailTicket:'sealed-thumb-qa'};
 const token='w'.repeat(43);
 
+test('approval shortcut is consumed and never reopens after leaving the list',async({page,context},info)=>{
+ await prepare(page,'reviews-intent-'+info.project.name+'@example.com');
+ await context.route(api+'/reviews**',route=>route.fulfill({json:{reviews:[],hasMore:false,summary:{pending:0,changes:0,approved:0}}}));
+ const nav=async(name:string)=>{
+  const menu=page.getByRole('button',{name:'Abrir menu',exact:true});if(await menu.isVisible())await menu.click();
+  await page.locator('.sidebar nav').getByRole('button',{name:new RegExp('^'+name)}).click();
+ };
+ await nav('Clientes');await page.getByText('Cliente Revisão',{exact:true}).click();
+ await page.getByRole('button',{name:/aprovação/i}).click();
+ await expect(page.locator('.review-modal-backdrop')).toBeVisible();
+ await page.getByRole('button',{name:'Fechar',exact:true}).click();
+ await nav('Projetos');await nav('Aprovações');
+ await expect(page.locator('.review-modal-backdrop')).toHaveCount(0);
+ await page.getByRole('button',{name:'Nova aprovação',exact:true}).click();
+ await expect(page.locator('.review-modal-backdrop')).toBeVisible();
+ await page.getByRole('button',{name:'Fechar',exact:true}).click();
+ await nav('Projetos');await nav('Aprovações');
+ await expect(page.locator('.review-modal-backdrop')).toHaveCount(0);
+});
+
 async function prepare(page:Page,email:string){
   await page.goto(root);
   await page.getByRole('button',{name:'Criar conta',exact:true}).click();

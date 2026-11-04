@@ -151,6 +151,12 @@ test("image-only reviews hide all video timestamp controls",async({page})=>{
   await expect(page.getByRole("heading",{name:"Avaliação da arte"})).toBeVisible();
   await expect(page.locator('iframe[title="Prévia de Capa.png"]')).toHaveCount(0);
   await expect(page.locator('img.review-private-preview-image')).toBeVisible();
+  const image=page.locator('img.review-private-preview-image');
+  const fitted=await image.evaluate(el=>el.clientWidth);
+  await page.getByRole('button',{name:'Ampliar zoom',exact:true}).click();
+  await expect.poll(()=>image.evaluate(el=>el.clientWidth)).toBeGreaterThan(fitted*1.2);
+  const compositor=await image.evaluate(el=>new DOMMatrix(getComputedStyle(el).transform).a);
+  expect(compositor,'Zoom rerasterizes at layout size instead of stretching a small GPU texture').toBe(1);
   const stage=page.locator(".review-portal-stage");
   expect(await stage.evaluate(element=>element.dispatchEvent(new MouseEvent("contextmenu",{bubbles:true,cancelable:true})))).toBe(false);
   expect(await stage.evaluate(element=>element.dispatchEvent(new Event("dragstart",{bubbles:true,cancelable:true})))).toBe(false);
@@ -184,11 +190,11 @@ test('unsupported document preview shows clear next step without blank canvas',a
 });
 
 test("portal-only PDF preview cannot expose a direct download link or iframe download permission",async({page})=>{
-  const pdf=Buffer.from("%PDF-1.4\n1 0 obj <</Type/Catalog/Pages 2 0 R>> endobj\n2 0 obj <</Type/Pages/Kids []/Count 0>> endobj\ntrailer <</Root 1 0 R>>\n%%EOF");
+  const pdf=pdfFixture();
   const headers={"Access-Control-Allow-Origin":ROOT,"Access-Control-Allow-Methods":"GET,POST,OPTIONS",
     "Access-Control-Allow-Headers":"Authorization,Content-Type,X-Review-Token"};
   await page.route(API+"/reviews/media?*",route=>route.fulfill({status:200,contentType:"application/pdf",
-    headers:{"Cache-Control":"private, no-store"},body:pdf}));
+    headers:{...headers,"Cache-Control":"private, no-store"},body:pdf}));
   await page.route(API+"/reviews/public**",async route=>{
     if(route.request().method()==="OPTIONS")return route.fulfill({status:204,headers});
     const path=new URL(route.request().url()).pathname;
@@ -203,10 +209,15 @@ test("portal-only PDF preview cannot expose a direct download link or iframe dow
     return route.fulfill({status:404,headers,body:"{}"});
   });
   await page.goto(ROOT+"/review/"+TOKEN);
-  const frame=page.locator("iframe.review-private-preview-pdf");
-  await expect(frame).toBeVisible();
-  await expect(frame).toHaveAttribute("sandbox","allow-scripts");
-  await expect(frame).toHaveAttribute("referrerpolicy","no-referrer");
+  const viewer=page.getByRole('region',{name:'PDF Roteiro.pdf'});
+  await expect(viewer.locator('.review-pdf-pages')).toHaveAttribute('aria-busy','false');
+  await expect(viewer).toContainText('Página 1 de 2');
+  expect(await viewer.locator('canvas').evaluate(el=>el.width)).toBeGreaterThan(100);
+  await page.getByRole('button',{name:'Próxima página',exact:true}).click();
+  await expect(viewer).toContainText('Página 2 de 2');
+  await expect(viewer.locator('.review-pdf-pages')).toHaveAttribute('aria-busy','false');
+  await page.getByRole('button',{name:'Ampliar PDF',exact:true}).click();
+  await expect(viewer).toContainText('125%');
   await expect(page.getByRole("link",{name:/Abrir PDF em outra aba|Abrir no Drive/})).toHaveCount(0);
   const stage=page.locator(".review-portal-stage");
   expect(await stage.evaluate(element=>element.dispatchEvent(new MouseEvent("contextmenu",{bubbles:true,cancelable:true})))).toBe(false);
@@ -242,3 +253,4 @@ test("approval videos use only native player controls, without duplicate fullscr
   await expect(page.getByRole("button",{name:/^(Ampliar vídeo|Fechar tela cheia|Fechar vídeo ampliado)$/})).toHaveCount(0);
   await expect(page.getByRole("button",{name:"Marcar este instante e comentar"})).toBeVisible();
 });
+import {pdfFixture} from './pdf-fixture';

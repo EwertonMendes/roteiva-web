@@ -373,7 +373,7 @@ export function FirebaseWorkspace() {
   }),[repository,enqueue,financePeriod,financeBars]);
   if (!user) return null;
   return <>
-    {blockingWrites && <div className="cloud-operation" role="status">Salvando na nuvem…</div>}
+    {blockingWrites && <div className="cloud-operation" role="status">Salvando alterações…</div>}
     {authError && <p className="cloud-banner" role="alert">{authError}</p>}
     {remoteChanges && !error && <section className="cloud-recovery" role="status">
       <h2>Há alterações em outro dispositivo</h2>
@@ -382,10 +382,10 @@ export function FirebaseWorkspace() {
     </section>}
     {syncWarning && !error && <p className="cloud-banner" role="status">{syncWarning}</p>}
     {error && <section className="cloud-recovery" role="alert">
-      <h2>Não foi possível confirmar o acesso à nuvem</h2><p>{error}</p>
+      <h2>Não foi possível confirmar o acesso aos dados</h2><p>{error}</p>
       {failedWrite
         ? <><p>Essa gravação não foi confirmada. Para evitar duplicações, ela não será repetida automaticamente. Ao recuperar os dados confirmados, alterações locais não salvas serão descartadas.</p>
-            <AppButton className="primary-button" disabled={saving} onClick={()=>setVersion(v=>v+1)}>Recarregar dados da nuvem</AppButton></>
+            <AppButton className="primary-button" disabled={saving} onClick={()=>setVersion(v=>v+1)}>Recarregar dados</AppButton></>
         : <p>Entre novamente para continuar. Seus dados já salvos permanecem na sua conta.</p>}
       <AppButton className="secondary-button" disabled={saving||busy} onClick={()=>void logout()}>Sair da conta</AppButton>
     </section>}

@@ -30,8 +30,8 @@ const validEmail=(value:string)=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 type ReviewSummary={pending:number;changes:number;approved:number};
 type ReviewListResult={reviews:Review[];hasMore:boolean;summary:ReviewSummary};
 const summaryStatuses=['pending','changes','approved'] as const;
-export function ReviewsDashboard({clients,projects,studioName,onLibrary,startProjectId,startClientId}:{
-  clients:Client[];projects:Project[];studioName:string;onLibrary:()=>void;startProjectId?:number;startClientId?:number
+export function ReviewsDashboard({clients,projects,studioName,onLibrary,startProjectId,startClientId,onStartConsumed}:{
+  clients:Client[];projects:Project[];studioName:string;onLibrary:()=>void;startProjectId?:number;startClientId?:number;onStartConsumed?:()=>void
 }){
   const {user}=useAuth(),call=useDriveApi(),transfers=useDriveTransfers();
   const getThumbnail=useDriveThumbnailFetch();
@@ -98,9 +98,11 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
     void loadList(controller.signal);
     return()=>controller.abort();
   },[loadList]);
-  useEffect(()=>{if(startProjectId){setProjectId(startProjectId);setClientId(startClientId||projects.find(p=>p.id===startProjectId)?.clientId||0);setComposer(true);}},
-    [startProjectId,startClientId,projects]);
-  useEffect(()=>{if(startClientId&&!startProjectId){setClientId(startClientId);setComposer(true);}},[startClientId,startProjectId]);
+  useEffect(()=>{
+    if(!startProjectId&&!startClientId)return;
+    setProjectId(startProjectId||0);setClientId(startClientId||0);setComposer(true);
+    onStartConsumed?.();
+  },[startProjectId,startClientId,onStartConsumed]);
   const relevantProjects=useMemo(()=>clientId?projects.filter(p=>p.clientId===clientId):projects,[clientId,projects]);
   useEffect(()=>{
     browseSequence.current++;searchSequence.current++;setFileSearch("");setRemote(null);setSearchBusy(false);

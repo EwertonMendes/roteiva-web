@@ -1,5 +1,37 @@
 import {test,expect,type Page} from './fixtures';
 const base='http://127.0.0.1:4173';
+
+test('Dropbox-only project covers save and reload; search has one compact focus surface',async({page},info)=>{
+ const id='bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb';
+ const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Allow-Methods':'GET, OPTIONS'};
+ await page.route('https://roteiva-api-dev.ewertonmendes9.workers.dev/integrations/drive**',route=>route.fulfill({headers,json:{connections:[]}}));
+ const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jWZkAAAAASUVORK5CYII=','base64');
+ await page.route('https://roteiva-api-dev.ewertonmendes9.workers.dev/integrations/dropbox**',route=>{
+  const path=new URL(route.request().url()).pathname;
+  if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
+  if(path.endsWith('/cover')||path.endsWith('/thumbnail'))return route.fulfill({headers,contentType:'image/png',body:png});
+  if(path.endsWith('/folders'))return route.fulfill({headers,json:{files:[{id:'id:abcdefghijk',name:'Dropbox.png',mimeType:'image/png',size:'100'}],nextPageToken:null}});
+  return route.fulfill({headers,json:{connections:[{id,email:'dropbox@example.com',status:'connected',scopes:'files.content.read'}]}});
+ });
+ await register(page,'cover-dropbox-'+info.project.name+'@example.com');
+ await page.getByRole('button',{name:'Adicionar capa',exact:true}).click();
+ await expect(page.getByRole('combobox',{name:'Conta de armazenamento'})).toContainText('Dropbox');
+ const search=page.getByPlaceholder('Nome da imagem');
+ await search.focus();
+ const shape=await search.evaluate(el=>{
+  const frame=el.closest('.rt-input-frame')!,label=el.closest('label')!;
+  return {height:frame.getBoundingClientRect().height,frame:getComputedStyle(frame).boxShadow,label:getComputedStyle(label).boxShadow};
+ });
+ expect(shape.height).toBeGreaterThanOrEqual(42);expect(shape.height).toBeLessThan(52);
+ expect(shape.frame).not.toBe('none');expect(shape.label).toBe('none');
+ await page.getByRole('button',{name:'Dropbox.png',exact:true}).click();
+ await expect(page.locator('.pc-editor-preview img')).toBeVisible();
+ await page.getByRole('button',{name:'Salvar capa',exact:true}).click();
+ await expect(page.locator('[aria-busy]').first()).toHaveAttribute('aria-busy','false');
+ await page.reload();
+ await page.getByRole('button',{name:'Editar capa',exact:true}).click();
+ await expect(page.locator('.pc-editor-preview img')).toBeVisible();
+});
 async function register(page:Page,email:string){
  await page.goto(base);await page.getByRole('button',{name:'Criar conta',exact:true}).click();
  const popupPromise=page.waitForEvent('popup');await page.getByRole('button',{name:'Cadastrar com Google',exact:true}).click();const popup=await popupPromise;await popup.waitForLoadState('load');

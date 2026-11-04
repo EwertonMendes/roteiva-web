@@ -1,5 +1,10 @@
 # Identidade visual e experiência — Roteiva
 
+## Aprovação e capas — 03/11/2026
+
+Busca de capa usa AppInput com ícone, altura do controle compartilhado e foco apenas no campo, sem halo no rótulo. Capas de projeto oferecem conexões Drive/Dropbox ativas. PDFs de aprovação têm controles de páginas e zoom no painel e portal, sem toolbar nativa de download. Mensagens usam “dados”, “salvamento” e nomes de provedores quando necessário; “alteração preparada” nunca significa persistência confirmada.
+
+
 ## Detalhes do projeto — outubro/2026
 
 O conteúdo de `/projetos/:id` segue o mockup aprovado: formulário em largura completa, checklist compacto com progresso, resumo financeiro e lançamentos editáveis, materiais e agenda. Estilos em `features/projects/project-detail.css`, limitados a `.project-detail`; barra lateral preservada. Duas colunas passam a uma em telas estreitas; temas claro/escuro, foco e navegação por teclado mantidos. Tarefas concluídas têm marca e texto além da cor. Resultado negativo recebe cor própria.

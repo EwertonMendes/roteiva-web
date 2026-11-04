@@ -121,6 +121,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
   const [dataReady, setDataReady] = useState(false);
   const [selectedProject, setSelectedProject] = useState<number | null>(initialBrowserRoute.projectId || null);
   const [selectedClient, setSelectedClient] = useState<number | null>(initialBrowserRoute.clientId || null);
+  const consumeReviewStart=useCallback(()=>setReviewStart(null),[]);
   const [reviewStart,setReviewStart]=useState<{clientId?:number;projectId?:number}|null>(null);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
@@ -275,7 +276,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     window.setTimeout(() => setToast(""), 2600);
   }, []);
 
-  function notifyChange(message: string) { notify(isDemo ? message : "Alteração preparada · confira a confirmação na nuvem"); }
+  function notifyChange(message: string) { notify(isDemo ? message : "Alteração preparada · aguarde a confirmação do salvamento"); }
 
   function addProject(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -566,7 +567,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
                   recurringCount={clientPage && !query.trim()?clientPage.recurring:undefined}
                   activeProjectsCount={clientPage && !query.trim()?projects.filter(p=>p.status!=="Aprovado" && !!p.clientId).length:undefined}
                   hasMore={!!clientPage?.hasMore&&!query.trim()} onMore={onMoreClients} />)}
-          {view === "reviews" && (isDemo ? <StudioReviews /> : <ReviewsDashboard key={reviewStart?.projectId||reviewStart?.clientId||"reviews"} clients={clientList} projects={projects} studioName={workspaceName} onLibrary={()=>changeView("library")} startClientId={reviewStart?.clientId} startProjectId={reviewStart?.projectId} />)}
+          {view === "reviews" && (isDemo ? <StudioReviews /> : <ReviewsDashboard onStartConsumed={consumeReviewStart} clients={clientList} projects={projects} studioName={workspaceName} onLibrary={()=>changeView("library")} startClientId={reviewStart?.clientId} startProjectId={reviewStart?.projectId} />)}
           {view === "finance" && <FinancePanel entries={financeEntries} clients={clientList} onPeriodChange={onFinancePeriodChange} serverBars={financeBars} onAdd={() => openFinanceModal()} onEdit={(entry) => openFinanceModal(entry)} onDelete={setDeletingFinanceEntry} />}
           {view === "calendar" && <CalendarView events={calendarEvents} onMonthChange={onCalendarMonthChange} onAdd={(date) => openEvent(null, date)} onEdit={(entry) => openEvent(entry)} onDelete={(entry) => { if (window.confirm(`Excluir o compromisso “${entry.title}”?`)) { commitCommands([{kind:"deleteEvent",id:entry.id}]); setCalendarEvents(current => current.filter(e => e.id !== entry.id)); logActivity(`Compromisso excluído: ${entry.title}`); } }} />}
           {view === "library" && <LibraryView assets={libraryAssets} query={query} onUpload={(files) => uploadAssets(files, Number(libraryProject) || undefined)} projects={projects} selectedProjectId={Number(libraryProject)||undefined} onSelectProject={setLibraryProject} />}

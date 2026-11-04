@@ -13,7 +13,7 @@ export function DriveUploadQueue({uploads,onCancel,onRetry,onDismiss}:{
   const [collapsed,setCollapsed]=useState(false);
   if(!uploads.length)return null;
   const running=uploads.filter(u=>active.has(u.status)).length;
-  return <aside className="rl-upload-queue" aria-label="Transferências para a nuvem">
+  return <aside className="rl-upload-queue" aria-label="Transferências de arquivos">
     <header className="rl-upload-heading"><span><CloudUpload size={17}/> Transferências</span><div className="rl-upload-heading-actions"><small aria-live="polite">{running?running+" em andamento":uploads.length+" arquivo(s)"}</small><AppButton type="button" aria-label={collapsed?"Expandir transferências":"Recolher transferências"} aria-expanded={!collapsed} onClick={()=>setCollapsed(value=>!value)}>{collapsed?<ChevronUp size={17}/>:<ChevronDown size={17}/>}</AppButton></div></header>
     {!collapsed&&<div className="rl-upload-items">
       {uploads.map(upload=>{

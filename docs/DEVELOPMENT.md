@@ -1,5 +1,10 @@
 # Desenvolvimento e deploy — Roteiva
 
+## QA dos seis bugs DEV — 03/11/2026
+
+PDF.js é dependência frontend travada em `pnpm-lock.yaml`; biblioteca e worker são assets locais e carregados somente na visualização PDF. Não depende de CDN. Testes de navegador de PDFs usam fixture sintética válida de duas páginas e verificam renderização, troca de página e zoom. `project-covers.spec.ts` inclui conta apenas Dropbox, foco compacto, salvamento e reload; `reviews-workflow.spec.ts` verifica consumo do atalho e retorno à rota. Rodar essas suítes em emuladores (desktop/mobile), além de `pnpm test:rules` e testes API. Nenhum teste automatizado usa dados reais.
+
+
 ## Proteção de prévias — deploy do Worker (22/10/2026)
 
 O workflow `.github/workflows/api.yml` e o ambiente `cloudflare-development` restringem o deploy do Worker à branch `master`. A validação em PR executa testes, typecheck e build, mas não publica código. A tentativa de promoção manual do PR #86 foi negada pela proteção do ambiente antes de executar a publicação. O guard manual experimental foi revertido; nenhum Worker DEV ou dado D1 foi alterado por ela. Publicação futura do código de mídia depende de merge aprovado e do pipeline normal da master, seguido de smoke tests.

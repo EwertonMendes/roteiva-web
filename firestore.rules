@@ -83,9 +83,12 @@ service cloud.firestore {
     }
     function valid_projectCover(d) {
       let fields = ["coverConnectionId","coverFileId","coverName","coverX","coverY","coverZoom"];
-      return (!d.keys().hasAny(fields) && !d.keys().hasAny(["coverModifiedTime"])) || (d.keys().hasAll(fields) &&
+      return (!d.keys().hasAny(fields) && !d.keys().hasAny(["coverModifiedTime","coverProvider"])) || (d.keys().hasAll(fields) &&
         text(d.coverConnectionId,36,36) && d.coverConnectionId.matches('^[a-zA-Z0-9-]{36}$') &&
-        text(d.coverFileId,10,200) && d.coverFileId.matches('^[A-Za-z0-9_-]+$') &&
+        d.get('coverProvider','google_drive') in ['google_drive','dropbox'] &&
+        text(d.coverFileId,10,200) &&
+        ((d.get('coverProvider','google_drive')=='google_drive' && d.coverFileId.matches('^[A-Za-z0-9_-]+$')) ||
+         (d.get('coverProvider','google_drive')=='dropbox' && d.coverFileId.matches('^id:[A-Za-z0-9_-]+$'))) &&
         text(d.coverName,1,250) &&
         d.coverX is number && d.coverX>=0 && d.coverX<=100 &&
         d.coverY is number && d.coverY>=0 && d.coverY<=100 &&
@@ -93,7 +96,7 @@ service cloud.firestore {
          (!d.keys().hasAny(["coverModifiedTime"]) || text(d.coverModifiedTime,1,80)));
     }
     function valid_projects(d,uid,id) {
-      return d.keys().hasAll(["ownerUid","schemaVersion","revision","createdAt","updatedAt","id","name","clientId","client","status","dueDate","description","template","color","initials"]) && d.keys().hasOnly(["ownerUid","schemaVersion","revision","createdAt","updatedAt","id","name","clientId","client","status","dueDate","description","template","color","initials","coverConnectionId","coverFileId","coverName","coverX","coverY","coverZoom","coverModifiedTime"]) &&
+      return d.keys().hasAll(["ownerUid","schemaVersion","revision","createdAt","updatedAt","id","name","clientId","client","status","dueDate","description","template","color","initials"]) && d.keys().hasOnly(["ownerUid","schemaVersion","revision","createdAt","updatedAt","id","name","clientId","client","status","dueDate","description","template","color","initials","coverConnectionId","coverFileId","coverName","coverX","coverY","coverZoom","coverModifiedTime","coverProvider"]) &&
         metadata(d,uid) &&
         d.id is int && d.id>0 && d.id<=9007199254740991 && string(d.id)==id &&
         text(d.name,1,200) &&

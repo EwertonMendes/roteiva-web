@@ -43,9 +43,9 @@ export function dataErrorMessage(error: unknown): string {
   const code = (error as {code?:string})?.code || "";
   if (code.includes("permission-denied")) return "Não foi possível acessar ou salvar seus dados. Entre novamente e tente outra vez.";
   if (code.includes("unauthenticated")) return "Sua sessão expirou. Saia e entre novamente.";
-  if (code.includes("unavailable") || code.includes("deadline-exceeded")) return "Sem conexão com a nuvem. As alterações não foram confirmadas. Reconecte e recarregue os dados.";
+  if (code.includes("unavailable") || code.includes("deadline-exceeded")) return "Sem conexão com o serviço. As alterações não foram confirmadas. Reconecte e recarregue os dados.";
   if (code.includes("resource-exhausted")) return "O Roteiva está temporariamente indisponível. Tente novamente mais tarde.";
-  return error instanceof Error && error.message.startsWith("Conflito") ? error.message : "Não foi possível salvar ou carregar os dados. Recarregue para recuperar a versão da nuvem.";
+  return error instanceof Error && error.message.startsWith("Conflito") ? error.message : "Não foi possível salvar ou carregar os dados. Recarregue para recuperar a versão salva.";
 }
 export class FirestoreWorkspace {
   private stored = new Map<string, Stored>();
@@ -729,7 +729,7 @@ export class FirestoreWorkspace {
       const snapshots = await Promise.all(keys.map(key => tx.get(this.ref(key))));
       keys.forEach((key,index) => {
         if ((snapshots[index].data()?.revision || 0) !== (expected.get(key)?.revision || 0)) {
-          throw new Error("Conflito: este registro mudou em outra aba ou dispositivo. Recarregue a versão da nuvem antes de editar novamente.");
+          throw new Error("Conflito: este registro mudou em outra aba ou dispositivo. Recarregue a versão salva antes de editar novamente.");
         }
       });
       keys.forEach((key,index) => {

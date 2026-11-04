@@ -300,6 +300,26 @@ test('owner image preview requires owning Firebase account, selected image and a
   assert.equal((await x.send('POST','/reviews/'+create.id+'/close',x.alice)).status,200);
   assert.equal((await x.send('GET',pathname,x.alice)).status,404);
 });
+
+test('owner PDF bytes require owner, selected document and an active review',async t=>{
+ const x=await integration(t);const {id}=await createAndPublish(x);
+ x.f.sql.prepare("UPDATE review_assets SET mime_type='application/pdf' WHERE review_id=? AND file_id=?").run(id,file);
+ const previous=globalThis.fetch;
+ globalThis.fetch=async(url,init)=>{
+  const u=new URL(String(url));
+  if(u.host==='www.googleapis.com'&&u.searchParams.get('alt')==='media')return new Response('%PDF-1.4',{headers:{'Content-Type':'application/pdf'}});
+  return previous(url,init);
+ };
+ t.after(()=>{globalThis.fetch=previous;});
+ const path='/reviews/'+id+'/document?fileId='+file;
+ const ok=await x.send('GET',path,x.alice);assert.equal(ok.status,200);
+ assert.equal(ok.headers.get('Content-Type'),'application/pdf');assert.equal(await ok.text(),'%PDF-1.4');
+ assert.equal((await x.send('GET',path,x.bob)).status,404);
+ assert.equal((await x.send('GET','/reviews/'+id+'/image?fileId='+file,x.alice)).status,404);
+ assert.equal((await x.send('GET','/reviews/'+id+'/document?fileId=OTHER_FILE_12345678',x.alice)).status,404);
+ assert.equal((await x.send('POST','/reviews/'+id+'/close',x.alice)).status,200);
+ assert.equal((await x.send('GET',path,x.alice)).status,404);
+});
 test('public video media uses signed range tickets and stops immediately after review closure',async t=>{
   const x=await integration(t);
   const {id,published}=await createAndPublish(x);
@@ -818,4 +838,27 @@ test('Dropbox originals work with the portal-first public approval and signed vi
   assert.equal(called,1);
   f.sql.prepare("UPDATE review_requests SET status='closed' WHERE id=?").run(invited.id);
   await assert.rejects(()=>reviewRouter(new Request(mediaUrl.href),f.env,mediaUrl),e=>e.status===404||e.status===409);
+});
+
+test('PDF iframe gets final scoped CSP and ticket rotation still revokes access',async t=>{
+  const x=await integration(t);
+  const {id,published}=await createAndPublish(x);
+  assert.equal(published.status,200);
+  const result=await published.json();
+  const access=result.review.review.url.split('/').at(-1);
+  x.f.sql.prepare("UPDATE review_assets SET mime_type='application/pdf' WHERE review_id=? AND file_id=?").run(id,file);
+  const issued=await route(x.f,access,'/reviews/public/media-ticket','POST',{fileId:file});
+  assert.equal(issued.status,200);
+  const {url}=await issued.json();
+  const headers={Range:'bytes=0-','Sec-Fetch-Mode':'navigate','Sec-Fetch-Dest':'iframe'};
+  const response=await handle(new Request(url,{headers}),x.env);
+  assert.equal(response.status,206);
+  assert.equal(response.headers.get('Content-Type'),'application/pdf');
+  assert.equal(response.headers.get('Content-Security-Policy'),"default-src 'none'; frame-ancestors "+x.env.FRONTEND_ORIGIN);
+  assert.equal(response.headers.get('Content-Range'),'bytes 0-3/100');
+  await response.arrayBuffer();
+  assert.equal((await x.send('POST','/reviews/'+id+'/rotate',x.alice)).status,200);
+  const revoked=await handle(new Request(url,{headers}),x.env);
+  assert.equal(revoked.status,404);
+  assert.match(revoked.headers.get('Content-Security-Policy'),/frame-ancestors 'none'/);
 });
