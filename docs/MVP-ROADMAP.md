@@ -2,7 +2,7 @@
 
 ## Seis bugs DEV — 03/11/2026
 
-**IMPLEMENTADO EM BRANCH; HOMOLOGAÇÃO DEV EM ANDAMENTO.** PR #109 ampliado por solicitação do proprietário para os seis relatos.
+**IMPLEMENTADO, PUBLICADO EM DEV E VALIDADO nos cenários relatados em Chrome real (desktop e viewport mobile).** PR [#109](https://github.com/EwertonMendes/roteiva-web/pull/109) mergeado após autorização explícita. Commit publicado: `7e1b199fb92b054558d09c07e5499c4d6ca9c4df`.
 
 - [x] Imagens: preservar fonte original e renderizar dimensões finais do zoom no layout, sem ampliar textura reduzida via compositor. Nenhuma recodificação no upload.
 - [x] PDF: visualizador PDF.js compartilhado, carregado sob demanda, com páginas, zoom, cancelamento e raster limitado; proprietário acessa somente PDF selecionado da revisão autenticada. Portal mantém tickets e ranges.
@@ -10,7 +10,10 @@
 - [x] Navegação: intenção de abrir aprovação é consumida após copiar o contexto; voltar à listagem não reabre o modal.
 - [x] Vocabulário: removido “nuvem” dos textos ativos; operação preparada continua distinguida de salvamento confirmado.
 - [x] 34 testes de regras Firestore A/B e 56 testes da API de aprovação/mídia/política passaram localmente; TypeScript frontend/API aprovado.
-- [ ] Concluir navegador desktop/mobile, CI, publicação DEV e homologação real dos seis itens, incluindo integridade de imagens. Evidências finais devem ser registradas no PR.
+- [x] Regressão integral local e [remota](https://github.com/EwertonMendes/roteiva-web/actions/runs/41756231186): 145 testes browser aprovados, 5 ignorados preexistentes; 34 testes Firestore A/B. CI frontend/API/acesso/regras verde.
+- [x] Deploy [Hosting DEV](https://github.com/EwertonMendes/roteiva-web/actions/runs/41757496951), [Worker DEV](https://github.com/EwertonMendes/roteiva-web/actions/runs/41757496968) e [regras DEV](https://github.com/EwertonMendes/roteiva-web/actions/runs/41757496918) confirmados.
+- [x] QA real: PNG sintético 2400×1600 e PDF válido de duas páginas enviados pela aprovação a Drive/Dropbox; PDF no painel e portal, páginas/zoom; imagem original e zoom; capa Dropbox salva e recarregada; campo de busca 46 px com foco somente no controle; criação por atalho, saída e retorno sem modal; mensagens sem “nuvem”. Apenas fixtures identificadas, sem excluir dados reais ou enviar mensagens.
+- Limites da evidência: original baixado do Drive tem SHA-256 idêntico à fixture; imagem Dropbox preserva dimensões e aparência na prévia original. Download oficial do Dropbox não produziu arquivo/evento no navegador automatizado, portanto não há comparação binária independente do original Dropbox. Safari/iOS físico não homologado nesta rodada. Não generalizar os testes Chrome para todos os navegadores.
 
 
 O escopo inicial de CSP/PDF do PR #109 foi incorporado ao conjunto acima. O visualizador atual usa canvas; a política de incorporação restrita permanece para compatibilidade de clientes anteriores durante o rollout. Os seis relatos são tratados no mesmo PR por solicitação explícita do proprietário.

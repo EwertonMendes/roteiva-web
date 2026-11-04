@@ -2,7 +2,7 @@
 
 ## Correções de aprovação e capas — 03/11/2026
 
-**DECISÃO TOMADA / IMPLEMENTADO EM BRANCH:** PDFs são renderizados por PDF.js em canvas, uma página por vez, com worker local carregado sob demanda, ranges no portal e raster máximo de 16 milhões de pixels. O painel usa `/reviews/:id/document`, com identidade Firebase, dono, versão atual, seleção/grant, estado e expiração verificados; apenas PDF, até 24 MiB, sem tokens de armazenamento no cliente. O endpoint de imagem continua exclusivo de imagens. CSP restritiva e ticket/revogação permanecem válidos; o tratamento de iframe do PR permite compatibilidade com frontend anterior durante publicação gradual.
+**DECISÃO TOMADA / IMPLEMENTADO E PUBLICADO EM DEV (PR #109):** PDFs são renderizados por PDF.js em canvas, uma página por vez, com worker local carregado sob demanda, ranges no portal e raster máximo de 16 milhões de pixels. O painel usa `/reviews/:id/document`, com identidade Firebase, dono, versão atual, seleção/grant, estado e expiração verificados; apenas PDF, até 24 MiB, sem tokens de armazenamento no cliente. O endpoint de imagem continua exclusivo de imagens. CSP restritiva e ticket/revogação permanecem válidos; o tratamento de iframe do PR permite compatibilidade com frontend anterior durante publicação gradual.
 
 Capas de projeto persistem `coverProvider` opcional (ausente = Drive legado), com pareamento estrito Drive/ID ou Dropbox/`id:` nas regras de create/update. Apenas metadados de recorte são gravados. Imagens ampliadas são rasterizadas no tamanho final de layout; a fonte original e os bytes de upload permanecem intactos. A intenção de abrir aprovação é transitória, consumida pelo componente filho após copiar cliente/projeto; não depende de atualizações de coleções.
 
