@@ -1,5 +1,10 @@
 # Arquitetura do Roteiva — MVP SaaS
 
+## Decisão — política de incorporação PDF (03/11/2026)
+
+**IMPLEMENTADO EM BRANCH, EM VALIDAÇÃO:** a política final de respostas em `api/src/response-policy.ts` autoriza `frame-ancestors https://roteiva-web-dev.web.app` apenas para respostas 2xx PDF em `/reviews/media` e `/integrations/dropbox/media`. Não depende do header Origin do iframe. Erros, JSON e outros tipos/rotas mantêm `frame-ancestors 'none'`; diretivas de rota como sandbox de SVG são preservadas. Tokens, revisão, participante e conexão continuam validados antes da política. Cache segue no-store. Nenhum escopo OAuth, ACL ou schema foi alterado. Alternativa de remover CSP globalmente foi descartada; viewer próprio permanece condicionado ao QA real de compatibilidade.
+
+
 **Decisão CI/CD (01/11/2026):** validações de navegador disparadas por PR/push são um subconjunto *smoke* nomeado `@ci-smoke`, com fluxo de autorização, isolamento entre contas, revisão pública/restrita e Drive (capas permanecem na regressão integral). O check exigido por promoções DEV conserva seu nome. A regressão integral de Playwright + regras de segurança permanece agendada em `qa-regression.yml` e disponível manualmente; E2E isolado não agenda uma segunda regressão idêntica. Mudanças críticas continuam exigindo execução integral manual antes do merge. Cache versionado armazena apenas executáveis de navegador/emulador, não dados, tokens ou artefatos privados. Sem mudanças de runtime, Firestore, D1, OAuth ou deploy.
 
 
