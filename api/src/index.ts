@@ -1,3 +1,4 @@
+import {applyResponsePolicy} from './response-policy.ts';
 import {listCoverImages,coverImage,dropboxCoverImage,fastCoverPreview} from './project-covers.ts';
 import { ApiError, type Env } from './types.ts';
 import { reviewRouter,cleanupExpiredReviews } from './reviews.ts';
@@ -15,10 +16,6 @@ import { backfillAccess } from './access-backfill.ts';
 import {dropboxEnabled,dropboxStart,dropboxLaunch,dropboxCallback,dropboxConnections,dropboxList,dropboxMetadata,dropboxRevoke,dropboxThumbnail} from './dropbox.ts';
 import {startDropboxUpload,appendDropboxUpload,finishDropboxUpload,cleanupDropboxUploads} from './dropbox-uploads.ts';
 import {issueDropboxPreview,streamDropboxPreview} from './dropbox-preview.ts';
-const headers = {
-  'Cache-Control':'no-store', 'Referrer-Policy':'no-referrer',
-  'X-Content-Type-Options':'nosniff', 'Content-Security-Policy':"default-src 'none'; frame-ancestors 'none'",
-};
 /** Route categories are intentionally static: never log tokens, file IDs or URL params. */
 function operationName(path:string):string{
   if(path.endsWith('/thumbnail')||path.endsWith('/cover')||path==='/reviews/media')return 'thumbnail_or_media';
@@ -230,8 +227,7 @@ export async function handle(request: Request, env: Env): Promise<Response> {
     // Only categorical events. Never emit Request, URL, exception, headers or provider bodies.
     if (!known) console.error(JSON.stringify({event:'dependency_failure',requestId:id}));
   }
-  const result = new Response(response.body,response);
-  Object.entries(headers).forEach(([name,value])=>result.headers.set(name,value));
+  const result = applyResponsePolicy(response,url.pathname,env.FRONTEND_ORIGIN);
   result.headers.set('X-Request-Id',id);
   result.headers.set('Vary','Origin');
   if (origin === env.FRONTEND_ORIGIN) {
