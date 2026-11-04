@@ -13,14 +13,7 @@
 - [ ] Concluir navegador desktop/mobile, CI, publicação DEV e homologação real dos seis itens, incluindo integridade de imagens. Evidências finais devem ser registradas no PR.
 
 
-## Bugs DEV — PDF na aprovação (03/11/2026)
-
-**PARCIAL — correção em branch, sem publicação:** política final permite iframe somente para PDF com resposta 2xx nas rotas de mídia com ticket, pela origem DEV exata. JSON, erros e demais conteúdos continuam sem incorporação. Testes de política e integração com rotação de ticket adicionados; CI e homologação real pendentes. Não declara resolvida toda incompatibilidade de PDF.
-
-- [x] Corrigir conflito entre iframe PDF e CSP global, preservando sandbox de SVG.
-- [ ] Validar CI frontend/API e headers finais de 200/206 e erros.
-- [ ] Homologar PDFs multipágina Drive/Dropbox no proprietário e portal, desktop/mobile/Safari; verificar sandbox nativo, zoom e páginas posteriores.
-- [ ] Demais relatos: qualidade de imagens, campo da capa, Dropbox nas capas, reabertura do modal e textos com “nuvem” continuam PLANEJADOS para PRs separados.
+O escopo inicial de CSP/PDF do PR #109 foi incorporado ao conjunto acima. O visualizador atual usa canvas; a política de incorporação restrita permanece para compatibilidade de clientes anteriores durante o rollout. Os seis relatos são tratados no mesmo PR por solicitação explícita do proprietário.
 
 
 ## Configurações — fidelidade ao mockup (01/11/2026)

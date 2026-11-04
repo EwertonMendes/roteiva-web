@@ -1,5 +1,7 @@
 # Roteiva
 
+**Correções de mídia e capas (PR #109):** visualização PDF com páginas/zoom no painel e portal, ampliação de imagens no tamanho final, capas de projeto Drive/Dropbox com recorte persistido, busca compacta e retorno à listagem de aprovações com modal fechado. Resultados de testes e situação da publicação/homologação ficam no [roadmap](docs/MVP-ROADMAP.md).
+
 **Detalhes do projeto:** conteúdo reorganizado com checklist compacto e progresso, financeiro com lançamentos editáveis, agenda e acesso aos materiais vinculados no Drive pela Biblioteca. Compatível com claro/escuro e celular; lateral preservada. QA automatizado e limites da homologação no [roadmap](docs/MVP-ROADMAP.md).
 
 > **Aprovações:** o fluxo MVP está implementado e passou pela regressão automatizada local na [PR #55](https://github.com/EwertonMendes/roteiva-web/pull/55), ainda draft. Consulte [docs/REVIEWS-MVP.md](docs/REVIEWS-MVP.md) para resultados, segurança e aceite. A integração foi publicada no DEV existente para homologação, por autorização do proprietário e sem merge; os fluxos centrais foram homologados com Google Drive real, com limitações de Picker/dispositivos explicitadas no documento.
