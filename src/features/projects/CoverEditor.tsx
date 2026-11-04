@@ -20,7 +20,7 @@ export function CoverEditor({project,client,onClose,onSave}:{project?:Project;cl
  const subject=client||project!;
  const context=useDriveCovers()!;const call=useDriveApi();const getDriveThumbnail=useDriveThumbnailFetch();
  const {user}=useAuth();
- const choices=context.connections.filter(c=>client||c.provider==='google_drive');
+ const choices=context.connections;
  const stored=client?.photo||project?.cover;
  const dialog=useRef<HTMLDialogElement>(null);
  const [account,setAccount]=useState(stored?.connectionId||'');
@@ -125,7 +125,7 @@ export function CoverEditor({project,client,onClose,onSave}:{project?:Project;cl
     {context.loadingConnections&&<p className="pc-connection-status" role="status">Verificando Google Drive e Dropbox conectados…</p>}
     {context.error&&<div className="pc-connection-status pc-connection-status--warning" role="alert"><span>{context.error}</span><AppButton type="button" className="secondary-button" disabled={context.loadingConnections} onClick={context.retryConnections}>Atualizar conexões</AppButton></div>}
     {!context.loadingConnections&&!choices.length&&!context.error&&<p className="pc-connection-status" role="status">Nenhuma conta com acesso ativo. Conecte o Google Drive ou Dropbox na <a href="/biblioteca">Biblioteca</a>.</p>}
-    <div className="pc-picker-tools"><label>Armazenamento<AppSelect aria-label="Conta de armazenamento" value={account} onValueChange={value=>{setAccount(value);setFolderTrail([]);setPage({files:[],nextPageToken:null});setMoreToken('');}}>{choices.map(c=><option key={c.id} value={c.id}>{c.provider==='dropbox'?'Dropbox · ':'Drive · '}{c.google_email}</option>)}</AppSelect></label><label className="pc-image-search"><span>Buscar imagens {provider==='dropbox'?'no Dropbox':'no Drive'}</span><div><Search size={18}/><AppInput value={search} onChange={e=>setSearch(e.target.value)} placeholder="Nome da imagem" maxLength={100}/></div></label></div>
+    <div className="pc-picker-tools"><label>Armazenamento<AppSelect aria-label="Conta de armazenamento" value={account} onValueChange={value=>{setAccount(value);setFolderTrail([]);setPage({files:[],nextPageToken:null});setMoreToken('');}}>{choices.map(c=><option key={c.id} value={c.id}>{c.provider==='dropbox'?'Dropbox · ':'Drive · '}{c.google_email}</option>)}</AppSelect></label><label className="pc-search-label" htmlFor="pc-image-query"><span>Buscar imagens {provider==='dropbox'?'no Dropbox':'no Drive'}</span><AppInput id="pc-image-query" leading={<Search size={18}/>} value={search} onChange={e=>setSearch(e.target.value)} placeholder="Nome da imagem" maxLength={100}/></label></div>
     <p className="pc-helper pc-picker-guidance">Escolha uma pasta ou uma imagem. JPG, PNG, WebP{provider==='google_drive'?' ou AVIF':''}, até 8 MB. Seus arquivos permanecem privados.</p>
     {folderTrail.length>0&&<nav className="pc-folder-trail" aria-label="Pasta de imagens"><AppButton type="button" onClick={()=>{setFolderTrail([]);setPage({files:[],nextPageToken:null});setMoreToken('');}}>Meu {provider==='dropbox'?'Dropbox':'Drive'}</AppButton>{folderTrail.map((folder,i)=><span key={folder.id}><ChevronRight size={14}/><AppButton type="button" onClick={()=>{setFolderTrail(current=>current.slice(0,i+1));setPage({files:[],nextPageToken:null});setMoreToken('');}}>{folder.name}</AppButton></span>)}</nav>}
     {!currentAccount?null:!canRead?<p role="status">Esta conexão do Google Drive não possui permissão de leitura de imagens. Reconecte a conta na <a href="/biblioteca">Biblioteca</a> e autorize o acesso de leitura.</p>:<>

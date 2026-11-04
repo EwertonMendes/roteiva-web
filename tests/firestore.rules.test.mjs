@@ -642,6 +642,20 @@ test('project covers validate create/update, require complete fields and preserv
  await assertSucceeds(updateDoc(ref,{...removed,revision:3,updatedAt:serverTimestamp()}));
 });
 
+test('Dropbox project covers validate provider pairing on create/update with owner isolation',async()=>{
+ const ref=doc(dbFor('alice'),'users/alice/projects/10');
+ const cover={coverProvider:'dropbox',coverConnectionId:'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa',coverFileId:'id:abcdefghijk',coverName:'Capa.png',coverX:50,coverY:50,coverZoom:1};
+ for(const invalid of [{coverProvider:'other'},{coverProvider:'google_drive'},{coverFileId:'drive_12345678'},{coverProvider:'dropbox',coverFileId:'https://evil.test/x'}]){
+  await assertFails(setDoc(ref,{...project,...cover,...invalid,...meta('alice')}));
+ }
+ await assertSucceeds(setDoc(ref,{...project,...cover,...meta('alice')}));
+ await assertFails(getDoc(doc(dbFor('bob'),'users/alice/projects/10')));
+ await assertFails(updateDoc(doc(dbFor('bob'),'users/alice/projects/10'),{coverX:20,revision:2,updatedAt:serverTimestamp()}));
+ await assertFails(updateDoc(ref,{coverProvider:'google_drive',revision:2,updatedAt:serverTimestamp()}));
+ await assertSucceeds(updateDoc(ref,{coverX:25,revision:2,updatedAt:serverTimestamp()}));
+ await assertSucceeds(updateDoc(ref,{...Object.fromEntries(Object.keys(cover).map(k=>[k,deleteField()])),revision:3,updatedAt:serverTimestamp()}));
+});
+
 test('private client photos validate provider, crop, complete metadata and owner access',async()=>{
  const alice=dbFor('alice'),bob=dbFor('bob');
  const ref=doc(alice,'users/alice/clients/10');

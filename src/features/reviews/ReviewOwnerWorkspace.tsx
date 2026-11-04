@@ -7,6 +7,7 @@ import {CheckCircle2,ChevronRight,Clock3,Copy,ExternalLink,FileAudio,FileImage,F
 import {formatReviewTime} from "./review-timecode";
 import {useDriveApi} from "../drive/drive-api";
 import {ReviewImageViewer} from "./ReviewImageViewer";
+import {ReviewPdfViewer} from "./ReviewPdfViewer";
 import {useOwnerReviewImage} from "./useOwnerReviewImage";
 import {DriveThumbnail} from "../drive/DriveThumbnail";
 import {useDriveThumbnailFetch} from "../drive/useDriveThumbnailFetch";
@@ -141,12 +142,13 @@ export function ReviewOwnerWorkspace({detail,working,error,onClose,onRevise,onPu
   const blocked=review.status==="closed";
   const previewable=active&&active.grantState==="granted"&&!blocked;
   const isImage=Boolean(active?.mimeType.startsWith("image/"));
-  const imagePreview=useOwnerReviewImage(review.id,isImage?active?.fileId:undefined,
-    Boolean(isImage&&previewable));
+  const isPdf=active?.mimeType==='application/pdf';
+  const imagePreview=useOwnerReviewImage(review.id,isImage||isPdf?active?.fileId:undefined,
+    Boolean((isImage||isPdf)&&previewable),isPdf);
   const showMaterials=review.status!=="draft"||currentAssets.length>0;
   const [dropboxPreview,setDropboxPreview]=useState<{fileId:string;url:string;error:string}>({fileId:'',url:'',error:''});
   useEffect(()=>{
-    if(!previewable||!active||active.provider!=='dropbox'||isImage){
+    if(!previewable||!active||active.provider!=='dropbox'||isImage||isPdf){
       setDropboxPreview({fileId:'',url:'',error:''});return;
     }
     let alive=true;
@@ -286,9 +288,9 @@ export function ReviewOwnerWorkspace({detail,working,error,onClose,onRevise,onPu
                   aria-label={'Abrir '+(active.provider==='dropbox'?'Dropbox':'arquivo '+active.name+' no Google Drive')}><ExternalLink size={14}/> Abrir arquivo</a>}
               </div></div>
             <div className={"rowner-preview-stage"+(isImage?" is-image":"")}>
-              {previewable&&isImage?(
+              {previewable&&(isImage||isPdf)?(
                 imagePreview.fileId===active?.fileId&&imagePreview.url?
-                  <ReviewImageViewer key={active.fileId} src={imagePreview.url} name={active.name}/>:
+                  isPdf?<ReviewPdfViewer key={active.fileId} src={imagePreview.url} name={active.name}/>:<ReviewImageViewer key={active.fileId} src={imagePreview.url} name={active.name}/>:
                   <div className="rowner-preview-empty" role="status">
                     {imagePreview.fileId===active?.fileId&&imagePreview.error?
                       <><ShieldCheck size={24}/><p>{imagePreview.error}</p></>:

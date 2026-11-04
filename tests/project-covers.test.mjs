@@ -5,6 +5,14 @@ import {coverGeometry,dragCover,transformCover,coverGesture} from '../src/featur
 import {emptyWorkspace} from '../src/domain/workspace.ts';
 import {encodeWorkspace,decodeWorkspace} from '../src/data/workspace-codec.ts';
 const cover={connectionId:'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa',fileId:'photo_123456789',name:'Capa.jpg',x:50,y:50,zoom:1};
+
+test('Dropbox project cover preserves provider and opaque file ID after reload',()=>{
+ const workspace=emptyWorkspace();
+ workspace.projects=[{id:2,name:'Dropbox',cover:{...cover,provider:'dropbox',fileId:'id:abcdefghijk'}}];
+ const encoded=encodeWorkspace(workspace);
+ assert.equal(encoded.get('projects/2').coverProvider,'dropbox');
+ assert.deepEqual(decodeWorkspace(encoded).projects[0].cover,workspace.projects[0].cover);
+});
 test('landscape/portrait crops fill the frame, drag clamps and zoom preserves focal coordinates',()=>{
  for(const [iw,ih] of [[1600,900],[900,1600],[1000,1000]]){
   const g=coverGeometry(500,200,iw,ih,cover);assert.ok(g.width>=500&&g.height>=200);assert.ok(g.left<=0&&g.top<=0);

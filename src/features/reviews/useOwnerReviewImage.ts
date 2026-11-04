@@ -9,7 +9,7 @@ type State={fileId:string;url:string;loading:boolean;error:string};
  * No Google access tokens or private URLs are embedded in markup. Object URLs
  * live only in this modal, are LRU-bounded, and are revoked on unmount.
  */
-export function useOwnerReviewImage(reviewId:string,fileId:string|undefined,enabled:boolean):State{
+export function useOwnerReviewImage(reviewId:string,fileId:string|undefined,enabled:boolean,document=false):State{
   const {user}=useAuth();
   const urls=useRef(new Map<string,string>());
   const [state,setState]=useState<State>({fileId:"",url:"",loading:false,error:""});
@@ -19,7 +19,7 @@ export function useOwnerReviewImage(reviewId:string,fileId:string|undefined,enab
       setState({fileId:"",url:"",loading:false,error:""});
       return;
     }
-    const key=reviewId+":"+fileId;
+    const key=reviewId+":"+fileId+":"+document;
     const cached=urls.current.get(key);
     if(cached){
       // Keep frequent material switching instantaneous.
@@ -35,14 +35,14 @@ export function useOwnerReviewImage(reviewId:string,fileId:string|undefined,enab
         for(let attempt=0;attempt<2;attempt++){
           const token=await user.getIdToken(attempt===1);
           if(controller.signal.aborted)return;
-          response=await fetch(API+"/reviews/"+encodeURIComponent(reviewId)+"/image?fileId="+
+          response=await fetch(API+"/reviews/"+encodeURIComponent(reviewId)+(document?"/document":"/image")+"?fileId="+
             encodeURIComponent(fileId),{headers:{Authorization:"Bearer "+token},
             cache:"no-store",signal:controller.signal});
           if(response.status!==401)break;
         }
         if(!response?.ok)throw new Error("Não foi possível carregar a imagem. Confira a conexão com o Google Drive.");
         const mime=(response.headers.get("Content-Type")||"").split(";")[0];
-        if(!mime.startsWith("image/"))throw new Error("O arquivo recebido não é uma imagem.");
+        if(document?mime!=="application/pdf":!mime.startsWith("image/"))throw new Error("O formato recebido não corresponde ao material.");
         const size=Number(response.headers.get("Content-Length")||0);
         if(size>MAX_IMAGE_BYTES)throw new Error("A imagem é grande demais para a prévia. Abra no Google Drive.");
         const blob=await response.blob();
@@ -62,6 +62,6 @@ export function useOwnerReviewImage(reviewId:string,fileId:string|undefined,enab
       }
     })();
     return()=>controller.abort();
-  },[enabled,fileId,reviewId,user]);
+  },[enabled,fileId,reviewId,user,document]);
   return state;
 }

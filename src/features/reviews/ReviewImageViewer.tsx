@@ -139,7 +139,11 @@ export function ReviewImageViewer({src,name,onError}:{src:string;name:string;onE
       <img className="review-private-preview-image" src={src} alt={name} draggable={false}
         onLoad={e=>setNatural({x:e.currentTarget.naturalWidth,y:e.currentTarget.naturalHeight})}
         onError={onError}
-        style={{transform:`translate(${view.x}px, ${view.y}px) scale(${view.scale})`}}/>
+        style={natural&&size.x&&size.y?{
+          width:natural.x*Math.min(size.x/natural.x,size.y/natural.y)*view.scale,
+          height:natural.y*Math.min(size.x/natural.x,size.y/natural.y)*view.scale,
+          left:'50%',top:'50%',transform:`translate(calc(-50% + ${view.x}px), calc(-50% + ${view.y}px))`
+        }:undefined}/>
     </div>
     <ZoomToolbar className="review-image-toolbar" value={view.scale} min={1} max={MAX_SCALE}
       onDecrease={()=>changeZoom(view.scale/1.3)}

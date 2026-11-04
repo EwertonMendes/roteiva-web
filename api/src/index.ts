@@ -47,8 +47,8 @@ export async function handle(request: Request, env: Env): Promise<Response> {
     if (request.method === 'OPTIONS') {
       if (!origin) throw new ApiError(403,'origin_required');
       response = new Response(null,{status:204,headers:{
-        'Access-Control-Allow-Methods':'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers':'Authorization, Content-Type, X-Review-Token','Access-Control-Max-Age':'3600',
+        'Access-Control-Allow-Methods':'GET, HEAD, POST, OPTIONS',
+        'Access-Control-Allow-Headers':'Authorization, Content-Type, X-Review-Token, Range','Access-Control-Max-Age':'3600',
       }});
     } else if (!(await ((url.pathname.endsWith('/thumbnail')||url.pathname.endsWith('/cover')||url.pathname==='/reviews/media') ? env.API_THUMB_LIMIT : env.API_RATE_LIMIT)
         .limit({key:'dev:ip:'+sourceIp.slice(0,64)})).success) {

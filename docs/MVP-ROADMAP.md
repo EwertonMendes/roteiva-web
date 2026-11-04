@@ -1,5 +1,18 @@
 # Roadmap vivo — Roteiva MVP
 
+## Seis bugs DEV — 03/11/2026
+
+**IMPLEMENTADO EM BRANCH; HOMOLOGAÇÃO DEV EM ANDAMENTO.** PR #109 ampliado por solicitação do proprietário para os seis relatos.
+
+- [x] Imagens: preservar fonte original e renderizar dimensões finais do zoom no layout, sem ampliar textura reduzida via compositor. Nenhuma recodificação no upload.
+- [x] PDF: visualizador PDF.js compartilhado, carregado sob demanda, com páginas, zoom, cancelamento e raster limitado; proprietário acessa somente PDF selecionado da revisão autenticada. Portal mantém tickets e ranges.
+- [x] Capas: campo usa AppInput com ícone e uma única superfície de foco; Dropbox habilitado no editor, codecs e regras, preservando documentos Drive legados.
+- [x] Navegação: intenção de abrir aprovação é consumida após copiar o contexto; voltar à listagem não reabre o modal.
+- [x] Vocabulário: removido “nuvem” dos textos ativos; operação preparada continua distinguida de salvamento confirmado.
+- [x] 34 testes de regras Firestore A/B e 56 testes da API de aprovação/mídia/política passaram localmente; TypeScript frontend/API aprovado.
+- [ ] Concluir navegador desktop/mobile, CI, publicação DEV e homologação real dos seis itens, incluindo integridade de imagens. Evidências finais devem ser registradas no PR.
+
+
 ## Bugs DEV — PDF na aprovação (03/11/2026)
 
 **PARCIAL — correção em branch, sem publicação:** política final permite iframe somente para PDF com resposta 2xx nas rotas de mídia com ticket, pela origem DEV exata. JSON, erros e demais conteúdos continuam sem incorporação. Testes de política e integração com rotação de ticket adicionados; CI e homologação real pendentes. Não declara resolvida toda incompatibilidade de PDF.

@@ -14,7 +14,7 @@ function ProjectCard({project,onOpen,onEdit,eager=false}:{project:Project;onOpen
  const context=useDriveCovers();const box=useRef<HTMLElement>(null);const [visible,setVisible]=useState(eager);
  useEffect(()=>{if(eager||visible)return;const observer=new IntersectionObserver(([entry])=>{if(entry.isIntersecting){setVisible(true);observer.disconnect();}},{rootMargin:'320px'});if(box.current)observer.observe(box.current);return ()=>observer.disconnect();},[eager,visible]);
  const {src,error,loading}=useCoverImage(project.cover,eager||visible,true,true);
- const canEdit=!!context?.connections.some(c=>c.provider==='google_drive');
+ const canEdit=!!context?.connections.length;
  const hasCover=!!project.cover;
  return <article className="pc-card" ref={box}>
   <div className={"pc-photo"+(hasCover?"":" pc-photo--empty")} data-cover-state={!hasCover?"empty":src?"loaded":error?"unavailable":loading?"loading":"pending"}>
@@ -47,7 +47,7 @@ function ProjectsGrid({projects,statusFilter,setStatusFilter,onOpen,onSaveCover,
    {!projects.length&&<div className="empty-state"><FolderOpen size={32}/><h3>{statusFilter==='Todos'?'Nenhum projeto encontrado':'Nenhum projeto nesta situação'}</h3><p>{statusFilter==='Todos'?'Crie um projeto ou ajuste sua busca para continuar.':'Selecione outra situação para ver seus projetos.'}</p></div>}
    {hasMore&&<div className="pc-more"><AppButton type="button" className="secondary-button" onClick={onMore}>Carregar mais projetos<ChevronDown size={16}/></AppButton></div>}
   </section>
-  {project&&context?.connections.some(c=>c.provider==='google_drive')?<CoverEditor key={project.id} project={project} onClose={()=>setEditing(null)} onSave={cover=>onSaveCover(project.id,cover)}/>:null}
+  {project&&context?.connections.length?<CoverEditor key={project.id} project={project} onClose={()=>setEditing(null)} onSave={cover=>onSaveCover(project.id,cover)}/>:null}
  </>;
 }
-export function ProjectsView(props:Props){return isDemo?<ProjectsGrid {...props}/>:<DriveCoversProvider><ProjectsGrid {...props}/></DriveCoversProvider>;}
+export function ProjectsView(props:Props){return isDemo?<ProjectsGrid {...props}/>:<DriveCoversProvider includeDropbox><ProjectsGrid {...props}/></DriveCoversProvider>;}

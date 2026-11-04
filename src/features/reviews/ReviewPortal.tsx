@@ -7,6 +7,7 @@ import {Check,CheckCircle2,Clock3,ExternalLink,FileAudio,FileImage,FileText,File
 import {useAuth} from "../auth/AuthProvider";
 import {useOverlayFocus} from "../drive/DriveLibraryUI";
 import {ReviewImageViewer} from "./ReviewImageViewer";
+import {ReviewPdfViewer} from "./ReviewPdfViewer";
 import {useReviewBrowserGuards} from "./useReviewBrowserGuards";
 import {ReviewMediaSessionCache,type MediaTicket} from "./review-media-cache";
 import {captureReviewPlayback,formatReviewTime,maskReviewTime,parseReviewTime,validReviewSecond} from "./review-timecode";
@@ -267,8 +268,7 @@ export function ReviewPortal({token}:{token:string}){
                   <ReviewImageViewer key={active.fileId} src={previewUrl} name={active.name}
                     onError={()=>{setPreviewError("O navegador não conseguiu exibir esta imagem. Peça ao profissional uma versão compatível.");setMediaMode("error");}}/>}
                 {active&&previewMode==="ready"&&active.mimeType==="application/pdf"&&
-                  <iframe className="review-private-preview-pdf" src={previewUrl}
-                    title={"Prévia PDF de "+active.name} sandbox="allow-scripts" referrerPolicy="no-referrer"/>}
+                  <ReviewPdfViewer src={previewUrl} name={active.name}/>}
                 {active&&previewMode==="ready"&&active.mimeType.startsWith("audio/")&&
                   <div className="review-private-preview-audio"><FileAudio size={32}/><audio controls controlsList="nodownload noremoteplayback" src={previewUrl}
                     onError={()=>{setPreviewError("Este áudio não pôde ser reproduzido. Peça ao profissional uma versão compatível.");setMediaMode("error");}}/></div>}

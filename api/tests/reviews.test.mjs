@@ -300,6 +300,26 @@ test('owner image preview requires owning Firebase account, selected image and a
   assert.equal((await x.send('POST','/reviews/'+create.id+'/close',x.alice)).status,200);
   assert.equal((await x.send('GET',pathname,x.alice)).status,404);
 });
+
+test('owner PDF bytes require owner, selected document and an active review',async t=>{
+ const x=await integration(t);const {id}=await createAndPublish(x);
+ x.f.sql.prepare("UPDATE review_assets SET mime_type='application/pdf' WHERE review_id=? AND file_id=?").run(id,file);
+ const previous=globalThis.fetch;
+ globalThis.fetch=async(url,init)=>{
+  const u=new URL(String(url));
+  if(u.host==='www.googleapis.com'&&u.searchParams.get('alt')==='media')return new Response('%PDF-1.4',{headers:{'Content-Type':'application/pdf'}});
+  return previous(url,init);
+ };
+ t.after(()=>{globalThis.fetch=previous;});
+ const path='/reviews/'+id+'/document?fileId='+file;
+ const ok=await x.send('GET',path,x.alice);assert.equal(ok.status,200);
+ assert.equal(ok.headers.get('Content-Type'),'application/pdf');assert.equal(await ok.text(),'%PDF-1.4');
+ assert.equal((await x.send('GET',path,x.bob)).status,404);
+ assert.equal((await x.send('GET','/reviews/'+id+'/image?fileId='+file,x.alice)).status,404);
+ assert.equal((await x.send('GET','/reviews/'+id+'/document?fileId=OTHER_FILE_12345678',x.alice)).status,404);
+ assert.equal((await x.send('POST','/reviews/'+id+'/close',x.alice)).status,200);
+ assert.equal((await x.send('GET',path,x.alice)).status,404);
+});
 test('public video media uses signed range tickets and stops immediately after review closure',async t=>{
   const x=await integration(t);
   const {id,published}=await createAndPublish(x);
