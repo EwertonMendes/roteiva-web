@@ -34,8 +34,7 @@ test('seven-day trial status, expiry, restore and suspension react without a rel
   await signup(page,email);
   await expect(page.getByRole('button',{name:'Excluir conta',exact:true})).toHaveCount(0);
   await page.goto(cloud+'/configuracoes');
-  await expect(page.getByRole('heading',{name:'Seu acesso'})).toBeVisible();
-  await expect(page.getByText('Período de teste gratuito',{exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Período de teste gratuito'})).toBeVisible();
   await expect(page.getByText(/Seu teste gratuito dura 7 dias/)).toBeVisible();
   await expect(page.getByRole('button',{name:'Excluir conta',exact:true})).toBeVisible();
   await changeAccess(email,{accessUntil:Timestamp.fromMillis(Date.now()-60000),unlimited:false});

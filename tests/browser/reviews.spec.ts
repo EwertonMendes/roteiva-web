@@ -151,6 +151,12 @@ test("image-only reviews hide all video timestamp controls",async({page})=>{
   await expect(page.getByRole("heading",{name:"Avaliação da arte"})).toBeVisible();
   await expect(page.locator('iframe[title="Prévia de Capa.png"]')).toHaveCount(0);
   await expect(page.locator('img.review-private-preview-image')).toBeVisible();
+  const image=page.locator('img.review-private-preview-image');
+  const fitted=await image.evaluate(el=>el.clientWidth);
+  await page.getByRole('button',{name:'Ampliar zoom',exact:true}).click();
+  await expect.poll(()=>image.evaluate(el=>el.clientWidth)).toBeGreaterThan(fitted*1.2);
+  const compositor=await image.evaluate(el=>new DOMMatrix(getComputedStyle(el).transform).a);
+  expect(compositor,'Zoom rerasterizes at layout size instead of stretching a small GPU texture').toBe(1);
   const stage=page.locator(".review-portal-stage");
   expect(await stage.evaluate(element=>element.dispatchEvent(new MouseEvent("contextmenu",{bubbles:true,cancelable:true})))).toBe(false);
   expect(await stage.evaluate(element=>element.dispatchEvent(new Event("dragstart",{bubbles:true,cancelable:true})))).toBe(false);
