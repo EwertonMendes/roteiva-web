@@ -295,7 +295,7 @@ test("offline writing shows recovery, never a false cloud confirmation",async({p
   await page.getByRole("button",{name:"Salvar cliente"}).click();
   await expect(page.locator(".cloud-recovery")).toBeVisible({timeout:45000});
   await context.setOffline(false);
-  await page.getByRole("button",{name:"Recarregar dados da nuvem",exact:true}).click();
+  await page.getByRole("button",{name:"Recarregar dados",exact:true}).click();
   await expect(page.locator(".app-shell")).toBeVisible();await settled(page);
   await navigate(page,"Clientes");await expect(page.getByText("Não confirmado",{exact:true})).toHaveCount(0);
 });
@@ -386,3 +386,4 @@ test("removed workspace copy action stays absent on every screen while financial
     if(name==="Financeiro") await expect(page.getByRole("button",{name:"Exportar CSV"})).toBeVisible();
   }
 });
+
