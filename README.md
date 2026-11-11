@@ -1,6 +1,6 @@
 # Roteiva
 
-**Domínio próprio em configuração:** roteiva.com para o frontend/login, api.roteiva.com para a API, usando os mesmos recursos PROD. Propriedade Google confirmada; TLS, promoção e homologação no endereço novo têm aceites separados no [roadmap](docs/MVP-ROADMAP.md#domínio-roteivacom--11112026). O adiamento de compra registrado abaixo foi superado.
+**Domínio próprio publicado:** [roteiva.com](https://roteiva.com), login no mesmo domínio e API [api.roteiva.com](https://api.roteiva.com), usando os recursos PROD existentes. HTTPS, www, login real, recarga, links antigos e conexões preservadas conferidos; marcas Google verificadas/publicadas. Aprovação dos escopos Drive e produção Dropbox continuam separadas no [roadmap](docs/MVP-ROADMAP.md#domínio-roteivacom--11112026).
 
 **Preparação sem domínio final:** preflight público DEV/PROD aprovado e recuperação de uma cópia cifrada Auth/Firestore PROD validada em emulador. Pedidos dos provedores, ciclo completo com usuários externos, operação contínua e aparelhos físicos continuam com aceites separados. Roteiro e evidências no [roadmap](docs/MVP-ROADMAP.md#preparação-sem-domínio-final--11112026).
 
@@ -13,13 +13,13 @@
 | Ambiente | Frontend | API | Estado |
 |---|---|---|---|
 | DEV | https://roteiva-web-dev.web.app | https://roteiva-api-dev.roteiva-dev.workers.dev | Migrado; usuários, Firestore, D1 e credenciais preservados |
-| PROD | https://roteiva-web-prod.web.app | https://roteiva-api-prod.roteiva-prod.workers.dev | Publicado; schema e serviços isolados, sem dados de negócio |
+| PROD | https://roteiva.com | https://api.roteiva.com | Publicado; schema e serviços isolados, sem dados de negócio |
 
 [Primeira promoção PROD](https://github.com/EwertonMendes/roteiva-web/actions/runs/43023457363) aprovada e concluída por delegação expressa do proprietário, com regressão completa e dois ambientes protegidos. Manifestos dos dois frontends confirmam o mesmo SHA e os respectivos destinos. `PRODUCTION_ENABLED` voltou a false após a publicação; promoções futuras continuam manuais e protegidas.
 
 **VALIDADO:** migração DEV com 25 tabelas/99 registros comparados antes do selo novo, Google Drive real reconectado/listando, Dropbox existente listando e abrindo PDF. Em PROD, identidades sintéticas provaram isolamento Firestore A/B/anônimo e rejeição de JWT entre projetos nas duas direções. Fixtures da primeira homologação removidas; naquele ponto Auth/Firestore ficaram vazios e D1 sem dados de negócio. Depois, a conta real do proprietário foi criada em PROD pelo fluxo Google/cadastro, com espaço vazio. Smokes de saúde/CORS/auth/cache e recuperação do SQL PROD passaram. Nenhum faturamento habilitado.
 
-**BLOQUEADO PARA LANÇAMENTO AMPLO:** clientes OAuth PROD, secrets e callbacks separados foram criados, mas Google PROD já está Em produção, com escopos declarados e páginas públicas salvas. A verificação de marca exige comprovar a propriedade da homepage; Os consentimentos reais Drive/Dropbox foram concluídos; a solicitação de produção Dropbox agora exige o ícone. A comprovação de domínio e a verificação de marca Google foram adiadas por decisão do proprietário até adquirir o domínio final. Submissão/aprovação e homologação completa de arquivos continuam pendentes. O acesso aos consoles foi restabelecido. `drive.readonly` foi preservado por necessidade funcional e pode exigir avaliação anual de segurança externa, com custos não autorizados. Login Google PROD por popup e cadastro real confirmados; Safari/iOS físico ainda não homologado. Detalhes, limites gratuitos, backups e recuperação em [DEVELOPMENT](docs/DEVELOPMENT.md#ambientes-dev-e-prod--10112026) e no [roadmap](docs/MVP-ROADMAP.md).
+**Integrações para lançamento amplo:** Google login/Drive com marca verificada e publicada, callbacks e URLs próprias. Acesso aos escopos Drive ainda requer análise distinta. Dropbox com callback/site atualizados, aguardando ícones enviados manualmente pelo proprietário e solicitação/aprovação de produção. Conexões existentes e login no domínio novo foram conferidos; homologação completa de arquivos com usuários externos e Safari/iOS físico continua separada. drive.readonly permanece por necessidade funcional e pode exigir avaliação externa; nenhum custo novo foi habilitado. Consulte [DEVELOPMENT](docs/DEVELOPMENT.md) e o [roadmap](docs/MVP-ROADMAP.md).
 
 As descrições abaixo conservam contexto histórico das respectivas entregas; o estado atual dos ambientes está nesta seção e no roadmap.
 

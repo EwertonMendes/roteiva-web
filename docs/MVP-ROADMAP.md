@@ -2,15 +2,18 @@
 
 ## Domínio roteiva.com — 11/11/2026
 
-**EM CONFIGURAÇÃO / NÃO EQUIVALE A LIBERAÇÃO PÚBLICA.** O proprietário adquiriu o domínio e autorizou configurar PROD; esta seção substitui o adiamento histórico abaixo.
+**DOMÍNIO PUBLICADO E HOMOLOGADO; NÃO EQUIVALE A LIBERAÇÃO PÚBLICA DOS PROVEDORES.** O proprietário adquiriu o domínio e autorizou configurar PROD; esta seção substitui o adiamento histórico abaixo.
 
 - [x] Registro na conta exclusiva Cloudflare PROD confirmado; Hosting raiz/www criados no site existente, DNS A/TXT/CNAME e desafios de certificado cadastrados. www redireciona à raiz.
 - [x] Propriedade verificada no Google Search Console por TXT manual, sem delegar DNS a outro app. Captura da confirmação guardada privadamente.
 - [x] api.roteiva.com vinculado ao Worker PROD existente; Firebase Auth autorizado para domínio próprio, Picker restrito às APIs existentes e referrer raiz adicionado. Variáveis GitHub PROD de API/authDomain atualizadas, sem trocar credenciais.
 - [x] Código canônico e compatibilidade de rollout: aliases exatos por ambiente, redirecionamento antigo preservando rota/query/hash, CORS por origem, callbacks canônicos e handler Auth no domínio próprio. Testes de contrato rejeitam origem cruzada, imitações, HTTP e null.
 - [x] Ícones Dropbox 64×64 e 256×256 em assets/brand/dropbox, com instrução manual. Não repetir upload automatizado, conforme pedido do proprietário.
-- [ ] Concluir TLS/DNS públicos, consoles OAuth Google/Dropbox, CI/merge e promoção por SHA aprovado; repetir login/retorno OAuth e conferir conexões no domínio novo. Certificado em emissão não conta como HTTPS pronto.
-- [ ] Concluir marca/escopos e análise Google. Propriedade não elimina revisão de escopos restritos, demonstração real ou eventual avaliação externa.
+- [x] TLS público raiz/www/API validado; www redireciona à raiz. PR #119 integrada; release 84bb2781f3bec1a3d26dca067e22cafddf341481 publicado pelo workflow 43115795774: validação 90 frontend/216 API, 34 Rules e 151 browser (cinco skips de viewport) aprovada; Worker e publicação Hosting concluídos. O pós-check de cache falhou por whitelist antiga do verificador; correção operacional subsequente mantém a guarda e passou em DEV/PROD. Não relatar esse run histórico inteiro como verde.
+- [x] Login Google real da conta existente em roteiva.com, leitura da Biblioteca, Drive/Dropbox conectados, recarga e segunda aba via URL antiga aprovados; rota/query/hash preservados. Nenhum novo cadastro, concessão ou registro de negócio criado para a troca.
+- [x] Marca Google verificada e publicada nos projetos roteiva-web-prod e roteiva-drive-prod, com páginas institucionais e suporte salvos; isso não aprova os escopos restritos do Drive.
+- [x] Verificador de cache passa a derivar origens exatas do contrato, recusando URLs externas/credenciais/paths; tolera propagação breve com tentativas limitadas, sem aceitar política persistentemente errada.
+- [ ] Concluir a análise dos escopos Drive. Propriedade e marca aprovadas não eliminam revisão de escopos restritos, demonstração real ou eventual avaliação externa.
 
 ## Preparação sem domínio final — 11/11/2026
 

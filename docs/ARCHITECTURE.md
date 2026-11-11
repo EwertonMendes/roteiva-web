@@ -2,11 +2,11 @@
 
 ## Domínio próprio PROD — 11/11/2026
 
-**DECISÃO TOMADA / IMPLEMENTADO, PUBLICAÇÃO EM VALIDAÇÃO:** domínio registrado pelo proprietário na conta Cloudflare PROD. Contrato canônico: frontend/Auth `https://roteiva.com`, API `https://api.roteiva.com`; www redireciona no Hosting à raiz. Custom domains usam o mesmo site Firebase e Worker/D1 PROD. Não migrar usuários, dados, Client IDs ou chaves para trocar hostnames. Propriedade DNS confirmada no Search Console é distinta de aprovação OAuth.
+**DECISÃO TOMADA / PUBLICADO E HOMOLOGADO NO DOMÍNIO:** domínio registrado pelo proprietário na conta Cloudflare PROD. Contrato canônico: frontend/Auth `https://roteiva.com`, API `https://api.roteiva.com`; www redireciona no Hosting à raiz. Custom domains usam o mesmo site Firebase e Worker/D1 PROD. Não migrar usuários, dados, Client IDs ou chaves para trocar hostnames. Propriedade DNS confirmada no Search Console é distinta de aprovação OAuth.
 
 O contrato inclui authDomain explícito e origens históricas PROD exatas. `allowedFrontend` aceita origem canônica e os dois hosts Firebase PROD conhecidos, apenas dentro do mesmo ambiente; DEV, HTTP, null, www e imitações são recusados em PROD. CORS e frame-ancestors usam a origem autorizada da requisição, com Vary Origin, sem curinga. Redirecionamentos OAuth e links novos de revisão usam origem canônica. O frontend em modo PROD redireciona hosts históricos antes de montar a aplicação, preservando rota/query/hash. Modo não é inferido do hostname; DEV/demo/emulador não redirecionam.
 
-Callback da API e handler Firebase passam ao domínio comprovado; consoles e Picker devem aceitar URLs exatas antes do corte. Aliases legados preservam o rollout. Sessão local não é transferida entre origens: login no domínio novo usa a mesma identidade/workspace remoto. Certificado em emissão não é HTTPS operacional; ver evidências e aceites no roadmap.
+Callback da API e handler Firebase passam ao domínio comprovado; consoles e Picker devem aceitar URLs exatas antes do corte. Aliases legados preservam o rollout. Sessão local não é transferida entre origens: login no domínio novo usa a mesma identidade/workspace remoto. HTTPS, login e conexões existentes foram conferidos; ver evidências e aceites separados no roadmap. O diagnóstico de cache deriva suas origens do mesmo contrato e mantém asserts após tentativas limitadas durante propagação CDN. Aprovação de escopos restritos continua independente da marca já verificada/publicada.
 
 ## Preparação anterior ao domínio — 11/11/2026
 
