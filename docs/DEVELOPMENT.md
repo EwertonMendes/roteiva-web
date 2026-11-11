@@ -2,7 +2,7 @@
 
 ## Ambientes DEV e PROD — 10/11/2026
 
-**Estado atual:** PR #111 em validação; DEV migrado para conta exclusiva e domínio da marca, Google/Dropbox conferidos nos cenários do roadmap. Cloudflare/Firebase PROD provisionados sem billing, D1 com schema e sem dados de negócio; integrações PROD em configuração. Nenhum primeiro deploy PROD foi autorizado. As seções históricas abaixo preservam evidências anteriores e não significam que PROD está ativo.
+**Estado atual:** PR #111 em validação; DEV migrado para conta exclusiva e domínio da marca, Google/Dropbox conferidos nos cenários do roadmap. Cloudflare/Firebase PROD provisionados sem billing, D1 com schema e sem dados de negócio; integrações PROD em configuração. O proprietário autorizou em 11/11 concluir a ativação e delegou decisões; nenhum deploy PROD executado até esta revisão. As seções históricas abaixo preservam evidências anteriores e não significam que PROD está ativo.
 
 ### Contrato e builds
 

@@ -3,6 +3,7 @@ import {writeFileSync} from 'node:fs';
 import {join} from 'node:path';
 import {createPrivateKey} from 'node:crypto';
 import {config,target} from './environment.mjs';
+try {
 assert.equal(target,'prod','Only explicit PROD bootstrap is supported');
 for(const flag of ['OAUTH_ENABLED','DROPBOX_ENABLED','ACCOUNT_DELETION_ENABLED'])assert.equal(config.vars[flag],'true','PROD feature not provisioned: '+flag);
 assert.match(config.vars.GOOGLE_CLIENT_ID,/^18860974410-[a-z0-9]+\.apps\.googleusercontent\.com$/,'PROD Google client must belong to its dedicated OAuth project');
@@ -21,3 +22,8 @@ assert.ok(account.client_email?.endsWith('@roteiva-web-prod.iam.gserviceaccount.
 assert.ok(process.env.RUNNER_TEMP,'GitHub private runner temporary directory required');
 writeFileSync(join(process.env.RUNNER_TEMP,'roteiva-prod-secrets.json'),JSON.stringify(secrets),{mode:0o600});
 console.log('Validated PROD secret structure and prepared additive atomic upload. No values logged.');
+} catch {
+ // Assertion and JSON parsing errors may otherwise echo protected input values.
+ console.error('PROD secret validation failed. Check required names, key sizes and credential project. Values suppressed.');
+ process.exitCode=1;
+}
