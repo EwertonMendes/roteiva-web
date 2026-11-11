@@ -30,7 +30,7 @@ export function parseEnvironment(values: Record<string, string | boolean | undef
   }
   const contract = environment(appEnv);
   if (buildMode && buildMode !== (appEnv === 'dev' ? 'firebase' : 'production')) throw new Error('Build mode and environment disagree');
-  if (firebase.projectId !== contract.projectId || firebase.authDomain !== contract.projectId + '.firebaseapp.com' ||
+  if (firebase.projectId !== contract.projectId || firebase.authDomain !== contract.authDomain ||
       values.VITE_API_BASE_URL !== contract.apiOrigin ||
       (firebase.storageBucket && firebase.storageBucket !== contract.projectId + '.firebasestorage.app'))
     throw new Error('Cross-environment Firebase/API configuration rejected');

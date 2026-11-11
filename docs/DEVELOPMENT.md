@@ -1,5 +1,17 @@
 # Desenvolvimento e deploy — Roteiva
 
+## Configuração do domínio próprio — 11/11/2026
+
+**EM VALIDAÇÃO:** compra concluída pelo proprietário. Frontend/Auth canônico roteiva.com no site Firebase PROD existente; www com redirectTarget roteiva.com; API api.roteiva.com como Custom Domain do Worker PROD existente. DNS do Hosting usa os registros exigidos pela API, sem proxy Cloudflare; domínio do Worker é gerenciado pelo serviço Workers. TXT Google confirma propriedade; não remover TXT de propriedade/ACME por parecer temporário sem conferir as exigências atuais do provedor. Certificados ainda precisam de conferência externa real, sem bypass de TLS.
+
+Contrato: shared/environments.ts, authDomain em .env.production e src/lib/environment-config.ts, FRONTEND_ORIGIN/callbacks em api/wrangler.jsonc; API_BASE_URL dos dois ambientes GitHub PROD e VITE_FIREBASE_AUTH_DOMAIN em firebase-production. DNS e vínculo do Custom Domain são configurações externas; deploy Wrangler sem lista de custom domains preserva o vínculo existente. Conferir ligação e health depois de publicar; não acrescentar permissões de DNS aos tokens CI por conveniência. Site/projeto/conta/D1 e sete segredos permanecem os mesmos.
+
+Antes da promoção, cadastrar origem raiz e callbacks api.roteiva.com nos clientes Drive/Dropbox e handler https://roteiva.com/__/auth/handler no cliente Firebase. Preservar entradas antigas até o corte validado; depois revisar as entradas remanescentes e os domínios associados à verificação OAuth. Atualizar marca/privacidade/termos para as páginas públicas roteiva.com; a página sobre.html explica o serviço sem login. Não confundir marca salva com verificação aprovada.
+
+Validar pnpm test/typecheck, npm test/typecheck da API, builds e isolamento; publicar SHA aprovado pelo workflow PROD protegido. Após publicar: preflight/cache no domínio canônico, DNS/TLS raiz/www/API, retorno OAuth, login Google, reabertura, leitura de dados e conexões existentes. Links legados movem para raiz preservando rota/query/hash; a sessão local muda de origem e pode exigir login, sem recriar cadastro nem importar dados. CI e emulador não substituem esse aceite real.
+
+Ícones para envio pelo proprietário: assets/brand/dropbox/roteiva-icon-64.png e roteiva-icon-256.png; instruções na mesma pasta. Os procedimentos abaixo de preparação sem domínio são históricos; não repetem um adiamento após a compra.
+
 ## Preparação de lançamento antes do domínio — 11/11/2026
 
 **DECISÃO TOMADA:** manter os endereços `web.app`/`workers.dev` atuais enquanto o proprietário compra o domínio. Não cadastrar nome fictício, comprar domínio, ampliar permissões OAuth ou habilitar cobrança para antecipar o lançamento. O domínio não impede testar fluxos, restaurar backups isoladamente nem preparar os pedidos aos provedores.

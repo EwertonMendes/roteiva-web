@@ -1,4 +1,4 @@
-import { environment } from '../../shared/environments.ts';
+import { environment, isEnvironmentFrontend } from '../../shared/environments.ts';
 import { ApiError, type Env } from './types.ts';
 
 export function assertEnvironment(env: Env): void {
@@ -19,4 +19,9 @@ export async function assertDatabaseEnvironment(env: Env): Promise<void> {
 
 export function apiOrigin(env: Env): string {
   return environment(env.ENVIRONMENT).apiOrigin;
+}
+
+export function allowedFrontend(env:Env,origin:string|null):origin is string {
+  try{return origin!==null&&isEnvironmentFrontend(origin,env.ENVIRONMENT);}
+  catch{return false;}
 }

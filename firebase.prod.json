@@ -44,6 +44,7 @@
         "oAuthBrandDisplayName": "Roteiva",
         "supportEmail": "roteiva-suporte@googlegroups.com",
         "authorizedRedirectUris": [
+          "https://roteiva.com/__/auth/handler",
           "https://roteiva-web-prod.firebaseapp.com/__/auth/handler",
           "https://roteiva-web-prod.web.app/__/auth/handler"
         ]
