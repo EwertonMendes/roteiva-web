@@ -1,3 +1,4 @@
+import {apiOrigin} from './environment.ts';
 import {ApiError,type Env} from './types.ts';
 import {base64url,decode} from './crypto.ts';
 import {dropboxConnection,dropboxMedia,dropboxDocumentPreview} from './dropbox.ts';
@@ -66,7 +67,7 @@ export async function issueDropboxPreview(env:Env,uid:string,conn:string,request
  const convert=officeDocument(meta.name);
  const token=await sign(env,{u:uid,c:conn,f:data.fileId,l:data.linkedFolderId,p:Number(data.projectId),
   r:row.revision,e:expiresAt,k:env.TOKEN_KEY_VERSION,m:convert?'document':'original'});
- return Response.json({url:'https://roteiva-api-dev.ewertonmendes9.workers.dev/integrations/dropbox/media?ticket='+token,
+ return Response.json({url:apiOrigin(env)+'/integrations/dropbox/media?ticket='+token,
    expiresAt,mimeType:convert?'application/pdf':meta.mimeType,size:meta.size});
 }
 function parseRange(range:string|null,size:number,partialOnNoRange:boolean):string|undefined{

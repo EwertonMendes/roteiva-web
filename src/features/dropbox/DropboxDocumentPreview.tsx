@@ -1,10 +1,11 @@
+import { API_BASE_URL } from "../../lib/environment.ts";
 import {useDriveApi} from '../drive/drive-api';
 import type {DriveItem} from '../drive/DriveLibraryUI';
 import type {DropboxFolderLink} from '../../data/dropbox-folder-links';
 
 type Ticket={url:string;mimeType:string;size:number;expiresAt:number};
 type Api=ReturnType<typeof useDriveApi>;
-const API_ORIGIN='https://roteiva-api-dev.ewertonmendes9.workers.dev';
+const API_ORIGIN=API_BASE_URL;
 const VIEWER_BYTES=48*1024*1024;
 const DOCUMENT=/\.(pdf|pptx?|ppsx?|docx?|rtf|odp|odt)$/i;
 export const isDropboxDocument=(file:DriveItem)=>DOCUMENT.test(file.name)&&file.mimeType!=='application/vnd.roteiva.folder';

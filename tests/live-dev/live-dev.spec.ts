@@ -1,7 +1,7 @@
 import {test,expect,type Page} from "@playwright/test";
 
 const ORIGIN="https://roteiva-web-dev.web.app";
-const API="https://roteiva-api-dev.ewertonmendes9.workers.dev";
+const API="https://roteiva-api-dev.roteiva-dev.workers.dev";
 const validRoutes=["/","/projetos","/clientes","/calendario","/financeiro","/biblioteca","/aprovacoes","/configuracoes"];
 const email=process.env.QA_EXPECTED_EMAIL?.trim()||"";
 const folder=process.env.QA_DRIVE_FOLDER_NAME?.trim()||"";

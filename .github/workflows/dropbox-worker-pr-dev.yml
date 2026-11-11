@@ -87,6 +87,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     environment: cloudflare-development
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_D1_DATABASE_ID: ${{ vars.CLOUDFLARE_D1_DATABASE_ID }}
+      API_BASE_URL: ${{ vars.API_BASE_URL }}
     defaults:
       run:
         working-directory: api
@@ -109,54 +113,12 @@ jobs:
           DATABASE: ${{ vars.CLOUDFLARE_D1_DATABASE_ID }}
         run: |
           set -euo pipefail
-          test "$ACCOUNT" = 'b3855f9c192541a01a45b2dae7b6a7f8'
-          test "$DATABASE" = '302adc88-76b2-4827-bb16-99662fa0408b'
+          test "$ACCOUNT" = '71d7d72a003796ba12b6bf23d149916c'
+          test "$DATABASE" = '4fa31040-0cde-45dc-8140-cd784b5463a0'
           test "$(gh api "repos/$GITHUB_REPOSITORY/pulls/87" --jq '.head.sha')" = "$SHA"
           test "$(git rev-parse HEAD)" = "$SHA"
           grep -q '"name": "roteiva-api-dev"' wrangler.jsonc
           grep -q '"DROPBOX_ENABLED": "true"' wrangler.jsonc
-      - name: Promote verified secrets-only DEV version if the staged Dropbox secrets are still inactive
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          WRANGLER_SEND_METRICS: 'false'
-        run: |
-          set -euo pipefail
-          test -n "$CLOUDFLARE_API_TOKEN"
-          npx wrangler secret list --env dev --format json > "$RUNNER_TEMP/active-secret-names.json"
-          if ! node --input-type=module -e '
-            import fs from "node:fs";
-            const a=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+"/active-secret-names.json","utf8"));
-            if(!Array.isArray(a)||!["DROPBOX_APP_KEY","DROPBOX_APP_SECRET"].every(n=>a.some(x=>x.name===n)))process.exit(1);
-          '; then
-            # This exact secrets-only version was prepared and recorded by the
-            # independent Cloudflare infrastructure audit on 24 Oct 2026.
-            # Never promote it if the active Worker has changed in the meantime.
-            old='8a69e41a-2bc5-4ccb-9ea1-f7833d97fab9'
-            prepared='f73f50fa-f367-4ad0-9722-31e3d02eac2c'
-            npx wrangler deployments list --env dev --json > "$RUNNER_TEMP/worker-deployments.json"
-            npx wrangler versions view "$prepared" --env dev --json > "$RUNNER_TEMP/prepared-worker-version.json"
-            OLD="$old" node --input-type=module -e '
-              import fs from "node:fs";
-              const d=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+"/worker-deployments.json","utf8"));
-              const current=Array.isArray(d)?d[0]:d.deployments?.[0];
-              if(!current||!JSON.stringify(current).includes(process.env.OLD))throw Error("Active DEV Worker differs from verified pre-Dropbox version: stop.");
-              const v=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+"/prepared-worker-version.json","utf8"));
-              const data=JSON.stringify(v);
-              for(const n of ["DROPBOX_APP_KEY","DROPBOX_APP_SECRET","TOKEN_KEYS",
-                "FIREBASE_ADMIN_CREDENTIALS_JSON","GOOGLE_CLIENT_SECRET",
-                "GOOGLE_PICKER_API_KEY","TRIAL_IDENTITY_HMAC_KEY"]){
-                if(!data.includes(n))throw Error("Prepared version metadata missing required secret name: "+n);
-              }
-            '
-            npx wrangler versions deploy "$prepared@100" --env dev --yes \
-              --message 'Promote previously verified secrets-only version before Dropbox QA'
-            node --input-type=module -e '
-              const r=await fetch("https://roteiva-api-dev.ewertonmendes9.workers.dev/health",{cache:"no-store"});
-              if(r.status!==200)process.exit(1);
-            '
-          fi
-          rm -f "$RUNNER_TEMP/active-secret-names.json" \
-            "$RUNNER_TEMP/worker-deployments.json" "$RUNNER_TEMP/prepared-worker-version.json"
       - name: Ensure all seven Worker secrets are published before touching D1
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -186,6 +148,7 @@ jobs:
           npx wrangler d1 time-travel info DB --env dev --json
           node scripts/check-access-migration.mjs --before
           npm run migrate:dev
+          node scripts/guard-environment.mjs dev --seal
           node scripts/check-access-migration.mjs
       - name: Publish SHA-pinned Worker to existing DEV only
         env:
@@ -196,7 +159,7 @@ jobs:
         run: |
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
-          const root='https://roteiva-api-dev.ewertonmendes9.workers.dev';
+          const root='https://roteiva-api-dev.roteiva-dev.workers.dev';
           const health=await fetch(root+'/health',{cache:'no-store'});
           assert.equal(health.status,200);
           assert.deepEqual(await health.json(),{status:'ok',environment:'dev'});

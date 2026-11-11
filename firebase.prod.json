@@ -32,7 +32,7 @@
         ]
       }
     ],
-    "site": "REPLACE_WITH_PROD_HOSTING_SITE"
+    "site": "roteiva-web-prod"
   },
   "firestore": {
     "rules": "firestore.rules",

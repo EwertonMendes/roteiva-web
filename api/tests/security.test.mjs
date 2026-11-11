@@ -11,7 +11,8 @@ const env = {
  API_RATE_LIMIT:{limit:async()=>({success:true})},
  ENVIRONMENT:'dev', FIREBASE_PROJECT_ID:'roteiva-web-dev',
  FRONTEND_ORIGIN:'https://roteiva-web-dev.web.app',
- OAUTH_REDIRECT_URI:'https://roteiva-api-dev.ewertonmendes9.workers.dev/oauth/drive/callback',
+ OAUTH_REDIRECT_URI:'https://roteiva-api-dev.roteiva-dev.workers.dev/oauth/drive/callback',
+ DB:database().DB,
  OAUTH_ENABLED:'false', TOKEN_KEY_VERSION:'v1',
  TOKEN_KEYS:JSON.stringify({v1:base64url(crypto.getRandomValues(new Uint8Array(32)))}),
 };
@@ -58,10 +59,10 @@ test('HTTP rejects missing identity, wrong CORS origin and disabled OAuth withou
  assert.equal(denied.status,403); assert.equal(denied.headers.get('Access-Control-Allow-Origin'),null);
  const allowed=await handle(request('/oauth/drive/start',{method:'OPTIONS',headers:{Origin:env.FRONTEND_ORIGIN}}),env);
  assert.equal(allowed.status,204); assert.equal(allowed.headers.get('Access-Control-Allow-Origin'),env.FRONTEND_ORIGIN);
- const health=await handle(request('/health'),{...env,DB:{prepare:()=>({first:async()=>({})})}});
+ const health=await handle(request('/health'),{...env,DB:{prepare:()=>({first:async()=>({environment:'dev'})})}});
  assert.equal(health.status,200); assert.deepEqual(await health.json(),{status:'ok',environment:'dev'});
  assert.equal(health.headers.get('Referrer-Policy'),'no-referrer');
- const unavailable=await handle(request('/health'),env);
+ const unavailable=await handle(request('/health'),{...env,DB:undefined});
  assert.equal(unavailable.status,503); assert.ok(!(await unavailable.text()).includes('TypeError'));
  assert.equal((await handle(request('/health'),{...env,ENVIRONMENT:'prod'})).status,503);
 });
@@ -124,7 +125,7 @@ test('OAuth first-party launch uses one-time ticket, PKCE and Lax callback cooki
  const response=await start(configured,'A');
  const {launchUrl}=await response.json();
  assert.equal(response.headers.get('Set-Cookie'),null);
- assert.equal(new URL(launchUrl).origin,'https://roteiva-api-dev.ewertonmendes9.workers.dev');
+ assert.equal(new URL(launchUrl).origin,'https://roteiva-api-dev.roteiva-dev.workers.dev');
  assert.equal(new URL(launchUrl).pathname,'/oauth/drive/launch');
  assert.equal(new URL(launchUrl).searchParams.get('ticket').length,43);
  assert.equal(insertCount,1);
@@ -150,7 +151,7 @@ async function hashTest(value) {
 
 test('source rate limit does not use shared all-users bucket',async()=>{
  const keys=[];
- const limited={...env,DB:{prepare:()=>({first:async()=>({})})},API_RATE_LIMIT:{limit:async({key})=>{keys.push(key);return {success:true};}}};
+ const limited={...env,DB:{prepare:()=>({first:async()=>({environment:'dev'})})},API_RATE_LIMIT:{limit:async({key})=>{keys.push(key);return {success:true};}}};
  const response=await handle(new Request('https://api.example/health',{headers:{'CF-Connecting-IP':'203.0.113.9'}}),limited);
  assert.equal(response.status,200);
  assert.deepEqual(keys,['dev:ip:203.0.113.9']);

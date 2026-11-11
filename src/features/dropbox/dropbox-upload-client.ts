@@ -1,6 +1,7 @@
+import { API_BASE_URL } from "../../lib/environment.ts";
 import {UploadFailure,type UploadedFile} from '../drive/drive-upload-client';
 export type DropboxUploadSession={attemptId:string;offset:number;chunkSize:number;completed?:boolean;fileId?:string};
-const API='https://roteiva-api-dev.ewertonmendes9.workers.dev';
+const API=API_BASE_URL;
 const MAX_RETRIES=4;
 const RETRYABLE=new Set([429,500,502,503,504]);
 function isSession(value:DropboxUploadSession):boolean{

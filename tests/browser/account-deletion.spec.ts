@@ -3,7 +3,7 @@ import {initializeTestEnvironment} from '@firebase/rules-unit-testing';
 import {collection,getDocs,query,where,updateDoc,deleteDoc} from 'firebase/firestore';
 
 const cloud="http://127.0.0.1:4173";
-const api="https://roteiva-api-dev.ewertonmendes9.workers.dev";
+const api="http://127.0.0.1:8787";
 
 async function createTestAccount(page:Page,email:string){
   await page.goto(cloud);

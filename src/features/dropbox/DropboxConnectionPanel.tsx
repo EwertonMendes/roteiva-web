@@ -1,3 +1,4 @@
+import { API_BASE_URL } from "../../lib/environment.ts";
 import {AppButton} from "../ui/AppButton";
 import {CollectionState} from "../ui/CollectionState";
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
@@ -20,7 +21,7 @@ import {useDriveTransfers} from '../drive/DriveTransfersProvider';
 import {dropboxFolderLinkId,linkDropboxFolder,readDropboxLinks,unlinkDropboxFolder,type DropboxFolderLink} from '../../data/dropbox-folder-links';
 import '../drive/drive-library.css';
 import './dropbox.css';
-const API='https://roteiva-api-dev.ewertonmendes9.workers.dev';
+const API=API_BASE_URL;
 type Connection={id:string;email:string;status:'connected'|'reconnect_required'|'revocation_pending';scopes:string};
 type Page={folder:{id:string;name:string};files:DriveItem[];nextPageToken:string|null;syncCursor?:string|null};
 const FRESH_MS=30_000;

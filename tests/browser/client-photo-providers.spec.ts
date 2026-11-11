@@ -21,7 +21,7 @@ test('client photo selector recovers Drive discovery and shows both connected pr
  const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Headers':'Authorization,Content-Type',
    'Access-Control-Allow-Methods':'GET,OPTIONS'};
  let failDriveOnce=true;
- await page.route('https://roteiva-api-dev.ewertonmendes9.workers.dev/integrations/drive**',route=>{
+ await page.route('http://127.0.0.1:8787/integrations/drive**',route=>{
   const path=new URL(route.request().url()).pathname;
   if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
   if(path==='/integrations/drive'){
@@ -38,7 +38,7 @@ test('client photo selector recovers Drive discovery and shows both connected pr
    files:[{id:'photo_123456789',name:'Foto do Drive.png',mimeType:'image/png',size:'1000'}],nextPageToken:null}});
   return route.fulfill({headers,json:{}});
  });
- await page.route('https://roteiva-api-dev.ewertonmendes9.workers.dev/integrations/dropbox**',route=>{
+ await page.route('http://127.0.0.1:8787/integrations/dropbox**',route=>{
   if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
   const path=new URL(route.request().url()).pathname;
   if(path==='/integrations/dropbox')return route.fulfill({headers,json:{connections:[{id:dropboxId,email:'dropbox@example.com',status:'connected',scopes:'files.metadata.read files.content.read'}]}});

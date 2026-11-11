@@ -1,5 +1,33 @@
 # Arquitetura do Roteiva — MVP SaaS
 
+## Ambientes DEV e PROD — 10/11/2026
+
+**DECISÃO TOMADA:** um repositório e uma base de código, Firebase por projeto e Cloudflare por conta. A conta Cloudflare anterior hospeda outros aplicativos e seu subdomínio não será alterado. O proprietário escolheu migrar apenas Roteiva DEV para a conta exclusiva. Nenhum dado DEV será copiado para PROD.
+
+| Contrato | DEV de destino | PROD |
+|---|---|---|
+| Firebase | roteiva-web-dev, preservado | roteiva-web-prod, provisionado |
+| Origem frontend | https://roteiva-web-dev.web.app | https://roteiva-web-prod.web.app |
+| API prevista | https://roteiva-api-dev.roteiva-dev.workers.dev | https://roteiva-api-prod.roteiva-prod.workers.dev |
+| Worker | roteiva-api-dev | roteiva-api-prod |
+| D1 | roteiva-drive-dev, migração pendente | roteiva-drive-prod, pendente |
+| Cloudflare | conta exclusiva 71d7d72a003796ba12b6bf23d149916c | conta exclusiva pendente |
+
+**IMPLEMENTADO:** `shared/environments.ts` define identidades públicas exatas; `src/lib/environment-config.ts` valida Vite e Firebase sem fallback remoto. Todos os consumidores de API usam `src/lib/environment.ts`. A validação ocorre com a precedência real de `loadEnv` mais o processo, e novamente no navegador. Um build de produção rejeita demo, emulador, Firebase DEV e API DEV; preview apenas serve o artefato já validado.
+
+A API recusa projeto/origem/callback de outro ambiente antes de executar handlers. JWT continua validando assinatura, issuer e audience do projeto escolhido. A migration 0020 cria identidade D1 imutável; o comando protegido confere metadados remotos de conta/UUID/nome antes de selá-la. Requisições e Cron verificam essa identidade; falhas impedem acesso ao banco. Rate limit mantém 60/min para API e 240/min para mídia/upload, com prefixo do ambiente e namespaces distintos por conta. O limiter é local ao ponto de presença e não constitui orçamento global.
+
+**Mídia:** URLs de tickets e links de revisão derivam do contrato; PDFs autorizados mantêm framing apenas pelo frontend exato do ambiente. Respostas de erro/JSON continuam sem framing, no-store e sem referrer; SVG conserva sandbox. ACL, estado, revisões e expiração permanecem nos handlers existentes.
+
+**Migração DEV:** o mesmo projeto Firebase e os mesmos dados, grants OAuth, Client IDs, chaves AES/HMAC e credenciais administrativas serão preservados. Sem backup original, há operação explícita e temporária em `api/operations/`: o Worker DEV sela apenas sete credenciais para a chave RSA local, após assinatura ECDSA, expiração de cinco minutos e recusa de Origin/PROD. O entrypoint normal não importa essa operação. A versão original é restaurada e verificada em finally. Não registrar payloads, tokens ou respostas de provedores. Transferência de segredos e cópia final do D1 exigem evidências distintas; backup de código não é backup de dados.
+
+**OAuth público ainda PENDENTE:** console Google confirmou Externo/Testing e branding incompleto. Preservados `drive.file` + `drive.readonly`: a navegação de pastas preexistentes depende da leitura ampla; Picker/drive.file sozinho não demonstra paridade. Não ampliar escopos. Dados restritos processados pelo Worker podem exigir verificação e avaliação anual de segurança; custos não autorizados. Identidade de suporte profissional, termos e política precisam revisão antes da publicação.
+
+**CI/CD:** DEV conserva validação independente por componente e promoção manual controlada de PR. PROD é manual, exclusivo do proprietário, SHA completo da master atual com PR merged, serializado entre API e frontend, com duas aprovações de ambientes. Segredos PROD nunca são entregues a PRs. O frontend PROD é recompilado a partir do SHA aprovado após o Worker; credencial Firebase deve pertencer ao projeto PROD. Conta/D1 não provisionados e flags OAuth/destruição incompletas bloqueiam promoção. Nenhum deploy PROD ocorreu.
+
+**Estado documental:** seções anteriores abaixo registram decisões/entregas históricas e não substituem este contrato atual. Domínios personalizados futuros exigem alteração explícita do contrato, CORS, CSP, Firebase Auth, callbacks e testes, sem descoberta de ambiente pelo hostname e sem registro automático de domínio.
+
+
 ## Correções de aprovação e capas — 03/11/2026
 
 **DECISÃO TOMADA / IMPLEMENTADO E PUBLICADO EM DEV (PR #109):** PDFs são renderizados por PDF.js em canvas, uma página por vez, com worker local carregado sob demanda, ranges no portal e raster máximo de 16 milhões de pixels. O painel usa `/reviews/:id/document`, com identidade Firebase, dono, versão atual, seleção/grant, estado e expiração verificados; apenas PDF, até 24 MiB, sem tokens de armazenamento no cliente. O endpoint de imagem continua exclusivo de imagens. CSP restritiva e ticket/revogação permanecem válidos; o tratamento de iframe do PR permite compatibilidade com frontend anterior durante publicação gradual.

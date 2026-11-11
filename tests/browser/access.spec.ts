@@ -54,7 +54,7 @@ test('seven-day trial status, expiry, restore and suspension react without a rel
 
 test('access validation errors never offer account deletion',async({page},info)=>{
   await signup(page,'access-error-'+info.project.name+'@example.com');
-  await page.route('https://roteiva-api-dev.ewertonmendes9.workers.dev/access/ensure',async route=>{
+  await page.route('http://127.0.0.1:8787/access/ensure',async route=>{
     const headers={'Access-Control-Allow-Origin':cloud,'Access-Control-Allow-Methods':'POST, OPTIONS','Access-Control-Allow-Headers':'Authorization, Content-Type'};
     await route.fulfill(route.request().method()==='OPTIONS'?{status:204,headers}:{status:503,headers,contentType:'application/json',body:'{}'});
   });

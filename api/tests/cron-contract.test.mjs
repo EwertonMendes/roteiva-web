@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {environments} from '../../shared/environments.ts';
 import worker from '../src/index.ts';
 
 const settings=JSON.parse(readFileSync(new URL('../wrangler.jsonc',import.meta.url),'utf8'));
@@ -8,7 +9,7 @@ function environment(){
   const sql=[];
   const DB={prepare(query){
     sql.push(query);
-    const stmt={bind(){return stmt;},first:async()=>query.includes('AS oauth_without_token')?{
+    const stmt={bind(){return stmt;},first:async()=>query.includes('deployment_identity')?{environment:'dev'}:query.includes('AS oauth_without_token')?{
       manual_review:0,stalled:0,oauth_without_token:0,oauth_with_token:0}:null,
       all:async()=>({results:[]}),
       run:async()=>({meta:{changes:0}})};
@@ -18,7 +19,7 @@ function environment(){
     client_email:'unit-test@test.iam.gserviceaccount.com',
     private_key:'-----BEGIN PRIVATE KEY-----test',
     token_uri:'https://oauth2.googleapis.com/token'};
-  return {env:{DB,ENVIRONMENT:'dev',FIREBASE_PROJECT_ID:'roteiva-web-dev',
+  return {env:{...{FRONTEND_ORIGIN:environments.dev.frontendOrigin,OAUTH_REDIRECT_URI:environments.dev.apiOrigin+'/oauth/drive/callback'},DB,ENVIRONMENT:'dev',FIREBASE_PROJECT_ID:'roteiva-web-dev',
     ACCOUNT_DELETION_ENABLED:'true',FIREBASE_ADMIN_CREDENTIALS_JSON:JSON.stringify(cred)},sql};
 }
 async function run(cron,env){

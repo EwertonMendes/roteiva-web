@@ -4,6 +4,7 @@ on:
     branches: [master]
     paths:
       - 'src/**'
+      - 'shared/**'
       - 'assets/**'
       - 'public/**'
       - 'index.html'
@@ -22,6 +23,7 @@ on:
     branches: [master]
     paths:
       - 'src/**'
+      - 'shared/**'
       - 'assets/**'
       - 'public/**'
       - 'index.html'
@@ -65,6 +67,7 @@ jobs:
           pnpm typecheck
           pnpm build
           node scripts/verify-static-build.mjs dist /
+          node scripts/verify-environment-build.mjs dev
       - name: Reuse validated SPA output
         if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch')
         uses: actions/upload-artifact@v4
@@ -130,6 +133,8 @@ jobs:
             }
             echo "Explicit manual DEV Hosting promotion authorized for current PR commit."
           fi
+      - name: Verify downloaded artifact identity
+        run: node scripts/verify-environment-build.mjs dev
       - name: Require deployed access Worker before integrated frontend
         run: node scripts/check-access-worker.mjs
       - uses: google-github-actions/auth@v3

@@ -22,7 +22,7 @@ test('minted media ticket is authenticated, scoped to a video, expiring and tamp
 test('expired media ticket never authorizes a range request',async()=>{
   const e=env(),ticket=await mintReviewMediaTicket(e,review,file,2,Date.now()-1000,inviteHash);
   await assert.rejects(()=>verifyReviewMediaTicket(e,ticket),x=>x.status===404);
-  const request=new Request('https://roteiva-api-dev.ewertonmendes9.workers.dev/reviews/media?ticket='+ticket,
+  const request=new Request('https://roteiva-api-dev.roteiva-dev.workers.dev/reviews/media?ticket='+ticket,
     {headers:{Range:'bytes=0-100'}});
   await assert.rejects(()=>streamReviewMedia(request,e,new URL(request.url)),x=>x.status===404);
 });
@@ -39,7 +39,7 @@ test('wrong file type and a closed review cannot stream even with signed ticket'
     }};
   }};
   const scope={...e,DB};
-  const request=new Request('https://roteiva-api-dev.ewertonmendes9.workers.dev/reviews/media?ticket='+ticket);
+  const request=new Request('https://roteiva-api-dev.roteiva-dev.workers.dev/reviews/media?ticket='+ticket);
   await assert.rejects(()=>streamReviewMedia(request,scope,new URL(request.url)),x=>x.status===404);
   status='pending';mime='application/x-unsafe';
   await assert.rejects(()=>streamReviewMedia(request,scope,new URL(request.url)),x=>x.status===404);
@@ -47,7 +47,7 @@ test('wrong file type and a closed review cannot stream even with signed ticket'
 
 test('browser top-level navigation cannot open a preview ticket as a standalone document',async()=>{
   const e=env(),ticket=await mintReviewMediaTicket(e,review,file,1,Date.now()+60000,inviteHash);
-  const url='https://roteiva-api-dev.ewertonmendes9.workers.dev/reviews/media?ticket='+ticket;
+  const url='https://roteiva-api-dev.roteiva-dev.workers.dev/reviews/media?ticket='+ticket;
   const navigation=new Request(url,{headers:{'Sec-Fetch-Mode':'navigate','Sec-Fetch-Dest':'document'}});
   await assert.rejects(()=>streamReviewMedia(navigation,e,new URL(url)),err=>err.status===404);
   // A same URL with a media destination still proceeds to server authorization.

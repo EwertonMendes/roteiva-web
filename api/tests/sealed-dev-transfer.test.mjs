@@ -1,0 +1,24 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {transferHandler} from '../operations/sealed-dev-transfer.mjs';
+test('maintenance transfer requires DEV, signature, expiry and no browser origin; only recipient can decrypt',async()=>{
+ const signing=await crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},true,['sign','verify']);
+ const recipient=await crypto.subtle.generateKey({name:'RSA-OAEP',modulusLength:2048,publicExponent:new Uint8Array([1,0,1]),hash:'SHA-256'},true,['encrypt','decrypt']);
+ const config={path:'/__ops/synthetic',expiresAt:Date.now()+60000,signingPublicKey:await crypto.subtle.exportKey('jwk',signing.publicKey),encryptionPublicKey:await crypto.subtle.exportKey('jwk',recipient.publicKey)};
+ const env={ENVIRONMENT:'dev',FIREBASE_PROJECT_ID:'roteiva-web-dev'};
+ for(const name of ['TOKEN_KEYS','TRIAL_IDENTITY_HMAC_KEY','GOOGLE_CLIENT_SECRET','GOOGLE_PICKER_API_KEY','DROPBOX_APP_KEY','DROPBOX_APP_SECRET','FIREBASE_ADMIN_CREDENTIALS_JSON'])env[name]='synthetic-'+name;
+ const handler=transferHandler(config),message=new TextEncoder().encode('POST\n'+config.path+'\n'+config.expiresAt);
+ const sig=Buffer.from(await crypto.subtle.sign({name:'ECDSA',hash:'SHA-256'},signing.privateKey,message)).toString('base64');
+ const request=(headers={})=>new Request('https://source.example'+config.path,{method:'POST',headers:{'X-Migration-Signature':sig,...headers}});
+ assert.equal((await handler(request({'X-Migration-Signature':'bad'}),env)).status,404);
+ assert.equal((await handler(request({Origin:'https://evil.example'}),env)).status,404);
+ assert.equal((await handler(request(),{...env,ENVIRONMENT:'prod'})).status,404);
+ assert.equal((await transferHandler({...config,expiresAt:0})(request(),env)).status,404);
+ const response=await handler(request(),env),text=await response.text();
+ assert.equal(response.headers.get('Cache-Control'),'no-store');assert.ok(!text.includes('synthetic-'));
+ const sealed=JSON.parse(text),raw=await crypto.subtle.decrypt({name:'RSA-OAEP'},recipient.privateKey,Buffer.from(sealed.wrapped,'base64'));
+ const key=await crypto.subtle.importKey('raw',raw,'AES-GCM',false,['decrypt']);
+ const plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:Buffer.from(sealed.iv,'base64'),additionalData:message},key,Buffer.from(sealed.encrypted,'base64'));
+ assert.equal(JSON.parse(new TextDecoder().decode(plain)).TOKEN_KEYS,env.TOKEN_KEYS);
+ await assert.rejects(()=>crypto.subtle.decrypt({name:'AES-GCM',iv:Buffer.from(sealed.iv,'base64'),additionalData:new Uint8Array()},key,Buffer.from(sealed.encrypted,'base64')));
+});

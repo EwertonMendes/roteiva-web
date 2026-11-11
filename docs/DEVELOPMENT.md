@@ -1,5 +1,73 @@
 # Desenvolvimento e deploy — Roteiva
 
+## Ambientes DEV e PROD — 10/11/2026
+
+**Estado atual:** preparação multiambiente em branch; Firebase PROD provisionado sem billing; migração Cloudflare DEV e homologação remota pendentes. Nenhum primeiro deploy PROD foi autorizado. As seções históricas abaixo preservam evidências anteriores e não significam que PROD está ativo.
+
+### Contrato e builds
+
+`shared/environments.ts` é a fonte das identidades públicas. `.env.firebase` e `.env.production` contêm somente configuração SDK pública. Segredos nunca usam prefixo VITE_. Vite carrega `.env`, `.env.local`, `.env.[mode]`, `.env.[mode].local`; variáveis já presentes no processo prevalecem. Um arquivo local que alterar modo/projeto/API indevidamente faz o build falhar; não usar `.env.local` de DEV em builds PROD. `production` é o modo de PROD; o build DEV usa `firebase`, mesmo que Vite marque ambos como builds otimizados.
+
+```bash
+pnpm build
+node scripts/verify-environment-build.mjs dev
+pnpm build:prod
+node scripts/verify-environment-build.mjs prod
+pnpm build:demo
+pnpm build:emulator
+pnpm test
+pnpm typecheck
+npm ci --prefix api
+npm test --prefix api
+npm run typecheck --prefix api
+npm run migrate:local --prefix api
+npm run build --prefix api
+pnpm test:firebase
+```
+
+O manifesto registra ambiente, API, Firebase e SHA (GITHUB_SHA ou SOURCE_SHA); Actions exige o mesmo SHA do job. Demo não chama API; emulador usa exclusivamente demo-roteiva e API loopback `127.0.0.1:8787`, interceptada em Playwright. URLs pessoais não são aceitas pelo contrato nem pelo verificador do bundle.
+
+### Credenciais e promoção
+
+Ambientes GitHub: cloudflare-development/firebase-development e cloudflare-production/firebase-production. Não reaproveitar credencial Cloudflare da conta anterior após a migração; criar token com Workers Scripts/D1 somente na conta correta. Variáveis Cloudflare: CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_D1_DATABASE_ID, API_BASE_URL. Secret: CLOUDFLARE_API_TOKEN. Firebase: FIREBASE_PROJECT_ID, API_BASE_URL, VITE_FIREBASE_AUTH_DOMAIN/API_KEY/APP_ID/MESSAGING_SENDER_ID/STORAGE_BUCKET públicos; FIREBASE_SERVICE_ACCOUNT protegido e exclusivo do projeto.
+
+Worker Secrets obrigatórios: TOKEN_KEYS (JSON de chaves AES-256 base64url por versão), TRIAL_IDENTITY_HMAC_KEY (CSPRNG independente), GOOGLE_CLIENT_SECRET, GOOGLE_PICKER_API_KEY, DROPBOX_APP_KEY, DROPBOX_APP_SECRET e FIREBASE_ADMIN_CREDENTIALS_JSON. GOOGLE_CLIENT_ID e callbacks são variáveis públicas. PROD recebe chaves novas; nunca duplicar AES/HMAC DEV. Preservar as chaves DEV durante migração e não trocar Client IDs para tentar corrigir callback.
+
+Em api/, com as variáveis protegidas e credencial da conta correta: `node scripts/guard-environment.mjs dev --before-migrations`, `npm run migrate:dev`, `node scripts/guard-environment.mjs dev --seal`, `node scripts/guard-secrets.mjs dev`. Para PROD substituir dev/prod e usar migrate:prod, exclusivamente após aprovação. Selagem só insere identidade ausente após conferir o D1 real, não corrige identidade divergente. Migrações são aditivas; nunca editar arquivo já aplicado.
+
+DEV segue workflows existentes. PROD: habilitar PRODUCTION_ENABLED somente após DEV homologado, OAuth público resolvido e aprovação explícita; dispatch de production.yml em master com SHA completo e confirmação DEPLOY ROTEIVA PROD. Configurar required reviewer proprietário nos dois environments, sem bypass de admin e branch master. GitHub Free suporta required reviewers neste repositório público. Aprovação humana é ação real no ambiente; workflow_dispatch sozinho não a substitui.
+
+### Migração e recuperação
+
+Backup DEV inicial: export SQL consistente do D1 e configurações/código/versão do Worker foram salvos fora do repositório em diretório privado local. Nunca publicar SQL, export cifrado, chave privada de recuperação ou arquivos de credenciais como artifact de Actions público. Fazer uma nova exportação final em janela sem escrita e sem Cron no banco de origem antes do cutover, para evitar perder alterações posteriores ao backup inicial. Conferir schema, contagens por tabela, quick_check e foreign_key_check antes/depois; não inferir integridade apenas pelo tamanho do arquivo.
+
+1. Preparar conta exclusiva, D1 de destino, credenciais preservadas, callbacks novos adicionados aos clientes DEV e builds/testes aprovados.
+2. Transferência de segredos: operação de manutenção explícita em api/operations/transfer-dev-secrets.mjs, origem DEV fixa por argumentos, versão esperada, token via ambiente e saída privada absoluta. A chave privada nunca vai à Cloudflare; export é cifrado e a versão original é restaurada em finally. Conferir health e ausência da rota após restauração.
+3. Pausar escritas e Cron da origem durante exportação final, importar somente no novo D1 DEV, aplicar migrations versionadas e selar dev. Validar chaves/grants cifrados sem revelar valores. Nunca importar esse dump em PROD.
+4. Publicar API DEV nova e frontend correspondente por commit identificável; smoke de saúde/CORS/JWT/D1 e homologação sintética Drive/Dropbox, mídia e aprovação antes de PROD. Tratar sessões OAuth em andamento e cookies do hostname antigo; manter cliente/grants e redirects antigos durante a janela, sem presumir validade de código de autorização emitido para outro redirect.
+5. Após cutover, não deixar dois bancos DEV aceitando escrita. Endpoint legado temporário pode apenas encaminhar ao destino novo; origem preservada para recuperação, sem Cron concorrente. Remoção posterior exige confirmar ausência de clientes antigos.
+
+Rollback antes do cutover: restaurar versão original e manter frontend/destinos antigos. Depois de aceitar escritas no destino novo: reverter código compatível sobre o mesmo novo D1; não apontar para snapshot antigo sem reconciliar dados. Rollback de Worker/Hosting nunca desfaz schema. D1 Free oferece Time Travel de sete dias; guardar SQL privado além dessa janela, testar restore numa base isolada e conferir integridade. Firestore Spark não recebe backup gerenciado pago; exportação de domínio e recuperação de Auth/Firestore exigem processo separado. Não apresentar exportação parcial da UI como backup integral.
+
+### Franquias gratuitas e observabilidade (documentação oficial consultada em 10/11/2026)
+
+| Serviço | Franquia/unidade | Limite operacional |
+|---|---|---|
+| Workers Free | 100.000 requisições/dia por conta, reset UTC; CPU 10 ms por invocação | Sem limite de wall time HTTP enquanto cliente conectado; Cron tem limite de execução de 15 min e CPU do plano. Não configurar cpu_ms pago. |
+| D1 Free | 5 milhões de linhas lidas/dia e 100 mil escritas/dia por conta; 5 GB totais | 10 bancos/conta; 500 MB/banco; 50 queries/invocação; Time Travel 7 dias. Scans/índices também impactam linhas. |
+| Cron | até 5 triggers por conta Free | Mantidos os dois triggers DEV, um minuto para revogação/exclusão e 15 minutos para manutenção. |
+| Rate Limiting binding | limites definidos por chave e ponto de presença | Eventualmente consistente; não substitui autorização nem medição global de consumo. |
+| Hosting Spark | 10 GB armazenados; pricing informa 360 MB/dia e guia Hosting informa 10 GB/mês, por projeto | Versões retidas consomem armazenamento; monitorar console e manter retenção. |
+| Firestore Standard Spark | 1 GiB; 50 mil leituras, 20 mil escritas e 20 mil exclusões/dia; 10 GiB saída/mês | Franquia de um banco por projeto, reset diário no horário do Pacífico; Rules/índices/retries contam conforme operação. |
+| Firebase Auth | Google/federados básicos sem cobrança por SMS | Não ativar telefone. Identity Platform Spark tem limite próprio de 3.000 DAU Tier 1; não confundir com Auth básico nem habilitar upgrade automaticamente. |
+
+Fontes: [contas Free adicionais](https://developers.cloudflare.com/fundamentals/account/create-account/), [Workers](https://developers.cloudflare.com/workers/platform/limits/), [D1 pricing](https://developers.cloudflare.com/d1/platform/pricing/), [D1 limits](https://developers.cloudflare.com/d1/platform/limits/), [rate limiting](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/), [Hosting](https://firebase.google.com/docs/hosting/usage-quotas-pricing), [Firestore](https://firebase.google.com/docs/firestore/quotas), [Auth](https://firebase.google.com/docs/auth/limits), [ambientes GitHub](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments). A documentação oficial de transferência Hosting diverge: a página de preços informa 360 MB/dia, enquanto o guia operacional atualizado informa 10 GB/mês. Confirmar a franquia exibida no console de cada projeto antes de estimar capacidade; não tratar as unidades como intercambiáveis. Contas adicionais servem ao isolamento real DEV/PROD, nunca a distribuir o mesmo tráfego para contornar franquias.
+
+Monitorar Workers Analytics (requisições/CPU/erros), D1 Metrics (scans, escritas, armazenamento), eventos categóricos api_operation/OAuth/Cron, Hosting Usage e Firestore Usage. Não logar URLs com tickets, identidades ou corpos de provedores. O health verifica banco/ambiente, mas não comprova login nem concessão OAuth. Smoke: `node scripts/smoke-environment.mjs dev` ou prod após ativação. Alertas, consentimento real e homologação mobile são evidências separadas.
+
+Google mantém drive.readonly porque a navegação atual usa pastas existentes além dos arquivos autorizados no Picker. Uma migração apenas para drive.file exige prova de paridade antes de remover o escopo. [Escopos](https://developers.google.com/workspace/drive/api/guides/api-specific-auth), [verificação restrita](https://developers.google.com/identity/protocols/oauth2/production-readiness/restricted-scope-verification) e [expiração Testing](https://developers.google.com/identity/protocols/oauth2#expiration). Dropbox deve usar app PROD separado e cumprir [aprovação de produção](https://www.dropbox.com/developers/reference/developer-guide). Nenhuma aprovação de provedor foi presumida.
+
+
 ## QA dos seis bugs DEV — 03/11/2026
 
 PDF.js é dependência frontend travada em `pnpm-lock.yaml`; biblioteca e worker são assets locais e carregados somente na visualização PDF. Não depende de CDN. Testes de navegador de PDFs usam fixture sintética válida de duas páginas e verificam renderização, troca de página e zoom. `project-covers.spec.ts` inclui conta apenas Dropbox, foco compacto, salvamento e reload; `reviews-workflow.spec.ts` verifica consumo do atalho e retorno à rota. Rodar essas suítes em emuladores (desktop/mobile), além de `pnpm test:rules` e testes API. Nenhum teste automatizado usa dados reais.

@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {environment} from '../shared/environments.ts';
+const target=process.argv[2],config=environment(target);
+const send=(path,options={})=>fetch(config.apiOrigin+path,{...options,redirect:'manual',signal:AbortSignal.timeout(15000)});
+const health=await send('/health');assert.equal(health.status,200);assert.deepEqual(await health.json(),{status:'ok',environment:target});
+assert.equal((await send('/integrations/drive',{headers:{Authorization:'Bearer invalid'}})).status,401);
+assert.equal((await send('/health',{headers:{Origin:'https://evil.example'}})).status,403);
+const cors=await send('/oauth/drive/start',{method:'OPTIONS',headers:{Origin:config.frontendOrigin}});
+assert.equal(cors.status,204);assert.equal(cors.headers.get('Access-Control-Allow-Origin'),config.frontendOrigin);
+assert.match(cors.headers.get('Content-Security-Policy'),/frame-ancestors 'none'/);
+console.log('Health, durable D1 identity, invalid token, exact CORS and response policy passed for '+target+'. OAuth consent remains separate.');

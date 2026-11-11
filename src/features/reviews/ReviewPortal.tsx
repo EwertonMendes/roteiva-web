@@ -1,3 +1,4 @@
+import { API_BASE_URL } from "../../lib/environment.ts";
 import {AppInput} from "../ui/AppInput";
 import {AppTextarea} from "../ui/AppTextarea";
 import {AppButton} from "../ui/AppButton";
@@ -22,7 +23,7 @@ type Comment={id:string;file_id:string;author_name:string;body:string;seconds:nu
 type Decision={version:number;decision:string;author_name:string;message:string;created_at:number};
 type PublicData={review:Review;assets:Asset[];comments:Comment[];decisions:Decision[];mediaTickets?:Record<string,MediaTicket>};
 type Mode="light"|"dark";
-const API="https://roteiva-api-dev.ewertonmendes9.workers.dev";
+const API=API_BASE_URL;
 const messages:Record<string,string>={
   review_not_found:"Este link não existe mais ou foi revogado.",
   review_expired:"O prazo de acesso a este material terminou. Solicite um novo link ao profissional.",

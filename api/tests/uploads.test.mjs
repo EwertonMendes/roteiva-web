@@ -216,7 +216,7 @@ test('real HTTP middleware enforces signed Firebase identity, entitlement and UI
     .setAudience(f.env.FIREBASE_PROJECT_ID).setIssuer('https://securetoken.google.com/'+f.env.FIREBASE_PROJECT_ID)
     .setSubject(sub).setIssuedAt(now).setExpirationTime(now+300).sign(privateKey);
   const tokens={alice:await jwt('alice'),bob:await jwt('bob')};
-  const env={...f.env,OAUTH_ENABLED:'true',OAUTH_REDIRECT_URI:'https://roteiva-api-dev.ewertonmendes9.workers.dev/oauth/drive/callback',
+  const env={...f.env,OAUTH_ENABLED:'true',OAUTH_REDIRECT_URI:'https://roteiva-api-dev.roteiva-dev.workers.dev/oauth/drive/callback',
     API_RATE_LIMIT:{limit:async()=>({success:true})}};
   const original=globalThis.fetch;
   globalThis.fetch=async(url,init)=>{

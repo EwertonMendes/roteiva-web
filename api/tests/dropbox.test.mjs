@@ -9,7 +9,7 @@ import {issueDropboxPreview,streamDropboxPreview} from '../src/dropbox-preview.t
 const uid='alice', conn='ffffffff-ffff-4fff-8fff-ffffffffffff';
 const folder='root', id='id:a4ayc_80_OEAAAAAAAAAXw', root=uid;
 const projectId=17,attemptId='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-const API='https://roteiva-api-dev.ewertonmendes9.workers.dev';
+const API='https://roteiva-api-dev.roteiva-dev.workers.dev';
 async function fixture(t) {
  const f=database();t.after(f.close);
  const env={DB:f.DB,ENVIRONMENT:'dev',FIREBASE_PROJECT_ID:'roteiva-web-dev',
@@ -237,7 +237,7 @@ test('Dropbox Office previews convert to protected PDF; native PDF is streamed w
 test('Dropbox OAuth launch is one-use, short-lived and never returns credentials',async t=>{
  const f=await fixture(t);
  const launch=await (await dropboxStart(f.env,uid)).json();
- assert.match(launch.launchUrl,/^https:\/\/roteiva-api-dev\.ewertonmendes9\.workers\.dev\/oauth\/dropbox\/launch\?ticket=/);
+ assert.match(launch.launchUrl,/^https:\/\/roteiva-api-dev\.roteiva-dev\.workers\.dev\/oauth\/dropbox\/launch\?ticket=/);
  assert.doesNotMatch(JSON.stringify(launch),/demo-token|demo-refresh|synthetic-secret/);
  const records=f.sql.prepare('SELECT * FROM dropbox_oauth_transactions').all();
  assert.equal(records.length,1);

@@ -34,7 +34,7 @@ try{
   const result=await page.evaluate(async config=>{
     const {sendToDrive}=await import(URL.createObjectURL(new Blob([config.source],{type:'text/javascript'})));
     const input=document.querySelector('input[data-real-drive-qa]');const file=input.files[0];
-    const api='https://roteiva-api-dev.ewertonmendes9.workers.dev';
+    const api='https://roteiva-api-dev.roteiva-dev.workers.dev';
     const endpoint=api+'/integrations/drive/'+encodeURIComponent(config.connection)+'/folders/'+encodeURIComponent(config.folder)+'/uploads';
     const call=async(path,payload)=>{
       const response=await fetch(path,{method:'POST',cache:'no-store',headers:{Authorization:'Bearer '+config.token,

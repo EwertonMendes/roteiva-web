@@ -109,7 +109,7 @@ test('access loading uses the authenticated theme before the workspace mounts',a
    },{key:key!,theme});
    let release!:()=>void;
    const paused=new Promise<void>(resolve=>{release=resolve;});
-   await page.route('https://roteiva-api-dev.ewertonmendes9.workers.dev/access/ensure',async route=>{
+   await page.route('http://127.0.0.1:8787/access/ensure',async route=>{
      // The account was already registered by login(). Simulate only the
      // pending access request: no real Worker access or new trial writes.
      await paused;
@@ -137,7 +137,7 @@ test('access loading uses the authenticated theme before the workspace mounts',a
      await expect(page.locator('.app-shell')).toBeVisible();
    }finally{
      release();
-     await page.unroute('https://roteiva-api-dev.ewertonmendes9.workers.dev/access/ensure');
+     await page.unroute('http://127.0.0.1:8787/access/ensure');
    }
  }
 });

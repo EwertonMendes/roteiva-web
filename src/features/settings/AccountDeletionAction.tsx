@@ -1,3 +1,4 @@
+import { API_BASE_URL } from "../../lib/environment.ts";
 import {AppInput} from "../ui/AppInput";
 import {AppButton} from "../ui/AppButton";
 import { useEffect, useRef, useState } from "react";
@@ -7,7 +8,7 @@ import { useAuth } from "../auth/AuthProvider";
 import { firebaseServices, persistentCacheEnabled, purgePrivateCache } from "../../lib/firebase";
 import "./account-deletion.css";
 
-const BASE="https://roteiva-api-dev.ewertonmendes9.workers.dev";
+const BASE=API_BASE_URL;
 const CONFIRM="EXCLUIR MINHA CONTA";
 export type StatusResponse={available:boolean;operation:{id:string;status:"processing"|"completed"|"manual_review"}|null};
 class DeletionApiError extends Error{

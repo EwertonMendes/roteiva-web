@@ -3,8 +3,8 @@
 import assert from "node:assert/strict";
 
 const target=process.argv[2];
-if(!target||!/^https:\/\/roteiva-web-dev\.web\.app\/?$/.test(target)){
-  throw new Error("Only the DEV Hosting origin is authorized for header verification.");
+if(!target||!/^https:\/\/roteiva-web-(?:dev|prod)\.web\.app\/?$/.test(target)){
+  throw new Error("Only a Roteiva Hosting origin is authorized for header verification.");
 }
 const root=target.replace(/\/$/,"");
 const pages=["/","/index.html","/configuracoes","/biblioteca","/projetos/12345678"];

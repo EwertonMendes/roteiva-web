@@ -41,7 +41,7 @@ import {handle} from '../src/index.ts';
 test('cover HTTP routes require a signed identity, active entitlement and connection ownership',async()=>{
  const {env,db,fetcher}=await setup();const original=globalThis.fetch;
  try{
-  Object.assign(env,{FIREBASE_PROJECT_ID:'roteiva-web-dev',ENVIRONMENT:'dev',OAUTH_ENABLED:'true',FRONTEND_ORIGIN:'https://roteiva-web-dev.web.app',OAUTH_REDIRECT_URI:'https://roteiva-api-dev.ewertonmendes9.workers.dev/oauth/drive/callback',API_RATE_LIMIT:{limit:async()=>({success:true})},API_THUMB_LIMIT:{limit:async()=>({success:true})}});
+  Object.assign(env,{FIREBASE_PROJECT_ID:'roteiva-web-dev',ENVIRONMENT:'dev',OAUTH_ENABLED:'true',FRONTEND_ORIGIN:'https://roteiva-web-dev.web.app',OAUTH_REDIRECT_URI:'https://roteiva-api-dev.roteiva-dev.workers.dev/oauth/drive/callback',API_RATE_LIMIT:{limit:async()=>({success:true})},API_THUMB_LIMIT:{limit:async()=>({success:true})}});
   const {privateKey,publicKey}=await generateKeyPair('RS256'),jwk=await exportJWK(publicKey);jwk.kid='cover-test';const now=Math.floor(Date.now()/1000);
   const jwt=sub=>new SignJWT({auth_time:now}).setProtectedHeader({alg:'RS256',kid:'cover-test'}).setAudience(env.FIREBASE_PROJECT_ID).setIssuer('https://securetoken.google.com/'+env.FIREBASE_PROJECT_ID).setSubject(sub).setIssuedAt(now).setExpirationTime(now+300).sign(privateKey);
   const alice=await jwt('alice'),bob=await jwt('bob');

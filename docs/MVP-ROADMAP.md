@@ -1,5 +1,27 @@
 # Roadmap vivo — Roteiva MVP
 
+## Infraestrutura multiambiente — 10/11/2026
+
+**IMPLEMENTADO EM BRANCH; ATIVAÇÃO E HOMOLOGAÇÃO PENDENTES.** Esta seção é o estado atual dos ambientes; entradas anteriores abaixo conservam contexto e evidências históricas.
+
+- [x] Auditoria do código e recursos reais: master 5323a53; conta Cloudflare contém também dois Workers de outro aplicativo. Proprietário decidiu conta exclusiva para DEV, preservando a conta anterior.
+- [x] Backup SQL consistente inicial do D1 DEV, inventário de bindings/cron e backup do código/versão do Worker fora do repositório. Exportação final de cutover ainda necessária.
+- [x] Conta Cloudflare Roteiva DEV 71d7d72a003796ba12b6bf23d149916c, subdomínio roteiva-dev.workers.dev e D1 4fa31040-0cde-45dc-8140-cd784b5463a0 criados. D1 destino ainda vazio.
+- [x] Firebase roteiva-web-prod e app Web criados; billingEnabled=false confirmado via Cloud Billing API; Firestore Standard nativo, southamerica-east1, freeTier=true, proteção contra exclusão, sem dados.
+- [x] Código centralizado, guardas Firebase/API/callback/issuer/audience, identidade D1 imutável, Cron protegido, prefixos de rate limit por ambiente, CSP PDF e links/tickets parametrizados.
+- [x] Configuração explícita dos builds dev/prod/demo/emulator; manifesto de artefato e auditoria contra URLs pessoais e segredos; workflow manual PROD preparado com SHA atual, PR merged, conta/projeto/D1 e secrets protegidos.
+- [x] Testes iniciais: 209 API + teste específico de transferência cifrada; 75 frontend; TypeScript; builds dev/prod/demo/emulador; 34 testes de regras A/B; migrations D1 locais e dry-run Worker DEV.
+- [ ] Finalizar regressão completa de navegador desktop/mobile. A primeira execução identificou o preview Vite sem modo; corrigido para validar configuração em builds/execução, sem exigir recompilar no preview.
+- [ ] Transferir credenciais DEV preservadas por operação cifrada e restaurar a versão original; importar exportação final no novo D1 e validar integridade/contagens, sem mudar Firebase/usuários/arquivos.
+- [ ] Adicionar callbacks branded a Google/Dropbox e executar cutover coordenado API/frontend; impedir duas bases DEV graváveis; homologar login, refresh, mídias e aprovação com dados sintéticos.
+- [ ] Depois de DEV validado, provisionar Cloudflare PROD exclusivo, D1 limpo/schema, secrets novos, Auth Google/Firestore/IAM dedicados e clientes OAuth PROD separados.
+- [ ] Revisar/publicar identidade e políticas; Google DEV confirmado Externo/Testing com branding incompleto. Verificação Google/Dropbox PROD não realizada; drive.readonly mantido por necessidade funcional.
+- [ ] Configurar e verificar ambientes GitHub/reviewers e credenciais por ambiente. Auditoria inicial encontrou firebase-production sem proteção e master sem branch protection; não alegar proteção ativa antes de configurar.
+- [ ] Pedir aprovação explícita para primeiro deploy PROD com commit/destinos/testes/riscos; nenhum deploy PROD executado nesta etapa.
+
+Evidências de código: shared/environments.ts, src/lib/environment-config.ts, api/src/environment.ts, migration 0020, api/operations/, tests/environment.test.mjs, api/tests/environment.test.mjs, .github/workflows/production.yml e DEVELOPMENT.md. Testes simulados não comprovam consentimento/refresh Google ou Dropbox reais nem homologação de ambos ambientes.
+
+
 ## Seis bugs DEV — 03/11/2026
 
 **IMPLEMENTADO, PUBLICADO EM DEV E VALIDADO nos cenários relatados em Chrome real (desktop e viewport mobile).** PR [#109](https://github.com/EwertonMendes/roteiva-web/pull/109) mergeado após autorização explícita. Commit publicado: `7e1b199fb92b054558d09c07e5499c4d6ca9c4df`.
