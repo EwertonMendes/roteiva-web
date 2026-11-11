@@ -84,7 +84,8 @@
 .auth-account-check {flex:none;background:#d5e7ad;border-radius:50%;width:26px;height:26px;color:#191919;display:grid;place-items:center;}
 .auth-invitation {margin:2px 0 30px;padding:5px 12px 5px 20px;border-left:2px solid #afc87c;color:var(--ink);max-width:460px;font-size:clamp(15px,1.2vw,17px);font-weight:500;line-height:1.65;letter-spacing:-.014em;}
 .auth-primary {width:100%;min-height:54px;gap:12px;justify-content:space-between;border:0;border-radius:12px;background:var(--ink);color:var(--card);padding:14px 18px;font-size: var(--type-support);font-weight:700;transition:transform .15s ease,opacity .15s ease;}
-.auth-row-actions {display:flex;align-items:center;gap:16px;}
+.auth-row-actions {display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+.auth-error + .auth-row-actions {margin-top:20px;}
 .auth-row-actions .auth-primary {width:auto;}
 .auth-content .auth-link {margin-top:18px;}
 .register-form {display:flex;flex-direction:column;gap:21px;}

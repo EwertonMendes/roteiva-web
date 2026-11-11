@@ -1,5 +1,7 @@
 # Roteiva
 
+**Recuperação de acesso (em validação):** a leitura vazia do observador agora é conferida por uma consulta autenticada ao servidor antes de bloquear uma conta válida. Cache, resposta de outra conta ou estado inválido não liberam acesso. O alerta mantém espaço de 20 px antes dos botões; testes e publicação estão no [roadmap](docs/MVP-ROADMAP.md).
+
 ## Ambientes DEV e PROD — publicado em 11/11/2026
 
 **IMPLEMENTADO E PUBLICADO:** um repositório e uma base de código, com Cloudflare em contas exclusivas e Firebase em projetos distintos. PR [#111](https://github.com/EwertonMendes/roteiva-web/pull/111), commit publicado `d599e247e9858afe26c9f93e7bd0da70af870dee`.
@@ -13,7 +15,7 @@
 
 **VALIDADO:** migração DEV com 25 tabelas/99 registros comparados antes do selo novo, Google Drive real reconectado/listando, Dropbox existente listando e abrindo PDF. Em PROD, identidades sintéticas provaram isolamento Firestore A/B/anônimo e rejeição de JWT entre projetos nas duas direções. Fixtures da primeira homologação removidas; naquele ponto Auth/Firestore ficaram vazios e D1 sem dados de negócio. Depois, a conta real do proprietário foi criada em PROD pelo fluxo Google/cadastro, com espaço vazio. Smokes de saúde/CORS/auth/cache e recuperação do SQL PROD passaram. Nenhum faturamento habilitado.
 
-**BLOQUEADO PARA LANÇAMENTO AMPLO:** clientes OAuth PROD, secrets e callbacks separados foram criados, mas Google PROD já está Em produção, com escopos declarados e páginas públicas salvas. A verificação de marca exige comprovar a propriedade da homepage; Dropbox ainda exige a primeira conexão real antes de receber a solicitação de produção. Submissão/aprovação de escopos e consentimentos reais ainda não foram concluídos. O acesso aos consoles foi restabelecido. `drive.readonly` foi preservado por necessidade funcional e pode exigir avaliação anual de segurança externa, com custos não autorizados. Login Google PROD por popup e cadastro real confirmados; Safari/iOS físico ainda não homologado. Detalhes, limites gratuitos, backups e recuperação em [DEVELOPMENT](docs/DEVELOPMENT.md#ambientes-dev-e-prod--10112026) e no [roadmap](docs/MVP-ROADMAP.md).
+**BLOQUEADO PARA LANÇAMENTO AMPLO:** clientes OAuth PROD, secrets e callbacks separados foram criados, mas Google PROD já está Em produção, com escopos declarados e páginas públicas salvas. A verificação de marca exige comprovar a propriedade da homepage; Os consentimentos reais Drive/Dropbox foram concluídos; a solicitação de produção Dropbox agora exige o ícone. A comprovação de domínio e a verificação de marca Google foram adiadas por decisão do proprietário até adquirir o domínio final. Submissão/aprovação e homologação completa de arquivos continuam pendentes. O acesso aos consoles foi restabelecido. `drive.readonly` foi preservado por necessidade funcional e pode exigir avaliação anual de segurança externa, com custos não autorizados. Login Google PROD por popup e cadastro real confirmados; Safari/iOS físico ainda não homologado. Detalhes, limites gratuitos, backups e recuperação em [DEVELOPMENT](docs/DEVELOPMENT.md#ambientes-dev-e-prod--10112026) e no [roadmap](docs/MVP-ROADMAP.md).
 
 As descrições abaixo conservam contexto histórico das respectivas entregas; o estado atual dos ambientes está nesta seção e no roadmap.
 

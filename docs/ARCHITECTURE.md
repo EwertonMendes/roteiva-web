@@ -1,5 +1,11 @@
 # Arquitetura do Roteiva — MVP SaaS
 
+## Validação de acesso após restauração de sessão — 11/11/2026
+
+**DECISÃO TOMADA / IMPLEMENTADO:** snapshot ausente do listener não basta para concluir que uma projeção válida acabou de desaparecer. access-observer.ts reconcilia esse evento por leitura direta autenticada do documento access/current no Firestore REST, sem cache do SDK. access-watch.ts deriva projeto e endpoint do contrato existente, limita a consulta ao UID autenticado, rejeita redirect e valida nome completo, ownerUid e dados pelo parser comum access-state.ts. Credencial administrativa nunca participa; Rules continuam autorizando a leitura. Não reexecutar cadastro, renovar teste ou escrever concessões para recuperar a tela.
+
+Eventos novos do servidor e erros do listener invalidam respostas em voo. Cleanup de UID/logout impede aplicar uma leitura anterior. Ausência confirmada, permissão negada, timeout e dados inválidos permanecem fail-closed; dados de cache não autorizam acesso. Suspensão/expiração seguem a mesma política e o backend permanece independente da UI. A leitura adicional ocorre somente ao receber snapshot ausente; não há polling nem novas consultas no caminho normal.
+
 ## Ambientes DEV e PROD — 10/11/2026
 
 **DECISÃO TOMADA:** um repositório e uma base de código, Firebase por projeto e Cloudflare por conta. A conta Cloudflare anterior hospeda outros aplicativos e seu subdomínio não será alterado. O proprietário escolheu migrar apenas Roteiva DEV para a conta exclusiva. Nenhum dado DEV será copiado para PROD.

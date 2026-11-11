@@ -1,6 +1,6 @@
 import {test,expect,type Page} from './fixtures';
 import {initializeTestEnvironment} from '@firebase/rules-unit-testing';
-import {collection,doc,getDocs,query,updateDoc,where,Timestamp} from 'firebase/firestore';
+import {collection,doc,getDoc,getDocs,query,updateDoc,setDoc,deleteDoc,where,Timestamp} from 'firebase/firestore';
 
 const cloud='http://127.0.0.1:4173';
 async function signup(page:Page,email:string){
@@ -60,6 +60,52 @@ test('access validation errors never offer account deletion',async({page},info)=
   });
   await page.reload();
   await expect(page.getByRole('heading',{name:'Não conseguimos validar sua assinatura.'})).toBeVisible();
+  for(const theme of ['light','dark']){
+    await page.evaluate(value=>{document.documentElement.dataset.theme=value;},theme);
+    const messageBox=await page.getByRole('alert').boundingBox(),actionsBox=await page.locator('.auth-row-actions').boundingBox();
+    expect(messageBox).not.toBeNull();expect(actionsBox).not.toBeNull();
+    expect(actionsBox!.y-(messageBox!.y+messageBox!.height)).toBeGreaterThanOrEqual(18);
+  }
   await expect(page.getByRole('button',{name:'Excluir conta',exact:true})).toHaveCount(0);
   await expect(page.getByText('Excluir minha conta',{exact:true})).toHaveCount(0);
+});
+
+test('session survives reload and OAuth return URLs for every registered identity',async({page},info)=>{
+  await signup(page,'access-return-'+info.project.name+'@example.com');
+  for(const provider of ['drive','dropbox']){
+    await page.goto(cloud+'/biblioteca?'+provider+'=connected');
+    await expect(page.locator('.app-shell')).toBeVisible();
+    await page.reload();await expect(page.locator('.app-shell')).toBeVisible();
+    await expect(page.getByRole('heading',{name:'Não conseguimos validar sua assinatura.'})).toHaveCount(0);
+  }
+});
+
+test('an empty listener snapshot is reconciled by an authenticated server read',async({page},info)=>{
+  const email='access-reconcile-'+info.project.name+'@example.com';
+  await signup(page,email);
+  const env=await initializeTestEnvironment({projectId:'demo-roteiva',firestore:{host:'127.0.0.1',port:8080}});
+  try{
+    await env.withSecurityRulesDisabled(async context=>{
+      const db=context.firestore(),users=await getDocs(query(collection(db,'users'),where('email','==',email)));
+      expect(users.size).toBe(1);
+      const uid=users.docs[0].id,ref=doc(db,'users',uid,'access','current'),saved=(await getDoc(ref)).data();
+      expect(saved).toBeDefined();
+      const url='http://127.0.0.1:8080/v1/projects/demo-roteiva/databases/(default)/documents/users/'+uid+'/access/current';
+      let authorized=false;
+      await page.route(url,async route=>{
+        if(route.request().method()==='GET'){
+          authorized=(route.request().headers().authorization||'').startsWith('Bearer ');
+          // Restore the isolated fixture before the independent read reaches the
+          // emulator. Its normal Rules still validate the browser's user token.
+          await setDoc(ref,saved!);
+        }
+        await route.continue();
+      });
+      const response=page.waitForResponse(r=>r.url()===url&&r.request().method()==='GET');
+      await deleteDoc(ref);
+      expect((await response).status()).toBe(200);expect(authorized).toBe(true);
+      await expect(page.locator('.app-shell')).toBeVisible();
+      await expect(page.getByRole('heading',{name:'Não conseguimos validar sua assinatura.'})).toHaveCount(0);
+    });
+  }finally{await env.cleanup();}
 });
