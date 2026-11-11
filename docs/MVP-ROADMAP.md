@@ -1,5 +1,15 @@
 # Roadmap vivo — Roteiva MVP
 
+## Ativação dos provedores PROD — 11/11/2026
+
+- [x] Conta real do proprietário criada em roteiva-web-prod pelo login Google e cadastro da aplicação; perfil Firestore com ownerUid correspondente confirmado via API. Espaço inicial vazio, teste de acesso provisionado pelo fluxo normal. Não copiar usuários nem registros DEV.
+- [x] Google Drive PROD com openid, userinfo.email, drive.file e drive.readonly declarados e salvos; status de publicação alterado para **Em produção**. Isso não equivale à aprovação de escopos restritos.
+- [x] Branding Google e Dropbox com nome Roteiva, páginas oficiais e suporte profissional salvos. Callback Dropbox PROD e permissões necessários preservados; PKCE depende da opção de clientes públicos, não desativá-la por conveniência.
+- [x] Google identificou requisito concreto de propriedade da homepage. Arquivo oficial de Search Console preparado em public/googleb5008dcbf685c696.html; página pública sobre.html descreve o serviço e as integrações sem exigir login. Descrição HTML deixou de rotular o serviço publicado como demonstração.
+- [ ] Publicar/conferir o arquivo oficial e confirmar propriedade no Search Console; repetir a verificação de marca e avançar para a de escopos. O Google pode levar até 24 horas para reconhecer a propriedade.
+- [ ] Consentimentos reais Drive/Dropbox PROD preparados, aguardando confirmação no momento de conceder acesso persistente, exigida pela política do controle do navegador. Configuração, publicação e homologação continuam sem presumir essa concessão.
+- [ ] Após conectar uma conta Dropbox real, solicitar produção: o console rejeita a solicitação antes da primeira autenticação OAuth. Executar QA sintético de pastas, upload, preview e aprovação após os vínculos.
+
 ## Infraestrutura multiambiente — 10/11/2026
 
 **INFRAESTRUTURA DEV/PROD PUBLICADA E ISOLAMENTO VALIDADO; OAUTH PROD BLOQUEADO PARA LANÇAMENTO AMPLO.** PR [#111](https://github.com/EwertonMendes/roteiva-web/pull/111), branch codex/dev-prod-environments. Esta seção é o estado atual; entradas abaixo registram entregas históricas.
