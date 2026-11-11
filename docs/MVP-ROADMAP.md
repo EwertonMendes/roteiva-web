@@ -1,5 +1,18 @@
 # Roadmap vivo — Roteiva MVP
 
+## Preparação sem domínio final — 11/11/2026
+
+**PARCIAL; NÃO AUTORIZA LANÇAMENTO AMPLO.** O domínio final permanece adiado pelo proprietário. A preparação independente dele está separada da análise dos provedores e dos testes com pessoas/aparelhos reais; roteiro em [DEVELOPMENT](DEVELOPMENT.md#preparação-de-lançamento-antes-do-domínio--11112026).
+
+- [x] Preflight público read-only reutilizável `scripts/launch-preflight.mjs`: DEV/PROD no SHA publicado 8a8480d298213172e983741fa356f2551cbda289 aprovados (manifesto/projeto/API, saúde/D1, negação anônima/token inválido, CORS/frames, páginas públicas e endereço de suporte).
+- [x] Corrigido QA de infraestrutura DEV que ainda apontava ao subdomínio legado pessoal: `api/scripts/qa-free-tier-live.mjs` deriva API/frontend do contrato compartilhado. Sem alterar Worker, banco ou contas.
+- [x] Cópia criptografada Auth/Firestore PROD capturada e restaurada em demo-roteiva; sete documentos e duas identidades conferidos, sem escrita em PROD. Prova separada da restauração SQL D1 anterior; captura não atômica e arquivos externos não incluídos. Dados/chave/evidências só em armazenamento privado.
+- [x] Novo snapshot D1 PROD com dados atuais exportado e restaurado em SQLite isolado: 26 tabelas, integridade e chaves estrangeiras aprovadas, selo PROD conferido. Evidência privada `prod-launch-d1-recovery.json`; não é snapshot atômico conjunto com Auth/Firestore.
+- [x] Ícone oficial Dropbox 256×256 localizado; console real reconfirmado: Development, somente proprietário, branding/URLs salvos e quatro escopos. Pacote de uso/escopos e roteiro de domínio preparados.
+- [ ] Upload do ícone Dropbox e pedido/análise de produção. Chooser da extensão continuou bloqueado; não depende de domínio. Nenhuma ampliação de acesso nem novo aceite executados.
+- [ ] Fluxos completos com contas externas em PROD, dispositivos físicos, recebimento do suporte, entrega de alertas/cotas, cópia de recuperação externa recorrente e operação de continuidade após sete dias ainda não concluídos. Não confundir endereço de suporte publicado com entrega de mensagens validada.
+- [ ] Após aquisição: DNS/TLS/Hosting, contrato de origem/Auth/Picker, marca e comprovação de propriedade Google, reverificação do fluxo e análise dos escopos. Callbacks da API podem permanecer se o hostname da API for mantido.
+
 ## Recuperação da validação de acesso — 11/11/2026
 
 **VALIDADO EM DEV E PROD.** A tela reportava acesso ausente após retorno OAuth/F5, apesar de o D1 indicar teste ativo e a projeção Firestore existir. watchAccess convertia snapshot vazio do observador diretamente em erro, sem uma confirmação independente do servidor.

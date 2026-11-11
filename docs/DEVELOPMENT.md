@@ -1,5 +1,48 @@
 # Desenvolvimento e deploy — Roteiva
 
+## Preparação de lançamento antes do domínio — 11/11/2026
+
+**DECISÃO TOMADA:** manter os endereços `web.app`/`workers.dev` atuais enquanto o proprietário compra o domínio. Não cadastrar nome fictício, comprar domínio, ampliar permissões OAuth ou habilitar cobrança para antecipar o lançamento. O domínio não impede testar fluxos, restaurar backups isoladamente nem preparar os pedidos aos provedores.
+
+### Preflight público, sem credenciais nem escritas
+
+```bash
+node scripts/launch-preflight.mjs prod 8a8480d298213172e983741fa356f2551cbda289
+node scripts/launch-preflight.mjs dev 8a8480d298213172e983741fa356f2551cbda289
+```
+
+O SHA opcional é o **release publicado**, não o HEAD de um commit posterior só de documentação. O script verifica manifesto/projeto/API, saúde com identidade D1, rejeição de anônimo/token inválido, CORS exato/política de frames e páginas públicas. Foi executado nos dois ambientes. Não usa credenciais, não envia mensagens, não cria usuários e não grava dados. Saída aprovada não comprova fluxos autenticados, entrega de suporte, aprovação OAuth, capacidade sob carga ou aparelhos físicos.
+
+O QA de infraestrutura existente `api/scripts/qa-free-tier-live.mjs` também usa agora o contrato compartilhado para API/frontend DEV, eliminando a referência ao subdomínio pessoal legado. Consultas D1 continuam somente EXPLAIN no ambiente protegido DEV; sem token, o helper testa apenas HTTP e informa o bloqueio da consulta D1. Não usar esse helper DEV para consultar PROD.
+
+### Recuperação de Auth e Firestore
+
+Em 11/11 foi capturada uma cópia privada de leitura dos documentos Firestore (coleções/subcoleções, incluindo descendentes de pais ausentes) e identidades Auth PROD, com paginação e limites explícitos. Conteúdo cifrado AES-256-GCM e chave separados em arquivos fora do repositório, com digest e horários da coleta. O round-trip de cifra e a restauração em `demo-roteiva` foram aprovados: campos Firestore e identidades/provedores Auth comparados com a cópia, sem escrita em PROD. Emuladores foram encerrados depois do teste. Evidência privada: `prod-firebase-recovery-latest.json` no diretório privado já documentado.
+
+Limites: captura sequencial, sem transação entre Firestore/Auth/D1; não é export gerenciado Firebase nem prova de restore no serviço real. Arquivos originais Drive/Dropbox, configurações OAuth/IAM, índices/regras e segredos têm recuperação separada. Login por senha/hashing não foi homologado por esse procedimento. Chave e cópia permanecem no mesmo computador: falta cópia externa protegida e rotina recorrente, retenção e teste de desastre integrado. Não ativar backup pago implicitamente nem publicar dados/chaves em artifacts do Actions. A restauração SQL D1 isolada anterior continua sendo evidência distinta.
+
+Um snapshot adicional D1 PROD com dados atuais foi exportado e restaurado em SQLite em memória em 11/11: 26 tabelas, `quick_check` e `foreign_key_check` aprovados e selo de ambiente PROD conferido. SQL e `prod-launch-d1-recovery.json` permanecem privados. Isso complementa a prova do schema inicial; não fornece atomicidade com a captura Firebase nem comprova restauração D1 remota.
+
+### Pacote preparatório para os provedores
+
+- **Dropbox:** app Roteiva, ícone oficial local `public/roteiva-icon.png` (256×256), páginas/descrição já salvas. No console de 11/11: Development, somente proprietário, quatro escopos existentes. O upload do ícone foi bloqueado pelo chooser da extensão; nada foi enviado/salvo nessa tentativa. Destravar envio, conferir ícones exigidos e finalizar o formulário de produção sem ampliar os quatro escopos. Aprovação pertence ao Dropbox; não declarar aprovação apenas por preencher ou enviar. Fonte: [guia de produção](https://www.dropbox.com/developers/reference/developer-guide#production-approval).
+- **Descrição de uso preparada:** Roteiva organiza clientes, projetos e aprovações audiovisuais. O usuário conecta sua própria conta, vincula pastas, navega metadados e envia/visualiza materiais selecionados. `account_info.read` identifica a conexão; `files.metadata.read` navega pastas/arquivos; `files.content.read` permite prévias/download autorizado; `files.content.write` permite uploads. Não solicitar permissões administrativas ou de equipe por conveniência.
+- **Google:** manter a configuração PROD existente e preparar justificativa dos escopos e demonstração do fluxo completo. `openid`/`userinfo.email` identificam a conexão; `drive.file` permite arquivos usados pelo app; `drive.readonly` serve à navegação/leitura de pastas existentes que o fluxo atual exige. Remover esse último escopo demanda mudança funcional e nova homologação; comprar domínio não elimina a análise de escopos restritos nem eventuais exigências de avaliação de segurança. Não prometer custos/prazo/aprovação. Fonte: [verificação de escopos restritos](https://developers.google.com/identity/protocols/oauth2/production-readiness/restricted-scope-verification).
+- **Evidências ainda a produzir:** ciclo real de pastas/upload/prévia/aprovação em PROD e material de demonstração correspondente, com fixtures e sem arquivos privados de clientes. Não apresentar testes emulador ou callback `connected` como demonstração desse ciclo.
+
+### Corte futuro para domínio próprio
+
+1. Depois da aquisição, escolher o hostname público exato e conectar ao **Hosting PROD existente**, validar DNS/TLS e servir as páginas institucionais/privacidade/termos/suporte. Não criar outro Firebase, D1 ou Worker nem migrar dados só para trocar o endereço.
+2. Preparar PR coerente para `shared/environments.ts`, `.env.production`, contrato de build em `src/lib/environment-config.ts` e `FRONTEND_ORIGIN` PROD em `api/wrangler.jsonc`. O contrato atual aceita origem exata: não trocar só uma variável nem liberar CORS curinga. Se houver convivência temporária de origens, implementá-la e testá-la explicitamente antes do corte; ela não está pronta só por este roteiro.
+3. Adicionar hostname no Firebase Auth e origem JavaScript do cliente OAuth Google; atualizar restrições de referrer da chave Picker e URLs de marca/privacidade/termos nos provedores. Preservar o Client ID, o projeto e os segredos PROD. Conferir política de login/popup no hostname novo.
+4. A API pode continuar em `roteiva-api-prod.roteiva-prod.workers.dev`; nesse caso os callbacks `/oauth/drive/callback` e `/oauth/dropbox/callback` **permanecem iguais**. Se também mudar hostname da API, coordenar contrato, cookie/OAuth e callbacks exatos nos dois consoles antes de publicar. Não trocar Client IDs nem chaves de criptografia para mudar domínio.
+5. Publicar código compatível por SHA aprovado, validar manifesto/CORS, login, retorno OAuth, Picker, upload/prévias/aprovação e reabertura. Não supor que cache local migra de origem; dados remotos permanecem no mesmo workspace. Manter rollback de código/destino sem restaurar banco antigo.
+6. Comprovar propriedade no Google do domínio real e concluir marca/escopos exigidos. O arquivo Search Console do endereço anterior não é prova automática do domínio futuro. Submeter evidências e aguardar a decisão do provedor; domínio comprado não significa app verificado.
+
+### Aceites independentes do domínio
+
+Homologar ciclo completo com contas externas/fixtures PROD, reconexão, isolamento e exclusão descartável; validar Safari/iPhone físico; comprovar recebimento do suporte e tratamento de falha; configurar destino e testar entrega de alertas/cotas; definir recuperação recorrente externa; concluir piloto acompanhado. O teste gratuito dura sete dias e não cobra automaticamente. Ativação administrativa/renovação ainda precisa de operação própria com fence D1/Firestore do `ACCESS-CONTROL.md`; não editar grants/projeções manualmente como atalho nem inventar contratação já disponível. Checkout e preços não são criados por este preparo.
+
 ## Regressão de sessão e validação de acesso
 
 Release de referência: PR #115, SHA 8a8480d298213172e983741fa356f2551cbda289, manifesto confirmado nos dois ambientes. Em PROD, validar aba existente e nova aba, F5 e navegação de dados, preservando cadastro e conexões. A homologação real foi concluída em 11/11/2026; detalhes no roadmap.
