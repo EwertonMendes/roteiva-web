@@ -1,3 +1,4 @@
+import { API_BASE_URL } from "../../lib/environment.ts";
 import {createContext,useContext,useCallback,useEffect,useRef,useState,type ReactNode} from "react";
 import {useAuth} from "../auth/AuthProvider";
 import {useStorageConnections,type StorageConnection} from "../drive/StorageConnectionsProvider";
@@ -12,7 +13,7 @@ type Context={
  load:(cover:ProjectCover,thumbnail?:boolean,highQuality?:boolean)=>Promise<string>;
 };
 const CoverContext=createContext<Context|null>(null);
-const API="https://roteiva-api-dev.ewertonmendes9.workers.dev";
+const API=API_BASE_URL;
 function coverIdentity(uid:string,cover:ProjectCover,thumbnail:boolean,highQuality=false):MediaIdentity{
  return {uid,provider:cover.provider==="dropbox"?"dropbox":"google_drive",
   connectionId:cover.connectionId,fileId:cover.fileId,

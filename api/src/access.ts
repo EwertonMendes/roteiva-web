@@ -141,7 +141,7 @@ async function provisionAccess(env:Env,uid:string,created:number,token:string,al
   if(!rollout)throw new ApiError(503,'access_provision_unavailable');
   if(created<=rollout.cutoff_at){
     await env.DB.prepare("INSERT OR IGNORE INTO access_grants(id,owner_uid,grant_kind,starts_at,ends_at,reason,created_at) VALUES(?,?,'complimentary',?,?,?,?)")
-      .bind('dev-beta-30d:'+uid,uid,rollout.cutoff_at,rollout.beta_ends_at,'DEV existing-account migration: 30 days',now).run();
+      .bind(env.ENVIRONMENT+'-beta-30d:'+uid,uid,rollout.cutoff_at,rollout.beta_ends_at,env.ENVIRONMENT.toUpperCase()+' existing-account migration: 30 days',now).run();
   }
   return publish(env,uid,token,profileVersion);
 }

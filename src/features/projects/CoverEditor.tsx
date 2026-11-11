@@ -1,3 +1,4 @@
+import { API_BASE_URL } from "../../lib/environment.ts";
 import {AppInput} from "../ui/AppInput";
 import {AppButton} from "../ui/AppButton";
 import { AppSelect } from "../ui/AppSelect";
@@ -48,7 +49,7 @@ export function CoverEditor({project,client,onClose,onSave}:{project?:Project;cl
  const thumbnail=useCallback(async(file:DriveItem,signal?:AbortSignal)=>{
    if(provider==='google_drive')return getDriveThumbnail(file,signal,account);
    if(!user)return null;
-   const url='https://roteiva-api-dev.ewertonmendes9.workers.dev/integrations/dropbox/'+encodeURIComponent(account)+'/files/'+encodeURIComponent(file.id)+'/thumbnail';
+   const url=API_BASE_URL+'/integrations/dropbox/'+encodeURIComponent(account)+'/files/'+encodeURIComponent(file.id)+'/thumbnail';
    let response=await fetch(url,{headers:{Authorization:'Bearer '+await user.getIdToken()},signal,cache:'no-store'});
    if(response.status===401)response=await fetch(url,{headers:{Authorization:'Bearer '+await user.getIdToken(true)},signal,cache:'no-store'});
    if(!response.ok||response.status===204)return null;

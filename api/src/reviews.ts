@@ -1,3 +1,4 @@
+import {apiOrigin} from './environment.ts';
 import { ApiError, type Env, type Connection } from './types.ts';
 import { identity, verifiedTrialPrincipal } from './auth.ts';
 import { assertActiveAccess } from './access.ts';
@@ -26,7 +27,6 @@ const CONN=/^[A-Za-z0-9-]{36}$/;
 type Participant={email:string;role:'reviewer'|'viewer'};
 const EMAIL=/^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const UUID=/^[0-9a-f-]{36}$/i;
-const FRONT='https://roteiva-web-dev.web.app';
 const now=()=>Date.now();
 const inputText=(s:unknown,max:number,required=false)=>{
   if(typeof s!=='string' || s.length>max || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(s))
@@ -36,7 +36,7 @@ const inputText=(s:unknown,max:number,required=false)=>{
   return value;
 };
 const integer=(x:unknown)=>Number.isSafeInteger(x)&&Number(x)>0&&Number(x)<9007199254740991?Number(x):0;
-const reviewLink=(token:string)=>FRONT+'/review/'+encodeURIComponent(token);
+const reviewLink=(env:Env,token:string)=>env.FRONTEND_ORIGIN+'/review/'+encodeURIComponent(token);
 const tokenContext=(env:Env,row:Pick<Review,'owner_uid'|'id'>)=>context(env,row.owner_uid,row.id,'review-invite');
 const showReview=(r:Review)=>({
   id:r.id,clientId:r.client_id,projectId:r.project_id,clientName:r.client_name,projectName:r.project_name,
@@ -215,7 +215,7 @@ async function detail(env:Env,r:Review){
       .bind(r.id).all(),
     participants(env,r.id),tokenFor(env,r)
   ]);
-  return {review:{...showReview(r),url:reviewLink(token)},participants:people,votes:votes.results,
+  return {review:{...showReview(r),url:reviewLink(env,token)},participants:people,votes:votes.results,
     assets:files.map(a=>({
       version:a.version,fileId:a.file_id,name:a.name,mimeType:a.mime_type,grantState:a.grant_state,
       connectionId:a.connection_id,linkedFolderId:a.linked_folder_id,provider:a.provider
@@ -280,7 +280,7 @@ async function createReview(request:Request,env:Env,uid:string):Promise<Response
     project_name:metadata.projectName,studio_name:studio,title,message,recipient_email:people.find(p=>p.role==='reviewer')?.email||'',access_mode:mode,
     restrict_existing_public:restrict,drive_share_enabled:shareDirect,status:'draft',current_version:1,expires_at:ts+days*86400000,token_hash:'',encrypted_token:encrypted,
     created_at:ts,updated_at:ts
-  }),url:reviewLink(secret)}},{status:201});
+  }),url:reviewLink(env,secret)}},{status:201});
 }
 const REVIEW_PAGE_SIZE=15;
 async function ownerList(env:Env,uid:string,url:URL):Promise<Response>{
@@ -764,7 +764,7 @@ async function rotate(env:Env,r:Review):Promise<Response>{
   const rotated=await env.DB.prepare("UPDATE review_requests SET token_hash=?,encrypted_token=?,updated_at=? WHERE id=? AND owner_uid=? AND token_hash=? AND status IN ('pending','changes','approved','draft') AND expires_at>?")
     .bind(await hash(secret),encrypted,now(),r.id,r.owner_uid,r.token_hash,now()).run();
   if(rotated.meta.changes!==1)throw new ApiError(409,'review_busy');
-  return Response.json({url:reviewLink(secret)});
+  return Response.json({url:reviewLink(env,secret)});
 }
 async function publicReview(request:Request,env:Env,action:'view'|'comment'|'decide'|'media'):Promise<Response>{
   const token=request.headers.get('X-Review-Token')||'';
@@ -809,7 +809,7 @@ async function publicReview(request:Request,env:Env,action:'view'|'comment'|'dec
     for(const file of files){
       if(!(/^(image|video|audio)\//.test(file.mime_type)||file.mime_type==='application/pdf'))continue;
       const ticket=await mintReviewMediaTicket(env,r.id,file.file_id,r.current_version,r.expires_at,r.token_hash,subject);
-      mediaTickets[file.file_id]={url:'https://roteiva-api-dev.ewertonmendes9.workers.dev/reviews/media?ticket='+ticket,expiresAt};
+      mediaTickets[file.file_id]={url:apiOrigin(env)+'/reviews/media?ticket='+ticket,expiresAt};
     }
     return Response.json({mediaTickets,review:{title:r.title,message:r.message,studioName:r.studio_name,
       status:r.status,version:r.current_version,expiresAt:r.expires_at,mode:r.access_mode,
@@ -830,7 +830,7 @@ async function publicReview(request:Request,env:Env,action:'view'|'comment'|'dec
       throw new ApiError(415,'review_media_unsupported');
     const subject=r.access_mode==='google'?await reviewMediaSubject(env,r.id,email):undefined;
     const ticket=await mintReviewMediaTicket(env,r.id,fileId,r.current_version,r.expires_at,r.token_hash,subject);
-    return Response.json({url:'https://roteiva-api-dev.ewertonmendes9.workers.dev/reviews/media?ticket='+ticket,
+    return Response.json({url:apiOrigin(env)+'/reviews/media?ticket='+ticket,
       expiresAt:Math.min(r.expires_at,now()+REVIEW_MEDIA_MAX_AGE)});
   }
   if(r.status!=='pending')throw new ApiError(409,'review_already_decided');

@@ -48,6 +48,11 @@ export function AuthLayout({children,section,title,description}: AuthLayoutProps
           <p>{description}</p>
         </header>
         {children}
+        <nav className="auth-policy-links" aria-label="Informações do serviço">
+          <a href="/privacidade.html" target="_blank" rel="noreferrer">Privacidade</a>
+          <a href="/termos.html" target="_blank" rel="noreferrer">Termos</a>
+          <a href="/suporte.html" target="_blank" rel="noreferrer">Suporte</a>
+        </nav>
         <div className="auth-bottom"><span>ROTEIVA</span><span>SEU TRABALHO, EM ORDEM</span></div>
       </div>
     </section>

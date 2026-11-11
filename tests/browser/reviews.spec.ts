@@ -1,7 +1,7 @@
 import {assertReviewPageGuards} from "./review-browser-guards";
 import {test,expect} from "./fixtures";
 const ROOT="http://127.0.0.1:4173";
-const API="https://roteiva-api-dev.ewertonmendes9.workers.dev";
+const API="http://127.0.0.1:8787";
 const TOKEN="x".repeat(43);
 function publicApi(page:import("@playwright/test").Page){
   const comments:{id:string;file_id:string;author_name:string;body:string;seconds:number|null;created_at:number}[]=[];

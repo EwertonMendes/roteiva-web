@@ -1,5 +1,33 @@
 # Arquitetura do Roteiva — MVP SaaS
 
+## Ambientes DEV e PROD — 10/11/2026
+
+**DECISÃO TOMADA:** um repositório e uma base de código, Firebase por projeto e Cloudflare por conta. A conta Cloudflare anterior hospeda outros aplicativos e seu subdomínio não será alterado. O proprietário escolheu migrar apenas Roteiva DEV para a conta exclusiva. Nenhum dado DEV será copiado para PROD.
+
+| Contrato | DEV ativo | PROD |
+|---|---|---|
+| Firebase | roteiva-web-dev, preservado | roteiva-web-prod, provisionado |
+| Origem frontend | https://roteiva-web-dev.web.app | https://roteiva-web-prod.web.app |
+| API (PROD ainda sem deploy) | https://roteiva-api-dev.roteiva-dev.workers.dev | https://roteiva-api-prod.roteiva-prod.workers.dev |
+| Worker | roteiva-api-dev | roteiva-api-prod |
+| D1 | roteiva-drive-dev, migrado e selado dev | roteiva-drive-prod, schema aplicado e selado prod |
+| Cloudflare | conta exclusiva 71d7d72a003796ba12b6bf23d149916c | conta exclusiva 836f81609b80e6b75be8e33d80c59dd5 |
+
+**IMPLEMENTADO:** `shared/environments.ts` define identidades públicas exatas; `src/lib/environment-config.ts` valida Vite e Firebase sem fallback remoto. Todos os consumidores de API usam `src/lib/environment.ts`. A validação ocorre com a precedência real de `loadEnv` mais o processo, e novamente no navegador. Um build de produção rejeita demo, emulador, Firebase DEV e API DEV; preview apenas serve o artefato já validado.
+
+A API recusa projeto/origem/callback de outro ambiente antes de executar handlers. JWT continua validando assinatura, issuer e audience do projeto escolhido. A migration 0020 cria identidade D1 imutável; o comando protegido confere metadados remotos de conta/UUID/nome antes de selá-la. Requisições e Cron verificam essa identidade; falhas impedem acesso ao banco. Rate limit mantém 60/min para API e 240/min para mídia/upload, com prefixo do ambiente e namespaces distintos por conta. O limiter é local ao ponto de presença e não constitui orçamento global.
+
+**Mídia:** URLs de tickets e links de revisão derivam do contrato; PDFs autorizados mantêm framing apenas pelo frontend exato do ambiente. Respostas de erro/JSON continuam sem framing, no-store e sem referrer; SVG conserva sandbox. ACL, estado, revisões e expiração permanecem nos handlers existentes.
+
+**Migração DEV concluída:** mesmo projeto Firebase, usuários, dados, grants OAuth, Client IDs, chaves AES/HMAC e credenciais administrativas preservados. Exportação final com origem congelada e Cron pausado: 25 tabelas/99 registros comparados por conteúdo, integridade SQLite aprovada. Destino selado dev e Cron habilitado; origem virou proxy de compatibilidade sem Cron e mantém banco antigo somente para recuperação. Novas escritas ocorrem somente no destino. O frontend f079bfc usa o endpoint da marca. Sem backup original, há operação explícita e temporária em `api/operations/`: o Worker DEV sela apenas sete credenciais para a chave RSA local, após assinatura ECDSA, expiração de cinco minutos e recusa de Origin/PROD. O entrypoint normal não importa essa operação. A versão original é restaurada e verificada em finally. Não registrar payloads, tokens ou respostas de provedores. Transferência de segredos e cópia final do D1 exigem evidências distintas; backup de código não é backup de dados.
+
+**OAuth público ainda PENDENTE:** Google DEV permanece Externo/Testing, agora com nome Roteiva DEV, logo e suporte roteiva-suporte@googlegroups.com. O grupo de suporte gratuito pertence ao proprietário, aceita mensagens externas e restringe leitura/membros ao proprietário. Google PROD tem projeto OAuth próprio roteiva-drive-prod e identidade Roteiva; cliente Web PROD e chave Picker com restrição de origem/API criados; revisão de produção ainda pendente. Preservados `drive.file` + `drive.readonly`: a navegação de pastas preexistentes depende da leitura ampla; Picker/drive.file sozinho não demonstra paridade. Não ampliar escopos. Dados restritos processados pelo Worker podem exigir verificação e avaliação anual de segurança; custos não autorizados. Identidade de suporte profissional, termos e política precisam revisão antes da publicação.
+
+**CI/CD:** DEV conserva validação independente por componente e promoção manual controlada de PR. PROD é manual, exclusivo do proprietário, SHA completo da master atual com PR merged, serializado entre API e frontend, com duas aprovações de ambientes. Segredos PROD nunca são entregues a PRs. O frontend PROD é recompilado a partir do SHA aprovado após o Worker; credencial Firebase deve pertencer ao projeto PROD. Conta/D1 PROD já provisionados; credenciais independentes e flags OAuth/Dropbox/exclusão configuradas; ativação continua protegida. Environments PROD exigem reviewer proprietário, somente master e sem bypass administrativo; PRODUCTION_ENABLED=false. Tokens Cloudflare distintos, restritos por conta a Workers Scripts Write/D1 Write, expiram em 08/02/2027. Guard verifica acesso ao D1 alvo e recusa acesso ao outro ambiente. Migrações pendentes que alteram dados/schema existente são bloqueadas em bases populadas. O bootstrap prepara sete secrets protegidos e publica código/segredos atomicamente com Wrangler --secrets-file, sem Worker provisório. Nenhum deploy PROD ocorreu.
+
+**Estado documental:** seções anteriores abaixo registram decisões/entregas históricas e não substituem este contrato atual. Domínios personalizados futuros exigem alteração explícita do contrato, CORS, CSP, Firebase Auth, callbacks e testes, sem descoberta de ambiente pelo hostname e sem registro automático de domínio.
+
+
 ## Correções de aprovação e capas — 03/11/2026
 
 **DECISÃO TOMADA / IMPLEMENTADO E PUBLICADO EM DEV (PR #109):** PDFs são renderizados por PDF.js em canvas, uma página por vez, com worker local carregado sob demanda, ranges no portal e raster máximo de 16 milhões de pixels. O painel usa `/reviews/:id/document`, com identidade Firebase, dono, versão atual, seleção/grant, estado e expiração verificados; apenas PDF, até 24 MiB, sem tokens de armazenamento no cliente. O endpoint de imagem continua exclusivo de imagens. CSP restritiva e ticket/revogação permanecem válidos; o tratamento de iframe do PR permite compatibilidade com frontend anterior durante publicação gradual.

@@ -1,3 +1,4 @@
+import { API_BASE_URL } from "../../lib/environment.ts";
 import {AppInput} from "../ui/AppInput";
 import {AppTextarea} from "../ui/AppTextarea";
 import {AppButton} from "../ui/AppButton";
@@ -57,7 +58,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
     if(selectedFolder?.provider!=='dropbox')return getThumbnail(item,signal,accountId);
     if(!user||!item.thumbnailFallback)return null;
     const token=await user.getIdToken();
-    const response=await fetch('https://roteiva-api-dev.ewertonmendes9.workers.dev/integrations/dropbox/'+
+    const response=await fetch(API_BASE_URL+'/integrations/dropbox/'+
       encodeURIComponent(accountId||selectedFolder.connectionId)+'/files/'+encodeURIComponent(item.id)+'/thumbnail',
       {headers:{Authorization:'Bearer '+token},signal,cache:'no-store'});
     return response.ok&&response.status!==204?response.blob():null;

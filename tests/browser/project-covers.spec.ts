@@ -4,9 +4,9 @@ const base='http://127.0.0.1:4173';
 test('Dropbox-only project covers save and reload; search has one compact focus surface',async({page},info)=>{
  const id='bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb';
  const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Allow-Methods':'GET, OPTIONS'};
- await page.route('https://roteiva-api-dev.ewertonmendes9.workers.dev/integrations/drive**',route=>route.fulfill({headers,json:{connections:[]}}));
+ await page.route('http://127.0.0.1:8787/integrations/drive**',route=>route.fulfill({headers,json:{connections:[]}}));
  const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jWZkAAAAASUVORK5CYII=','base64');
- await page.route('https://roteiva-api-dev.ewertonmendes9.workers.dev/integrations/dropbox**',route=>{
+ await page.route('http://127.0.0.1:8787/integrations/dropbox**',route=>{
   const path=new URL(route.request().url()).pathname;
   if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
   if(path.endsWith('/cover')||path.endsWith('/thumbnail'))return route.fulfill({headers,contentType:'image/png',body:png});
@@ -47,7 +47,7 @@ test('project covers require Drive, persist crop, cancel safely and support remo
  let releaseList!:()=>void,releaseImage!:()=>void;
  const listGate=new Promise<void>(resolve=>{releaseList=resolve;}),imageGate=new Promise<void>(resolve=>{releaseImage=resolve;});
 
- await page.route('https://roteiva-api-dev.ewertonmendes9.workers.dev/integrations/drive**',async route=>{
+ await page.route('http://127.0.0.1:8787/integrations/drive**',async route=>{
   const path=new URL(route.request().url()).pathname;
   const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Allow-Methods':'GET, OPTIONS'};
   if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});

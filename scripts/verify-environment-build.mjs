@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import {readFileSync,readdirSync} from 'node:fs';
+import {environment} from '../shared/environments.ts';
+const config=environment(process.argv[2]);
+const output=process.argv[3]||'dist';
+const identity=JSON.parse(readFileSync(output+'/roteiva-build.json','utf8'));
+assert.equal(identity.environment,process.argv[2]);assert.equal(identity.apiOrigin,config.apiOrigin);
+assert.equal(identity.projectId,config.projectId);
+assert.equal(identity.mode,process.argv[2]==='dev'?'firebase':'production');
+if(process.env.GITHUB_SHA)assert.equal(identity.sha,process.env.GITHUB_SHA,'Artifact belongs to another commit');
+const contents=readdirSync(output+'/assets').filter(name=>/\.(js|mjs|css)$/.test(name)).map(name=>readFileSync(output+'/assets/'+name,'utf8')).join('\n');
+assert.ok(contents.includes(config.apiOrigin),'Expected API absent from bundle');
+assert.ok(contents.includes(config.projectId),'Expected Firebase project absent from bundle');
+assert.doesNotMatch(contents,/https?:[^\s'"<>]*ewertonmendes/i,'Personal infrastructure endpoint in public bundle');
+assert.doesNotMatch(contents,/BEGIN PRIVATE KEY|GOOGLE_CLIENT_SECRET|FIREBASE_ADMIN_CREDENTIALS_JSON/,'Private server configuration in browser bundle');
+console.log('Verified public '+process.argv[2]+' build destinations and secret exclusion.');

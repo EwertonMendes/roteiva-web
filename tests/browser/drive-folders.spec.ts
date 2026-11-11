@@ -2,7 +2,7 @@ import { chooseAppSelect } from "./select-helpers";
 import { test, expect, type Page } from "./fixtures";
 
 const cloud = "http://127.0.0.1:4173";
-const api = "https://roteiva-api-dev.ewertonmendes9.workers.dev";
+const api = "http://127.0.0.1:8787";
 const connection = "aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa";
 const folderId = "folder_1234567890";
 

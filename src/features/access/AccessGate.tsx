@@ -1,3 +1,4 @@
+import { API_BASE_URL } from "../../lib/environment.ts";
 import {AppButton} from "../ui/AppButton";
 import {createContext,useContext,useEffect,useState,type ReactNode} from "react";
 import {watchAccess,type AccessInfo} from "../../data/access-watch";
@@ -7,7 +8,7 @@ import {useAuth} from "../auth/AuthProvider";
 import {AuthLayout} from "../auth/AuthLayout";
 import "./access.css";
 
-const BASE="https://roteiva-api-dev.ewertonmendes9.workers.dev";
+const BASE=API_BASE_URL;
 const AccessContext=createContext<AccessInfo|null>(null);
 export const useAccess=()=>useContext(AccessContext);
 export async function ensureUserAccess():Promise<void>{

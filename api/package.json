@@ -12,7 +12,9 @@
     "build": "wrangler deploy --env dev --dry-run --outdir dist",
     "migrate:local": "wrangler d1 migrations apply DB --env dev --local",
     "migrate:dev": "wrangler d1 migrations apply DB --env dev --remote",
-    "deploy:dev": "wrangler deploy --env dev"
+    "deploy:dev": "wrangler deploy --env dev",
+    "build:prod": "wrangler deploy --env prod --dry-run --outdir dist-prod",
+    "migrate:prod": "wrangler d1 migrations apply DB --env prod --remote"
   },
   "dependencies": {
     "jose": "6.2.12"

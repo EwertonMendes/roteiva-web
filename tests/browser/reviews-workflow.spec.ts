@@ -3,7 +3,7 @@ import { chooseAppSelect } from "./select-helpers";
 import {test,expect,type Page} from './fixtures';
 import {initializeTestEnvironment} from '@firebase/rules-unit-testing';
 import {collection,doc,getDocs,query,setDoc,where,Timestamp} from 'firebase/firestore';
-const root='http://127.0.0.1:4173',api='https://roteiva-api-dev.ewertonmendes9.workers.dev';
+const root='http://127.0.0.1:4173',api='http://127.0.0.1:8787';
 const connection='aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa',folder='REVIEW_FOLDER_12345',childFolder='REVIEW_CHILD_FOLDER_12345';
 const file={fileId:'REVIEW_FILE_12345678',name:'Corte.mp4',mimeType:'video/mp4'};
 const second={fileId:'REVIEW_FILE_22345678',name:'Corte final.mp4',mimeType:'video/mp4',thumbnailTicket:'sealed-thumb-qa'};

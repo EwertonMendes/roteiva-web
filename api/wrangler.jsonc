@@ -9,17 +9,17 @@
       "name": "roteiva-api-dev",
       "workers_dev": true,
       "preview_urls": false,
-      "account_id": "b3855f9c192541a01a45b2dae7b6a7f8",
+      "account_id": "71d7d72a003796ba12b6bf23d149916c",
       "vars": {
         "ENVIRONMENT": "dev",
         "ACCOUNT_DELETION_ENABLED": "true",
         "ACCESS_PROVISION_ON_DRIVE": "false",
         "FIREBASE_PROJECT_ID": "roteiva-web-dev",
         "FRONTEND_ORIGIN": "https://roteiva-web-dev.web.app",
-        "OAUTH_REDIRECT_URI": "https://roteiva-api-dev.ewertonmendes9.workers.dev/oauth/drive/callback",
+        "OAUTH_REDIRECT_URI": "https://roteiva-api-dev.roteiva-dev.workers.dev/oauth/drive/callback",
         "OAUTH_ENABLED": "true",
         "DROPBOX_ENABLED": "true",
-        "DROPBOX_OAUTH_REDIRECT_URI": "https://roteiva-api-dev.ewertonmendes9.workers.dev/oauth/dropbox/callback",
+        "DROPBOX_OAUTH_REDIRECT_URI": "https://roteiva-api-dev.roteiva-dev.workers.dev/oauth/dropbox/callback",
         "TOKEN_KEY_VERSION": "v1",
         "GOOGLE_CLIENT_ID": "479738001561-4gu97o42v4m8kiq1bga8ck3msmjp0me3.apps.googleusercontent.com"
       },
@@ -33,7 +33,7 @@
         {
           "binding": "DB",
           "database_name": "roteiva-drive-dev",
-          "database_id": "302adc88-76b2-4827-bb16-99662fa0408b",
+          "database_id": "4fa31040-0cde-45dc-8140-cd784b5463a0",
           "migrations_dir": "migrations"
         }
       ],
@@ -48,17 +48,92 @@
         {
           "name": "API_RATE_LIMIT",
           "namespace_id": "479738001561",
-          "simple": { "limit": 60, "period": 60 }
+          "simple": {
+            "limit": 60,
+            "period": 60
+          }
         },
         {
           "name": "API_THUMB_LIMIT",
           "namespace_id": "479738001562",
-          "simple": { "limit": 240, "period": 60 }
+          "simple": {
+            "limit": 240,
+            "period": 60
+          }
         },
         {
           "name": "API_UPLOAD_LIMIT",
           "namespace_id": "479738001563",
-          "simple": { "limit": 240, "period": 60 }
+          "simple": {
+            "limit": 240,
+            "period": 60
+          }
+        }
+      ]
+    },
+    "prod": {
+      "name": "roteiva-api-prod",
+      "workers_dev": true,
+      "preview_urls": false,
+      "account_id": "836f81609b80e6b75be8e33d80c59dd5",
+      "vars": {
+        "ENVIRONMENT": "prod",
+        "ACCOUNT_DELETION_ENABLED": "true",
+        "ACCESS_PROVISION_ON_DRIVE": "false",
+        "FIREBASE_PROJECT_ID": "roteiva-web-prod",
+        "FRONTEND_ORIGIN": "https://roteiva-web-prod.web.app",
+        "OAUTH_REDIRECT_URI": "https://roteiva-api-prod.roteiva-prod.workers.dev/oauth/drive/callback",
+        "OAUTH_ENABLED": "true",
+        "DROPBOX_ENABLED": "true",
+        "DROPBOX_OAUTH_REDIRECT_URI": "https://roteiva-api-prod.roteiva-prod.workers.dev/oauth/dropbox/callback",
+        "TOKEN_KEY_VERSION": "v1",
+        "GOOGLE_CLIENT_ID": "18860974410-ji942jb4b3839bm6nk75vqhdders42vh.apps.googleusercontent.com"
+      },
+      "triggers": {
+        "crons": [
+          "* * * * *",
+          "*/15 * * * *"
+        ]
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "roteiva-drive-prod",
+          "database_id": "082ca9da-af45-4162-a581-ed2c8c1938cb",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "observability": {
+        "enabled": true,
+        "head_sampling_rate": 1,
+        "logs": {
+          "invocation_logs": false
+        }
+      },
+      "ratelimits": [
+        {
+          "name": "API_RATE_LIMIT",
+          "namespace_id": "479738001571",
+          "simple": {
+            "limit": 60,
+            "period": 60
+          }
+        },
+        {
+          "name": "API_THUMB_LIMIT",
+          "namespace_id": "479738001572",
+          "simple": {
+            "limit": 240,
+            "period": 60
+          }
+        },
+        {
+          "name": "API_UPLOAD_LIMIT",
+          "namespace_id": "479738001573",
+          "simple": {
+            "limit": 240,
+            "period": 60
+          }
         }
       ]
     }

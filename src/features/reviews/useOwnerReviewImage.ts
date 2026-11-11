@@ -1,7 +1,8 @@
+import { API_BASE_URL } from "../../lib/environment.ts";
 import {useEffect,useRef,useState} from "react";
 import {useAuth} from "../auth/AuthProvider";
 
-const API="https://roteiva-api-dev.ewertonmendes9.workers.dev";
+const API=API_BASE_URL;
 const MAX_IMAGE_BYTES=24*1024*1024;
 type State={fileId:string;url:string;loading:boolean;error:string};
 

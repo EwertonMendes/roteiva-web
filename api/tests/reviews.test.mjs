@@ -5,7 +5,7 @@ import {reviewRouter,assertNoConnectionReviews,closeOwnerReviews,cleanupExpiredR
 import {handle} from '../src/index.ts';
 import {generateKeyPair,exportJWK,SignJWT} from 'jose';
 import {random,hash,encrypt,context,base64url} from '../src/crypto.ts';
-const BASE='https://roteiva-api-dev.ewertonmendes9.workers.dev';
+const BASE='https://roteiva-api-dev.roteiva-dev.workers.dev';
 const account='aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa';
 const file='FILE_REVIEW_12345678';
 const imageFile='IMAGE_REVIEW_12345678';
@@ -151,7 +151,7 @@ async function integration(t){
   const folder='PARENT_FOLDER_12345';
   const env={...f.env,GOOGLE_CLIENT_ID:'client-id-test',GOOGLE_CLIENT_SECRET:'client-secret-test',
     FRONTEND_ORIGIN:'https://roteiva-web-dev.web.app',
-    OAUTH_REDIRECT_URI:'https://roteiva-api-dev.ewertonmendes9.workers.dev/oauth/drive/callback',
+    OAUTH_REDIRECT_URI:'https://roteiva-api-dev.roteiva-dev.workers.dev/oauth/drive/callback',
     API_RATE_LIMIT:{limit:async()=>({success:true})},
     API_THUMB_LIMIT:{limit:async()=>({success:true})}};
   const acl=new Map(),imageAcl=new Map();

@@ -1,3 +1,4 @@
+import { API_BASE_URL } from "../../lib/environment.ts";
 import {AppInput} from "../ui/AppInput";
 import {AppButton} from "../ui/AppButton";
 import { AppSelect } from "../ui/AppSelect";
@@ -75,7 +76,7 @@ export function ReviewOwnerWorkspace({detail,working,error,onClose,onRevise,onPu
   const getDropboxThumbnail=useCallback(async(item:{id:string;thumbnailFallback?:boolean},signal?:AbortSignal,accountId?:string)=>{
     if(!user||!item.thumbnailFallback||!accountId)return null;
     const token=await user.getIdToken();
-    const response=await fetch('https://roteiva-api-dev.ewertonmendes9.workers.dev/integrations/dropbox/'+
+    const response=await fetch(API_BASE_URL+'/integrations/dropbox/'+
       encodeURIComponent(accountId)+'/files/'+encodeURIComponent(item.id)+'/thumbnail',
       {cache:'no-store',signal,headers:{Authorization:'Bearer '+token}});
     return response.ok&&response.status!==204?response.blob():null;

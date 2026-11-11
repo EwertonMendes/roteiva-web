@@ -1,8 +1,9 @@
+import { API_BASE_URL } from "../../lib/environment.ts";
 import {useCallback} from "react";
 import {useAuth} from "../auth/AuthProvider";
 import type {DriveItem} from "./DriveLibraryUI";
 
-const API="https://roteiva-api-dev.ewertonmendes9.workers.dev";
+const API=API_BASE_URL;
 
 /** Shared authenticated thumbnail loader. Only opaque tickets are passed to the
  * Worker; Google upstream URLs and OAuth tokens never enter image src attributes. */

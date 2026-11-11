@@ -3,7 +3,7 @@ import {initializeTestEnvironment,assertFails,assertSucceeds} from "@firebase/ru
 import {collection,deleteDoc,doc,getDoc,getDocs,query,setDoc,Timestamp,updateDoc,where} from "firebase/firestore";
 
 const cloud="http://127.0.0.1:4173";
-const api="https://roteiva-api-dev.ewertonmendes9.workers.dev";
+const api="http://127.0.0.1:8787";
 const emulator={projectId:"demo-roteiva",firestore:{host:"127.0.0.1",port:8080}};
 
 async function register(page:Page,email:string){

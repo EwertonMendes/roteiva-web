@@ -32,10 +32,22 @@
         ]
       }
     ],
-    "site": "REPLACE_WITH_PROD_HOSTING_SITE"
+    "site": "roteiva-web-prod"
   },
   "firestore": {
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
+  },
+  "auth": {
+    "providers": {
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "Roteiva",
+        "supportEmail": "roteiva-suporte@googlegroups.com",
+        "authorizedRedirectUris": [
+          "https://roteiva-web-prod.firebaseapp.com/__/auth/handler",
+          "https://roteiva-web-prod.web.app/__/auth/handler"
+        ]
+      }
+    }
   }
 }

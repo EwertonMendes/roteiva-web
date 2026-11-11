@@ -1,5 +1,16 @@
 # Roteiva
 
+## Ambientes DEV e PROD — 10/11/2026
+
+**IMPLEMENTADO EM BRANCH:** configuração multiambiente centralizada e validação antes do build, no navegador, API, Cron e D1. O código é único. `pnpm build` gera DEV; `pnpm build:prod` gera PROD; demo e emuladores permanecem explícitos e locais. O manifesto `roteiva-build.json` identifica ambiente e commit e é conferido no deploy.
+
+**DEV MIGRADO E VALIDADO NOS CENÁRIOS REGISTRADOS:** API em https://roteiva-api-dev.roteiva-dev.workers.dev e frontend em https://roteiva-web-dev.web.app, commit `f079bfc`. O D1 foi transferido com comparação integral de 25 tabelas/99 registros; usuários e Firestore foram preservados. Google Drive real voltou a listar arquivos após renovar consentimento Testing expirado; Dropbox existente listou arquivos e abriu PDF sem reconexão.
+
+**PROVISIONADO / ATIVAÇÃO PENDENTE:** Cloudflare PROD independente, D1 com schema e sem dados de negócio; Firebase `roteiva-web-prod`, Auth Google, aplicativo Web, Firestore Standard vazio em São Paulo e identidades administrativas dedicadas, sem faturamento e com proteção contra exclusão. PROD ainda não foi publicado nem homologado. As descrições antigas abaixo são histórico das respectivas entregas; o estado atual dos ambientes está nesta seção e no roadmap.
+
+O primeiro deploy PROD exige aprovação explícita do proprietário; `production.yml` permanece bloqueado sem `PRODUCTION_ENABLED=true`, ambientes protegidos, SHA atual aprovado e destinos provisionados. Detalhes de migração, OAuth, recuperação e limites em [DEVELOPMENT](docs/DEVELOPMENT.md#ambientes-dev-e-prod--10112026).
+
+
 **Correções de mídia e capas (PR #109):** visualização PDF com páginas/zoom no painel e portal, ampliação de imagens no tamanho final, capas de projeto Drive/Dropbox com recorte persistido, busca compacta e retorno à listagem de aprovações com modal fechado. Resultados de testes e situação da publicação/homologação ficam no [roadmap](docs/MVP-ROADMAP.md).
 
 **Detalhes do projeto:** conteúdo reorganizado com checklist compacto e progresso, financeiro com lançamentos editáveis, agenda e acesso aos materiais vinculados no Drive pela Biblioteca. Compatível com claro/escuro e celular; lateral preservada. QA automatizado e limites da homologação no [roadmap](docs/MVP-ROADMAP.md).
@@ -15,6 +26,7 @@ A [PR #6](https://github.com/EwertonMendes/roteiva-web/pull/6) implementa a fund
 | Ambiente | Build | Persistência |
 |---|---|---|
 | Firebase DEV — `roteiva-web-dev` | `pnpm build` → `dist/` | Firebase Auth Google + Firestore Standard, São Paulo |
+| Firebase PROD — `roteiva-web-prod` | `pnpm build:prod` → `dist/` | Recursos provisionados; primeiro deploy depende de aprovação |
 | Demo local (sem publicação) | `pnpm build:demo` → `dist-demo/` | Sem login; armazenamento local isolado |
 | Emuladores | `pnpm build:emulator` | Projeto fictício `demo-roteiva`, nunca DEV real |
 

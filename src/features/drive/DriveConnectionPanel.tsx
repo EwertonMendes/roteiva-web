@@ -1,3 +1,4 @@
+import { API_BASE_URL } from "../../lib/environment.ts";
 import {AppButton} from "../ui/AppButton";
 import {CollectionState} from "../ui/CollectionState";
 import { AppSelect } from "../ui/AppSelect";
@@ -19,7 +20,7 @@ import {invalidateStorageConnection} from "./storage-image-cache";
 import type {UploadedFile} from "./drive-upload-client";
 import "./drive-library.css";
 
-const API = "https://roteiva-api-dev.ewertonmendes9.workers.dev";
+const API = API_BASE_URL;
 const READ = "https://www.googleapis.com/auth/drive.readonly";
 const INTENT = "roteiva-drive-folder-project";
 type Connection = {id:string;google_email:string;status:"connected"|"reconnect_required"|"revocation_pending";scopes:string};

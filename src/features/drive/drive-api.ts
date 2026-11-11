@@ -1,6 +1,7 @@
+import { API_BASE_URL } from "../../lib/environment.ts";
 import {useCallback} from 'react';
 import {useAuth} from '../auth/AuthProvider';
-const API='https://roteiva-api-dev.ewertonmendes9.workers.dev';
+const API=API_BASE_URL;
 export const messages:Record<string,string> = {
   dropbox_not_configured:"A integração Dropbox ainda está sendo preparada neste ambiente.",
   dropbox_reconnect_required:"A autorização do Dropbox expirou. Conecte sua conta novamente.",
