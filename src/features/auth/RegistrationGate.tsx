@@ -4,6 +4,7 @@ import { ArrowRight } from "lucide-react";
 import { FirestoreWorkspace, dataErrorMessage, type RoteivaProfile, type ProfileChanges } from "../../data/firestore-workspace";
 import { firebaseServices } from "../../lib/firebase";
 import { retryFirestoreRead } from "../../data/firestore-recovery";
+import {loadRegistrationProfile} from '../../data/registration-profile.ts';
 import { useAuth } from "./AuthProvider";
 import { AuthLayout } from "./AuthLayout";
 import { RegistrationPage, type RegistrationValues } from "./RegistrationPage";
@@ -34,7 +35,7 @@ export function RegistrationGate({children}: {children: ReactNode}) {
     setError("");
     // A temporary Firestore outage must not be confused with a missing profile.
     // Retry server-only reads (never registration writes), bounded and cancellable.
-    retryFirestoreRead(()=>repository.loadProfile(),{
+    retryFirestoreRead(()=>loadRegistrationProfile(firebaseServices().db,user!.uid,repository),{
       attempts:4,delaysMs:[300,900,2000],isCurrent:()=>active
     }).then(async result=>{
         // The profile is removed before Auth. A durable job still closes the
@@ -54,7 +55,7 @@ export function RegistrationGate({children}: {children: ReactNode}) {
         ...values,email:user.email||"",photoURL:user.photoURL||"",
         acknowledgedDataUse:true,
       });
-      const saved=await repository.loadProfile();
+      const saved=await loadRegistrationProfile(firebaseServices().db,user.uid,repository);
       if (!saved) throw new Error("Conflito: o perfil não foi encontrado depois do cadastro.");
       setProfile(saved);
       setStatus("registered");

@@ -1,6 +1,6 @@
 # Roteiva
 
-**Recuperação de acesso (em validação):** a leitura vazia do observador agora é conferida por uma consulta autenticada ao servidor antes de bloquear uma conta válida. Cache, resposta de outra conta ou estado inválido não liberam acesso. O alerta mantém espaço de 20 px antes dos botões; testes e publicação estão no [roadmap](docs/MVP-ROADMAP.md).
+**Recuperação de sessão e acesso:** leituras iniciais ausentes ou recusadas pelo SDK são conferidas no servidor com a identidade do próprio usuário. A recuperação renova a sessão e restabelece o acompanhamento de acesso sem recriar cadastro ou concessões. O alerta mantém 20 px antes dos botões; evidências e publicação no [roadmap](docs/MVP-ROADMAP.md).
 
 ## Ambientes DEV e PROD — publicado em 11/11/2026
 
