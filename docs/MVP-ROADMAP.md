@@ -1,14 +1,24 @@
 # Roadmap vivo — Roteiva MVP
 
+## Recuperação da validação de acesso — 11/11/2026
+
+**IMPLEMENTADO E TESTADO; PUBLICAÇÃO EM VALIDAÇÃO.** A tela reportava acesso ausente após retorno OAuth/F5, apesar de o D1 indicar teste ativo e a projeção Firestore existir. watchAccess convertia snapshot vazio do observador diretamente em erro, sem uma confirmação independente do servidor.
+
+- [x] Reconciliar snapshot vazio com GET autenticado Firestore REST, sem cache do SDK, usando ID token do próprio usuário e as mesmas Rules; exigir projeto/caminho/ownerUid/schema/datas/flags corretos. Não criar ou ampliar concessões nem alterar dados para liberar uma conta.
+- [x] Ignorar snapshots de cache e respostas antigas após evento mais novo, erro do listener, logout ou troca de UID; ausência real, negação, dados inválidos e falha de rede continuam bloqueando. Suspensão e expiração continuam aplicadas.
+- [x] Separar alerta e ações por 20 px; permitir quebra dos botões no mobile, sem redesenho.
+- [x] 83 testes frontend aprovados, incluindo oito regressões novas de reconciliação/isolamento/ordenação. 34 Rules A/B e 14 testes Chromium desktop/mobile aprovados: retorno Drive/Dropbox, reload, expiração, suspensão, isolamento A/B, exclusão isolada, espaçamento claro/escuro e recuperação por REST autenticado real no emulador.
+- [ ] Conferir CI, publicar frontend DEV/PROD por SHA aprovado e homologar reabertura/retorno OAuth na conta real existente. Sem alteração de Worker, schema, permissões ou plano.
+
 ## Ativação dos provedores PROD — 11/11/2026
 
 - [x] Conta real do proprietário criada em roteiva-web-prod pelo login Google e cadastro da aplicação; perfil Firestore com ownerUid correspondente confirmado via API. Espaço inicial vazio, teste de acesso provisionado pelo fluxo normal. Não copiar usuários nem registros DEV.
 - [x] Google Drive PROD com openid, userinfo.email, drive.file e drive.readonly declarados e salvos; status de publicação alterado para **Em produção**. Isso não equivale à aprovação de escopos restritos.
 - [x] Branding Google e Dropbox com nome Roteiva, páginas oficiais e suporte profissional salvos. Callback Dropbox PROD e permissões necessários preservados; PKCE depende da opção de clientes públicos, não desativá-la por conveniência.
 - [x] Google identificou requisito concreto de propriedade da homepage. Arquivo oficial de Search Console preparado em public/googleb5008dcbf685c696.html; página pública sobre.html descreve o serviço e as integrações sem exigir login. Descrição HTML deixou de rotular o serviço publicado como demonstração.
-- [ ] Publicar/conferir o arquivo oficial e confirmar propriedade no Search Console; repetir a verificação de marca e avançar para a de escopos. O Google pode levar até 24 horas para reconhecer a propriedade.
-- [ ] Consentimentos reais Drive/Dropbox PROD preparados, aguardando confirmação no momento de conceder acesso persistente, exigida pela política do controle do navegador. Configuração, publicação e homologação continuam sem presumir essa concessão.
-- [ ] Após conectar uma conta Dropbox real, solicitar produção: o console rejeita a solicitação antes da primeira autenticação OAuth. Executar QA sintético de pastas, upload, preview e aprovação após os vínculos.
+- [ ] **PENDENTE POR DECISÃO DO PROPRIETÁRIO:** comprovar propriedade e concluir marca/escopos Google quando o domínio final for adquirido. Não registrar/comprar domínio nem forçar verificação do endereço gratuito. Arquivo público permanece preparado; nenhuma propriedade foi confirmada.
+- [x] Consentimentos reais Drive/Dropbox PROD autorizados pelo proprietário e concluídos; ambos retornaram connected nos callbacks PROD. Isso não comprova upload/preview/aprovação completos.
+- [ ] Dropbox já recebeu a primeira autenticação real; o próximo requisito da solicitação de produção é ícone de aplicativo. O upload pela automação falhou e o controle nativo foi encerrado por não confirmar a URL. Homologação de pastas/upload/preview/aprovação continua pendente.
 
 ## Infraestrutura multiambiente — 10/11/2026
 

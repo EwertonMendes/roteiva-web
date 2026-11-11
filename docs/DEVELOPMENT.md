@@ -1,5 +1,11 @@
 # Desenvolvimento e deploy — Roteiva
 
+## Regressão de sessão e validação de acesso
+
+Executar pnpm test e pnpm typecheck; compilar build:emulator e build:demo; nos emuladores demo-roteiva rodar tests/firestore.rules.test.mjs e Playwright tests/browser/access.spec.ts + tests/browser/access-isolated-e2e.spec.ts. O teste adicional de reconciliação força snapshot ausente, restaura apenas a fixture isolada e confere GET REST com Bearer do usuário e Rules reais do emulador. A medição do espaço entre alerta e ações exige pelo menos 18 px em desktop/mobile e claro/escuro. Nunca apagar ou recriar o perfil real para corrigir um erro de acesso.
+
+Publicar somente Hosting a partir do SHA aprovado e identificado quando a mudança for apenas no cliente. A configuração PROD deve gerar seu próprio artefato; verificar ambiente, manifesto, projeto da credencial e destino explícito. Após publicar, repetir F5, reabertura e retorno /biblioteca?drive=connected e ?dropbox=connected; conferir expiração/suspensão e isolamento com fixtures separadas. Verificação de propriedade do domínio Google está adiada por decisão do proprietário até adquirir o domínio final.
+
 ## Ambientes DEV e PROD — 10/11/2026
 
 **Estado atual:** PR #111 integrado; DEV migrado para conta exclusiva e domínio da marca, Google/Dropbox conferidos nos cenários do roadmap. Cloudflare/Firebase PROD publicados sem billing, D1 com schema e sem dados de negócio. Primeiro release d599e247e9858afe26c9f93e7bd0da70af870dee concluído pelo workflow 43023457363 em 11/11/2026, sob delegação expressa do proprietário. Integrações OAuth PROD ainda não homologadas/aprovadas pelos provedores. As seções históricas abaixo preservam evidências anteriores e não substituem este estado atual.
