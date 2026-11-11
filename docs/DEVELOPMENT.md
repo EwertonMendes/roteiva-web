@@ -59,6 +59,12 @@ Backup privado `prod-initial-schema.sql`, SHA-256 b87d1b226b4641cf58f33d2627e459
 
 Páginas privacidade.html, termos.html e suporte.html publicadas nos dois frontends, com contato roteiva-suporte@googlegroups.com. Google/Dropbox PROD continuam sem consentimento real homologado e sem revisão de produção aprovada. Não anunciar disponibilidade ampla dessas integrações; completar branding/escopos/publishing e submissão nos consoles quando o acesso for restabelecido. Não contratar avaliação de segurança nem habilitar cobrança sem autorização específica.
 
+### Propriedade pública e ativação OAuth
+
+public/googleb5008dcbf685c696.html é o arquivo público emitido pelo Search Console para a conta administrativa. Manter seu conteúdo exato e não removê-lo após verificar a propriedade. A página public/sobre.html fornece a descrição pública do serviço, acesso à aplicação, privacidade, termos e suporte sem exigir sessão. Não colocar credenciais ou dados de usuários nessas páginas.
+
+A publicação de verificação altera somente Hosting: build PROD novo, identificado pelo SHA aprovado da master, validado por verify-environment-build.mjs e verify-static-build.mjs; deploy explícito --config firebase.prod.json --only hosting --project roteiva-web-prod. Não reutilizar dist DEV, alterar regras, reexecutar migrations nem republicar Worker para publicar uma prova estática. Registrar release e resposta pública do arquivo antes de clicar VERIFICAR no Search Console. Manter o workflow protegido completo para promoções de aplicação/backend e não remover suas guardas.
+
 ### Franquias gratuitas e observabilidade (documentação oficial consultada em 10/11/2026)
 
 | Serviço | Franquia/unidade | Limite operacional |
