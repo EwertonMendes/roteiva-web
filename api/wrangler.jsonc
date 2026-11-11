@@ -75,19 +75,19 @@
       "name": "roteiva-api-prod",
       "workers_dev": true,
       "preview_urls": false,
-      "account_id": "00000000000000000000000000000000",
+      "account_id": "836f81609b80e6b75be8e33d80c59dd5",
       "vars": {
         "ENVIRONMENT": "prod",
-        "ACCOUNT_DELETION_ENABLED": "false",
+        "ACCOUNT_DELETION_ENABLED": "true",
         "ACCESS_PROVISION_ON_DRIVE": "false",
         "FIREBASE_PROJECT_ID": "roteiva-web-prod",
         "FRONTEND_ORIGIN": "https://roteiva-web-prod.web.app",
         "OAUTH_REDIRECT_URI": "https://roteiva-api-prod.roteiva-prod.workers.dev/oauth/drive/callback",
-        "OAUTH_ENABLED": "false",
-        "DROPBOX_ENABLED": "false",
+        "OAUTH_ENABLED": "true",
+        "DROPBOX_ENABLED": "true",
         "DROPBOX_OAUTH_REDIRECT_URI": "https://roteiva-api-prod.roteiva-prod.workers.dev/oauth/dropbox/callback",
         "TOKEN_KEY_VERSION": "v1",
-        "GOOGLE_CLIENT_ID": ""
+        "GOOGLE_CLIENT_ID": "18860974410-ji942jb4b3839bm6nk75vqhdders42vh.apps.googleusercontent.com"
       },
       "triggers": {
         "crons": [
@@ -99,7 +99,7 @@
         {
           "binding": "DB",
           "database_name": "roteiva-drive-prod",
-          "database_id": "00000000-0000-0000-0000-000000000000",
+          "database_id": "082ca9da-af45-4162-a581-ed2c8c1938cb",
           "migrations_dir": "migrations"
         }
       ],

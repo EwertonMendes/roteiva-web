@@ -37,6 +37,17 @@ test('database identity cannot be changed, deleted, duplicated or omitted',async
   assert.throws(()=>db.sql.exec("INSERT INTO deployment_identity VALUES(2,'prod')"));
   await assert.rejects(()=>assertDatabaseEnvironment({ENVIRONMENT:'prod',DB:db.DB}));
 });
+test('edge rate limiting rejects abuse before any D1 query',async()=>{
+ let reads=0;
+ const env={ENVIRONMENT:'dev',FIREBASE_PROJECT_ID:environments.dev.projectId,FRONTEND_ORIGIN:environments.dev.frontendOrigin,
+  OAUTH_REDIRECT_URI:environments.dev.apiOrigin+'/oauth/drive/callback',
+  API_RATE_LIMIT:{limit:async()=>({success:false})},API_THUMB_LIMIT:{limit:async()=>({success:false})},
+  DB:{prepare(){reads++;throw new Error('Rate-limited requests must not touch D1');}}};
+ for(const path of ['/health','/integrations/drive','/reviews/media']){
+  assert.equal((await handle(new Request(environments.dev.apiOrigin+path),env)).status,429);
+ }
+ assert.equal(reads,0);
+});
 test('signed Firebase DEV and PROD tokens are mutually rejected',async()=>{
   const {privateKey,publicKey}=await generateKeyPair('RS256');
   const jwk=await exportJWK(publicKey);jwk.kid='environment-test';const keys=createLocalJWKSet({keys:[jwk]});

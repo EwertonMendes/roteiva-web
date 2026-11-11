@@ -86,13 +86,26 @@ jobs:
         run: |
           test "$(git ls-remote origin refs/heads/master | cut -f1)" = "$GITHUB_SHA"
           node scripts/guard-environment.mjs prod --before-migrations
-          node scripts/guard-secrets.mjs prod
+          node scripts/guard-token-scope.mjs prod
+          node scripts/guard-migrations.mjs prod
+      - name: Prepare independent Worker secrets for atomic first deployment
+        env:
+          TOKEN_KEYS: ${{ secrets.TOKEN_KEYS }}
+          TRIAL_IDENTITY_HMAC_KEY: ${{ secrets.TRIAL_IDENTITY_HMAC_KEY }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_PICKER_API_KEY: ${{ secrets.GOOGLE_PICKER_API_KEY }}
+          DROPBOX_APP_KEY: ${{ secrets.DROPBOX_APP_KEY }}
+          DROPBOX_APP_SECRET: ${{ secrets.DROPBOX_APP_SECRET }}
+          FIREBASE_ADMIN_CREDENTIALS_JSON: ${{ secrets.FIREBASE_ADMIN_CREDENTIALS_JSON }}
+        run: node scripts/prepare-worker-secrets.mjs prod
       - name: Apply additive schema and seal durable identity
         run: |
           npm run migrate:prod
           node scripts/guard-environment.mjs prod --seal
       - name: Publish approved Worker
-        run: npx wrangler deploy --env prod
+        run: npx wrangler deploy --env prod --secrets-file "$RUNNER_TEMP/roteiva-prod-secrets.json"
+      - name: Verify protected Worker secret bindings
+        run: node scripts/guard-secrets.mjs prod
       - name: Verify deployed environment and authorization
         run: node ../scripts/smoke-environment.mjs prod
   frontend:

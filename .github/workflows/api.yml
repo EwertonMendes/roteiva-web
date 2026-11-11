@@ -106,6 +106,8 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
+          node scripts/guard-token-scope.mjs dev
+          node scripts/guard-migrations.mjs dev
           node scripts/check-access-migration.mjs --before
           npm run migrate:dev
           node scripts/guard-environment.mjs dev --seal

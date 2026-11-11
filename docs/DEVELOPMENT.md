@@ -2,7 +2,7 @@
 
 ## Ambientes DEV e PROD — 10/11/2026
 
-**Estado atual:** preparação multiambiente em branch; Firebase PROD provisionado sem billing; migração Cloudflare DEV e homologação remota pendentes. Nenhum primeiro deploy PROD foi autorizado. As seções históricas abaixo preservam evidências anteriores e não significam que PROD está ativo.
+**Estado atual:** PR #111 em validação; DEV migrado para conta exclusiva e domínio da marca, Google/Dropbox conferidos nos cenários do roadmap. Cloudflare/Firebase PROD provisionados sem billing, D1 com schema e sem dados de negócio; integrações PROD em configuração. Nenhum primeiro deploy PROD foi autorizado. As seções históricas abaixo preservam evidências anteriores e não significam que PROD está ativo.
 
 ### Contrato e builds
 
@@ -29,7 +29,7 @@ O manifesto registra ambiente, API, Firebase e SHA (GITHUB_SHA ou SOURCE_SHA); A
 
 ### Credenciais e promoção
 
-Ambientes GitHub: cloudflare-development/firebase-development e cloudflare-production/firebase-production. Não reaproveitar credencial Cloudflare da conta anterior após a migração; criar token com Workers Scripts/D1 somente na conta correta. Variáveis Cloudflare: CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_D1_DATABASE_ID, API_BASE_URL. Secret: CLOUDFLARE_API_TOKEN. Firebase: FIREBASE_PROJECT_ID, API_BASE_URL, VITE_FIREBASE_AUTH_DOMAIN/API_KEY/APP_ID/MESSAGING_SENDER_ID/STORAGE_BUCKET públicos; FIREBASE_SERVICE_ACCOUNT protegido e exclusivo do projeto.
+Ambientes GitHub: cloudflare-development/firebase-development e cloudflare-production/firebase-production. Tokens Cloudflare já criados por conta, apenas Workers Scripts Write/D1 Write, validade 08/02/2027. Renovar antes do vencimento e substituir o secret do ambiente correspondente. Não usar OAuth administrativo mult conta da CLI como credencial CI. guard-token-scope verifica acesso ao D1 alvo e recusa ao D1 oposto. Variáveis Cloudflare: CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_D1_DATABASE_ID, API_BASE_URL. Secret: CLOUDFLARE_API_TOKEN. Firebase: FIREBASE_PROJECT_ID, API_BASE_URL, VITE_FIREBASE_AUTH_DOMAIN/API_KEY/APP_ID/MESSAGING_SENDER_ID/STORAGE_BUCKET públicos; FIREBASE_SERVICE_ACCOUNT protegido e exclusivo do projeto.
 
 Worker Secrets obrigatórios: TOKEN_KEYS (JSON de chaves AES-256 base64url por versão), TRIAL_IDENTITY_HMAC_KEY (CSPRNG independente), GOOGLE_CLIENT_SECRET, GOOGLE_PICKER_API_KEY, DROPBOX_APP_KEY, DROPBOX_APP_SECRET e FIREBASE_ADMIN_CREDENTIALS_JSON. GOOGLE_CLIENT_ID e callbacks são variáveis públicas. PROD recebe chaves novas; nunca duplicar AES/HMAC DEV. Preservar as chaves DEV durante migração e não trocar Client IDs para tentar corrigir callback.
 
@@ -39,10 +39,10 @@ DEV segue workflows existentes. PROD: habilitar PRODUCTION_ENABLED somente após
 
 ### Migração e recuperação
 
-Backup DEV inicial: export SQL consistente do D1 e configurações/código/versão do Worker foram salvos fora do repositório em diretório privado local. Nunca publicar SQL, export cifrado, chave privada de recuperação ou arquivos de credenciais como artifact de Actions público. Fazer uma nova exportação final em janela sem escrita e sem Cron no banco de origem antes do cutover, para evitar perder alterações posteriores ao backup inicial. Conferir schema, contagens por tabela, quick_check e foreign_key_check antes/depois; não inferir integridade apenas pelo tamanho do arquivo.
+Backup DEV inicial e snapshot final do cutover salvos fora do repositório em `%USERPROFILE%/.codex/private/roteiva-environments`. `dev-final.sql` tem SHA-256 `6f331e2fe5ebc323a5f3f581982e9e91d85ae53c344f7ab2658a94d1ef1cf01d`; `dev-cutover-evidence.json` registra contagens/digests, integridade e manifesto publicado. Cutover concluído em 11/11/2026 00:17 UTC (10/11, 21:17 em São Paulo). Configurações, código/versão e credenciais preservadas estão no mesmo diretório privado. Nunca publicar SQL, export cifrado, chave privada de recuperação ou arquivos de credenciais como artifact de Actions público. Fazer uma nova exportação final em janela sem escrita e sem Cron no banco de origem antes do cutover, para evitar perder alterações posteriores ao backup inicial. Conferir schema, contagens por tabela, quick_check e foreign_key_check antes/depois; não inferir integridade apenas pelo tamanho do arquivo.
 
 1. Preparar conta exclusiva, D1 de destino, credenciais preservadas, callbacks novos adicionados aos clientes DEV e builds/testes aprovados.
-2. Transferência de segredos: operação de manutenção explícita em api/operations/transfer-dev-secrets.mjs, origem DEV fixa por argumentos, versão esperada, token via ambiente e saída privada absoluta. A chave privada nunca vai à Cloudflare; export é cifrado e a versão original é restaurada em finally. Conferir health e ausência da rota após restauração.
+2. Transferência de segredos: operação de manutenção explícita em api/operations/transfer-dev-secrets.mjs, origem DEV fixa por argumentos, versão esperada, token via ambiente, saída privada absoluta, arquivo multipart original `.bin` e SHA-256 revisados. O arquivo `.headers.json` correspondente deve acompanhar o backup. Não usar content/v2 como prova de versão ativa: a API pode devolver o último upload após rollback. A chave privada nunca vai à Cloudflare; export é cifrado e a versão original é restaurada em finally. Conferir health e ausência da rota após restauração.
 3. Pausar escritas e Cron da origem durante exportação final, importar somente no novo D1 DEV, aplicar migrations versionadas e selar dev. Validar chaves/grants cifrados sem revelar valores. Nunca importar esse dump em PROD.
 4. Publicar API DEV nova e frontend correspondente por commit identificável; smoke de saúde/CORS/JWT/D1 e homologação sintética Drive/Dropbox, mídia e aprovação antes de PROD. Tratar sessões OAuth em andamento e cookies do hostname antigo; manter cliente/grants e redirects antigos durante a janela, sem presumir validade de código de autorização emitido para outro redirect.
 5. Após cutover, não deixar dois bancos DEV aceitando escrita. Endpoint legado temporário pode apenas encaminhar ao destino novo; origem preservada para recuperação, sem Cron concorrente. Remoção posterior exige confirmar ausência de clientes antigos.
@@ -127,7 +127,7 @@ As dependências desta PR foram instaladas e o lockfile gerado em GitHub Actions
 | VITE_APP_MODE | `demo` ou `firebase`, obrigatório |
 | VITE_FIREBASE_API_KEY | Chave pública do SDK, obrigatória no Firebase |
 | VITE_FIREBASE_AUTH_DOMAIN | Domínio Firebase Auth, obrigatório |
-| VITE_FIREBASE_PROJECT_ID | Somente `roteiva-web-dev`; testes exigem `demo-roteiva` |
+| VITE_FIREBASE_PROJECT_ID | `roteiva-web-dev` em DEV, `roteiva-web-prod` em PROD; testes exigem `demo-roteiva` |
 | VITE_FIREBASE_APP_ID | App Web registrado, obrigatório |
 | VITE_FIREBASE_MESSAGING_SENDER_ID | Número do projeto, obrigatório |
 | VITE_FIREBASE_STORAGE_BUCKET | Opcional; nenhum bucket é utilizado/provisionado |

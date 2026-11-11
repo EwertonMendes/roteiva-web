@@ -147,6 +147,8 @@ jobs:
           set -euo pipefail
           npx wrangler d1 time-travel info DB --env dev --json
           node scripts/check-access-migration.mjs --before
+          node scripts/guard-token-scope.mjs dev
+          node scripts/guard-migrations.mjs dev
           npm run migrate:dev
           node scripts/guard-environment.mjs dev --seal
           node scripts/check-access-migration.mjs

@@ -40,20 +40,20 @@ export async function handle(request: Request, env: Env): Promise<Response> {
     assertEnvironment(env);
     if (origin && origin !== env.FRONTEND_ORIGIN) throw new ApiError(403,'origin_denied');
     // Rate limiting per edge-provided source address prevents one user's traffic
-    // from exhausting the entire DEV account's shared 60/minute bucket.
-    if (request.method !== 'OPTIONS' && url.pathname !== '/health') await assertDatabaseEnvironment(env);
+    // from exhausting the environment account's shared 60/minute bucket.
     const sourceIp = request.headers.get('CF-Connecting-IP') || 'unknown';
+    if (request.method !== 'OPTIONS') {
+      const limiter=(url.pathname.endsWith('/thumbnail')||url.pathname.endsWith('/cover')||url.pathname==='/reviews/media') ? env.API_THUMB_LIMIT : env.API_RATE_LIMIT;
+      if (!(await limiter.limit({key:env.ENVIRONMENT+':ip:'+sourceIp.slice(0,64)})).success) throw new ApiError(429,'rate_limited');
+      await assertDatabaseEnvironment(env);
+    }
     if (request.method === 'OPTIONS') {
       if (!origin) throw new ApiError(403,'origin_required');
       response = new Response(null,{status:204,headers:{
         'Access-Control-Allow-Methods':'GET, HEAD, POST, OPTIONS',
         'Access-Control-Allow-Headers':'Authorization, Content-Type, X-Review-Token, Range','Access-Control-Max-Age':'3600',
       }});
-    } else if (!(await ((url.pathname.endsWith('/thumbnail')||url.pathname.endsWith('/cover')||url.pathname==='/reviews/media') ? env.API_THUMB_LIMIT : env.API_RATE_LIMIT)
-        .limit({key:env.ENVIRONMENT+':ip:'+sourceIp.slice(0,64)})).success) {
-      throw new ApiError(429,'rate_limited');
     } else if (url.pathname === '/health' && request.method === 'GET') {
-      await assertDatabaseEnvironment(env);
       response = Response.json({status:'ok',environment:env.ENVIRONMENT});
       response.headers.set('X-Roteiva-Access-Version','1');
     } else if (url.pathname === '/oauth/dropbox/launch' && request.method === 'GET') {

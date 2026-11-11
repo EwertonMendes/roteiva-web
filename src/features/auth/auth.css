@@ -117,6 +117,8 @@
 .profile-photo{width:36px;height:36px;border-radius:50%;object-fit:cover}
 .cloud-banner{display:flex;gap:16px;align-items:center;padding:12px 16px;border:1px solid var(--line,#ddd);border-radius:12px;margin-bottom:20px;font-size: var(--type-support)}
 .cloud-recovery{position:fixed;z-index:2000;inset:0;background:var(--paper,#fff);padding:clamp(24px,7vw,96px);display:flex;flex-direction:column;justify-content:center;gap:20px}
+.auth-policy-links{display:flex;flex-wrap:wrap;gap:18px;margin-top:24px;font-size:var(--type-support);color:var(--muted,#666)}
+.auth-policy-links a{color:inherit;text-underline-offset:3px}
 .cloud-recovery button{align-self:flex-start}
 .cloud-recovery h2{font-size:28px;max-width:680px}
 .cloud-recovery p{max-width:680px;line-height:1.6}

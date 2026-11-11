@@ -40,7 +40,7 @@ Não recrie READMEs concorrentes, documentos de teste avulsos ou planos paralelo
 
 - O frontend foi **explicitamente migrado na PR #5 para React + Vite + TypeScript** a fim de atender ao Firebase Hosting estático. A entrada é `index.html` e o código da UI está em `src/`. **Não recriar Next.js/Vinext, SSR nem backend por conveniência**.
 - Existe **um único frontend**. `pnpm build` gera `dist/` para Firebase; `pnpm build:demo` fornece apenas um build de QA local. GitHub Pages não é usado nem deve ser reintroduzido.
-- A fundação Firebase DEV da PR #6 usa somente roteiva-web-dev (Spark, Standard/nativo em São Paulo), Auth Google e subcoleções privadas users/{uid}. Conferir validação no roadmap. A PR #15 adiciona a fundação Worker/D1 DEV em api/; OAuth real, biblioteca Drive e PROD continuam pendentes. Mudanças de integração não autorizam redesenho.
+- A fundação Firebase DEV da PR #6 usa somente roteiva-web-dev (Spark, Standard/nativo em São Paulo), Auth Google e subcoleções privadas users/{uid}. Conferir validação no roadmap. A PR #15 adiciona a fundação Worker/D1 DEV em api/; OAuth e biblioteca DEV evoluíram nas entregas posteriores; consultar a seção atual do roadmap. PROD foi provisionado gratuitamente e aguarda integração/aprovação do primeiro deploy. Mudanças de integração não autorizam redesenho.
 - O BRBET antigo é referência conceitual, não uma dependência e não deve ser copiado cegamente; verificar direitos de reutilização antes de aproveitar código.
 - O escopo `drive.file` é o padrão desejado; **não pedir acesso irrestrito ao Drive** por conveniência.
 - Com uploads grandes, dados passam diretamente do navegador ao Drive quando a prova de conceito confirmar segurança e CORS; **não passar vídeo pelo Worker**.

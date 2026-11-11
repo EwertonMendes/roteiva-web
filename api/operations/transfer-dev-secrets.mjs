@@ -2,12 +2,18 @@
 import assert from 'node:assert/strict';
 import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
 import {resolve} from 'node:path';
+import {createHash} from 'node:crypto';
 
-const [sourceAccount,sourceOrigin,outputDirectory,expectedVersion]=process.argv.slice(2);
+const [sourceAccount,sourceOrigin,outputDirectory,expectedVersion,backupFile,backupSha256]=process.argv.slice(2);
 assert.match(sourceAccount||'',/^[a-f0-9]{32}$/);
 assert.match(expectedVersion||'',/^[a-f0-9-]{36}$/);
 assert.equal(new URL(sourceOrigin).pathname,'/');assert.equal(new URL(sourceOrigin).protocol,'https:');
 assert.ok(outputDirectory&&resolve(outputDirectory)===outputDirectory,'Absolute private output directory required');
+assert.ok(backupFile&&resolve(backupFile)===backupFile,'Reviewed original multipart backup path required');
+assert.match(backupSha256||'',/^[a-f0-9]{64}$/,'Reviewed original backup SHA-256 required');
+const backup=readFileSync(backupFile);
+assert.equal(createHash('sha256').update(backup).digest('hex'),backupSha256,'Original backup changed');
+const backupHeaders=JSON.parse(readFileSync(backupFile.replace(/\.bin$/,'.headers.json'),'utf8')).headers;
 const credential=process.env.CLOUDFLARE_API_TOKEN;assert.ok(credential,'Source-account deploy token required');
 const base=`https://api.cloudflare.com/client/v4/accounts/${sourceAccount}/workers/scripts/roteiva-api-dev`;
 const call=async(path,options={})=>{
@@ -20,7 +26,9 @@ assert.equal(deployments.deployments[0].versions[0].version_id,expectedVersion,'
 const settings=await call('/settings');
 const values=Object.fromEntries(settings.bindings.filter(b=>b.type==='plain_text').map(b=>[b.name,b.text]));
 assert.equal(values.ENVIRONMENT,'dev');assert.equal(values.FIREBASE_PROJECT_ID,'roteiva-web-dev');
-const response=await fetch(base+'/content/v2',{headers:{Authorization:'Bearer '+credential}});assert.equal(response.status,200);
+// content/v2 can return the latest upload instead of the active deployment.
+// Use the operator-reviewed backup associated with expectedVersion, never that endpoint.
+const response=new Response(backup,{headers:backupHeaders});
 const original=await response.formData(),entry=response.headers.get('cf-entrypoint');assert.ok(entry);
 mkdirSync(outputDirectory,{recursive:true});
 const signing=await crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},true,['sign','verify']);
