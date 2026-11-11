@@ -4,6 +4,7 @@ allowBuilds:
   protobufjs: false
   re2: false
 overrides:
+  're2js@>=2.2.0 <2.8.7': 2.8.7
   '@grpc/grpc-js@<1.13.6': 1.14.6
   'body-parser@<1.20.9': 1.20.9
   'body-parser@>=2.0.0 <2.4.0': 2.4.0
