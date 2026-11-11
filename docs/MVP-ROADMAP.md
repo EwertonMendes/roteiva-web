@@ -2,13 +2,15 @@
 
 ## Recuperação da validação de acesso — 11/11/2026
 
-**IMPLEMENTADO E TESTADO; PUBLICAÇÃO EM VALIDAÇÃO.** A tela reportava acesso ausente após retorno OAuth/F5, apesar de o D1 indicar teste ativo e a projeção Firestore existir. watchAccess convertia snapshot vazio do observador diretamente em erro, sem uma confirmação independente do servidor.
+**IMPLEMENTADO E TESTADO; PUBLICAÇÃO COMPLEMENTAR EM VALIDAÇÃO.** A tela reportava acesso ausente após retorno OAuth/F5, apesar de o D1 indicar teste ativo e a projeção Firestore existir. watchAccess convertia snapshot vazio do observador diretamente em erro, sem uma confirmação independente do servidor.
 
 - [x] Reconciliar snapshot vazio com GET autenticado Firestore REST, sem cache do SDK, usando ID token do próprio usuário e as mesmas Rules; exigir projeto/caminho/ownerUid/schema/datas/flags corretos. Não criar ou ampliar concessões nem alterar dados para liberar uma conta.
 - [x] Ignorar snapshots de cache e respostas antigas após evento mais novo, erro do listener, logout ou troca de UID; ausência real, negação, dados inválidos e falha de rede continuam bloqueando. Suspensão e expiração continuam aplicadas.
 - [x] Separar alerta e ações por 20 px; permitir quebra dos botões no mobile, sem redesenho.
 - [x] 83 testes frontend aprovados, incluindo oito regressões novas de reconciliação/isolamento/ordenação. 34 Rules A/B e 14 testes Chromium desktop/mobile aprovados: retorno Drive/Dropbox, reload, expiração, suspensão, isolamento A/B, exclusão isolada, espaçamento claro/escuro e recuperação por REST autenticado real no emulador.
-- [ ] Conferir CI, publicar frontend DEV/PROD por SHA aprovado e homologar reabertura/retorno OAuth na conta real existente. Sem alteração de Worker, schema, permissões ou plano.
+- [x] Primeira correção #114 publicada em PROD (747ee96ec91ba9d9b51b454a21b2fc1a529485b8); retorno/reload da aba original aprovados. A nova aba revelou falha adicional na leitura inicial do perfil e listener encerrado. Recuperação compartilhada confirma dados com token renovado e reinicia o listener uma única vez; não altera registros reais.
+- [x] Rodada complementar: 89 testes unitários, TypeScript, 34 Rules A/B e 16 browser desktop/mobile aprovados, incluindo nova aba + reload.
+- [ ] Conferir CI e publicar frontend DEV/PROD por SHA aprovado e homologar reabertura/retorno OAuth na conta real existente. Sem alteração de Worker, schema, permissões ou plano.
 
 ## Ativação dos provedores PROD — 11/11/2026
 

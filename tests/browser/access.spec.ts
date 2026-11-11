@@ -80,6 +80,23 @@ test('session survives reload and OAuth return URLs for every registered identit
   }
 });
 
+test('a second tab restores the same account and can reload without manual recovery',async({page},info)=>{
+  await signup(page,'access-new-tab-'+info.project.name+'@example.com');
+  // The first tab has already provisioned this isolated account. Share only the
+  // API transport mock; Firestore and persistent Auth stay real emulator SDKs.
+  await page.context().route('http://127.0.0.1:8787/access/ensure',async route=>{
+    const headers={'Access-Control-Allow-Origin':cloud,'Access-Control-Allow-Methods':'POST, OPTIONS','Access-Control-Allow-Headers':'Authorization, Content-Type'};
+    await route.fulfill({status:route.request().method()==='OPTIONS'?204:200,headers,body:route.request().method()==='OPTIONS'?'':'{}'});
+  });
+  const restored=await page.context().newPage();
+  try{
+    await restored.goto(cloud+'/biblioteca?drive=connected');
+    await expect(restored.locator('.app-shell')).toBeVisible();
+    await restored.reload();await expect(restored.locator('.app-shell')).toBeVisible();
+    await expect(restored.getByRole('heading',{name:'Não foi possível consultar seu cadastro.'})).toHaveCount(0);
+  }finally{await restored.close();}
+});
+
 test('an empty listener snapshot is reconciled by an authenticated server read',async({page},info)=>{
   const email='access-reconcile-'+info.project.name+'@example.com';
   await signup(page,email);

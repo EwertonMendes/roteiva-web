@@ -26,7 +26,7 @@ export function validateProfileChanges(profile: ProfileChanges): ProfileChanges 
   }
   return {displayName,studioName,professionalType:profile.professionalType};
 }
-function readProfile(data:DocumentData): RoteivaProfile {
+export function readProfile(data:DocumentData): RoteivaProfile {
   return {
     displayName:typeof data.displayName==="string" ? data.displayName : "",
     studioName:typeof data.studioName==="string" ? data.studioName : "",

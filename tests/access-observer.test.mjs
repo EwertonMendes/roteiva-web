@@ -39,7 +39,7 @@ test('newer suspension or expiration wins over a delayed active server response'
  }
 });
 test('listener denial invalidates any pending recovery result',async()=>{
- let resolve;const h=harness(()=>new Promise(r=>{resolve=r;}));h.next({fromCache:false,value:null});await settle();
+ let resolve,reads=0;const h=harness(()=>++reads===1?new Promise(r=>{resolve=r;}):Promise.reject(new Error('denied')));h.next({fromCache:false,value:null});await settle();
  h.fail();resolve(active);await settle();assert.equal(h.errors.length,1);assert.deepEqual(h.values,[]);h.stop();
 });
 test('logout/account switch ignores late responses and cancels reads not started yet',async()=>{
@@ -58,4 +58,12 @@ test('REST recovery requires exact project/path, owner and validated entitlement
   d=>d.fields.schemaVersion.integerValue='2',d=>delete d.fields.suspended]){
   const d=document();change(d);assert.throws(()=>parseAccessRest(d,name,'alice'));
  }
+});
+
+test('a terminated listener refreshes from the server and restarts once, retaining revocation monitoring',async()=>{
+ let next,fail,subscriptions=0,reads=0;const values=[],errors=[];
+ const stop=observeAccess((n,e)=>{next=n;fail=e;subscriptions++;return()=>{};},async()=>{reads++;return active;},v=>values.push(v),e=>errors.push(e));
+ fail();await settle();assert.equal(subscriptions,2);assert.equal(reads,1);assert.deepEqual(values,[active]);
+ next({fromCache:false,value:{...active,suspended:true}});assert.equal(values.at(-1).suspended,true);
+ fail();await settle();assert.equal(subscriptions,2);assert.equal(reads,1);assert.equal(errors.length,1);stop();
 });
