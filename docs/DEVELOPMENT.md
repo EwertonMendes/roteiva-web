@@ -2,7 +2,7 @@
 
 ## Ambientes DEV e PROD — 10/11/2026
 
-**Estado atual:** PR #111 em validação; DEV migrado para conta exclusiva e domínio da marca, Google/Dropbox conferidos nos cenários do roadmap. Cloudflare/Firebase PROD provisionados sem billing, D1 com schema e sem dados de negócio; integrações PROD em configuração. O proprietário autorizou em 11/11 concluir a ativação e delegou decisões; nenhum deploy PROD executado até esta revisão. As seções históricas abaixo preservam evidências anteriores e não significam que PROD está ativo.
+**Estado atual:** PR #111 integrado; DEV migrado para conta exclusiva e domínio da marca, Google/Dropbox conferidos nos cenários do roadmap. Cloudflare/Firebase PROD publicados sem billing, D1 com schema e sem dados de negócio. Primeiro release d599e247e9858afe26c9f93e7bd0da70af870dee concluído pelo workflow 43023457363 em 11/11/2026, sob delegação expressa do proprietário. Integrações OAuth PROD ainda não homologadas/aprovadas pelos provedores. As seções históricas abaixo preservam evidências anteriores e não substituem este estado atual.
 
 ### Contrato e builds
 
@@ -35,7 +35,7 @@ Worker Secrets obrigatórios: TOKEN_KEYS (JSON de chaves AES-256 base64url por v
 
 Em api/, com as variáveis protegidas e credencial da conta correta: `node scripts/guard-environment.mjs dev --before-migrations`, `npm run migrate:dev`, `node scripts/guard-environment.mjs dev --seal`, `node scripts/guard-secrets.mjs dev`. Para PROD substituir dev/prod e usar migrate:prod, exclusivamente após aprovação. Selagem só insere identidade ausente após conferir o D1 real, não corrige identidade divergente. Migrações são aditivas; nunca editar arquivo já aplicado.
 
-DEV segue workflows existentes. PROD: habilitar PRODUCTION_ENABLED somente após DEV homologado, OAuth público resolvido e aprovação explícita; dispatch de production.yml em master com SHA completo e confirmação DEPLOY ROTEIVA PROD. Configurar required reviewer proprietário nos dois environments, sem bypass de admin e branch master. GitHub Free suporta required reviewers neste repositório público. Aprovação humana é ação real no ambiente; workflow_dispatch sozinho não a substitui.
+DEV segue workflows existentes. PROD: habilitar PRODUCTION_ENABLED somente para uma promoção técnica autorizada e identificada, após DEV homologado; lançamento amplo com OAuth exige resolver previamente as revisões dos provedores; dispatch de production.yml em master com SHA completo e confirmação DEPLOY ROTEIVA PROD. Configurar required reviewer proprietário nos dois environments, sem bypass de admin e branch master. GitHub Free suporta required reviewers neste repositório público. Revisão do ambiente é uma ação registrada distinta do workflow_dispatch; o dispatch sozinho não a substitui. Neste primeiro release, o proprietário delegou explicitamente as decisões e ambas as revisões foram executadas por sua identidade administrativa, sem desativar proteções. Repor PRODUCTION_ENABLED=false ao concluir.
 
 ### Migração e recuperação
 
@@ -48,6 +48,16 @@ Backup DEV inicial e snapshot final do cutover salvos fora do repositório em `%
 5. Após cutover, não deixar dois bancos DEV aceitando escrita. Endpoint legado temporário pode apenas encaminhar ao destino novo; origem preservada para recuperação, sem Cron concorrente. Remoção posterior exige confirmar ausência de clientes antigos.
 
 Rollback antes do cutover: restaurar versão original e manter frontend/destinos antigos. Depois de aceitar escritas no destino novo: reverter código compatível sobre o mesmo novo D1; não apontar para snapshot antigo sem reconciliar dados. Rollback de Worker/Hosting nunca desfaz schema. D1 Free oferece Time Travel de sete dias; guardar SQL privado além dessa janela, testar restore numa base isolada e conferir integridade. Firestore Spark não recebe backup gerenciado pago; exportação de domínio e recuperação de Auth/Firestore exigem processo separado. Não apresentar exportação parcial da UI como backup integral.
+
+### Evidências da primeira publicação PROD — 11/11/2026
+
+Workflow [43023457363](https://github.com/EwertonMendes/roteiva-web/actions/runs/43023457363), SHA d599e247e9858afe26c9f93e7bd0da70af870dee: validate/worker/frontend concluídos. Regressão completa: 145 browser aprovados/5 ignorados, 34 Rules A/B e 215 API. Auditorias de dependências de produção sem vulnerabilidades conhecidas após corrigir re2js 2.8.7.
+
+Homologação remota com identidades sintéticas: Firebase custom sign-in, perfil próprio permitido, leitura cruzada/anônima negada, JWT PROD recusado em DEV e JWT DEV recusado em PROD. Isso não testa popup Google nem consentimento Drive/Dropbox. Limpeza confirmada por APIs: Auth PROD 0 usuários e Firestore 0 perfis. D1 exportado/restaurado em SQLite isolado: quick_check/foreign_key_check aprovados, 26 tabelas, somente d1_migrations/access_rollout/deployment_identity com registros e zero linhas de negócio.
+
+Backup privado `prod-initial-schema.sql`, SHA-256 b87d1b226b4641cf58f33d2627e4595c5adbbe2fc86daf80db0f8f520b300b57; evidências em prod-restore-evidence.json, prod-empty-after-qa.json, prod-real-synthetic-qa.json, prod-rejects-dev-jwt.json e deployed-workers-final.json, no mesmo diretório privado dos backups DEV. Credencial backend PROD leu/listou Firestore PROD e recebeu 403 em DEV; credencial deploy própria acessou Hosting/Rules/índices. Os dois tokens Cloudflare passaram pelo teste de conta/D1 oposto negado nos workflows.
+
+Páginas privacidade.html, termos.html e suporte.html publicadas nos dois frontends, com contato roteiva-suporte@googlegroups.com. Google/Dropbox PROD continuam sem consentimento real homologado e sem revisão de produção aprovada. Não anunciar disponibilidade ampla dessas integrações; completar branding/escopos/publishing e submissão nos consoles quando o acesso for restabelecido. Não contratar avaliação de segurança nem habilitar cobrança sem autorização específica.
 
 ### Franquias gratuitas e observabilidade (documentação oficial consultada em 10/11/2026)
 
