@@ -1,4 +1,4 @@
-import {assertEnvironment,assertDatabaseEnvironment} from './environment.ts';
+import {assertEnvironment,assertDatabaseEnvironment,allowedFrontend} from './environment.ts';
 import {applyResponsePolicy} from './response-policy.ts';
 import {listCoverImages,coverImage,dropboxCoverImage,fastCoverPreview} from './project-covers.ts';
 import { ApiError, type Env } from './types.ts';
@@ -38,7 +38,7 @@ export async function handle(request: Request, env: Env): Promise<Response> {
   let response: Response;
   try {
     assertEnvironment(env);
-    if (origin && origin !== env.FRONTEND_ORIGIN) throw new ApiError(403,'origin_denied');
+    if (origin && !allowedFrontend(env,origin)) throw new ApiError(403,'origin_denied');
     // Rate limiting per edge-provided source address prevents one user's traffic
     // from exhausting the environment account's shared 60/minute bucket.
     const sourceIp = request.headers.get('CF-Connecting-IP') || 'unknown';
@@ -68,33 +68,33 @@ export async function handle(request: Request, env: Env): Promise<Response> {
       const uid=await identity(request,env);
       response=await deletionStatus(env,uid);
     } else if (url.pathname === '/account/deletion' && request.method === 'POST') {
-      if(origin!==env.FRONTEND_ORIGIN)throw new ApiError(403,'origin_required');
+      if(!allowedFrontend(env,origin))throw new ApiError(403,'origin_required');
       const principal=await verifiedTrialPrincipal(request,env,300);
       if(!(await env.API_RATE_LIMIT.limit({key:env.ENVIRONMENT+':delete:'+principal.uid})).success)throw new ApiError(429,'rate_limited');
       response=await requestDeletion(request,env,principal.uid,principal);
     } else if (url.pathname === '/access/ensure' && request.method === 'POST') {
-      if(origin!==env.FRONTEND_ORIGIN)throw new ApiError(403,'origin_required');
+      if(!allowedFrontend(env,origin))throw new ApiError(403,'origin_required');
       const principal=await verifiedTrialPrincipal(request,env);
       if(!(await env.API_RATE_LIMIT.limit({key:env.ENVIRONMENT+':access:'+principal.uid})).success)throw new ApiError(429,'rate_limited');
       response=await ensureAccess(env,principal.uid,undefined,principal);
     } else if (url.pathname === '/reviews' || url.pathname.startsWith('/reviews/')) {
-      if (request.method === 'POST' && origin !== env.FRONTEND_ORIGIN) throw new ApiError(403,'origin_required');
+      if (request.method === 'POST' && !allowedFrontend(env,origin)) throw new ApiError(403,'origin_required');
       if (url.pathname!=='/reviews/media'&&!(await env.API_RATE_LIMIT.limit({key:env.ENVIRONMENT+':reviews:'+sourceIp.slice(0,64)})).success) throw new ApiError(429,'rate_limited');
       response = await reviewRouter(request,env,url);
     } else if (url.pathname === '/oauth/dropbox/start' && request.method === 'POST') {
       dropboxEnabled(env);
-      if(origin!==env.FRONTEND_ORIGIN)throw new ApiError(403,'origin_required');
+      if(!allowedFrontend(env,origin))throw new ApiError(403,'origin_required');
       const uid=await identity(request,env);await assertActiveAccess(env,uid);
       response=await dropboxStart(env,uid);
     } else if (/^\/integrations\/dropbox\/[^/]+\/uploads\/start$/.test(url.pathname) && request.method==='POST') {
       dropboxEnabled(env);
-      if(origin!==env.FRONTEND_ORIGIN)throw new ApiError(403,'origin_required');
+      if(!allowedFrontend(env,origin))throw new ApiError(403,'origin_required');
       const uid=await identity(request,env);await assertActiveAccess(env,uid);
       if(!(await env.API_RATE_LIMIT.limit({key:env.ENVIRONMENT+':upload:'+uid})).success)throw new ApiError(429,'rate_limited');
       response=await startDropboxUpload(env,uid,url.pathname.split('/')[3],request);
     } else if (/^\/integrations\/dropbox\/[^/]+\/uploads\/[0-9a-f-]{36}\/(chunk|finish)$/.test(url.pathname) && request.method==='POST') {
       dropboxEnabled(env);
-      if(origin!==env.FRONTEND_ORIGIN)throw new ApiError(403,'origin_required');
+      if(!allowedFrontend(env,origin))throw new ApiError(403,'origin_required');
       const uid=await identity(request,env);await assertActiveAccess(env,uid);
       const parts=url.pathname.split('/');
       const limiter=parts[6]==='chunk'?env.API_UPLOAD_LIMIT:env.API_RATE_LIMIT;
@@ -119,7 +119,7 @@ export async function handle(request: Request, env: Env): Promise<Response> {
       response=await dropboxThumbnail(env,uid,parts[3],decodeURIComponent(parts[5]));
     } else if (/^\/integrations\/dropbox\/[^/]+\/preview-ticket$/.test(url.pathname) && request.method==='POST') {
       dropboxEnabled(env);
-      if(origin!==env.FRONTEND_ORIGIN)throw new ApiError(403,'origin_required');
+      if(!allowedFrontend(env,origin))throw new ApiError(403,'origin_required');
       const uid=await identity(request,env);await assertActiveAccess(env,uid);
       response=await issueDropboxPreview(env,uid,url.pathname.split('/')[3],request);
     } else if (url.pathname === '/integrations/dropbox' && request.method === 'GET') {
@@ -139,7 +139,7 @@ export async function handle(request: Request, env: Env): Promise<Response> {
       response=Response.json({file:await dropboxMetadata(env,uid,parts[3],url.searchParams.get('fileId')||'')});
     } else if (/^\/integrations\/dropbox\/[^/]+\/disconnect$/.test(url.pathname) && request.method==='POST') {
       dropboxEnabled(env);
-      if(origin!==env.FRONTEND_ORIGIN)throw new ApiError(403,'origin_required');
+      if(!allowedFrontend(env,origin))throw new ApiError(403,'origin_required');
       const uid=await identity(request,env);await assertActiveAccess(env,uid);
       response=await dropboxRevoke(env,uid,url.pathname.split('/')[3]);
     } else if (url.pathname === '/integrations/drive' && request.method === 'GET') {
@@ -149,7 +149,7 @@ export async function handle(request: Request, env: Env): Promise<Response> {
       const rows = await env.DB.prepare('SELECT id,google_email,status,scopes,updated_at FROM drive_connections WHERE owner_uid=? ORDER BY created_at LIMIT 20').bind(uid).all();
       response = Response.json({connections:rows.results});
     } else if (url.pathname === '/oauth/drive/start' && request.method === 'POST') {
-      if (origin !== env.FRONTEND_ORIGIN) throw new ApiError(403,'origin_required');
+      if (!allowedFrontend(env,origin)) throw new ApiError(403,'origin_required');
       const uid = await identity(request,env);
       await assertActiveAccess(env,uid);
       if (!(await env.API_RATE_LIMIT.limit({key:env.ENVIRONMENT+':uid:'+uid})).success) throw new ApiError(429,'rate_limited');
@@ -174,14 +174,14 @@ export async function handle(request: Request, env: Env): Promise<Response> {
        :await coverImage(env,uid,parts[3],parts[5]);
     } else if (/^\/integrations\/drive\/[^/]+\/picker\/verify$/.test(url.pathname) && request.method==='POST') {
       enabled(env);
-      if(origin!==env.FRONTEND_ORIGIN)throw new ApiError(403,'origin_required');
+      if(!allowedFrontend(env,origin))throw new ApiError(403,'origin_required');
       const uid=await identity(request,env);
       await assertActiveAccess(env,uid);
       if(!(await env.API_RATE_LIMIT.limit({key:env.ENVIRONMENT+':upload:'+uid})).success)throw new ApiError(429,'rate_limited');
       response=await verifyPickerToken(env,uid,url.pathname.split('/')[3],request);
     } else if (/^\/integrations\/drive\/[^/]+\/folders\/[^/]+\/uploads(?:\/(?:complete|authorize))?$/.test(url.pathname) && request.method==='POST') {
       enabled(env);
-      if(origin!==env.FRONTEND_ORIGIN)throw new ApiError(403,'origin_required');
+      if(!allowedFrontend(env,origin))throw new ApiError(403,'origin_required');
       const uid=await identity(request,env);
       await assertActiveAccess(env,uid);
       if(!(await env.API_RATE_LIMIT.limit({key:env.ENVIRONMENT+':upload:'+uid})).success)throw new ApiError(429,'rate_limited');
@@ -207,7 +207,7 @@ export async function handle(request: Request, env: Env): Promise<Response> {
       } else if (parts[4] === 'metadata' && request.method === 'GET') {
         response = await metadata(env,uid,parts[3],url.searchParams.get('fileId') || '');
       } else if (parts[4] === 'disconnect' && request.method === 'POST') {
-        if (origin !== env.FRONTEND_ORIGIN) throw new ApiError(403,'origin_required');
+        if (!allowedFrontend(env,origin)) throw new ApiError(403,'origin_required');
         response = await disconnect(env,uid,parts[3]);
       } else throw new ApiError(405,'method_not_allowed');
     } else {
@@ -226,10 +226,10 @@ export async function handle(request: Request, env: Env): Promise<Response> {
     // Only categorical events. Never emit Request, URL, exception, headers or provider bodies.
     if (!known) console.error(JSON.stringify({event:'dependency_failure',requestId:id}));
   }
-  const result = applyResponsePolicy(response,url.pathname,env.FRONTEND_ORIGIN);
+  const result = applyResponsePolicy(response,url.pathname,allowedFrontend(env,origin)?origin!:env.FRONTEND_ORIGIN);
   result.headers.set('X-Request-Id',id);
   result.headers.set('Vary','Origin');
-  if (origin === env.FRONTEND_ORIGIN) {
+  if (allowedFrontend(env,origin)) {
     result.headers.set('Access-Control-Allow-Origin',origin);
     result.headers.set('Access-Control-Allow-Credentials','true');
   }

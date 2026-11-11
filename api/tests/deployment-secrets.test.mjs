@@ -18,7 +18,7 @@ function run(overrides={}) {
  const result=spawnSync(process.execPath,[fileURLToPath(new URL('../scripts/prepare-worker-secrets.mjs',import.meta.url)),'prod'],{
   cwd:fileURLToPath(new URL('..',import.meta.url)),encoding:'utf8',env:{...process.env,...secrets,
    CLOUDFLARE_ACCOUNT_ID:config.account_id,CLOUDFLARE_D1_DATABASE_ID:config.d1_databases[0].database_id,
-   API_BASE_URL:'https://roteiva-api-prod.roteiva-prod.workers.dev',RUNNER_TEMP:dir}});
+   API_BASE_URL:'https://api.roteiva.com',RUNNER_TEMP:dir}});
  const output=result.stdout+result.stderr,path=join(dir,'roteiva-prod-secrets.json');
  const saved=existsSync(path)?JSON.parse(readFileSync(path,'utf8')):null;
  assert.equal(resolve(dirname(dir)),resolve(tmpdir()),'Cleanup must stay inside the temporary root');

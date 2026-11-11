@@ -1,5 +1,13 @@
 # Arquitetura do Roteiva — MVP SaaS
 
+## Domínio próprio PROD — 11/11/2026
+
+**DECISÃO TOMADA / IMPLEMENTADO, PUBLICAÇÃO EM VALIDAÇÃO:** domínio registrado pelo proprietário na conta Cloudflare PROD. Contrato canônico: frontend/Auth `https://roteiva.com`, API `https://api.roteiva.com`; www redireciona no Hosting à raiz. Custom domains usam o mesmo site Firebase e Worker/D1 PROD. Não migrar usuários, dados, Client IDs ou chaves para trocar hostnames. Propriedade DNS confirmada no Search Console é distinta de aprovação OAuth.
+
+O contrato inclui authDomain explícito e origens históricas PROD exatas. `allowedFrontend` aceita origem canônica e os dois hosts Firebase PROD conhecidos, apenas dentro do mesmo ambiente; DEV, HTTP, null, www e imitações são recusados em PROD. CORS e frame-ancestors usam a origem autorizada da requisição, com Vary Origin, sem curinga. Redirecionamentos OAuth e links novos de revisão usam origem canônica. O frontend em modo PROD redireciona hosts históricos antes de montar a aplicação, preservando rota/query/hash. Modo não é inferido do hostname; DEV/demo/emulador não redirecionam.
+
+Callback da API e handler Firebase passam ao domínio comprovado; consoles e Picker devem aceitar URLs exatas antes do corte. Aliases legados preservam o rollout. Sessão local não é transferida entre origens: login no domínio novo usa a mesma identidade/workspace remoto. Certificado em emissão não é HTTPS operacional; ver evidências e aceites no roadmap.
+
 ## Preparação anterior ao domínio — 11/11/2026
 
 **DECISÃO TOMADA:** preservar projetos/contas/Client IDs e endereços públicos atuais durante a preparação. Aquisição de domínio não exige migração de dados. O corte futuro precisa alterar o contrato de origem/CORS, Auth, Picker e branding em conjunto; manter hostname da API preserva callbacks OAuth atuais. O roteiro é preparação operacional, não suporte já implementado a múltiplas origens. Ver [DEVELOPMENT](DEVELOPMENT.md#preparação-de-lançamento-antes-do-domínio--11112026).

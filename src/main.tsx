@@ -1,3 +1,5 @@
+import {canonicalFrontendUrl} from './lib/canonical-frontend.ts';
+import {appEnvironment} from './lib/environment.ts';
 import {AppButton} from "./features/ui/AppButton";
 import React, { Component, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
@@ -41,7 +43,9 @@ class AppErrorBoundary extends Component<{children:ReactNode},{error:string}> {
 }
 const review=window.location.pathname.replace(/\/+$/, "").endsWith("/review");
 const publicToken=/^\/review\/([A-Za-z0-9_-]{43})\/?$/.exec(window.location.pathname)?.[1];
-createRoot(document.getElementById("root")!).render(<React.StrictMode>
+const canonicalUrl=canonicalFrontendUrl(window.location.href,appEnvironment.appEnv);
+if(canonicalUrl)window.location.replace(canonicalUrl);
+else createRoot(document.getElementById("root")!).render(<React.StrictMode>
   <SiteExperience />
   <AppErrorBoundary>{isDemo ? review ? <ReviewUnavailable /> : <DashboardClient firstName="Visitante" email="demo@roteiva.local" /> :
     <AuthProvider>{publicToken ? <ReviewPortal token={publicToken}/> : <ProtectedRoute><RegistrationGate><AccessGate>{review ? <ReviewUnavailable /> : <DriveTransfersProvider><StorageConnectionsProvider><FirebaseWorkspace /></StorageConnectionsProvider></DriveTransfersProvider>}</AccessGate></RegistrationGate></ProtectedRoute>}</AuthProvider>}

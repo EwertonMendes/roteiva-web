@@ -3,10 +3,22 @@ import assert from 'node:assert/strict';
 import {readFileSync,readdirSync} from 'node:fs';
 import {parseEnvironment} from '../src/lib/environment-config.ts';
 import {environments} from '../shared/environments.ts';
+import {canonicalFrontendUrl} from '../src/lib/canonical-frontend.ts';
 const config=(env)=>({VITE_APP_MODE:'firebase',VITE_APP_ENV:env,VITE_USE_EMULATORS:'false',
   VITE_API_BASE_URL:environments[env].apiOrigin,VITE_FIREBASE_PROJECT_ID:environments[env].projectId,
-  VITE_FIREBASE_AUTH_DOMAIN:environments[env].projectId+'.firebaseapp.com',VITE_FIREBASE_API_KEY:'synthetic',
+  VITE_FIREBASE_AUTH_DOMAIN:environments[env].authDomain,VITE_FIREBASE_API_KEY:'synthetic',
   VITE_FIREBASE_APP_ID:'1:123:web:synthetic',VITE_FIREBASE_MESSAGING_SENDER_ID:'123'});
+
+test('old PROD links move to the canonical domain without changing route, query or fragment',()=>{
+  for(const origin of environments.prod.frontendAliases){
+    assert.equal(canonicalFrontendUrl(origin+'/review/synthetic?drive=connected#section','prod'),
+      'https://roteiva.com/review/synthetic?drive=connected#section');
+    assert.equal(new URL(canonicalFrontendUrl(origin+'//evil.example/?next=https://evil.example','prod')).origin,'https://roteiva.com');
+    for(const mode of ['dev','demo','emulator',undefined])assert.equal(canonicalFrontendUrl(origin+'/biblioteca',mode),null);
+  }
+  for(const href of ['https://roteiva.com/biblioteca','https://www.roteiva.com/','https://evil.example/',environments.dev.frontendOrigin])
+    assert.equal(canonicalFrontendUrl(href,'prod'),null);
+});
 
 for(const env of ['dev','prod']) test(env+' configuration rejects missing and crossed values',()=>{
   const valid=config(env),mode=env==='dev'?'firebase':'production';

@@ -1,5 +1,17 @@
 # Roadmap vivo — Roteiva MVP
 
+## Domínio roteiva.com — 11/11/2026
+
+**EM CONFIGURAÇÃO / NÃO EQUIVALE A LIBERAÇÃO PÚBLICA.** O proprietário adquiriu o domínio e autorizou configurar PROD; esta seção substitui o adiamento histórico abaixo.
+
+- [x] Registro na conta exclusiva Cloudflare PROD confirmado; Hosting raiz/www criados no site existente, DNS A/TXT/CNAME e desafios de certificado cadastrados. www redireciona à raiz.
+- [x] Propriedade verificada no Google Search Console por TXT manual, sem delegar DNS a outro app. Captura da confirmação guardada privadamente.
+- [x] api.roteiva.com vinculado ao Worker PROD existente; Firebase Auth autorizado para domínio próprio, Picker restrito às APIs existentes e referrer raiz adicionado. Variáveis GitHub PROD de API/authDomain atualizadas, sem trocar credenciais.
+- [x] Código canônico e compatibilidade de rollout: aliases exatos por ambiente, redirecionamento antigo preservando rota/query/hash, CORS por origem, callbacks canônicos e handler Auth no domínio próprio. Testes de contrato rejeitam origem cruzada, imitações, HTTP e null.
+- [x] Ícones Dropbox 64×64 e 256×256 em assets/brand/dropbox, com instrução manual. Não repetir upload automatizado, conforme pedido do proprietário.
+- [ ] Concluir TLS/DNS públicos, consoles OAuth Google/Dropbox, CI/merge e promoção por SHA aprovado; repetir login/retorno OAuth e conferir conexões no domínio novo. Certificado em emissão não conta como HTTPS pronto.
+- [ ] Concluir marca/escopos e análise Google. Propriedade não elimina revisão de escopos restritos, demonstração real ou eventual avaliação externa.
+
 ## Preparação sem domínio final — 11/11/2026
 
 **PARCIAL; NÃO AUTORIZA LANÇAMENTO AMPLO.** O domínio final permanece adiado pelo proprietário. A preparação independente dele está separada da análise dos provedores e dos testes com pessoas/aparelhos reais; roteiro em [DEVELOPMENT](DEVELOPMENT.md#preparação-de-lançamento-antes-do-domínio--11112026).

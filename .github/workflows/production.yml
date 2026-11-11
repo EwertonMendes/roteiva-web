@@ -148,5 +148,5 @@ jobs:
         run: node --input-type=module -e "import fs from 'node:fs';if(JSON.parse(fs.readFileSync(process.env.GOOGLE_APPLICATION_CREDENTIALS)).project_id!=='roteiva-web-prod')process.exit(1)"
       - name: Publish verified rules, indexes and Hosting
         run: pnpm exec firebase deploy --config firebase.prod.json --only firestore:rules,firestore:indexes,hosting --project roteiva-web-prod --non-interactive
-      - run: node scripts/verify-hosting-cache.mjs https://roteiva-web-prod.web.app
+      - run: node scripts/verify-hosting-cache.mjs https://roteiva.com
       - run: node scripts/smoke-environment.mjs prod

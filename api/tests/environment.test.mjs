@@ -2,11 +2,30 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {generateKeyPair,SignJWT,exportJWK,createLocalJWKSet} from 'jose';
 import {environments} from '../../shared/environments.ts';
-import {assertEnvironment,assertDatabaseEnvironment} from '../src/environment.ts';
+import {assertEnvironment,assertDatabaseEnvironment,allowedFrontend} from '../src/environment.ts';
 import {applyResponsePolicy} from '../src/response-policy.ts';
 import {verifyFirebase} from '../src/auth.ts';
 import {database} from './helpers/database.mjs';
 import {handle,default as worker} from '../src/index.ts';
+
+test('PROD canonical and exact historical origins retain CORS while DEV and lookalikes are denied',async(t)=>{
+ const db=database();t.after(db.close);
+ const base={ENVIRONMENT:'prod',FIREBASE_PROJECT_ID:environments.prod.projectId,FRONTEND_ORIGIN:environments.prod.frontendOrigin,
+   OAUTH_REDIRECT_URI:environments.prod.apiOrigin+'/oauth/drive/callback',DB:db.DB};
+ for(const origin of [environments.prod.frontendOrigin,...environments.prod.frontendAliases]){
+   assert.equal(allowedFrontend(base,origin),true);
+   const response=await handle(new Request(environments.prod.apiOrigin+'/oauth/drive/start',{method:'OPTIONS',headers:{Origin:origin}}),base);
+   assert.equal(response.status,204);assert.equal(response.headers.get('Access-Control-Allow-Origin'),origin);
+   assert.equal(response.headers.get('Vary'),'Origin');
+ }
+ for(const origin of [null,'null','https://www.roteiva.com',environments.dev.frontendOrigin,'https://roteiva.com.evil.example','https://evil.example','http://roteiva.com']){
+   assert.equal(allowedFrontend(base,origin),false);
+   if(origin!==null){const response=await handle(new Request(environments.prod.apiOrigin+'/health',{headers:{Origin:origin}}),base);assert.equal(response.status,403);assert.equal(response.headers.get('Access-Control-Allow-Origin'),null);}
+ }
+ assert.equal(allowedFrontend({...base,ENVIRONMENT:'invalid'},'https://roteiva.com'),false);
+ for(const origin of [environments.prod.frontendOrigin,...environments.prod.frontendAliases])
+   assert.equal(allowedFrontend({...base,ENVIRONMENT:'dev'},origin),false);
+});
 for(const name of ['dev','prod'])test(name+' rejects cross-environment configuration, D1 and PDF origins',async(t)=>{
   const contract=environments[name];
   const env={ENVIRONMENT:name,FIREBASE_PROJECT_ID:contract.projectId,FRONTEND_ORIGIN:contract.frontendOrigin,
