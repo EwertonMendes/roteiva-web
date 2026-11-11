@@ -2,6 +2,8 @@
 
 ## Regressão de sessão e validação de acesso
 
+Release de referência: PR #115, SHA 8a8480d298213172e983741fa356f2551cbda289, manifesto confirmado nos dois ambientes. Em PROD, validar aba existente e nova aba, F5 e navegação de dados, preservando cadastro e conexões. A homologação real foi concluída em 11/11/2026; detalhes no roadmap.
+
 Executar pnpm test e pnpm typecheck; compilar build:emulator e build:demo; nos emuladores demo-roteiva rodar tests/firestore.rules.test.mjs e Playwright tests/browser/access.spec.ts + tests/browser/access-isolated-e2e.spec.ts. Incluir restauração em segunda aba e reload, com persistência Auth/Firestore real no emulador; os mocks ficam restritos à API de provisionamento. Os testes unitários cobrem recuperação de perfil, listener encerrado com reinício limitado e manutenção da suspensão. O teste adicional de reconciliação força snapshot ausente, restaura apenas a fixture isolada e confere GET REST com Bearer do usuário e Rules reais do emulador. A medição do espaço entre alerta e ações exige pelo menos 18 px em desktop/mobile e claro/escuro. Nunca apagar ou recriar o perfil real para corrigir um erro de acesso.
 
 Publicar somente Hosting a partir do SHA aprovado e identificado quando a mudança for apenas no cliente. A configuração PROD deve gerar seu próprio artefato; verificar ambiente, manifesto, projeto da credencial e destino explícito. Após publicar, repetir F5, reabertura e retorno /biblioteca?drive=connected e ?dropbox=connected; conferir expiração/suspensão e isolamento com fixtures separadas. Verificação de propriedade do domínio Google está adiada por decisão do proprietário até adquirir o domínio final.
