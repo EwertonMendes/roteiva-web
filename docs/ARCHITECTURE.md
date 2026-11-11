@@ -1,5 +1,11 @@
 # Arquitetura do Roteiva — MVP SaaS
 
+## Preparação anterior ao domínio — 11/11/2026
+
+**DECISÃO TOMADA:** preservar projetos/contas/Client IDs e endereços públicos atuais durante a preparação. Aquisição de domínio não exige migração de dados. O corte futuro precisa alterar o contrato de origem/CORS, Auth, Picker e branding em conjunto; manter hostname da API preserva callbacks OAuth atuais. O roteiro é preparação operacional, não suporte já implementado a múltiplas origens. Ver [DEVELOPMENT](DEVELOPMENT.md#preparação-de-lançamento-antes-do-domínio--11112026).
+
+Preflight público é somente leitura e não concede acesso ou declara aprovação dos provedores. Snapshot privado cifrado Auth/Firestore teve recuperação em emulador, sem escrita PROD; não constitui backup atômico conjunto nem recuperação de originais Drive/Dropbox. Monitor de backlog existente em Cron registra eventos categóricos, mas entrega de alerta externo/cotas e recuperação externa recorrente ainda exigem aceite. Não inferir essas capacidades do Cron ou de um backup local.
+
 ## Validação de acesso após restauração de sessão — 11/11/2026
 
 **DECISÃO TOMADA / IMPLEMENTADO:** snapshot ausente do listener não basta para concluir que uma projeção válida acabou de desaparecer. access-observer.ts reconcilia esse evento por leitura direta autenticada do documento access/current no Firestore REST, sem cache do SDK. access-watch.ts deriva projeto e endpoint do contrato existente, limita a consulta ao UID autenticado, rejeita redirect e valida nome completo, ownerUid e dados pelo parser comum access-state.ts. Credencial administrativa nunca participa; Rules continuam autorizando a leitura. Não reexecutar cadastro, renovar teste ou escrever concessões para recuperar a tela.
