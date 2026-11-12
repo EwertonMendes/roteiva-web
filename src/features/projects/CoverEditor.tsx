@@ -3,7 +3,7 @@ import {AppInput} from "../ui/AppInput";
 import {AppButton} from "../ui/AppButton";
 import { AppSelect } from "../ui/AppSelect";
 import {useCallback,useEffect,useRef,useState} from 'react';
-import {ArrowLeft,Check,LoaderCircle,ChevronDown,Search,Trash2,X} from 'lucide-react';
+import {ArrowLeft,Check,LoaderCircle,ChevronDown,Search,Trash2,X,Image as ImageIcon} from 'lucide-react';
 import type {Project,ProjectCover,Client} from '../../domain/workspace';
 import {useDriveApi} from '../drive/drive-api';
 import type {DriveItem} from '../drive/DriveLibraryUI';
@@ -129,7 +129,10 @@ export function CoverEditor({project,client,onClose,onSave}:{project?:Project;cl
    }
    if(!['image/jpeg','image/png','image/webp',...(provider==='google_drive'?['image/avif']:[])].includes(file.mimeType))return;
    if(file.size!==undefined && (!Number.isFinite(Number(file.size))||Number(file.size)>8*1024*1024))return;
-   setCover({provider,connectionId:account,fileId:file.id,name:file.name,x:50,y:50,zoom:1,...(file.modifiedTime?{modifiedTime:file.modifiedTime}:{})});setChoosing(false);
+   setCover({provider,connectionId:account,fileId:file.id,name:file.name,
+     ...(stored&&stored.connectionId===account&&stored.fileId===file.id?
+      {x:stored.x,y:stored.y,zoom:stored.zoom}:{x:50,y:50,zoom:1}),
+     ...(file.modifiedTime?{modifiedTime:file.modifiedTime}:{})});setChoosing(false);
  };
  const chooseGoogle=()=>{
   if(!picker||picker.account!==account||busy)return;
@@ -159,7 +162,7 @@ export function CoverEditor({project,client,onClose,onSave}:{project?:Project;cl
     <p className="pc-helper pc-picker-guidance">{virtual&&provider==='google_drive'?'Selecione uma imagem pelo Google Picker.':'Escolha uma pasta ou uma imagem.'} JPG, PNG, WebP{provider==='google_drive'?' ou AVIF':''}, até 8 MB. Seus arquivos permanecem privados.</p>
     {folderTrail.length>0&&<nav className="pc-folder-trail" aria-label="Pasta de imagens"><AppButton type="button" onClick={()=>{setFolderTrail([]);setPage({files:[],nextPageToken:null});setMoreToken('');}}>Meu {provider==='dropbox'?'Dropbox':'Drive'}</AppButton>{folderTrail.map((folder,i)=><span key={folder.id}><ChevronRight size={14}/><AppButton type="button" onClick={()=>{setFolderTrail(current=>current.slice(0,i+1));setPage({files:[],nextPageToken:null});setMoreToken('');}}>{folder.name}</AppButton></span>)}</nav>}
     {!currentAccount?null:!canRead?<p role="status">Esta conexão do Google Drive não possui permissão de leitura de imagens. Reconecte a conta na <a href="/biblioteca">Biblioteca</a> e autorize o acesso de leitura.</p>:<>
-     {virtual&&provider==='google_drive'?<div className="pc-picker-results">{error&&<p role="alert">{error}</p>}<AppButton type="button" disabled={busy||!picker||picker.account!==account} onClick={chooseGoogle}>Selecionar imagem no Google Drive</AppButton><p>Somente a imagem selecionada será autorizada. Você pode pesquisar e navegar no seletor do Google.</p></div>:<div className="pc-picker-results" aria-busy={busy}>
+     {virtual&&provider==='google_drive'?<div className="pc-picker-results">{error&&<p role="alert">{error}</p>}<AppButton type="button" className="primary-button" disabled={busy||!picker||picker.account!==account} onClick={chooseGoogle}><ImageIcon size={18}/>Selecionar imagem no Google Drive</AppButton><p className="pc-helper">Apenas a imagem escolhida será autorizada. Se for uma capa antiga, selecione o mesmo arquivo para preservar seu enquadramento.</p></div>:<div className="pc-picker-results" aria-busy={busy}>
      {error&&<p role="alert">{error} <AppButton type="button" className="secondary-button" onClick={()=>{setRetry(n=>n+1);}}>Tentar novamente</AppButton></p>}
      {busy&&!page.files.length?<CoverLoading>Carregando imagens…</CoverLoading>:<>
      <div className="pc-image-grid">{page.files.filter(file=>isStorageFolder(file.mimeType)||(['image/jpeg','image/png','image/webp',...(provider==='google_drive'?['image/avif']:[])].includes(file.mimeType)&&(file.size===undefined&&provider==='google_drive'||Number(file.size)>0&&Number(file.size)<=8*1024*1024))).map(file=><AppButton type="button" key={file.id} onClick={()=>chooseFile(file)} title={file.name}>{isStorageFolder(file.mimeType)?<span className="pc-folder-icon"><Folder size={30}/></span>:<DriveThumbnail item={file} scope={context.uid+':'+account} provider={provider} getThumbnail={thumbnail}/>}<span>{file.name}</span></AppButton>)}</div>
@@ -171,7 +174,7 @@ export function CoverEditor({project,client,onClose,onSave}:{project?:Project;cl
     </>}
    </>:cover?<>
     <AppButton type="button" className="pc-text-button" onClick={()=>setChoosing(true)}><ArrowLeft size={16}/>Escolher outra imagem</AppButton>
-    <div className="pc-crop-content"><div className={'pc-editor-preview'+(client?' pc-editor-preview--portrait':'')} aria-busy={!src&&!imageError}>{src?<CoverFrame src={src} cover={cover} onChange={setCover}/>:!storedConnectionAvailable?<p className="pc-preview-error" role="status">A conexão dessa imagem não está mais disponível. Escolha outra imagem ou reconecte sua conta na Biblioteca.</p>:imageError?<p className="pc-preview-error" role="alert">{imageError}</p>:<CoverLoading>Carregando imagem…</CoverLoading>}</div>
+    <div className="pc-crop-content"><div className={'pc-editor-preview'+(client?' pc-editor-preview--portrait':'')} aria-busy={!src&&!imageError}>{src?<CoverFrame src={src} cover={cover} onChange={setCover}/>:!storedConnectionAvailable?<p className="pc-preview-error" role="status">A conexão dessa imagem não está mais disponível. Escolha outra imagem ou reconecte sua conta na Biblioteca.</p>:imageError?<div className="pc-preview-error" role="alert"><p>{imageError}</p>{(cover?.provider||"google_drive")==="google_drive"&&<AppButton type="button" className="secondary-button" onClick={()=>setChoosing(true)}>Reautorizar imagem pelo Drive</AppButton>}</div>:<CoverLoading>Carregando imagem…</CoverLoading>}</div>
     <p id="pc-gesture-help" className="pc-helper pc-gesture-help">Arraste para reposicionar. Use a roda do mouse ou faça pinça para ajustar o zoom.<span> No teclado, use as setas para mover, + e − para ampliar e Home para redefinir.</span></p></div>
    </>:null}
   </div>

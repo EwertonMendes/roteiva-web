@@ -46,7 +46,12 @@ export function DriveCoversProvider({children,includeDropbox=false}:{children:Re
    };
    let response=await fetchImage(highQuality&&thumbnail?"/preview":thumbnail?"/thumbnail":"/cover");
    if(response.status===404&&highQuality&&thumbnail)response=await fetchImage("/cover");
-   if(!response.ok||response.status===204)throw Error("Imagem indisponível. Confira o arquivo e a conexão de armazenamento.");
+   if(!response.ok||response.status===204){
+    const issue=await response.json().catch(()=>null) as {error?:{code?:string}}|null;
+    if(identity.provider==='google_drive'&&['library_picker_required','drive_read_permission_missing','drive_reconnect_minimum_required'].includes(issue?.error?.code||''))
+     throw Error('Esta imagem foi vinculada antes da autorização atual do Google. Abra Editar capa/foto e selecione novamente o mesmo arquivo pelo Google Drive; o original não foi apagado.');
+    throw Error('Imagem indisponível. Confira o arquivo e a conexão de armazenamento.');
+   }
    const mime=(response.headers.get("Content-Type")||"").split(";")[0].toLowerCase();
    if(!["image/jpeg","image/png","image/webp","image/avif"].includes(mime))
     throw Error("Formato de imagem não suportado.");
