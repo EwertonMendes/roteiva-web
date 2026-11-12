@@ -1,5 +1,9 @@
 # Desenvolvimento e deploy — Roteiva
 
+## Biblioteca virtual — desenvolvimento local
+
+Branch `codex/virtual-library`. Executar em `api/`: `node --experimental-strip-types --test tests/library-tree.test.mjs tests/library-source.test.mjs`, `npm run typecheck` e `npm test`. Migration 0021 é somente aditiva e não foi aplicada remotamente. Não publicar como substituta do runtime antes de integrar consumidores, validar provedores reais e concluir os gates DEV.
+
 ## Configuração do domínio próprio — 11/11/2026
 
 **PUBLICADO E HOMOLOGADO NO DOMÍNIO:** compra concluída pelo proprietário. Frontend/Auth canônico roteiva.com no site Firebase PROD existente; www com redirectTarget roteiva.com; API api.roteiva.com como Custom Domain do Worker PROD existente. DNS do Hosting usa os registros exigidos pela API, sem proxy Cloudflare; domínio do Worker é gerenciado pelo serviço Workers. TXT Google confirma propriedade; não remover TXT de propriedade/ACME por parecer temporário sem conferir as exigências atuais do provedor. Certificados ainda precisam de conferência externa real, sem bypass de TLS.

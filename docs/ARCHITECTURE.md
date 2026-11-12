@@ -1,5 +1,9 @@
 # Arquitetura do Roteiva — MVP SaaS
 
+## Fundação da Biblioteca virtual — 11/11/2026
+
+**IMPLEMENTAÇÃO PARCIAL, NÃO HABILITADA.** Migration 0021 prepara árvores isoladas por biblioteca, com pais compostos e triggers para ciclos/profundidade. `library-source.ts` separa falhas temporárias de indisponibilidade e exige revisão explícita para construir endpoints de mídia de aprovação. Esses contratos ainda não são consumidores do runtime: não afirmar OAuth mínimo, portal seguro por sessão ou nova Biblioteca já entregues. Não há reset nem mudança de grants.
+
 ## Domínio próprio PROD — 11/11/2026
 
 **DECISÃO TOMADA / PUBLICADO E HOMOLOGADO NO DOMÍNIO:** domínio registrado pelo proprietário na conta Cloudflare PROD. Contrato canônico: frontend/Auth `https://roteiva.com`, API `https://api.roteiva.com`; www redireciona no Hosting à raiz. Custom domains usam o mesmo site Firebase e Worker/D1 PROD. Não migrar usuários, dados, Client IDs ou chaves para trocar hostnames. Propriedade DNS confirmada no Search Console é distinta de aprovação OAuth.

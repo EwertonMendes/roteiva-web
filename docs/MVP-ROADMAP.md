@@ -1,5 +1,16 @@
 # Roadmap vivo — Roteiva MVP
 
+## Biblioteca virtual e aprovações — implementação autorizada 11/11/2026
+
+**EM ANDAMENTO; NÃO PUBLICADO.** Proprietário autorizou implementar o estudo, reconstruir metadados necessários, homologar DEV e depois publicar/testar PROD com sua conta. Isso não autoriza apagar originais dos provedores.
+
+- [x] Fundação local: árvore com constraints/triggers e testes de ciclos, pais cruzados e profundidade; endpoints de revisão específica e ranges limitados, classificação de falhas; seis testes focados aprovados.
+- [ ] PoC real de grant mínimo, revisão específica/Range nos dois provedores e sessão de clientes DEV/PROD/Safari.
+- [ ] Registry/grants e comandos autenticados de árvore; Picker em lote e interface virtual.
+- [ ] Upload, capas e aprovações consumindo recursos sem ancestral físico; identidade/sessão de mídia e revisão exata.
+- [ ] Reconciliação de ACLs antigas, reset controlado e redução efetiva dos grants.
+- [ ] Homologação completa DEV, release PROD e teste real na conta do proprietário.
+
 ## Domínio roteiva.com — 11/11/2026
 
 **DOMÍNIO PUBLICADO E HOMOLOGADO; NÃO EQUIVALE A LIBERAÇÃO PÚBLICA DOS PROVEDORES.** O proprietário adquiriu o domínio e autorizou configurar PROD; esta seção substitui o adiamento histórico abaixo.
