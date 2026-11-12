@@ -1,5 +1,12 @@
 # Roadmap vivo — Roteiva MVP
 
+## Homologação de UX da Biblioteca virtual — 12/11/2026
+
+- [x] Implementado em `codex/library-oauth-modal-fixes`: hierarquia visual, grupos de ferramentas, SVGs existentes Drive/Dropbox, Lucide semântico, botões e campos compartilhados, estado vazio sem comandos inoperantes, gerenciamento de contas sem botão redundante de conexão, nomes acessíveis, lista de arquivos e modais responsivos. Alterações de UI somente; sem migration, OAuth scopes ou alteração de dados.
+- [ ] Verificar CI com E2E da Biblioteca e isolamento, incluindo navegação mobile, transições de projeto, pastas vazias, renomear/mover/lixeira/restaurar, fluxos Drive/Dropbox, preview e uploads.
+- [ ] Homologar visualmente em DEV com Chrome Android real e desktop, temas claro/escuro, diferentes larguras, menu de projeto e arquivos de nome longo; comparar com as telas Projetos/Clientes. A captura de 12/11 motivou a correção, não é evidência de aceite.
+- [ ] Manter PR draft e PROD inalterado até homologação real, então revisar merge/publicação conforme aprovações e pipeline.
+
 ## Continuidade da Biblioteca virtual — 12/11/2026
 
 - [x] Base da Biblioteca virtual integrada na PR #121, SHA `957b75750db5477537d2bc521f5e1b039f4e2cbf`; DEV publicado (API #43166381703, frontend #43166381763) e E2E isolado #43166381710 concluídos com sucesso. Migrations 0021–0030 apenas em DEV; PROD permanece com as novas flags desligadas.
