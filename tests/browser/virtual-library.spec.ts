@@ -163,7 +163,7 @@ test('minimum-scope cover selection releases the native dialog for Google Picker
 });
 test('assisted Dropbox organization imports selected descendants and retries without duplicating its folder',async({page,context},info)=>{
  const headers={'Access-Control-Allow-Origin':web,'Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Allow-Methods':'GET, POST, OPTIONS'};
- const physical='id:PHYSICAL_FOLDER_12345',file='id:SELECTED_VIDEO_12345',virtual=crypto.randomUUID();let folderCreated=false,imported=false,structureCalls=0,importCalls=0;
+ const physical='id:PHYSICAL_FOLDER_12345',file='id:SELECTED_VIDEO_12345',virtual=crypto.randomUUID();let folderCreated=false,imported=false,structureCalls=0,importCalls=0;let rootReads=0,nestedReads=0;
  const importedParents:string[]=[];
  await context.route(api+'/**',async route=>{
   const request=route.request(),url=new URL(request.url()),path=url.pathname;
@@ -172,7 +172,10 @@ test('assisted Dropbox organization imports selected descendants and retries wit
   if(path.startsWith('/account/')||path.startsWith('/access/'))return route.fallback();
   if(path==='/integrations/drive')return json({connections:[]});
   if(path==='/integrations/dropbox')return json({connections:[{id:connection,email:'qa@example.com',status:'connected',scopes:'files.content.read files.metadata.read files.content.write'}]});
-  if(path.startsWith('/integrations/dropbox/')&&path.endsWith('/items'))return json({files:path.includes('root')?[{id:physical,name:'Originais',isFolder:true}]:[{id:file,name:'Corte.mp4',isFolder:false}],nextPageToken:null});
+  if(path.startsWith('/integrations/dropbox/')&&path.endsWith('/items')){
+   const root=path.includes('root');if(root)rootReads++;else nestedReads++;
+   return json({files:root?[{id:physical,name:'Originais',isFolder:true}]:[{id:file,name:'Corte.mp4',isFolder:false}],nextPageToken:null});
+  }
   if(path.endsWith('/inspect')){
    const body=request.postDataJSON();return json({results:body.items.map((item:{fileId:string})=>({fileId:item.fileId,status:'ready',source:{provider:'dropbox',connectionId:connection,fileId:item.fileId,name:item.fileId===physical?'Originais':'Corte.mp4',kind:item.fileId===physical?'folder':'asset',parentIds:[],path:item.fileId===physical?'/originais':'/originais/corte.mp4'}}))});
   }
@@ -191,7 +194,14 @@ test('assisted Dropbox organization imports selected descendants and retries wit
  await libraryAdd(page,'Trazer organização do Dropbox');
  const picker=page.getByRole('dialog',{name:'Adicionar do Dropbox'});
  await picker.getByRole('checkbox',{name:'Selecionar pasta Originais'}).check();await picker.getByRole('button',{name:'Originais',exact:true}).click();
- await picker.getByLabel('Corte.mp4').check();await picker.getByRole('button',{name:'Adicionar selecionados'}).click();
+ await picker.getByLabel('Corte.mp4').check();
+ // Returning to a previously visited Dropbox folder should reuse metadata
+ // and preserve selection rather than repeat provider requests.
+ await picker.getByRole('button',{name:'Meu Dropbox'}).click();
+ await picker.getByRole('button',{name:'Originais',exact:true}).click();
+ await expect(picker.getByLabel('Corte.mp4')).toBeChecked();
+ expect(rootReads).toBe(1);expect(nestedReads).toBe(1);
+ await picker.getByRole('button',{name:'Adicionar selecionados'}).click();
  const preview=page.getByRole('dialog',{name:'Revisar organização selecionada'});
  await expect(preview.getByRole('combobox',{name:'Destino de Corte.mp4'})).toContainText('Originais');
  await preview.getByRole('textbox',{name:'Nome da pasta Originais'}).fill('Materiais');
