@@ -1,7 +1,7 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {ChevronDown,FolderKanban,Search,LoaderCircle} from 'lucide-react';
-import {collection,documentId,endAt,getDocsFromServer,limit,orderBy,query,startAt} from 'firebase/firestore';
-import {firebaseServices,isDemo} from '../../lib/firebase';
+import {isDemo} from '../../lib/firebase';
+import {searchLibraryProjects} from '../../data/firestore-project-search';
 import {useAuth} from '../auth/AuthProvider';
 import {AppButton} from '../ui/AppButton';
 import {AppInput} from '../ui/AppInput';
@@ -37,17 +37,9 @@ export function LibraryProjectPicker({projects,value,onChange}:{projects:readonl
   const timer=window.setTimeout(async()=>{
    setBusy(true);setError('');
    try{
-    // The existing project schema has a case-sensitive name field. Probe
-    // common capitalizations without reading all projects into memory.
-    const prefix=term.trim().slice(0,90);
-    const variants=Array.from(new Set([prefix,prefix.charAt(0).toLocaleUpperCase('pt-BR')+prefix.slice(1)])).slice(0,2);
-    const {db}=firebaseServices();
-    const base=collection(db,'users',user.uid,'projects');
-    const batches=await Promise.all(variants.map(p=>getDocsFromServer(query(base,orderBy('name'),orderBy(documentId()),
-     startAt(p),endAt(p+'\uf8ff'),limit(35)))));
+    const results=await searchLibraryProjects(user.uid,term.trim());
     if(request!==serial.current)return;
-    setRemote(Array.from(new Map(batches.flatMap(b=>b.docs.map(d=>({id:Number(d.id),name:String(d.data().name||'')})))
-     .filter(p=>Number.isSafeInteger(p.id)&&p.id>0&&p.name).map(p=>[p.id,p])).values()));
+    setRemote(results);
    }catch{
     if(request===serial.current)setError('Não foi possível pesquisar online. Você ainda pode escolher um projeto carregado.');
    }finally{if(request===serial.current)setBusy(false);}
