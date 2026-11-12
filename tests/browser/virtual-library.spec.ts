@@ -57,7 +57,18 @@ test('virtual navigation preserves folder commands and a partial Dropbox batch r
   return json({error:{code:'not_found'}},404);
  });
  await prepare(page,'virtual-'+info.project.name+'-'+Date.now()+'@example.com');await page.goto(web+'/biblioteca');
+ // The unselected library must have a polished, meaningful empty state, not a wall of disabled actions.
+ await expect(page.getByRole('heading',{name:'Escolha um projeto para começar'})).toBeVisible();
+ await expect(page.getByRole('button',{name:'Nova pasta',exact:true})).toHaveCount(0);
+ await expect(page.locator('.vl-connect-button img')).toHaveCount(1);
+ await expect(page.getByRole('button',{name:'Conectar Dropbox',exact:true})).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'Conectar Google Drive',exact:true})).toBeVisible();
+ await expect(page.locator('.vl-head')).toBeVisible();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1)).toBe(true);
  await chooseAppSelect(page,page.getByRole('combobox',{name:'Projeto dos arquivos'}),{label:'Projeto Biblioteca QA'});
+ await expect(page.getByRole('heading',{name:'Seus arquivos'})).toBeVisible();
+ await expect(page.getByRole('button',{name:'Nova pasta',exact:true}).locator('svg')).toHaveCount(1);
+ await expect(page.getByRole('button',{name:'Estrutura de pastas',exact:true}).locator('svg')).toHaveCount(1);
  await page.getByRole('button',{name:'Nova pasta',exact:true}).click();await page.getByLabel('Nome',{exact:true}).fill('Vídeos');await page.getByRole('button',{name:'Confirmar',exact:true}).click();
  await page.getByRole('button',{name:'Vídeos',exact:true}).click();
  await page.getByRole('button',{name:'Nova pasta',exact:true}).click();await page.getByLabel('Nome',{exact:true}).fill('Originais');await page.getByRole('button',{name:'Confirmar',exact:true}).click();
