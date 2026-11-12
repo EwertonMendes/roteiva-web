@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {database} from './helpers/database.mjs';
-import {libraryFor,libraryNode,listLibrary,mutateLibrary,libraryRouter} from '../src/library.ts';
+import {libraryFor,libraryNode,listLibrary,listLibraryExplorer,mutateLibrary,libraryRouter} from '../src/library.ts';
 test('virtual folder commands preserve isolation, CAS and ancestor visibility',async t=>{
  const f=database();t.after(f.close);const env={DB:f.DB};
  const a=await libraryFor(env,'alice',1),b=await libraryFor(env,'bob',1);
@@ -45,4 +45,28 @@ test('virtual name search is literal, paginated in the authorized folder and nev
  const child=await (await mutateLibrary(env,lib,null,{name:'Nested'})).json();await mutateLibrary(env,lib,null,{name:'100% Hidden',parentId:child.id});
  const result=await (await listLibrary(env,lib,'root',null,'100%')).json();assert.deepEqual(result.nodes.map(x=>x.name),['100% Final']);
  await assert.rejects(listLibrary(env,lib,'root',null,'a'.repeat(101)),e=>e.code==='invalid_search');
+});
+
+
+test('explorer sorts folders first and searches within the project including descendants',async t=>{
+ const f=database();t.after(f.close);const env={DB:f.DB},lib=await libraryFor(env,'alice',10),other=await libraryFor(env,'bob',10);
+ const make=async(name,parentId='root')=>(await (await mutateLibrary(env,lib,null,{name,parentId})).json()).id;
+ const a=await make('Zoo'),nested=await make('Subfolder',a),b=await make('alpha');
+ await make('Image final',nested);await make('Image root');
+ const all=await (await listLibraryExplorer(env,lib,'root',null,'image',true)).json();
+ assert.deepEqual(all.nodes.map(x=>x.name),['Image final','Image root']);
+ assert.equal(all.nodes[0].parent_name,'Subfolder');
+ assert.deepEqual((await (await listLibraryExplorer(env,lib,'root',null,'image',false)).json()).nodes.map(x=>x.name),['Image root']);
+ const root=await (await listLibraryExplorer(env,lib,'root',null)).json();
+ assert.deepEqual(root.nodes.map(x=>x.name),['alpha','Zoo']);
+ assert.equal((await (await listLibraryExplorer(env,other,'root',null,'Image',true)).json()).nodes.length,0);
+});
+test('explorer sorted pagination has stable non-overlapping pages',async t=>{
+ const f=database();t.after(f.close);const env={DB:f.DB},lib=await libraryFor(env,'alice',11);
+ for(let i=0;i<65;i++)await mutateLibrary(env,lib,null,{name:'Folder '+String(64-i).padStart(3,'0')});
+ const page1=await (await listLibraryExplorer(env,lib,'root',null)).json();
+ const page2=await (await listLibraryExplorer(env,lib,'root',page1.nextPage)).json();
+ assert.equal(page1.nodes.length,50);assert.equal(page2.nodes.length,15);
+ assert.equal(new Set([...page1.nodes,...page2.nodes].map(x=>x.id)).size,65);
+ assert.equal(page1.nodes.at(-1).name,'Folder 049');assert.equal(page2.nodes[0].name,'Folder 050');
 });
