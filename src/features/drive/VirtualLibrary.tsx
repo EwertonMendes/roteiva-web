@@ -15,6 +15,7 @@ import {LibraryAssetPreview} from './LibraryAssetPreview';
 import {API_BASE_URL} from '../../lib/environment';
 import {messages} from './drive-api';
 import {useDriveTransfers} from './DriveTransfersProvider';
+import {rememberLibraryOAuthReturn,readLibraryOAuthReturn,forgetLibraryOAuthReturn} from './library-oauth-return';
 import {importLibraryBatch,type LibraryImport,type FailedLibraryImport} from './library-import';
 import {LibraryConnections} from './LibraryConnections';
 import {LibraryStructureDialog} from './LibraryStructureDialog';
@@ -22,7 +23,7 @@ import {AssistedLibraryImport} from './AssistedLibraryImport';
 import type {InspectedLibrarySource,LibraryInspection} from '../../../shared/library-selection';
 type Node={id:string;parent_id:string|null;kind:'folder'|'asset';name:string;revision:number;provider?:string;source_state?:string;mime_type?:string};
 type Page={nodes:Node[];trail:{id:string;name:string}[];nextPage:string|null};
-export function VirtualLibrary({projects,selectedProjectId}:{projects:readonly Project[];selectedProjectId?:number;onSelectProject:(id:string)=>void}){
+export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{projects:readonly Project[];selectedProjectId?:number;onSelectProject:(id:string)=>void}){
  const {user}=useAuth(),call=useDriveApi();
  const storage=useStorageConnections();
  const transfers=useDriveTransfers(),fileInput=useRef<HTMLInputElement>(null),uploadProvider=useRef<'google_drive'|'dropbox'>('google_drive');
@@ -33,6 +34,7 @@ export function VirtualLibrary({projects,selectedProjectId}:{projects:readonly P
  const [dropboxId,setDropboxId]=useState(''),[dropboxPicker,setDropboxPicker]=useState(false);
  const dropbox=dropboxAccounts.find(x=>x.id===dropboxId)||dropboxAccounts[0];
  const [parent,setParent]=useState('root'),[loadedPage,setPage]=useState<(Page&{scope:string})|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ const [returnNotice,setReturnNotice]=useState('');
  const [edit,setEdit]=useState<{node?:Node;action:'create'|'rename'|'trash'|'restore'|'move'}|null>(null),[name,setName]=useState('');
  const [trash,setTrash]=useState(false),[moveParent,setMoveParent]=useState('root'),[movePage,setMovePage]=useState<Page|null>(null);
  const moveGeneration=useRef(0),[moveBusy,setMoveBusy]=useState(false);
@@ -44,6 +46,7 @@ export function VirtualLibrary({projects,selectedProjectId}:{projects:readonly P
  const generation=useRef(0),mutation=useRef<AbortController|null>(null);
  const dialogRef=useOverlayFocus(()=>{if(!busy)setEdit(null);},Boolean(edit),edit?.action+':'+edit?.node?.id);
  const base=selectedProjectId?'/library/projects/'+selectedProjectId+'/nodes':'';
+ const oauthReturned=new URLSearchParams(window.location.search).has('drive')||new URLSearchParams(window.location.search).has('dropbox');
  const pageScope=base+':'+parent+':'+trash+':'+term;
  const page=loadedPage?.scope===pageScope?loadedPage:null;
  useEffect(()=>{const timer=setTimeout(()=>setTerm(search.trim()),300);return()=>clearTimeout(timer);},[search]);
@@ -56,6 +59,8 @@ export function VirtualLibrary({projects,selectedProjectId}:{projects:readonly P
   if(busy)return;setBusy(true);setError('');
   try{const result=await call<{launchUrl:string}>('/oauth/'+provider+'/start','POST');const target=new URL(result.launchUrl);
    if(target.origin!==API_BASE_URL||target.pathname!=='/oauth/'+provider+'/launch')throw new Error('O endereço de conexão recebido não é válido.');
+   if(user?.uid&&selectedProjectId)rememberLibraryOAuthReturn(user.uid,selectedProjectId,parent);
+   else forgetLibraryOAuthReturn();
    window.location.assign(target.href);
   }catch(e){setError(e instanceof Error?e.message:'Não foi possível conectar a conta.');setBusy(false);}
  }
@@ -70,9 +75,16 @@ export function VirtualLibrary({projects,selectedProjectId}:{projects:readonly P
  if(!base||!user)return;const revision=++generation.current;setBusy(true);setError('');
  try{const value=await call<Page>(base+'?parent='+encodeURIComponent(parent)+(trash?'&trash=1':'')+(term?'&q='+encodeURIComponent(term):'')+(after?'&after='+encodeURIComponent(after):''));
  if(revision===generation.current)setPage(old=>({...value,scope:pageScope,nodes:after&&old?.scope===pageScope?[...old.nodes,...value.nodes]:value.nodes}));
- }catch(e){if(revision===generation.current)setError(e instanceof Error?e.message:'Não foi possível carregar a pasta.');}
+ }catch(e){if(revision===generation.current){
+  const code=(e as {code?:string}).code;
+  if(parent!=='root'&&(code==='library_node_unavailable'||code==='library_parent_denied')){
+   setReturnNotice('A pasta anterior não está mais disponível. Abrimos a pasta Arquivos.');setParent('root');
+  }else if(code==='library_project_denied'){
+   setReturnNotice('O projeto anterior não está mais disponível. Selecione outro projeto.');onSelectProject('');
+  }else setError(e instanceof Error?e.message:'Não foi possível carregar a pasta.');
+ }}
  finally{if(revision===generation.current)setBusy(false);}
- },[base,user,call,parent,trash,pageScope,term]);
+ },[base,user,call,parent,trash,pageScope,term,onSelectProject]);
  useEffect(()=>transfers.subscribe((_file,destination)=>{
   if(destination.projectId===selectedProjectId&&destination.linkedFolderId===parent&&!mutation.current)void load();
  }),[transfers.subscribe,selectedProjectId,parent,load]);
@@ -96,6 +108,14 @@ export function VirtualLibrary({projects,selectedProjectId}:{projects:readonly P
  return()=>controller.abort();
  },[edit?.action,base,moveParent,call]);
  useEffect(()=>{setParent('root');setPage(null);setEdit(null);setPreview(null);setStructure(false);setAssisted(null);setDropboxPicker(false);setFailedImports(null);mutation.current?.abort();++generation.current;},[selectedProjectId,user?.uid]);
+ // OAuth reloads React; restore only a short-lived hint for the same UID.
+ // The API revalidates project ownership and the selected folder ancestors.
+ useEffect(()=>{
+  if(!oauthReturned||!user?.uid)return;
+  const intent=readLibraryOAuthReturn(user.uid);if(!intent)return;
+  if(selectedProjectId!==intent.projectId){onSelectProject(String(intent.projectId));return;}
+  forgetLibraryOAuthReturn();setParent(intent.parentId);
+ },[oauthReturned,user?.uid,selectedProjectId,onSelectProject]);
  useEffect(()=>{setPage(null);void load();return()=>{++generation.current;};},[load]);
  useEffect(()=>()=>mutation.current?.abort(),[]);
  async function performImport(items:LibraryImport[],target:string,controller:AbortController,scope:number){
@@ -158,6 +178,7 @@ export function VirtualLibrary({projects,selectedProjectId}:{projects:readonly P
  {base&&!trash&&<div className="virtual-library-toolbar"><AppSelect aria-label="Conta Google Drive" value={account?.id||''} onValueChange={setAccountId} disabled={busy}><option value="">Selecione uma conta</option>{accounts.map(x=><option key={x.id} value={x.id}>{x.email}</option>)}</AppSelect><AppButton disabled={busy||!picker||picker.connectionId!==account?.id} onClick={()=>void addDrive()}>Adicionar do Drive</AppButton><AppButton disabled={busy||!picker||picker.connectionId!==account?.id} onClick={()=>void addDrive(true)}>Trazer organização do Drive</AppButton></div>}
  {progress&&<p role="status">{progress}</p>}
  {base&&!trash&&dropbox&&<div className="virtual-library-toolbar"><AppSelect aria-label="Conta Dropbox" value={dropbox.id} onValueChange={setDropboxId} disabled={busy}><option value="">Selecione uma conta</option>{dropboxAccounts.map(x=><option key={x.id} value={x.id}>{x.email}</option>)}</AppSelect><AppButton disabled={busy} onClick={()=>{setDropboxStructure(false);setDropboxPicker(true);}}>Adicionar do Dropbox</AppButton><AppButton disabled={busy} onClick={()=>{setDropboxStructure(true);setDropboxPicker(true);}}>Trazer organização do Dropbox</AppButton></div>}
+ {returnNotice&&<div role="status" className="virtual-library-error">{returnNotice}<AppButton onClick={()=>setReturnNotice('')}>Dispensar</AppButton></div>}
  {error&&<div role="alert" className="virtual-library-error">{error}</div>}
  {failedImports&&<div role="alert" className="virtual-library-error"><p>Alguns arquivos não foram adicionados. Os itens confirmados foram preservados.</p><ul>{failedImports.items.map(item=><li key={item.provider+item.connectionId+item.fileId}><strong>{item.name}</strong>: {messages[item.code]||'Não foi possível confirmar o arquivo. Tente novamente.'}</li>)}</ul><div className="virtual-library-toolbar"><AppButton disabled={busy} onClick={()=>void retryImports()}>Tentar somente os arquivos pendentes</AppButton><AppButton disabled={busy} onClick={()=>setFailedImports(null)}>Dispensar aviso</AppButton></div></div>}
  {base&&<nav aria-label="Caminho da pasta" className="virtual-library-path">{page?.trail.map(x=><AppButton key={x.id} disabled={busy} onClick={()=>setParent(x.id)}>{x.name}</AppButton>)}</nav>}
