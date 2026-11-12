@@ -1,5 +1,9 @@
 # Desenvolvimento e deploy — Roteiva
 
+## Continuação de homologação — OAuth e modais da Biblioteca (12/11/2026)
+
+Branch remota `codex/library-oauth-modal-fixes`, baseada no SHA da PR #121. A mudança não requer migration, D1 ou secret novo. Teste unitário: `node --experimental-strip-types --test tests/library-oauth-return.test.mjs` (incluído em `pnpm test`). E2E: `tests/browser/virtual-library.spec.ts` com a configuração virtual já descrita abaixo; cobre retorno OAuth em navegação completa, validação de pasta removida e fila de transferências sob prévia. Antes da promoção, conferir CI e repetir no navegador real com Google Drive/Dropbox; mocks não comprovam consentimento dos provedores. Não publicar em PROD sem homologar DEV.
+
 ### QA da prévia nova
 
 `node --experimental-strip-types --test tests/authenticated-media-worker.test.mjs` valida mapeamento por aba/origem, Range, revogação e passagem da identidade. Após `pnpm build:emulator`, `pnpm exec playwright test tests/browser/authenticated-media.spec.ts` testa o worker real em Chromium desktop/mobile com upstream sintético. Isso não comprova OAuth, codecs ou APIs reais. Os cenários de transporte/portal agora usam servidor HTTP local real em 127.0.0.1:8787: WebKit não encaminha fetch do Service Worker para context.route(). O servidor existe somente durante cada teste; nenhum backend real é utilizado. O worker não intercepta rotas comuns da aplicação, não grava cache e não concede acesso apenas por URL copiada.
