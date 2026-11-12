@@ -77,9 +77,9 @@ test('virtual navigation preserves folder commands and a partial Dropbox batch r
  await expect(page.getByRole('complementary',{name:'Transferências de arquivos'})).toBeVisible();
  await page.getByRole('button',{name:'Imagem A.png',exact:true}).click();
  await expect(page.getByRole('dialog',{name:'Prévia de Imagem A.png'})).toBeVisible();
- await expect(page.locator('.rl-transfer-layer')).toBeHidden();
+ await expect(page.locator('.rl-upload-queue')).toBeHidden();
  await page.getByRole('button',{name:'Fechar prévia'}).click();
- await expect(page.locator('.rl-transfer-layer')).toBeVisible();
+ await expect(page.locator('.rl-upload-queue')).toBeVisible();
  await page.getByRole('button',{name:'Renomear Originais',exact:true}).click();await page.getByLabel('Nome',{exact:true}).fill('Brutos');await page.getByRole('button',{name:'Confirmar',exact:true}).click();
  await page.getByRole('button',{name:'Remover Brutos do Roteiva',exact:true}).click();await page.getByRole('button',{name:'Confirmar',exact:true}).click();
  await expect(page.getByRole('button',{name:'Brutos',exact:true})).toHaveCount(0);
