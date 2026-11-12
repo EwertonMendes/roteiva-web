@@ -118,7 +118,14 @@ export async function libraryRouter(request:Request,env:Env,uid:string,url:URL,f
  await authorizeLibraryProject(request,env,uid,Number(match[1]),fetcher);
  const lib=await libraryFor(env,uid,Number(match[1]));
  if(match[2]==='imports'&&request.method==='POST'&&!match[3])return importLibraryAssets(env,uid,Number(match[1]),await uploadBody(request),fetcher);
- if(match[2]==='nodes'&&request.method==='GET'&&!match[3])return listLibrary(env,lib,nodeId(url.searchParams.get('parent')||'root'),url.searchParams.get('after'));
+ if(match[2]==='nodes'&&request.method==='GET'&&!match[3]){
+ if(url.searchParams.get('trash')==='1'){
+ const after=url.searchParams.get('after');if(after)nodeId(after);
+ const data=await env.DB.prepare("SELECT id,parent_id,kind,name,state,revision FROM library_nodes WHERE library_id=? AND state='trashed' AND id>? ORDER BY id LIMIT 51").bind(lib.id,after||'').all<LibraryNode>();
+ const nodes=data.results.slice(0,50);return Response.json({libraryId:lib.id,trail:[{id:'root',name:'Lixeira'}],nodes,nextPage:data.results.length>50?nodes.at(-1)!.id:null});
+ }
+ return listLibrary(env,lib,nodeId(url.searchParams.get('parent')||'root'),url.searchParams.get('after'));
+ }
  if(match[2]==='nodes'&&request.method==='POST')return mutateLibrary(env,lib,match[3]||null,await uploadBody(request));
  throw new ApiError(405,'method_not_allowed');
 }

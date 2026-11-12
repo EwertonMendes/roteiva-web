@@ -19,7 +19,8 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
  const accounts=storage.connections.filter(x=>x.provider==='google_drive'&&x.status==='connected');
  const account=accounts.find(x=>x.id===accountId)||accounts[0];
  const [parent,setParent]=useState('root'),[page,setPage]=useState<Page|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
- const [edit,setEdit]=useState<{node?:Node;action:'create'|'rename'|'trash'}|null>(null),[name,setName]=useState('');
+ const [edit,setEdit]=useState<{node?:Node;action:'create'|'rename'|'trash'|'restore'|'move'}|null>(null),[name,setName]=useState('');
+ const [trash,setTrash]=useState(false),[moveParent,setMoveParent]=useState('root'),[movePage,setMovePage]=useState<Page|null>(null);
  const generation=useRef(0),mutation=useRef<AbortController|null>(null);
  const dialogRef=useOverlayFocus(()=>{if(!busy)setEdit(null);},Boolean(edit),edit?.action+':'+edit?.node?.id);
  const base=selectedProjectId?'/library/projects/'+selectedProjectId+'/nodes':'';
@@ -32,11 +33,16 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
  },[base,account?.id,call]);
  const load=useCallback(async(after?:string)=>{
  if(!base||!user)return;const revision=++generation.current;setBusy(true);setError('');
- try{const value=await call<Page>(base+'?parent='+encodeURIComponent(parent)+(after?'&after='+encodeURIComponent(after):''));
+ try{const value=await call<Page>(base+'?parent='+encodeURIComponent(parent)+(trash?'&trash=1':'')+(after?'&after='+encodeURIComponent(after):''));
  if(revision===generation.current)setPage(old=>after&&old?{...value,nodes:[...old.nodes,...value.nodes]}:value);
  }catch(e){if(revision===generation.current)setError(e instanceof Error?e.message:'Não foi possível carregar a pasta.');}
  finally{if(revision===generation.current)setBusy(false);}
- },[base,user,call,parent]);
+ },[base,user,call,parent,trash]);
+ useEffect(()=>{
+ setMovePage(null);if(edit?.action!=='move'||!base)return;const controller=new AbortController();
+ void call<Page>(base+'?parent='+encodeURIComponent(moveParent),'GET',undefined,controller.signal).then(setMovePage).catch(e=>{if(!controller.signal.aborted)setError(e instanceof Error?e.message:'Não foi possível carregar o destino.');});
+ return()=>controller.abort();
+ },[edit?.action,base,moveParent,call]);
  useEffect(()=>{setParent('root');setPage(null);setEdit(null);mutation.current?.abort();++generation.current;},[selectedProjectId,user?.uid]);
  useEffect(()=>{setPage(null);void load();return()=>{++generation.current;};},[load]);
  useEffect(()=>()=>mutation.current?.abort(),[]);
@@ -58,7 +64,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
  async function save(){
  if(!edit||!base||busy)return;const operation=edit,scope=generation.current,controller=new AbortController();mutation.current=controller;setBusy(true);setError('');
  try{await call(base+(operation.node?'/'+operation.node.id:''),'POST',operation.node?
- {action:operation.action,name,revision:operation.node.revision}:{name,parentId:parent},controller.signal);
+ {action:operation.action,name,parentId:moveParent,revision:operation.node.revision}:{name,parentId:parent},controller.signal);
  if(scope===generation.current){setEdit(null);await load();}
  }catch(e){if(!controller.signal.aborted&&scope===generation.current)setError(e instanceof Error?e.message:'Não foi possível salvar.');}
  finally{if(scope===generation.current)setBusy(false);}
@@ -66,24 +72,27 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
  return <section className="panel virtual-library" aria-label="Arquivos do projeto">
  <div className="virtual-library-toolbar"><AppSelect aria-label="Projeto dos arquivos" value={selectedProjectId?String(selectedProjectId):''} onValueChange={onSelectProject}>
  <option value="">Selecione um projeto</option>{projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</AppSelect>
- <AppButton disabled={!base||busy} onClick={()=>{setName('');setEdit({action:'create'});}}><Plus size={16}/>Nova pasta</AppButton>
+ <AppButton disabled={!base||busy||trash} onClick={()=>{setName('');setEdit({action:'create'});}}><Plus size={16}/>Nova pasta</AppButton>
+ <AppButton disabled={!base||busy} onClick={()=>{setTrash(x=>!x);setParent('root');}}>{trash?'Voltar aos arquivos':'Lixeira'}</AppButton>
  <AppButton disabled={!base||busy} aria-label="Atualizar pasta" onClick={()=>void load()}><RefreshCw size={16}/></AppButton></div>
- {base&&<div className="virtual-library-toolbar"><AppSelect aria-label="Conta Google Drive" value={account?.id||''} onValueChange={setAccountId} disabled={busy}><option value="">Selecione uma conta</option>{accounts.map(x=><option key={x.id} value={x.id}>{x.email}</option>)}</AppSelect><AppButton disabled={busy||!picker||picker.connectionId!==account?.id} onClick={()=>void addDrive()}>Adicionar do Drive</AppButton></div>}
+ {base&&!trash&&<div className="virtual-library-toolbar"><AppSelect aria-label="Conta Google Drive" value={account?.id||''} onValueChange={setAccountId} disabled={busy}><option value="">Selecione uma conta</option>{accounts.map(x=><option key={x.id} value={x.id}>{x.email}</option>)}</AppSelect><AppButton disabled={busy||!picker||picker.connectionId!==account?.id} onClick={()=>void addDrive()}>Adicionar do Drive</AppButton></div>}
  {progress&&<p role="status">{progress}</p>}
  {error&&<div role="alert" className="virtual-library-error">{error}</div>}
  {base&&<nav aria-label="Caminho da pasta" className="virtual-library-path">{page?.trail.map(x=><AppButton key={x.id} disabled={busy} onClick={()=>setParent(x.id)}>{x.name}</AppButton>)}</nav>}
  {!base?<p>Selecione o projeto para organizar os arquivos.</p>:busy&&!page?<p role="status">Carregando pasta…</p>:<>
- <ul className="virtual-library-nodes">{page?.nodes.map(n=><li key={n.id}><AppButton disabled={busy||n.kind!=='folder'} onClick={()=>setParent(n.id)}><FolderOpen size={20}/>{n.name}</AppButton>
+ <ul className="virtual-library-nodes">{page?.nodes.map(n=><li key={n.id}><AppButton disabled={busy||trash||n.kind!=='folder'} onClick={()=>setParent(n.id)}><FolderOpen size={20}/>{n.name}</AppButton>
  <span>{n.provider==='google_drive'?'Google Drive':n.provider==='dropbox'?'Dropbox':''}</span>
- <AppButton disabled={busy} aria-label={'Renomear '+n.name} onClick={()=>{setName(n.name);setEdit({action:'rename',node:n});}}>Renomear</AppButton>
- <AppButton disabled={busy} aria-label={'Remover '+n.name+' do Roteiva'} onClick={()=>setEdit({action:'trash',node:n})}>Remover</AppButton></li>)}</ul>
+ {trash?<AppButton disabled={busy} onClick={()=>setEdit({action:'restore',node:n})}>Restaurar</AppButton>:<><AppButton disabled={busy} aria-label={'Renomear '+n.name} onClick={()=>{setName(n.name);setEdit({action:'rename',node:n});}}>Renomear</AppButton>
+ <AppButton disabled={busy} onClick={()=>{setMoveParent('root');setEdit({action:'move',node:n});}}>Mover</AppButton>
+ <AppButton disabled={busy} aria-label={'Remover '+n.name+' do Roteiva'} onClick={()=>setEdit({action:'trash',node:n})}>Remover</AppButton></>}</li>)}</ul>
  {page&&!page.nodes.length&&<p>Esta pasta ainda está vazia.</p>}
  {page?.nextPage&&<AppButton disabled={busy} onClick={()=>void load(page.nextPage!)}>Carregar mais</AppButton>}
  </>}
  {edit&&<div className="virtual-library-backdrop"><div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="virtual-library-title" className="virtual-library-editor">
- <h3 id="virtual-library-title">{edit.action==='create'?'Nova pasta':edit.action==='rename'?'Renomear':'Remover do Roteiva'}</h3>
- <form onSubmit={e=>{e.preventDefault();void save();}}>{edit.action==='trash'?<p>Os arquivos originais permanecem no provedor. A organização desta pasta será removida da Biblioteca.</p>:<label>Nome<AppInput autoFocus value={name} maxLength={120} onChange={e=>setName(e.target.value)} required/></label>}
- <div className="virtual-library-toolbar"><AppButton type="submit" disabled={busy}>Confirmar</AppButton><AppButton type="button" disabled={busy} onClick={()=>setEdit(null)}>Cancelar</AppButton></div></form>
+ <h3 id="virtual-library-title">{{create:'Nova pasta',rename:'Renomear',move:'Mover para',restore:'Restaurar',trash:'Remover do Roteiva'}[edit.action]}</h3>
+ {error&&<div role="alert" className="virtual-library-error">{error}</div>}
+ <form onSubmit={e=>{e.preventDefault();void save();}}>{edit.action==='trash'?<p>Os arquivos originais permanecem no provedor. A organização desta pasta será removida da Biblioteca.</p>:edit.action==='restore'?<p>Restaurar esta referência na pasta anterior. Se ela também estiver na lixeira, restaure a pasta primeiro.</p>:edit.action==='move'?<><nav aria-label="Pasta de destino">{movePage?.trail.map(x=><AppButton type="button" key={x.id} onClick={()=>setMoveParent(x.id)}>{x.name}</AppButton>)}</nav>{movePage?.nodes.filter(x=>x.kind==='folder'&&x.id!==edit.node?.id).map(x=><AppButton type="button" key={x.id} onClick={()=>setMoveParent(x.id)}>{x.name}</AppButton>)}{movePage?.nextPage&&<AppButton type="button" onClick={()=>{const old=movePage;void call<Page>(base+'?parent='+encodeURIComponent(moveParent)+'&after='+old.nextPage).then(p=>setMovePage({...p,nodes:[...old.nodes,...p.nodes]})).catch(()=>setError('Não foi possível carregar mais pastas.'));}}>Mais pastas</AppButton>}</>:<label>Nome<AppInput autoFocus value={name} maxLength={120} onChange={e=>setName(e.target.value)} required/></label>}
+ <div className="virtual-library-toolbar"><AppButton type="submit" disabled={busy||edit.action==='move'&&!movePage}>Confirmar</AppButton><AppButton type="button" disabled={busy} onClick={()=>setEdit(null)}>Cancelar</AppButton></div></form>
  </div></div>}
  </section>;
 }

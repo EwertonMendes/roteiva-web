@@ -1,5 +1,7 @@
 # Roadmap vivo — Roteiva MVP
 
+**Progresso adicional:** mover, lixeira e restaurar implementados localmente (ainda sem QA browser). Checks GitHub do SHA 71dacd7: API 43134827810, frontend 43134827196 e E2E SaaS 43134828769 concluídos com sucesso. São checks de PR, não deploy DEV.
+
 ## Biblioteca virtual e aprovações — implementação autorizada 11/11/2026
 
 - [x] Código local adicional: comandos autorizados por projeto, registry e importação confirmada/deduplicada, interface de pastas/criação/renomeação/remoção e Picker Drive em lote. Onze testes focados aprovados; API completa 227 testes e TypeScript frontend/backend aprovados antes da revisão final.
