@@ -141,3 +141,28 @@
  .virtual-library-backdrop .virtual-library-editor .virtual-library-toolbar>button{flex:1 1 130px}
 }
 @media(prefers-reduced-motion:reduce){.virtual-library .vl-loading{animation:none}.virtual-library .vl-action,.virtual-library .vl-icon-action,.virtual-library .vl-summary-chevron{transition:none}}
+
+
+/* Shared virtual-library dialogs also use the same button rhythm and list treatment. */
+.virtual-library-backdrop .virtual-library-editor .virtual-library-toolbar>button{border:1px solid var(--line);background:var(--subtle);color:var(--ink);font-weight:550}
+.virtual-library-backdrop .virtual-library-editor .virtual-library-toolbar>button:first-child{background:var(--accent);color:var(--on-accent);border-color:transparent}
+.virtual-library-backdrop .virtual-library-editor button:disabled{opacity:.45;cursor:not-allowed}
+.virtual-library-backdrop .virtual-library-editor .virtual-library-nodes{list-style:none;margin:14px 0;padding:0}
+.virtual-library-backdrop .virtual-library-editor .virtual-library-nodes li{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 0;border-bottom:1px solid var(--line);font-size:13px}
+.virtual-library-backdrop .virtual-library-editor .virtual-library-nodes li>button,.virtual-library-backdrop .virtual-library-editor nav>button{border:1px solid var(--line);background:var(--subtle);color:var(--ink);padding:8px 12px;min-height:38px;border-radius:9px}
+.virtual-library-backdrop .virtual-library-editor .virtual-library-nodes li>button:first-child{flex:1 1 auto;text-align:left}
+.virtual-library-backdrop .virtual-library-editor .virtual-library-nodes li label{display:flex;align-items:center;gap:9px;margin:0;min-width:0}
+.virtual-library-backdrop .virtual-library-editor .virtual-library-nodes li label .rt-select{flex:1 1 160px}
+.virtual-library-backdrop .virtual-library-editor nav{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin:14px 0}
+.virtual-library-backdrop .virtual-library-editor fieldset{border:1px solid var(--line);border-radius:12px;margin:15px 0;padding:12px}
+.virtual-library-backdrop .virtual-library-editor legend{font-size:13px;font-weight:600;padding:0 7px}
+.virtual-library-backdrop .virtual-library-editor .vl-preview-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line);padding-bottom:12px}
+.virtual-library-backdrop .virtual-library-editor .vl-preview-head h3{flex:1;min-width:0;margin:0}
+.virtual-library-backdrop .virtual-library-editor .vl-preview-head .vl-icon-action{flex:0 0 40px;width:40px;height:40px;border:1px solid var(--line);background:var(--subtle);border-radius:10px;color:var(--ink);display:grid;place-items:center}
+@media(max-width:440px){
+ .virtual-library .vl-file-row{display:grid;grid-template-columns:minmax(0,1fr)}
+ .virtual-library .vl-file-open{width:100%}
+ .virtual-library .vl-file-actions{justify-content:flex-end;padding-top:4px;border-top:1px solid var(--line)}
+ .virtual-library .vl-file-actions .vl-icon-action{flex-basis:44px;width:44px;min-width:44px;height:44px}
+ .virtual-library-backdrop .virtual-library-editor .virtual-library-nodes li label{flex:1 1 100%}
+}
