@@ -106,6 +106,8 @@ test('virtual navigation preserves folder commands and a partial Dropbox batch r
  await page.getByRole('button',{name:'Fechar prévia'}).click();
  await expect(page.locator('.rl-upload-queue')).toBeVisible();
  // Discard only the synthetic failed transfer before exercising the remaining mobile UI.
+ const expand=page.getByRole('button',{name:'Expandir transferências'});
+ if(await expand.isVisible())await expand.click();
  await page.getByRole('button',{name:'Dispensar queue-overlay.txt'}).click();
  await expect(page.locator('.rl-upload-queue')).toHaveCount(0);
  await libraryMenu(page,'Originais','Renomear');await page.getByLabel('Nome',{exact:true}).fill('Brutos');await page.getByRole('button',{name:'Confirmar',exact:true}).click();
