@@ -24,6 +24,7 @@ import {importLibraryBatch,type LibraryImport,type FailedLibraryImport} from './
 import {LibraryConnections} from './LibraryConnections';
 import {LibraryStructureDialog} from './LibraryStructureDialog';
 import {AssistedLibraryImport} from './AssistedLibraryImport';
+import {expandDropboxTree} from './expand-dropbox-tree';
 import googleDriveMark from '../../assets/brand/google-drive.svg';
 import dropboxMark from '../../assets/brand/dropbox.svg';
 import type {InspectedLibrarySource,LibraryInspection} from '../../../shared/library-selection';
@@ -49,7 +50,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
  const moveGeneration=useRef(0),[moveBusy,setMoveBusy]=useState(false);
  const [preview,setPreview]=useState<Node|null>(null);
  const [structure,setStructure]=useState(false);
- const [dropboxStructure,setDropboxStructure]=useState(false),[assisted,setAssisted]=useState<{parentId:string;sources:InspectedLibrarySource[];failed:{name:string;code:string}[]}|null>(null);
+ const [dropboxStructure,setDropboxStructure]=useState(false),[assisted,setAssisted]=useState<{parentId:string;sources:InspectedLibrarySource[];failed:{name:string;code:string}[];recursive?:boolean}|null>(null);
  const [search,setSearch]=useState(''),[term,setTerm]=useState('');
  const [failedImports,setFailedImports]=useState<{parentId:string;items:FailedLibraryImport[]}|null>(null);
  const generation=useRef(0),mutation=useRef<AbortController|null>(null);
@@ -154,7 +155,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
   if(scope!==generation.current||controller.signal.aborted)return;
   setFailedImports(failed.length?{parentId:target,items:failed}:null);if(user?.uid&&selectedProjectId)invalidateLibraryFolders(user.uid,selectedProjectId);await load();
  }
- async function inspectSelection(items:LibraryImport[],target:string,controller:AbortController,scope:number){
+ async function inspectSelection(items:LibraryImport[],target:string,controller:AbortController,scope:number,folderIds?:ReadonlySet<string>){
   const sources:InspectedLibrarySource[]=[],failed:{name:string;code:string}[]=[];
   for(let i=0;i<items.length;i+=3){
    if(controller.signal.aborted)return;setProgress('Conferindo '+Math.min(i+3,items.length)+' de '+items.length+' itens selecionados…');
@@ -164,12 +165,17 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
     for(const item of batch){const result=reply.results.find(x=>x.fileId===item.fileId);if(result?.status==='ready')sources.push(result.source);else failed.push({name:item.name,code:result?.status==='failed'?result.code:'service_unavailable'});}
    }catch(e){if(controller.signal.aborted)return;failed.push(...items.slice(i).map(x=>({name:x.name,code:(e as {code?:string}).code||'service_unavailable'})));break;}
   }
-  if(scope===generation.current&&!controller.signal.aborted)setAssisted({parentId:target,sources,failed});
+  if(folderIds?.size&&scope===generation.current&&!controller.signal.aborted){
+   const expanded=await expandDropboxTree(call,items[0].connectionId,sources,folderIds,controller.signal,
+    (folders,files)=>setProgress('Lendo Dropbox: '+folders+' pastas e '+files+' arquivos…'));
+   sources.splice(0,sources.length,...expanded);
+  }
+  if(scope===generation.current&&!controller.signal.aborted)setAssisted({parentId:target,sources,failed,recursive:Boolean(folderIds?.size)});
  }
- async function addDropbox(ids:string[],names:Map<string,string>){
+ async function addDropbox(ids:string[],names:Map<string,string>,folderIds:Set<string>){
  if(!dropbox||busy)return;setDropboxPicker(false);const controller=new AbortController();mutation.current=controller;
  const scope=generation.current,target=parent;setBusy(true);setError('');
- try{const items=ids.map((fileId,i)=>({provider:'dropbox' as const,connectionId:dropbox.id,fileId,name:names.get(fileId)||'Arquivo '+(i+1)}));if(dropboxStructure)await inspectSelection(items,target,controller,scope);else await performImport(items,target,controller,scope);
+ try{const items=ids.map((fileId,i)=>({provider:'dropbox' as const,connectionId:dropbox.id,fileId,name:names.get(fileId)||'Arquivo '+(i+1)}));if(dropboxStructure)await inspectSelection(items,target,controller,scope,folderIds);else await performImport(items,target,controller,scope);
  }catch(e){if(!controller.signal.aborted&&scope===generation.current)setError(e instanceof Error?e.message:'Não foi possível adicionar os arquivos.');}
  finally{if(mutation.current===controller){mutation.current=null;setProgress('');}if(scope===generation.current)setBusy(false);}
  }
@@ -299,9 +305,9 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
  <form onSubmit={e=>{e.preventDefault();void save();}}>{(edit.action==='create'||edit.action==='rename')&&<label>Nome<AppInput aria-label="Nome" required maxLength={120} value={name} onChange={e=>setName(e.target.value)} autoFocus/></label>}{edit.action==='trash'?<p>Os arquivos originais permanecem no provedor. A organização desta pasta será removida da Biblioteca.</p>:edit.action==='restore'?<p>Restaurar esta referência na pasta anterior. Se ela também estiver na lixeira, restaure a pasta primeiro.</p>:edit.action==='move'?<><nav aria-label="Pasta de destino">{movePage?.trail.map(x=><AppButton type="button" key={x.id} onClick={()=>setMoveParent(x.id)}>{x.name}</AppButton>)}</nav>{movePage?.nodes.filter(x=>x.kind==='folder'&&x.id!==edit.node?.id).map(x=><AppButton type="button" key={x.id} onClick={()=>setMoveParent(x.id)}>{x.name}</AppButton>)}{movePage?.nextPage&&<AppButton type="button" disabled={moveBusy} onClick={()=>{const old=movePage,scope=moveGeneration.current;setMoveBusy(true);void call<Page>(base+'?parent='+encodeURIComponent(moveParent)+'&after='+old.nextPage).then(p=>{if(scope===moveGeneration.current)setMovePage({...p,nodes:[...old.nodes,...p.nodes]});}).catch(()=>{if(scope===moveGeneration.current)setError('Não foi possível carregar mais pastas.');}).finally(()=>{if(scope===moveGeneration.current)setMoveBusy(false);});}}>Mais pastas</AppButton>}</>:<label>Nome<AppInput autoFocus value={name} maxLength={120} onChange={e=>setName(e.target.value)} required/></label>}
  <div className="virtual-library-toolbar"><AppButton type="submit" disabled={busy||edit.action==='move'&&!movePage}>Confirmar</AppButton><AppButton type="button" disabled={busy} onClick={()=>setEdit(null)}>Cancelar</AppButton></div></form>
  </div></div>}
- {dropboxPicker&&dropbox&&<DropboxLibraryPicker key={dropbox.id+':'+dropboxStructure} connectionId={dropbox.id} includeFolders={dropboxStructure} onClose={()=>setDropboxPicker(false)} onSelect={(ids,names)=>void addDropbox(ids,names)}/>}
+ {dropboxPicker&&dropbox&&<DropboxLibraryPicker key={dropbox.id+':'+dropboxStructure} connectionId={dropbox.id} includeFolders={dropboxStructure} onClose={()=>setDropboxPicker(false)} onSelect={(ids,names,folderIds)=>void addDropbox(ids,names,folderIds)}/>}
  {preview&&selectedProjectId&&<LibraryAssetPreview key={preview.id} projectId={selectedProjectId} node={preview} onClose={()=>setPreview(null)}/>}
  {structure&&selectedProjectId&&<LibraryStructureDialog key={selectedProjectId+':'+parent} projectId={selectedProjectId} parentId={parent} onClose={()=>setStructure(false)} onApplied={()=>{setStructure(false);void load();}}/>}
- {assisted&&selectedProjectId&&<AssistedLibraryImport key={selectedProjectId+':'+assisted.parentId} projectId={selectedProjectId} parentId={assisted.parentId} sources={assisted.sources} unavailable={assisted.failed} onClose={()=>{setAssisted(null);void load();}} onApplied={()=>{setAssisted(null);setSearch('');setTerm('');void load();}}/>}
+ {assisted&&selectedProjectId&&<AssistedLibraryImport key={selectedProjectId+':'+assisted.parentId} projectId={selectedProjectId} parentId={assisted.parentId} sources={assisted.sources} unavailable={assisted.failed} recursive={assisted.recursive} onClose={()=>{setAssisted(null);void load();}} onApplied={()=>{setAssisted(null);setSearch('');setTerm('');void load();}}/>}
  </section>;
 }
