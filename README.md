@@ -1,5 +1,7 @@
 # Roteiva
 
+> **Homologação em andamento (12/11/2026):** a Biblioteca virtual e a aprovação por versão exata foram integradas na PR #121 e publicadas em DEV. A continuidade em `codex/library-oauth-modal-fixes` corrige a navegação após OAuth e a sobreposição do painel de transferências; ainda requer CI e QA real antes de PROD. Consulte [roadmap](docs/MVP-ROADMAP.md).
+
 ## Biblioteca virtual — implementação em andamento
 
 A branch `codex/virtual-library` inclui árvore virtual com mover/lixeira/restauração, seleção múltipla Drive/Dropbox, busca por nome, estruturas editáveis e importação assistida da organização selecionada, prévia protegida, uploads confirmados e aprovações com versões exatas e sessões limitadas. Capas usam Google Picker com `drive.file`. Ativação DEV configurada nesta branch; PROD permanece desativado. O código novo ainda aguarda publicação e homologação real de DEV. Uma PoC real DEV confirmou o escopo mínimo e Range de revisão nos dois provedores; homologação completa, reconstrução dos metadados e redução dos grants persistidos ainda impedem a release PROD. Estado e evidências no [roadmap](docs/MVP-ROADMAP.md#biblioteca-virtual-e-aprovações--implementação-autorizada-11112026).
