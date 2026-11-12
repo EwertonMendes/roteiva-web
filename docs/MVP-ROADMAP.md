@@ -6,7 +6,8 @@
 - [x] **IMPLEMENTADO NA BRANCH**: contrato API `explorer=1` com paginação ordenada sem alterar contrato antigo, busca D1 com autorização por projeto; testes de escopo, paginação e isolamento.
 - [x] **IMPLEMENTADO NA BRANCH**: travessia limitada de subpastas selecionadas no Dropbox e prévia assistida, idempotência já existente; Google `drive.file` continua exigindo seleção explícita e não autoriza automaticamente descendentes.
 - [x] **IMPLEMENTADO NA BRANCH**: caminho de reautorização das capas Google antigas pelo Picker e preservação de recorte ao selecionar o mesmo arquivo; não equivale a recuperar automaticamente grants expirados.
-- [ ] **VALIDAÇÃO OBRIGATÓRIA**: CI API/frontend/Firestore/E2E no SHA final, regressões dos demais domínios e teste de perfis real; publicar Worker DEV antes do Hosting DEV.
+- [x] **CI base completo**: SHA `92faeea8`, quatro workflows verdes (Frontend DEV, API DEV, Firestore security DEV e Isolated SaaS access E2E); regressão de busca que oculta descendentes de pastas na lixeira passou em `Validate Worker and D1` no run #43330850222.
+- [ ] **VALIDAÇÃO OBRIGATÓRIA**: QA específico do cache de navegação Dropbox, regressões dos demais domínios e testes de perfis reais; publicar Worker DEV antes do Hosting DEV. **BLOQUEADO**: o environment `cloudflare-development` restringe deploy à `master`; job de deploy da branch recusado antes de executar, sem alterar Worker/D1.
 - [ ] **ACEITE REAL**: Google Drive/Dropbox autenticados com pastas e arquivos reais, capas de projetos e clientes existentes, velocidades cold/warm, teste 1000+ projetos, celulares, foco e tema. **Sem esta evidência não afirmar que está pronto para usuários finais.**
 - [ ] PROD: somente após aprovação explícita e testes reais de segurança/permissões, sem migração destrutiva, sem reintroduzir escopo restrito automaticamente.
 

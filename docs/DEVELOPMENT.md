@@ -1,5 +1,11 @@
 # Desenvolvimento e deploy — Roteiva
 
+## Homologação e bloqueio do deploy DEV — PR #123 (12/11/2026)
+
+A branch `codex/library-explorer-release` permite QA isolado sem deploy: GitHub Actions > **Isolated SaaS access E2E** > Run workflow > selecionar a branch e definir `suite=virtual`. Essa opção roda testes de Biblioteca e portal protegido em emuladores desktop/mobile; `suite=full` conserva a regressão geral Firestore e navegador. Não confundir estes testes com Google/Dropbox reais.
+
+**Bloqueio protegido conhecido:** `cloudflare-development` permite deploy somente pela `master`. O `workflow_dispatch` `API DEV` da PR validou Worker/D1, mas o job de deploy da branch foi recusado **antes de executar steps** (run 43330850222). Para homologar sem merge, o administrador pode permitir temporariamente apenas `codex/library-explorer-release` em GitHub Settings > Environments > `cloudflare-development` > Deployment branches and tags, mantendo `master` autorizada e retirando a exceção após QA. Depois, executar API DEV manual na branch, confirmar smoke do Worker, e só então Frontend DEV manual na mesma branch/SHA. Não contornar a proteção pelo código, não publicar PROD, não mutar dados reais para liberar pipeline.
+
 ## QA do explorador compacto — PR #123 (12/11/2026)
 
 **Ainda em validação, não liberar PROD.** O novo explorador substitui cartões estáticos por busca de projeto, lista/grade, breadcrumbs, ações de contexto e menu Adicionar. A API possui `GET /library/projects/:id/nodes?explorer=1&parent=root&q=nome&scope=project` com paginação `after`, retornando `parent_name` e ordem determinística; manter a rota sem `explorer=1` para compatibilidade. Testes: `node --experimental-strip-types --test api/tests/library.test.mjs` no diretório `api/`, `node --experimental-strip-types --test tests/library-folder-cache.test.mjs tests/dropbox-tree.test.mjs` na raiz, além de `pnpm test`, `pnpm typecheck` e `pnpm build:emulator`.
