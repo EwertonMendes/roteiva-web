@@ -5,6 +5,8 @@ import { driveJson } from './drive-client.ts';
 import { rejectCachedToken } from './token-store.ts';
 import { context, encrypt, decrypt } from './crypto.ts';
 import { sealThumbnailTicket } from './thumbnails.ts';
+import {authorizeVirtualUpload} from './library-upload-target.ts';
+import {importLibraryAssets} from './library-assets.ts';
 
 const FOLDER = 'application/vnd.google-apps.folder';
 const ID = /^[A-Za-z0-9_-]{10,200}$/;
@@ -31,12 +33,12 @@ function validId(value:string):string {
   return value;
 }
 
-function input(value:unknown):UploadInput {
+function input(value:unknown,virtual=false):UploadInput {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new ApiError(400,'invalid_upload');
   const data = value as Partial<UploadInput>;
   if (typeof data.attemptId!=='string' || !UUID.test(data.attemptId) ||
       !Number.isSafeInteger(data.projectId) || !data.projectId || data.projectId <= 0 ||
-      typeof data.linkedFolderId !== 'string' || !ID.test(data.linkedFolderId) ||
+      typeof data.linkedFolderId !== 'string' || !(virtual?(data.linkedFolderId==='root'||UUID.test(data.linkedFolderId)):ID.test(data.linkedFolderId)) ||
       typeof data.name !== 'string' || !data.name.trim() || data.name.length > 255 ||
       /[\u0000-\u001f\u007f]/.test(data.name) ||
       !Number.isSafeInteger(data.size) || data.size === undefined || data.size < 1 || data.size > MAX_SIZE ||
@@ -48,14 +50,14 @@ function input(value:unknown):UploadInput {
     name:data.name,size:data.size,mimeType:data.mimeType || 'application/octet-stream'};
 }
 
-export async function uploadBody(request:Request):Promise<unknown> {
+export async function uploadBody(request:Request,max=8192):Promise<unknown> {
   const size=Number(request.headers.get('Content-Length')||0);
-  if (size>8192) throw new ApiError(413,'upload_metadata_too_large');
+  if (size>max) throw new ApiError(413,'upload_metadata_too_large');
   const reader=request.body?.getReader();
   const chunks:Uint8Array[]=[];let length=0;
   if(reader)try{while(true){
     const {done,value}=await reader.read();if(done)break;
-    length+=value.byteLength;if(length>8192){await reader.cancel();throw new ApiError(413,'upload_metadata_too_large');}
+    length+=value.byteLength;if(length>max){await reader.cancel();throw new ApiError(413,'upload_metadata_too_large');}
     chunks.push(value);
   }}finally{reader.releaseLock();}
   const bytes=new Uint8Array(length);let offset=0;
@@ -138,13 +140,14 @@ export async function startUpload(env:Env,uid:string,connectionId:string,targetI
   request:Request,fetcher:typeof fetch=fetch):Promise<Response> {
   fetcher=boundedFetch(fetcher);
   validId(targetId);
-  const data=input(await uploadBody(request));
+  const data=input(await uploadBody(request),env.VIRTUAL_LIBRARY_ENABLED==='true');
   const firebaseToken=request.headers.get('Authorization')?.replace(/^Bearer /,'')||'';
   let row=await connection(env,uid,connectionId);
-  await linkedFolder(env,uid,firebaseToken,connectionId,data.projectId,data.linkedFolderId,fetcher);
+  if(env.VIRTUAL_LIBRARY_ENABLED==='true')await authorizeVirtualUpload(request,env,uid,'google_drive',connectionId,data.projectId,data.linkedFolderId,targetId,fetcher);
+  else await linkedFolder(env,uid,firebaseToken,connectionId,data.projectId,data.linkedFolderId,fetcher);
   if(row.status!=='connected')throw new ApiError(409,'reconnect_required');
   if(!row.scopes.split(/\s+/).includes(DRIVE_SCOPE))throw new ApiError(409,'drive_upload_permission_missing');
-  await destination(env,row,targetId,data.linkedFolderId,fetcher);
+  if(env.VIRTUAL_LIBRARY_ENABLED!=='true')await destination(env,row,targetId,data.linkedFolderId,fetcher);
   row=await connection(env,uid,connectionId);
   if(row.status!=='connected')throw new ApiError(409,'reconnect_required');
   const existing=await env.DB.prepare('SELECT * FROM drive_upload_attempts WHERE owner_uid=? AND id=?')
@@ -221,7 +224,7 @@ export async function completeUpload(env:Env,uid:string,connectionId:string,targ
   const payload=await uploadBody(request);
   const data=payload as {attemptId?:string;projectId?:number;linkedFolderId?:string;fileId?:string;size?:number}|null;
   if(!data || typeof data.attemptId!=='string'||!UUID.test(data.attemptId)|| !Number.isSafeInteger(data.projectId) || !data.projectId ||
-     typeof data.linkedFolderId!=='string'||!ID.test(data.linkedFolderId)||
+     typeof data.linkedFolderId!=='string'||!(env.VIRTUAL_LIBRARY_ENABLED==='true'?(data.linkedFolderId==='root'||UUID.test(data.linkedFolderId)):ID.test(data.linkedFolderId))||
      typeof data.fileId!=='string'||!ID.test(data.fileId)||
      !Number.isSafeInteger(data.size)||data.size===undefined||data.size<1)
     throw new ApiError(400,'invalid_upload');
@@ -235,8 +238,11 @@ export async function completeUpload(env:Env,uid:string,connectionId:string,targ
      attempt.linked_folder_id!==data.linkedFolderId || attempt.file_id!==data.fileId ||
      attempt.size!==data.size)throw new ApiError(409,'upload_attempt_mismatch');
   if(attempt.expires_at<=Date.now())throw new ApiError(410,'upload_attempt_expired');
-  await linkedFolder(env,uid,firebaseToken,connectionId,data.projectId!,data.linkedFolderId,fetcher);
-  await destination(env,row,targetId,data.linkedFolderId,fetcher);
+  if(env.VIRTUAL_LIBRARY_ENABLED==='true')await authorizeVirtualUpload(request,env,uid,'google_drive',connectionId,data.projectId!,data.linkedFolderId,targetId,fetcher);
+  else{
+    await linkedFolder(env,uid,firebaseToken,connectionId,data.projectId!,data.linkedFolderId,fetcher);
+    await destination(env,row,targetId,data.linkedFolderId,fetcher);
+  }
   const url=new URL('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(data.fileId));
   url.searchParams.set('fields','id,name,mimeType,size,parents,trashed,webViewLink,thumbnailLink,modifiedTime');
   url.searchParams.set('supportsAllDrives','true');
@@ -245,10 +251,14 @@ export async function completeUpload(env:Env,uid:string,connectionId:string,targ
      !result.parents.includes(targetId) || result.trashed===true ||
      result.size!==String(attempt.size) || result.name!==attempt.name || result.mimeType!==attempt.mime_type)
     throw new ApiError(409,'drive_upload_not_confirmed');
-  await env.DB.prepare("UPDATE drive_upload_attempts SET status='completed',encrypted_session=NULL WHERE owner_uid=? AND id=?")
-    .bind(uid,data.attemptId).run();
   const latest=await connection(env,uid,connectionId);
   if(latest.status!=='connected'||latest.revision!==attempt.connection_revision)throw new ApiError(409,'connection_changed');
+  if(env.VIRTUAL_LIBRARY_ENABLED==='true'){
+    const imported=await (await importLibraryAssets(env,uid,data.projectId!,{parentId:data.linkedFolderId,items:[{provider:'google_drive',connectionId,fileId:data.fileId}]},fetcher)).json() as {results:{status:string;code?:string}[]};
+    if(imported.results[0]?.status!=='added')throw new ApiError(409,imported.results[0]?.code||'library_changed');
+  }
+  await env.DB.prepare("UPDATE drive_upload_attempts SET status='completed',encrypted_session=NULL WHERE owner_uid=? AND id=?")
+    .bind(uid,data.attemptId).run();
   const thumbnailTicket=typeof result.thumbnailLink==='string'
     ?await sealThumbnailTicket(env,uid,connectionId,latest.revision,data.fileId,result.thumbnailLink):undefined;
   return Response.json({file:{id:result.id,name:result.name,mimeType:result.mimeType,
@@ -267,9 +277,13 @@ export async function authorizeUploadFolder(env:Env,uid:string,connectionId:stri
   validId(targetId);
   const data=await uploadBody(request) as {projectId?:number;linkedFolderId?:string}|null;
   if(!data||!Number.isSafeInteger(data.projectId)||!data.projectId||data.projectId<0||
-    typeof data.linkedFolderId!=='string'||!ID.test(data.linkedFolderId))throw new ApiError(400,'invalid_upload');
+    typeof data.linkedFolderId!=='string'||!(env.VIRTUAL_LIBRARY_ENABLED==='true'?(data.linkedFolderId==='root'||UUID.test(data.linkedFolderId)):ID.test(data.linkedFolderId)))throw new ApiError(400,'invalid_upload');
   const row=await connection(env,uid,connectionId);
   if(row.status!=='connected')throw new ApiError(409,'reconnect_required');
+  if(env.VIRTUAL_LIBRARY_ENABLED==='true'){
+    await authorizeVirtualUpload(request,env,uid,'google_drive',connectionId,data.projectId,data.linkedFolderId,targetId,fetcher);
+    return Response.json({authorized:true});
+  }
   await linkedFolder(env,uid,request.headers.get('Authorization')?.replace(/^Bearer /,'')||'',
     connectionId,data.projectId,data.linkedFolderId,fetcher);
   try{await destination(env,row,targetId,data.linkedFolderId,fetcher);return Response.json({authorized:true});}

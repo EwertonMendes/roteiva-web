@@ -1,5 +1,9 @@
 # Roteiva
 
+## Biblioteca virtual — implementação em andamento
+
+A branch `codex/virtual-library` inclui árvore virtual com mover/lixeira/restauração, seleção múltipla Drive/Dropbox, busca por nome, estruturas editáveis e importação assistida da organização selecionada, prévia protegida, uploads confirmados e aprovações com versões exatas e sessões limitadas. Capas usam Google Picker com `drive.file`. Ativação DEV configurada nesta branch; PROD permanece desativado. O código novo ainda aguarda publicação e homologação real de DEV. Uma PoC real DEV confirmou o escopo mínimo e Range de revisão nos dois provedores; homologação completa, reconstrução dos metadados e redução dos grants persistidos ainda impedem a release PROD. Estado e evidências no [roadmap](docs/MVP-ROADMAP.md#biblioteca-virtual-e-aprovações--implementação-autorizada-11112026).
+
 **Domínio próprio publicado:** [roteiva.com](https://roteiva.com), login no mesmo domínio e API [api.roteiva.com](https://api.roteiva.com), usando os recursos PROD existentes. HTTPS, www, login real, recarga, links antigos e conexões preservadas conferidos; marcas Google verificadas/publicadas. Aprovação dos escopos Drive e produção Dropbox continuam separadas no [roadmap](docs/MVP-ROADMAP.md#domínio-roteivacom--11112026).
 
 **Preparação sem domínio final:** preflight público DEV/PROD aprovado e recuperação de uma cópia cifrada Auth/Firestore PROD validada em emulador. Pedidos dos provedores, ciclo completo com usuários externos, operação contínua e aparelhos físicos continuam com aceites separados. Roteiro e evidências no [roadmap](docs/MVP-ROADMAP.md#preparação-sem-domínio-final--11112026).

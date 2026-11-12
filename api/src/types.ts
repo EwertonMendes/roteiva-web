@@ -12,6 +12,7 @@ export interface Env {
   GOOGLE_CLIENT_SECRET?: string;
   GOOGLE_PICKER_API_KEY?: string;
   DROPBOX_ENABLED?: string;
+  VIRTUAL_LIBRARY_ENABLED?: string;
   DROPBOX_APP_KEY?: string;
   DROPBOX_APP_SECRET?: string;
   DROPBOX_OAUTH_REDIRECT_URI?: string;

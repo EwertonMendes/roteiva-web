@@ -15,6 +15,7 @@ import {useDriveThumbnailFetch} from "../drive/useDriveThumbnailFetch";
 import {useAuth} from "../auth/AuthProvider";
 import {fmt,statusText,type Asset,type Comment,type Detail} from "./review-model";
 import "./review-owner-workspace.css";
+import {ReviewSourcePreview} from './ReviewSourcePreview';
 
 function Glyph({mime}:{mime:string}){
   if(mime.startsWith("video/"))return <FileVideo size={19}/>;
@@ -106,7 +107,7 @@ export function ReviewOwnerWorkspace({detail,working,error,onClose,onRevise,onPu
   const parentKey=active?.connectionId&&active.fileId
     ?active.connectionId+":"+active.fileId:"";
   useEffect(()=>{
-    if(!active?.connectionId||!parentKey||Object.prototype.hasOwnProperty.call(parentFolders,parentKey))return;
+    if(import.meta.env.VITE_VIRTUAL_LIBRARY==='true'||!active?.connectionId||!parentKey||Object.prototype.hasOwnProperty.call(parentFolders,parentKey))return;
     if(active.provider==='dropbox'){setParentFolders(prev=>({...prev,[parentKey]:null}));return;}
     let mounted=true;
     void driveCall<{file?:{parents?:string[]}}>(
@@ -145,11 +146,11 @@ export function ReviewOwnerWorkspace({detail,working,error,onClose,onRevise,onPu
   const isImage=Boolean(active?.mimeType.startsWith("image/"));
   const isPdf=active?.mimeType==='application/pdf';
   const imagePreview=useOwnerReviewImage(review.id,isImage||isPdf?active?.fileId:undefined,
-    Boolean((isImage||isPdf)&&previewable),isPdf);
+    Boolean(import.meta.env.VITE_VIRTUAL_LIBRARY!=='true'&&(isImage||isPdf)&&previewable),isPdf);
   const showMaterials=review.status!=="draft"||currentAssets.length>0;
   const [dropboxPreview,setDropboxPreview]=useState<{fileId:string;url:string;error:string}>({fileId:'',url:'',error:''});
   useEffect(()=>{
-    if(!previewable||!active||active.provider!=='dropbox'||isImage||isPdf){
+    if(import.meta.env.VITE_VIRTUAL_LIBRARY==='true'||!previewable||!active||active.provider!=='dropbox'||isImage||isPdf){
       setDropboxPreview({fileId:'',url:'',error:''});return;
     }
     let alive=true;
@@ -252,7 +253,7 @@ export function ReviewOwnerWorkspace({detail,working,error,onClose,onRevise,onPu
               aria-pressed={active?.fileId===a.fileId} aria-label={"Selecionar arquivo "+a.name}
               title={a.name} onClick={()=>{setSelectedFile(a.fileId);setNotice("");}}>
               <span className="rowner-file-art">
-                {user&&a.connectionId?<DriveThumbnail
+                {import.meta.env.VITE_VIRTUAL_LIBRARY!=='true'&&user&&a.connectionId?<DriveThumbnail
                   item={{id:a.fileId,name:a.name,mimeType:a.mimeType,
                     thumbnailFallback:a.grantState==="granted"&&review.status!=="closed"}}
                   scope={user.uid+":"+a.connectionId} getThumbnail={a.provider==='dropbox'?getDropboxThumbnail:getThumbnail}/>:
@@ -289,7 +290,7 @@ export function ReviewOwnerWorkspace({detail,working,error,onClose,onRevise,onPu
                   aria-label={'Abrir '+(active.provider==='dropbox'?'Dropbox':'arquivo '+active.name+' no Google Drive')}><ExternalLink size={14}/> Abrir arquivo</a>}
               </div></div>
             <div className={"rowner-preview-stage"+(isImage?" is-image":"")}>
-              {previewable&&(isImage||isPdf)?(
+              {previewable&&import.meta.env.VITE_VIRTUAL_LIBRARY==='true'?<ReviewSourcePreview key={review.id+':'+review.version+':'+active.fileId} reviewId={review.id} asset={active}/>:previewable&&(isImage||isPdf)?(
                 imagePreview.fileId===active?.fileId&&imagePreview.url?
                   isPdf?<ReviewPdfViewer key={active.fileId} src={imagePreview.url} name={active.name}/>:<ReviewImageViewer key={active.fileId} src={imagePreview.url} name={active.name}/>:
                   <div className="rowner-preview-empty" role="status">

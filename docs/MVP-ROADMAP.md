@@ -1,5 +1,27 @@
 # Roadmap vivo — Roteiva MVP
 
+## Biblioteca virtual e aprovações — implementação autorizada 11/11/2026
+
+- [x] Código local: árvore autorizada por projeto, CAS/ciclos/profundidade, registry/importação deduplicada; criar/renomear/mover/lixeira/restaurar e seletores múltiplos Drive/Dropbox. Exclusão de conta limpa metadados virtuais após encerrar revisões.
+- [x] Prévia protegida por aba, sem cookies de terceiros; Chromium desktop/mobile com upstream sintético e negação de URL copiada; testes de origem/Range/revogação/suspensão do worker.
+- [x] PoC DEV com provedores reais (12/11/2026 UTC): token Google confirmado somente drive.file, recurso criado com isAppAuthorized, Range 206 de revisão Google e Dropbox e revisão antiga após troca de conteúdo; arquivos sintéticos removidos (204/200). Evidência privada sanitizada `virtual-provider-poc-evidence.json`; não equivale a homologação do produto nem à revogação dos grants antigos.
+- [x] Aprovações no código novo selecionam referências virtuais e armazenam revisão/tamanho; leitura exata e indisponibilidade testadas, mídia Google exige identidade real e sessão do portal além do ticket. Convite em fragmento, sessão por aba e retomada após recarga sem cadastro/trial.
+- [x] Código local: uploads para destinos geridos independentes da árvore; confirmação no provedor antes do registro, cancelamento/retry, capas/fotos Drive pelo Picker mínimo; busca por nome e estruturas editáveis em transação idempotente. Reconexão preserva IDs sem manter credenciais revogadas. Fences de exclusão de conta no banco.
+- [x] Importação assistida Drive/Dropbox no código: prévia, destinos/apelidos editáveis, somente seleção explícita, reaproveitamento não ambíguo e retry parcial idempotente; chaves de recursos Drive cifradas. Snapshots incluem checksum opcional e hash do manifesto, comentários com idempotência e decisões verificadas em etapas sob limites Free.
+- [x] Testes locais: API completa 253 e frontend 101 aprovados; TypeScript aprovado nos dois componentes. Chromium desktop/mobile: oito cenários de mídia/árvore/lotes/capas/importação assistida aprovados, portal/decisão em lotes aprovado nos dois viewports após correção do seletor do teste. Provedores sintéticos; não equivale ao ciclo real publicado. CI anterior 2ef1e22: API 43139490417, frontend 43139490194, Firestore 43139490298 e SaaS E2E 43139490207 aprovados.
+- [x] WebKit desktop/mobile local: árvore/capas/importação assistida aprovados (seis cenários); transporte HTTP real do Service Worker e portal com recarga/decisão aprovados em rodada focada (quatro cenários). A primeira tentativa usava mocks não interceptados por esse motor; corrigida a infraestrutura de teste, sem relaxar a aplicação. Safari/iPhone físico continua sem evidência.
+- [x] Preparação DEV em 12/11/2026: backup D1 privado restaurado localmente e inventário de ACLs/exclusão conferido; 0021–0030 aplicadas em manutenção revisada. Três convites antigos sem ACL gerida foram encerrados; dez históricos e suas referências foram preservados, sem uploads pendentes. Identidades, credenciais e originais preservados. Backup PROD exportado/restaurado localmente; sem revisões, ACL gerida ou upload pendente, ainda sem mutação PROD.
+- [ ] QA real de uploads/capas/aprovações, reset/redução efetiva dos grants, Safari físico, release DEV/PROD. CI do código 4e59cda passou nos quatro componentes; suíte virtual adicionada ao CI. Ativação DEV configurada na branch; frontend/API ainda não publicados. PROD intacto.
+
+**EM ANDAMENTO; NÃO PUBLICADO.** Proprietário autorizou implementar o estudo, reconstruir metadados necessários, homologar DEV e depois publicar/testar PROD com sua conta. Isso não autoriza apagar originais dos provedores.
+
+- [x] Fundação local: árvore com constraints/triggers e testes de ciclos, pais cruzados e profundidade; endpoints de revisão específica e ranges limitados, classificação de falhas; seis testes focados aprovados.
+- [ ] PoC real de grant mínimo, revisão específica/Range nos dois provedores e sessão de clientes DEV/PROD/Safari.
+- [x] Registry por proprietário e comandos autenticados de árvore; Picker em lote e interface virtual (código local).
+- [x] Upload, capas e aprovações sem dependência dos vínculos antigos de pastas; sessão de mídia e revisão exata (código local; homologação de produto ainda pendente).
+- [ ] Reconciliação de ACLs antigas, reset controlado e redução efetiva dos grants.
+- [ ] Homologação completa DEV, release PROD e teste real na conta do proprietário.
+
 ## Domínio roteiva.com — 11/11/2026
 
 **DOMÍNIO PUBLICADO E HOMOLOGADO; NÃO EQUIVALE A LIBERAÇÃO PÚBLICA DOS PROVEDORES.** O proprietário adquiriu o domínio e autorizou configurar PROD; esta seção substitui o adiamento histórico abaixo.

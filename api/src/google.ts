@@ -64,12 +64,13 @@ async function cached(env: Env, row: TokenConnection): Promise<AccessCredential 
   };
 }
 
-export async function accessCredential(env: Env, input: Connection, fetcher: typeof fetch = fetch): Promise<AccessCredential> {
+export async function accessCredential(env: Env, input: Pick<Connection,'owner_uid'|'id'>, fetcher: typeof fetch = fetch): Promise<AccessCredential> {
   const started = Date.now();
   let attempt = 0;
   while (true) {
     // Reload even if caller supplied a stale row: status/revision are authoritative in D1.
     const row = await loadTokenConnection(env,input.owner_uid,input.id);
+    if(env.VIRTUAL_LIBRARY_ENABLED==='true'&&row.scopes.split(/\s+/).some(scope=>scope!==DRIVE_SCOPE))throw new ApiError(409,'drive_reconnect_minimum_required');
     const hit = await cached(env,row);
     if (hit) { metric(attempt ? 'hit_after_wait' : 'hit',started); return hit; }
     if (row.refresh_retry_after > Date.now()) throw new ApiError(503,'token_refresh_retry_later');
@@ -83,6 +84,7 @@ export async function accessCredential(env: Env, input: Connection, fetcher: typ
         const requestStarted = Date.now();
         const token = await tokenRequest(env,{
           grant_type:'refresh_token',
+          ...(env.VIRTUAL_LIBRARY_ENABLED==='true'?{scope:DRIVE_SCOPE}:{}),
           refresh_token:await decrypt(env,row.encrypted_refresh_token!,context(env,row.owner_uid,row.google_account_id)),
         },fetcher);
         const version = crypto.randomUUID();

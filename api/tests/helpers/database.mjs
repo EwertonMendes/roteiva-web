@@ -16,6 +16,16 @@ export function database(...rows) {
   sql.exec(readFileSync(new URL('../../migrations/0018_dropbox_oauth_guards.sql',import.meta.url),'utf8'));
   sql.exec(readFileSync(new URL('../../migrations/0019_dropbox_upload_leases.sql',import.meta.url),'utf8'));
   sql.exec(readFileSync(new URL('../../migrations/0020_deployment_identity.sql',import.meta.url),'utf8'));
+  sql.exec(readFileSync(new URL('../../migrations/0021_virtual_library.sql',import.meta.url),'utf8'));
+  sql.exec(readFileSync(new URL('../../migrations/0022_library_assets.sql',import.meta.url),'utf8'));
+  sql.exec(readFileSync(new URL('../../migrations/0023_review_source_versions.sql',import.meta.url),'utf8'));
+  sql.exec(readFileSync(new URL('../../migrations/0024_library_upload_targets.sql',import.meta.url),'utf8'));
+  sql.exec(readFileSync(new URL('../../migrations/0025_review_sessions.sql',import.meta.url),'utf8'));
+  sql.exec(readFileSync(new URL('../../migrations/0026_library_deletion_fences.sql',import.meta.url),'utf8'));
+  sql.exec(readFileSync(new URL('../../migrations/0027_library_structure.sql',import.meta.url),'utf8'));
+  sql.exec(readFileSync(new URL('../../migrations/0028_drive_resource_keys.sql',import.meta.url),'utf8'));
+  sql.exec(readFileSync(new URL('../../migrations/0029_review_source_checks.sql',import.meta.url),'utf8'));
+  sql.exec(readFileSync(new URL('../../migrations/0030_review_source_checksum.sql',import.meta.url),'utf8'));
   sql.exec("INSERT INTO deployment_identity VALUES(1,'dev')");
   for (const row of rows) {
     sql.prepare('INSERT INTO drive_connections(id,owner_uid,google_account_id,google_email,encrypted_refresh_token,status,scopes,revision,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)')

@@ -12,6 +12,7 @@
       "account_id": "71d7d72a003796ba12b6bf23d149916c",
       "vars": {
         "ENVIRONMENT": "dev",
+        "VIRTUAL_LIBRARY_ENABLED": "true",
         "ACCOUNT_DELETION_ENABLED": "true",
         "ACCESS_PROVISION_ON_DRIVE": "false",
         "FIREBASE_PROJECT_ID": "roteiva-web-dev",

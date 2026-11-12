@@ -1,13 +1,14 @@
 import { ApiError, type Connection, type Env } from './types.ts';
 import { accessCredential } from './google.ts';
 import { rejectCachedToken } from './token-store.ts';
+import {driveResourceHeaders} from './drive-resource-keys.ts';
 
 const QUOTA_REASONS = new Set(['rateLimitExceeded','userRateLimitExceeded','dailyLimitExceeded','quotaExceeded','downloadQuotaExceeded','sharingRateLimitExceeded']);
 interface GoogleError { error?: { errors?: Array<{reason?:string}>; status?:string }; }
 
 /** Only fixed-host Drive GETs: never retry a write or follow an arbitrary URL with credentials. */
 export async function driveJson(env: Env, row: Connection, url: URL, fetcher: typeof fetch = fetch,
-  notFoundCode = 'drive_file_not_found'): Promise<Record<string,unknown>> {
+  notFoundCode = 'drive_file_not_found',resourceKey?:string): Promise<Record<string,unknown>> {
   if (url.origin !== 'https://www.googleapis.com' || !url.pathname.startsWith('/drive/v3/') ||
       url.username || url.password || url.searchParams.get('alt') === 'media') throw new ApiError(400,'invalid_drive_endpoint');
   let token = await accessCredential(env,row,fetcher);
@@ -23,7 +24,7 @@ export async function driveJson(env: Env, row: Connection, url: URL, fetcher: ty
       followed.add(endpoint.href);
       try {
         response = await fetcher(endpoint,{
-          method:'GET',headers:{Authorization:'Bearer '+token.value},
+          method:'GET',headers:{Authorization:'Bearer '+token.value,...driveResourceHeaders(url.pathname.split('/').at(-1)||'',resourceKey)},
           redirect:'manual',signal:AbortSignal.timeout(12000),
         });
       } catch (error) {

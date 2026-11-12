@@ -20,7 +20,7 @@ export async function disconnect(env: Env, uid: string, connectionId: string, fe
   if (row.encrypted_refresh_token) {
     const token = await decrypt(env,row.encrypted_refresh_token,context(env,uid,row.google_account_id));
     const response = await fetcher('https://oauth2.googleapis.com/revoke',{
-      method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      method:'POST',redirect:'manual',headers:{'Content-Type':'application/x-www-form-urlencoded'},
       body:new URLSearchParams({token}),signal:AbortSignal.timeout(10000),
     });
     if (!response.ok) {
@@ -29,8 +29,13 @@ export async function disconnect(env: Env, uid: string, connectionId: string, fe
       if (body.error !== 'invalid_token') throw new ApiError(502,'revocation_pending');
     }
   }
-  await env.DB.prepare('DELETE FROM drive_connections WHERE id=? AND owner_uid=? AND revision=?')
-    .bind(row.id,uid,row.revision+1).run();
+  if(env.VIRTUAL_LIBRARY_ENABLED==='true'){
+    await env.DB.prepare('DELETE FROM drive_resource_keys WHERE owner_uid=? AND connection_id=?').bind(uid,row.id).run();
+    // Stable account identity lets explicit re-consent recover references without moving originals.
+    await env.DB.prepare("UPDATE drive_connections SET status='reconnect_required',encrypted_refresh_token=NULL,encrypted_access_token=NULL,access_token_expires_at=0,access_token_version=NULL WHERE id=? AND owner_uid=? AND revision=? AND status='revocation_pending'")
+      .bind(row.id,uid,row.revision+1).run();
+  }else await env.DB.prepare('DELETE FROM drive_connections WHERE id=? AND owner_uid=? AND revision=?')
+      .bind(row.id,uid,row.revision+1).run();
   return Response.json({status:'disconnected'});
 }
 

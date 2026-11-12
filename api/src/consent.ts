@@ -20,6 +20,19 @@ export async function persistDriveConsent(
   fetcher: typeof fetch = fetch,
   folders = false,
 ): Promise<void> {
+  if(env.VIRTUAL_LIBRARY_ENABLED==='true'){
+    let granted=tokens.scope;
+    if(!granted){
+      const proof=await fetcher('https://oauth2.googleapis.com/tokeninfo',{method:'POST',redirect:'manual',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({access_token:tokens.access_token}),signal:AbortSignal.timeout(10000)});
+      if(!proof.ok)throw new ApiError(503,'drive_verification_unavailable');
+      const info=await proof.json() as {aud?:string;scope?:string};
+      if(info.aud!==env.GOOGLE_CLIENT_ID)throw new ApiError(409,'drive_permission_missing');
+      granted=info.scope;
+    }
+    const scopes=new Set(granted?.trim().split(/\s+/));
+    const allowed=new Set([DRIVE_SCOPE,'openid','email','https://www.googleapis.com/auth/userinfo.email']);
+    if(!scopes.has(DRIVE_SCOPE)||[...scopes].some(x=>!allowed.has(x)))throw new ApiError(409,'drive_reconnect_minimum_required');
+  }
   if (typeof tokens.scope === 'string' && tokens.scope.trim() &&
       !tokens.scope.split(/\s+/).includes(DRIVE_SCOPE)) {
     throw new ApiError(409, 'drive_permission_missing');
@@ -61,6 +74,7 @@ export async function persistDriveConsent(
     scopes: string;
   }>();
   const previous = old?.status === 'connected' ? old.encrypted_refresh_token : null;
+  if(env.VIRTUAL_LIBRARY_ENABLED==='true'&&!tokens.refresh_token&&old?.scopes.split(/\s+/).some(x=>x!==DRIVE_SCOPE))throw new ApiError(409,'drive_reconnect_minimum_required');
   if (!tokens.refresh_token && (!previous || (folders && !old?.scopes?.split(' ').includes(DRIVE_READ_SCOPE)))) throw new ApiError(409, 'offline_access_unavailable');
 
   const encrypted = tokens.refresh_token
@@ -73,7 +87,7 @@ export async function persistDriveConsent(
     "WHERE drive_connections.status!='revocation_pending'"
   ).bind(
     crypto.randomUUID(), ownerUid, account.sub, account.email, encrypted,
-    folders ? DRIVE_SCOPE+' '+DRIVE_READ_SCOPE : (old?.scopes?.includes(DRIVE_READ_SCOPE) ? DRIVE_SCOPE+' '+DRIVE_READ_SCOPE : DRIVE_SCOPE), now, now,
+    env.VIRTUAL_LIBRARY_ENABLED==='true'?DRIVE_SCOPE:folders ? DRIVE_SCOPE+' '+DRIVE_READ_SCOPE : (old?.scopes?.includes(DRIVE_READ_SCOPE) ? DRIVE_SCOPE+' '+DRIVE_READ_SCOPE : DRIVE_SCOPE), now, now,
   ).run();
   if (result.meta.changes !== 1) throw new ApiError(409, 'connection_changed');
 }

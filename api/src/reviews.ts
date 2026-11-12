@@ -11,6 +11,12 @@ import {mintReviewMediaTicket,reviewMediaSubject,streamReviewMedia,REVIEW_MEDIA_
 import {assertDropboxFolderLinked,verifyDropboxFile} from './dropbox-uploads.ts';
 import {dropboxMedia} from './dropbox.ts';
 import {validStorageFileId,validStorageFolderId,type StorageProviderId} from './storage.ts';
+import {reviewManifestHash} from './review-manifest.ts';
+import {reviewLibrarySelection} from './review-library-selection.ts';
+import {prepareReviewDecision,assertReviewDecisionProof} from './review-decision-check.ts';
+import {readLibrarySource} from './library-assets.ts';
+import {readPublishedSource} from './review-source.ts';
+import {openReviewSession,loadReviewSession,sessionSubject,assertReviewSession,touchReviewSession,cleanupReviewSessions} from './review-sessions.ts';
 
 type Status = 'draft'|'publishing'|'pending'|'changes'|'approved'|'replacing'|'closing'|'closed';
 type Mode = 'link'|'google';
@@ -20,8 +26,8 @@ type Review = {
   current_version:number;expires_at:number;token_hash:string;encrypted_token:string;transition_id?:string|null;restrict_existing_public:number;drive_share_enabled:number;created_at:number;updated_at:number;
 };
 type Asset = {review_id:string;version:number;file_id:string;connection_id:string;linked_folder_id:string;provider:StorageProviderId;
-  name:string;mime_type:string;permission_id:string|null;grant_state:'unshared'|'granting'|'granted'|'revoking'|'revoked'};
-type Selection = {fileId:string;connectionId:string;linkedFolderId:string;provider:StorageProviderId};
+  name:string;mime_type:string;permission_id:string|null;grant_state:'unshared'|'granting'|'granted'|'revoking'|'revoked';library_node_id?:string|null;source_revision?:string|null;source_size?:string|null;source_checked_at?:number;source_checksum?:string|null};
+type Selection = {fileId:string;connectionId:string;linkedFolderId:string;provider:StorageProviderId;libraryNodeId?:string};
 const ID=/^[A-Za-z0-9_-]{10,200}$/;
 const CONN=/^[A-Za-z0-9-]{36}$/;
 type Participant={email:string;role:'reviewer'|'viewer'};
@@ -36,7 +42,7 @@ const inputText=(s:unknown,max:number,required=false)=>{
   return value;
 };
 const integer=(x:unknown)=>Number.isSafeInteger(x)&&Number(x)>0&&Number(x)<9007199254740991?Number(x):0;
-const reviewLink=(env:Env,token:string)=>env.FRONTEND_ORIGIN+'/review/'+encodeURIComponent(token);
+const reviewLink=(env:Env,token:string)=>env.FRONTEND_ORIGIN+(env.VIRTUAL_LIBRARY_ENABLED==='true'?'/review#invite=':'/review/')+encodeURIComponent(token);
 const tokenContext=(env:Env,row:Pick<Review,'owner_uid'|'id'>)=>context(env,row.owner_uid,row.id,'review-invite');
 const showReview=(r:Review)=>({
   id:r.id,clientId:r.client_id,projectId:r.project_id,clientName:r.client_name,projectName:r.project_name,
@@ -126,7 +132,15 @@ async function verifyFolder(env:Env,uid:string,token:string,projectId:number,s:S
     throw new ApiError(403,'review_folder_denied');
 }
 async function checkedFile(env:Env,uid:string,token:string,projectId:number,s:Selection):
-  Promise<{name:string;mimeType:string;appAuthorized:boolean;canShare:boolean;ancestors:string[];inheritsPublic:boolean}>{
+  Promise<{name:string;mimeType:string;appAuthorized:boolean;canShare:boolean;ancestors:string[];inheritsPublic:boolean;sourceRevision?:string;sourceSize?:string;sourceChecksum?:string}>{
+  if(env.VIRTUAL_LIBRARY_ENABLED==='true'){
+    if(!s.libraryNodeId)throw new ApiError(403,'review_library_reference_required');
+    const [asset]=await reviewLibrarySelection(env,uid,projectId,[s.libraryNodeId]);
+    if(asset.provider!==s.provider||asset.connection_id!==s.connectionId||asset.file_id!==s.fileId)throw new ApiError(403,'review_file_denied');
+    const meta=await readLibrarySource(env,uid,s);
+    if(!/^(image|video|audio)\//.test(meta.mimeType)&&meta.mimeType!=='application/pdf'||!meta.revision||!meta.size)throw new ApiError(415,'review_source_version_unsupported');
+    return {name:meta.name,mimeType:meta.mimeType,sourceRevision:meta.revision,sourceSize:meta.size,sourceChecksum:meta.checksum,appAuthorized:true,canShare:false,ancestors:[],inheritsPublic:false};
+  }
   if(!validStorageFileId(s.provider,s.fileId)||!validStorageFolderId(s.provider,s.linkedFolderId,true)||!CONN.test(s.connectionId))
     throw new ApiError(400,'review_invalid_input');
   await verifyFolder(env,uid,token,projectId,s);
@@ -164,12 +178,16 @@ async function checkedFile(env:Env,uid:string,token:string,projectId:number,s:Se
   }
   throw new ApiError(403,'review_file_denied');
 }
-function selected(value:unknown):Selection[]{
+function selected(value:unknown,virtual=false):Selection[]{
   if(!Array.isArray(value)||value.length<1||value.length>8)throw new ApiError(400,'review_invalid_input');
   const seen=new Set<string>();
   return value.map((x:unknown)=>{
     if(!x||typeof x!=='object'||Array.isArray(x))throw new ApiError(400,'review_invalid_input');
     const d=x as Partial<Selection>;
+    if(virtual){
+      if(typeof d.libraryNodeId!=='string'||!CONN.test(d.libraryNodeId)||seen.has(d.libraryNodeId))throw new ApiError(400,'review_invalid_input');
+      seen.add(d.libraryNodeId);return {fileId:'',connectionId:'',linkedFolderId:'',provider:'google_drive',libraryNodeId:d.libraryNodeId};
+    }
     const provider=d.provider??'google_drive';
     if(provider!=='google_drive'&&provider!=='dropbox')throw new ApiError(400,'review_invalid_input');
     if(typeof d.fileId!=='string'||typeof d.connectionId!=='string'||typeof d.linkedFolderId!=='string'||
@@ -182,43 +200,53 @@ function selected(value:unknown):Selection[]{
 }
 async function validatedAssets(env:Env,uid:string,token:string,projectId:number,list:Selection[],id:string,version:number){
   const result:Asset[]=[];
-  for(const item of list){
+  const virtual=env.VIRTUAL_LIBRARY_ENABLED==='true';
+  const sources=virtual?await reviewLibrarySelection(env,uid,projectId,list.map(x=>x.libraryNodeId||'')):[];
+  for(const [index,candidate] of list.entries()){
+    const source=sources[index];
+    const item=virtual?{...candidate,fileId:source.file_id,connectionId:source.connection_id,provider:source.provider}:candidate;
+    if(result.some(a=>a.file_id===item.fileId))throw new ApiError(400,'review_invalid_input');
     let meta:Awaited<ReturnType<typeof checkedFile>>;
-    try{meta=await checkedFile(env,uid,token,projectId,item);}
+    try{
+      if(virtual){
+        const m=await readLibrarySource(env,uid,item);
+        if(!/^(image|video|audio)\//.test(m.mimeType)&&m.mimeType!=='application/pdf'||!m.revision||!m.size)throw new ApiError(415,'review_source_version_unsupported');
+        meta={name:m.name,mimeType:m.mimeType,sourceRevision:m.revision,sourceSize:m.size,sourceChecksum:m.checksum,appAuthorized:true,canShare:false,ancestors:[],inheritsPublic:false};
+      }else meta=await checkedFile(env,uid,token,projectId,item);
+    }
     catch(error){
       if(error instanceof ApiError)error.asset={fileId:item.fileId};
       throw error;
     }
     result.push({review_id:id,version,file_id:item.fileId,connection_id:item.connectionId,
-      linked_folder_id:item.linkedFolderId,provider:item.provider,name:meta.name,mime_type:meta.mimeType,permission_id:null,grant_state:'unshared'});
+      linked_folder_id:item.linkedFolderId,provider:item.provider,name:meta.name,mime_type:meta.mimeType,permission_id:null,grant_state:'unshared',
+      library_node_id:item.libraryNodeId||null,source_revision:meta.sourceRevision||null,source_size:meta.sourceSize||null,source_checksum:meta.sourceChecksum||null});
   }
   return result;
 }
 function insertAssets(env:Env,entries:Asset[],transition?:string){
   return entries.map(a=>env.DB.prepare(
-    "INSERT INTO review_assets(review_id,version,file_id,connection_id,linked_folder_id,provider,name,mime_type,grant_state) SELECT ?,?,?,?,?,?,?,?,'unshared'"+
+    "INSERT INTO review_assets(review_id,version,file_id,connection_id,linked_folder_id,provider,name,mime_type,grant_state,library_node_id,source_revision,source_size,source_checksum) SELECT ?,?,?,?,?,?,?,?,'unshared',?,?,?,?"+
     (transition?" WHERE EXISTS(SELECT 1 FROM review_requests WHERE id=? AND status='replacing' AND transition_id=?)":""))
-    .bind(a.review_id,a.version,a.file_id,a.connection_id,a.linked_folder_id,a.provider,a.name,a.mime_type,
+    .bind(a.review_id,a.version,a.file_id,a.connection_id,a.linked_folder_id,a.provider,a.name,a.mime_type,a.library_node_id||null,a.source_revision||null,a.source_size||null,a.source_checksum||null,
       ...(transition?[a.review_id,transition]:[])));
 }
 async function tokenFor(env:Env,r:Review):Promise<string>{
   return decrypt(env,r.encrypted_token,tokenContext(env,r));
 }
 async function detail(env:Env,r:Review){
-  const [files,comments,decisions,votes,people,token]=await Promise.all([
-    assets(env,r.id),
-    env.DB.prepare('SELECT * FROM review_comments WHERE review_id=? ORDER BY created_at DESC LIMIT 300')
-      .bind(r.id).all(),
-    env.DB.prepare('SELECT * FROM review_decisions WHERE review_id=? ORDER BY created_at DESC LIMIT 50')
-      .bind(r.id).all(),
-    env.DB.prepare('SELECT version,email,decision,author_name,message,created_at FROM review_votes WHERE review_id=? ORDER BY created_at DESC LIMIT 500')
-      .bind(r.id).all(),
-    participants(env,r.id),tokenFor(env,r)
-  ]);
+  const [rows,token]=await Promise.all([env.DB.batch([
+    env.DB.prepare('SELECT * FROM review_assets WHERE review_id=? ORDER BY version,file_id').bind(r.id),
+    env.DB.prepare('SELECT * FROM review_comments WHERE review_id=? ORDER BY created_at DESC LIMIT 300').bind(r.id),
+    env.DB.prepare('SELECT * FROM review_decisions WHERE review_id=? ORDER BY created_at DESC LIMIT 50').bind(r.id),
+    env.DB.prepare('SELECT version,email,decision,author_name,message,created_at FROM review_votes WHERE review_id=? ORDER BY created_at DESC LIMIT 500').bind(r.id),
+    env.DB.prepare('SELECT email,role FROM review_participants WHERE review_id=? ORDER BY role,email').bind(r.id)
+  ]),tokenFor(env,r)]);
+  const files=rows[0].results as Asset[],comments=rows[1],decisions=rows[2],votes=rows[3],people=rows[4].results;
   return {review:{...showReview(r),url:reviewLink(env,token)},participants:people,votes:votes.results,
     assets:files.map(a=>({
       version:a.version,fileId:a.file_id,name:a.name,mimeType:a.mime_type,grantState:a.grant_state,
-      connectionId:a.connection_id,linkedFolderId:a.linked_folder_id,provider:a.provider
+      connectionId:a.connection_id,linkedFolderId:a.linked_folder_id,provider:a.provider,sourceRevision:a.source_revision
     })),comments:comments.results,decisions:decisions.results};
 }
 function pages(n:URLSearchParams):number{
@@ -255,11 +283,12 @@ async function createReview(request:Request,env:Env,uid:string):Promise<Response
   const mode:Mode=data.mode==='link'?'link':data.mode==='google'?'google':(()=>{throw new ApiError(400,'review_invalid_input');})();
   const email=inputText(data.recipientEmail||'',200).toLowerCase();
   const people=parseParticipants(data.participants,mode,email);
+  if(env.VIRTUAL_LIBRARY_ENABLED==='true'&&data.driveShareEnabled===true)throw new ApiError(400,'review_direct_share_disabled');
   const shareDirect=data.driveShareEnabled===true?1:0;
   const restrict=shareDirect&&data.restrictExistingPublic===true?1:0;
   const days=integer(data.expiresInDays);
   if(!days||days>30)throw new ApiError(400,'review_invalid_input');
-  const list=selected(data.assets);
+  const list=selected(data.assets,env.VIRTUAL_LIBRARY_ENABLED==='true');
   const bearer=request.headers.get('Authorization')!.slice(7);
   const metadata=await verifyProject(env,uid,bearer,projectId,clientId);
   const id=crypto.randomUUID(),secret=random(),ts=now();
@@ -290,8 +319,8 @@ async function ownerList(env:Env,uid:string,url:URL):Promise<Response>{
   // Fetch one extra entry to distinguish a full final page from a page with more results.
   // The summary is owner-scoped and intentionally independent of list search/filters.
   const [list,counts]=await Promise.all([
-    env.DB.prepare("SELECT * FROM review_requests WHERE owner_uid=? AND (LOWER(client_name) LIKE ? OR LOWER(project_name) LIKE ? OR LOWER(title) LIKE ?) AND (?='' OR status=?) ORDER BY updated_at DESC, id DESC LIMIT ? OFFSET ?")
-      .bind(uid,'%'+search+'%','%'+search+'%','%'+search+'%',condition,condition,REVIEW_PAGE_SIZE+1,pages(url.searchParams)*REVIEW_PAGE_SIZE).all<Review>(),
+    env.DB.prepare("SELECT * FROM review_requests WHERE owner_uid=? AND (instr(LOWER(client_name),?)>0 OR instr(LOWER(project_name),?)>0 OR instr(LOWER(title),?)>0) AND (?='' OR status=?) ORDER BY updated_at DESC, id DESC LIMIT ? OFFSET ?")
+      .bind(uid,search,search,search,condition,condition,REVIEW_PAGE_SIZE+1,pages(url.searchParams)*REVIEW_PAGE_SIZE).all<Review>(),
     env.DB.prepare("SELECT status, COUNT(*) AS total FROM review_requests WHERE owner_uid=? AND status IN ('pending','changes','approved') GROUP BY status")
       .bind(uid).all<{status:'pending'|'changes'|'approved';total:number}>()
   ]);
@@ -343,8 +372,16 @@ async function mutatePermission(env:Env,row:Connection,fileId:string,method:'POS
   return method==='DELETE'?{}:res.json() as Promise<Record<string,unknown>>;
 }
 async function grant(env:Env,r:Review,a:Asset,ownerToken:string):Promise<void>{
-  const sel={fileId:a.file_id,connectionId:a.connection_id,linkedFolderId:a.linked_folder_id,provider:a.provider};
+  const sel={fileId:a.file_id,connectionId:a.connection_id,linkedFolderId:a.linked_folder_id,provider:a.provider,libraryNodeId:a.library_node_id||undefined};
   const validation=await checkedFile(env,r.owner_uid,ownerToken,r.project_id,sel);
+  if(env.VIRTUAL_LIBRARY_ENABLED==='true'&&(validation.sourceRevision!==a.source_revision||validation.sourceSize!==a.source_size))throw new ApiError(409,'review_source_changed');
+  if(env.VIRTUAL_LIBRARY_ENABLED==='true'){
+    await readPublishedSource(new Request('https://internal.invalid/probe'),env,r.owner_uid,a,true);
+    const saved=await env.DB.prepare("UPDATE review_assets SET grant_state='granted',source_checked_at=? WHERE review_id=? AND version=? AND file_id=? AND EXISTS(SELECT 1 FROM review_requests r WHERE r.id=? AND r.status='publishing' AND r.current_version=? AND r.expires_at>?)")
+      .bind(now(),r.id,a.version,a.file_id,r.id,a.version,now()).run();
+    if(saved.meta.changes!==1)throw new ApiError(409,'review_busy');
+    return;
+  }
   return withAssetLease(env,r,a,async current=>grantLocked(env,r,current,validation));
 }
 /** Serialize bounded Google ACL calls, including reconciliation after a lost response.
@@ -683,16 +720,23 @@ async function publish(request:Request,env:Env,r:Review):Promise<Response>{
     .bind(now(),r.id,r.owner_uid).run();
   const files=await assets(env,r.id,r.current_version);
   if(!files.length)throw new ApiError(409,'review_invalid_state');
-  for(const file of files){
+  const virtual=env.VIRTUAL_LIBRARY_ENABLED==='true';
+  const unchecked=virtual?files.filter(a=>a.grant_state!=='granted'||(a.source_checked_at||0)<now()-60000).slice(0,2):files;
+  for(const file of unchecked){
     try{await grant(env,r,file,bearer);}
     catch(error){
       if(error instanceof ApiError)error.asset={fileId:file.file_id,fileName:file.name};
       throw error;
     }
   }
-  const published=await env.DB.prepare("UPDATE review_requests SET status='pending',updated_at=? WHERE id=? AND owner_uid=? AND status='publishing' AND current_version=? AND expires_at>? AND NOT EXISTS(SELECT 1 FROM review_assets WHERE review_id=? AND version=? AND grant_state!='granted')")
-    .bind(now(),r.id,r.owner_uid,r.current_version,now(),r.id,r.current_version).run();
-  if(published.meta.changes!==1)throw new ApiError(409,'review_busy');
+  const published=await env.DB.prepare("UPDATE review_requests SET status='pending',updated_at=? WHERE id=? AND owner_uid=? AND status='publishing' AND current_version=? AND expires_at>? AND NOT EXISTS(SELECT 1 FROM review_assets WHERE review_id=? AND version=? AND (grant_state!='granted'"+(virtual?" OR source_checked_at<?":"")+"))")
+    .bind(now(),r.id,r.owner_uid,r.current_version,now(),r.id,r.current_version,...(virtual?[now()-60000]:[])).run();
+  if(published.meta.changes!==1){
+    const current=await stored(env,r.id,r.owner_uid);
+    if(virtual&&current.status==='publishing'&&current.current_version===r.current_version)
+      return Response.json({pending:true,review:await detail(env,current)},{status:202});
+    throw new ApiError(409,'review_busy');
+  }
   return Response.json({review:await detail(env,await stored(env,r.id,r.owner_uid))});
 }
 async function revise(request:Request,env:Env,r:Review):Promise<Response>{
@@ -710,7 +754,7 @@ async function revise(request:Request,env:Env,r:Review):Promise<Response>{
   if(r.status!=='changes'&&r.status!=='replacing')throw new ApiError(409,'review_invalid_state');
   const version=r.current_version+1;
   if(r.status==='changes'){
-    const entries=await validatedAssets(env,r.owner_uid,bearer,r.project_id,selected(data?.assets),r.id,version);
+    const entries=await validatedAssets(env,r.owner_uid,bearer,r.project_id,selected(data?.assets,env.VIRTUAL_LIBRARY_ENABLED==='true'),r.id,version);
     if(r.drive_share_enabled&&entries.some(a=>a.provider==='dropbox'))
       throw new ApiError(409,'dropbox_direct_share_not_supported');
     const transition=crypto.randomUUID();
@@ -727,7 +771,7 @@ async function revise(request:Request,env:Env,r:Review):Promise<Response>{
   // preserve the old version, reuse the stored transition fence and validate
   // the newly selected files against the original client's project.
   if(!next.length&&r.status==='replacing'){
-    const entries=await validatedAssets(env,r.owner_uid,bearer,r.project_id,selected(data?.assets),r.id,version);
+    const entries=await validatedAssets(env,r.owner_uid,bearer,r.project_id,selected(data?.assets,env.VIRTUAL_LIBRARY_ENABLED==='true'),r.id,version);
     const current=await stored(env,r.id,r.owner_uid);
     if(current.status!=='replacing'||current.current_version!==r.current_version||!current.transition_id)
       throw new ApiError(409,'review_busy');
@@ -737,7 +781,10 @@ async function revise(request:Request,env:Env,r:Review):Promise<Response>{
   if(!next.length)throw new ApiError(409,'review_revision_recovery_required');
   // During 'replacing' the public link is blocked. Revoke only Roteiva-owned
   // ACLs; resume safely after transient Google failures or network retries.
-  for(const old of await assets(env,r.id,r.current_version))await revokeAsset(env,r,old);
+  const oldFiles=await assets(env,r.id,r.current_version);
+  if(env.VIRTUAL_LIBRARY_ENABLED==='true'&&r.drive_share_enabled===0&&oldFiles.every(a=>!a.permission_id)){
+    await env.DB.prepare("UPDATE review_assets SET grant_state='revoked' WHERE review_id=? AND version=?").bind(r.id,r.current_version).run();
+  }else for(const old of oldFiles)await revokeAsset(env,r,old);
   const changed=await env.DB.prepare("UPDATE review_requests SET current_version=?,status='draft',transition_id=NULL,updated_at=? WHERE id=? AND owner_uid=? AND current_version=? AND status='replacing' AND NOT EXISTS(SELECT 1 FROM review_assets WHERE review_id=? AND version=? AND grant_state NOT IN ('revoked','unshared'))")
     .bind(version,now(),r.id,r.owner_uid,r.current_version,r.id,r.current_version).run();
   if(changed.meta.changes!==1){
@@ -746,13 +793,18 @@ async function revise(request:Request,env:Env,r:Review):Promise<Response>{
       return publish(request,env,current);
     throw new ApiError(409,'review_busy');
   }
-  return publish(request,env,await stored(env,r.id,r.owner_uid));
+  const current=await stored(env,r.id,r.owner_uid);
+  if(env.VIRTUAL_LIBRARY_ENABLED==='true')return Response.json({pending:true,review:await detail(env,current)},{status:202});
+  return publish(request,env,current);
 }
 async function close(env:Env,r:Review):Promise<Response>{
   if(r.status==='closed')return Response.json({closed:true});
   await env.DB.prepare("UPDATE review_requests SET status='closing',updated_at=? WHERE id=? AND owner_uid=? AND status!='closed'")
     .bind(now(),r.id,r.owner_uid).run();
-  for(const file of await assets(env,r.id))await revokeAsset(env,r,file);
+  if(env.VIRTUAL_LIBRARY_ENABLED==='true'&&r.drive_share_enabled===0){
+    await env.DB.prepare("UPDATE review_assets SET grant_state='revoked' WHERE review_id=? AND permission_id IS NULL").bind(r.id).run();
+    for(const file of (await assets(env,r.id)).filter(a=>a.permission_id))await revokeAsset(env,r,file);
+  }else for(const file of await assets(env,r.id))await revokeAsset(env,r,file);
   await env.DB.prepare("UPDATE review_requests SET status='closed',updated_at=? WHERE id=? AND owner_uid=? AND status='closing'")
     .bind(now(),r.id,r.owner_uid).run();
   return Response.json({closed:true});
@@ -766,24 +818,28 @@ async function rotate(env:Env,r:Review):Promise<Response>{
   if(rotated.meta.changes!==1)throw new ApiError(409,'review_busy');
   return Response.json({url:reviewLink(env,secret)});
 }
-async function publicReview(request:Request,env:Env,action:'view'|'comment'|'decide'|'media'):Promise<Response>{
+async function publicReview(request:Request,env:Env,action:'view'|'comment'|'decide'|'decision-check'|'media'|'session'):Promise<Response>{
   const token=request.headers.get('X-Review-Token')||'';
-  if(!/^[A-Za-z0-9_-]{43}$/.test(token))throw new ApiError(404,'review_not_found');
-  const r=await env.DB.prepare('SELECT * FROM review_requests WHERE token_hash=?').bind(await hash(token)).first<Review>();
+  const session=env.VIRTUAL_LIBRARY_ENABLED==='true'&&action!=='session'?await loadReviewSession(env,request.headers.get('X-Review-Session')||''):null;
+  if(!session&&!/^[A-Za-z0-9_-]{43}$/.test(token))throw new ApiError(404,'review_not_found');
+  const r=session?await env.DB.prepare('SELECT * FROM review_requests WHERE id=?').bind(session.review_id).first<Review>():await env.DB.prepare('SELECT * FROM review_requests WHERE token_hash=?').bind(await hash(token)).first<Review>();
   if(!r||r.status==='closed'||r.status==='closing')throw new ApiError(404,'review_not_found');
   if(r.expires_at<=now())throw new ApiError(410,'review_expired');
   if(!['pending','changes','approved'].includes(r.status))throw new ApiError(409,'review_not_ready');
-  let email='',role:'reviewer'|'viewer'='reviewer';
+  let email='',subject:string|null=null,role:'reviewer'|'viewer'='reviewer';
   if(r.access_mode==='google'){
     const principal=await verifiedTrialPrincipal(request,env);
+    subject=await sessionSubject(principal.uid,principal.googleSubject);
     email=principal.verifiedEmail.toLowerCase();
     const participant=await env.DB.prepare('SELECT role FROM review_participants WHERE review_id=? AND email=?')
       .bind(r.id,email).first<{role:'reviewer'|'viewer'}>();
     if(!participant)throw new ApiError(403,'review_recipient_denied');
     role=participant.role;
-    if((action==='comment'||action==='decide')&&role!=='reviewer')
+    if((action==='comment'||action==='decide'||action==='decision-check')&&role!=='reviewer')
       throw new ApiError(403,'review_viewer_read_only');
   }
+  if(session){assertReviewSession(session,r,subject);await touchReviewSession(env,session,r);}
+  if(action==='session')return openReviewSession(env,r,subject);
   const files=await assets(env,r.id,r.current_version);
   if(files.some(a=>a.grant_state!=='granted'))throw new ApiError(409,'review_not_ready');
   if(action==='view'){
@@ -804,14 +860,14 @@ async function publicReview(request:Request,env:Env,action:'view'|'comment'|'dec
     // Bundle short-lived signed URLs with the first response, avoiding a second
     // Worker/D1 round trip every time the user selects another file.
     const mediaTickets:Record<string,{url:string;expiresAt:number}>={};
-    const subject=r.access_mode==='google'?await reviewMediaSubject(env,r.id,email):undefined;
+    const mediaSubject=r.access_mode==='google'?await reviewMediaSubject(env,r.id,email):undefined;
     const expiresAt=Math.min(r.expires_at,now()+REVIEW_MEDIA_MAX_AGE);
     for(const file of files){
       if(!(/^(image|video|audio)\//.test(file.mime_type)||file.mime_type==='application/pdf'))continue;
-      const ticket=await mintReviewMediaTicket(env,r.id,file.file_id,r.current_version,r.expires_at,r.token_hash,subject);
+      const ticket=await mintReviewMediaTicket(env,r.id,file.file_id,r.current_version,r.expires_at,r.token_hash,mediaSubject,session?.id_hash);
       mediaTickets[file.file_id]={url:apiOrigin(env)+'/reviews/media?ticket='+ticket,expiresAt};
     }
-    return Response.json({mediaTickets,review:{title:r.title,message:r.message,studioName:r.studio_name,
+    return Response.json({manifestHash:env.VIRTUAL_LIBRARY_ENABLED==='true'?await reviewManifestHash(files):undefined,mediaTickets,sessionExpiresAt:session?.expires_at,review:{title:r.title,message:r.message,studioName:r.studio_name,
       status:r.status,version:r.current_version,expiresAt:r.expires_at,mode:r.access_mode,
       driveShareEnabled:r.drive_share_enabled===1,
       role:r.access_mode==='google'?role:'reviewer',myVote:myVote?.decision||null,
@@ -829,14 +885,19 @@ async function publicReview(request:Request,env:Env,action:'view'|'comment'|'dec
     if(!(/^(video|image|audio)\//.test(chosen.mime_type)||chosen.mime_type==='application/pdf'))
       throw new ApiError(415,'review_media_unsupported');
     const subject=r.access_mode==='google'?await reviewMediaSubject(env,r.id,email):undefined;
-    const ticket=await mintReviewMediaTicket(env,r.id,fileId,r.current_version,r.expires_at,r.token_hash,subject);
-    return Response.json({url:apiOrigin(env)+'/reviews/media?ticket='+ticket,
+    const ticket=await mintReviewMediaTicket(env,r.id,fileId,r.current_version,r.expires_at,r.token_hash,subject,session?.id_hash);
+    return Response.json({url:apiOrigin(env)+'/reviews/media?ticket='+ticket,sessionExpiresAt:session?.expires_at,
       expiresAt:Math.min(r.expires_at,now()+REVIEW_MEDIA_MAX_AGE)});
   }
   if(r.status!=='pending')throw new ApiError(409,'review_already_decided');
   const data=await uploadBody(request) as Record<string,unknown>|null;
   if(!data||typeof data!=='object'||Array.isArray(data))throw new ApiError(400,'review_invalid_input');
   if(integer(data.version)!==r.current_version)throw new ApiError(409,'review_version_changed');
+  if(session&&data.manifestHash!==await reviewManifestHash(files))throw new ApiError(409,'review_manifest_changed');
+  if(action==='decision-check'){
+    if(!session)throw new ApiError(401,'review_session_required');
+    return Response.json(await prepareReviewDecision(env,r,session,files,data.proof));
+  }
   const author=email||inputText(data.authorName,100,true);
   const authorName=email?inputText(data.authorName||email,100,true):author;
   if(action==='comment'){
@@ -848,20 +909,32 @@ async function publicReview(request:Request,env:Env,action:'view'|'comment'|'dec
     if(sec!==null&&(!Number.isSafeInteger(sec)||sec<0||sec>172800||
        !chosen.mime_type.startsWith('video/')))
       throw new ApiError(400,'review_invalid_input');
-    const saved=await env.DB.prepare("INSERT INTO review_comments(id,review_id,version,file_id,author_name,author_email,body,seconds,created_at) SELECT ?,?,?,?,?,?,?,?,? FROM review_requests WHERE id=? AND status='pending' AND current_version=? AND token_hash=? AND expires_at>?")
-      .bind(crypto.randomUUID(),r.id,r.current_version,fileId,authorName,email||null,body,sec,now(),
-        r.id,r.current_version,r.token_hash,now()).run();
-    if(saved.meta.changes!==1)throw new ApiError(409,'review_already_decided');
+    const key=session?inputText(data.idempotencyKey,36,true):'';
+    if(session&&!UUID.test(key))throw new ApiError(400,'review_invalid_input');
+    const commentId=session?await hash(r.id+':'+r.current_version+':'+session.id_hash+':'+key):crypto.randomUUID();
+    const commentFence=session?" AND EXISTS(SELECT 1 FROM review_sessions s WHERE s.id_hash=? AND s.review_id=review_requests.id AND s.version=review_requests.current_version AND s.invite_hash=review_requests.token_hash AND s.expires_at>unixepoch()*1000) AND NOT EXISTS(SELECT 1 FROM account_deletions d WHERE d.owner_uid=review_requests.owner_uid)":"";
+    const roleFence=r.access_mode==='google'?" AND EXISTS(SELECT 1 FROM review_participants p WHERE p.review_id=review_requests.id AND p.email=? AND p.role='reviewer')":"";
+    const saved=await env.DB.prepare("INSERT OR IGNORE INTO review_comments(id,review_id,version,file_id,author_name,author_email,body,seconds,created_at) SELECT ?,?,?,?,?,?,?,?,? FROM review_requests WHERE id=? AND status='pending' AND current_version=? AND token_hash=? AND expires_at>?"+commentFence+roleFence)
+      .bind(commentId,r.id,r.current_version,fileId,authorName,email||null,body,sec,now(),
+        r.id,r.current_version,r.token_hash,now(),...(session?[session.id_hash]:[]),...(r.access_mode==='google'?[email]:[])).run();
+    if(saved.meta.changes!==1){
+      const prior=session?await env.DB.prepare('SELECT file_id,author_name,body,seconds FROM review_comments WHERE id=? AND review_id=? AND version=?').bind(commentId,r.id,r.current_version).first<{file_id:string;author_name:string;body:string;seconds:number|null}>():null;
+      if(!prior||prior.file_id!==fileId||prior.author_name!==authorName||prior.body!==body||prior.seconds!==sec)throw new ApiError(409,'review_already_decided');
+    }
     return Response.json({saved:true});
   }
   const decision=data.decision;
   if(decision!=='approved'&&decision!=='changes')throw new ApiError(400,'review_invalid_input');
+  const proofExpiry=session?await assertReviewDecisionProof(env,r,session,files,data.proof):null;
+  // The final write rechecks the same live session and receipt expiry atomically.
+  const proofFence=session?" AND ? > unixepoch()*1000 AND EXISTS(SELECT 1 FROM review_sessions s WHERE s.id_hash=? AND s.review_id=? AND s.version=? AND s.invite_hash=? AND s.expires_at>?) AND NOT EXISTS(SELECT 1 FROM account_deletions d WHERE d.owner_uid=review_requests.owner_uid)":"";
+  const proofArgs=session?[proofExpiry,session.id_hash,r.id,r.current_version,r.token_hash,now()]:[];
   const message=inputText(data.message||'',1500,decision==='changes');
   const ts=now();
   if(r.access_mode==='google'){
     const eventId=crypto.randomUUID();
-    const vote=await env.DB.prepare("INSERT OR IGNORE INTO review_votes(review_id,version,email,decision,author_name,message,created_at) SELECT ?,?,?,?,?,?,? FROM review_requests WHERE id=? AND status='pending' AND current_version=? AND token_hash=? AND expires_at>?")
-      .bind(r.id,r.current_version,email,decision,authorName,message,ts,r.id,r.current_version,r.token_hash,ts).run();
+    const vote=await env.DB.prepare("INSERT OR IGNORE INTO review_votes(review_id,version,email,decision,author_name,message,created_at) SELECT ?,?,?,?,?,?,? FROM review_requests WHERE id=? AND status='pending' AND current_version=? AND token_hash=? AND expires_at>? AND EXISTS(SELECT 1 FROM review_participants p WHERE p.review_id=review_requests.id AND p.email=? AND p.role='reviewer')"+proofFence)
+      .bind(r.id,r.current_version,email,decision,authorName,message,ts,r.id,r.current_version,r.token_hash,ts,email,...proofArgs).run();
     if(vote.meta.changes!==1)throw new ApiError(409,'review_already_decided');
     // One request for changes ends the round immediately. Otherwise every
     // registered reviewer must explicitly approve before the owner sees Approved.
@@ -883,8 +956,8 @@ async function publicReview(request:Request,env:Env,action:'view'|'comment'|'dec
   // Conditional insert + transition within one D1 batch avoid phantom decisions on replay.
   const eventId=crypto.randomUUID();
   const saved=await env.DB.batch([
-    env.DB.prepare("INSERT OR IGNORE INTO review_decisions(id,review_id,version,decision,author_name,author_email,message,created_at) SELECT ?,?,?,?,?,?,?,? FROM review_requests WHERE id=? AND status='pending' AND current_version=? AND token_hash=? AND expires_at>?")
-      .bind(eventId,r.id,r.current_version,decision,authorName,email||null,message,ts,r.id,r.current_version,r.token_hash,ts),
+    env.DB.prepare("INSERT OR IGNORE INTO review_decisions(id,review_id,version,decision,author_name,author_email,message,created_at) SELECT ?,?,?,?,?,?,?,? FROM review_requests WHERE id=? AND status='pending' AND current_version=? AND token_hash=? AND expires_at>?"+proofFence)
+      .bind(eventId,r.id,r.current_version,decision,authorName,email||null,message,ts,r.id,r.current_version,r.token_hash,ts,...proofArgs),
     env.DB.prepare("UPDATE review_requests SET status=?,updated_at=? WHERE id=? AND status='pending' AND current_version=? AND token_hash=? AND expires_at>? AND EXISTS(SELECT 1 FROM review_decisions WHERE id=?)")
       .bind(decision,ts,r.id,r.current_version,r.token_hash,ts,eventId)
   ]);
@@ -945,10 +1018,10 @@ async function ownerImage(env:Env,r:Review,url:URL):Promise<Response>{
 export async function reviewRouter(request:Request,env:Env,url:URL):Promise<Response>{
   const path=url.pathname;
   if(path==='/reviews/media')return streamReviewMedia(request,env,url);
-  if(path==='/reviews/public' || path==='/reviews/public/comment' || path==='/reviews/public/decide'||path==='/reviews/public/media-ticket'){
+  if(path==='/reviews/public' || path==='/reviews/public/comment' || path==='/reviews/public/decide'||path==='/reviews/public/decision-check'&&env.VIRTUAL_LIBRARY_ENABLED==='true'||path==='/reviews/public/media-ticket'||path==='/reviews/public/session'&&env.VIRTUAL_LIBRARY_ENABLED==='true'){
     if(!['GET','POST'].includes(request.method))throw new ApiError(405,'method_not_allowed');
     if((path==='/reviews/public')!==(request.method==='GET'))throw new ApiError(405,'method_not_allowed');
-    return publicReview(request,env,path.endsWith('/comment')?'comment':path.endsWith('/decide')?'decide':path.endsWith('/media-ticket')?'media':'view');
+    return publicReview(request,env,path.endsWith('/session')?'session':path.endsWith('/comment')?'comment':path.endsWith('/decide')?'decide':path.endsWith('/decision-check')?'decision-check':path.endsWith('/media-ticket')?'media':'view');
   }
   const uid=await activeOwner(request,env);
   if(path==='/reviews'&&request.method==='GET')return ownerList(env,uid,url);
@@ -957,6 +1030,13 @@ export async function reviewRouter(request:Request,env:Env,url:URL):Promise<Resp
   if(parts.length!==4&&parts.length!==3)throw new ApiError(404,'not_found');
   const r=await stored(env,parts[2],uid);
   if(parts.length===3&&request.method==='GET')return Response.json(await detail(env,r));
+  if(parts.length===4&&parts[3]==='content'&&['GET','HEAD'].includes(request.method)&&env.VIRTUAL_LIBRARY_ENABLED==='true'){
+    if(!['pending','changes','approved'].includes(r.status)||r.expires_at<=now())throw new ApiError(404,'review_not_found');
+    const fileId=url.searchParams.get('fileId');
+    const asset=(await assets(env,r.id,r.current_version)).find(a=>a.file_id===fileId&&a.grant_state==='granted');
+    if(!asset)throw new ApiError(404,'review_not_found');
+    return readPublishedSource(request,env,uid,asset);
+  }
   if(parts.length===4&&parts[3]==='image'&&request.method==='GET')return ownerImage(env,r,url);
   if(parts.length===4&&parts[3]==='document'&&request.method==='GET')return ownerImage(env,r,url);
   if(parts.length!==4||request.method!=='POST')throw new ApiError(405,'method_not_allowed');
@@ -992,6 +1072,7 @@ export async function assertNoConnectionReviews(env:Env,uid:string,connectionId:
 }
 /** Expired capability links cease to work immediately; revoke Drive ACLs in bounded cron jobs. */
 export async function cleanupExpiredReviews(env:Env):Promise<void>{
+  await cleanupReviewSessions(env);
   const r=await env.DB.prepare("SELECT * FROM review_requests WHERE (expires_at<=? OR status='closing') AND status!='closed' AND updated_at<? ORDER BY updated_at LIMIT 1")
     .bind(now(),now()-60000).first<Review>();
   if(r)await close(env,r);

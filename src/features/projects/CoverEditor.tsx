@@ -14,11 +14,13 @@ import {CoverFrame} from './CoverFrame';
 import {useAuth} from '../auth/AuthProvider';
 import {isStorageFolder} from '../drive/DriveLibraryUI';
 import {Folder,ChevronRight} from 'lucide-react';
+import {preparePicker,pickLibraryFiles,type PickerConfig} from '../drive/google-picker';
 function CoverLoading({children}:{children:string}){return <div className="pc-loading-fill" role="status"><LoaderCircle size={25} className="pc-spin" aria-hidden="true"/><span>{children}</span></div>;}
 
 type Page={files:DriveItem[];nextPageToken:string|null;incompleteSearch?:boolean};
 export function CoverEditor({project,client,onClose,onSave}:{project?:Project;client?:Client;onClose:()=>void;onSave:(cover:ProjectCover|undefined)=>void}){
  const subject=client||project!;
+ const virtual=import.meta.env.VITE_VIRTUAL_LIBRARY==='true';
  const context=useDriveCovers()!;const call=useDriveApi();const getDriveThumbnail=useDriveThumbnailFetch();
  const {user}=useAuth();
  const choices=context.connections;
@@ -45,7 +47,17 @@ export function CoverEditor({project,client,onClose,onSave}:{project?:Project;cl
  },[context.loadingConnections,stored?.connectionId,stored?.provider,storedConnectionAvailable]);
  const currentAccount=choices.find(c=>c.id===account);
  const provider=currentAccount?.provider||'google_drive';
- const canRead=provider==='dropbox'||currentAccount?.scopes.split(' ').includes('https://www.googleapis.com/auth/drive.readonly');
+ const canRead=provider==='dropbox'||currentAccount?.scopes.split(' ').includes(virtual?'https://www.googleapis.com/auth/drive.file':'https://www.googleapis.com/auth/drive.readonly');
+ const [picker,setPicker]=useState<{account:string;config:PickerConfig}|null>(null);
+ const pickerOperation=useRef<AbortController|null>(null);
+ useEffect(()=>{
+  setPicker(null);pickerOperation.current?.abort();if(!virtual||provider!=='google_drive'||!account)return;
+  const controller=new AbortController();
+  void Promise.all([preparePicker(),call<PickerConfig>('/integrations/drive/'+account+'/picker/config','GET',undefined,controller.signal)])
+   .then(([,config])=>{if(!controller.signal.aborted)setPicker({account,config});})
+   .catch(e=>{if(!controller.signal.aborted)setError(e instanceof Error?e.message:'Não foi possível preparar o seletor.');});
+  return()=>{controller.abort();pickerOperation.current?.abort();};
+ },[virtual,provider,account,call]);
  const thumbnail=useCallback(async(file:DriveItem,signal?:AbortSignal)=>{
    if(provider==='google_drive')return getDriveThumbnail(file,signal,account);
    if(!user)return null;
@@ -59,7 +71,7 @@ export function CoverEditor({project,client,onClose,onSave}:{project?:Project;cl
  useEffect(()=>{const el=dialog.current!;el.showModal();const old=document.body.style.overflow;document.body.style.overflow='hidden';return ()=>{document.body.style.overflow=old;el.close();};},[]);
  useEffect(()=>{if(search.trim()===term)return;const timer=setTimeout(()=>{setPage({files:[],nextPageToken:null});setMoreToken('');setTerm(search.trim());},300);return ()=>clearTimeout(timer);},[search,term]);
  useEffect(()=>{
-  if(!choosing||!account||!canRead)return;
+  if(!choosing||!account||!canRead||virtual&&provider==='google_drive'){setBusy(false);return;}
   const controller=new AbortController();setBusy(true);setError('');
   const request=async():Promise<Page>=>{
    if(provider==='dropbox'){
@@ -119,6 +131,23 @@ export function CoverEditor({project,client,onClose,onSave}:{project?:Project;cl
    if(file.size!==undefined && (!Number.isFinite(Number(file.size))||Number(file.size)>8*1024*1024))return;
    setCover({provider,connectionId:account,fileId:file.id,name:file.name,x:50,y:50,zoom:1,...(file.modifiedTime?{modifiedTime:file.modifiedTime}:{})});setChoosing(false);
  };
+ const chooseGoogle=()=>{
+  if(!picker||picker.account!==account||busy)return;
+  const controller=new AbortController();pickerOperation.current=controller;setBusy(true);setError('');
+  // Google's Picker mounts outside this native dialog; release top-layer inertness while it is open.
+  dialog.current?.close();
+  const keys=new Map<string,string>();
+  void pickLibraryFiles(picker.config,accessToken=>call('/integrations/drive/'+account+'/picker/verify','POST',{accessToken},controller.signal),controller.signal,
+   {mimeTypes:'image/jpeg,image/png,image/webp,image/avif',maxItems:1,title:'Escolha uma imagem para o Roteiva',onDocuments:docs=>{for(const doc of docs)if(doc.resourceKey)keys.set(doc.id,doc.resourceKey);}})
+   .then(async ids=>{
+    if(!ids.length||controller.signal.aborted)return;
+    const reply=await call<{file:DriveItem}>('/integrations/drive/'+account+'/picker/file','POST',{fileId:ids[0],resourceKey:keys.get(ids[0])},controller.signal);
+    if(controller.signal.aborted)return;
+    if(!['image/jpeg','image/png','image/webp','image/avif'].includes(reply.file.mimeType)||Number(reply.file.size)>8*1024*1024)throw new Error('Escolha uma imagem JPG, PNG, WebP ou AVIF de até 8 MB.');
+    chooseFile(reply.file);
+   }).catch(e=>{if(!controller.signal.aborted)setError(e instanceof Error?e.message:'Não foi possível selecionar a imagem.');})
+   .finally(()=>{if(!controller.signal.aborted){setBusy(false);const modal=dialog.current;if(modal?.isConnected&&!modal.open)modal.showModal();}});
+ };
  return <dialog ref={dialog} className="pc-dialog" aria-labelledby="pc-editor-title" onCancel={e=>{e.preventDefault();onClose();}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
   <header><div><span className="eyebrow">{client?'FOTO DO CLIENTE':'CAPA DO PROJETO'}</span><h2 id="pc-editor-title">{choosing?'Escolha uma imagem':'Encontre o melhor enquadramento'}</h2><p>{subject.name}</p></div><AppButton className="icon-button" type="button" onClick={onClose} aria-label="Fechar editor de capa"><X size={20}/></AppButton></header>
   <div className={"pc-editor-body "+(choosing?"pc-editor-body--picker":"pc-editor-body--crop")}>
@@ -126,11 +155,11 @@ export function CoverEditor({project,client,onClose,onSave}:{project?:Project;cl
     {context.loadingConnections&&<p className="pc-connection-status" role="status">Verificando Google Drive e Dropbox conectados…</p>}
     {context.error&&<div className="pc-connection-status pc-connection-status--warning" role="alert"><span>{context.error}</span><AppButton type="button" className="secondary-button" disabled={context.loadingConnections} onClick={context.retryConnections}>Atualizar conexões</AppButton></div>}
     {!context.loadingConnections&&!choices.length&&!context.error&&<p className="pc-connection-status" role="status">Nenhuma conta com acesso ativo. Conecte o Google Drive ou Dropbox na <a href="/biblioteca">Biblioteca</a>.</p>}
-    <div className="pc-picker-tools"><label>Armazenamento<AppSelect aria-label="Conta de armazenamento" value={account} onValueChange={value=>{setAccount(value);setFolderTrail([]);setPage({files:[],nextPageToken:null});setMoreToken('');}}>{choices.map(c=><option key={c.id} value={c.id}>{c.provider==='dropbox'?'Dropbox · ':'Drive · '}{c.google_email}</option>)}</AppSelect></label><label className="pc-search-label" htmlFor="pc-image-query"><span>Buscar imagens {provider==='dropbox'?'no Dropbox':'no Drive'}</span><AppInput id="pc-image-query" leading={<Search size={18}/>} value={search} onChange={e=>setSearch(e.target.value)} placeholder="Nome da imagem" maxLength={100}/></label></div>
-    <p className="pc-helper pc-picker-guidance">Escolha uma pasta ou uma imagem. JPG, PNG, WebP{provider==='google_drive'?' ou AVIF':''}, até 8 MB. Seus arquivos permanecem privados.</p>
+    <div className="pc-picker-tools"><label>Armazenamento<AppSelect aria-label="Conta de armazenamento" value={account} onValueChange={value=>{setAccount(value);setFolderTrail([]);setPage({files:[],nextPageToken:null});setMoreToken('');}}>{choices.map(c=><option key={c.id} value={c.id}>{c.provider==='dropbox'?'Dropbox · ':'Drive · '}{c.google_email}</option>)}</AppSelect></label>{!(virtual&&provider==='google_drive')&&<label className="pc-search-label" htmlFor="pc-image-query"><span>Buscar imagens {provider==='dropbox'?'no Dropbox':'no Drive'}</span><AppInput id="pc-image-query" leading={<Search size={18}/>} value={search} onChange={e=>setSearch(e.target.value)} placeholder="Nome da imagem" maxLength={100}/></label>}</div>
+    <p className="pc-helper pc-picker-guidance">{virtual&&provider==='google_drive'?'Selecione uma imagem pelo Google Picker.':'Escolha uma pasta ou uma imagem.'} JPG, PNG, WebP{provider==='google_drive'?' ou AVIF':''}, até 8 MB. Seus arquivos permanecem privados.</p>
     {folderTrail.length>0&&<nav className="pc-folder-trail" aria-label="Pasta de imagens"><AppButton type="button" onClick={()=>{setFolderTrail([]);setPage({files:[],nextPageToken:null});setMoreToken('');}}>Meu {provider==='dropbox'?'Dropbox':'Drive'}</AppButton>{folderTrail.map((folder,i)=><span key={folder.id}><ChevronRight size={14}/><AppButton type="button" onClick={()=>{setFolderTrail(current=>current.slice(0,i+1));setPage({files:[],nextPageToken:null});setMoreToken('');}}>{folder.name}</AppButton></span>)}</nav>}
     {!currentAccount?null:!canRead?<p role="status">Esta conexão do Google Drive não possui permissão de leitura de imagens. Reconecte a conta na <a href="/biblioteca">Biblioteca</a> e autorize o acesso de leitura.</p>:<>
-     <div className="pc-picker-results" aria-busy={busy}>
+     {virtual&&provider==='google_drive'?<div className="pc-picker-results">{error&&<p role="alert">{error}</p>}<AppButton type="button" disabled={busy||!picker||picker.account!==account} onClick={chooseGoogle}>Selecionar imagem no Google Drive</AppButton><p>Somente a imagem selecionada será autorizada. Você pode pesquisar e navegar no seletor do Google.</p></div>:<div className="pc-picker-results" aria-busy={busy}>
      {error&&<p role="alert">{error} <AppButton type="button" className="secondary-button" onClick={()=>{setRetry(n=>n+1);}}>Tentar novamente</AppButton></p>}
      {busy&&!page.files.length?<CoverLoading>Carregando imagens…</CoverLoading>:<>
      <div className="pc-image-grid">{page.files.filter(file=>isStorageFolder(file.mimeType)||(['image/jpeg','image/png','image/webp',...(provider==='google_drive'?['image/avif']:[])].includes(file.mimeType)&&(file.size===undefined&&provider==='google_drive'||Number(file.size)>0&&Number(file.size)<=8*1024*1024))).map(file=><AppButton type="button" key={file.id} onClick={()=>chooseFile(file)} title={file.name}>{isStorageFolder(file.mimeType)?<span className="pc-folder-icon"><Folder size={30}/></span>:<DriveThumbnail item={file} scope={context.uid+':'+account} provider={provider} getThumbnail={thumbnail}/>}<span>{file.name}</span></AppButton>)}</div>
@@ -138,7 +167,7 @@ export function CoverEditor({project,client,onClose,onSave}:{project?:Project;cl
      </>}
      {page.incompleteSearch&&<p role="status">O Drive retornou resultados parciais. Refine a busca pelo nome.</p>}
      {page.nextPageToken&&<div className="pc-image-more"><AppButton className="secondary-button" type="button" disabled={busy} onClick={()=>setMoreToken(page.nextPageToken!)}>{busy?<LoaderCircle size={18} className="pc-spin" aria-hidden="true"/>:<ChevronDown size={18} aria-hidden="true"/>}{busy?"Carregando itens…":"Carregar mais itens"}</AppButton></div>}
-     </div>
+     </div>}
     </>}
    </>:cover?<>
     <AppButton type="button" className="pc-text-button" onClick={()=>setChoosing(true)}><ArrowLeft size={16}/>Escolher outra imagem</AppButton>

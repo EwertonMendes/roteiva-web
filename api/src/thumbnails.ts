@@ -1,9 +1,10 @@
 import {streamBoundedThumbnail} from './thumbnail-stream.ts';
 import {ApiError,type Env} from './types.ts';
 import {connection} from './repository.ts';
-import {DRIVE_READ_SCOPE,accessCredential} from './google.ts';
+import {DRIVE_SCOPE,DRIVE_READ_SCOPE,accessCredential} from './google.ts';
 import {driveJson} from './drive-client.ts';
 import {encrypt,decrypt,base64url,decode} from './crypto.ts';
+import {pickedDriveResource} from './drive-picked-source.ts';
 
 const FILE_ID=/^[A-Za-z0-9_-]{10,200}$/;
 const IMAGE_TYPES=new Set(['image/jpeg','image/png','image/webp','image/gif','image/avif']);
@@ -59,17 +60,18 @@ export async function thumbnail(env:Env,uid:string,connectionId:string,fileId:st
   const started=Date.now();
   const row=await connection(env,uid,connectionId);
   if(row.status!=='connected')throw new ApiError(409,'reconnect_required');
-  if(!row.scopes.split(' ').includes(DRIVE_READ_SCOPE))throw new ApiError(409,'drive_read_permission_missing');
+  if(!row.scopes.split(' ').includes(env.VIRTUAL_LIBRARY_ENABLED==='true'?DRIVE_SCOPE:DRIVE_READ_SCOPE))throw new ApiError(409,'drive_read_permission_missing');
 
   let url:URL;
-  if(ticket){
+  if(ticket&&env.VIRTUAL_LIBRARY_ENABLED!=='true'){
     url=await resolveTicket(env,uid,connectionId,row.revision,fileId,ticket);
   }else{
     // Backward-compatible slow fallback when a list has no ticket or a ticket has expired.
     const target=new URL('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(fileId));
-    target.searchParams.set('fields','id,mimeType,thumbnailLink,trashed');
+    target.searchParams.set('fields','id,mimeType,thumbnailLink,trashed'+(env.VIRTUAL_LIBRARY_ENABLED==='true'?',isAppAuthorized,capabilities(canDownload)':''));
     target.searchParams.set('supportsAllDrives','true');
-    const info=await driveJson(env,row,target,fetcher,'file_unavailable');
+    const info=env.VIRTUAL_LIBRARY_ENABLED==='true'?await pickedDriveResource(env,uid,connectionId,fileId,undefined,fetcher):await driveJson(env,row,target,fetcher,'file_unavailable');
+    if(env.VIRTUAL_LIBRARY_ENABLED==='true'&&(info.isAppAuthorized!==true||(info.capabilities as {canDownload?:boolean}|undefined)?.canDownload===false))throw new ApiError(403,'library_picker_required');
     if(info.trashed===true||info.mimeType==='application/vnd.google-apps.folder')throw new ApiError(404,'thumbnail_unavailable');
     const found=allowedThumbnailUrl(info.thumbnailLink);
     if(!found)throw new ApiError(404,'thumbnail_unavailable');

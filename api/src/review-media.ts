@@ -4,8 +4,11 @@ import {accessCredential} from './google.ts';
 import {dropboxMedia} from './dropbox.ts';
 import type {StorageProviderId} from './storage.ts';
 import {base64url,decode} from './crypto.ts';
+import {verifiedTrialPrincipal} from './auth.ts';
+import {readPublishedSource} from './review-source.ts';
+import {loadReviewSession,assertReviewSession,sessionSubject} from './review-sessions.ts';
 
-type Ticket={r:string;f:string;v:number;e:number;k:string;h:string;s?:string};
+type Ticket={r:string;f:string;v:number;e:number;k:string;h:string;s?:string;j?:string};
 const idPattern=/^[0-9a-f-]{36}$/i;
 const filePattern=/^(?:[A-Za-z0-9_-]{10,200}|id:[A-Za-z0-9_-]{8,200})$/;
 const encoder=new TextEncoder();
@@ -29,8 +32,8 @@ async function key(env:Env,version:string):Promise<CryptoKey>{
   if(raw.length!==32)throw new ApiError(503,'invalid_key');
   return crypto.subtle.importKey('raw',raw,{name:'HMAC',hash:'SHA-256'},false,['sign','verify']);
 }
-export async function mintReviewMediaTicket(env:Env,reviewId:string,fileId:string,version:number,expiry:number,inviteHash:string,subject?:string):Promise<string>{
-  const p:Ticket={r:reviewId,f:fileId,v:version,e:Math.min(expiry,Date.now()+REVIEW_MEDIA_MAX_AGE),k:env.TOKEN_KEY_VERSION,h:inviteHash,...(subject?{s:subject}:{})};
+export async function mintReviewMediaTicket(env:Env,reviewId:string,fileId:string,version:number,expiry:number,inviteHash:string,subject?:string,sessionHash?:string):Promise<string>{
+  const p:Ticket={r:reviewId,f:fileId,v:version,e:Math.min(expiry,Date.now()+REVIEW_MEDIA_MAX_AGE),k:env.TOKEN_KEY_VERSION,h:inviteHash,...(subject?{s:subject}:{}),...(sessionHash?{j:sessionHash}:{})};
   const payload=base64url(encoder.encode(JSON.stringify(p)));
   const mac=await crypto.subtle.sign('HMAC',await key(env,p.k),encoder.encode('roteiva/review-media/v1/'+payload));
   return payload+'.'+base64url(new Uint8Array(mac));
@@ -43,7 +46,7 @@ export async function verifyReviewMediaTicket(env:Env,token:string):Promise<Tick
   if(!p||typeof p!=='object'||!idPattern.test(p.r)||!filePattern.test(p.f)||
      !Number.isSafeInteger(p.v)||p.v<1||typeof p.h!=='string'||!/^[A-Za-z0-9_-]{43}$/.test(p.h)||typeof p.e!=='number'||!Number.isFinite(p.e)||
      p.e<=Date.now()||p.e>Date.now()+REVIEW_MEDIA_MAX_AGE+5000||typeof p.k!=='string'||
-     !/^[A-Za-z0-9_-]{1,50}$/.test(p.k)||(p.s!==undefined&&!/^[A-Za-z0-9_-]{43}$/.test(p.s)))throw new ApiError(404,'review_not_found');
+     !/^[A-Za-z0-9_-]{1,50}$/.test(p.k)||(p.s!==undefined&&!/^[A-Za-z0-9_-]{43}$/.test(p.s))||(p.j!==undefined&&!/^[A-Za-z0-9_-]{43}$/.test(p.j)))throw new ApiError(404,'review_not_found');
   let verified=false;
   try{verified=await crypto.subtle.verify('HMAC',await key(env,p.k),decode(mac),
     encoder.encode('roteiva/review-media/v1/'+part));}
@@ -67,8 +70,14 @@ export async function streamReviewMedia(request:Request,env:Env,url:URL):Promise
     .bind(p.r).first<{id:string;owner_uid:string;status:string;current_version:number;expires_at:number;token_hash:string;access_mode:string}>();
   if(!r||r.expires_at<=Date.now()||r.current_version!==p.v||r.token_hash!==p.h||
      !['pending','changes','approved'].includes(r.status))throw new ApiError(404,'review_not_found');
+  let viewerSubject:string|null=null;
   if(r.access_mode==='google'){
     if(!p.s)throw new ApiError(404,'review_not_found');
+    if(env.VIRTUAL_LIBRARY_ENABLED==='true'){
+      const principal=await verifiedTrialPrincipal(request,env);
+      viewerSubject=await sessionSubject(principal.uid,principal.googleSubject);
+      if(await reviewMediaSubject(env,r.id,principal.verifiedEmail,p.k)!==p.s)throw new ApiError(404,'review_not_found');
+    }
     const permitted=await env.DB.prepare("SELECT email FROM review_participants WHERE review_id=?")
       .bind(r.id).all<{email:string}>();
     // Rechecking membership for every range revokes outstanding playback tickets
@@ -79,9 +88,15 @@ export async function streamReviewMedia(request:Request,env:Env,url:URL):Promise
     }
     if(!allowed)throw new ApiError(404,'review_not_found');
   }else if(p.s)throw new ApiError(404,'review_not_found');
-  const asset=await env.DB.prepare("SELECT file_id,connection_id,mime_type,provider FROM review_assets WHERE review_id=? AND version=? AND file_id=? AND grant_state='granted'")
-    .bind(p.r,p.v,p.f).first<{file_id:string;connection_id:string;mime_type:string;provider:StorageProviderId}>();
+  if(env.VIRTUAL_LIBRARY_ENABLED==='true'){
+    const session=await loadReviewSession(env,request.headers.get('X-Review-Session')||'');
+    if(p.j!==session.id_hash)throw new ApiError(404,'review_not_found');
+    assertReviewSession(session,r,viewerSubject);
+  }
+  const asset=await env.DB.prepare("SELECT file_id,connection_id,mime_type,provider,source_revision,source_size FROM review_assets WHERE review_id=? AND version=? AND file_id=? AND grant_state='granted'")
+    .bind(p.r,p.v,p.f).first<{file_id:string;connection_id:string;mime_type:string;provider:StorageProviderId;source_revision:string|null;source_size:string|null}>();
   if(!asset||!(/^(video|image|audio)\//.test(asset.mime_type)||asset.mime_type==='application/pdf'))throw new ApiError(404,'review_not_found');
+  if(env.VIRTUAL_LIBRARY_ENABLED==='true')return readPublishedSource(request,env,r.owner_uid,asset);
   const range=request.headers.get('Range');
   // Single bounded chunks avoid turning a paused preview into a full large-file
   // download through Workers. HTML5 players request more ranges as needed.

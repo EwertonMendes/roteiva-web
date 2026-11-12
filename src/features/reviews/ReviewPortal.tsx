@@ -6,6 +6,7 @@ import {useCallback,useEffect,useRef,useState} from "react";
 import {Check,CheckCircle2,Clock3,ExternalLink,FileAudio,FileImage,FileText,FileVideo,
   LoaderCircle,MessageSquare,Moon,Pause,Play,Send,ShieldCheck,Sun,Video,X} from "lucide-react";
 import {useAuth} from "../auth/AuthProvider";
+import {authenticatedReviewMedia} from '../drive/authenticated-media';
 import {useOverlayFocus} from "../drive/DriveLibraryUI";
 import {ReviewImageViewer} from "./ReviewImageViewer";
 import {ReviewPdfViewer} from "./ReviewPdfViewer";
@@ -14,6 +15,7 @@ import {ReviewMediaSessionCache,type MediaTicket} from "./review-media-cache";
 import {captureReviewPlayback,formatReviewTime,maskReviewTime,parseReviewTime,validReviewSecond} from "./review-timecode";
 import "../reviews/reviews.css";
 import "./review-portal-v2.css";
+import {readPortalSession,rememberPortalSession,forgetPortalSession,type PortalSession} from './review-session';
 
 type Review={title:string;message:string;studioName:string;clientName:string;projectName:string;status:string;
   version:number;expiresAt:number;mode:"link"|"google";driveShareEnabled?:boolean;
@@ -21,15 +23,26 @@ type Review={title:string;message:string;studioName:string;clientName:string;pro
 type Asset={fileId:string;name:string;mimeType:string};
 type Comment={id:string;file_id:string;author_name:string;body:string;seconds:number|null;created_at:number};
 type Decision={version:number;decision:string;author_name:string;message:string;created_at:number};
-type PublicData={review:Review;assets:Asset[];comments:Comment[];decisions:Decision[];mediaTickets?:Record<string,MediaTicket>};
+type PublicData={manifestHash?:string;review:Review;assets:Asset[];comments:Comment[];decisions:Decision[];mediaTickets?:Record<string,MediaTicket>};
 type Mode="light"|"dark";
 const API=API_BASE_URL;
 const messages:Record<string,string>={
+  review_session_required:'Abra o link original enviado pelo profissional para iniciar a revisão.',
+  review_session_expired:'Sua sessão de revisão terminou ou o convite mudou. Abra novamente o link original enviado pelo profissional.',
+  review_session_limit:'Há muitas sessões abertas para esta revisão. Aguarde alguns minutos e tente novamente.',
+  source_unavailable:'Um dos materiais foi removido ou perdeu acesso no provedor. Solicite ao profissional a recuperação antes de decidir.',
+  source_trashed:'Um dos materiais está na lixeira do provedor. O profissional precisa restaurá-lo antes da decisão.',
+  source_restricted:'O provedor restringiu o acesso a um dos materiais. Solicite a correção ao profissional.',
+  review_source_revision_unavailable:'A versão enviada deixou de estar disponível. Solicite uma nova versão ao profissional.',
+  provider_temporary_failure:'O provedor não respondeu à confirmação dos materiais. Aguarde e tente novamente.',
+  provider_rate_limited:'O provedor limitou as leituras temporariamente. Aguarde e tente novamente.',
   review_not_found:"Este link não existe mais ou foi revogado.",
   review_expired:"O prazo de acesso a este material terminou. Solicite um novo link ao profissional.",
   review_not_ready:"Este material ainda não está disponível para revisão.",
   review_recipient_denied:"Sua conta Google não está na lista de participantes desta revisão.",
   review_viewer_read_only:"Sua conta tem permissão de leitura, sem autorização para comentar ou decidir.",
+  review_manifest_changed:"O material desta revisão mudou. Atualize a página antes de responder.",
+  review_decision_check_required:"A verificação dos arquivos expirou. Confirme a decisão novamente.",
   review_already_decided:"A decisão desta versão já foi registrada.",
   review_invalid_input:"Revise os dados preenchidos e tente novamente.",
   review_version_changed:"Uma nova versão está disponível. Atualize a página e revise o material antes de responder.",
@@ -53,6 +66,18 @@ function initialTheme():Mode{
 export function ReviewPortal({token}:{token:string}){
   useReviewBrowserGuards();
   const {user,loading:authLoading,busy:authBusy,login,error:authError}=useAuth();
+  const virtual=import.meta.env.VITE_VIRTUAL_LIBRARY==='true';
+  const portalSession=useRef<PortalSession|null>(token?null:readPortalSession());
+  const openingSession=useRef<Promise<PortalSession>|null>(null);
+  const sessionOwner=useRef<string|null>(null);
+  const sessionEpoch=useRef(0),reloadSequence=useRef(0);
+  useEffect(()=>{
+    const next=user?.uid||'';
+    if(sessionOwner.current!==null&&sessionOwner.current!==next){
+      portalSession.current=null;openingSession.current=null;forgetPortalSession();sessionEpoch.current++;
+    }
+    sessionOwner.current=next;
+  },[user?.uid]);
   const [theme,setTheme]=useState<Mode>(initialTheme);
   const [data,setData]=useState<PublicData|null>(null),[loading,setLoading]=useState(true);
   const [error,setError]=useState(""),[needsGoogle,setNeedsGoogle]=useState(false);
@@ -71,26 +96,57 @@ export function ReviewPortal({token}:{token:string}){
   const playbackResume=useRef({at:0,playing:false});
   const dialogRef=useOverlayFocus(()=>{if(!busy)setDecision(null);},!!decision);
   const request=useCallback(async<T,>(path:string,method:"GET"|"POST"="GET",payload?:unknown):Promise<T>=>{
+    const epoch=sessionEpoch.current;
+    const unchanged=()=>{if(epoch!==sessionEpoch.current||sessionOwner.current!==(user?.uid||''))throw Object.assign(new Error('A conta mudou. Atualize a revisão.'),{code:'invalid_identity',status:401});};
+    unchanged();
     const auth=user?await user.getIdToken():null;
+    unchanged();
+    let session='';
+    if(virtual){
+      if(!portalSession.current||portalSession.current.expiresAt<=Date.now()+20000){
+        if(!token)throw Object.assign(new Error(messages.review_session_expired),{code:'review_session_expired',status:410});
+        if(!openingSession.current){const pending=(async()=>{
+          const response=await fetch(API+'/reviews/public/session',{method:'POST',cache:'no-store',credentials:'omit',referrerPolicy:'no-referrer',headers:{'X-Review-Token':token,...(auth?{Authorization:'Bearer '+auth}:{})}});
+          if(!response.ok){const body=await response.json().catch(()=>({})) as {error?:{code?:string}};const code=body.error?.code||'review_unavailable';throw Object.assign(new Error(messages[code]||'Não foi possível iniciar a revisão.'),{code,status:response.status});}
+          const result=await response.json() as PortalSession;
+          unchanged();
+          if(!/^[A-Za-z0-9_-]{43}$/.test(result.session)||!Number.isFinite(result.expiresAt))throw new Error('A sessão recebida é inválida.');
+          portalSession.current=result;rememberPortalSession(result);
+          if(window.location.pathname.startsWith('/review/')||window.location.hash)window.history.replaceState(window.history.state,'','/review');
+          return result;
+        })();const tracked=pending.finally(()=>{if(openingSession.current===tracked)openingSession.current=null;});openingSession.current=tracked;}
+        await openingSession.current;
+        unchanged();
+      }
+      session=portalSession.current!.session;
+    }
     const response=await fetch(API+path,{
       method,cache:"no-store",referrerPolicy:"no-referrer",
-      headers:{"X-Review-Token":token,...(auth?{"Authorization":"Bearer "+auth}:{}),
+      headers:{...(virtual?{'X-Review-Session':session}:{"X-Review-Token":token}),...(auth?{"Authorization":"Bearer "+auth}:{}),
         ...(payload?{"Content-Type":"application/json"}:{})},
       ...(payload?{body:JSON.stringify(payload)}:{})
     }).catch(()=>{throw new Error("Sem conexão com o serviço. Verifique sua internet e tente novamente.");});
+    unchanged();
     if(!response.ok){
       const json=await response.json().catch(()=>({})) as {error?:{code?:string}};
       const code=json.error?.code||"review_unavailable";
+      if(code==='review_session_expired'||code==='review_session_required'){portalSession.current=null;forgetPortalSession();}
       throw Object.assign(new Error(messages[code]||"Não foi possível carregar este material. Tente novamente."),
         {code,status:response.status});
     }
-    return response.json() as Promise<T>;
-  },[user,token]);
+    const result=await response.json() as T&{sessionExpiresAt?:number};
+    if(virtual&&portalSession.current?.session===session&&typeof result.sessionExpiresAt==='number'&&result.sessionExpiresAt>portalSession.current.expiresAt){
+      portalSession.current={...portalSession.current,expiresAt:result.sessionExpiresAt};rememberPortalSession(portalSession.current);
+    }
+    return result;
+  },[user,token,virtual]);
   const reload=useCallback(async(preserve=false)=>{
+    const sequence=++reloadSequence.current;
     if(!preserve){setLoading(true);setData(null);}
     setError("");setNeedsGoogle(false);
     try{
       const value=await request<PublicData>("/reviews/public");
+      if(sequence!==reloadSequence.current)return;
       const changed=loadedVersion.current!==value.review.version;
       if(changed)mediaCache.clear();
       for(const [fileId,ticket] of Object.entries(value.mediaTickets||{})){
@@ -100,13 +156,14 @@ export function ReviewPortal({token}:{token:string}){
       if(changed){setMinutes("");setBody("");}
       loadedVersion.current=value.review.version;
     }catch(e){
+      if(sequence!==reloadSequence.current)return;
       setData(null);
       const status=(e as {status?:number}).status;
-      if(status===401||((e as {code?:string}).code==="review_recipient_denied")){
+      if(status===401&&!((e as {code?:string}).code||'').startsWith('review_session_')||((e as {code?:string}).code==="review_recipient_denied")){
         setNeedsGoogle(true);
         setError(e instanceof Error&&status!==401?e.message:"Entre com a conta Google autorizada para visualizar.");
       }else setError(e instanceof Error?e.message:"Não foi possível carregar.");
-    }finally{setLoading(false);}
+    }finally{if(sequence===reloadSequence.current)setLoading(false);}
   },[request,mediaCache]);
   useEffect(()=>{if(!authLoading)void reload();},[authLoading,reload]);
   useEffect(()=>()=>mediaCache.clear(),[mediaCache,token,user?.uid]);
@@ -130,6 +187,7 @@ export function ReviewPortal({token}:{token:string}){
   useEffect(()=>{
     let alive=true;
     let renewal:ReturnType<typeof setTimeout>|undefined;
+    const releaseMedia:(()=>void)[]=[];
     const issue=async(refresh=false)=>{
       if(!activeFileId||!activeVersion)return;
       if(refresh&&videoRef.current){
@@ -140,8 +198,14 @@ export function ReviewPortal({token}:{token:string}){
           {fileId:activeFileId,version:activeVersion}));
         if(!ticket.url.startsWith(API+"/reviews/media?ticket="))
           throw new Error("Endereço de mídia inválido.");
+        let sourceURL=ticket.url;
+        if(import.meta.env.VITE_VIRTUAL_LIBRARY==='true'){
+          const binding=await authenticatedReviewMedia(ticket.url,()=>user?user.getIdToken():Promise.resolve(''),()=>portalSession.current?.session||'');
+          if(!alive){binding.close();return;}
+          releaseMedia.push(binding.close);sourceURL=binding.url;
+        }
         const url=activeMime?.startsWith("image/")?
-          await mediaCache.image(cacheKey,ticket.url,activeMime):ticket.url;
+          await mediaCache.image(cacheKey,sourceURL,activeMime):sourceURL;
         if(!alive)return;
         setMediaUrl(url);setMediaMode("ready");setPreviewError("");
         if(isVideo){
@@ -165,7 +229,7 @@ export function ReviewPortal({token}:{token:string}){
         else{setMediaMode("loading");setMediaUrl("");void issue();}
       }
     }
-    return()=>{alive=false;if(renewal)clearTimeout(renewal);};
+    return()=>{alive=false;if(renewal)clearTimeout(renewal);for(const close of releaseMedia)close();};
   },[activeFileId,activeVersion,activeMime,isVideo,request,previewRetry,mediaCache,cacheKey]);
   const playableVideo=isVideo&&previewMode==="ready";
   const seconds=isVideo?parseReviewTime(minutes):null;
@@ -187,6 +251,7 @@ export function ReviewPortal({token}:{token:string}){
       videoRef.current.scrollIntoView({behavior:"smooth",block:"center"});
     }else setNotice("Não é possível avançar no vídeo neste momento. Verifique a prévia e tente novamente.");
   };
+  const pendingComment=useRef<{body:string;key:string}|null>(null);
   const action=async(kind:"comment"|"decide",status?:"approved"|"changes")=>{
     if(!name.trim()){setNotice("Informe seu nome antes de continuar.");return;}
     if(kind==="comment"&&!body.trim()){setNotice("Escreva sua observação.");return;}
@@ -194,11 +259,21 @@ export function ReviewPortal({token}:{token:string}){
     if(kind==="decide"&&status==="changes"&&!decisionText.trim()){setNotice("Explique quais ajustes são necessários.");return;}
     setBusy(true);setNotice("");
     try{
+      let proof:string|undefined;
+      if(virtual&&kind==="decide"){
+        for(let step=0;step<4;step++){
+          const check=await request<{ready:boolean;proof:string}>("/reviews/public/decision-check","POST",{version:data?.review.version,manifestHash:data?.manifestHash,proof});
+          proof=check.proof;if(check.ready)break;
+          if(step===3)throw new Error("Não foi possível concluir a verificação dos arquivos. Tente novamente.");
+        }
+      }
+      const commentBody=JSON.stringify([data?.review.version,active?.fileId,name.trim(),body.trim(),isVideo?seconds:null]);
+      if(kind==="comment"&&pendingComment.current?.body!==commentBody)pendingComment.current={body:commentBody,key:crypto.randomUUID()};
       await request(kind==="comment"?"/reviews/public/comment":"/reviews/public/decide","POST",
-        kind==="comment"?{version:data?.review.version,authorName:name.trim(),fileId:active?.fileId,
+        kind==="comment"?{version:data?.review.version,manifestHash:data?.manifestHash,idempotencyKey:pendingComment.current?.key,authorName:name.trim(),fileId:active?.fileId,
           body:body.trim(),seconds:isVideo?seconds:null}:
-          {version:data?.review.version,authorName:name.trim(),decision:status,message:decisionText.trim()});
-      if(kind==="comment"){setBody("");setMinutes("");setNotice("Comentário registrado com sucesso.");}
+          {version:data?.review.version,manifestHash:data?.manifestHash,authorName:name.trim(),decision:status,message:decisionText.trim(),proof});
+      if(kind==="comment"){pendingComment.current=null;setBody("");setMinutes("");setNotice("Comentário registrado com sucesso.");}
       else{setDecision(null);setDecisionText("");setNotice(status==="approved"?"Material aprovado com sucesso.":"Solicitação de ajustes registrada.");}
       await reload(true);
     }catch(e){setNotice(e instanceof Error?e.message:"Não foi possível registrar sua resposta.");}

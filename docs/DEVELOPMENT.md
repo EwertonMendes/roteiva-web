@@ -1,5 +1,17 @@
 # Desenvolvimento e deploy — Roteiva
 
+### QA da prévia nova
+
+`node --experimental-strip-types --test tests/authenticated-media-worker.test.mjs` valida mapeamento por aba/origem, Range, revogação e passagem da identidade. Após `pnpm build:emulator`, `pnpm exec playwright test tests/browser/authenticated-media.spec.ts` testa o worker real em Chromium desktop/mobile com upstream sintético. Isso não comprova OAuth, codecs ou APIs reais. Os cenários de transporte/portal agora usam servidor HTTP local real em 127.0.0.1:8787: WebKit não encaminha fetch do Service Worker para context.route(). O servidor existe somente durante cada teste; nenhum backend real é utilizado. O worker não intercepta rotas comuns da aplicação, não grava cache e não concede acesso apenas por URL copiada.
+
+## Biblioteca virtual — desenvolvimento local
+
+**Flags de desenvolvimento:** `VIRTUAL_LIBRARY_ENABLED=true` no Worker e `VITE_VIRTUAL_LIBRARY=true` no build frontend. Ativação DEV configurada na branch; PROD permanece desativado até homologação DEV. Fixtures de API aplicam 0021–0030; `library*.test.mjs`, `review-source.test.mjs` e `review-sessions.test.mjs` cobrem árvore, estrutura atômica, autorização, importação, upload, exclusão e mídia/sessão. Em 12/11/2026 foram aplicadas 0021–0030 no D1 DEV, após exportação privada e restauração local conferida (selo dev, 20 migrations anteriores, duas conexões). Inventário não encontrou ACL nativa gerida ou job de exclusão pendente. Nenhuma migration desta branch foi aplicada em PROD. Migrations com ALTER e fences exigem manutenção revisada e backup; não enfraquecer o guard automático de banco populado.
+
+Para homologar a interface nova sem alterar builds legados: definir `VITE_VIRTUAL_LIBRARY=true` apenas no processo, executar `pnpm exec vite build --mode emulator --outDir dist-virtual`, depois definir `VIRTUAL_LIBRARY_E2E=1` e executar `pnpm exec firebase emulators:exec --project demo-roteiva --only auth,firestore "pnpm exec playwright test --config playwright.virtual.config.ts"`. O workflow SaaS E2E também executa essa suíte nova nas PRs/master. Para a aproximação local Safari/WebKit, definir ainda `VIRTUAL_WEBKIT_E2E=1`; isso não substitui iPhone físico. O config usa `dist-virtual` e preserva `dist-emulator`; os testes novos ficam explicitamente desativados no build legado. Fixtures são fictícias, com provedores sintéticos; a PoC real é uma evidência separada. `pnpm test` inclui também parsing de estruturas, falha parcial de importação e transporte de sessão no worker.
+
+Branch `codex/virtual-library`. Executar em `api/`: `node --experimental-strip-types --test tests/library-tree.test.mjs tests/library-source.test.mjs`, `npm run typecheck` e `npm test`. As migrations da branch são aditivas; DEV já recebeu 0021–0030 em manutenção revisada. Não publicar como substituta do runtime antes de integrar consumidores, validar provedores reais e concluir os gates DEV.
+
 ## Configuração do domínio próprio — 11/11/2026
 
 **PUBLICADO E HOMOLOGADO NO DOMÍNIO:** compra concluída pelo proprietário. Frontend/Auth canônico roteiva.com no site Firebase PROD existente; www com redirectTarget roteiva.com; API api.roteiva.com como Custom Domain do Worker PROD existente. DNS do Hosting usa os registros exigidos pela API, sem proxy Cloudflare; domínio do Worker é gerenciado pelo serviço Workers. TXT Google confirma propriedade; não remover TXT de propriedade/ACME por parecer temporário sem conferir as exigências atuais do provedor. Certificados ainda precisam de conferência externa real, sem bypass de TLS.

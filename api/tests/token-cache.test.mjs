@@ -165,6 +165,16 @@ test('actual disconnect path atomically clears cache and removes only its owner 
   });
   assert.equal(revoked,1);assert.equal(saved(),undefined);
 });
+test('virtual disconnect retains the account identifier without credentials; new consent recovers the same reference',async t=>{
+ const {disconnect}=await import('../src/drive.ts'),{persistDriveConsent}=await import('../src/consent.ts');
+ const {env,row,saved}=await setup(t);env.VIRTUAL_LIBRARY_ENABLED='true';
+ await disconnect(env,'A',row.id,async()=>new Response(null,{status:200}));
+ assert.equal(saved().id,row.id);assert.equal(saved().status,'reconnect_required');
+ assert.equal(saved().encrypted_refresh_token,null);assert.equal(saved().encrypted_access_token,null);
+ await persistDriveConsent(env,'A',{access_token:'new-access',refresh_token:'new-refresh',token_type:'Bearer',expires_in:3600,scope:'https://www.googleapis.com/auth/drive.file'},
+  {sub:row.google_account_id,email:'a@example.com'},async()=>Response.json({user:{emailAddress:'a@example.com'}}));
+ assert.equal(saved().id,row.id);assert.equal(saved().status,'connected');assert.ok(saved().encrypted_refresh_token);
+});
 
 test('actual consent upsert invalidates cache and revision before future reads',async(t)=>{
   const {persistDriveConsent}=await import('../src/consent.ts');
