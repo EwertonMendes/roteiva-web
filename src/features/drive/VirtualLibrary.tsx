@@ -148,7 +148,8 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
   forgetLibraryOAuthReturn();setParent(intent.parentId);
  },[oauthReturned,user?.uid,selectedProjectId,onSelectProject]);
  useEffect(()=>{const cached=getLibraryFolder<Node>(pageScope);setPage(cached?{...cached.data,scope:pageScope}:null);void load(undefined,false);return()=>{++loadRevision.current;++generation.current;};},[pageScope]);
- useEffect(()=>()=>clearLibraryFolders(user?.uid),[user?.uid]);
+ const lastCacheUser=useRef(user?.uid);
+ useEffect(()=>{if(lastCacheUser.current&&lastCacheUser.current!==user?.uid)clearLibraryFolders(lastCacheUser.current);lastCacheUser.current=user?.uid;},[user?.uid]);
  useEffect(()=>()=>mutation.current?.abort(),[]);
  async function performImport(items:LibraryImport[],target:string,controller:AbortController,scope:number){
   const failed=await importLibraryBatch(call,base.replace('/nodes','/imports'),target,items,controller.signal,(done,total)=>setProgress('Adicionando '+done+' de '+total+' arquivos…'));
@@ -246,7 +247,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
   {storage.error&&<div role="alert" className="vl-compact-alert"><AlertCircle size={17}/><span>Falha ao verificar {storage.error}.</span><AppButton onClick={()=>void storage.refresh(true)}>Tentar novamente</AppButton></div>}
   {returnNotice&&<div role="status" className="vl-compact-alert"><AlertCircle size={17}/><span>{returnNotice}</span><AppButton onClick={()=>setReturnNotice('')}>Dispensar</AppButton></div>}
   {error&&<div role="alert" className="vl-compact-alert"><AlertCircle size={17}/><span>{error}</span><AppButton onClick={()=>setError('')} aria-label="Dispensar erro"><X size={16}/></AppButton></div>}
-  {failedImports&&<div role="alert" className="vl-compact-alert"><AlertCircle size={17}/><span>{failedImports.items.length} item(ns) não foram adicionados. Os demais foram preservados.</span><AppButton disabled={busy} onClick={()=>void retryImports()}>Tentar pendentes</AppButton><AppButton onClick={()=>setFailedImports(null)}>Dispensar</AppButton></div>}
+  {failedImports&&<div role="alert" className="vl-compact-alert"><AlertCircle size={17}/><span>{failedImports.items.length} item(ns) não foram adicionados: {failedImports.items.slice(0,2).map(x=>x.name).join(', ')}{failedImports.items.length>2?' e outros.':'.'} Os demais foram preservados.</span><AppButton disabled={busy} onClick={()=>void retryImports()}>Tentar somente os arquivos pendentes</AppButton><AppButton onClick={()=>setFailedImports(null)}>Dispensar</AppButton></div>}
   {!base?<div className="vl-explorer-empty"><FolderOpen size={40}/><h3>Selecione um projeto</h3><p>Pesquise um projeto acima para acessar e organizar seus arquivos.</p></div>:<>
    <div className="vl-explorer-toolbar">
     <nav aria-label="Caminho da pasta" className="vl-explorer-breadcrumb">
