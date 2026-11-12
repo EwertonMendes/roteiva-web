@@ -1,5 +1,9 @@
 # Desenvolvimento e deploy — Roteiva
 
+### QA visual da Biblioteca virtual — 12/11/2026
+
+A interface passou a usar `virtual-library.css` com tokens existentes, `AppButton`, `AppInput`, `AppSelect`, `IconLabel`, marcas de Drive/Dropbox e ícones Lucide. `tests/browser/virtual-library.spec.ts` também verifica estado sem projeto, ações semânticas, ausência de conexão redundante e ausência de scroll horizontal. Executar a mesma suíte virtual documentada abaixo com Chromium desktop/mobile; conferir manualmente Chrome Android real, modo claro/escuro, menus, modais e scroll em DEV após o deploy. E2E sintético não substitui homologação visual real.
+
 ## Continuação de homologação — OAuth e modais da Biblioteca (12/11/2026)
 
 Branch remota `codex/library-oauth-modal-fixes`, baseada no SHA da PR #121. A mudança não requer migration, D1 ou secret novo. Teste unitário: `node --experimental-strip-types --test tests/library-oauth-return.test.mjs` (incluído em `pnpm test`). E2E: `tests/browser/virtual-library.spec.ts` com a configuração virtual já descrita abaixo; cobre retorno OAuth em navegação completa, validação de pasta removida e fila de transferências sob prévia. Antes da promoção, conferir CI e repetir no navegador real com Google Drive/Dropbox; mocks não comprovam consentimento dos provedores. Não publicar em PROD sem homologar DEV.
