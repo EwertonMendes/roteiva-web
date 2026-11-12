@@ -7,7 +7,7 @@ import {prepareLibraryUploadTarget} from './library-upload-target.ts';
 import {createLibraryStructure} from './library-structure.ts';
 import {inspectLibrarySelection} from './library-inspect.ts';
 import {authorizeLibraryProject,libraryFor,nodeId,listLibrary,listLibraryExplorer,mutateLibrary,type LibraryNode} from './library-core.ts';
-export {authorizeLibraryProject,libraryFor,libraryNode,listLibrary,mutateLibrary} from './library-core.ts';
+export {authorizeLibraryProject,libraryFor,libraryNode,listLibrary,listLibraryExplorer,mutateLibrary} from './library-core.ts';
 
 export async function libraryRouter(request:Request,env:Env,uid:string,url:URL,fetcher:typeof fetch=fetch){
  const inspect=/^\/library\/projects\/([1-9][0-9]{0,14})\/inspect$/.exec(url.pathname);
