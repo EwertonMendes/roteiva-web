@@ -1,5 +1,11 @@
 # Identidade visual e experiência — Roteiva
 
+## Biblioteca virtual — coerência visual e acessibilidade (12/11/2026)
+
+**Implementado em branch / homologação DEV pendente:** a nova Biblioteca usa os componentes compartilhados `AppButton`, `AppInput`, `AppSelect`, `IconLabel`, os SVGs de marca existentes e Lucide. O painel se divide em cabeçalho, armazenamento conectado, estado inicial de seleção de projeto, explorador de arquivos e cartões Drive/Dropbox para importar e enviar. Com projeto não selecionado, controles de pasta não aparecem desabilitados; um vazio instrutivo aponta para o seletor global. Com provedor já conectado, o botão redundante de conexão não aparece, mantendo o gerenciamento no bloco de contas.
+
+Ações de arquivos usam ícones com `aria-label` e `title`, nome e origem textual, com áreas de toque de 44px nas telas estreitas. Desktop e mobile não exibem comandos como texto solto; breadcrumbs, busca, botões, linhas de arquivo, estados vazios, erros e modais seguem os tokens `--card`, `--subtle`, `--ink`, `--muted`, `--line`, `--accent` e `--on-accent`, sem cores fixas de tema. A pasta e as conexões existentes continuam sob a mesma autorização e sem operação física nos originais. CSS escopado em `src/features/drive/virtual-library.css`, sem duplicar componentes globais. Revalidar visualmente em mobile real, modo claro/escuro, teclado e telas grandes antes de declarar pronto para PROD.
+
 ## Aprovação e capas — 03/11/2026
 
 Busca de capa usa AppInput com ícone, altura do controle compartilhado e foco apenas no campo, sem halo no rótulo. Capas de projeto oferecem conexões Drive/Dropbox ativas. PDFs de aprovação têm controles de páginas e zoom no painel e portal, sem toolbar nativa de download. Mensagens usam “dados”, “salvamento” e nomes de provedores quando necessário; “alteração preparada” nunca significa persistência confirmada.
