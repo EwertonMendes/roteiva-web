@@ -77,7 +77,7 @@ test('project-wide explorer search hides descendants of trashed ancestor and rej
  const hidden=await make('Hidden parent'),child=await make('hiddenchild',hidden);
  const item=await make('hiddenVisibleRoot'),otherFolder=await make('another');
  let result=await (await listLibraryExplorer(env,lib,'root',null,'hidden',true)).json();
- assert.deepEqual(result.nodes.map(x=>x.name),['Hidden parent','hiddenVisibleRoot','hiddenchild']);
+ assert.deepEqual(result.nodes.map(x=>x.name),['Hidden parent','hiddenchild','hiddenVisibleRoot']);
  await mutateLibrary(env,lib,hidden,{action:'trash',revision:1});
  result=await (await listLibraryExplorer(env,lib,'root',null,'hidden',true)).json();
  assert.deepEqual(result.nodes.map(x=>x.name),['hiddenVisibleRoot']);
