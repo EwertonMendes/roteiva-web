@@ -1,5 +1,11 @@
 # Arquitetura do Roteiva — MVP SaaS
 
+## Decisão — intenção de retorno OAuth da Biblioteca (12/11/2026, branch em validação)
+
+O redirecionamento OAuth do Google Drive/Dropbox reconstrói a aplicação e não conserva estado React. A Biblioteca guarda somente `{uid, projectId, parentId, expiresAt}` em `sessionStorage` no mesmo origin e aba, por no máximo dez minutos, antes de navegar ao provedor. Ao voltar com resultado OAuth, a UI lê somente o registro do mesmo UID, seleciona o projeto e a pasta e o consome. O dado é apenas uma **dica de navegação**, nunca uma autorização: `/library/projects/{id}/nodes` continua exigindo token Firebase e validação no Firestore, D1 e ancestrais da pasta. Projeto inacessível ou pasta removida geram recuperação controlada na UI. Sem tokens ou secrets nessa intenção; armazenamento indisponível não bloqueia o OAuth.
+
+A fila de transferências continua no provider global e não deve ser desmontada quando uma prévia ou modal virtual está aberto. Seu overlay fica visualmente oculto e sem eventos de ponteiro enquanto o diálogo da Biblioteca estiver aberto, retornando imediatamente quando for fechado. Preservar uploads em andamento, foco/modal e suporte desktop/mobile. **IMPLEMENTADO EM BRANCH; homologação real pendente.**
+
 ### Decisão de transporte autenticado de mídia (implementação na branch)
 
 A prévia nova usa Service Worker sem cache/offline, limitado a rotas de mídia permitidas. A URL local é um identificador opaco vinculado ao clientId da aba; cada request obtém identidade via MessageChannel e a API revalida projeto, referência, conexão e origem. Não depende de cookies de terceiros em DEV. Conteúdo segue em stream/ranges, sem token de identidade em URL. A implementação não substitui a autorização no servidor. Para portal Google no modo novo, streamReviewMedia exige também a identidade Google verificada e o compromisso do participante, além do ticket. Link aberto conserva o comportamento de capacidade. O worker recupera seu mapa após suspensão apenas pela aba que ainda possui o vínculo. Nada foi habilitado nos ambientes publicados; QA Safari e integração completa ainda pendentes.
