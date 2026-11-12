@@ -2,7 +2,7 @@
 
 ### QA da prévia nova
 
-`node --experimental-strip-types --test tests/authenticated-media-worker.test.mjs` valida mapeamento por aba/origem, Range, revogação e passagem da identidade. Após `pnpm build:emulator`, `pnpm exec playwright test tests/browser/authenticated-media.spec.ts` testa o worker real em Chromium desktop/mobile com upstream sintético. Isso não comprova OAuth, codecs ou APIs reais. O worker não intercepta rotas comuns da aplicação, não grava cache e não concede acesso apenas por URL copiada.
+`node --experimental-strip-types --test tests/authenticated-media-worker.test.mjs` valida mapeamento por aba/origem, Range, revogação e passagem da identidade. Após `pnpm build:emulator`, `pnpm exec playwright test tests/browser/authenticated-media.spec.ts` testa o worker real em Chromium desktop/mobile com upstream sintético. Isso não comprova OAuth, codecs ou APIs reais. Os cenários de transporte/portal agora usam servidor HTTP local real em 127.0.0.1:8787: WebKit não encaminha fetch do Service Worker para context.route(). O servidor existe somente durante cada teste; nenhum backend real é utilizado. O worker não intercepta rotas comuns da aplicação, não grava cache e não concede acesso apenas por URL copiada.
 
 ## Biblioteca virtual — desenvolvimento local
 
