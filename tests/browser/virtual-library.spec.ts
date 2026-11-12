@@ -30,6 +30,7 @@ test('virtual navigation preserves folder commands and a partial Dropbox batch r
   if(path==='/integrations/drive')return json({connections:[]});
   if(path==='/integrations/dropbox')return json({connections:[{id:connection,email:'qa@example.com',status:'connected',scopes:'files.metadata.read files.content.read files.content.write'}]});
   if(path.startsWith('/integrations/dropbox/')&&path.endsWith('/items'))return json({files:[{id:'id:FILE_SELECTED_A',name:'Imagem A.png',isFolder:false},{id:'id:FILE_SELECTED_B',name:'Imagem B.png',isFolder:false}],nextPageToken:null});
+  if(path.endsWith('/uploads/destination'))return json({targetFolderId:'managed-target'});
   if(path.endsWith('/imports')){
    const body=req.postDataJSON(),ids=body.items.map((x:{fileId:string})=>x.fileId);batches.push(ids);
    const results=ids.map((fileId:string)=>{
@@ -69,6 +70,16 @@ test('virtual navigation preserves folder commands and a partial Dropbox batch r
  await page.getByRole('button',{name:'Tentar somente os arquivos pendentes'}).click();
  await expect(page.getByRole('button',{name:'Imagem B.png',exact:true})).toBeVisible();
  expect(batches).toEqual([['id:FILE_SELECTED_A','id:FILE_SELECTED_B'],['id:FILE_SELECTED_B']]);
+ // The upload queue remains mounted but cannot obscure the virtual preview.
+ const chooser=page.waitForEvent('filechooser');
+ await page.getByRole('button',{name:'Enviar ao Dropbox',exact:true}).click();
+ await (await chooser).setFiles({name:'queue-overlay.txt',mimeType:'text/plain',buffer:Buffer.from('synthetic fixture')});
+ await expect(page.getByRole('complementary',{name:'Transferências de arquivos'})).toBeVisible();
+ await page.getByRole('button',{name:'Imagem A.png',exact:true}).click();
+ await expect(page.getByRole('dialog',{name:'Prévia de Imagem A.png'})).toBeVisible();
+ await expect(page.locator('.rl-transfer-layer')).toBeHidden();
+ await page.getByRole('button',{name:'Fechar prévia'}).click();
+ await expect(page.locator('.rl-transfer-layer')).toBeVisible();
  await page.getByRole('button',{name:'Renomear Originais',exact:true}).click();await page.getByLabel('Nome',{exact:true}).fill('Brutos');await page.getByRole('button',{name:'Confirmar',exact:true}).click();
  await page.getByRole('button',{name:'Remover Brutos do Roteiva',exact:true}).click();await page.getByRole('button',{name:'Confirmar',exact:true}).click();
  await expect(page.getByRole('button',{name:'Brutos',exact:true})).toHaveCount(0);
@@ -160,4 +171,46 @@ test('assisted Dropbox organization previews only explicit selections and retrie
  await expect(preview).toHaveCount(0);await page.getByRole('button',{name:'Materiais',exact:true}).click();
  await expect(page.getByRole('button',{name:'Corte.mp4',exact:true})).toBeVisible();
  expect(structureCalls).toBe(1);expect(importCalls).toBe(2);expect(importedParents).toEqual([virtual,virtual]);
+});
+
+test('OAuth return restores the same virtual project and folder after a full page navigation',async({page,context},info)=>{
+ const headers={'Access-Control-Allow-Origin':web,'Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Allow-Methods':'GET, POST, OPTIONS'};
+ let folderId='',folderAvailable=true;
+ await context.route(api+'/**',async route=>{
+  const request=route.request(),url=new URL(request.url()),path=url.pathname;
+  const json=(body:unknown,status=200)=>route.fulfill({status,headers,json:body});
+  if(request.method()==='OPTIONS')return route.fulfill({status:204,headers});
+  if(path.startsWith('/access/')||path.startsWith('/account/'))return route.fallback();
+  if(path==='/integrations/drive')return json({connections:[]});
+  if(path==='/integrations/dropbox')return json({connections:[]});
+  if(path==='/oauth/dropbox/start')return json({launchUrl:api+'/oauth/dropbox/launch'});
+  if(path==='/oauth/dropbox/launch')return route.fulfill({status:302,headers:{Location:web+'/biblioteca?dropbox=connected'}});
+  if(/\/library\/projects\/\d+\/nodes$/.test(path)){
+   if(request.method()==='POST'){
+    folderId=crypto.randomUUID();return json({id:folderId},201);
+   }
+   const parent=url.searchParams.get('parent')||'root';
+   if(parent!=='root'&&(!folderAvailable||parent!==folderId))return json({error:{code:'library_node_unavailable'}},404);
+   return json({nodes:parent==='root'&&folderId&&folderAvailable?[{id:folderId,parent_id:'root',kind:'folder',name:'Originais',revision:1}]:[],
+    trail:parent==='root'?[{id:'root',name:'Arquivos'}]:[{id:'root',name:'Arquivos'},{id:folderId,name:'Originais'}],nextPage:null});
+  }
+  return json({error:{code:'not_found'}},404);
+ });
+ await prepare(page,'oauth-return-'+info.project.name+'-'+Date.now()+'@example.com');
+ await page.goto(web+'/biblioteca');
+ await chooseAppSelect(page,page.getByRole('combobox',{name:'Projeto dos arquivos'}),{label:'Projeto Biblioteca QA'});
+ await page.getByRole('button',{name:'Nova pasta',exact:true}).click();
+ await page.getByLabel('Nome',{exact:true}).fill('Originais');
+ await page.getByRole('button',{name:'Confirmar',exact:true}).click();
+ await page.getByRole('button',{name:'Originais',exact:true}).click();
+ await expect(page.getByRole('navigation',{name:'Caminho da pasta'})).toContainText('Originais');
+ await page.getByRole('button',{name:'Conectar Dropbox',exact:true}).click();
+ await expect(page).toHaveURL(/\/biblioteca\?dropbox=connected/);
+ await expect(page.getByRole('combobox',{name:'Projeto dos arquivos'})).toContainText('Projeto Biblioteca QA');
+ await expect(page.getByRole('navigation',{name:'Caminho da pasta'})).toContainText('Originais');
+ // A stale folder must not be trusted: server ownership and ancestor checks win.
+ folderAvailable=false;
+ await page.getByRole('button',{name:'Atualizar pasta'}).click();
+ await expect(page.getByRole('status')).toContainText('A pasta anterior não está mais disponível');
+ await expect(page.getByRole('navigation',{name:'Caminho da pasta'})).toContainText('Arquivos');
 });
