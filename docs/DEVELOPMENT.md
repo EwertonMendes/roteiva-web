@@ -1,8 +1,10 @@
 # Desenvolvimento e deploy — Roteiva
 
-### QA visual da Biblioteca virtual — 12/11/2026
+## QA do explorador compacto — PR #123 (12/11/2026)
 
-A interface passou a usar `virtual-library.css` com tokens existentes, `AppButton`, `AppInput`, `AppSelect`, `IconLabel`, marcas de Drive/Dropbox e ícones Lucide. `tests/browser/virtual-library.spec.ts` também verifica estado sem projeto, ações semânticas, ausência de conexão redundante e ausência de scroll horizontal. Executar a mesma suíte virtual documentada abaixo com Chromium desktop/mobile; conferir manualmente Chrome Android real, modo claro/escuro, menus, modais e scroll em DEV após o deploy. E2E sintético não substitui homologação visual real.
+**Ainda em validação, não liberar PROD.** O novo explorador substitui cartões estáticos por busca de projeto, lista/grade, breadcrumbs, ações de contexto e menu Adicionar. A API possui `GET /library/projects/:id/nodes?explorer=1&parent=root&q=nome&scope=project` com paginação `after`, retornando `parent_name` e ordem determinística; manter a rota sem `explorer=1` para compatibilidade. Testes: `node --experimental-strip-types --test api/tests/library.test.mjs` no diretório `api/`, `node --experimental-strip-types --test tests/library-folder-cache.test.mjs tests/dropbox-tree.test.mjs` na raiz, além de `pnpm test`, `pnpm typecheck` e `pnpm build:emulator`.
+
+Executar CI `Isolated SaaS access E2E` com `tests/browser/virtual-library.spec.ts` para desktop e mobile antes de publicar DEV. Depois testar com Google Drive/Dropbox reais: seleção/importação, pastas/subpastas, paginação, capas já salvas, reautorização, fotos de clientes, prévias PDF/vídeo, menu mobile, cache de retorno, projeto com muito conteúdo, tema claro/escuro e isolamento A/B. Não confundir E2E de mocks com autorização real ou validação final de UX. Em DEV, publicar **API antes do frontend** porque a UI usa `explorer=1`; workflow manual de PR deve validar SHA exato. Não foram introduzidas migrations ou secrets. PROD não deve ser tocado.
 
 ## Continuação de homologação — OAuth e modais da Biblioteca (12/11/2026)
 

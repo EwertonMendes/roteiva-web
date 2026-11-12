@@ -1,5 +1,16 @@
 # Roadmap vivo — Roteiva MVP
 
+## Reconstrução integral da Biblioteca — PR #123 (12/11/2026)
+
+- [x] **IMPLEMENTADO NA BRANCH** `codex/library-explorer-release`: explorador com botão Adicionar, projeto pesquisável, lista/grade, breadcrumbs, busca por projeto, menu de contexto, integração de UI e cache curto. Não está automaticamente homologado em DEV.
+- [x] **IMPLEMENTADO NA BRANCH**: contrato API `explorer=1` com paginação ordenada sem alterar contrato antigo, busca D1 com autorização por projeto; testes de escopo, paginação e isolamento.
+- [x] **IMPLEMENTADO NA BRANCH**: travessia limitada de subpastas selecionadas no Dropbox e prévia assistida, idempotência já existente; Google `drive.file` continua exigindo seleção explícita e não autoriza automaticamente descendentes.
+- [x] **IMPLEMENTADO NA BRANCH**: caminho de reautorização das capas Google antigas pelo Picker e preservação de recorte ao selecionar o mesmo arquivo; não equivale a recuperar automaticamente grants expirados.
+- [ ] **VALIDAÇÃO OBRIGATÓRIA**: CI API/frontend/Firestore/E2E no SHA final, regressões dos demais domínios e teste de perfis real; publicar Worker DEV antes do Hosting DEV.
+- [ ] **ACEITE REAL**: Google Drive/Dropbox autenticados com pastas e arquivos reais, capas de projetos e clientes existentes, velocidades cold/warm, teste 1000+ projetos, celulares, foco e tema. **Sem esta evidência não afirmar que está pronto para usuários finais.**
+- [ ] PROD: somente após aprovação explícita e testes reais de segurança/permissões, sem migração destrutiva, sem reintroduzir escopo restrito automaticamente.
+
+
 ## Homologação de UX da Biblioteca virtual — 12/11/2026
 
 - [x] Implementado em `codex/library-oauth-modal-fixes`: hierarquia visual, grupos de ferramentas, SVGs existentes Drive/Dropbox, Lucide semântico, botões e campos compartilhados, estado vazio sem comandos inoperantes, gerenciamento de contas sem botão redundante de conexão, nomes acessíveis, lista de arquivos e modais responsivos. Alterações de UI somente; sem migration, OAuth scopes ou alteração de dados.
