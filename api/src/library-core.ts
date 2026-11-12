@@ -56,6 +56,45 @@ export async function listLibrary(env:Env,lib:Library,parentId:string,after:stri
  SELECT id,name FROM c ORDER BY depth DESC`).bind(lib.id,parentId,lib.id).all<{id:string;name:string}>();
  return Response.json({libraryId:lib.id,parent,trail:chain.results,nodes:items,nextPage:rows.results.length>50?items.at(-1)!.id:null});
 }
+
+/** Explorer endpoint: keyset pagination by folder-first, case-insensitive name and ID.
+ * Search is scoped to the authenticated project's virtual registry, never provider-wide.
+ * Original listLibrary is kept for older client/rollback compatibility.
+ */
+export async function listLibraryExplorer(env:Env,lib:Library,parentId:string,after:string|null,search='',projectWide=false){
+ const parent=await libraryNode(env,lib,parentId);
+ if(parent.kind!=='folder')throw new ApiError(400,'library_parent_denied');
+ if(after)nodeId(after);
+ const term=search.normalize('NFC').trim();
+ if(term.length>100||/[\x00-\x1f\x7f]/.test(term))throw new ApiError(400,'invalid_search');
+ const all=Boolean(term&&projectWide);
+ const cursor=after?await env.DB.prepare("SELECT kind,name FROM library_nodes WHERE library_id=? AND id=? AND state='active'")
+  .bind(lib.id,after).first<{kind:string;name:string}>():null;
+ if(after&&!cursor)throw new ApiError(409,'library_changed');
+ const paging=cursor? ` AND (n.kind < ? OR (n.kind=? AND (n.name COLLATE NOCASE > ? COLLATE NOCASE OR (n.name = ? COLLATE NOCASE AND n.id > ?))))`:'';
+ const sql=`SELECT n.id,n.asset_id,n.parent_id,n.kind,n.name,n.state,n.revision,
+  a.provider,a.source_name,a.mime_type,a.size,a.state AS source_state,
+  parent.name AS parent_name
+  FROM library_nodes n
+  LEFT JOIN library_nodes parent ON parent.library_id=n.library_id AND parent.id=n.parent_id
+  LEFT JOIN library_entries e ON e.library_id=n.library_id AND e.node_id=n.id
+  LEFT JOIN library_assets a ON a.library_id=e.library_id AND a.id=e.asset_id
+  WHERE n.library_id=? AND n.state='active' AND n.id!='root' ${all?'':'AND n.parent_id=?'}
+   AND instr(lower(n.name),lower(?))>0${paging}
+  ORDER BY n.kind DESC,n.name COLLATE NOCASE ASC,n.id ASC LIMIT 51`;
+ const args:unknown[]=[lib.id,...(all?[]:[parentId]),term,
+  ...(cursor?[cursor.kind,cursor.kind,cursor.name,cursor.name,after]:[])];
+ const rows=await env.DB.prepare(sql).bind(...args).all<LibraryNode&{parent_name:string;mime_type?:string;provider?:string}>();
+ const items=rows.results.slice(0,50);
+ const chain=await env.DB.prepare(`WITH RECURSIVE c(id,parent_id,name,depth) AS (
+  SELECT id,parent_id,name,0 FROM library_nodes WHERE library_id=? AND id=?
+  UNION ALL SELECT n.id,n.parent_id,n.name,c.depth+1 FROM library_nodes n JOIN c ON n.id=c.parent_id
+  WHERE n.library_id=? AND c.depth<16)
+  SELECT id,name FROM c ORDER BY depth DESC`).bind(lib.id,parentId,lib.id).all<{id:string;name:string}>();
+ return Response.json({libraryId:lib.id,parent,trail:chain.results,nodes:items,
+  nextPage:rows.results.length>50?items.at(-1)!.id:null,searchScope:all?'project':'folder'});
+}
+
 export async function mutateLibrary(env:Env,lib:Library,id:string|null,data:unknown){
  if(!data||typeof data!=='object'||Array.isArray(data))throw new ApiError(400,'invalid_library_operation');
  const x=data as Record<string,unknown>;

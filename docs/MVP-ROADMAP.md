@@ -1,5 +1,12 @@
 # Roadmap vivo — Roteiva MVP
 
+## Backend compatível do novo explorador — PR de infraestrutura DEV (12/11/2026)
+
+- [x] **IMPLEMENTADO EM BRANCH**: endpoint opcional `explorer=1` de árvore virtual com busca no projeto, paginação por pastas/nome, testes de isolamento e cursor, preservando contrato anterior e dados existentes.
+- [ ] Confirmar CI e publicação DEV pela `master` após merge aprovado; não supor deployment sem evidência.
+- [ ] Novo frontend está em [PR #123](https://github.com/EwertonMendes/roteiva-web/pull/123), aguardando homologação real de interface/Google Drive/Dropbox. PROD inalterado.
+
+
 ## Biblioteca virtual e aprovações — implementação autorizada 11/11/2026
 
 - [x] Código local: árvore autorizada por projeto, CAS/ciclos/profundidade, registry/importação deduplicada; criar/renomear/mover/lixeira/restaurar e seletores múltiplos Drive/Dropbox. Exclusão de conta limpa metadados virtuais após encerrar revisões.
