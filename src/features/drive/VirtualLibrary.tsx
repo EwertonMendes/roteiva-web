@@ -8,6 +8,8 @@ import {IconLabel} from '../ui/IconLabel';
 import {AppInput} from '../ui/AppInput';
 import {AppSelect} from '../ui/AppSelect';
 import './virtual-library.css';
+import {LibraryProjectPicker} from './LibraryProjectPicker';
+import {libraryFolderKey,getLibraryFolder,setLibraryFolder,libraryFolderFlight,invalidateLibraryFolders,clearLibraryFolders} from './library-folder-cache';
 import {useOverlayFocus} from './DriveLibraryUI';
 import {useStorageConnections} from './StorageConnectionsProvider';
 import {preparePicker,pickLibraryFiles,type PickerConfig} from './google-picker';
@@ -24,7 +26,7 @@ import {AssistedLibraryImport} from './AssistedLibraryImport';
 import googleDriveMark from '../../assets/brand/google-drive.svg';
 import dropboxMark from '../../assets/brand/dropbox.svg';
 import type {InspectedLibrarySource,LibraryInspection} from '../../../shared/library-selection';
-type Node={id:string;parent_id:string|null;kind:'folder'|'asset';name:string;revision:number;provider?:string;source_state?:string;mime_type?:string};
+type Node={id:string;parent_id:string|null;kind:'folder'|'asset';name:string;revision:number;provider?:string;source_state?:string;mime_type?:string;parent_name?:string};
 type Page={nodes:Node[];trail:{id:string;name:string}[];nextPage:string|null};
 export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{projects:readonly Project[];selectedProjectId?:number;onSelectProject:(id:string)=>void}){
  const {user}=useAuth(),call=useDriveApi();
@@ -38,6 +40,9 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
  const dropbox=dropboxAccounts.find(x=>x.id===dropboxId)||dropboxAccounts[0];
  const [parent,setParent]=useState('root'),[loadedPage,setPage]=useState<(Page&{scope:string})|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const [returnNotice,setReturnNotice]=useState('');
+ const [loadingPage,setLoadingPage]=useState(false),[searchAll,setSearchAll]=useState(true);
+ const [layout,setLayout]=useState<'list'|'grid'>(()=>{try{return localStorage.getItem('roteiva-library-layout')==='grid'?'grid':'list';}catch{return 'list';}});
+ const [addOpen,setAddOpen]=useState(false),[settingsOpen,setSettingsOpen]=useState(false),[menuNode,setMenuNode]=useState<Node|null>(null);
  const [edit,setEdit]=useState<{node?:Node;action:'create'|'rename'|'trash'|'restore'|'move'}|null>(null),[name,setName]=useState('');
  const [trash,setTrash]=useState(false),[moveParent,setMoveParent]=useState('root'),[movePage,setMovePage]=useState<Page|null>(null);
  const moveGeneration=useRef(0),[moveBusy,setMoveBusy]=useState(false);
@@ -50,9 +55,19 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
  const dialogRef=useOverlayFocus(()=>{if(!busy)setEdit(null);},Boolean(edit),edit?.action+':'+edit?.node?.id);
  const base=selectedProjectId?'/library/projects/'+selectedProjectId+'/nodes':'';
  const oauthReturned=new URLSearchParams(window.location.search).has('drive')||new URLSearchParams(window.location.search).has('dropbox');
- const pageScope=base+':'+parent+':'+trash+':'+term;
- const page=loadedPage?.scope===pageScope?loadedPage:null;
- useEffect(()=>{const timer=setTimeout(()=>setTerm(search.trim()),300);return()=>clearTimeout(timer);},[search]);
+ const pageScope=libraryFolderKey(user?.uid||'anonymous',selectedProjectId||0,parent,trash,term,searchAll);
+ const page=loadedPage?.scope===pageScope?loadedPage:getLibraryFolder<Node>(pageScope)?.data||null;
+ useEffect(()=>{try{localStorage.setItem('roteiva-library-layout',layout);}catch{/* optional preference */}},[layout]);
+ useEffect(()=>{
+  if(!addOpen&&!settingsOpen&&!menuNode)return;
+  const outside=(e:PointerEvent)=>{
+   if(!(e.target as Element)?.closest?.('.vl-add-shell,.vl-context-menu,.vl-menu-trigger,.vl-accounts-popover,.vl-settings-trigger')){
+    setAddOpen(false);setSettingsOpen(false);setMenuNode(null);
+   }
+  };
+  document.addEventListener('pointerdown',outside);return()=>document.removeEventListener('pointerdown',outside);
+ },[addOpen,settingsOpen,menuNode]);
+ useEffect(()=>{const timer=setTimeout(()=>setTerm(search.trim().length>=2?search.trim():''),280);return()=>clearTimeout(timer);},[search]);
  useEffect(()=>{setSearch('');setTerm('');},[parent,selectedProjectId,trash]);
  useEffect(()=>{
   const params=new URLSearchParams(window.location.search),result=params.get('drive')||params.get('dropbox');
@@ -74,22 +89,33 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
  .catch(e=>{if(!controller.signal.aborted)setError(e instanceof Error?e.message:'Não foi possível preparar o Drive.');});
  return()=>controller.abort();
  },[base,account?.id,call]);
- const load=useCallback(async(after?:string)=>{
- if(!base||!user)return;const revision=++generation.current;setBusy(true);setError('');
- try{const value=await call<Page>(base+'?parent='+encodeURIComponent(parent)+(trash?'&trash=1':'')+(term?'&q='+encodeURIComponent(term):'')+(after?'&after='+encodeURIComponent(after):''));
- if(revision===generation.current)setPage(old=>({...value,scope:pageScope,nodes:after&&old?.scope===pageScope?[...old.nodes,...value.nodes]:value.nodes}));
- }catch(e){if(revision===generation.current){
-  const code=(e as {code?:string}).code;
-  if(parent!=='root'&&(code==='library_node_unavailable'||code==='library_parent_denied')){
-   setReturnNotice('A pasta anterior não está mais disponível. Abrimos a pasta Arquivos.');setParent('root');
-  }else if(code==='library_project_denied'){
-   setReturnNotice('O projeto anterior não está mais disponível. Selecione outro projeto.');onSelectProject('');
-  }else setError(e instanceof Error?e.message:'Não foi possível carregar a pasta.');
- }}
- finally{if(revision===generation.current)setBusy(false);}
- },[base,user,call,parent,trash,pageScope,term,onSelectProject]);
+ const load=useCallback(async(after?:string,force=true)=>{
+  if(!base||!user)return;
+  const revision=++generation.current;
+  const cached=!after?getLibraryFolder<Node>(pageScope):null;
+  if(cached)setPage({...cached.data,scope:pageScope});
+  if(cached&&!cached.stale&&!force)return;
+  if(!cached&&!after)setLoadingPage(true);
+  setError('');
+  try{
+   const path=base+'?'+new URLSearchParams({parent,...(trash?{trash:'1'}:{explorer:'1'}),
+    ...(term?{q:term,scope:searchAll?'project':'folder'}:{}),...(after?{after}:{})}).toString();
+   const value=await libraryFolderFlight(pageScope+':'+(after||'first'),()=>call<Page>(path));
+   if(revision!==generation.current)return;
+   const old=after?getLibraryFolder<Node>(pageScope)?.data:null;
+   const next={...value,scope:pageScope,nodes:after&&old?[...old.nodes,...value.nodes]:value.nodes};
+   setLibraryFolder(pageScope,next);setPage(next);
+  }catch(e){if(revision===generation.current){
+   const code=(e as {code?:string}).code;
+   if(parent!=='root'&&(code==='library_node_unavailable'||code==='library_parent_denied')){
+    setReturnNotice('A pasta anterior não está mais disponível. Abrimos a pasta Arquivos.');setParent('root');
+   }else if(code==='library_project_denied'){
+    setReturnNotice('O projeto anterior não está disponível. Selecione outro projeto.');onSelectProject('');
+   }else setError(e instanceof Error?e.message:'Não foi possível carregar a pasta.');
+  }}finally{if(revision===generation.current)setLoadingPage(false);}
+ },[base,user?.uid,call,parent,trash,pageScope,term,searchAll,onSelectProject]);
  useEffect(()=>transfers.subscribe((_file,destination)=>{
-  if(destination.projectId===selectedProjectId&&destination.linkedFolderId===parent&&!mutation.current)void load();
+  if(destination.projectId===selectedProjectId&&destination.linkedFolderId===parent&&!mutation.current){if(user?.uid&&selectedProjectId)invalidateLibraryFolders(user.uid,selectedProjectId);void load();}
  }),[transfers.subscribe,selectedProjectId,parent,load]);
  async function upload(files:File[]){
   if(!files.length||!selectedProjectId||busy)return;
@@ -119,12 +145,13 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
   if(selectedProjectId!==intent.projectId){onSelectProject(String(intent.projectId));return;}
   forgetLibraryOAuthReturn();setParent(intent.parentId);
  },[oauthReturned,user?.uid,selectedProjectId,onSelectProject]);
- useEffect(()=>{setPage(null);void load();return()=>{++generation.current;};},[load]);
+ useEffect(()=>{const cached=getLibraryFolder<Node>(pageScope);setPage(cached?{...cached.data,scope:pageScope}:null);void load(undefined,false);return()=>{++generation.current;};},[pageScope]);
+ useEffect(()=>()=>clearLibraryFolders(user?.uid),[user?.uid]);
  useEffect(()=>()=>mutation.current?.abort(),[]);
  async function performImport(items:LibraryImport[],target:string,controller:AbortController,scope:number){
   const failed=await importLibraryBatch(call,base.replace('/nodes','/imports'),target,items,controller.signal,(done,total)=>setProgress('Adicionando '+done+' de '+total+' arquivos…'));
   if(scope!==generation.current||controller.signal.aborted)return;
-  setFailedImports(failed.length?{parentId:target,items:failed}:null);await load();
+  setFailedImports(failed.length?{parentId:target,items:failed}:null);if(user?.uid&&selectedProjectId)invalidateLibraryFolders(user.uid,selectedProjectId);await load();
  }
  async function inspectSelection(items:LibraryImport[],target:string,controller:AbortController,scope:number){
   const sources:InspectedLibrarySource[]=[],failed:{name:string;code:string}[]=[];
@@ -165,7 +192,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
  if(!edit||!base||busy)return;const operation=edit,scope=generation.current,controller=new AbortController();mutation.current=controller;setBusy(true);setError('');
  try{await call(base+(operation.node?'/'+operation.node.id:''),'POST',operation.node?
  {action:operation.action,name,parentId:moveParent,revision:operation.node.revision}:{name,parentId:parent},controller.signal);
- if(scope===generation.current){setEdit(null);await load();}
+ if(scope===generation.current){setEdit(null);if(user?.uid&&selectedProjectId)invalidateLibraryFolders(user.uid,selectedProjectId);await load();}
  }catch(e){if(!controller.signal.aborted&&scope===generation.current)setError(e instanceof Error?e.message:'Não foi possível salvar.');}
  finally{if(mutation.current===controller)mutation.current=null;if(scope===generation.current)setBusy(false);}
  }
