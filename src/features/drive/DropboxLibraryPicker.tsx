@@ -2,7 +2,7 @@ import {useCallback,useEffect,useRef,useState} from 'react';
 import {AppButton} from '../ui/AppButton';
 import {AppInput} from '../ui/AppInput';
 import {useDriveApi} from './drive-api';
-import {useOverlayFocus} from './DriveLibraryUI';
+import {useOverlayFocus,type DriveItem} from './DriveLibraryUI';
 import {useAuth} from '../auth/AuthProvider';
 import {cacheKey,getCachedFolder,setCachedFolder,onceFolderRequest} from './storage-folder-cache';
 type Item={id:string;name:string;isFolder:boolean};
@@ -32,12 +32,10 @@ export function DropboxLibraryPicker({connectionId,onClose,onSelect,includeFolde
     (cursor?'?pageToken='+encodeURIComponent(cursor):'');
    const result=await onceFolderRequest(scope+':'+(cursor||'first'),()=>call<Page>(endpoint));
    if(g!==generation.current)return;
-   setPage(old=>{
-    const prev=old?.scope===scope?old:cached?{files:cached.files as unknown as Item[],nextPageToken:cached.nextPageToken,scope}:null;
-    const next={...result,scope,files:cursor&&prev?[...prev.files,...result.files]:result.files};
-    setCachedFolder(scope,{files:next.files as never,nextPageToken:next.nextPageToken});
-    return next;
-   });
+   const previous=cursor?getCachedFolder(scope)?.files as Item[]|undefined:undefined;
+   const next={...result,scope,files:cursor?[...(previous||[]),...result.files]:result.files};
+   setCachedFolder(scope,{files:next.files as unknown as DriveItem[],nextPageToken:next.nextPageToken});
+   setPage(next);
   }catch(e){if(g===generation.current)setError(e instanceof Error?e.message:'Não foi possível abrir esta pasta.');}
   finally{if(g===generation.current)setBusy(false);}
  },[call,connectionId,folder,scope]);
