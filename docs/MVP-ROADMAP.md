@@ -11,15 +11,19 @@
 - [x] Testes locais: API completa 253 e frontend 101 aprovados; TypeScript aprovado nos dois componentes. Chromium desktop/mobile: oito cenários de mídia/árvore/lotes/capas/importação assistida aprovados, portal/decisão em lotes aprovado nos dois viewports após correção do seletor do teste. Provedores sintéticos; não equivale ao ciclo real publicado. CI anterior 2ef1e22: API 43139490417, frontend 43139490194, Firestore 43139490298 e SaaS E2E 43139490207 aprovados.
 - [x] WebKit desktop/mobile local: árvore/capas/importação assistida aprovados (seis cenários); transporte HTTP real do Service Worker e portal com recarga/decisão aprovados em rodada focada (quatro cenários). A primeira tentativa usava mocks não interceptados por esse motor; corrigida a infraestrutura de teste, sem relaxar a aplicação. Safari/iPhone físico continua sem evidência.
 - [x] Preparação DEV em 12/11/2026: backup D1 privado restaurado localmente e inventário de ACLs/exclusão conferido; 0021–0030 aplicadas em manutenção revisada. Três convites antigos sem ACL gerida foram encerrados; dez históricos e suas referências foram preservados, sem uploads pendentes. Identidades, credenciais e originais preservados. Backup PROD exportado/restaurado localmente; sem revisões, ACL gerida ou upload pendente, ainda sem mutação PROD.
-- [ ] QA real de uploads/capas/aprovações, reset/redução efetiva dos grants, Safari físico, release DEV/PROD. CI do código 4e59cda passou nos quatro componentes; suíte virtual adicionada ao CI. Ativação DEV configurada na branch; frontend/API ainda não publicados. PROD intacto.
+- [x] PR #121 integrada e DEV publicado no SHA `957b75750db5477537d2bc521f5e1b039f4e2cbf`: API 43166381703, frontend 43166381763 e SaaS E2E 43166381710 concluídos com sucesso. Preflight público conferiu o mesmo SHA, saúde, identidade D1 e políticas de acesso.
+- [x] Grant persistente do proprietário DEV substituído pelo fluxo real de reconexão; refresh sem solicitar downscope confirmou somente drive.file e identidade básica. Evidência privada sanitizada `virtual-library-dev-minimum-grant.json`.
+- [x] Ciclo real parcial DEV: cliente/projeto QA isolados e árvore Arquivos/Midias QA/Entregas criados no app; quatro uploads Drive concluídos (vídeo H.264 de 13.652.739 bytes, imagem, PDF e WAV). Vídeo aberto com duração de oito segundos e readyState 4; isso ainda não comprova play/pausa/seek. Evidência privada `virtual-library-rollout-evidence.json`.
+- [ ] Corrigir achados reais: retorno OAuth perde projeto/pasta selecionados; painel de transferências encobre controles da prévia. Ainda não implementados. Continuidade na branch `codex/virtual-library-rollout`.
+- [ ] Concluir prévias/Picker/capas/Dropbox/importação assistida e aprovações mistas reais (link e Google), eventos externos e recuperação; publicar/revalidar correções em DEV. Depois executar migrations/flags/release PROD e testar conta do proprietário. PROD continua com 20 migrations, sem a Biblioteca nova; Safari físico continua sem evidência.
 
-**EM ANDAMENTO; NÃO PUBLICADO.** Proprietário autorizou implementar o estudo, reconstruir metadados necessários, homologar DEV e depois publicar/testar PROD com sua conta. Isso não autoriza apagar originais dos provedores.
+**PUBLICADO EM DEV; HOMOLOGAÇÃO PARCIAL; PROD AINDA NÃO PROMOVIDO.** Proprietário autorizou implementar o estudo, reconstruir metadados necessários, homologar DEV e depois publicar/testar PROD com sua conta. Isso não autoriza apagar originais dos provedores.
 
 - [x] Fundação local: árvore com constraints/triggers e testes de ciclos, pais cruzados e profundidade; endpoints de revisão específica e ranges limitados, classificação de falhas; seis testes focados aprovados.
 - [ ] PoC real de grant mínimo, revisão específica/Range nos dois provedores e sessão de clientes DEV/PROD/Safari.
 - [x] Registry por proprietário e comandos autenticados de árvore; Picker em lote e interface virtual (código local).
 - [x] Upload, capas e aprovações sem dependência dos vínculos antigos de pastas; sessão de mídia e revisão exata (código local; homologação de produto ainda pendente).
-- [ ] Reconciliação de ACLs antigas, reset controlado e redução efetiva dos grants.
+- [ ] Concluir transição PROD; em DEV, ACLs geridas foram inventariadas, convites legados encerrados e grant do proprietário efetivamente reduzido.
 - [ ] Homologação completa DEV, release PROD e teste real na conta do proprietário.
 
 ## Domínio roteiva.com — 11/11/2026
