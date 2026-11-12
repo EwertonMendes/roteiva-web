@@ -1,8 +1,20 @@
 import {test,expect,type Page} from './fixtures';
-import {chooseAppSelect} from './select-helpers';
 const web='http://127.0.0.1:4173',api='http://127.0.0.1:8787';
 const connection='aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa';
 test.skip(!process.env.VIRTUAL_LIBRARY_E2E,'Run with the dedicated virtual-library build/config.');
+async function chooseLibraryProject(page:Page){
+ await page.getByRole('button',{name:'Projeto dos arquivos'}).click();
+ await page.getByRole('option',{name:'Projeto Biblioteca QA'}).click();
+}
+async function libraryAdd(page:Page,name:string){
+ await page.getByRole('button',{name:'Adicionar',exact:true}).click();
+ await page.getByRole('button',{name,exact:true}).click();
+}
+async function libraryMenu(page:Page,file:string,action:string){
+ await page.getByRole('button',{name:'Ações de '+file,exact:true}).click();
+ await page.getByRole('button',{name:action,exact:true}).click();
+}
+
 async function prepare(page:Page,email:string){
  await page.goto(web);await page.getByRole('button',{name:'Criar conta',exact:true}).click();
  const popupPromise=page.waitForEvent('popup');await page.getByRole('button',{name:'Cadastrar com Google',exact:true}).click();
@@ -58,22 +70,24 @@ test('virtual navigation preserves folder commands and a partial Dropbox batch r
  });
  await prepare(page,'virtual-'+info.project.name+'-'+Date.now()+'@example.com');await page.goto(web+'/biblioteca');
  // The unselected library must have a polished, meaningful empty state, not a wall of disabled actions.
- await expect(page.getByRole('heading',{name:'Escolha um projeto para começar'})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Selecione um projeto'})).toBeVisible();
  await expect(page.getByRole('button',{name:'Nova pasta',exact:true})).toHaveCount(0);
+ await page.getByRole('button',{name:'Contas de armazenamento'}).click();
  await expect(page.locator('.vl-connect-button img')).toHaveCount(1);
  await expect(page.getByRole('button',{name:'Conectar Dropbox',exact:true})).toHaveCount(0);
  await expect(page.getByRole('button',{name:'Conectar Google Drive',exact:true})).toBeVisible();
- await expect(page.locator('.vl-head')).toBeVisible();
+ await page.getByRole('button',{name:'Fechar contas'}).click();
+ await expect(page.locator('.vl-explorer-head')).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1)).toBe(true);
- await chooseAppSelect(page,page.getByRole('combobox',{name:'Projeto dos arquivos'}),{label:'Projeto Biblioteca QA'});
- await expect(page.getByRole('heading',{name:'Seus arquivos'})).toBeVisible();
- await expect(page.getByRole('button',{name:'Nova pasta',exact:true}).locator('svg')).toHaveCount(1);
+ await chooseLibraryProject(page);
+ await expect(page.getByRole('navigation',{name:'Caminho da pasta'})).toBeVisible();
+ await expect(page.getByRole('button',{name:'Adicionar',exact:true}).locator('svg')).toHaveCount(1);
  await expect(page.getByRole('button',{name:'Estrutura de pastas',exact:true}).locator('svg')).toHaveCount(1);
- await page.getByRole('button',{name:'Nova pasta',exact:true}).click();await page.getByLabel('Nome',{exact:true}).fill('Vídeos');await page.getByRole('button',{name:'Confirmar',exact:true}).click();
+ await libraryAdd(page,'Nova pasta');await page.getByLabel('Nome',{exact:true}).fill('Vídeos');await page.getByRole('button',{name:'Confirmar',exact:true}).click();
  await page.getByRole('button',{name:'Vídeos',exact:true}).click();
- await page.getByRole('button',{name:'Nova pasta',exact:true}).click();await page.getByLabel('Nome',{exact:true}).fill('Originais');await page.getByRole('button',{name:'Confirmar',exact:true}).click();
+ await libraryAdd(page,'Nova pasta');await page.getByLabel('Nome',{exact:true}).fill('Originais');await page.getByRole('button',{name:'Confirmar',exact:true}).click();
  await expect(page.getByRole('button',{name:'Originais',exact:true})).toBeVisible();
- await page.getByRole('button',{name:'Adicionar do Dropbox',exact:true}).click();
+ await libraryAdd(page,'Adicionar do Dropbox');
  const picker=page.getByRole('dialog',{name:'Adicionar do Dropbox'});
  await picker.getByLabel('Imagem A.png').check();await picker.getByLabel('Imagem B.png').check();await picker.getByRole('button',{name:'Adicionar selecionados'}).click();
  await expect(page.getByRole('button',{name:'Imagem A.png',exact:true})).toBeVisible();
@@ -83,7 +97,7 @@ test('virtual navigation preserves folder commands and a partial Dropbox batch r
  expect(batches).toEqual([['id:FILE_SELECTED_A','id:FILE_SELECTED_B'],['id:FILE_SELECTED_B']]);
  // The upload queue remains mounted but cannot obscure the virtual preview.
  const chooser=page.waitForEvent('filechooser');
- await page.getByRole('button',{name:'Enviar ao Dropbox',exact:true}).click();
+ await libraryAdd(page,'Enviar ao Dropbox');
  await (await chooser).setFiles({name:'queue-overlay.txt',mimeType:'text/plain',buffer:Buffer.from('synthetic fixture')});
  await expect(page.getByRole('complementary',{name:'Transferências de arquivos'})).toBeVisible();
  await page.getByRole('button',{name:'Imagem A.png',exact:true}).click();
@@ -94,10 +108,10 @@ test('virtual navigation preserves folder commands and a partial Dropbox batch r
  // Discard only the synthetic failed transfer before exercising the remaining mobile UI.
  await page.getByRole('button',{name:'Dispensar queue-overlay.txt'}).click();
  await expect(page.locator('.rl-upload-queue')).toHaveCount(0);
- await page.getByRole('button',{name:'Renomear Originais',exact:true}).click();await page.getByLabel('Nome',{exact:true}).fill('Brutos');await page.getByRole('button',{name:'Confirmar',exact:true}).click();
- await page.getByRole('button',{name:'Remover Brutos do Roteiva',exact:true}).click();await page.getByRole('button',{name:'Confirmar',exact:true}).click();
+ await libraryMenu(page,'Originais','Renomear');await page.getByLabel('Nome',{exact:true}).fill('Brutos');await page.getByRole('button',{name:'Confirmar',exact:true}).click();
+ await libraryMenu(page,'Brutos','Remover da Biblioteca');await page.getByRole('button',{name:'Confirmar',exact:true}).click();
  await expect(page.getByRole('button',{name:'Brutos',exact:true})).toHaveCount(0);
- await page.getByRole('button',{name:'Lixeira',exact:true}).click();await page.getByRole('button',{name:'Restaurar Brutos',exact:true}).click();await page.getByRole('button',{name:'Confirmar',exact:true}).click();
+ await page.getByRole('button',{name:'Lixeira',exact:true}).click();await libraryMenu(page,'Brutos','Restaurar');await page.getByRole('button',{name:'Confirmar',exact:true}).click();
  await expect(page.getByRole('button',{name:'Brutos',exact:true})).toHaveCount(0);
  await page.getByRole('button',{name:'Voltar aos arquivos',exact:true}).click();await page.getByRole('button',{name:'Vídeos',exact:true}).click();
  await expect(page.getByRole('button',{name:'Brutos',exact:true})).toBeVisible();
@@ -145,7 +159,7 @@ test('minimum-scope cover selection releases the native dialog for Google Picker
  await expect(page.locator('dialog.pc-dialog')).toHaveCount(0);
  await expect(page.locator('[aria-busy]').first()).toHaveAttribute('aria-busy','false');
 });
-test('assisted Dropbox organization previews only explicit selections and retries without duplicating its folder',async({page,context},info)=>{
+test('assisted Dropbox organization imports selected descendants and retries without duplicating its folder',async({page,context},info)=>{
  const headers={'Access-Control-Allow-Origin':web,'Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Allow-Methods':'GET, POST, OPTIONS'};
  const physical='id:PHYSICAL_FOLDER_12345',file='id:SELECTED_VIDEO_12345',virtual=crypto.randomUUID();let folderCreated=false,imported=false,structureCalls=0,importCalls=0;
  const importedParents:string[]=[];
@@ -171,8 +185,8 @@ test('assisted Dropbox organization previews only explicit selections and retrie
   return json({});
  });
  await prepare(page,'assisted-'+info.project.name+'-'+Date.now()+'@example.com');await page.goto(web+'/biblioteca');
- await chooseAppSelect(page,page.getByRole('combobox',{name:'Projeto dos arquivos'}),{label:'Projeto Biblioteca QA'});
- await page.getByRole('button',{name:'Trazer organização do Dropbox',exact:true}).click();
+ await chooseLibraryProject(page);
+ await libraryAdd(page,'Trazer organização do Dropbox');
  const picker=page.getByRole('dialog',{name:'Adicionar do Dropbox'});
  await picker.getByRole('checkbox',{name:'Selecionar pasta Originais'}).check();await picker.getByRole('button',{name:'Originais',exact:true}).click();
  await picker.getByLabel('Corte.mp4').check();await picker.getByRole('button',{name:'Adicionar selecionados'}).click();
@@ -212,15 +226,16 @@ test('OAuth return restores the same virtual project and folder after a full pag
  });
  await prepare(page,'oauth-return-'+info.project.name+'-'+Date.now()+'@example.com');
  await page.goto(web+'/biblioteca');
- await chooseAppSelect(page,page.getByRole('combobox',{name:'Projeto dos arquivos'}),{label:'Projeto Biblioteca QA'});
- await page.getByRole('button',{name:'Nova pasta',exact:true}).click();
+ await chooseLibraryProject(page);
+ await libraryAdd(page,'Nova pasta');
  await page.getByLabel('Nome',{exact:true}).fill('Originais');
  await page.getByRole('button',{name:'Confirmar',exact:true}).click();
  await page.getByRole('button',{name:'Originais',exact:true}).click();
  await expect(page.getByRole('navigation',{name:'Caminho da pasta'})).toContainText('Originais');
+ await page.getByRole('button',{name:'Contas de armazenamento'}).click();
  await page.getByRole('button',{name:'Conectar Dropbox',exact:true}).click();
  await expect(page).toHaveURL(/\/biblioteca\?dropbox=connected/);
- await expect(page.getByRole('combobox',{name:'Projeto dos arquivos'})).toContainText('Projeto Biblioteca QA');
+ await expect(page.getByRole('button',{name:'Projeto dos arquivos'})).toContainText('Projeto Biblioteca QA');
  await expect(page.getByRole('navigation',{name:'Caminho da pasta'})).toContainText('Originais');
  // A stale folder must not be trusted: server ownership and ancestor checks win.
  folderAvailable=false;
