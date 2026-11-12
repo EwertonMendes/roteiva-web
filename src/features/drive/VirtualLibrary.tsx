@@ -1,5 +1,5 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
-import {FolderOpen,FolderPlus,FolderTree,RefreshCw,Trash2,RotateCcw,Search,CloudUpload,FilePlus2,FolderInput,Image as ImageIcon,FileText,FileVideo,FileAudio,File,Pencil,MoveRight,AlertCircle} from 'lucide-react';
+import {FolderOpen,FolderPlus,FolderTree,RefreshCw,Trash2,RotateCcw,Search,CloudUpload,FilePlus2,FolderInput,Image as ImageIcon,FileText,FileVideo,FileAudio,File,Pencil,MoveRight,AlertCircle,Plus,LayoutGrid,List,MoreVertical,ChevronRight,X,HardDrive} from 'lucide-react';
 import type {Project} from '../../domain/workspace';
 import {useAuth} from '../auth/AuthProvider';
 import {useDriveApi} from './drive-api';
@@ -8,6 +8,7 @@ import {IconLabel} from '../ui/IconLabel';
 import {AppInput} from '../ui/AppInput';
 import {AppSelect} from '../ui/AppSelect';
 import './virtual-library.css';
+import './library-explorer.css';
 import {LibraryProjectPicker} from './LibraryProjectPicker';
 import {libraryFolderKey,getLibraryFolder,setLibraryFolder,libraryFolderFlight,invalidateLibraryFolders,clearLibraryFolders} from './library-folder-cache';
 import {useOverlayFocus} from './DriveLibraryUI';
@@ -196,85 +197,110 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
  }catch(e){if(!controller.signal.aborted&&scope===generation.current)setError(e instanceof Error?e.message:'Não foi possível salvar.');}
  finally{if(mutation.current===controller)mutation.current=null;if(scope===generation.current)setBusy(false);}
  }
- return <section className="panel virtual-library" aria-label="Arquivos do projeto">
- <header className="vl-head">
-  <div className="vl-head-copy"><span className="vl-title-icon"><FolderOpen size={24} aria-hidden="true"/></span><div><h2>Arquivos do projeto</h2><p>{projects.find(p=>p.id===selectedProjectId)?.name||'Organize todos os seus materiais em um único lugar.'}</p></div></div>
-  {base&&<div className="vl-main-actions">
-   <AppButton className="vl-action vl-action-primary" disabled={busy||trash} onClick={()=>{setName('');setEdit({action:'create'});}}><IconLabel icon={FolderPlus}>Nova pasta</IconLabel></AppButton>
-   <AppButton className="vl-icon-action" disabled={busy} aria-label="Atualizar pasta" title="Atualizar pasta" onClick={()=>void load()}><RefreshCw size={18} aria-hidden="true"/></AppButton>
+ const openEditor=(action:'rename'|'move'|'trash'|'restore',node:Node)=>{
+  setMenuNode(null);setError('');setEdit({action,node});
+  if(action==='rename')setName(node.name);
+  if(action==='move')setMoveParent('root');
+ };
+ const showAdd=(action:'new'|'drive-upload'|'dropbox-upload'|'drive-file'|'dropbox-file'|'drive-tree'|'dropbox-tree')=>{
+  setAddOpen(false);setError('');
+  if(action==='new'){setName('');setEdit({action:'create'});}
+  else if(action==='drive-upload'||action==='dropbox-upload'){uploadProvider.current=action==='drive-upload'?'google_drive':'dropbox';fileInput.current?.click();}
+  else if(action==='drive-file'||action==='drive-tree')void addDrive(action==='drive-tree');
+  else{setDropboxStructure(action==='dropbox-tree');setDropboxPicker(true);}
+ };
+ return <section className="panel virtual-library vl-explorer" aria-label="Explorador da Biblioteca">
+  <header className="vl-explorer-head">
+   <LibraryProjectPicker projects={projects} value={selectedProjectId} onChange={onSelectProject}/>
+   <div className="vl-explorer-actions">
+    <AppButton className="vl-settings-trigger" aria-label="Contas de armazenamento" title="Contas conectadas" aria-expanded={settingsOpen} onClick={()=>{setSettingsOpen(x=>!x);setAddOpen(false);setMenuNode(null);}}><HardDrive size={18}/><span>{storage.connections.filter(c=>c.status==='connected').length}</span></AppButton>
+    <AppButton className="vl-refresh" aria-label="Atualizar pasta" title="Atualizar pasta" disabled={!base||busy||loadingPage} onClick={()=>void load()}><RefreshCw size={18}/></AppButton>
+    {base&&!trash&&<div className="vl-add-shell">
+     <AppButton className="vl-primary-add" aria-label="Adicionar" aria-expanded={addOpen} onClick={()=>{setAddOpen(x=>!x);setMenuNode(null);setSettingsOpen(false);}}><Plus size={18}/>Adicionar</AppButton>
+     {addOpen&&<div className="vl-add-menu" role="group" aria-label="Adicionar à Biblioteca">
+      <AppButton onClick={()=>showAdd('new')}><FolderPlus size={18}/> Nova pasta</AppButton>
+      <div className="vl-menu-divider"/>
+      <AppButton disabled={!account} onClick={()=>showAdd('drive-upload')}><CloudUpload size={18}/> Enviar ao Google Drive</AppButton>
+      <AppButton disabled={!dropbox} onClick={()=>showAdd('dropbox-upload')}><CloudUpload size={18}/> Enviar ao Dropbox</AppButton>
+      <div className="vl-menu-divider"/>
+      <AppButton disabled={!picker||picker.connectionId!==account?.id} onClick={()=>showAdd('drive-file')}><img src={googleDriveMark} alt=""/> Adicionar do Drive</AppButton>
+      <AppButton disabled={!dropbox} onClick={()=>showAdd('dropbox-file')}><img src={dropboxMark} alt=""/> Adicionar do Dropbox</AppButton>
+      <AppButton disabled={!picker||picker.connectionId!==account?.id} onClick={()=>showAdd('drive-tree')}><FolderTree size={18}/> Trazer organização do Drive</AppButton>
+      <AppButton disabled={!dropbox} onClick={()=>showAdd('dropbox-tree')}><FolderTree size={18}/> Trazer organização do Dropbox</AppButton>
+     </div>}
+    </div>}
+   </div>
+  </header>
+  {settingsOpen&&<div className="vl-accounts-popover">
+   <div className="vl-popover-head"><strong>Contas de armazenamento</strong><AppButton aria-label="Fechar contas" onClick={()=>setSettingsOpen(false)}><X size={18}/></AppButton></div>
+   {accounts.length>1&&<label>Google Drive<AppSelect aria-label="Conta Google Drive" value={account?.id||''} onValueChange={setAccountId}>{accounts.map(x=><option key={x.id} value={x.id}>{x.email}</option>)}</AppSelect></label>}
+   {dropboxAccounts.length>1&&<label>Dropbox<AppSelect aria-label="Conta Dropbox" value={dropbox?.id||''} onValueChange={setDropboxId}>{dropboxAccounts.map(x=><option key={x.id} value={x.id}>{x.email}</option>)}</AppSelect></label>}
+   <LibraryConnections busy={busy} onConnect={provider=>void connect(provider)}/>
   </div>}
- </header>
- <LibraryConnections busy={busy} onConnect={provider=>void connect(provider)}/>
- {storage.error&&<div className="virtual-library-error" role="alert"><AlertCircle size={18} aria-hidden="true"/><span>Não foi possível consultar {storage.error}.</span><AppButton className="vl-action" disabled={storage.loading} onClick={()=>void storage.refresh(true)}>Atualizar conexões</AppButton></div>}
- {returnNotice&&<div role="status" className="virtual-library-error"><AlertCircle size={18} aria-hidden="true"/>{returnNotice}<AppButton className="vl-action" onClick={()=>setReturnNotice('')}>Dispensar</AppButton></div>}
- {error&&<div role="alert" className="virtual-library-error"><AlertCircle size={18} aria-hidden="true"/>{error}</div>}
- {failedImports&&<div role="alert" className="virtual-library-error vl-failures"><p>Alguns arquivos não foram adicionados. Os itens confirmados foram preservados.</p><ul>{failedImports.items.map(item=><li key={item.provider+item.connectionId+item.fileId}><strong>{item.name}</strong>: {messages[item.code]||'Não foi possível confirmar o arquivo. Tente novamente.'}</li>)}</ul><div className="virtual-library-toolbar"><AppButton className="vl-action vl-action-primary" disabled={busy} onClick={()=>void retryImports()}>Tentar somente os arquivos pendentes</AppButton><AppButton className="vl-action" disabled={busy} onClick={()=>setFailedImports(null)}>Dispensar aviso</AppButton></div></div>}
- {!base?<div className="vl-empty-project"><span className="vl-empty-icon"><FolderOpen size={34} aria-hidden="true"/></span><h3>Escolha um projeto para começar</h3><p>Selecione um projeto no menu acima para visualizar arquivos, criar pastas e organizar seus materiais do Drive e Dropbox.</p></div>:
- <div className="vl-workspace">
-  <div className="vl-browse-head">
-   <div className="vl-section-heading"><span className="vl-section-icon"><FolderOpen size={19} aria-hidden="true"/></span><div><h3>{trash?'Lixeira':'Seus arquivos'}</h3><p>{trash?'Referências removidas da Biblioteca':'Pastas e arquivos organizados por projeto'}</p></div></div>
-   <div className="vl-browse-actions">
-    <AppButton className="vl-action" disabled={busy||trash} onClick={()=>setStructure(true)}><IconLabel icon={FolderTree}>Estrutura de pastas</IconLabel></AppButton>
-    <AppButton className="vl-action" disabled={busy} onClick={()=>{setTrash(x=>!x);setParent('root');}}><IconLabel icon={trash?RotateCcw:Trash2}>{trash?'Voltar aos arquivos':'Lixeira'}</IconLabel></AppButton>
+  {storage.error&&<div role="alert" className="vl-compact-alert"><AlertCircle size={17}/><span>Falha ao verificar {storage.error}.</span><AppButton onClick={()=>void storage.refresh(true)}>Tentar novamente</AppButton></div>}
+  {returnNotice&&<div role="status" className="vl-compact-alert"><AlertCircle size={17}/><span>{returnNotice}</span><AppButton onClick={()=>setReturnNotice('')}>Dispensar</AppButton></div>}
+  {error&&<div role="alert" className="vl-compact-alert"><AlertCircle size={17}/><span>{error}</span><AppButton onClick={()=>setError('')} aria-label="Dispensar erro"><X size={16}/></AppButton></div>}
+  {failedImports&&<div role="alert" className="vl-compact-alert"><AlertCircle size={17}/><span>{failedImports.items.length} item(ns) não foram adicionados. Os demais foram preservados.</span><AppButton disabled={busy} onClick={()=>void retryImports()}>Tentar pendentes</AppButton><AppButton onClick={()=>setFailedImports(null)}>Dispensar</AppButton></div>}
+  {!base?<div className="vl-explorer-empty"><FolderOpen size={40}/><h3>Selecione um projeto</h3><p>Pesquise um projeto acima para acessar e organizar seus arquivos.</p></div>:<>
+   <div className="vl-explorer-toolbar">
+    <nav aria-label="Caminho da pasta" className="vl-explorer-breadcrumb">
+     {(page?.trail||[{id:'root',name:trash?'Lixeira':'Arquivos'}]).map((crumb,i)=><span key={crumb.id} className="vl-path-part">
+      {i>0&&<ChevronRight size={15}/>}
+      <AppButton disabled={loadingPage} onClick={()=>setParent(crumb.id)} aria-current={crumb.id===parent?'location':undefined}>{crumb.name}</AppButton>
+     </span>)}
+    </nav>
+    <div className="vl-toolbar-end">
+     <AppButton className="vl-small-tool" disabled={loadingPage||busy} aria-label={trash?'Voltar aos arquivos':'Lixeira'} onClick={()=>{setTrash(x=>!x);setParent('root');}}>{trash?<RotateCcw size={17}/>:<Trash2 size={17}/>}<span>{trash?'Voltar':'Lixeira'}</span></AppButton>
+     <AppButton className="vl-small-tool" disabled={busy||trash} onClick={()=>setStructure(true)} aria-label="Estrutura de pastas"><FolderTree size={17}/><span>Pastas</span></AppButton>
+     <div className="vl-layout-control" role="group" aria-label="Visualização dos arquivos">
+      <AppButton aria-label="Exibir lista" aria-pressed={layout==='list'} onClick={()=>setLayout('list')}><List size={18}/></AppButton>
+      <AppButton aria-label="Exibir grade" aria-pressed={layout==='grid'} onClick={()=>setLayout('grid')}><LayoutGrid size={18}/></AppButton>
+     </div>
+    </div>
    </div>
-  </div>
-  <div className="vl-browser-tools">
-   <nav aria-label="Caminho da pasta" className="virtual-library-path">{page?.trail.map(x=><AppButton className="vl-crumb" type="button" key={x.id} disabled={busy} onClick={()=>setParent(x.id)}>{x.name}</AppButton>)}</nav>
-   {!trash&&<label className="vl-search"><Search size={18} aria-hidden="true"/><AppInput aria-label="Buscar nesta pasta" value={search} disabled={Boolean(progress)} maxLength={100} onChange={e=>setSearch(e.target.value)} placeholder="Buscar nesta pasta"/></label>}
-  </div>
-  {busy&&!page?<div className="vl-empty-folder" role="status"><RefreshCw className="vl-loading" size={23} aria-hidden="true"/><p>Carregando pasta…</p></div>:
-   <>
-   <ul className="virtual-library-nodes">{page?.nodes.map(n=><li className="vl-file-row" key={n.id}>
-    <AppButton className="vl-file-open" aria-label={n.name} disabled={busy||trash} onClick={()=>n.kind==='folder'?setParent(n.id):setPreview(n)}>
-     <span className="vl-file-glyph">{n.kind==='folder'?<FolderOpen size={21} aria-hidden="true"/>:n.mime_type?.startsWith('image/')?<ImageIcon size={21} aria-hidden="true"/>:n.mime_type?.startsWith('video/')?<FileVideo size={21} aria-hidden="true"/>:n.mime_type?.startsWith('audio/')?<FileAudio size={21} aria-hidden="true"/>:n.mime_type==='application/pdf'?<FileText size={21} aria-hidden="true"/>:<File size={21} aria-hidden="true"/>}</span>
-     <span className="vl-file-copy"><strong>{n.name}</strong><small>{n.kind==='folder'?'Pasta':n.provider==='google_drive'?'Google Drive':n.provider==='dropbox'?'Dropbox':'Arquivo'}{n.source_state&&n.source_state!=='available'?' · '+({unavailable:'Original indisponível',restricted:'Acesso restrito',source_trashed:'Original na lixeira'}[n.source_state]||'Verifique o original'):''}</small></span>
-    </AppButton>
-    <div className="vl-file-actions">{trash?
-     <AppButton className="vl-icon-action" disabled={busy} title={'Restaurar '+n.name} aria-label={'Restaurar '+n.name} onClick={()=>setEdit({action:'restore',node:n})}><RotateCcw size={18} aria-hidden="true"/></AppButton>:
-     <>
-      <AppButton className="vl-icon-action" disabled={busy} title={'Renomear '+n.name} aria-label={'Renomear '+n.name} onClick={()=>{setName(n.name);setEdit({action:'rename',node:n});}}><Pencil size={17} aria-hidden="true"/></AppButton>
-      <AppButton className="vl-icon-action" disabled={busy} title={'Mover '+n.name} aria-label={'Mover '+n.name} onClick={()=>{setMoveParent('root');setEdit({action:'move',node:n});}}><MoveRight size={18} aria-hidden="true"/></AppButton>
-      <AppButton className="vl-icon-action vl-danger" disabled={busy} title={'Remover '+n.name+' do Roteiva'} aria-label={'Remover '+n.name+' do Roteiva'} onClick={()=>setEdit({action:'trash',node:n})}><Trash2 size={17} aria-hidden="true"/></AppButton>
-     </>}</div>
-   </li>)}</ul>
-   {page&&!page.nodes.length&&<div className="vl-empty-folder"><span className="vl-empty-icon"><FolderOpen size={28} aria-hidden="true"/></span><h4>{term?'Nenhum resultado nesta pasta':trash?'A lixeira está vazia':'Esta pasta ainda está vazia'}</h4><p>{term?'Tente outro nome.':trash?'Itens removidos aparecerão aqui.':'Crie uma pasta ou adicione arquivos para começar.'}</p></div>}
-   {page?.nextPage&&<div className="vl-more"><AppButton className="vl-action" disabled={busy} onClick={()=>void load(page.nextPage!)}>Carregar mais</AppButton></div>}
+   {!trash&&<div className="vl-query">
+    <label className="vl-query-input"><Search size={18}/><AppInput aria-label="Buscar arquivos e pastas" placeholder="Buscar arquivos e pastas…" value={search} maxLength={100} onChange={e=>setSearch(e.target.value)}/></label>
+    {term&&<AppSelect aria-label="Pesquisar em" value={searchAll?'project':'folder'} onValueChange={v=>setSearchAll(v==='project')}><option value="project">Todo o projeto</option><option value="folder">Esta pasta</option></AppSelect>}
+   </div>}
+   {progress&&<p role="status" className="vl-import-status">{progress}</p>}
+   {loadingPage&&!page?<div role="status" className="vl-loading-area"><RefreshCw className="vl-loading" size={22}/>Carregando arquivos…</div>:<>
+    {page?.nodes.length?<ul className={'vl-explorer-items vl-explorer-items--'+layout} aria-label={trash?'Itens na lixeira':'Arquivos e pastas'}>
+     {page.nodes.map(n=><li key={n.id} className="vl-explorer-item" onContextMenu={e=>{e.preventDefault();setMenuNode(n);setAddOpen(false);}}>
+      <AppButton className="vl-explorer-file" disabled={trash||busy} aria-label={n.name} title={n.name}
+       onClick={()=>{setMenuNode(null);if(n.kind==='folder'){setParent(n.id);setSearch('');setTerm('');}else setPreview(n);}}>
+       <span className="vl-file-emblem">{n.kind==='folder'?<FolderOpen size={24}/>:
+         n.mime_type?.startsWith('image/')?<ImageIcon size={23}/>:
+         n.mime_type?.startsWith('video/')?<FileVideo size={23}/>:
+         n.mime_type?.startsWith('audio/')?<FileAudio size={23}/>:
+         n.mime_type==='application/pdf'?<FileText size={23}/>:<File size={23}/>}</span>
+       <span className="vl-file-meta"><strong>{n.name}</strong><small>{term&&searchAll?n.parent_name||'Arquivos':n.kind==='folder'?'Pasta':n.provider==='google_drive'?'Google Drive':n.provider==='dropbox'?'Dropbox':'Arquivo'}</small></span>
+      </AppButton>
+      <div className="vl-menu-shell">
+       <AppButton className="vl-menu-trigger" aria-label={'Ações de '+n.name} aria-expanded={menuNode?.id===n.id} onClick={()=>setMenuNode(old=>old?.id===n.id?null:n)}><MoreVertical size={19}/></AppButton>
+       {menuNode?.id===n.id&&<div className="vl-context-menu" role="group" aria-label={'Ações de '+n.name}>
+        {trash?<AppButton onClick={()=>openEditor('restore',n)}><RotateCcw size={17}/> Restaurar</AppButton>:<>
+         {n.kind==='asset'&&<AppButton onClick={()=>{setMenuNode(null);setPreview(n);}}><FolderOpen size={17}/> Visualizar</AppButton>}
+         <AppButton onClick={()=>openEditor('rename',n)}><Pencil size={17}/> Renomear</AppButton>
+         <AppButton onClick={()=>openEditor('move',n)}><MoveRight size={17}/> Mover</AppButton>
+         <div className="vl-menu-divider"/>
+         <AppButton onClick={()=>openEditor('trash',n)}><Trash2 size={17}/> Remover da Biblioteca</AppButton>
+        </>}
+       </div>}
+      </div>
+     </li>)}
+    </ul>:<div className="vl-explorer-empty vl-explorer-empty--folder"><FolderOpen size={32}/><h3>{term?'Nenhum resultado':trash?'Lixeira vazia':'Esta pasta está vazia'}</h3><p>{term?'Experimente outro nome ou escopo.':trash?'Itens removidos aparecem aqui.':'Use Adicionar para criar pastas e incluir arquivos.'}</p></div>}
+    {page?.nextPage&&<div className="vl-loadmore"><AppButton disabled={loadingPage} onClick={()=>void load(page.nextPage!,true)}>Carregar mais</AppButton></div>}
    </>}
-  {!trash&&<section className="vl-import-section" aria-label="Adicionar materiais">
-   <div className="vl-section-heading"><span className="vl-section-icon"><CloudUpload size={19} aria-hidden="true"/></span><div><h3>Adicionar materiais</h3><p>Envie novos arquivos ou importe itens existentes.</p></div></div>
-   <div className="vl-providers">
-    <div className="vl-provider-card">
-     <div className="vl-provider-head"><img src={googleDriveMark} alt="" aria-hidden="true"/><div><h4>Google Drive</h4><p>{accounts.length?accounts.length+' conta(s) conectada(s)':'Conecte uma conta para adicionar arquivos'}</p></div></div>
-     {accounts.length>0&&<AppSelect aria-label="Conta Google Drive" value={account?.id||''} onValueChange={setAccountId} disabled={busy}><option value="">Selecione uma conta</option>{accounts.map(x=><option key={x.id} value={x.id}>{x.email}</option>)}</AppSelect>}
-     <div className="vl-provider-actions">
-      <AppButton className="vl-action vl-action-primary" disabled={busy||!account} onClick={()=>{uploadProvider.current='google_drive';fileInput.current?.click();}}><IconLabel icon={CloudUpload}>Enviar ao Drive</IconLabel></AppButton>
-      <AppButton className="vl-action" disabled={busy||!picker||picker.connectionId!==account?.id} onClick={()=>void addDrive()}><IconLabel icon={FilePlus2}>Adicionar do Drive</IconLabel></AppButton>
-      <AppButton className="vl-action" disabled={busy||!picker||picker.connectionId!==account?.id} onClick={()=>void addDrive(true)}><IconLabel icon={FolderInput}>Trazer organização do Drive</IconLabel></AppButton>
-     </div>
-    </div>
-    <div className="vl-provider-card">
-     <div className="vl-provider-head"><img src={dropboxMark} alt="" aria-hidden="true"/><div><h4>Dropbox</h4><p>{dropboxAccounts.length?dropboxAccounts.length+' conta(s) conectada(s)':'Conecte uma conta para adicionar arquivos'}</p></div></div>
-     {dropboxAccounts.length>0&&<AppSelect aria-label="Conta Dropbox" value={dropbox?.id||''} onValueChange={setDropboxId} disabled={busy}><option value="">Selecione uma conta</option>{dropboxAccounts.map(x=><option key={x.id} value={x.id}>{x.email}</option>)}</AppSelect>}
-     <div className="vl-provider-actions">
-      <AppButton className="vl-action vl-action-primary" disabled={busy||!dropbox} onClick={()=>{uploadProvider.current='dropbox';fileInput.current?.click();}}><IconLabel icon={CloudUpload}>Enviar ao Dropbox</IconLabel></AppButton>
-      <AppButton className="vl-action" disabled={busy||!dropbox} onClick={()=>{setDropboxStructure(false);setDropboxPicker(true);}}><IconLabel icon={FilePlus2}>Adicionar do Dropbox</IconLabel></AppButton>
-      <AppButton className="vl-action" disabled={busy||!dropbox} onClick={()=>{setDropboxStructure(true);setDropboxPicker(true);}}><IconLabel icon={FolderInput}>Trazer organização do Dropbox</IconLabel></AppButton>
-     </div>
-    </div>
-   </div>
-   <AppInput ref={fileInput} type="file" multiple hidden onChange={e=>{const files=Array.from(e.target.files||[]);e.target.value='';void upload(files);}}/>
-   <p className="vl-import-hint">Os originais continuam no provedor escolhido. Organizar a Biblioteca não altera suas pastas físicas.</p>
-   {progress&&<p role="status" className="vl-progress">{progress}</p>}
-  </section>}
- </div>}
+  </>}
+  {base&&<AppInput ref={fileInput} type="file" multiple hidden onChange={e=>{const files=Array.from(e.target.files||[]);e.target.value='';void upload(files);}}/>}
  {edit&&<div className="virtual-library-backdrop"><div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="virtual-library-title" className="virtual-library-editor">
  <h3 id="virtual-library-title">{{create:'Nova pasta',rename:'Renomear',move:'Mover para',restore:'Restaurar',trash:'Remover do Roteiva'}[edit.action]}</h3>
  {error&&<div role="alert" className="virtual-library-error">{error}</div>}
- <form onSubmit={e=>{e.preventDefault();void save();}}>{edit.action==='trash'?<p>Os arquivos originais permanecem no provedor. A organização desta pasta será removida da Biblioteca.</p>:edit.action==='restore'?<p>Restaurar esta referência na pasta anterior. Se ela também estiver na lixeira, restaure a pasta primeiro.</p>:edit.action==='move'?<><nav aria-label="Pasta de destino">{movePage?.trail.map(x=><AppButton type="button" key={x.id} onClick={()=>setMoveParent(x.id)}>{x.name}</AppButton>)}</nav>{movePage?.nodes.filter(x=>x.kind==='folder'&&x.id!==edit.node?.id).map(x=><AppButton type="button" key={x.id} onClick={()=>setMoveParent(x.id)}>{x.name}</AppButton>)}{movePage?.nextPage&&<AppButton type="button" disabled={moveBusy} onClick={()=>{const old=movePage,scope=moveGeneration.current;setMoveBusy(true);void call<Page>(base+'?parent='+encodeURIComponent(moveParent)+'&after='+old.nextPage).then(p=>{if(scope===moveGeneration.current)setMovePage({...p,nodes:[...old.nodes,...p.nodes]});}).catch(()=>{if(scope===moveGeneration.current)setError('Não foi possível carregar mais pastas.');}).finally(()=>{if(scope===moveGeneration.current)setMoveBusy(false);});}}>Mais pastas</AppButton>}</>:<label>Nome<AppInput autoFocus value={name} maxLength={120} onChange={e=>setName(e.target.value)} required/></label>}
+ <form onSubmit={e=>{e.preventDefault();void save();}}>{(edit.action==='create'||edit.action==='rename')&&<label>Nome<AppInput aria-label="Nome" required maxLength={120} value={name} onChange={e=>setName(e.target.value)} autoFocus/></label>}{edit.action==='trash'?<p>Os arquivos originais permanecem no provedor. A organização desta pasta será removida da Biblioteca.</p>:edit.action==='restore'?<p>Restaurar esta referência na pasta anterior. Se ela também estiver na lixeira, restaure a pasta primeiro.</p>:edit.action==='move'?<><nav aria-label="Pasta de destino">{movePage?.trail.map(x=><AppButton type="button" key={x.id} onClick={()=>setMoveParent(x.id)}>{x.name}</AppButton>)}</nav>{movePage?.nodes.filter(x=>x.kind==='folder'&&x.id!==edit.node?.id).map(x=><AppButton type="button" key={x.id} onClick={()=>setMoveParent(x.id)}>{x.name}</AppButton>)}{movePage?.nextPage&&<AppButton type="button" disabled={moveBusy} onClick={()=>{const old=movePage,scope=moveGeneration.current;setMoveBusy(true);void call<Page>(base+'?parent='+encodeURIComponent(moveParent)+'&after='+old.nextPage).then(p=>{if(scope===moveGeneration.current)setMovePage({...p,nodes:[...old.nodes,...p.nodes]});}).catch(()=>{if(scope===moveGeneration.current)setError('Não foi possível carregar mais pastas.');}).finally(()=>{if(scope===moveGeneration.current)setMoveBusy(false);});}}>Mais pastas</AppButton>}</>:<label>Nome<AppInput autoFocus value={name} maxLength={120} onChange={e=>setName(e.target.value)} required/></label>}
  <div className="virtual-library-toolbar"><AppButton type="submit" disabled={busy||edit.action==='move'&&!movePage}>Confirmar</AppButton><AppButton type="button" disabled={busy} onClick={()=>setEdit(null)}>Cancelar</AppButton></div></form>
  </div></div>}
  {dropboxPicker&&dropbox&&<DropboxLibraryPicker key={dropbox.id+':'+dropboxStructure} connectionId={dropbox.id} includeFolders={dropboxStructure} onClose={()=>setDropboxPicker(false)} onSelect={(ids,names)=>void addDropbox(ids,names)}/>}
- {preview&&selectedProjectId&&<LibraryAssetPreview key={preview.id} projectId={selectedProjectId} node={preview} onClose={()=>{setPreview(null);void load();}}/>}
+ {preview&&selectedProjectId&&<LibraryAssetPreview key={preview.id} projectId={selectedProjectId} node={preview} onClose={()=>setPreview(null)}/>}
  {structure&&selectedProjectId&&<LibraryStructureDialog key={selectedProjectId+':'+parent} projectId={selectedProjectId} parentId={parent} onClose={()=>setStructure(false)} onApplied={()=>{setStructure(false);void load();}}/>}
  {assisted&&selectedProjectId&&<AssistedLibraryImport key={selectedProjectId+':'+assisted.parentId} projectId={selectedProjectId} parentId={assisted.parentId} sources={assisted.sources} unavailable={assisted.failed} onClose={()=>{setAssisted(null);void load();}} onApplied={()=>{setAssisted(null);setSearch('');setTerm('');void load();}}/>}
  </section>;
