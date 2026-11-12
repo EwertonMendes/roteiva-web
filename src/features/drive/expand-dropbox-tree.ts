@@ -23,11 +23,11 @@ export async function expandDropboxTree(call:Call,connectionId:string,selected:I
   let cursor:string|null=null;
   do{
    if(++requests>MAX_REQUESTS)throw new Error('A árvore é grande demais para uma única operação. Importe por subpastas.');
-   const path='/integrations/dropbox/'+encodeURIComponent(connectionId)+'/folders/'+encodeURIComponent(current.fileId)+'/items'+
+   const endpoint:string='/integrations/dropbox/'+encodeURIComponent(connectionId)+'/folders/'+encodeURIComponent(current.fileId)+'/items'+
     (cursor?'?pageToken='+encodeURIComponent(cursor):'');
-   const page=await call<Page>(path,'GET',undefined,signal);
-   if(!page||!Array.isArray(page.files))throw new Error('O Dropbox retornou uma página inválida. Nada foi importado.');
-   for(const file of page.files){
+   const listing:Page=await call<Page>(endpoint,'GET',undefined,signal);
+   if(!listing||!Array.isArray(listing.files))throw new Error('O Dropbox retornou uma página inválida. Nada foi importado.');
+   for(const file of listing.files){
     if(!file||typeof file.id!=='string'||typeof file.name!=='string'||!file.id||!file.name)continue;
     const source:InspectedLibrarySource={provider:'dropbox',connectionId,fileId:file.id,
      kind:file.isFolder?'folder':'asset',name:file.name,parentIds:[],path:file.pathLower};
@@ -40,7 +40,7 @@ export async function expandDropboxTree(call:Call,connectionId:string,selected:I
    const files=fileCount();progress(folders,files);
    if(folders>MAX_FOLDERS||files>MAX_FILES)
     throw new Error('A seleção ultrapassa o limite seguro de 80 pastas ou 500 arquivos. Selecione subpastas menores; nenhum item foi importado.');
-   cursor=page.nextPageToken||null;
+   cursor=listing.nextPageToken||null;
   }while(cursor);
  }
  return [...results.values()];

@@ -58,7 +58,7 @@ test('explorer sorts folders first and searches within the project including des
  assert.equal(all.nodes[0].parent_name,'Subfolder');
  assert.deepEqual((await (await listLibraryExplorer(env,lib,'root',null,'image',false)).json()).nodes.map(x=>x.name),['Image root']);
  const root=await (await listLibraryExplorer(env,lib,'root',null)).json();
- assert.deepEqual(root.nodes.map(x=>x.name),['alpha','Zoo']);
+ assert.deepEqual(root.nodes.map(x=>x.name),['alpha','Image root','Zoo']);
  assert.equal((await (await listLibraryExplorer(env,other,'root',null,'Image',true)).json()).nodes.length,0);
 });
 test('explorer sorted pagination has stable non-overlapping pages',async t=>{
