@@ -2,6 +2,8 @@
 
 ## Biblioteca virtual — implementação em andamento
 
+A branch agora inclui API de comandos autenticados, registry de referências e interface virtual com seleção múltipla Drive. O desenvolvimento fica atrás de flags desativadas (`VIRTUAL_LIBRARY_ENABLED`/`VITE_VIRTUAL_LIBRARY`); não habilitar em PROD antes de completar aprovações, mídia e homologação.
+
 Branch `codex/virtual-library`: fundação local aditiva de árvore virtual e contratos de revisão de conteúdo. Ainda não integrada à interface nem habilitada em DEV/PROD. O produto publicado mantém seu comportamento atual.
 
 **Domínio próprio publicado:** [roteiva.com](https://roteiva.com), login no mesmo domínio e API [api.roteiva.com](https://api.roteiva.com), usando os recursos PROD existentes. HTTPS, www, login real, recarga, links antigos e conexões preservadas conferidos; marcas Google verificadas/publicadas. Aprovação dos escopos Drive e produção Dropbox continuam separadas no [roadmap](docs/MVP-ROADMAP.md#domínio-roteivacom--11112026).

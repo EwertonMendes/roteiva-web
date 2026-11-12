@@ -12,7 +12,7 @@ export type DropboxConnection={
  access_token_expires_at:number;revision:number;status:'connected'|'reconnect_required'|'revocation_pending';
  refresh_lease_id:string|null;refresh_lease_until:number;refresh_retry_after:number;
 };
-type DropboxMeta={'.tag':'file'|'folder'|'deleted';id?:string;name?:string;size?:number;
+type DropboxMeta={'.tag':'file'|'folder'|'deleted';id?:string;name?:string;size?:number;rev?:string;
  path_display?:string;path_lower?:string;server_modified?:string;is_downloadable?:boolean};
 type DropboxAccount={account_id:string;email:string;email_verified:boolean;disabled?:boolean};
 export const DROPBOX_SCOPE=['account_info.read','files.metadata.read','files.content.read','files.content.write'];
@@ -280,10 +280,10 @@ export function dropboxNormalize(meta:DropboxMeta){
    isFolder:folder,size:folder?undefined:String(meta.size||0),modifiedTime:meta.server_modified,
    pathDisplay:meta.path_display,pathLower:meta.path_lower,thumbnailFallback:!folder&&/\.(jpe?g|png|gif|webp|bmp|tiff?|pdf)$/i.test(meta.name)};
 }
-export async function dropboxMetadata(env:Env,uid:string,connectionId:string,fileId:string):Promise<DropboxMeta>{
+export async function dropboxMetadata(env:Env,uid:string,connectionId:string,fileId:string,fetcher:typeof fetch=fetch):Promise<DropboxMeta>{
  if(!validStorageFileId('dropbox',fileId))throw new ApiError(400,'dropbox_invalid_file');
  const row=await dropboxConnection(env,uid,connectionId);
- return await jsonDropbox(env,row,'files/get_metadata',{path:fileId}) as DropboxMeta;
+ return await jsonDropbox(env,row,'files/get_metadata',{path:fileId},fetcher) as DropboxMeta;
 }
 /**
  * A final Dropbox list_folder cursor is reusable for future changes. The cursor

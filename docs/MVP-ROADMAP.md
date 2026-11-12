@@ -2,6 +2,9 @@
 
 ## Biblioteca virtual e aprovações — implementação autorizada 11/11/2026
 
+- [x] Código local adicional: comandos autorizados por projeto, registry e importação confirmada/deduplicada, interface de pastas/criação/renomeação/remoção e Picker Drive em lote. Onze testes focados aprovados; API completa 227 testes e TypeScript frontend/backend aprovados antes da revisão final.
+- [ ] Integrar Dropbox na UI, mover/restaurar, preview, uploads, capas, portal por sessão e revisão exata; testes de navegador e provedores reais. Flags permanecem desativadas e nenhum deploy ocorreu.
+
 **EM ANDAMENTO; NÃO PUBLICADO.** Proprietário autorizou implementar o estudo, reconstruir metadados necessários, homologar DEV e depois publicar/testar PROD com sua conta. Isso não autoriza apagar originais dos provedores.
 
 - [x] Fundação local: árvore com constraints/triggers e testes de ciclos, pais cruzados e profundidade; endpoints de revisão específica e ranges limitados, classificação de falhas; seis testes focados aprovados.

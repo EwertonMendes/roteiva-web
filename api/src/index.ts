@@ -8,6 +8,7 @@ import { callback, start, launch, enabled } from './oauth.ts';
 import { metadata, disconnect, about } from './drive.ts';
 import { listFolders, listFolderItems } from './folders.ts';
 import { thumbnail } from './thumbnails.ts';
+import {libraryRouter} from './library.ts';
 import { startUpload, completeUpload, authorizeUploadFolder, cleanupUploads } from './uploads.ts';
 import { verifyPickerToken } from './picker.ts';
 import { deletionStatus, requestDeletion, runPendingDeletions, runDeletionMaintenance } from './account-deletion.ts';
@@ -77,6 +78,11 @@ export async function handle(request: Request, env: Env): Promise<Response> {
       const principal=await verifiedTrialPrincipal(request,env);
       if(!(await env.API_RATE_LIMIT.limit({key:env.ENVIRONMENT+':access:'+principal.uid})).success)throw new ApiError(429,'rate_limited');
       response=await ensureAccess(env,principal.uid,undefined,principal);
+    } else if (url.pathname.startsWith('/library/')) {
+      if(env.VIRTUAL_LIBRARY_ENABLED!=='true')throw new ApiError(404,'not_found');
+      if(request.method==='POST'&&!allowedFrontend(env,origin))throw new ApiError(403,'origin_required');
+      const uid=await identity(request,env);await assertActiveAccess(env,uid);
+      response=await libraryRouter(request,env,uid,url);
     } else if (url.pathname === '/reviews' || url.pathname.startsWith('/reviews/')) {
       if (request.method === 'POST' && !allowedFrontend(env,origin)) throw new ApiError(403,'origin_required');
       if (url.pathname!=='/reviews/media'&&!(await env.API_RATE_LIMIT.limit({key:env.ENVIRONMENT+':reviews:'+sourceIp.slice(0,64)})).success) throw new ApiError(429,'rate_limited');

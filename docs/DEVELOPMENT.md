@@ -2,6 +2,8 @@
 
 ## Biblioteca virtual — desenvolvimento local
 
+**Flags de desenvolvimento:** `VIRTUAL_LIBRARY_ENABLED=true` no Worker e `VITE_VIRTUAL_LIBRARY=true` no build frontend. Ainda NÃO configurar em DEV/PROD compartilhados: interface/importação incompletas para Dropbox, uploads, mover/restaurar, preview e aprovações. A suíte de API aplica 0021 e 0022 em todos os fixtures; testes `library*.test.mjs` cobrem árvore, autorização, importação e contratos de fonte. Nenhuma migration remota executada.
+
 Branch `codex/virtual-library`. Executar em `api/`: `node --experimental-strip-types --test tests/library-tree.test.mjs tests/library-source.test.mjs`, `npm run typecheck` e `npm test`. Migration 0021 é somente aditiva e não foi aplicada remotamente. Não publicar como substituta do runtime antes de integrar consumidores, validar provedores reais e concluir os gates DEV.
 
 ## Configuração do domínio próprio — 11/11/2026

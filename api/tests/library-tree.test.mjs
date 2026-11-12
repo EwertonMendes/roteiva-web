@@ -11,7 +11,7 @@ test('tree constraints reject cycles, foreign parents, nonfolder parents and mut
  const sql=fixture(t);add(sql,'videos');add(sql,'raw','videos');add(sql,'clip','raw','asset');
  assert.throws(()=>sql.prepare("UPDATE library_nodes SET parent_id='raw' WHERE library_id='a' AND id='videos'").run(),/library_cycle/);
  assert.throws(()=>add(sql,'invalid','clip'),/library_parent_denied/);
- sql.prepare("INSERT INTO library_nodes VALUES('b','other','root','folder','Other','active',1)").run();
+ sql.prepare("INSERT INTO library_nodes(library_id,id,parent_id,kind,name) VALUES('b','other','root','folder','Other')").run();
  assert.throws(()=>add(sql,'foreign','other'),/library_parent_denied/);
  assert.throws(()=>sql.prepare("UPDATE library_nodes SET state='trashed' WHERE id='root'").run(),/library_root_immutable/);
  assert.throws(()=>sql.prepare("UPDATE library_nodes SET id='changed' WHERE id='raw'").run(),/library_identity_immutable/);

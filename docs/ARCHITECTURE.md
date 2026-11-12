@@ -2,6 +2,8 @@
 
 ## Fundação da Biblioteca virtual — 11/11/2026
 
+**Atualização da branch:** migration 0022 registra assets e referências sem conteúdo binário. Comandos da árvore usam autorização Firestore do próprio solicitante, CAS e limites SQL. Importação confirma cada recurso pelo provedor, exige isAppAuthorized no Drive, vincula conta/projeto/pasta e deduplica por asset na pasta ativa. Pastas virtuais não dependem de parent físico. Rotas `/library/projects/{id}/nodes`, `/imports` e `/picker/{connectionId}` só existem quando a flag backend está true. A UI tem flag independente; ambas permanecem desativadas nos ambientes publicados. Sessões/versões do portal e reset ainda não foram implementados.
+
 **IMPLEMENTAÇÃO PARCIAL, NÃO HABILITADA.** Migration 0021 prepara árvores isoladas por biblioteca, com pais compostos e triggers para ciclos/profundidade. `library-source.ts` separa falhas temporárias de indisponibilidade e exige revisão explícita para construir endpoints de mídia de aprovação. Esses contratos ainda não são consumidores do runtime: não afirmar OAuth mínimo, portal seguro por sessão ou nova Biblioteca já entregues. Não há reset nem mudança de grants.
 
 ## Domínio próprio PROD — 11/11/2026

@@ -36,6 +36,7 @@ import { SettingsPage } from "./features/settings/SettingsPage";
 import { IconLabel } from "./features/ui/IconLabel";
 import { PROJECT_STATUS_ICONS, PROJECT_STATUS_LABELS } from "./features/ui/project-status";
 import { DriveConnectionPanel } from "./features/drive/DriveConnectionPanel";
+import {VirtualLibrary} from './features/drive/VirtualLibrary';
 import { DropboxConnectionPanel } from "./features/dropbox/DropboxConnectionPanel";
 import googleDriveMark from "./assets/brand/google-drive.svg";
 import dropboxMark from "./assets/brand/dropbox.svg";
@@ -720,6 +721,7 @@ function LibraryView({ assets, query, onUpload, projects, selectedProjectId, onS
   const kinds: (AssetKind | "Todos")[] = ["Todos", "Vídeo", "Imagem", "Áudio", "Documento"];
 
   if (isDemo && import.meta.env.VITE_LIBRARY_REVIEW === "true") return <LibraryReviewDemo />;
+  if (!isDemo && import.meta.env.VITE_VIRTUAL_LIBRARY === 'true') return <VirtualLibrary projects={projects} selectedProjectId={selectedProjectId} onSelectProject={onSelectProject}/>;
   return <div className="library-layout">
     {!isDemo && (!useEmulators || (import.meta.env.MODE === "emulator" && new URLSearchParams(window.location.search).get("driveE2E") === "1")) && <>
       {dropboxEnabled&&<nav className="storage-providers" aria-label="Provedor de armazenamento" role="tablist">
