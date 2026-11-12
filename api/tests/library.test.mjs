@@ -70,3 +70,17 @@ test('explorer sorted pagination has stable non-overlapping pages',async t=>{
  assert.equal(new Set([...page1.nodes,...page2.nodes].map(x=>x.id)).size,65);
  assert.equal(page1.nodes.at(-1).name,'Folder 049');assert.equal(page2.nodes[0].name,'Folder 050');
 });
+
+test('project-wide explorer search hides descendants of trashed ancestor and rejects foreign cursors',async t=>{
+ const f=database();t.after(f.close);const env={DB:f.DB},lib=await libraryFor(env,'alice',12);
+ const make=async(name,parentId='root')=>(await (await mutateLibrary(env,lib,null,{name,parentId})).json()).id;
+ const hidden=await make('Hidden parent'),child=await make('hiddenchild',hidden);
+ const item=await make('hiddenVisibleRoot'),otherFolder=await make('another');
+ let result=await (await listLibraryExplorer(env,lib,'root',null,'hidden',true)).json();
+ assert.deepEqual(result.nodes.map(x=>x.name),['Hidden parent','hiddenVisibleRoot','hiddenchild']);
+ await mutateLibrary(env,lib,hidden,{action:'trash',revision:1});
+ result=await (await listLibraryExplorer(env,lib,'root',null,'hidden',true)).json();
+ assert.deepEqual(result.nodes.map(x=>x.name),['hiddenVisibleRoot']);
+ await assert.rejects(listLibraryExplorer(env,lib,'root',child,'hidden',true),e=>e.code==='library_node_unavailable');
+ await assert.rejects(listLibraryExplorer(env,lib,otherFolder,item,'hidden',false),e=>e.code==='library_changed');
+});
