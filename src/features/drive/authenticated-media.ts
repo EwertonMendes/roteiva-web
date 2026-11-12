@@ -1,5 +1,5 @@
 import {API_BASE_URL} from '../../lib/environment';
-const providers=new Map<string,{getToken:()=>Promise<string>;url:string}>();
+const providers=new Map<string,{getToken:()=>Promise<string>;getReviewSession?:()=>string;url:string}>();
 let setup:Promise<void>|undefined;
 let listening=false;
 async function prepare(){
@@ -9,7 +9,7 @@ async function prepare(){
  if(event.source!==navigator.serviceWorker.controller||event.data?.type!=='media-authorization'||!event.ports[0])return;
  const provider=providers.get(event.data.id),port=event.ports[0];
  if(!provider){port.postMessage({});return;}
- void provider.getToken().then(token=>port.postMessage({authorization:token?'Bearer '+token:'',url:provider.url})).catch(()=>port.postMessage({}));
+ void provider.getToken().then(token=>port.postMessage({authorization:token?'Bearer '+token:'',reviewSession:provider.getReviewSession?.(),url:provider.url})).catch(()=>port.postMessage({}));
  });}
  await navigator.serviceWorker.register('/roteiva-media-sw.js',{scope:'/',updateViaCache:'none'});
  await navigator.serviceWorker.ready;
@@ -32,15 +32,15 @@ function message(data:unknown):Promise<void>{
 export async function authenticatedMedia(projectId:number,nodeId:string,getToken:()=>Promise<string>){
  return bindMedia(API_BASE_URL+'/library/projects/'+projectId+'/nodes/'+nodeId+'/content',getToken);
 }
-export async function authenticatedReviewMedia(url:string,getToken:()=>Promise<string>){
+export async function authenticatedReviewMedia(url:string,getToken:()=>Promise<string>,getReviewSession:()=>string){
  if(!url.startsWith(API_BASE_URL+'/reviews/media?ticket='))throw new Error('Endereço de mídia inválido.');
- return bindMedia(url,getToken);
+ return bindMedia(url,getToken,getReviewSession);
 }
 export async function authenticatedOwnerReviewMedia(reviewId:string,fileId:string,getToken:()=>Promise<string>){
  return bindMedia(API_BASE_URL+'/reviews/'+reviewId+'/content?fileId='+encodeURIComponent(fileId),getToken);
 }
-async function bindMedia(url:string,getToken:()=>Promise<string>){
- await prepare();const id=crypto.randomUUID();providers.set(id,{getToken,url});
+async function bindMedia(url:string,getToken:()=>Promise<string>,getReviewSession?:()=>string){
+ await prepare();const id=crypto.randomUUID();providers.set(id,{getToken,url,getReviewSession});
  try{await message({type:'bind-media',id,url});}
  catch(error){providers.delete(id);throw error;}
  return {url:'/__roteiva_media/'+id,close:()=>{providers.delete(id);void message({type:'revoke-media',id}).catch(()=>{});}};

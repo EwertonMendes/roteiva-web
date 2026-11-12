@@ -5,6 +5,7 @@ import {encrypt,context,base64url} from '../src/crypto.ts';
 import {dropboxAccess,dropboxConnection,dropboxList,dropboxStart,dropboxLaunch,dropboxCallback,dropboxNormalize,dropboxThumbnail} from '../src/dropbox.ts';
 import {startDropboxUpload,appendDropboxUpload,finishDropboxUpload} from '../src/dropbox-uploads.ts';
 import {issueDropboxPreview,streamDropboxPreview} from '../src/dropbox-preview.ts';
+import {libraryFor,mutateLibrary} from '../src/library.ts';
 
 const uid='alice', conn='ffffffff-ffff-4fff-8fff-ffffffffffff';
 const folder='root', id='id:a4ayc_80_OEAAAAAAAAAXw', root=uid;
@@ -63,6 +64,32 @@ test('Dropbox connection requires matching owner and encrypted token cache',asyn
  await assert.rejects(()=>dropboxConnection(f.env,'other-user',conn),e=>e.status===404);
  f.sql.prepare("UPDATE dropbox_connections SET status='reconnect_required' WHERE id=?").run(conn);
  await assert.rejects(()=>dropboxAccess(f.env,row),e=>e.code==='dropbox_reconnect_required');
+});
+test('virtual Dropbox upload registers only confirmed bytes and rechecks a trashed destination before each chunk',async t=>{
+ const f=await fixture(t);f.env.VIRTUAL_LIBRARY_ENABLED='true';const lib=await libraryFor(f.env,uid,17);
+ const virtual=(await (await mutateLibrary(f.env,lib,null,{name:'Videos'})).json()).id,target='id:MANAGED_FOLDER_12345';
+ f.sql.prepare("INSERT INTO library_upload_targets(library_id,provider,connection_id,reserved_id,file_id,state,created_at) VALUES(?,'dropbox',?,?,?,'ready',?)").run(lib.id,conn,'/Roteiva - '+crypto.randomUUID(),target,Date.now());
+ const old=global.fetch,log=[];global.fetch=async(url,options={})=>{
+  const path=new URL(url).pathname;log.push(path);
+  if(path.endsWith('files/get_metadata')){
+   const selected=JSON.parse(options.body).path;
+   return Response.json(selected===target?{'.tag':'folder',id:target,path_display:'/Roteiva QA',path_lower:'/roteiva qa',name:'Roteiva QA'}:
+    {'.tag':'file',id,name:'Review.mp4',size:5,path_display:'/Roteiva QA/Review.mp4',path_lower:'/roteiva qa/review.mp4',rev:'r1',is_downloadable:true});
+  }
+  if(path.endsWith('upload_session/finish'))return Response.json({id,name:'Review.mp4',size:5,path_lower:'/roteiva qa/review.mp4'});
+  return fetchStub()(url,options);
+ };t.after(()=>{global.fetch=old});
+ await startDropboxUpload(f.env,uid,conn,request({attemptId,projectId:17,linkedFolderId:virtual,targetFolderId:target,name:'Review.mp4',size:5,mimeType:'video/mp4'}));
+ await mutateLibrary(f.env,lib,virtual,{action:'trash',revision:1});
+ const chunk=()=>new Request(API+'/integrations/dropbox/'+conn+'/uploads/'+attemptId+'/chunk?offset=0',{method:'POST',headers:{Authorization:'Bearer fake'},body:new Uint8Array(5)});
+ await assert.rejects(appendDropboxUpload(f.env,uid,conn,attemptId,chunk()),e=>e.code==='library_node_unavailable');
+ assert.equal(log.filter(x=>x.endsWith('upload_session/append_v2')).length,0);
+ await mutateLibrary(f.env,lib,virtual,{action:'restore',revision:2});
+ await appendDropboxUpload(f.env,uid,conn,attemptId,chunk());
+ await finishDropboxUpload(f.env,uid,conn,attemptId,request({}));await finishDropboxUpload(f.env,uid,conn,attemptId,request({}));
+ assert.equal(log.filter(x=>x.endsWith('upload_session/finish')).length,1);
+ assert.equal(f.sql.prepare('SELECT count(*) n FROM library_entries').get().n,1);
+ assert.equal(log.some(x=>x.includes('/dropboxFolders/')),false);
 });
 test('Dropbox list preserves provider opaque ids and normalizes metadata',async t=>{
  const f=await fixture(t);const old=global.fetch;const log=[];global.fetch=fetchStub(log);

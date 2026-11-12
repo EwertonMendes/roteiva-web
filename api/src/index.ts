@@ -10,7 +10,7 @@ import { listFolders, listFolderItems } from './folders.ts';
 import { thumbnail } from './thumbnails.ts';
 import {libraryRouter} from './library.ts';
 import { startUpload, completeUpload, authorizeUploadFolder, cleanupUploads } from './uploads.ts';
-import { verifyPickerToken } from './picker.ts';
+import { verifyPickerToken,pickerConfiguration } from './picker.ts';
 import { deletionStatus, requestDeletion, runPendingDeletions, runDeletionMaintenance } from './account-deletion.ts';
 import { monitorDeletionBacklog } from './deletion-monitor.ts';
 import { ensureAccess, assertActiveAccess } from './access.ts';
@@ -53,7 +53,7 @@ export async function handle(request: Request, env: Env): Promise<Response> {
       if (!origin) throw new ApiError(403,'origin_required');
       response = new Response(null,{status:204,headers:{
         'Access-Control-Allow-Methods':'GET, HEAD, POST, OPTIONS',
-        'Access-Control-Allow-Headers':'Authorization, Content-Type, X-Review-Token, Range','Access-Control-Max-Age':'3600',
+        'Access-Control-Allow-Headers':'Authorization, Content-Type, X-Review-Token, X-Review-Session, Range','Access-Control-Max-Age':'3600',
       }});
     } else if (url.pathname === '/health' && request.method === 'GET') {
       response = Response.json({status:'ok',environment:env.ENVIRONMENT});
@@ -179,6 +179,10 @@ export async function handle(request: Request, env: Env): Promise<Response> {
       response=parts[4]==='cover-images'?await listCoverImages(env,uid,parts[3],url.searchParams)
        :parts[6]==='preview'?await fastCoverPreview(env,uid,parts[3],parts[5])
        :await coverImage(env,uid,parts[3],parts[5]);
+    } else if (/^\/integrations\/drive\/[^/]+\/picker\/config$/.test(url.pathname) && request.method==='GET'&&env.VIRTUAL_LIBRARY_ENABLED==='true') {
+      enabled(env);
+      const uid=await identity(request,env);await assertActiveAccess(env,uid);
+      response=await pickerConfiguration(env,uid,url.pathname.split('/')[3]);
     } else if (/^\/integrations\/drive\/[^/]+\/picker\/verify$/.test(url.pathname) && request.method==='POST') {
       enabled(env);
       if(!allowedFrontend(env,origin))throw new ApiError(403,'origin_required');

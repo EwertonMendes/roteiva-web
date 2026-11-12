@@ -6,7 +6,7 @@ import {useOverlayFocus} from './DriveLibraryUI';
 type Item={id:string;name:string;isFolder:boolean};
 type Page={files:Item[];nextPageToken:string|null};
 /** Selection survives folder navigation, but is never itself an authorization grant. */
-export function DropboxLibraryPicker({connectionId,onClose,onSelect}:{connectionId:string;onClose:()=>void;onSelect:(ids:string[])=>void}){
+export function DropboxLibraryPicker({connectionId,onClose,onSelect}:{connectionId:string;onClose:()=>void;onSelect:(ids:string[],names:Map<string,string>)=>void}){
  const call=useDriveApi(),dialogRef=useOverlayFocus(onClose);
  const [trail,setTrail]=useState([{id:'root',name:'Meu Dropbox'}]),[page,setPage]=useState<Page|null>(null);
  const [selected,setSelected]=useState<Map<string,string>>(new Map()),[busy,setBusy]=useState(false),[error,setError]=useState('');
@@ -27,6 +27,6 @@ export function DropboxLibraryPicker({connectionId,onClose,onSelect}:{connection
  {busy&&<p role="status">Carregando…</p>}{page&&!page.files.length&&!busy&&<p>Esta pasta está vazia.</p>}
  {page?.nextPageToken&&<AppButton disabled={busy} onClick={()=>void load(page.nextPageToken!)}>Carregar mais</AppButton>}
  <p role="status">{selected.size} arquivo(s) selecionado(s)</p>
- <div className="virtual-library-toolbar"><AppButton disabled={!selected.size} onClick={()=>onSelect(Array.from(selected.keys()))}>Adicionar selecionados</AppButton><AppButton onClick={onClose}>Cancelar</AppButton></div>
+ <div className="virtual-library-toolbar"><AppButton disabled={!selected.size} onClick={()=>onSelect(Array.from(selected.keys()),selected)}>Adicionar selecionados</AppButton><AppButton onClick={onClose}>Cancelar</AppButton></div>
  </div></div>;
 }

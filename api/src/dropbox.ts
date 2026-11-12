@@ -243,7 +243,8 @@ export async function dropboxRevoke(env:Env,uid:string,id:string,accountDeletion
  // Do not invalidate credentials until the remote revocation has a chance to run.
  let access:string;
  try{
-  if(row.status==='connected'&&!accountDeletion)access=await dropboxAccess(env,row);
+  if(row.status!=='connected'&&!row.encrypted_refresh_token&&!row.encrypted_access_token)access='';
+  else if(row.status==='connected'&&!accountDeletion)access=await dropboxAccess(env,row);
   else access=(await tokenRequest(env,{grant_type:'refresh_token',refresh_token:await decrypt(env,row.encrypted_refresh_token!,refreshContext(env,row))})).access_token;
  }catch(error){
   if(error instanceof ApiError&&error.code==='dropbox_reconnect_required')access='';
@@ -255,7 +256,8 @@ export async function dropboxRevoke(env:Env,uid:string,id:string,accountDeletion
   if(!response.ok&&response.status!==401)throw new ApiError(503,'dropbox_revocation_unavailable');
  }
  await env.DB.prepare('DELETE FROM dropbox_upload_attempts WHERE owner_uid=? AND connection_id=?').bind(uid,id).run();
- await env.DB.prepare('DELETE FROM dropbox_connections WHERE owner_uid=? AND id=?').bind(uid,id).run();
+ if(env.VIRTUAL_LIBRARY_ENABLED==='true'&&!accountDeletion)await env.DB.prepare("UPDATE dropbox_connections SET status='reconnect_required',encrypted_refresh_token=NULL,encrypted_access_token=NULL,access_token_expires_at=0 WHERE owner_uid=? AND id=? AND status='revocation_pending'").bind(uid,id).run();
+ else await env.DB.prepare('DELETE FROM dropbox_connections WHERE owner_uid=? AND id=?').bind(uid,id).run();
  return Response.json({disconnected:true});
 }
 function mime(name:string):string{

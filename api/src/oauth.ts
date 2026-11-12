@@ -57,7 +57,8 @@ export async function launch(request: Request, env: Env): Promise<Response> {
   target.search = new URLSearchParams({
     client_id:env.GOOGLE_CLIENT_ID!, redirect_uri:env.OAUTH_REDIRECT_URI,
     response_type:'code', access_type:'offline', prompt:'consent select_account',
-    scope:'openid email ' + DRIVE_SCOPE + ' ' + DRIVE_READ_SCOPE, state, nonce:tx.nonce,
+    scope:'openid email ' + DRIVE_SCOPE + (env.VIRTUAL_LIBRARY_ENABLED==='true'?'':' '+DRIVE_READ_SCOPE),
+    include_granted_scopes:'false',state, nonce:tx.nonce,
     code_challenge:await hash(verifier),code_challenge_method:'S256',
   }).toString();
   return new Response(null,{status:303,headers:{
@@ -96,7 +97,7 @@ export async function callback(request: Request, env: Env): Promise<Response> {
       throw new ApiError(400,'invalid_google_identity');
     }
     await assertActiveAccess(env,tx.owner_uid);
-    await persistDriveConsent(env, tx.owner_uid, tokens, {sub:payload.sub,email:payload.email}, fetch, true);
+    await persistDriveConsent(env, tx.owner_uid, tokens, {sub:payload.sub,email:payload.email}, fetch, env.VIRTUAL_LIBRARY_ENABLED!=='true');
     await finishExchange(env,tx.owner_uid,exchangeId);
     return finish(env,'connected');
   } catch (error) {
@@ -109,6 +110,7 @@ export async function callback(request: Request, env: Env): Promise<Response> {
       'drive_verification_unavailable', 'google_identity_missing',
       'invalid_google_identity', 'reconnect_required', 'connection_changed',
       'google_unavailable', 'drive_read_permission_missing',
+      'drive_reconnect_minimum_required',
     ]);
     const code = error instanceof ApiError && recoverable.has(error.code) ? error.code : 'connection_failed';
     return finish(env,code);

@@ -135,3 +135,22 @@ test('partial Drive authorization never claims existing-folder read access',asyn
   );
   assert.equal(writes.length,0);
 });
+test('virtual mode accepts only minimum Drive consent and never preserves a broad refresh credential',async()=>{
+ const broad=DRIVE_SCOPE+' https://www.googleapis.com/auth/drive.readonly';
+ const fresh=makeEnv();fresh.env.VIRTUAL_LIBRARY_ENABLED='true';
+ await assert.rejects(persistDriveConsent(fresh.env,'user-A',grant({scope:broad}),identity,driveOK()),e=>e.code==='drive_reconnect_minimum_required');
+ assert.equal(fresh.writes.length,0);
+ await persistDriveConsent(fresh.env,'user-A',grant({scope:'openid email '+DRIVE_SCOPE}),identity,driveOK());
+ assert.equal(fresh.writes[0][5],DRIVE_SCOPE);
+ const old=makeEnv({status:'connected',scopes:broad,encrypted_refresh_token:'old-encrypted'});old.env.VIRTUAL_LIBRARY_ENABLED='true';
+ await assert.rejects(persistDriveConsent(old.env,'user-A',grant({scope:DRIVE_SCOPE,refresh_token:undefined}),identity,driveOK()),e=>e.code==='drive_reconnect_minimum_required');
+ assert.equal(old.writes.length,0);
+});
+test('virtual consent proves missing scope with tokeninfo instead of assuming it',async()=>{
+ const {env,writes}=makeEnv();env.VIRTUAL_LIBRARY_ENABLED='true';env.GOOGLE_CLIENT_ID='expected-client';
+ const load=async(url,options)=>new URL(url).hostname==='oauth2.googleapis.com'?Response.json({aud:'expected-client',scope:DRIVE_SCOPE}):driveOK()(url,options);
+ await persistDriveConsent(env,'user-A',grant(),identity,load);assert.equal(writes[0][5],DRIVE_SCOPE);
+ const wrong=makeEnv();wrong.env.VIRTUAL_LIBRARY_ENABLED='true';wrong.env.GOOGLE_CLIENT_ID='expected-client';
+ await assert.rejects(persistDriveConsent(wrong.env,'user-A',grant(),identity,async()=>Response.json({aud:'wrong',scope:DRIVE_SCOPE})),e=>e.code==='drive_permission_missing');
+ assert.equal(wrong.writes.length,0);
+});

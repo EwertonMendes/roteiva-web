@@ -1,8 +1,8 @@
 import {ApiError,type Env} from './types.ts';
 import {connection} from './repository.ts';
 import {driveJson} from './drive-client.ts';
-import {dropboxMetadata} from './dropbox.ts';
-import {libraryNode,libraryFor} from './library.ts';
+import {dropboxMetadata,dropboxNormalize} from './dropbox.ts';
+import {libraryNode,libraryFor} from './library-core.ts';
 import {validConnectionId,validStorageFileId,isStorageProvider} from './storage.ts';
 
 type Candidate={provider:'google_drive'|'dropbox';connectionId:string;fileId:string};
@@ -19,6 +19,17 @@ function candidate(value:unknown):Candidate{
  return x as Candidate;
 }
 export async function readLibrarySource(env:Env,uid:string,x:Candidate,fetcher:typeof fetch=fetch):Promise<Metadata>{
+ try{return await readSource(env,uid,x,fetcher);}
+ catch(error){
+  if(error instanceof ApiError){
+   if(error.code==='dropbox_file_not_found')throw new ApiError(404,'source_unavailable');
+   if(['drive_permission_denied','dropbox_access_denied'].includes(error.code))throw new ApiError(403,'source_restricted');
+   if(['drive_rate_limited','dropbox_rate_limited'].includes(error.code))throw new ApiError(429,'provider_rate_limited');
+  }
+  throw error;
+ }
+}
+async function readSource(env:Env,uid:string,x:Candidate,fetcher:typeof fetch):Promise<Metadata>{
  if(x.provider==='google_drive'){
  const row=await connection(env,uid,x.connectionId);
  if(row.status!=='connected')throw new ApiError(409,'reconnect_required');
@@ -37,9 +48,7 @@ export async function readLibrarySource(env:Env,uid:string,x:Candidate,fetcher:t
  if(m['.tag']!=='file'||m.id!==x.fileId||typeof m.name!=='string')throw new ApiError(404,'source_unavailable');
  if(m.is_downloadable===false)throw new ApiError(403,'source_restricted');
  // Keep format discovery explicit; extensions never authorize or enable active content.
- const ext=m.name.split('.').at(-1)?.toLowerCase()||'';
- const types:Record<string,string>={pdf:'application/pdf',mp4:'video/mp4',webm:'video/webm',mov:'video/quicktime',mp3:'audio/mpeg',wav:'audio/wav',png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',webp:'image/webp'};
- return {name:m.name,mimeType:types[ext]||'application/octet-stream',size:typeof m.size==='number'?String(m.size):null,revision:typeof m.rev==='string'?m.rev:null};
+ return {name:m.name,mimeType:dropboxNormalize(m)?.mimeType||'application/octet-stream',size:typeof m.size==='number'?String(m.size):null,revision:typeof m.rev==='string'?m.rev:null};
 }
 /** Caller must authorize the project first; each item is then verified with its owner's credential. */
 export async function importLibraryAssets(env:Env,uid:string,projectId:number,input:unknown,fetcher:typeof fetch=fetch){
@@ -50,6 +59,7 @@ export async function importLibraryAssets(env:Env,uid:string,projectId:number,in
  const results=[];
  for(const item of items){
  try{
+ const observationStarted=Date.now();
  const metadata=await readLibrarySource(env,uid,item,fetcher);
  // Revalidate destination after provider I/O; a deleted destination never redirects the import.
  await libraryNode(env,lib,parent.id);
@@ -57,8 +67,8 @@ export async function importLibraryAssets(env:Env,uid:string,projectId:number,in
  const id=crypto.randomUUID();
  await env.DB.batch([
  env.DB.prepare(`INSERT INTO library_assets(library_id,id,provider,connection_id,file_id,source_name,mime_type,size,source_revision,observed_at,state)
- VALUES(?,?,?,?,?,?,?,?,?,?,'available') ON CONFLICT(library_id,id) DO UPDATE SET source_name=excluded.source_name,mime_type=excluded.mime_type,size=excluded.size,source_revision=excluded.source_revision,observed_at=excluded.observed_at,state='available'`)
- .bind(lib.id,asset,item.provider,item.connectionId,item.fileId,metadata.name,metadata.mimeType,metadata.size,metadata.revision,Date.now()),
+ VALUES(?,?,?,?,?,?,?,?,?,?,'available') ON CONFLICT(library_id,id) DO UPDATE SET source_name=excluded.source_name,mime_type=excluded.mime_type,size=excluded.size,source_revision=excluded.source_revision,observed_at=excluded.observed_at,state='available' WHERE library_assets.observed_at<=excluded.observed_at`)
+ .bind(lib.id,asset,item.provider,item.connectionId,item.fileId,metadata.name,metadata.mimeType,metadata.size,metadata.revision,observationStarted),
  env.DB.prepare(`INSERT OR IGNORE INTO library_nodes(library_id,id,parent_id,kind,name,asset_id)
  SELECT ?,?,?,'asset',?,? WHERE NOT EXISTS(WITH RECURSIVE c(id,parent_id,state) AS (
  SELECT id,parent_id,state FROM library_nodes WHERE library_id=? AND id=?

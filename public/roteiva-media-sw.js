@@ -6,7 +6,8 @@ function target(value){
  let url;try{url=new URL(value);}catch{return null;}
  const review=url.pathname==='/reviews/media'&&/^\?ticket=[A-Za-z0-9_.-]{1,750}$/.test(url.search);
  const owner=/^\/reviews\/[0-9a-f-]{36}\/content$/.test(url.pathname)&&/^\?fileId=(?:id%3A)?[A-Za-z0-9_-]{8,200}$/.test(url.search);
- if(!origins.has(url.origin)||(!review&&!owner&&(!path.test(url.pathname)||url.search))||url.hash||url.username||url.password)return null;
+ const local=['http://127.0.0.1:4173','http://127.0.0.1:5173'].includes(self.location.origin)&&url.origin==='http://127.0.0.1:8787';
+ if(!origins.has(url.origin)&&!local||(!review&&!owner&&(!path.test(url.pathname)||url.search))||url.hash||url.username||url.password)return null;
  return {url:url.href,review};
 }
 self.addEventListener('install',event=>event.waitUntil(self.skipWaiting()));
@@ -42,6 +43,7 @@ self.addEventListener('fetch',event=>{
  const current=target(reply?.url||entry?.url),token=reply?.authorization;
  if(!current||typeof token!=='string'||token.length>8192||(!token.startsWith('Bearer ')&&!(current.review&&token==='')))return deny();
  const headers=new Headers(token?{Authorization:token}:{});
+ if(current.review){if(!/^[A-Za-z0-9_-]{43}$/.test(reply?.reviewSession||''))return deny();headers.set('X-Review-Session',reply.reviewSession);}
  const range=event.request.headers.get('Range');if(range)headers.set('Range',range);
  try{
  const upstream=await fetch(current.url,{method:event.request.method,headers,credentials:'omit',cache:'no-store',redirect:'error',signal:AbortSignal.timeout(30000)});

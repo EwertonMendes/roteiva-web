@@ -11,9 +11,10 @@ import {mintReviewMediaTicket,reviewMediaSubject,streamReviewMedia,REVIEW_MEDIA_
 import {assertDropboxFolderLinked,verifyDropboxFile} from './dropbox-uploads.ts';
 import {dropboxMedia} from './dropbox.ts';
 import {validStorageFileId,validStorageFolderId,type StorageProviderId} from './storage.ts';
-import {libraryFor,libraryNode} from './library.ts';
+import {libraryFor,libraryNode} from './library-core.ts';
 import {readLibrarySource} from './library-assets.ts';
 import {readPublishedSource} from './review-source.ts';
+import {openReviewSession,loadReviewSession,sessionSubject,assertReviewSession,touchReviewSession,cleanupReviewSessions} from './review-sessions.ts';
 
 type Status = 'draft'|'publishing'|'pending'|'changes'|'approved'|'replacing'|'closing'|'closed';
 type Mode = 'link'|'google';
@@ -39,7 +40,7 @@ const inputText=(s:unknown,max:number,required=false)=>{
   return value;
 };
 const integer=(x:unknown)=>Number.isSafeInteger(x)&&Number(x)>0&&Number(x)<9007199254740991?Number(x):0;
-const reviewLink=(env:Env,token:string)=>env.FRONTEND_ORIGIN+'/review/'+encodeURIComponent(token);
+const reviewLink=(env:Env,token:string)=>env.FRONTEND_ORIGIN+(env.VIRTUAL_LIBRARY_ENABLED==='true'?'/review#invite=':'/review/')+encodeURIComponent(token);
 const tokenContext=(env:Env,row:Pick<Review,'owner_uid'|'id'>)=>context(env,row.owner_uid,row.id,'review-invite');
 const showReview=(r:Review)=>({
   id:r.id,clientId:r.client_id,projectId:r.project_id,clientName:r.client_name,projectName:r.project_name,
@@ -796,16 +797,18 @@ async function rotate(env:Env,r:Review):Promise<Response>{
   if(rotated.meta.changes!==1)throw new ApiError(409,'review_busy');
   return Response.json({url:reviewLink(env,secret)});
 }
-async function publicReview(request:Request,env:Env,action:'view'|'comment'|'decide'|'media'):Promise<Response>{
+async function publicReview(request:Request,env:Env,action:'view'|'comment'|'decide'|'media'|'session'):Promise<Response>{
   const token=request.headers.get('X-Review-Token')||'';
-  if(!/^[A-Za-z0-9_-]{43}$/.test(token))throw new ApiError(404,'review_not_found');
-  const r=await env.DB.prepare('SELECT * FROM review_requests WHERE token_hash=?').bind(await hash(token)).first<Review>();
+  const session=env.VIRTUAL_LIBRARY_ENABLED==='true'&&action!=='session'?await loadReviewSession(env,request.headers.get('X-Review-Session')||''):null;
+  if(!session&&!/^[A-Za-z0-9_-]{43}$/.test(token))throw new ApiError(404,'review_not_found');
+  const r=session?await env.DB.prepare('SELECT * FROM review_requests WHERE id=?').bind(session.review_id).first<Review>():await env.DB.prepare('SELECT * FROM review_requests WHERE token_hash=?').bind(await hash(token)).first<Review>();
   if(!r||r.status==='closed'||r.status==='closing')throw new ApiError(404,'review_not_found');
   if(r.expires_at<=now())throw new ApiError(410,'review_expired');
   if(!['pending','changes','approved'].includes(r.status))throw new ApiError(409,'review_not_ready');
-  let email='',role:'reviewer'|'viewer'='reviewer';
+  let email='',subject:string|null=null,role:'reviewer'|'viewer'='reviewer';
   if(r.access_mode==='google'){
     const principal=await verifiedTrialPrincipal(request,env);
+    subject=await sessionSubject(principal.uid,principal.googleSubject);
     email=principal.verifiedEmail.toLowerCase();
     const participant=await env.DB.prepare('SELECT role FROM review_participants WHERE review_id=? AND email=?')
       .bind(r.id,email).first<{role:'reviewer'|'viewer'}>();
@@ -814,6 +817,8 @@ async function publicReview(request:Request,env:Env,action:'view'|'comment'|'dec
     if((action==='comment'||action==='decide')&&role!=='reviewer')
       throw new ApiError(403,'review_viewer_read_only');
   }
+  if(session){assertReviewSession(session,r,subject);await touchReviewSession(env,session,r);}
+  if(action==='session')return openReviewSession(env,r,subject);
   const files=await assets(env,r.id,r.current_version);
   if(files.some(a=>a.grant_state!=='granted'))throw new ApiError(409,'review_not_ready');
   if(action==='view'){
@@ -834,14 +839,14 @@ async function publicReview(request:Request,env:Env,action:'view'|'comment'|'dec
     // Bundle short-lived signed URLs with the first response, avoiding a second
     // Worker/D1 round trip every time the user selects another file.
     const mediaTickets:Record<string,{url:string;expiresAt:number}>={};
-    const subject=r.access_mode==='google'?await reviewMediaSubject(env,r.id,email):undefined;
+    const mediaSubject=r.access_mode==='google'?await reviewMediaSubject(env,r.id,email):undefined;
     const expiresAt=Math.min(r.expires_at,now()+REVIEW_MEDIA_MAX_AGE);
     for(const file of files){
       if(!(/^(image|video|audio)\//.test(file.mime_type)||file.mime_type==='application/pdf'))continue;
-      const ticket=await mintReviewMediaTicket(env,r.id,file.file_id,r.current_version,r.expires_at,r.token_hash,subject);
+      const ticket=await mintReviewMediaTicket(env,r.id,file.file_id,r.current_version,r.expires_at,r.token_hash,mediaSubject,session?.id_hash);
       mediaTickets[file.file_id]={url:apiOrigin(env)+'/reviews/media?ticket='+ticket,expiresAt};
     }
-    return Response.json({mediaTickets,review:{title:r.title,message:r.message,studioName:r.studio_name,
+    return Response.json({mediaTickets,sessionExpiresAt:session?.expires_at,review:{title:r.title,message:r.message,studioName:r.studio_name,
       status:r.status,version:r.current_version,expiresAt:r.expires_at,mode:r.access_mode,
       driveShareEnabled:r.drive_share_enabled===1,
       role:r.access_mode==='google'?role:'reviewer',myVote:myVote?.decision||null,
@@ -859,8 +864,8 @@ async function publicReview(request:Request,env:Env,action:'view'|'comment'|'dec
     if(!(/^(video|image|audio)\//.test(chosen.mime_type)||chosen.mime_type==='application/pdf'))
       throw new ApiError(415,'review_media_unsupported');
     const subject=r.access_mode==='google'?await reviewMediaSubject(env,r.id,email):undefined;
-    const ticket=await mintReviewMediaTicket(env,r.id,fileId,r.current_version,r.expires_at,r.token_hash,subject);
-    return Response.json({url:apiOrigin(env)+'/reviews/media?ticket='+ticket,
+    const ticket=await mintReviewMediaTicket(env,r.id,fileId,r.current_version,r.expires_at,r.token_hash,subject,session?.id_hash);
+    return Response.json({url:apiOrigin(env)+'/reviews/media?ticket='+ticket,sessionExpiresAt:session?.expires_at,
       expiresAt:Math.min(r.expires_at,now()+REVIEW_MEDIA_MAX_AGE)});
   }
   if(r.status!=='pending')throw new ApiError(409,'review_already_decided');
@@ -976,10 +981,10 @@ async function ownerImage(env:Env,r:Review,url:URL):Promise<Response>{
 export async function reviewRouter(request:Request,env:Env,url:URL):Promise<Response>{
   const path=url.pathname;
   if(path==='/reviews/media')return streamReviewMedia(request,env,url);
-  if(path==='/reviews/public' || path==='/reviews/public/comment' || path==='/reviews/public/decide'||path==='/reviews/public/media-ticket'){
+  if(path==='/reviews/public' || path==='/reviews/public/comment' || path==='/reviews/public/decide'||path==='/reviews/public/media-ticket'||path==='/reviews/public/session'&&env.VIRTUAL_LIBRARY_ENABLED==='true'){
     if(!['GET','POST'].includes(request.method))throw new ApiError(405,'method_not_allowed');
     if((path==='/reviews/public')!==(request.method==='GET'))throw new ApiError(405,'method_not_allowed');
-    return publicReview(request,env,path.endsWith('/comment')?'comment':path.endsWith('/decide')?'decide':path.endsWith('/media-ticket')?'media':'view');
+    return publicReview(request,env,path.endsWith('/session')?'session':path.endsWith('/comment')?'comment':path.endsWith('/decide')?'decide':path.endsWith('/media-ticket')?'media':'view');
   }
   const uid=await activeOwner(request,env);
   if(path==='/reviews'&&request.method==='GET')return ownerList(env,uid,url);
@@ -1030,6 +1035,7 @@ export async function assertNoConnectionReviews(env:Env,uid:string,connectionId:
 }
 /** Expired capability links cease to work immediately; revoke Drive ACLs in bounded cron jobs. */
 export async function cleanupExpiredReviews(env:Env):Promise<void>{
+  await cleanupReviewSessions(env);
   const r=await env.DB.prepare("SELECT * FROM review_requests WHERE (expires_at<=? OR status='closing') AND status!='closed' AND updated_at<? ORDER BY updated_at LIMIT 1")
     .bind(now(),now()-60000).first<Review>();
   if(r)await close(env,r);

@@ -1,5 +1,5 @@
 import {ApiError,type Env} from './types.ts';
-import {libraryFor,libraryNode} from './library.ts';
+import {libraryFor,libraryNode} from './library-core.ts';
 import {readLibrarySource} from './library-assets.ts';
 import {connection} from './repository.ts';
 import {accessCredential} from './google.ts';
@@ -21,7 +21,7 @@ export async function libraryContent(request:Request,env:Env,uid:string,projectI
  if(state)await env.DB.prepare('UPDATE library_assets SET state=?,observed_at=? WHERE library_id=? AND id=? AND observed_at<=?').bind(state,observationStarted,lib.id,asset.id,observationStarted).run();
  }throw error;
  }
- if(!source.size||!/^(image\/(jpeg|png|webp|avif|gif)|video\/(mp4|webm|quicktime)|audio\/(mpeg|wav)|application\/pdf)$/.test(source.mimeType))throw new ApiError(415,'library_preview_unsupported');
+ if(!source.size||!/^(image\/(jpeg|png|webp|avif|gif|bmp|tiff|svg\+xml)|video\/(mp4|webm|quicktime|x-m4v|x-matroska)|audio\/(mpeg|wav|ogg|flac|mp4|aac)|application\/pdf)$/.test(source.mimeType))throw new ApiError(415,'library_preview_unsupported');
  sourceRange(null,source.size); // validate provider size even for a full PDF/image stream
  const full=!request.headers.has('Range')&&(source.mimeType.startsWith('image/')||source.mimeType==='application/pdf');
  if(full&&Number(source.size)>(source.mimeType.startsWith('image/')?24:64)*1024*1024)throw new ApiError(413,'library_preview_too_large');
@@ -50,6 +50,7 @@ export async function libraryContent(request:Request,env:Env,uid:string,projectI
  'Content-Length':String(Number(match[2])-Number(match[1])+1),'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer',
  'Access-Control-Expose-Headers':'Content-Length, Content-Range, Accept-Ranges'});
  if(!full)headers.set('Content-Range',upstream.headers.get('Content-Range')!);
+ if(source.mimeType==='image/svg+xml')headers.set('Content-Security-Policy',"sandbox; default-src 'none'");
  if(request.method==='HEAD'){await upstream.body?.cancel();return new Response(null,{status:full?200:206,headers});}
  const expected=Number(match[2])-Number(match[1])+1;let received=0;
  const body=upstream.body?.pipeThrough(new TransformStream<Uint8Array,Uint8Array>({

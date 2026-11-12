@@ -39,3 +39,10 @@ test('bounded keyset pagination includes every node exactly once',async t=>{
  assert.equal(p1.nodes.length,50);assert.equal(p2.nodes.length,7);assert.equal(p2.nextPage,null);
  assert.equal(new Set([...p1.nodes,...p2.nodes].map(x=>x.id)).size,57);
 });
+test('virtual name search is literal, paginated in the authorized folder and never browses providers',async t=>{
+ const f=database();t.after(f.close);const env={DB:f.DB},lib=await libraryFor(env,'alice',1);
+ await mutateLibrary(env,lib,null,{name:'100% Final'});await mutateLibrary(env,lib,null,{name:'1000 Final'});
+ const child=await (await mutateLibrary(env,lib,null,{name:'Nested'})).json();await mutateLibrary(env,lib,null,{name:'100% Hidden',parentId:child.id});
+ const result=await (await listLibrary(env,lib,'root',null,'100%')).json();assert.deepEqual(result.nodes.map(x=>x.name),['100% Final']);
+ await assert.rejects(listLibrary(env,lib,'root',null,'a'.repeat(101)),e=>e.code==='invalid_search');
+});

@@ -5,15 +5,17 @@
 - [x] Código local: árvore autorizada por projeto, CAS/ciclos/profundidade, registry/importação deduplicada; criar/renomear/mover/lixeira/restaurar e seletores múltiplos Drive/Dropbox. Exclusão de conta limpa metadados virtuais após encerrar revisões.
 - [x] Prévia protegida por aba, sem cookies de terceiros; Chromium desktop/mobile com upstream sintético e negação de URL copiada; testes de origem/Range/revogação/suspensão do worker.
 - [x] PoC DEV com provedores reais (12/11/2026 UTC): token Google confirmado somente drive.file, recurso criado com isAppAuthorized, Range 206 de revisão Google e Dropbox e revisão antiga após troca de conteúdo; arquivos sintéticos removidos (204/200). Evidência privada sanitizada `virtual-provider-poc-evidence.json`; não equivale a homologação do produto nem à revogação dos grants antigos.
-- [x] Aprovações no código novo selecionam referências virtuais e armazenam revisão/tamanho; leitura exata e indisponibilidade testadas, mídia Google requer identidade real. API completa 233 testes e frontend 97 testes aprovados nesta etapa.
-- [ ] Uploads, capas, sessão limitada do portal, reset/redução dos grants, QA completo de navegação/aprovações, Safari físico. Flags permanecem desativadas; nenhum deploy desta branch ocorreu.
+- [x] Aprovações no código novo selecionam referências virtuais e armazenam revisão/tamanho; leitura exata e indisponibilidade testadas, mídia Google exige identidade real e sessão do portal além do ticket. Convite em fragmento, sessão por aba e retomada após recarga sem cadastro/trial.
+- [x] Código local: uploads para destinos geridos independentes da árvore; confirmação no provedor antes do registro, cancelamento/retry, capas/fotos Drive pelo Picker mínimo; busca por nome e estruturas editáveis em transação idempotente. Reconexão preserva IDs sem manter credenciais revogadas. Fences de exclusão de conta no banco.
+- [x] Testes locais nesta etapa: API completa 246 e frontend 100 aprovados antes da busca adicional; teste focado da busca aprovado. Chromium desktop/mobile passou árvore/subpastas/lixeira/restauração/lotes/templates, sessão do portal/Service Worker e capa Picker mínimo (rodadas específicas, upstream sintético). CI anterior 2ef1e22: API 43139490417, frontend 43139490194, Firestore 43139490298 e SaaS E2E 43139490207 aprovados (checks de PR, sem deploy).
+- [ ] Importação assistida da organização selecionada, QA completo de uploads/capas/aprovações, reset/redução efetiva dos grants, Safari físico, release DEV/PROD. Flags permanecem desativadas; nenhum deploy desta branch ocorreu.
 
 **EM ANDAMENTO; NÃO PUBLICADO.** Proprietário autorizou implementar o estudo, reconstruir metadados necessários, homologar DEV e depois publicar/testar PROD com sua conta. Isso não autoriza apagar originais dos provedores.
 
 - [x] Fundação local: árvore com constraints/triggers e testes de ciclos, pais cruzados e profundidade; endpoints de revisão específica e ranges limitados, classificação de falhas; seis testes focados aprovados.
 - [ ] PoC real de grant mínimo, revisão específica/Range nos dois provedores e sessão de clientes DEV/PROD/Safari.
 - [x] Registry por proprietário e comandos autenticados de árvore; Picker em lote e interface virtual (código local).
-- [ ] Upload, capas e aprovações consumindo recursos sem ancestral físico; identidade/sessão de mídia e revisão exata.
+- [x] Upload, capas e aprovações sem dependência dos vínculos antigos de pastas; sessão de mídia e revisão exata (código local; homologação de produto ainda pendente).
 - [ ] Reconciliação de ACLs antigas, reset controlado e redução efetiva dos grants.
 - [ ] Homologação completa DEV, release PROD e teste real na conta do proprietário.
 

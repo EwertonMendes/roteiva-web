@@ -2,6 +2,13 @@ import {ApiError,type Env} from './types.ts';
 import {connection} from './repository.ts';
 import {DRIVE_SCOPE} from './google.ts';
 import {uploadBody} from './uploads.ts';
+export async function pickerConfiguration(env:Env,uid:string,connectionId:string):Promise<Response>{
+ const row=await connection(env,uid,connectionId);
+ if(row.status!=='connected')throw new ApiError(409,'reconnect_required');
+ const appId=env.GOOGLE_CLIENT_ID?.split('-')[0];
+ if(!appId||!/^\d+$/.test(appId)||!env.GOOGLE_PICKER_API_KEY)throw new ApiError(503,'picker_not_configured');
+ return Response.json({authorized:false,clientId:env.GOOGLE_CLIENT_ID,appId,developerKey:env.GOOGLE_PICKER_API_KEY,accountId:row.google_account_id});
+}
 
 /** Inspect the newly issued GIS token before it may reach Picker. Never persist it. */
 export async function verifyPickerToken(env:Env,uid:string,connectionId:string,request:Request,

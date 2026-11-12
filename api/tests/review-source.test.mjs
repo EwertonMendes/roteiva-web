@@ -43,3 +43,23 @@ test('missing source, purged revision and inconsistent range never fall back to 
  await assert.rejects(readPublishedSource(request,env,'alice',{...asset,source_revision:null},false,fetcher),e=>e.code==='review_source_version_unsupported');
  assert.equal(state.reads,2);
 });
+test('Dropbox revision content must prove the original file identity, revision and size in its response',async t=>{
+ const {env}=await fixture(t),id='id:DROPBOX_FILE_12345';
+ const row={owner_uid:'alice',id:connection,dropbox_account_id:'dbid:alice',revision:1};
+ const sealed=await encrypt(env,'test-token',context(env,row.owner_uid,row.dropbox_account_id,'dropbox-access:'+row.id+':1'));
+ const f=env.DB;
+ await f.prepare("INSERT INTO dropbox_connections(id,owner_uid,dropbox_account_id,dropbox_email,status,scopes,encrypted_refresh_token,encrypted_access_token,access_token_expires_at,created_at,updated_at) VALUES(?,?,?,?,'connected','files.content.read files.metadata.read','synthetic-encrypted',?,?,?,?)")
+  .bind(connection,'alice','dbid:alice','test@example.com',sealed,Date.now()+3600000,Date.now(),Date.now()).run();
+ let proof={id,rev:'v1',size:4};
+ const fetcher=async(url,options)=>{
+  if(String(url).includes('get_metadata'))return Response.json({'.tag':'file',id,name:'current.png',rev:'v2',size:9,is_downloadable:true});
+  assert.deepEqual(JSON.parse(options.headers['Dropbox-API-Arg']),{path:'rev:v1'});
+  return new Response('test',{status:206,headers:{'Content-Range':'bytes 0-3/4','Dropbox-API-Result':JSON.stringify(proof)}});
+ };
+ const asset={provider:'dropbox',connection_id:connection,file_id:id,mime_type:'image/png',source_revision:'v1',source_size:'4'},request=new Request('https://api.example/media');
+ assert.equal(await (await readPublishedSource(request,env,'alice',asset,false,fetcher)).text(),'test');
+ for(const patch of [{id:'id:WRONG_FILE_12345'},{rev:'v2'},{size:9}]){
+  proof={id,rev:'v1',size:4,...patch};
+  await assert.rejects(readPublishedSource(request,env,'alice',asset,false,fetcher),e=>e.code==='media_source_mismatch');
+ }
+});

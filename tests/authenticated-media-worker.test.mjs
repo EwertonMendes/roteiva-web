@@ -10,7 +10,7 @@ test('media worker origin allowlist matches the environment contract',()=>{
 });
 function fixture(){
  const events={},requests=[];
- const client={id:'alice-tab',url:origin+'/biblioteca',sourceURL:undefined,postMessage(data,ports){ports[0].postMessage({authorization:'Bearer synthetic-identity',url:this.sourceURL});ports[0].close();}};
+ const client={id:'alice-tab',url:origin+'/biblioteca',sourceURL:undefined,reviewSession:undefined,postMessage(data,ports){ports[0].postMessage({authorization:'Bearer synthetic-identity',reviewSession:this.reviewSession,url:this.sourceURL});ports[0].close();}};
  const self={location:{origin},addEventListener:(kind,handler)=>events[kind]=handler,clients:{get:async key=>key===client.id?client:null,claim:async()=>{}},skipWaiting:async()=>{}};
  vm.runInNewContext(source,{self,URL,Response,Headers,Map,Set,Date,MessageChannel,setTimeout,clearTimeout,AbortSignal,
  fetch:async(url,options)=>{requests.push({url,options});return new Response('test',{status:206,headers:{'Content-Range':'bytes 0-3/4'}});}});
@@ -43,4 +43,13 @@ test('an idle worker can recover a binding only from its live requesting tab',as
  const response=await f.read();assert.equal(response.status,206);assert.equal(await response.text(),'test');
  assert.equal((await f.read('other-tab')).status,403);assert.equal(f.requests.length,1);
  f.client.sourceURL=undefined;assert.equal((await f.read()).status,403);
+});
+test('review streaming requires the live tab session as well as the signed ticket',async()=>{
+ const f=fixture(),url='https://api.roteiva.com/reviews/media?ticket=synthetic.ticket';
+ f.client.sourceURL=url;f.bind({type:'bind-media',id,url});
+ assert.equal((await f.read()).status,403);assert.equal(f.requests.length,0);
+ f.client.reviewSession='a'.repeat(43);
+ assert.equal((await f.read()).status,206);
+ assert.equal(f.requests[0].options.headers.get('X-Review-Session'),'a'.repeat(43));
+ assert.equal((await f.read('other-tab')).status,403);
 });

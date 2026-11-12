@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {database} from './helpers/database.mjs';
 import {encrypt,base64url,context} from '../src/crypto.ts';
 import {listCoverImages,coverImage,fastCoverPreview,MAX_COVER_BYTES} from '../src/project-covers.ts';
-import {DRIVE_READ_SCOPE} from '../src/google.ts';
+import {DRIVE_SCOPE,DRIVE_READ_SCOPE} from '../src/google.ts';
 const id='aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa',fileId='image_123456789';
 async function setup(){
  const env={ENVIRONMENT:'dev',TOKEN_KEY_VERSION:'v1',TOKEN_KEYS:JSON.stringify({v1:base64url(crypto.getRandomValues(new Uint8Array(32)))}),GOOGLE_CLIENT_ID:'demo',GOOGLE_CLIENT_SECRET:'secret'};
@@ -16,6 +16,17 @@ async function setup(){
  };
  return {env,db,fetcher};
 }
+test('virtual cover picker requires only drive.file and refuses resources not explicitly authorized',async()=>{
+ const {env,db,fetcher}=await setup();try{
+  env.VIRTUAL_LIBRARY_ENABLED='true';db.sql.prepare('UPDATE drive_connections SET scopes=?').run(DRIVE_SCOPE);
+  let selected=true;
+  const load=fetcher(url=>url.searchParams.get('alt')==='media'?new Response(new Uint8Array([1,2,3]),{headers:{'Content-Type':'image/jpeg'}}):Response.json({id:fileId,mimeType:'image/jpeg',size:'3',isAppAuthorized:selected,capabilities:{canDownload:true}}));
+  assert.equal((await coverImage(env,'alice',id,fileId,load)).status,200);
+  selected=false;await assert.rejects(coverImage(env,'alice',id,fileId,load),e=>e.code==='library_picker_required');
+  await assert.rejects(fastCoverPreview(env,'alice',id,fileId,load),e=>e.code==='library_picker_required');
+  await assert.rejects(listCoverImages(env,'alice',id,new URLSearchParams(),load),e=>e.code==='library_picker_required');
+ }finally{db.close();}
+});
 test('cover search is private, escaped, paginated and filters unsupported/oversized files',async()=>{
  const {env,db,fetcher}=await setup();try{
   const load=fetcher(url=>{assert.match(url.searchParams.get('q'),/name contains 'bob\\'s'/);assert.equal(url.searchParams.get('pageToken'),'next');assert.equal(url.searchParams.get('pageSize'),'60');assert.match(url.searchParams.get('fields'),/modifiedTime/);return Response.json({files:[{id:fileId,name:'photo.jpg',mimeType:'image/jpeg',size:'3',modifiedTime:'2026-10-30T21:00:00.000Z'},{id:'oversize_123456',mimeType:'image/jpeg',size:String(MAX_COVER_BYTES+1)},{id:'svg_1234567890',mimeType:'image/svg+xml',size:'3'}],nextPageToken:'page2'});});

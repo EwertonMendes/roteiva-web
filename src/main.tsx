@@ -42,12 +42,14 @@ class AppErrorBoundary extends Component<{children:ReactNode},{error:string}> {
   }
 }
 const review=window.location.pathname.replace(/\/+$/, "").endsWith("/review");
-const publicToken=/^\/review\/([A-Za-z0-9_-]{43})\/?$/.exec(window.location.pathname)?.[1];
+const publicToken=/^\/review\/([A-Za-z0-9_-]{43})\/?$/.exec(window.location.pathname)?.[1]||
+ (window.location.pathname.replace(/\/+$/,'')==='/review'?/^#invite=([A-Za-z0-9_-]{43})$/.exec(window.location.hash)?.[1]:undefined);
+const publicReviewRoute=Boolean(publicToken)||(import.meta.env.VITE_VIRTUAL_LIBRARY==='true'&&window.location.pathname.replace(/\/+$/,'')==='/review');
 const canonicalUrl=canonicalFrontendUrl(window.location.href,appEnvironment.appEnv);
 if(canonicalUrl)window.location.replace(canonicalUrl);
 else createRoot(document.getElementById("root")!).render(<React.StrictMode>
   <SiteExperience />
   <AppErrorBoundary>{isDemo ? review ? <ReviewUnavailable /> : <DashboardClient firstName="Visitante" email="demo@roteiva.local" /> :
-    <AuthProvider>{publicToken ? <ReviewPortal token={publicToken}/> : <ProtectedRoute><RegistrationGate><AccessGate>{review ? <ReviewUnavailable /> : <DriveTransfersProvider><StorageConnectionsProvider><FirebaseWorkspace /></StorageConnectionsProvider></DriveTransfersProvider>}</AccessGate></RegistrationGate></ProtectedRoute>}</AuthProvider>}
+    <AuthProvider>{publicReviewRoute ? <ReviewPortal token={publicToken||''}/> : <ProtectedRoute><RegistrationGate><AccessGate>{review ? <ReviewUnavailable /> : <DriveTransfersProvider><StorageConnectionsProvider><FirebaseWorkspace /></StorageConnectionsProvider></DriveTransfersProvider>}</AccessGate></RegistrationGate></ProtectedRoute>}</AuthProvider>}
   </AppErrorBoundary>
 </React.StrictMode>);

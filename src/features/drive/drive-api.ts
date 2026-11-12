@@ -3,6 +3,11 @@ import {useCallback} from 'react';
 import {useAuth} from '../auth/AuthProvider';
 const API=API_BASE_URL;
 export const messages:Record<string,string> = {
+  drive_reconnect_minimum_required:'Esta conexão usa a autorização antiga. Reconecte o Google Drive com acesso somente aos arquivos selecionados.',
+  library_upload_target_missing:'A pasta de envios foi removida do provedor. Inicie um novo envio para criar outro destino, preservando os arquivos existentes.',
+  library_upload_target_restricted:'O provedor não permite enviar para esta pasta. Confira as permissões da conta conectada.',
+  library_upload_target_unavailable:'Não foi possível preparar a pasta de envios no provedor. Tente novamente.',
+  library_upload_target_denied:'Este destino não pertence à biblioteca e à conta escolhidas. Atualize e selecione o destino novamente.',
   library_project_denied:'Você não possui acesso a este projeto.',
   library_changed:'Esta pasta foi alterada em outra janela. Atualize e tente novamente.',
   library_cycle:'Uma pasta não pode ser movida para dentro dela mesma ou de suas subpastas.',

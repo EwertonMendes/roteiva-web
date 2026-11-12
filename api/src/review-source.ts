@@ -19,7 +19,19 @@ export async function readPublishedSource(request:Request,env:Env,uid:string,ass
  let response:Response;
  try{response=await fetcher(target.url,{method:target.method,headers:{...target.headers,Authorization:'Bearer '+token,Range:range},redirect:'manual',signal:AbortSignal.timeout(24000)});}
  catch{throw new ApiError(503,'provider_temporary_failure');}
- if(!response.ok){await response.body?.cancel();throw new ApiError(response.status===429?429:response.status===404?409:503,response.status===429?'provider_rate_limited':response.status===404?'review_source_revision_unavailable':'provider_temporary_failure');}
+ if(!response.ok){
+  const status=response.status;
+  const error=await response.json().catch(()=>null) as {error?:{errors?:{reason?:string}[]}}|null;
+  const quota=status===429||(status===403&&error?.error?.errors?.some(x=>['rateLimitExceeded','userRateLimitExceeded','dailyLimitExceeded','quotaExceeded','downloadQuotaExceeded'].includes(x.reason||'')));
+  const unavailable=[403,404,409,410].includes(status);
+  throw new ApiError(quota?429:unavailable?409:503,quota?'provider_rate_limited':unavailable?'review_source_revision_unavailable':'provider_temporary_failure');
+ }
+ if(source.provider==='dropbox'){
+  let metadata:{id?:string;rev?:string;size?:number}|null=null;
+  const header=response.headers.get('Dropbox-API-Result')||'';
+  try{if(header.length<=16384)metadata=JSON.parse(header) as {id?:string;rev?:string;size?:number};}catch{/* A missing or malformed revision proof fails closed. */}
+  if(!metadata||metadata.id!==source.fileId||metadata.rev!==source.revision||String(metadata.size)!==source.size){await response.body?.cancel();throw new ApiError(502,'media_source_mismatch');}
+ }
  const match=/^bytes (\d+)-(\d+)\/(\d+)$/.exec(response.headers.get('Content-Range')||'');
  if(response.status!==206||!match||'bytes='+match[1]+'-'+match[2]!==range||match[3]!==source.size){await response.body?.cancel();throw new ApiError(502,'media_range_unsupported');}
  if(probe){await response.body?.cancel();return new Response(null,{status:204});}

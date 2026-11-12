@@ -3,6 +3,8 @@ import {context,encrypt,decrypt} from './crypto.ts';
 import {dropboxConnection,dropboxAccess,dropboxMetadata,dropboxNormalize} from './dropbox.ts';
 import {validStorageFileId,validStorageFolderId,validConnectionId} from './storage.ts';
 import {uploadBody} from './uploads.ts';
+import {authorizeVirtualUpload} from './library-upload-target.ts';
+import {importLibraryAssets} from './library-assets.ts';
 
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const CHUNK=4*1024*1024, MAX_FILE=2_199_019_061_248;
@@ -17,12 +19,12 @@ function validName(name:unknown):name is string {
  return typeof name==='string'&&name.length>0&&name.length<=255&&
   name!=='.'&&name!=='..'&&!/[/\\\u0000-\u001f\u007f]/.test(name);
 }
-function isStart(data:unknown):data is Start{
+function isStart(data:unknown,virtual=false):data is Start{
  if(!data||typeof data!=='object'||Array.isArray(data))return false;
  const x=data as Partial<Start>;
  return typeof x.attemptId==='string'&&UUID.test(x.attemptId)&&
   Number.isSafeInteger(x.projectId)&&x.projectId!>0&&
-  typeof x.linkedFolderId==='string'&&validStorageFolderId('dropbox',x.linkedFolderId,true)&&
+  typeof x.linkedFolderId==='string'&&(virtual?(x.linkedFolderId==='root'||UUID.test(x.linkedFolderId)):validStorageFolderId('dropbox',x.linkedFolderId,true))&&
   typeof x.targetFolderId==='string'&&validStorageFolderId('dropbox',x.targetFolderId,true)&&
   validName(x.name)&&typeof x.size==='number'&&Number.isSafeInteger(x.size)&&x.size>0&&x.size<=MAX_FILE&&
   typeof x.mimeType==='string'&&x.mimeType.length<=120&&/^[\w!#$&^.+-]+\/[\w!#$&^.+-]+$/.test(x.mimeType);
@@ -136,11 +138,14 @@ async function unlock(env:Env,row:Attempt,lease:string):Promise<void>{
 }
 export async function startDropboxUpload(env:Env,uid:string,connectionId:string,request:Request):Promise<Response>{
  const raw=await uploadBody(request);
- if(!isStart(raw))throw new ApiError(400,'dropbox_invalid_upload');
+ if(!isStart(raw,env.VIRTUAL_LIBRARY_ENABLED==='true'))throw new ApiError(400,'dropbox_invalid_upload');
  const data=raw;
  const token=request.headers.get('Authorization')?.slice(7)||'';
- await assertDropboxFolderLinked(env,uid,token,connectionId,data.projectId,data.linkedFolderId);
- await verifyDropboxDescendant(env,uid,connectionId,data.linkedFolderId,data.targetFolderId);
+ if(env.VIRTUAL_LIBRARY_ENABLED==='true')await authorizeVirtualUpload(request,env,uid,'dropbox',connectionId,data.projectId,data.linkedFolderId,data.targetFolderId);
+ else{
+  await assertDropboxFolderLinked(env,uid,token,connectionId,data.projectId,data.linkedFolderId);
+  await verifyDropboxDescendant(env,uid,connectionId,data.linkedFolderId,data.targetFolderId);
+ }
  const conn=await dropboxConnection(env,uid,connectionId);
  if(conn.status!=='connected')throw new ApiError(409,'dropbox_reconnect_required');
  const old=await env.DB.prepare('SELECT * FROM dropbox_upload_attempts WHERE owner_uid=? AND id=?')
@@ -188,8 +193,11 @@ export async function appendDropboxUpload(env:Env,uid:string,connectionId:string
  if(offset!==row.committed_offset||!row.encrypted_session)
    throw new ApiError(409,'dropbox_upload_invalid_offset');
  const auth=request.headers.get('Authorization')?.slice(7)||'';
- await assertDropboxFolderLinked(env,uid,auth,connectionId,row.project_id,row.linked_folder_id);
- await verifyDropboxDescendant(env,uid,connectionId,row.linked_folder_id,row.target_folder_id);
+ if(env.VIRTUAL_LIBRARY_ENABLED==='true')await authorizeVirtualUpload(request,env,uid,'dropbox',connectionId,row.project_id,row.linked_folder_id,row.target_folder_id);
+ else{
+  await assertDropboxFolderLinked(env,uid,auth,connectionId,row.project_id,row.linked_folder_id);
+  await verifyDropboxDescendant(env,uid,connectionId,row.linked_folder_id,row.target_folder_id);
+ }
  const conn=await dropboxConnection(env,uid,connectionId);
  if(conn.revision!==row.connection_revision)throw new ApiError(409,'dropbox_reconnect_required');
  const lease=await lock(env,row);
@@ -226,13 +234,22 @@ export async function appendDropboxUpload(env:Env,uid:string,connectionId:string
 }
 export async function finishDropboxUpload(env:Env,uid:string,connectionId:string,id:string,request:Request):Promise<Response>{
  const row=await attempt(env,uid,connectionId,id);
- if(row.status==='completed'&&row.file_id)return Response.json({fileId:row.file_id,id:row.file_id,name:row.name,size:String(row.size),mimeType:row.mime_type});
+ const auth=request.headers.get('Authorization')?.slice(7)||'';
+ let target;
+ if(env.VIRTUAL_LIBRARY_ENABLED==='true')target=await authorizeVirtualUpload(request,env,uid,'dropbox',connectionId,row.project_id,row.linked_folder_id,row.target_folder_id);
+ else{
+  await assertDropboxFolderLinked(env,uid,auth,connectionId,row.project_id,row.linked_folder_id);
+  target=await verifyDropboxDescendant(env,uid,connectionId,row.linked_folder_id,row.target_folder_id);
+ }
+ const register=async(fileId:string)=>{
+  if(env.VIRTUAL_LIBRARY_ENABLED!=='true')return;
+  const result=await (await importLibraryAssets(env,uid,row.project_id,{parentId:row.linked_folder_id,items:[{provider:'dropbox',connectionId,fileId}]})).json() as {results:{status:string;code?:string}[]};
+  if(result.results[0]?.status!=='added')throw new ApiError(409,result.results[0]?.code||'library_changed');
+ };
+ if(row.status==='completed'&&row.file_id){await register(row.file_id);return Response.json({fileId:row.file_id,id:row.file_id,name:row.name,size:String(row.size),mimeType:row.mime_type});}
  if(row.status==='uncertain')throw new ApiError(409,'dropbox_upload_uncertain');
  if(row.status!=='active'||row.committed_offset!==row.size||!row.encrypted_session)
   throw new ApiError(409,'dropbox_upload_incomplete');
- const auth=request.headers.get('Authorization')?.slice(7)||'';
- await assertDropboxFolderLinked(env,uid,auth,connectionId,row.project_id,row.linked_folder_id);
- const target=await verifyDropboxDescendant(env,uid,connectionId,row.linked_folder_id,row.target_folder_id);
  const conn=await dropboxConnection(env,uid,connectionId);
  if(conn.revision!==row.connection_revision)throw new ApiError(409,'dropbox_reconnect_required');
  const lease=await lock(env,row);
@@ -251,10 +268,11 @@ export async function finishDropboxUpload(env:Env,uid:string,connectionId:string
     "UPDATE dropbox_upload_attempts SET status='completed',file_id=?,encrypted_session=NULL,updated_at=? WHERE owner_uid=? AND id=? AND lease_id=? AND committed_offset=?"
   ).bind(data.id,Date.now(),uid,id,lease,row.size).run();
   if(saved.meta.changes!==1)throw new ApiError(409,'dropbox_upload_busy');
+  await register(data.id);
   return Response.json({fileId:data.id,id:data.id,name:data.name,size:String(row.size),mimeType:row.mime_type});
  }catch(error){
   // Never blindly finish twice: the response may have been lost after commit.
-  await env.DB.prepare("UPDATE dropbox_upload_attempts SET status='uncertain',updated_at=? WHERE owner_uid=? AND id=? AND lease_id=?")
+  await env.DB.prepare("UPDATE dropbox_upload_attempts SET status='uncertain',updated_at=? WHERE owner_uid=? AND id=? AND lease_id=? AND status!='completed'")
    .bind(Date.now(),uid,id,lease).run();
   throw error;
  }finally{await unlock(env,row,lease)}

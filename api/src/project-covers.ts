@@ -1,7 +1,7 @@
 import {sealThumbnailTicket} from './thumbnails.ts';
 import {ApiError,type Env} from './types.ts';
 import {connection} from './repository.ts';
-import {DRIVE_READ_SCOPE,accessCredential} from './google.ts';
+import {DRIVE_SCOPE,DRIVE_READ_SCOPE,accessCredential} from './google.ts';
 import {driveJson} from './drive-client.ts';
 import {dropboxConnection,dropboxMetadata,dropboxMedia} from './dropbox.ts';
 import {validStorageFileId} from './storage.ts';
@@ -12,7 +12,7 @@ const ID=/^[A-Za-z0-9_-]{10,200}$/;
 async function authorized(env:Env,uid:string,id:string){
  const row=await connection(env,uid,id);
  if(row.status!=='connected')throw new ApiError(409,'reconnect_required');
- if(!row.scopes.split(' ').includes(DRIVE_READ_SCOPE))throw new ApiError(409,'drive_read_permission_missing');
+ if(!row.scopes.split(' ').includes(env.VIRTUAL_LIBRARY_ENABLED==='true'?DRIVE_SCOPE:DRIVE_READ_SCOPE))throw new ApiError(409,'drive_read_permission_missing');
  return row;
 }
 /** Paginated image/folder browsing using the account's existing read grant.
@@ -21,6 +21,7 @@ async function authorized(env:Env,uid:string,id:string){
  * Search can match names across accessible Drive content.
  */
 export async function listCoverImages(env:Env,uid:string,id:string,params:URLSearchParams,fetcher:typeof fetch=fetch){
+ if(env.VIRTUAL_LIBRARY_ENABLED==='true')throw new ApiError(409,'library_picker_required');
  const row=await authorized(env,uid,id);
  const term=(params.get('search')||'').trim();
  const page=params.get('pageToken')||'';
@@ -78,8 +79,9 @@ export async function coverImage(env:Env,uid:string,id:string,fileId:string,fetc
  if(!ID.test(fileId))throw new ApiError(400,'invalid_file_id');
  const row=await authorized(env,uid,id);
  const target=new URL('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(fileId));
- target.searchParams.set('fields','id,mimeType,size,trashed,imageMediaMetadata(width,height)');target.searchParams.set('supportsAllDrives','true');
+ target.searchParams.set('fields','id,mimeType,size,trashed,isAppAuthorized,capabilities(canDownload),imageMediaMetadata(width,height)');target.searchParams.set('supportsAllDrives','true');
  const info=await driveJson(env,row,target,fetcher,'file_unavailable');
+ if(env.VIRTUAL_LIBRARY_ENABLED==='true'&&(info.isAppAuthorized!==true||(info.capabilities as {canDownload?:boolean}|undefined)?.canDownload===false))throw new ApiError(403,'library_picker_required');
  const size=Number(info.size),dimensions=info.imageMediaMetadata as {width?:number;height?:number}|undefined;
  if(info.trashed||!COVER_TYPES.includes(String(info.mimeType))||!Number.isSafeInteger(size)||size<=0||size>MAX_COVER_BYTES||
  (dimensions?.width&&dimensions.height&&dimensions.width*dimensions.height>40_000_000))throw new ApiError(400,'invalid_cover_image');
@@ -104,6 +106,7 @@ export async function coverImage(env:Env,uid:string,id:string,fileId:string,fetc
  * redirect policy and a final connection-revision check before returning bytes.
  * Never persist originals on the server or expose upstream links/tokens. */
 export async function fastCoverPreview(env:Env,uid:string,id:string,fileId:string,fetcher:typeof fetch=fetch){
+ if(env.VIRTUAL_LIBRARY_ENABLED==='true')return coverImage(env,uid,id,fileId,fetcher);
  if(!ID.test(fileId))throw new ApiError(400,'invalid_file_id');
  const row=await authorized(env,uid,id);
  const token=await accessCredential(env,row,fetcher);
