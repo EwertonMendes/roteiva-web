@@ -1,5 +1,9 @@
 # Desenvolvimento e deploy — Roteiva
 
+### QA da prévia nova
+
+`node --experimental-strip-types --test tests/authenticated-media-worker.test.mjs` valida mapeamento por aba/origem, Range, revogação e passagem da identidade. Após `pnpm build:emulator`, `pnpm exec playwright test tests/browser/authenticated-media.spec.ts` testa o worker real em Chromium desktop/mobile com upstream sintético. Isso não comprova OAuth, codecs ou APIs reais. O worker não intercepta rotas comuns da aplicação, não grava cache e não concede acesso apenas por URL copiada.
+
 ## Biblioteca virtual — desenvolvimento local
 
 **Flags de desenvolvimento:** `VIRTUAL_LIBRARY_ENABLED=true` no Worker e `VITE_VIRTUAL_LIBRARY=true` no build frontend. Ainda NÃO configurar em DEV/PROD compartilhados: interface/importação incompletas para Dropbox, uploads, mover/restaurar, preview e aprovações. A suíte de API aplica 0021 e 0022 em todos os fixtures; testes `library*.test.mjs` cobrem árvore, autorização, importação e contratos de fonte. Nenhuma migration remota executada.

@@ -1,5 +1,9 @@
 # Arquitetura do Roteiva — MVP SaaS
 
+### Decisão de transporte autenticado de mídia (implementação na branch)
+
+A prévia nova usa Service Worker sem cache/offline, limitado a rotas de mídia permitidas. A URL local é um identificador opaco vinculado ao clientId da aba; cada request obtém identidade via MessageChannel e a API revalida projeto, referência, conexão e origem. Não depende de cookies de terceiros em DEV. Conteúdo segue em stream/ranges, sem token em URL. A implementação não substitui a autorização no servidor. Para portal Google no modo novo, streamReviewMedia exige também a identidade Google verificada e o compromisso do participante, além do ticket. Link aberto conserva o comportamento de capacidade. Nada foi habilitado nos ambientes publicados; QA Safari/provedores reais ainda pendente.
+
 ## Fundação da Biblioteca virtual — 11/11/2026
 
 **Atualização da branch:** migration 0022 registra assets e referências sem conteúdo binário. Comandos da árvore usam autorização Firestore do próprio solicitante, CAS e limites SQL. Importação confirma cada recurso pelo provedor, exige isAppAuthorized no Drive, vincula conta/projeto/pasta e deduplica por asset na pasta ativa. Pastas virtuais não dependem de parent físico. Rotas `/library/projects/{id}/nodes`, `/imports` e `/picker/{connectionId}` só existem quando a flag backend está true. A UI tem flag independente; ambas permanecem desativadas nos ambientes publicados. Sessões/versões do portal e reset ainda não foram implementados.

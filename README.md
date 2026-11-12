@@ -1,5 +1,7 @@
 # Roteiva
 
+Prévia autenticada e seleção múltipla Dropbox foram acrescentadas na branch, ainda desativada nos ambientes publicados. A homologação de provedor e a integração final de uploads/aprovações continuam pendentes.
+
 ## Biblioteca virtual — implementação em andamento
 
 A branch agora inclui API de comandos autenticados, registry de referências e interface virtual com seleção múltipla Drive. O desenvolvimento fica atrás de flags desativadas (`VIRTUAL_LIBRARY_ENABLED`/`VITE_VIRTUAL_LIBRARY`); não habilitar em PROD antes de completar aprovações, mídia e homologação.

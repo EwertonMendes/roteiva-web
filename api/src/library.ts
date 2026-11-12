@@ -2,6 +2,7 @@ import {ApiError,type Env} from './types.ts';
 import {uploadBody} from './uploads.ts';
 import {importLibraryAssets} from './library-assets.ts';
 import {connection} from './repository.ts';
+import {libraryContent} from './library-content.ts';
 
 type Library={id:string;owner_uid:string;project_id:number};
 export type LibraryNode={id:string;parent_id:string|null;kind:'folder'|'asset';name:string;state:'active'|'trashed';revision:number};
@@ -104,6 +105,11 @@ export async function mutateLibrary(env:Env,lib:Library,id:string|null,data:unkn
  }
 }
 export async function libraryRouter(request:Request,env:Env,uid:string,url:URL,fetcher:typeof fetch=fetch){
+ const content=/^\/library\/projects\/([1-9][0-9]{0,14})\/nodes\/([0-9a-f-]{36})\/content$/.exec(url.pathname);
+ if(content&&(request.method==='GET'||request.method==='HEAD')){
+ await authorizeLibraryProject(request,env,uid,Number(content[1]),fetcher);
+ return libraryContent(request,env,uid,Number(content[1]),content[2],fetcher);
+ }
  const picker=/^\/library\/projects\/([1-9][0-9]{0,14})\/picker\/([0-9a-f-]{36})$/.exec(url.pathname);
  if(picker&&request.method==='GET'){
  await authorizeLibraryProject(request,env,uid,Number(picker[1]),fetcher);

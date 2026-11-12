@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mintReviewMediaTicket,verifyReviewMediaTicket,streamReviewMedia} from '../src/review-media.ts';
+import {mintReviewMediaTicket,verifyReviewMediaTicket,streamReviewMedia,reviewMediaSubject} from '../src/review-media.ts';
 import {base64url} from '../src/crypto.ts';
 function env(){
   return {ENVIRONMENT:'dev',TOKEN_KEY_VERSION:'v1',
@@ -9,6 +9,14 @@ function env(){
 const review='12345678-1234-4234-8234-123456789012';
 const file='FILE_REVIEW_12345678';
 const inviteHash='a'.repeat(43);
+test('Google-restricted media requires actual viewer identity even with a valid copied ticket',async()=>{
+ const e={...env(),VIRTUAL_LIBRARY_ENABLED:'true',FIREBASE_PROJECT_ID:'demo-roteiva'};
+ const subject=await reviewMediaSubject(e,review,'allowed@example.com');
+ const ticket=await mintReviewMediaTicket(e,review,file,1,Date.now()+60000,inviteHash,subject);
+ e.DB={prepare(){return {bind(){return {async first(){return {id:review,owner_uid:'alice',status:'pending',current_version:1,expires_at:Date.now()+60000,token_hash:inviteHash,access_mode:'google'};}};}};}};
+ const request=new Request('https://api.example/reviews/media?ticket='+ticket);
+ await assert.rejects(streamReviewMedia(request,e,new URL(request.url)),error=>error.code==='authentication_required');
+});
 test('minted media ticket is authenticated, scoped to a video, expiring and tamper evident',async()=>{
   const e=env(),token=await mintReviewMediaTicket(e,review,file,1,Date.now()+300000,inviteHash);
   assert.ok(token.includes('.'));

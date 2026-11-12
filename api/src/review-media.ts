@@ -4,6 +4,7 @@ import {accessCredential} from './google.ts';
 import {dropboxMedia} from './dropbox.ts';
 import type {StorageProviderId} from './storage.ts';
 import {base64url,decode} from './crypto.ts';
+import {verifiedTrialPrincipal} from './auth.ts';
 
 type Ticket={r:string;f:string;v:number;e:number;k:string;h:string;s?:string};
 const idPattern=/^[0-9a-f-]{36}$/i;
@@ -69,6 +70,10 @@ export async function streamReviewMedia(request:Request,env:Env,url:URL):Promise
      !['pending','changes','approved'].includes(r.status))throw new ApiError(404,'review_not_found');
   if(r.access_mode==='google'){
     if(!p.s)throw new ApiError(404,'review_not_found');
+    if(env.VIRTUAL_LIBRARY_ENABLED==='true'){
+      const principal=await verifiedTrialPrincipal(request,env);
+      if(await reviewMediaSubject(env,r.id,principal.verifiedEmail,p.k)!==p.s)throw new ApiError(404,'review_not_found');
+    }
     const permitted=await env.DB.prepare("SELECT email FROM review_participants WHERE review_id=?")
       .bind(r.id).all<{email:string}>();
     // Rechecking membership for every range revokes outstanding playback tickets

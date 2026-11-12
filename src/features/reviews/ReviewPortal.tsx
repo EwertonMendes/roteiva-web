@@ -6,6 +6,7 @@ import {useCallback,useEffect,useRef,useState} from "react";
 import {Check,CheckCircle2,Clock3,ExternalLink,FileAudio,FileImage,FileText,FileVideo,
   LoaderCircle,MessageSquare,Moon,Pause,Play,Send,ShieldCheck,Sun,Video,X} from "lucide-react";
 import {useAuth} from "../auth/AuthProvider";
+import {authenticatedReviewMedia} from '../drive/authenticated-media';
 import {useOverlayFocus} from "../drive/DriveLibraryUI";
 import {ReviewImageViewer} from "./ReviewImageViewer";
 import {ReviewPdfViewer} from "./ReviewPdfViewer";
@@ -130,6 +131,7 @@ export function ReviewPortal({token}:{token:string}){
   useEffect(()=>{
     let alive=true;
     let renewal:ReturnType<typeof setTimeout>|undefined;
+    const releaseMedia:(()=>void)[]=[];
     const issue=async(refresh=false)=>{
       if(!activeFileId||!activeVersion)return;
       if(refresh&&videoRef.current){
@@ -140,8 +142,14 @@ export function ReviewPortal({token}:{token:string}){
           {fileId:activeFileId,version:activeVersion}));
         if(!ticket.url.startsWith(API+"/reviews/media?ticket="))
           throw new Error("Endereço de mídia inválido.");
+        let sourceURL=ticket.url;
+        if(import.meta.env.VITE_VIRTUAL_LIBRARY==='true'){
+          const binding=await authenticatedReviewMedia(ticket.url,()=>user?user.getIdToken():Promise.resolve(''));
+          if(!alive){binding.close();return;}
+          releaseMedia.push(binding.close);sourceURL=binding.url;
+        }
         const url=activeMime?.startsWith("image/")?
-          await mediaCache.image(cacheKey,ticket.url,activeMime):ticket.url;
+          await mediaCache.image(cacheKey,sourceURL,activeMime):sourceURL;
         if(!alive)return;
         setMediaUrl(url);setMediaMode("ready");setPreviewError("");
         if(isVideo){
@@ -165,7 +173,7 @@ export function ReviewPortal({token}:{token:string}){
         else{setMediaMode("loading");setMediaUrl("");void issue();}
       }
     }
-    return()=>{alive=false;if(renewal)clearTimeout(renewal);};
+    return()=>{alive=false;if(renewal)clearTimeout(renewal);for(const close of releaseMedia)close();};
   },[activeFileId,activeVersion,activeMime,isVideo,request,previewRetry,mediaCache,cacheKey]);
   const playableVideo=isVideo&&previewMode==="ready";
   const seconds=isVideo?parseReviewTime(minutes):null;

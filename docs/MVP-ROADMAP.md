@@ -1,5 +1,9 @@
 # Roadmap vivo — Roteiva MVP
 
+- [x] Código local: seletor Dropbox por lote com seleção entre pastas; preview dos recursos com validação por origem e Range/bytes limitados; transporte por aba sem cookies de terceiros; identidade real adicional para mídia Google no modo novo.
+- [x] Chromium desktop/mobile: teste do Service Worker real aprovado com upstream sintético, incluindo cópia da URL para outra aba negada. Testes de origem/Range/revogação e negação de ticket Google sem identidade aprovados.
+- [ ] Ainda não homologado com provedores reais, Safari físico, uploads/capas/aprovações completos ou reset. Flags e deploy permanecem inalterados.
+
 **Progresso adicional:** mover, lixeira e restaurar implementados localmente (ainda sem QA browser). Checks GitHub do SHA 71dacd7: API 43134827810, frontend 43134827196 e E2E SaaS 43134828769 concluídos com sucesso. São checks de PR, não deploy DEV.
 
 ## Biblioteca virtual e aprovações — implementação autorizada 11/11/2026

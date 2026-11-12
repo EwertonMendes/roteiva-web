@@ -27,6 +27,7 @@ export async function readLibrarySource(env:Env,uid:string,x:Candidate,fetcher:t
  url.searchParams.set('supportsAllDrives','true');
  const m=await driveJson(env,row,url,fetcher,'source_unavailable');
  if(m.trashed===true)throw new ApiError(410,'source_trashed');
+ if((m.capabilities as {canDownload?:boolean}|undefined)?.canDownload===false)throw new ApiError(403,'source_restricted');
  if(m.id!==x.fileId||m.isAppAuthorized!==true)throw new ApiError(403,'library_picker_required');
  if(m.mimeType==='application/vnd.google-apps.folder'||m.mimeType==='application/vnd.google-apps.shortcut')throw new ApiError(415,'library_select_files');
  if(typeof m.name!=='string'||typeof m.mimeType!=='string')throw new ApiError(502,'invalid_google_response');
