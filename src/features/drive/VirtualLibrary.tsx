@@ -53,7 +53,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
  const [dropboxStructure,setDropboxStructure]=useState(false),[assisted,setAssisted]=useState<{parentId:string;sources:InspectedLibrarySource[];failed:{name:string;code:string}[];recursive?:boolean}|null>(null);
  const [search,setSearch]=useState(''),[term,setTerm]=useState('');
  const [failedImports,setFailedImports]=useState<{parentId:string;items:FailedLibraryImport[]}|null>(null);
- const generation=useRef(0),mutation=useRef<AbortController|null>(null);
+ const generation=useRef(0),loadRevision=useRef(0),mutation=useRef<AbortController|null>(null);
  const dialogRef=useOverlayFocus(()=>{if(!busy)setEdit(null);},Boolean(edit),edit?.action+':'+edit?.node?.id);
  const base=selectedProjectId?'/library/projects/'+selectedProjectId+'/nodes':'';
  const oauthReturned=new URLSearchParams(window.location.search).has('drive')||new URLSearchParams(window.location.search).has('dropbox');
@@ -93,7 +93,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
  },[base,account?.id,call]);
  const load=useCallback(async(after?:string,force=true)=>{
   if(!base||!user)return;
-  const revision=++generation.current;
+  const revision=++loadRevision.current;
   const cached=!after?getLibraryFolder<Node>(pageScope):null;
   if(cached)setPage({...cached.data,scope:pageScope});
   if(cached&&!cached.stale&&!force)return;
@@ -103,18 +103,18 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
    const path=base+'?'+new URLSearchParams({parent,...(trash?{trash:'1'}:{explorer:'1'}),
     ...(term?{q:term,scope:searchAll?'project':'folder'}:{}),...(after?{after}:{})}).toString();
    const value=await libraryFolderFlight(pageScope+':'+(after||'first'),()=>call<Page>(path));
-   if(revision!==generation.current)return;
+   if(revision!==loadRevision.current)return;
    const old=after?getLibraryFolder<Node>(pageScope)?.data:null;
    const next={...value,scope:pageScope,nodes:after&&old?[...old.nodes,...value.nodes]:value.nodes};
    setLibraryFolder(pageScope,next);setPage(next);
-  }catch(e){if(revision===generation.current){
+  }catch(e){if(revision===loadRevision.current){
    const code=(e as {code?:string}).code;
    if(parent!=='root'&&(code==='library_node_unavailable'||code==='library_parent_denied')){
     setReturnNotice('A pasta anterior não está mais disponível. Abrimos a pasta Arquivos.');setParent('root');
    }else if(code==='library_project_denied'){
     setReturnNotice('O projeto anterior não está disponível. Selecione outro projeto.');onSelectProject('');
    }else setError(e instanceof Error?e.message:'Não foi possível carregar a pasta.');
-  }}finally{if(revision===generation.current)setLoadingPage(false);}
+  }}finally{if(revision===loadRevision.current)setLoadingPage(false);}
  },[base,user?.uid,call,parent,trash,pageScope,term,searchAll,onSelectProject]);
  useEffect(()=>transfers.subscribe((_file,destination)=>{
   if(destination.projectId===selectedProjectId&&destination.linkedFolderId===parent&&!mutation.current){if(user?.uid&&selectedProjectId)invalidateLibraryFolders(user.uid,selectedProjectId);void load();}
@@ -147,7 +147,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
   if(selectedProjectId!==intent.projectId){onSelectProject(String(intent.projectId));return;}
   forgetLibraryOAuthReturn();setParent(intent.parentId);
  },[oauthReturned,user?.uid,selectedProjectId,onSelectProject]);
- useEffect(()=>{const cached=getLibraryFolder<Node>(pageScope);setPage(cached?{...cached.data,scope:pageScope}:null);void load(undefined,false);return()=>{++generation.current;};},[pageScope]);
+ useEffect(()=>{const cached=getLibraryFolder<Node>(pageScope);setPage(cached?{...cached.data,scope:pageScope}:null);void load(undefined,false);return()=>{++loadRevision.current;++generation.current;};},[pageScope]);
  useEffect(()=>()=>clearLibraryFolders(user?.uid),[user?.uid]);
  useEffect(()=>()=>mutation.current?.abort(),[]);
  async function performImport(items:LibraryImport[],target:string,controller:AbortController,scope:number){
