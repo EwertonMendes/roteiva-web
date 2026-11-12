@@ -23,12 +23,12 @@ export function readLibraryOAuthReturn(uid:string,store?:Store,now=Date.now()):L
   const target=getStore(store);if(!target)return null;
   const raw=target.getItem(KEY);if(!raw)return null;
   const data=JSON.parse(raw) as Record<string,unknown>;
-  if(!uid||data.uid!==uid||!Number.isSafeInteger(data.projectId)||Number(data.projectId)<=0||
+  if(!uid||data.uid!==uid||typeof data.projectId!=='number'||!Number.isSafeInteger(data.projectId)||data.projectId<=0||
    typeof data.parentId!=='string'||!NODE.test(data.parentId)||
    typeof data.expiresAt!=='number'||!Number.isFinite(data.expiresAt)||data.expiresAt<=now||data.expiresAt>now+MAX_AGE_MS){
    target.removeItem(KEY);return null;
   }
-  return {projectId:Number(data.projectId),parentId:data.parentId};
+  return {projectId:data.projectId,parentId:data.parentId};
  }catch{
   forgetLibraryOAuthReturn(store);return null;
  }
