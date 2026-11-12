@@ -1,12 +1,8 @@
 # Roteiva
 
-Prévia autenticada e seleção múltipla Dropbox foram acrescentadas na branch, ainda desativada nos ambientes publicados. A homologação de provedor e a integração final de uploads/aprovações continuam pendentes.
-
 ## Biblioteca virtual — implementação em andamento
 
-A branch agora inclui API de comandos autenticados, registry de referências e interface virtual com seleção múltipla Drive. O desenvolvimento fica atrás de flags desativadas (`VIRTUAL_LIBRARY_ENABLED`/`VITE_VIRTUAL_LIBRARY`); não habilitar em PROD antes de completar aprovações, mídia e homologação.
-
-Branch `codex/virtual-library`: fundação local aditiva de árvore virtual e contratos de revisão de conteúdo. Ainda não integrada à interface nem habilitada em DEV/PROD. O produto publicado mantém seu comportamento atual.
+A branch `codex/virtual-library` inclui árvore virtual com mover/lixeira/restauração, seleção múltipla Drive/Dropbox, prévia protegida e integração inicial das aprovações com versões exatas. Flags desativadas (`VIRTUAL_LIBRARY_ENABLED`/`VITE_VIRTUAL_LIBRARY`): o produto publicado mantém seu comportamento atual. Uma PoC real DEV confirmou `drive.file` e Range de revisão nos dois provedores; uploads, capas, sessão do portal e homologação completa ainda impedem ativação e release PROD. Estado e evidências no [roadmap](docs/MVP-ROADMAP.md#biblioteca-virtual-e-aprovações--implementação-autorizada-11112026).
 
 **Domínio próprio publicado:** [roteiva.com](https://roteiva.com), login no mesmo domínio e API [api.roteiva.com](https://api.roteiva.com), usando os recursos PROD existentes. HTTPS, www, login real, recarga, links antigos e conexões preservadas conferidos; marcas Google verificadas/publicadas. Aprovação dos escopos Drive e produção Dropbox continuam separadas no [roadmap](docs/MVP-ROADMAP.md#domínio-roteivacom--11112026).
 

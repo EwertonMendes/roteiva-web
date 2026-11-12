@@ -5,7 +5,8 @@ const path=/^\/library\/projects\/[1-9][0-9]{0,14}\/nodes\/[0-9a-f-]{36}\/conten
 function target(value){
  let url;try{url=new URL(value);}catch{return null;}
  const review=url.pathname==='/reviews/media'&&/^\?ticket=[A-Za-z0-9_.-]{1,750}$/.test(url.search);
- if(!origins.has(url.origin)||(!review&&(!path.test(url.pathname)||url.search))||url.hash||url.username||url.password)return null;
+ const owner=/^\/reviews\/[0-9a-f-]{36}\/content$/.test(url.pathname)&&/^\?fileId=(?:id%3A)?[A-Za-z0-9_-]{8,200}$/.test(url.search);
+ if(!origins.has(url.origin)||(!review&&!owner&&(!path.test(url.pathname)||url.search))||url.hash||url.username||url.password)return null;
  return {url:url.href,review};
 }
 self.addEventListener('install',event=>event.waitUntil(self.skipWaiting()));

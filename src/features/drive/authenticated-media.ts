@@ -36,6 +36,9 @@ export async function authenticatedReviewMedia(url:string,getToken:()=>Promise<s
  if(!url.startsWith(API_BASE_URL+'/reviews/media?ticket='))throw new Error('Endereço de mídia inválido.');
  return bindMedia(url,getToken);
 }
+export async function authenticatedOwnerReviewMedia(reviewId:string,fileId:string,getToken:()=>Promise<string>){
+ return bindMedia(API_BASE_URL+'/reviews/'+reviewId+'/content?fileId='+encodeURIComponent(fileId),getToken);
+}
 async function bindMedia(url:string,getToken:()=>Promise<string>){
  await prepare();const id=crypto.randomUUID();providers.set(id,{getToken,url});
  try{await message({type:'bind-media',id,url});}

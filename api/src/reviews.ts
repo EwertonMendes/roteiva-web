@@ -11,6 +11,9 @@ import {mintReviewMediaTicket,reviewMediaSubject,streamReviewMedia,REVIEW_MEDIA_
 import {assertDropboxFolderLinked,verifyDropboxFile} from './dropbox-uploads.ts';
 import {dropboxMedia} from './dropbox.ts';
 import {validStorageFileId,validStorageFolderId,type StorageProviderId} from './storage.ts';
+import {libraryFor,libraryNode} from './library.ts';
+import {readLibrarySource} from './library-assets.ts';
+import {readPublishedSource} from './review-source.ts';
 
 type Status = 'draft'|'publishing'|'pending'|'changes'|'approved'|'replacing'|'closing'|'closed';
 type Mode = 'link'|'google';
@@ -20,8 +23,8 @@ type Review = {
   current_version:number;expires_at:number;token_hash:string;encrypted_token:string;transition_id?:string|null;restrict_existing_public:number;drive_share_enabled:number;created_at:number;updated_at:number;
 };
 type Asset = {review_id:string;version:number;file_id:string;connection_id:string;linked_folder_id:string;provider:StorageProviderId;
-  name:string;mime_type:string;permission_id:string|null;grant_state:'unshared'|'granting'|'granted'|'revoking'|'revoked'};
-type Selection = {fileId:string;connectionId:string;linkedFolderId:string;provider:StorageProviderId};
+  name:string;mime_type:string;permission_id:string|null;grant_state:'unshared'|'granting'|'granted'|'revoking'|'revoked';library_node_id?:string|null;source_revision?:string|null;source_size?:string|null};
+type Selection = {fileId:string;connectionId:string;linkedFolderId:string;provider:StorageProviderId;libraryNodeId?:string};
 const ID=/^[A-Za-z0-9_-]{10,200}$/;
 const CONN=/^[A-Za-z0-9-]{36}$/;
 type Participant={email:string;role:'reviewer'|'viewer'};
@@ -126,7 +129,17 @@ async function verifyFolder(env:Env,uid:string,token:string,projectId:number,s:S
     throw new ApiError(403,'review_folder_denied');
 }
 async function checkedFile(env:Env,uid:string,token:string,projectId:number,s:Selection):
-  Promise<{name:string;mimeType:string;appAuthorized:boolean;canShare:boolean;ancestors:string[];inheritsPublic:boolean}>{
+  Promise<{name:string;mimeType:string;appAuthorized:boolean;canShare:boolean;ancestors:string[];inheritsPublic:boolean;sourceRevision?:string;sourceSize?:string}>{
+  if(env.VIRTUAL_LIBRARY_ENABLED==='true'){
+    if(!s.libraryNodeId)throw new ApiError(403,'review_library_reference_required');
+    const lib=await libraryFor(env,uid,projectId),node=await libraryNode(env,lib,s.libraryNodeId);
+    const asset=await env.DB.prepare('SELECT a.* FROM library_entries e JOIN library_assets a ON a.library_id=e.library_id AND a.id=e.asset_id WHERE e.library_id=? AND e.node_id=?')
+      .bind(lib.id,node.id).first<{provider:StorageProviderId;connection_id:string;file_id:string}>();
+    if(!asset||node.kind!=='asset'||asset.provider!==s.provider||asset.connection_id!==s.connectionId||asset.file_id!==s.fileId)throw new ApiError(403,'review_file_denied');
+    const meta=await readLibrarySource(env,uid,s);
+    if(!/^(image|video|audio)\//.test(meta.mimeType)&&meta.mimeType!=='application/pdf'||!meta.revision||!meta.size)throw new ApiError(415,'review_source_version_unsupported');
+    return {name:meta.name,mimeType:meta.mimeType,sourceRevision:meta.revision,sourceSize:meta.size,appAuthorized:true,canShare:false,ancestors:[],inheritsPublic:false};
+  }
   if(!validStorageFileId(s.provider,s.fileId)||!validStorageFolderId(s.provider,s.linkedFolderId,true)||!CONN.test(s.connectionId))
     throw new ApiError(400,'review_invalid_input');
   await verifyFolder(env,uid,token,projectId,s);
@@ -164,12 +177,16 @@ async function checkedFile(env:Env,uid:string,token:string,projectId:number,s:Se
   }
   throw new ApiError(403,'review_file_denied');
 }
-function selected(value:unknown):Selection[]{
+function selected(value:unknown,virtual=false):Selection[]{
   if(!Array.isArray(value)||value.length<1||value.length>8)throw new ApiError(400,'review_invalid_input');
   const seen=new Set<string>();
   return value.map((x:unknown)=>{
     if(!x||typeof x!=='object'||Array.isArray(x))throw new ApiError(400,'review_invalid_input');
     const d=x as Partial<Selection>;
+    if(virtual){
+      if(typeof d.libraryNodeId!=='string'||!CONN.test(d.libraryNodeId)||seen.has(d.libraryNodeId))throw new ApiError(400,'review_invalid_input');
+      seen.add(d.libraryNodeId);return {fileId:'',connectionId:'',linkedFolderId:'',provider:'google_drive',libraryNodeId:d.libraryNodeId};
+    }
     const provider=d.provider??'google_drive';
     if(provider!=='google_drive'&&provider!=='dropbox')throw new ApiError(400,'review_invalid_input');
     if(typeof d.fileId!=='string'||typeof d.connectionId!=='string'||typeof d.linkedFolderId!=='string'||
@@ -182,7 +199,16 @@ function selected(value:unknown):Selection[]{
 }
 async function validatedAssets(env:Env,uid:string,token:string,projectId:number,list:Selection[],id:string,version:number){
   const result:Asset[]=[];
-  for(const item of list){
+  for(const candidate of list){
+    let item=candidate;
+    if(env.VIRTUAL_LIBRARY_ENABLED==='true'){
+      const lib=await libraryFor(env,uid,projectId);await libraryNode(env,lib,candidate.libraryNodeId||'');
+      const asset=await env.DB.prepare('SELECT a.* FROM library_entries e JOIN library_assets a ON a.library_id=e.library_id AND a.id=e.asset_id WHERE e.library_id=? AND e.node_id=?')
+        .bind(lib.id,candidate.libraryNodeId).first<{file_id:string;connection_id:string;provider:StorageProviderId}>();
+      if(!asset)throw new ApiError(403,'review_file_denied');
+      item={...candidate,fileId:asset.file_id,connectionId:asset.connection_id,provider:asset.provider};
+      if(result.some(a=>a.file_id===item.fileId))throw new ApiError(400,'review_invalid_input');
+    }
     let meta:Awaited<ReturnType<typeof checkedFile>>;
     try{meta=await checkedFile(env,uid,token,projectId,item);}
     catch(error){
@@ -190,15 +216,16 @@ async function validatedAssets(env:Env,uid:string,token:string,projectId:number,
       throw error;
     }
     result.push({review_id:id,version,file_id:item.fileId,connection_id:item.connectionId,
-      linked_folder_id:item.linkedFolderId,provider:item.provider,name:meta.name,mime_type:meta.mimeType,permission_id:null,grant_state:'unshared'});
+      linked_folder_id:item.linkedFolderId,provider:item.provider,name:meta.name,mime_type:meta.mimeType,permission_id:null,grant_state:'unshared',
+      library_node_id:item.libraryNodeId||null,source_revision:meta.sourceRevision||null,source_size:meta.sourceSize||null});
   }
   return result;
 }
 function insertAssets(env:Env,entries:Asset[],transition?:string){
   return entries.map(a=>env.DB.prepare(
-    "INSERT INTO review_assets(review_id,version,file_id,connection_id,linked_folder_id,provider,name,mime_type,grant_state) SELECT ?,?,?,?,?,?,?,?,'unshared'"+
+    "INSERT INTO review_assets(review_id,version,file_id,connection_id,linked_folder_id,provider,name,mime_type,grant_state,library_node_id,source_revision,source_size) SELECT ?,?,?,?,?,?,?,?,'unshared',?,?,?"+
     (transition?" WHERE EXISTS(SELECT 1 FROM review_requests WHERE id=? AND status='replacing' AND transition_id=?)":""))
-    .bind(a.review_id,a.version,a.file_id,a.connection_id,a.linked_folder_id,a.provider,a.name,a.mime_type,
+    .bind(a.review_id,a.version,a.file_id,a.connection_id,a.linked_folder_id,a.provider,a.name,a.mime_type,a.library_node_id||null,a.source_revision||null,a.source_size||null,
       ...(transition?[a.review_id,transition]:[])));
 }
 async function tokenFor(env:Env,r:Review):Promise<string>{
@@ -218,7 +245,7 @@ async function detail(env:Env,r:Review){
   return {review:{...showReview(r),url:reviewLink(env,token)},participants:people,votes:votes.results,
     assets:files.map(a=>({
       version:a.version,fileId:a.file_id,name:a.name,mimeType:a.mime_type,grantState:a.grant_state,
-      connectionId:a.connection_id,linkedFolderId:a.linked_folder_id,provider:a.provider
+      connectionId:a.connection_id,linkedFolderId:a.linked_folder_id,provider:a.provider,sourceRevision:a.source_revision
     })),comments:comments.results,decisions:decisions.results};
 }
 function pages(n:URLSearchParams):number{
@@ -255,11 +282,12 @@ async function createReview(request:Request,env:Env,uid:string):Promise<Response
   const mode:Mode=data.mode==='link'?'link':data.mode==='google'?'google':(()=>{throw new ApiError(400,'review_invalid_input');})();
   const email=inputText(data.recipientEmail||'',200).toLowerCase();
   const people=parseParticipants(data.participants,mode,email);
+  if(env.VIRTUAL_LIBRARY_ENABLED==='true'&&data.driveShareEnabled===true)throw new ApiError(400,'review_direct_share_disabled');
   const shareDirect=data.driveShareEnabled===true?1:0;
   const restrict=shareDirect&&data.restrictExistingPublic===true?1:0;
   const days=integer(data.expiresInDays);
   if(!days||days>30)throw new ApiError(400,'review_invalid_input');
-  const list=selected(data.assets);
+  const list=selected(data.assets,env.VIRTUAL_LIBRARY_ENABLED==='true');
   const bearer=request.headers.get('Authorization')!.slice(7);
   const metadata=await verifyProject(env,uid,bearer,projectId,clientId);
   const id=crypto.randomUUID(),secret=random(),ts=now();
@@ -343,8 +371,10 @@ async function mutatePermission(env:Env,row:Connection,fileId:string,method:'POS
   return method==='DELETE'?{}:res.json() as Promise<Record<string,unknown>>;
 }
 async function grant(env:Env,r:Review,a:Asset,ownerToken:string):Promise<void>{
-  const sel={fileId:a.file_id,connectionId:a.connection_id,linkedFolderId:a.linked_folder_id,provider:a.provider};
+  const sel={fileId:a.file_id,connectionId:a.connection_id,linkedFolderId:a.linked_folder_id,provider:a.provider,libraryNodeId:a.library_node_id||undefined};
   const validation=await checkedFile(env,r.owner_uid,ownerToken,r.project_id,sel);
+  if(env.VIRTUAL_LIBRARY_ENABLED==='true'&&(validation.sourceRevision!==a.source_revision||validation.sourceSize!==a.source_size))throw new ApiError(409,'review_source_changed');
+  if(env.VIRTUAL_LIBRARY_ENABLED==='true')await readPublishedSource(new Request('https://internal.invalid/probe'),env,r.owner_uid,a,true);
   return withAssetLease(env,r,a,async current=>grantLocked(env,r,current,validation));
 }
 /** Serialize bounded Google ACL calls, including reconciliation after a lost response.
@@ -710,7 +740,7 @@ async function revise(request:Request,env:Env,r:Review):Promise<Response>{
   if(r.status!=='changes'&&r.status!=='replacing')throw new ApiError(409,'review_invalid_state');
   const version=r.current_version+1;
   if(r.status==='changes'){
-    const entries=await validatedAssets(env,r.owner_uid,bearer,r.project_id,selected(data?.assets),r.id,version);
+    const entries=await validatedAssets(env,r.owner_uid,bearer,r.project_id,selected(data?.assets,env.VIRTUAL_LIBRARY_ENABLED==='true'),r.id,version);
     if(r.drive_share_enabled&&entries.some(a=>a.provider==='dropbox'))
       throw new ApiError(409,'dropbox_direct_share_not_supported');
     const transition=crypto.randomUUID();
@@ -727,7 +757,7 @@ async function revise(request:Request,env:Env,r:Review):Promise<Response>{
   // preserve the old version, reuse the stored transition fence and validate
   // the newly selected files against the original client's project.
   if(!next.length&&r.status==='replacing'){
-    const entries=await validatedAssets(env,r.owner_uid,bearer,r.project_id,selected(data?.assets),r.id,version);
+    const entries=await validatedAssets(env,r.owner_uid,bearer,r.project_id,selected(data?.assets,env.VIRTUAL_LIBRARY_ENABLED==='true'),r.id,version);
     const current=await stored(env,r.id,r.owner_uid);
     if(current.status!=='replacing'||current.current_version!==r.current_version||!current.transition_id)
       throw new ApiError(409,'review_busy');
@@ -856,6 +886,7 @@ async function publicReview(request:Request,env:Env,action:'view'|'comment'|'dec
   }
   const decision=data.decision;
   if(decision!=='approved'&&decision!=='changes')throw new ApiError(400,'review_invalid_input');
+  if(env.VIRTUAL_LIBRARY_ENABLED==='true')for(const file of files)await readPublishedSource(new Request('https://internal.invalid/probe'),env,r.owner_uid,file,true);
   const message=inputText(data.message||'',1500,decision==='changes');
   const ts=now();
   if(r.access_mode==='google'){
@@ -957,6 +988,13 @@ export async function reviewRouter(request:Request,env:Env,url:URL):Promise<Resp
   if(parts.length!==4&&parts.length!==3)throw new ApiError(404,'not_found');
   const r=await stored(env,parts[2],uid);
   if(parts.length===3&&request.method==='GET')return Response.json(await detail(env,r));
+  if(parts.length===4&&parts[3]==='content'&&['GET','HEAD'].includes(request.method)&&env.VIRTUAL_LIBRARY_ENABLED==='true'){
+    if(!['pending','changes','approved'].includes(r.status)||r.expires_at<=now())throw new ApiError(404,'review_not_found');
+    const fileId=url.searchParams.get('fileId');
+    const asset=(await assets(env,r.id,r.current_version)).find(a=>a.file_id===fileId&&a.grant_state==='granted');
+    if(!asset)throw new ApiError(404,'review_not_found');
+    return readPublishedSource(request,env,uid,asset);
+  }
   if(parts.length===4&&parts[3]==='image'&&request.method==='GET')return ownerImage(env,r,url);
   if(parts.length===4&&parts[3]==='document'&&request.method==='GET')return ownerImage(env,r,url);
   if(parts.length!==4||request.method!=='POST')throw new ApiError(405,'method_not_allowed');

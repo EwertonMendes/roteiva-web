@@ -8,6 +8,7 @@ import {sourceRange} from './library-source.ts';
 type Asset={id:string;provider:'google_drive'|'dropbox';connection_id:string;file_id:string;mime_type:string};
 /** Identity/project are verified by the router; the reference and origin are checked on every read. */
 export async function libraryContent(request:Request,env:Env,uid:string,projectId:number,nodeId:string,fetcher:typeof fetch=fetch){
+ const observationStarted=Date.now();
  const lib=await libraryFor(env,uid,projectId),node=await libraryNode(env,lib,nodeId);
  if(node.kind!=='asset')throw new ApiError(404,'source_unavailable');
  const asset=await env.DB.prepare('SELECT a.* FROM library_entries e JOIN library_assets a ON a.library_id=e.library_id AND a.id=e.asset_id WHERE e.library_id=? AND e.node_id=?').bind(lib.id,node.id).first<Asset>();
@@ -17,7 +18,7 @@ export async function libraryContent(request:Request,env:Env,uid:string,projectI
  catch(error){
  if(error instanceof ApiError){
  const state=error.code==='source_trashed'?'source_trashed':error.status===403?'restricted':error.status===404?'unavailable':null;
- if(state)await env.DB.prepare('UPDATE library_assets SET state=?,observed_at=? WHERE library_id=? AND id=?').bind(state,Date.now(),lib.id,asset.id).run();
+ if(state)await env.DB.prepare('UPDATE library_assets SET state=?,observed_at=? WHERE library_id=? AND id=? AND observed_at<=?').bind(state,observationStarted,lib.id,asset.id,observationStarted).run();
  }throw error;
  }
  if(!source.size||!/^(image\/(jpeg|png|webp|avif|gif)|video\/(mp4|webm|quicktime)|audio\/(mpeg|wav)|application\/pdf)$/.test(source.mimeType))throw new ApiError(415,'library_preview_unsupported');
@@ -29,7 +30,7 @@ export async function libraryContent(request:Request,env:Env,uid:string,projectI
  if(asset.provider==='google_drive'){
  const row=await connection(env,uid,asset.connection_id),credential=await accessCredential(env,row,fetcher);
  upstream=await fetcher('https://www.googleapis.com/drive/v3/files/'+asset.file_id+'?alt=media&supportsAllDrives=true',{
- method:request.method,headers:{Authorization:'Bearer '+credential.value,Range:range},redirect:'manual',signal:AbortSignal.timeout(24000)});
+ method:'GET',headers:{Authorization:'Bearer '+credential.value,Range:range},redirect:'manual',signal:AbortSignal.timeout(24000)});
  }else{
  const row=await dropboxConnection(env,uid,asset.connection_id),credential=await dropboxAccess(env,row,fetcher);
  upstream=await fetcher('https://content.dropboxapi.com/2/files/download',{
@@ -43,8 +44,8 @@ export async function libraryContent(request:Request,env:Env,uid:string,projectI
  const current=asset.provider==='google_drive'?await connection(env,uid,asset.connection_id):await dropboxConnection(env,uid,asset.connection_id);
  if(current.status!=='connected')throw new ApiError(409,'reconnect_required');
  }catch(error){await upstream.body?.cancel();throw error;}
- await env.DB.prepare("UPDATE library_assets SET source_name=?,mime_type=?,size=?,source_revision=?,state='available',observed_at=? WHERE library_id=? AND id=?")
- .bind(source.name,source.mimeType,source.size,source.revision,Date.now(),lib.id,asset.id).run();
+ await env.DB.prepare("UPDATE library_assets SET source_name=?,mime_type=?,size=?,source_revision=?,state='available',observed_at=? WHERE library_id=? AND id=? AND observed_at<=?")
+ .bind(source.name,source.mimeType,source.size,source.revision,observationStarted,lib.id,asset.id,observationStarted).run();
  const headers=new Headers({'Content-Type':source.mimeType,'Accept-Ranges':'bytes',
  'Content-Length':String(Number(match[2])-Number(match[1])+1),'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer',
  'Access-Control-Expose-Headers':'Content-Length, Content-Range, Accept-Ranges'});

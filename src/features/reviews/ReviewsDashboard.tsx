@@ -22,9 +22,10 @@ import type {UploadDestination} from "../drive/useDriveUploads";
 import "./reviews.css";
 import {ReviewOwnerWorkspace} from "./ReviewOwnerWorkspace";
 import {statusText,type Mode,type Review,type Detail} from "./review-model";
+import {LibraryReviewSelector} from './LibraryReviewSelector';
 
 type StorageFolderLink=(DriveFolderLink & {provider:'google_drive'})|DropboxFolderLink;
-type Selection={fileId:string;connectionId:string;linkedFolderId:string;name:string;mimeType:string;provider:'google_drive'|'dropbox'};
+type Selection={fileId:string;connectionId:string;linkedFolderId:string;name:string;mimeType:string;provider:'google_drive'|'dropbox';libraryNodeId?:string};
 const supported=(file:DriveItem)=>/^(video|image|audio)\//.test(file.mimeType)||file.mimeType==="application/pdf";
 const splitEmails=(raw:string)=>raw.split(/[\n,;]+/).map(v=>v.trim().toLowerCase()).filter(Boolean);
 const validEmail=(value:string)=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -35,6 +36,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
   clients:Client[];projects:Project[];studioName:string;onLibrary:()=>void;startProjectId?:number;startClientId?:number;onStartConsumed?:()=>void
 }){
   const {user}=useAuth(),call=useDriveApi(),transfers=useDriveTransfers();
+  const virtual=import.meta.env.VITE_VIRTUAL_LIBRARY==='true';
   const getThumbnail=useDriveThumbnailFetch();
   const [rows,setRows]=useState<Review[]>([]);
   const [search,setSearch]=useState(""),[debouncedSearch,setDebouncedSearch]=useState("");
@@ -108,7 +110,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
   useEffect(()=>{
     browseSequence.current++;searchSequence.current++;setFileSearch("");setRemote(null);setSearchBusy(false);
     setSelectedFolder(null);setItems([]);setTrail([]);setNextToken(null);setFolderBusy(false);setFolderError("");setLinks([]);
-    if(!user||!projectId||!composer){setLinksLoading(false);return;}
+    if(virtual||!user||!projectId||!composer){setLinksLoading(false);return;}
     setLinksLoading(true);
     let alive=true;
     Promise.allSettled([readDriveLinks(user.uid),readDropboxLinks(user.uid)]).then(([drive,dropbox])=>{
@@ -254,7 +256,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
     if(!replacement&&missingDetails.length){setComposerStep("details");setError(missingDetails[0]);return;}
     await run(async()=>{
       let publishWarning="";
-      const selections=files.map(f=>({fileId:f.fileId,linkedFolderId:f.linkedFolderId,connectionId:f.connectionId,provider:f.provider}));
+      const selections=files.map(f=>virtual?{libraryNodeId:f.libraryNodeId}:{fileId:f.fileId,linkedFolderId:f.linkedFolderId,connectionId:f.connectionId,provider:f.provider});
       if(replacement){
         const beforeVersion=opened?.review.version??0;
         const endpoint="/reviews/"+replacement;
@@ -451,7 +453,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
                       placeholder={"diretoria@gmail.com\nobservador@gmail.com"}/>
                   </label>
                   <p className="reviews-info">A aprovação só fica concluída depois que todos os revisores aprovarem. Um pedido de ajustes devolve a versão ao estúdio. Leitores nunca podem enviar comentários ou decisões.</p>
-                  <div className="review-share-heading">
+                  {!virtual&&<><div className="review-share-heading">
                     <h4>Permissões no Google Drive</h4>
                     <p>Estas opções são adicionais ao acesso pelo Roteiva. Desativadas, não concedem acesso direto aos arquivos no Drive.</p>
                   </div>
@@ -472,7 +474,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
                     <AppInput type="checkbox" checked={restrictPublic} onChange={e=>setRestrictPublic(e.target.checked)}/>
                     <span className="review-sharing-switch" aria-hidden="true"/>
                   </label>}
-                  <p className="review-sharing-footnote">O acesso à aprovação é protegido por conta Google mesmo se o Drive original for público. Para tornar os arquivos originais privados, ajuste também as permissões no Drive.</p>
+                  <p className="review-sharing-footnote">O acesso à aprovação é protegido por conta Google mesmo se o Drive original for público. Para tornar os arquivos originais privados, ajuste também as permissões no Drive.</p></>}
                 </div>}
               <label>Validade<AppSelect aria-label="Validade" value={days} onValueChange={value=>setDays(Number(value))}>
                 <option value={7}>7 dias</option><option value={14}>14 dias</option><option value={30}>30 dias</option>
@@ -495,7 +497,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
              <h3>Arquivos dos projetos <span>({files.length}/8)</span></h3>
              <p>Escolha pelo menos um arquivo. Você pode selecionar até 8 imagens, vídeos, áudios ou PDFs.</p>
            </div>
-          {!projectId?<p className="reviews-muted">Selecione um projeto para explorar os arquivos vinculados.</p>:
+          {virtual?<LibraryReviewSelector projectId={projectId} selected={files.map(f=>f.fileId)} onToggle={item=>setFiles(old=>old.some(f=>f.fileId===item.asset_id)?old.filter(f=>f.fileId!==item.asset_id):old.length>=8?old:[...old,{fileId:item.asset_id,libraryNodeId:item.id,name:item.name,mimeType:item.mime_type,provider:item.provider,connectionId:'',linkedFolderId:''}])}/>:!projectId?<p className="reviews-muted">Selecione um projeto para explorar os arquivos vinculados.</p>:
            linksLoading?<CollectionState loading compact message="Carregando pastas do projeto…"/>:
            !links.length?<div className="reviews-empty"><Folder size={26}/><p>Este projeto ainda não possui pastas vinculadas.</p>
             <AppButton className="secondary-button" onClick={()=>{resetComposer();onLibrary();}}>Vincular pasta na Biblioteca</AppButton></div>:

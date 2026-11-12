@@ -3,6 +3,21 @@ import {useCallback} from 'react';
 import {useAuth} from '../auth/AuthProvider';
 const API=API_BASE_URL;
 export const messages:Record<string,string> = {
+  library_project_denied:'Você não possui acesso a este projeto.',
+  library_changed:'Esta pasta foi alterada em outra janela. Atualize e tente novamente.',
+  library_cycle:'Uma pasta não pode ser movida para dentro dela mesma ou de suas subpastas.',
+  library_depth_exceeded:'A biblioteca permite até 16 níveis. Escolha uma pasta mais próxima da raiz.',
+  library_parent_denied:'A pasta de destino não está disponível. Atualize e escolha outra pasta.',
+  library_asset_exists:'Este arquivo já está nesta pasta. Escolha outro destino.',
+  library_picker_required:'Selecione este arquivo novamente pelo seletor do Google.',
+  source_unavailable:'O arquivo foi removido ou você perdeu o acesso. A referência e o histórico foram preservados.',
+  source_trashed:'O arquivo está na lixeira do provedor. Restaure o original para acessá-lo novamente.',
+  source_restricted:'O proprietário ou a organização bloqueou o download deste arquivo.',
+  review_source_changed:'O conteúdo mudou desde a seleção. Selecione os materiais novamente para criar uma versão atualizada.',
+  review_source_revision_unavailable:'Esta versão deixou de estar disponível no provedor. Envie uma nova versão pela Biblioteca.',
+  review_source_version_unsupported:'Este formato não oferece uma versão estável para aprovação. Selecione uma imagem, PDF, áudio ou vídeo binário.',
+  provider_temporary_failure:'O provedor não respondeu. Aguarde e tente novamente; seus materiais foram preservados.',
+  provider_rate_limited:'O provedor limitou temporariamente as leituras. Aguarde antes de tentar novamente.',
   dropbox_not_configured:"A integração Dropbox ainda está sendo preparada neste ambiente.",
   dropbox_reconnect_required:"A autorização do Dropbox expirou. Conecte sua conta novamente.",
   dropbox_oauth_code_invalid:"Não foi possível confirmar o código de autorização do Dropbox. Inicie uma nova conexão; se persistir, verifique a configuração OAuth do aplicativo.",

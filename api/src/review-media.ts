@@ -5,6 +5,7 @@ import {dropboxMedia} from './dropbox.ts';
 import type {StorageProviderId} from './storage.ts';
 import {base64url,decode} from './crypto.ts';
 import {verifiedTrialPrincipal} from './auth.ts';
+import {readPublishedSource} from './review-source.ts';
 
 type Ticket={r:string;f:string;v:number;e:number;k:string;h:string;s?:string};
 const idPattern=/^[0-9a-f-]{36}$/i;
@@ -84,9 +85,10 @@ export async function streamReviewMedia(request:Request,env:Env,url:URL):Promise
     }
     if(!allowed)throw new ApiError(404,'review_not_found');
   }else if(p.s)throw new ApiError(404,'review_not_found');
-  const asset=await env.DB.prepare("SELECT file_id,connection_id,mime_type,provider FROM review_assets WHERE review_id=? AND version=? AND file_id=? AND grant_state='granted'")
-    .bind(p.r,p.v,p.f).first<{file_id:string;connection_id:string;mime_type:string;provider:StorageProviderId}>();
+  const asset=await env.DB.prepare("SELECT file_id,connection_id,mime_type,provider,source_revision,source_size FROM review_assets WHERE review_id=? AND version=? AND file_id=? AND grant_state='granted'")
+    .bind(p.r,p.v,p.f).first<{file_id:string;connection_id:string;mime_type:string;provider:StorageProviderId;source_revision:string|null;source_size:string|null}>();
   if(!asset||!(/^(video|image|audio)\//.test(asset.mime_type)||asset.mime_type==='application/pdf'))throw new ApiError(404,'review_not_found');
+  if(env.VIRTUAL_LIBRARY_ENABLED==='true')return readPublishedSource(request,env,r.owner_uid,asset);
   const range=request.headers.get('Range');
   // Single bounded chunks avoid turning a paused preview into a full large-file
   // download through Workers. HTML5 players request more ranges as needed.

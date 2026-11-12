@@ -12,6 +12,8 @@ import {useStorageConnections} from './StorageConnectionsProvider';
 import {preparePicker,pickLibraryFiles,type PickerConfig} from './google-picker';
 import {DropboxLibraryPicker} from './DropboxLibraryPicker';
 import {LibraryAssetPreview} from './LibraryAssetPreview';
+import {API_BASE_URL} from '../../lib/environment';
+import {messages} from './drive-api';
 type Node={id:string;parent_id:string|null;kind:'folder'|'asset';name:string;revision:number;provider?:string;source_state?:string;mime_type?:string};
 type Page={nodes:Node[];trail:{id:string;name:string}[];nextPage:string|null};
 export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{projects:readonly Project[];selectedProjectId?:number;onSelectProject:(id:string)=>void}){
@@ -31,6 +33,17 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
  const dialogRef=useOverlayFocus(()=>{if(!busy)setEdit(null);},Boolean(edit),edit?.action+':'+edit?.node?.id);
  const base=selectedProjectId?'/library/projects/'+selectedProjectId+'/nodes':'';
  useEffect(()=>{
+  const params=new URLSearchParams(window.location.search),result=params.get('drive')||params.get('dropbox');
+  if(result&&result!=='connected'&&result!=='cancelled')setError(messages[result]||'Não foi possível conectar a conta. Tente novamente.');
+ },[]);
+ async function connect(provider:'drive'|'dropbox'){
+  if(busy)return;setBusy(true);setError('');
+  try{const result=await call<{launchUrl:string}>('/oauth/'+provider+'/start','POST');const target=new URL(result.launchUrl);
+   if(target.origin!==API_BASE_URL||target.pathname!=='/oauth/'+provider+'/launch')throw new Error('O endereço de conexão recebido não é válido.');
+   window.location.assign(target.href);
+  }catch(e){setError(e instanceof Error?e.message:'Não foi possível conectar a conta.');setBusy(false);}
+ }
+ useEffect(()=>{
  setPicker(null);if(!base||!account)return;const controller=new AbortController();
  void Promise.all([preparePicker(),call<PickerConfig>(base.replace('/nodes','/picker/')+account.id,'GET',undefined,controller.signal)])
  .then(([,config])=>{if(!controller.signal.aborted)setPicker({connectionId:account.id,config});})
@@ -46,7 +59,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
  },[base,user,call,parent,trash]);
  useEffect(()=>{
  setMovePage(null);if(edit?.action!=='move'||!base)return;const controller=new AbortController();
- void call<Page>(base+'?parent='+encodeURIComponent(moveParent),'GET',undefined,controller.signal).then(setMovePage).catch(e=>{if(!controller.signal.aborted)setError(e instanceof Error?e.message:'Não foi possível carregar o destino.');});
+ void call<Page>(base+'?parent='+encodeURIComponent(moveParent),'GET',undefined,controller.signal).then(p=>{if(!controller.signal.aborted)setMovePage(p);}).catch(e=>{if(!controller.signal.aborted)setError(e instanceof Error?e.message:'Não foi possível carregar o destino.');});
  return()=>controller.abort();
  },[edit?.action,base,moveParent,call]);
  useEffect(()=>{setParent('root');setPage(null);setEdit(null);setPreview(null);setDropboxPicker(false);mutation.current?.abort();++generation.current;},[selectedProjectId,user?.uid]);
@@ -92,6 +105,8 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
  <AppButton disabled={!base||busy||trash} onClick={()=>{setName('');setEdit({action:'create'});}}><Plus size={16}/>Nova pasta</AppButton>
  <AppButton disabled={!base||busy} onClick={()=>{setTrash(x=>!x);setParent('root');}}>{trash?'Voltar aos arquivos':'Lixeira'}</AppButton>
  <AppButton disabled={!base||busy} aria-label="Atualizar pasta" onClick={()=>void load()}><RefreshCw size={16}/></AppButton></div>
+ <div className="virtual-library-toolbar"><AppButton disabled={busy} onClick={()=>void connect('drive')}>Conectar Google Drive</AppButton><AppButton disabled={busy} onClick={()=>void connect('dropbox')}>Conectar Dropbox</AppButton></div>
+ {storage.error&&<p role="alert">Não foi possível consultar {storage.error}. <AppButton disabled={storage.loading} onClick={()=>void storage.refresh(true)}>Atualizar conexões</AppButton></p>}
  {base&&!trash&&<div className="virtual-library-toolbar"><AppSelect aria-label="Conta Google Drive" value={account?.id||''} onValueChange={setAccountId} disabled={busy}><option value="">Selecione uma conta</option>{accounts.map(x=><option key={x.id} value={x.id}>{x.email}</option>)}</AppSelect><AppButton disabled={busy||!picker||picker.connectionId!==account?.id} onClick={()=>void addDrive()}>Adicionar do Drive</AppButton></div>}
  {progress&&<p role="status">{progress}</p>}
  {base&&!trash&&dropbox&&<div className="virtual-library-toolbar"><AppSelect aria-label="Conta Dropbox" value={dropbox.id} onValueChange={setDropboxId} disabled={busy}><option value="">Selecione uma conta</option>{dropboxAccounts.map(x=><option key={x.id} value={x.id}>{x.email}</option>)}</AppSelect><AppButton disabled={busy} onClick={()=>setDropboxPicker(true)}>Adicionar do Dropbox</AppButton></div>}

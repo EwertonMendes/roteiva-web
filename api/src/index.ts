@@ -19,8 +19,9 @@ import {dropboxEnabled,dropboxStart,dropboxLaunch,dropboxCallback,dropboxConnect
 import {startDropboxUpload,appendDropboxUpload,finishDropboxUpload,cleanupDropboxUploads} from './dropbox-uploads.ts';
 import {issueDropboxPreview,streamDropboxPreview} from './dropbox-preview.ts';
 /** Route categories are intentionally static: never log tokens, file IDs or URL params. */
+function mediaRoute(path:string){return path.endsWith('/thumbnail')||path.endsWith('/cover')||path==='/reviews/media'||/^\/(library\/projects\/[0-9]+\/nodes\/[0-9a-f-]{36}|reviews\/[0-9a-f-]{36})\/content$/.test(path);}
 function operationName(path:string):string{
-  if(path.endsWith('/thumbnail')||path.endsWith('/cover')||path==='/reviews/media')return 'thumbnail_or_media';
+  if(mediaRoute(path))return 'thumbnail_or_media';
   if(path.startsWith('/reviews'))return 'reviews';
   if(path.includes('/uploads/'))return 'drive_upload';
   if(path.startsWith('/integrations/drive'))return 'drive_metadata';
@@ -44,7 +45,7 @@ export async function handle(request: Request, env: Env): Promise<Response> {
     // from exhausting the environment account's shared 60/minute bucket.
     const sourceIp = request.headers.get('CF-Connecting-IP') || 'unknown';
     if (request.method !== 'OPTIONS') {
-      const limiter=(url.pathname.endsWith('/thumbnail')||url.pathname.endsWith('/cover')||url.pathname==='/reviews/media') ? env.API_THUMB_LIMIT : env.API_RATE_LIMIT;
+      const limiter=mediaRoute(url.pathname) ? env.API_THUMB_LIMIT : env.API_RATE_LIMIT;
       if (!(await limiter.limit({key:env.ENVIRONMENT+':ip:'+sourceIp.slice(0,64)})).success) throw new ApiError(429,'rate_limited');
       await assertDatabaseEnvironment(env);
     }

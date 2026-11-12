@@ -26,6 +26,12 @@ type PublicData={review:Review;assets:Asset[];comments:Comment[];decisions:Decis
 type Mode="light"|"dark";
 const API=API_BASE_URL;
 const messages:Record<string,string>={
+  source_unavailable:'Um dos materiais foi removido ou perdeu acesso no provedor. Solicite ao profissional a recuperação antes de decidir.',
+  source_trashed:'Um dos materiais está na lixeira do provedor. O profissional precisa restaurá-lo antes da decisão.',
+  source_restricted:'O provedor restringiu o acesso a um dos materiais. Solicite a correção ao profissional.',
+  review_source_revision_unavailable:'A versão enviada deixou de estar disponível. Solicite uma nova versão ao profissional.',
+  provider_temporary_failure:'O provedor não respondeu à confirmação dos materiais. Aguarde e tente novamente.',
+  provider_rate_limited:'O provedor limitou as leituras temporariamente. Aguarde e tente novamente.',
   review_not_found:"Este link não existe mais ou foi revogado.",
   review_expired:"O prazo de acesso a este material terminou. Solicite um novo link ao profissional.",
   review_not_ready:"Este material ainda não está disponível para revisão.",

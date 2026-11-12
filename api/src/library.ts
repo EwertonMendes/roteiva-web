@@ -50,7 +50,7 @@ export async function libraryNode(env:Env,lib:Library,id:string,allowTrashed=fal
 export async function listLibrary(env:Env,lib:Library,parentId:string,after:string|null){
  const parent=await libraryNode(env,lib,parentId);if(parent.kind!=='folder')throw new ApiError(400,'library_parent_denied');
  if(after)nodeId(after);
- const rows=await env.DB.prepare("SELECT n.id,n.parent_id,n.kind,n.name,n.state,n.revision,a.provider,a.source_name,a.mime_type,a.size,a.state AS source_state FROM library_nodes n LEFT JOIN library_entries e ON e.library_id=n.library_id AND e.node_id=n.id LEFT JOIN library_assets a ON a.library_id=e.library_id AND a.id=e.asset_id WHERE n.library_id=? AND n.parent_id=? AND n.state='active' AND n.id>? ORDER BY n.id LIMIT 51")
+ const rows=await env.DB.prepare("SELECT n.id,n.asset_id,n.parent_id,n.kind,n.name,n.state,n.revision,a.provider,a.source_name,a.mime_type,a.size,a.state AS source_state FROM library_nodes n LEFT JOIN library_entries e ON e.library_id=n.library_id AND e.node_id=n.id LEFT JOIN library_assets a ON a.library_id=e.library_id AND a.id=e.asset_id WHERE n.library_id=? AND n.parent_id=? AND n.state='active' AND n.id>? ORDER BY n.id LIMIT 51")
  .bind(lib.id,parentId,after||'').all<LibraryNode>();
  const items=rows.results.slice(0,50);
  const chain=await env.DB.prepare(`WITH RECURSIVE c(id,parent_id,name,depth) AS (

@@ -1,21 +1,18 @@
 # Roadmap vivo — Roteiva MVP
 
-- [x] Código local: seletor Dropbox por lote com seleção entre pastas; preview dos recursos com validação por origem e Range/bytes limitados; transporte por aba sem cookies de terceiros; identidade real adicional para mídia Google no modo novo.
-- [x] Chromium desktop/mobile: teste do Service Worker real aprovado com upstream sintético, incluindo cópia da URL para outra aba negada. Testes de origem/Range/revogação e negação de ticket Google sem identidade aprovados.
-- [ ] Ainda não homologado com provedores reais, Safari físico, uploads/capas/aprovações completos ou reset. Flags e deploy permanecem inalterados.
-
-**Progresso adicional:** mover, lixeira e restaurar implementados localmente (ainda sem QA browser). Checks GitHub do SHA 71dacd7: API 43134827810, frontend 43134827196 e E2E SaaS 43134828769 concluídos com sucesso. São checks de PR, não deploy DEV.
-
 ## Biblioteca virtual e aprovações — implementação autorizada 11/11/2026
 
-- [x] Código local adicional: comandos autorizados por projeto, registry e importação confirmada/deduplicada, interface de pastas/criação/renomeação/remoção e Picker Drive em lote. Onze testes focados aprovados; API completa 227 testes e TypeScript frontend/backend aprovados antes da revisão final.
-- [ ] Integrar Dropbox na UI, mover/restaurar, preview, uploads, capas, portal por sessão e revisão exata; testes de navegador e provedores reais. Flags permanecem desativadas e nenhum deploy ocorreu.
+- [x] Código local: árvore autorizada por projeto, CAS/ciclos/profundidade, registry/importação deduplicada; criar/renomear/mover/lixeira/restaurar e seletores múltiplos Drive/Dropbox. Exclusão de conta limpa metadados virtuais após encerrar revisões.
+- [x] Prévia protegida por aba, sem cookies de terceiros; Chromium desktop/mobile com upstream sintético e negação de URL copiada; testes de origem/Range/revogação/suspensão do worker.
+- [x] PoC DEV com provedores reais (12/11/2026 UTC): token Google confirmado somente drive.file, recurso criado com isAppAuthorized, Range 206 de revisão Google e Dropbox e revisão antiga após troca de conteúdo; arquivos sintéticos removidos (204/200). Evidência privada sanitizada `virtual-provider-poc-evidence.json`; não equivale a homologação do produto nem à revogação dos grants antigos.
+- [x] Aprovações no código novo selecionam referências virtuais e armazenam revisão/tamanho; leitura exata e indisponibilidade testadas, mídia Google requer identidade real. API completa 233 testes e frontend 97 testes aprovados nesta etapa.
+- [ ] Uploads, capas, sessão limitada do portal, reset/redução dos grants, QA completo de navegação/aprovações, Safari físico. Flags permanecem desativadas; nenhum deploy desta branch ocorreu.
 
 **EM ANDAMENTO; NÃO PUBLICADO.** Proprietário autorizou implementar o estudo, reconstruir metadados necessários, homologar DEV e depois publicar/testar PROD com sua conta. Isso não autoriza apagar originais dos provedores.
 
 - [x] Fundação local: árvore com constraints/triggers e testes de ciclos, pais cruzados e profundidade; endpoints de revisão específica e ranges limitados, classificação de falhas; seis testes focados aprovados.
 - [ ] PoC real de grant mínimo, revisão específica/Range nos dois provedores e sessão de clientes DEV/PROD/Safari.
-- [ ] Registry/grants e comandos autenticados de árvore; Picker em lote e interface virtual.
+- [x] Registry por proprietário e comandos autenticados de árvore; Picker em lote e interface virtual (código local).
 - [ ] Upload, capas e aprovações consumindo recursos sem ancestral físico; identidade/sessão de mídia e revisão exata.
 - [ ] Reconciliação de ACLs antigas, reset controlado e redução efetiva dos grants.
 - [ ] Homologação completa DEV, release PROD e teste real na conta do proprietário.
