@@ -1,5 +1,10 @@
 # Arquitetura do Roteiva — MVP SaaS
 
+## Endpoint opcional da Biblioteca — 12/11/2026
+
+A rota autenticada `GET /library/projects/:id/nodes?explorer=1` foi acrescentada de forma retrocompatível para o novo frontend em DEV. Preserva o endpoint legado sem `explorer=1`. A nova consulta suporta ordenação determinística por pastas/nome/ID, paginação por cursor e busca textual por nome em todo o projeto (`scope=project`) quando há termo, sem consultar os provedores e sem alterar arquivos originais. Continua exigindo autorização Firebase/Firestore do projeto e escopo por proprietário no D1. Sem migrations ou segredos novos. O frontend ainda permanece em PR de homologação; PROD não está ativado nesta alteração.
+
+
 ### Decisão de transporte autenticado de mídia (implementação na branch)
 
 A prévia nova usa Service Worker sem cache/offline, limitado a rotas de mídia permitidas. A URL local é um identificador opaco vinculado ao clientId da aba; cada request obtém identidade via MessageChannel e a API revalida projeto, referência, conexão e origem. Não depende de cookies de terceiros em DEV. Conteúdo segue em stream/ranges, sem token de identidade em URL. A implementação não substitui a autorização no servidor. Para portal Google no modo novo, streamReviewMedia exige também a identidade Google verificada e o compromisso do participante, além do ticket. Link aberto conserva o comportamento de capacidade. O worker recupera seu mapa após suspensão apenas pela aba que ainda possui o vínculo. Nada foi habilitado nos ambientes publicados; QA Safari e integração completa ainda pendentes.

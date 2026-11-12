@@ -6,8 +6,8 @@ import {libraryContent} from './library-content.ts';
 import {prepareLibraryUploadTarget} from './library-upload-target.ts';
 import {createLibraryStructure} from './library-structure.ts';
 import {inspectLibrarySelection} from './library-inspect.ts';
-import {authorizeLibraryProject,libraryFor,nodeId,listLibrary,mutateLibrary,type LibraryNode} from './library-core.ts';
-export {authorizeLibraryProject,libraryFor,libraryNode,listLibrary,mutateLibrary} from './library-core.ts';
+import {authorizeLibraryProject,libraryFor,nodeId,listLibrary,listLibraryExplorer,mutateLibrary,type LibraryNode} from './library-core.ts';
+export {authorizeLibraryProject,libraryFor,libraryNode,listLibrary,listLibraryExplorer,mutateLibrary} from './library-core.ts';
 
 export async function libraryRouter(request:Request,env:Env,uid:string,url:URL,fetcher:typeof fetch=fetch){
  const inspect=/^\/library\/projects\/([1-9][0-9]{0,14})\/inspect$/.exec(url.pathname);
@@ -47,6 +47,8 @@ export async function libraryRouter(request:Request,env:Env,uid:string,url:URL,f
  const data=await env.DB.prepare("SELECT id,parent_id,kind,name,state,revision FROM library_nodes WHERE library_id=? AND state='trashed' AND id>? ORDER BY id LIMIT 51").bind(lib.id,after||'').all<LibraryNode>();
  const nodes=data.results.slice(0,50);return Response.json({libraryId:lib.id,trail:[{id:'root',name:'Lixeira'}],nodes,nextPage:data.results.length>50?nodes.at(-1)!.id:null});
  }
+ if(url.searchParams.get('explorer')==='1')return listLibraryExplorer(env,lib,nodeId(url.searchParams.get('parent')||'root'),
+  url.searchParams.get('after'),url.searchParams.get('q')||'',url.searchParams.get('scope')==='project');
  return listLibrary(env,lib,nodeId(url.searchParams.get('parent')||'root'),url.searchParams.get('after'),url.searchParams.get('q')||'');
  }
  if(match[2]==='nodes'&&request.method==='POST')return mutateLibrary(env,lib,match[3]||null,await uploadBody(request));
