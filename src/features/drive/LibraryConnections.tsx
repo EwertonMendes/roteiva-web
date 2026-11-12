@@ -13,6 +13,8 @@ export function LibraryConnections({busy,onConnect}:{busy:boolean;onConnect:(pro
  const storage=useStorageConnections(),transfers=useDriveTransfers(),call=useDriveApi();
  const [selected,setSelected]=useState<StorageConnection|null>(null),[working,setWorking]=useState(false),[error,setError]=useState('');
  const operation=useRef<AbortController|null>(null),dialog=useOverlayFocus(()=>{if(!working)setSelected(null);},Boolean(selected));
+ const connectedDrive=storage.connections.some(x=>x.provider==='google_drive'&&x.status==='connected');
+ const connectedDropbox=storage.connections.some(x=>x.provider==='dropbox'&&x.status==='connected');
  useEffect(()=>()=>operation.current?.abort(),[]);
  async function disconnect(){
   if(!selected||working)return;
@@ -33,14 +35,14 @@ export function LibraryConnections({busy,onConnect}:{busy:boolean;onConnect:(pro
     <span className="vl-section-icon"><HardDrive size={18} aria-hidden="true"/></span>
     <div><h3>Armazenamento conectado</h3><p>Gerencie suas contas do Google Drive e Dropbox.</p></div>
    </div>
-   <div className="vl-connection-actions">
-    <AppButton type="button" className="vl-action vl-connect-button" disabled={busy||working} onClick={()=>onConnect('drive')}>
+   {(!connectedDrive||!connectedDropbox)&&<div className="vl-connection-actions">
+    {!connectedDrive&&<AppButton type="button" className="vl-action vl-connect-button" disabled={busy||working} onClick={()=>onConnect('drive')}>
      <img src={googleDriveMark} alt="" aria-hidden="true"/><span>Conectar Google Drive</span>
-    </AppButton>
-    <AppButton type="button" className="vl-action vl-connect-button" disabled={busy||working} onClick={()=>onConnect('dropbox')}>
+    </AppButton>}
+    {!connectedDropbox&&<AppButton type="button" className="vl-action vl-connect-button" disabled={busy||working} onClick={()=>onConnect('dropbox')}>
      <img src={dropboxMark} alt="" aria-hidden="true"/><span>Conectar Dropbox</span>
-    </AppButton>
-   </div>
+    </AppButton>}
+   </div>}
   </div>
   {storage.connections.length>0&&<details className="vl-account-details">
    <summary><span className="vl-summary-title"><ShieldCheck size={17} aria-hidden="true"/> Contas de armazenamento ({storage.connections.length})</span><ChevronDown className="vl-summary-chevron" size={16} aria-hidden="true"/></summary>
