@@ -47,9 +47,8 @@ export async function listLibrary(env:Env,lib:Library,parentId:string,after:stri
  const parent=await libraryNode(env,lib,parentId);if(parent.kind!=='folder')throw new ApiError(400,'library_parent_denied');
  if(after)nodeId(after);
  const term=search.normalize('NFC').trim();if(term.length>100||/[\x00-\x1f\x7f]/.test(term))throw new ApiError(400,'invalid_search');
- const pattern='%'+term.replace(/[\\%_]/g,value=>'\\'+value)+'%';
- const rows=await env.DB.prepare("SELECT n.id,n.asset_id,n.parent_id,n.kind,n.name,n.state,n.revision,a.provider,a.source_name,a.mime_type,a.size,a.state AS source_state FROM library_nodes n LEFT JOIN library_entries e ON e.library_id=n.library_id AND e.node_id=n.id LEFT JOIN library_assets a ON a.library_id=e.library_id AND a.id=e.asset_id WHERE n.library_id=? AND n.parent_id=? AND n.state='active' AND n.id>? AND n.name LIKE ? ESCAPE '\\' ORDER BY n.id LIMIT 51")
- .bind(lib.id,parentId,after||'',pattern).all<LibraryNode>();
+ const rows=await env.DB.prepare("SELECT n.id,n.asset_id,n.parent_id,n.kind,n.name,n.state,n.revision,a.provider,a.source_name,a.mime_type,a.size,a.state AS source_state FROM library_nodes n LEFT JOIN library_entries e ON e.library_id=n.library_id AND e.node_id=n.id LEFT JOIN library_assets a ON a.library_id=e.library_id AND a.id=e.asset_id WHERE n.library_id=? AND n.parent_id=? AND n.state='active' AND n.id>? AND instr(lower(n.name),lower(?))>0 ORDER BY n.id LIMIT 51")
+ .bind(lib.id,parentId,after||'',term).all<LibraryNode>();
  const items=rows.results.slice(0,50);
  const chain=await env.DB.prepare(`WITH RECURSIVE c(id,parent_id,name,depth) AS (
  SELECT id,parent_id,name,0 FROM library_nodes WHERE library_id=? AND id=?

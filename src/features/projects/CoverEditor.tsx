@@ -136,11 +136,12 @@ export function CoverEditor({project,client,onClose,onSave}:{project?:Project;cl
   const controller=new AbortController();pickerOperation.current=controller;setBusy(true);setError('');
   // Google's Picker mounts outside this native dialog; release top-layer inertness while it is open.
   dialog.current?.close();
+  const keys=new Map<string,string>();
   void pickLibraryFiles(picker.config,accessToken=>call('/integrations/drive/'+account+'/picker/verify','POST',{accessToken},controller.signal),controller.signal,
-   {mimeTypes:'image/jpeg,image/png,image/webp,image/avif',maxItems:1,title:'Escolha uma imagem para o Roteiva'})
+   {mimeTypes:'image/jpeg,image/png,image/webp,image/avif',maxItems:1,title:'Escolha uma imagem para o Roteiva',onDocuments:docs=>{for(const doc of docs)if(doc.resourceKey)keys.set(doc.id,doc.resourceKey);}})
    .then(async ids=>{
     if(!ids.length||controller.signal.aborted)return;
-    const reply=await call<{file:DriveItem}>('/integrations/drive/'+account+'/metadata?fileId='+encodeURIComponent(ids[0]),'GET',undefined,controller.signal);
+    const reply=await call<{file:DriveItem}>('/integrations/drive/'+account+'/picker/file','POST',{fileId:ids[0],resourceKey:keys.get(ids[0])},controller.signal);
     if(controller.signal.aborted)return;
     if(!['image/jpeg','image/png','image/webp','image/avif'].includes(reply.file.mimeType)||Number(reply.file.size)>8*1024*1024)throw new Error('Escolha uma imagem JPG, PNG, WebP ou AVIF de até 8 MB.');
     chooseFile(reply.file);

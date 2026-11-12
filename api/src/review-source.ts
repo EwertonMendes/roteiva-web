@@ -1,23 +1,23 @@
 import {ApiError,type Env} from './types.ts';
 import {readLibrarySource} from './library-assets.ts';
 import {revisionEndpoint,sourceRange,type SourceVersion} from './library-source.ts';
-import {connection} from './repository.ts';
 import {accessCredential} from './google.ts';
 import {dropboxConnection,dropboxAccess} from './dropbox.ts';
+import {driveResourceHeaders} from './drive-resource-keys.ts';
 export type PublishedSource={provider:'google_drive'|'dropbox';connection_id:string;file_id:string;mime_type:string;source_revision?:string|null;source_size?:string|null};
 /** Current availability is checked, but bytes always come from the published revision. */
 export async function readPublishedSource(request:Request,env:Env,uid:string,asset:PublishedSource,probe=false,fetcher:typeof fetch=fetch):Promise<Response>{
  if(!asset.source_revision||!asset.source_size)throw new ApiError(409,'review_source_version_unsupported');
- await readLibrarySource(env,uid,{provider:asset.provider,connectionId:asset.connection_id,fileId:asset.file_id},fetcher);
+ const observed=await readLibrarySource(env,uid,{provider:asset.provider,connectionId:asset.connection_id,fileId:asset.file_id},fetcher);
  const source:SourceVersion={provider:asset.provider,fileId:asset.file_id,revision:asset.source_revision,size:asset.source_size,mimeType:asset.mime_type};
  const target=revisionEndpoint(source);sourceRange(null,source.size);
  const full=!probe&&!request.headers.has('Range')&&(source.mimeType.startsWith('image/')||source.mimeType==='application/pdf');
  if(full&&Number(source.size)>(source.mimeType.startsWith('image/')?24:64)*1024*1024)throw new ApiError(413,'library_preview_too_large');
  const range=probe?'bytes=0-0':full?'bytes=0-'+(Number(source.size)-1):sourceRange(request.headers.get('Range'),source.size);
- const token=source.provider==='google_drive'?(await accessCredential(env,await connection(env,uid,asset.connection_id),fetcher)).value:
+ const token=source.provider==='google_drive'?(await accessCredential(env,{owner_uid:uid,id:asset.connection_id},fetcher)).value:
  await dropboxAccess(env,await dropboxConnection(env,uid,asset.connection_id),fetcher);
  let response:Response;
- try{response=await fetcher(target.url,{method:target.method,headers:{...target.headers,Authorization:'Bearer '+token,Range:range},redirect:'manual',signal:AbortSignal.timeout(24000)});}
+ try{response=await fetcher(target.url,{method:target.method,headers:{...target.headers,...(source.provider==='google_drive'?driveResourceHeaders(source.fileId,observed.resourceKey):{}),Authorization:'Bearer '+token,Range:range},redirect:'manual',signal:AbortSignal.timeout(24000)});}
  catch{throw new ApiError(503,'provider_temporary_failure');}
  if(!response.ok){
   const status=response.status;

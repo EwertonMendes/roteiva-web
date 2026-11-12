@@ -1,12 +1,12 @@
 import {ApiError,type Env} from './types.ts';
-import {connection} from './repository.ts';
-import {driveJson} from './drive-client.ts';
+import {pickedDriveResource} from './drive-picked-source.ts';
+import {validDriveResourceKey} from './drive-resource-keys.ts';
 import {dropboxMetadata,dropboxNormalize} from './dropbox.ts';
 import {libraryNode,libraryFor} from './library-core.ts';
 import {validConnectionId,validStorageFileId,isStorageProvider} from './storage.ts';
 
-type Candidate={provider:'google_drive'|'dropbox';connectionId:string;fileId:string};
-type Metadata={name:string;mimeType:string;size:string|null;revision:string|null};
+type Candidate={provider:'google_drive'|'dropbox';connectionId:string;fileId:string;resourceKey?:string};
+type Metadata={name:string;mimeType:string;size:string|null;revision:string|null;resourceKey?:string;checksum?:string};
 async function stableId(value:string){
  const bytes=new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value)));
  const s=Array.from(bytes.slice(0,16),x=>x.toString(16).padStart(2,'0')).join('');
@@ -15,7 +15,7 @@ async function stableId(value:string){
 function candidate(value:unknown):Candidate{
  const x=value as Partial<Candidate>|null;
  if(!x||!isStorageProvider(x.provider)||typeof x.connectionId!=='string'||!validConnectionId(x.connectionId)||
- typeof x.fileId!=='string'||!validStorageFileId(x.provider,x.fileId))throw new ApiError(400,'invalid_library_asset');
+ typeof x.fileId!=='string'||!validStorageFileId(x.provider,x.fileId)||x.resourceKey!==undefined&&(x.provider!=='google_drive'||!validDriveResourceKey(x.resourceKey)))throw new ApiError(400,'invalid_library_asset');
  return x as Candidate;
 }
 export async function readLibrarySource(env:Env,uid:string,x:Candidate,fetcher:typeof fetch=fetch):Promise<Metadata>{
@@ -31,29 +31,21 @@ export async function readLibrarySource(env:Env,uid:string,x:Candidate,fetcher:t
 }
 async function readSource(env:Env,uid:string,x:Candidate,fetcher:typeof fetch):Promise<Metadata>{
  if(x.provider==='google_drive'){
- const row=await connection(env,uid,x.connectionId);
- if(row.status!=='connected')throw new ApiError(409,'reconnect_required');
- const url=new URL('https://www.googleapis.com/drive/v3/files/'+x.fileId);
- url.searchParams.set('fields','id,name,mimeType,size,headRevisionId,isAppAuthorized,trashed,capabilities(canDownload)');
- url.searchParams.set('supportsAllDrives','true');
- const m=await driveJson(env,row,url,fetcher,'source_unavailable');
- if(m.trashed===true)throw new ApiError(410,'source_trashed');
- if((m.capabilities as {canDownload?:boolean}|undefined)?.canDownload===false)throw new ApiError(403,'source_restricted');
- if(m.id!==x.fileId||m.isAppAuthorized!==true)throw new ApiError(403,'library_picker_required');
+ const m=await pickedDriveResource(env,uid,x.connectionId,x.fileId,x.resourceKey,fetcher);
  if(m.mimeType==='application/vnd.google-apps.folder'||m.mimeType==='application/vnd.google-apps.shortcut')throw new ApiError(415,'library_select_files');
  if(typeof m.name!=='string'||typeof m.mimeType!=='string')throw new ApiError(502,'invalid_google_response');
- return {name:m.name,mimeType:m.mimeType,size:typeof m.size==='string'?m.size:null,revision:typeof m.headRevisionId==='string'?m.headRevisionId:null};
+ return {name:m.name,mimeType:m.mimeType,size:typeof m.size==='string'?m.size:null,revision:typeof m.headRevisionId==='string'?m.headRevisionId:null,resourceKey:m.resourceKey,checksum:typeof m.md5Checksum==='string'&&/^[a-f0-9]{32}$/i.test(m.md5Checksum)?'md5:'+m.md5Checksum.toLowerCase():undefined};
  }
  const m=await dropboxMetadata(env,uid,x.connectionId,x.fileId,fetcher);
  if(m['.tag']!=='file'||m.id!==x.fileId||typeof m.name!=='string')throw new ApiError(404,'source_unavailable');
  if(m.is_downloadable===false)throw new ApiError(403,'source_restricted');
  // Keep format discovery explicit; extensions never authorize or enable active content.
- return {name:m.name,mimeType:dropboxNormalize(m)?.mimeType||'application/octet-stream',size:typeof m.size==='number'?String(m.size):null,revision:typeof m.rev==='string'?m.rev:null};
+ return {name:m.name,mimeType:dropboxNormalize(m)?.mimeType||'application/octet-stream',size:typeof m.size==='number'?String(m.size):null,revision:typeof m.rev==='string'?m.rev:null,checksum:typeof m.content_hash==='string'&&/^[a-f0-9]{64}$/i.test(m.content_hash)?'dropbox-content-hash:'+m.content_hash.toLowerCase():undefined};
 }
 /** Caller must authorize the project first; each item is then verified with its owner's credential. */
 export async function importLibraryAssets(env:Env,uid:string,projectId:number,input:unknown,fetcher:typeof fetch=fetch){
  const x=input as {parentId?:unknown;items?:unknown}|null;
- if(!x||typeof x.parentId!=='string'||!Array.isArray(x.items)||!x.items.length||x.items.length>10)throw new ApiError(400,'invalid_library_batch');
+ if(!x||typeof x.parentId!=='string'||!Array.isArray(x.items)||!x.items.length||x.items.length>3)throw new ApiError(400,'invalid_library_batch');
  const items=x.items.map(candidate);const lib=await libraryFor(env,uid,projectId);
  const parent=await libraryNode(env,lib,x.parentId);if(parent.kind!=='folder')throw new ApiError(400,'library_parent_denied');
  const results=[];

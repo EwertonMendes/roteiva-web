@@ -2,6 +2,14 @@ import {ApiError,type Env} from './types.ts';
 import {connection} from './repository.ts';
 import {DRIVE_SCOPE} from './google.ts';
 import {uploadBody} from './uploads.ts';
+import {pickedDriveResource} from './drive-picked-source.ts';
+import {validDriveResourceKey} from './drive-resource-keys.ts';
+export async function pickedDriveFile(env:Env,uid:string,connectionId:string,request:Request,fetcher:typeof fetch=fetch){
+ const data=await uploadBody(request) as {fileId?:unknown;resourceKey?:unknown}|null;
+ if(!data||typeof data.fileId!=='string'||!/^[A-Za-z0-9_-]{10,200}$/.test(data.fileId)||data.resourceKey!==undefined&&!validDriveResourceKey(data.resourceKey))throw new ApiError(400,'invalid_library_asset');
+ const file=await pickedDriveResource(env,uid,connectionId,data.fileId,data.resourceKey as string|undefined,fetcher);
+ return Response.json({file:{id:data.fileId,name:file.name,mimeType:file.mimeType,size:file.size,modifiedTime:file.modifiedTime,thumbnailFallback:true}});
+}
 export async function pickerConfiguration(env:Env,uid:string,connectionId:string):Promise<Response>{
  const row=await connection(env,uid,connectionId);
  if(row.status!=='connected')throw new ApiError(409,'reconnect_required');

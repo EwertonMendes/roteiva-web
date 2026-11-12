@@ -5,6 +5,7 @@ import {connection} from './repository.ts';
 import {accessCredential} from './google.ts';
 import {dropboxConnection,dropboxAccess} from './dropbox.ts';
 import {sourceRange} from './library-source.ts';
+import {driveResourceHeaders} from './drive-resource-keys.ts';
 type Asset={id:string;provider:'google_drive'|'dropbox';connection_id:string;file_id:string;mime_type:string};
 /** Identity/project are verified by the router; the reference and origin are checked on every read. */
 export async function libraryContent(request:Request,env:Env,uid:string,projectId:number,nodeId:string,fetcher:typeof fetch=fetch){
@@ -30,7 +31,7 @@ export async function libraryContent(request:Request,env:Env,uid:string,projectI
  if(asset.provider==='google_drive'){
  const row=await connection(env,uid,asset.connection_id),credential=await accessCredential(env,row,fetcher);
  upstream=await fetcher('https://www.googleapis.com/drive/v3/files/'+asset.file_id+'?alt=media&supportsAllDrives=true',{
- method:'GET',headers:{Authorization:'Bearer '+credential.value,Range:range},redirect:'manual',signal:AbortSignal.timeout(24000)});
+ method:'GET',headers:{Authorization:'Bearer '+credential.value,...driveResourceHeaders(asset.file_id,source.resourceKey),Range:range},redirect:'manual',signal:AbortSignal.timeout(24000)});
  }else{
  const row=await dropboxConnection(env,uid,asset.connection_id),credential=await dropboxAccess(env,row,fetcher);
  upstream=await fetcher('https://content.dropboxapi.com/2/files/download',{

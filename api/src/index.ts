@@ -3,6 +3,7 @@ import {applyResponsePolicy} from './response-policy.ts';
 import {listCoverImages,coverImage,dropboxCoverImage,fastCoverPreview} from './project-covers.ts';
 import { ApiError, type Env } from './types.ts';
 import { reviewRouter,cleanupExpiredReviews } from './reviews.ts';
+import {DRIVE_SCOPE} from './google.ts';
 import { identity,verifiedTrialPrincipal } from './auth.ts';
 import { callback, start, launch, enabled } from './oauth.ts';
 import { metadata, disconnect, about } from './drive.ts';
@@ -10,7 +11,7 @@ import { listFolders, listFolderItems } from './folders.ts';
 import { thumbnail } from './thumbnails.ts';
 import {libraryRouter} from './library.ts';
 import { startUpload, completeUpload, authorizeUploadFolder, cleanupUploads } from './uploads.ts';
-import { verifyPickerToken,pickerConfiguration } from './picker.ts';
+import { verifyPickerToken,pickerConfiguration,pickedDriveFile } from './picker.ts';
 import { deletionStatus, requestDeletion, runPendingDeletions, runDeletionMaintenance } from './account-deletion.ts';
 import { monitorDeletionBacklog } from './deletion-monitor.ts';
 import { ensureAccess, assertActiveAccess } from './access.ts';
@@ -20,6 +21,7 @@ import {startDropboxUpload,appendDropboxUpload,finishDropboxUpload,cleanupDropbo
 import {issueDropboxPreview,streamDropboxPreview} from './dropbox-preview.ts';
 /** Route categories are intentionally static: never log tokens, file IDs or URL params. */
 function mediaRoute(path:string){return path.endsWith('/thumbnail')||path.endsWith('/cover')||path==='/reviews/media'||/^\/(library\/projects\/[0-9]+\/nodes\/[0-9a-f-]{36}|reviews\/[0-9a-f-]{36})\/content$/.test(path);}
+function libraryBatchRoute(path:string){return /^\/library\/projects\/[0-9]+\/(imports|inspect|structure|uploads\/destination)$/.test(path);}
 function operationName(path:string):string{
   if(mediaRoute(path))return 'thumbnail_or_media';
   if(path.startsWith('/reviews'))return 'reviews';
@@ -45,7 +47,7 @@ export async function handle(request: Request, env: Env): Promise<Response> {
     // from exhausting the environment account's shared 60/minute bucket.
     const sourceIp = request.headers.get('CF-Connecting-IP') || 'unknown';
     if (request.method !== 'OPTIONS') {
-      const limiter=mediaRoute(url.pathname) ? env.API_THUMB_LIMIT : env.API_RATE_LIMIT;
+      const limiter=mediaRoute(url.pathname) ? env.API_THUMB_LIMIT : libraryBatchRoute(url.pathname)?env.API_UPLOAD_LIMIT:env.API_RATE_LIMIT;
       if (!(await limiter.limit({key:env.ENVIRONMENT+':ip:'+sourceIp.slice(0,64)})).success) throw new ApiError(429,'rate_limited');
       await assertDatabaseEnvironment(env);
     }
@@ -154,7 +156,10 @@ export async function handle(request: Request, env: Env): Promise<Response> {
       await assertActiveAccess(env,uid);
       if (!(await env.API_RATE_LIMIT.limit({key:env.ENVIRONMENT+':uid:'+uid})).success) throw new ApiError(429,'rate_limited');
       const rows = await env.DB.prepare('SELECT id,google_email,status,scopes,updated_at FROM drive_connections WHERE owner_uid=? ORDER BY created_at LIMIT 20').bind(uid).all();
-      response = Response.json({connections:rows.results});
+      response = Response.json({connections:rows.results.map(row=>{
+        const c=row as {status?:string;scopes?:string};
+        return env.VIRTUAL_LIBRARY_ENABLED==='true'&&c.status==='connected'&&c.scopes?.trim()!==DRIVE_SCOPE?{...row,status:'minimum_reconsent_required'}:row;
+      })});
     } else if (url.pathname === '/oauth/drive/start' && request.method === 'POST') {
       if (!allowedFrontend(env,origin)) throw new ApiError(403,'origin_required');
       const uid = await identity(request,env);
@@ -183,13 +188,14 @@ export async function handle(request: Request, env: Env): Promise<Response> {
       enabled(env);
       const uid=await identity(request,env);await assertActiveAccess(env,uid);
       response=await pickerConfiguration(env,uid,url.pathname.split('/')[3]);
-    } else if (/^\/integrations\/drive\/[^/]+\/picker\/verify$/.test(url.pathname) && request.method==='POST') {
+    } else if (/^\/integrations\/drive\/[^/]+\/picker\/(verify|file)$/.test(url.pathname) && request.method==='POST') {
       enabled(env);
       if(!allowedFrontend(env,origin))throw new ApiError(403,'origin_required');
       const uid=await identity(request,env);
       await assertActiveAccess(env,uid);
       if(!(await env.API_RATE_LIMIT.limit({key:env.ENVIRONMENT+':upload:'+uid})).success)throw new ApiError(429,'rate_limited');
-      response=await verifyPickerToken(env,uid,url.pathname.split('/')[3],request);
+      if(url.pathname.endsWith('/file')&&env.VIRTUAL_LIBRARY_ENABLED!=='true')throw new ApiError(404,'not_found');
+      response=url.pathname.endsWith('/file')?await pickedDriveFile(env,uid,url.pathname.split('/')[3],request):await verifyPickerToken(env,uid,url.pathname.split('/')[3],request);
     } else if (/^\/integrations\/drive\/[^/]+\/folders\/[^/]+\/uploads(?:\/(?:complete|authorize))?$/.test(url.pathname) && request.method==='POST') {
       enabled(env);
       if(!allowedFrontend(env,origin))throw new ApiError(403,'origin_required');

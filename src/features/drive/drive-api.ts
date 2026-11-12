@@ -3,6 +3,10 @@ import {useCallback} from 'react';
 import {useAuth} from '../auth/AuthProvider';
 const API=API_BASE_URL;
 export const messages:Record<string,string> = {
+  invalid_library_structure:'A estrutura de pastas não é válida. Confira os nomes e a organização.',
+  library_structure_mismatch:'A tentativa anterior corresponde a outra estrutura. Feche e revise a biblioteca antes de iniciar uma nova.',
+  library_structure_ambiguous:'Há mais de uma pasta com o mesmo nome no destino. Use outro nome na prévia ou renomeie as pastas existentes antes de importar.',
+  media_source_mismatch:'O provedor não confirmou a identidade e a versão dos bytes. Nenhum conteúdo diferente será exibido.',
   drive_reconnect_minimum_required:'Esta conexão usa a autorização antiga. Reconecte o Google Drive com acesso somente aos arquivos selecionados.',
   library_upload_target_missing:'A pasta de envios foi removida do provedor. Inicie um novo envio para criar outro destino, preservando os arquivos existentes.',
   library_upload_target_restricted:'O provedor não permite enviar para esta pasta. Confira as permissões da conta conectada.',

@@ -5,6 +5,8 @@ import {DRIVE_SCOPE,DRIVE_READ_SCOPE,accessCredential} from './google.ts';
 import {driveJson} from './drive-client.ts';
 import {dropboxConnection,dropboxMetadata,dropboxMedia} from './dropbox.ts';
 import {validStorageFileId} from './storage.ts';
+import {pickedDriveResource} from './drive-picked-source.ts';
+import {driveResourceHeaders} from './drive-resource-keys.ts';
 
 export const COVER_TYPES=['image/jpeg','image/png','image/webp','image/avif'];
 export const MAX_COVER_BYTES=8*1024*1024;
@@ -80,14 +82,14 @@ export async function coverImage(env:Env,uid:string,id:string,fileId:string,fetc
  const row=await authorized(env,uid,id);
  const target=new URL('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(fileId));
  target.searchParams.set('fields','id,mimeType,size,trashed,isAppAuthorized,capabilities(canDownload),imageMediaMetadata(width,height)');target.searchParams.set('supportsAllDrives','true');
- const info=await driveJson(env,row,target,fetcher,'file_unavailable');
+ const info=env.VIRTUAL_LIBRARY_ENABLED==='true'?await pickedDriveResource(env,uid,id,fileId,undefined,fetcher):await driveJson(env,row,target,fetcher,'file_unavailable');
  if(env.VIRTUAL_LIBRARY_ENABLED==='true'&&(info.isAppAuthorized!==true||(info.capabilities as {canDownload?:boolean}|undefined)?.canDownload===false))throw new ApiError(403,'library_picker_required');
  const size=Number(info.size),dimensions=info.imageMediaMetadata as {width?:number;height?:number}|undefined;
  if(info.trashed||!COVER_TYPES.includes(String(info.mimeType))||!Number.isSafeInteger(size)||size<=0||size>MAX_COVER_BYTES||
  (dimensions?.width&&dimensions.height&&dimensions.width*dimensions.height>40_000_000))throw new ApiError(400,'invalid_cover_image');
  const token=await accessCredential(env,row,fetcher);
  target.search='';target.searchParams.set('alt','media');target.searchParams.set('supportsAllDrives','true');
- const response=await fetcher(target,{headers:{Authorization:'Bearer '+token.value},redirect:'manual',signal:AbortSignal.timeout(15000)});
+ const response=await fetcher(target,{headers:{Authorization:'Bearer '+token.value,...driveResourceHeaders(fileId,typeof info.resourceKey==='string'?info.resourceKey:undefined)},redirect:'manual',signal:AbortSignal.timeout(15000)});
  if(!response.ok||response.status!==200||response.headers.get('Content-Type')?.split(';')[0]!==info.mimeType){await response.body?.cancel();throw new ApiError(502,'cover_unavailable');}
  const reader=response.body?.getReader();if(!reader)throw new ApiError(502,'cover_unavailable');
  const bytes=new Uint8Array(size);let received=0;

@@ -22,3 +22,16 @@ test('cycles, missing parents and excessive resulting depth cannot leave a parti
  await assert.rejects(createLibraryStructure(env,'alice',17,{attemptId:crypto.randomUUID(),parentId:parent,folders:[{key:'one',parentKey:null,name:'One'},{key:'two',parentKey:'one',name:'Two'}]}),e=>e.code==='library_depth_exceeded');
  assert.equal(f.sql.prepare('SELECT count(*) n FROM library_nodes').get().n,before);
 });
+test('assisted structures reuse unambiguous active folders and never merge a stale renamed folder',async t=>{
+ const f=database();t.after(f.close);const env={DB:f.DB},folders=[{key:'one',parentKey:null,name:'Vídeos'},{key:'two',parentKey:'one',name:'Originais'}];
+ const initial=await (await createLibraryStructure(env,'alice',17,{attemptId:crypto.randomUUID(),parentId:'root',folders,reuseExisting:true})).json();
+ const repeated=await (await createLibraryStructure(env,'alice',17,{attemptId:crypto.randomUUID(),parentId:'root',folders,reuseExisting:true})).json();
+ assert.deepEqual(repeated.created,initial.created);assert.equal(f.sql.prepare('SELECT count(*) n FROM library_nodes').get().n,3);
+ const lib=await libraryFor(env,'alice',17);await mutateLibrary(env,lib,null,{name:'Vídeos'});
+ await assert.rejects(createLibraryStructure(env,'alice',17,{attemptId:crypto.randomUUID(),parentId:'root',folders,reuseExisting:true}),e=>e.code==='library_structure_ambiguous');
+ const isolated=await libraryFor(env,'alice',18),node=await (await mutateLibrary(env,isolated,null,{name:'Vídeos'})).json();
+ const batch=f.DB.batch.bind(f.DB);let renamed=false;
+ f.DB.batch=async statements=>{if(!renamed&&statements.length>1){renamed=true;f.sql.prepare("UPDATE library_nodes SET name='Alterada',revision=revision+1 WHERE id=?").run(node.id);}return batch(statements);};
+ await assert.rejects(createLibraryStructure(env,'alice',18,{attemptId:crypto.randomUUID(),parentId:'root',folders,reuseExisting:true}),e=>e.code==='library_changed');
+ assert.equal(f.sql.prepare('SELECT count(*) n FROM library_nodes WHERE library_id=?').get(isolated.id).n,2);
+});

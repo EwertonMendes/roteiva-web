@@ -13,7 +13,7 @@ export type DropboxConnection={
  refresh_lease_id:string|null;refresh_lease_until:number;refresh_retry_after:number;
 };
 type DropboxMeta={'.tag':'file'|'folder'|'deleted';id?:string;name?:string;size?:number;rev?:string;
- path_display?:string;path_lower?:string;server_modified?:string;is_downloadable?:boolean};
+ path_display?:string;path_lower?:string;server_modified?:string;is_downloadable?:boolean;content_hash?:string};
 type DropboxAccount={account_id:string;email:string;email_verified:boolean;disabled?:boolean};
 export const DROPBOX_SCOPE=['account_info.read','files.metadata.read','files.content.read','files.content.write'];
 const CALLBACK='/oauth/dropbox/callback';

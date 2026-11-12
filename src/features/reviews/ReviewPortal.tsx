@@ -23,7 +23,7 @@ type Review={title:string;message:string;studioName:string;clientName:string;pro
 type Asset={fileId:string;name:string;mimeType:string};
 type Comment={id:string;file_id:string;author_name:string;body:string;seconds:number|null;created_at:number};
 type Decision={version:number;decision:string;author_name:string;message:string;created_at:number};
-type PublicData={review:Review;assets:Asset[];comments:Comment[];decisions:Decision[];mediaTickets?:Record<string,MediaTicket>};
+type PublicData={manifestHash?:string;review:Review;assets:Asset[];comments:Comment[];decisions:Decision[];mediaTickets?:Record<string,MediaTicket>};
 type Mode="light"|"dark";
 const API=API_BASE_URL;
 const messages:Record<string,string>={
@@ -41,6 +41,8 @@ const messages:Record<string,string>={
   review_not_ready:"Este material ainda não está disponível para revisão.",
   review_recipient_denied:"Sua conta Google não está na lista de participantes desta revisão.",
   review_viewer_read_only:"Sua conta tem permissão de leitura, sem autorização para comentar ou decidir.",
+  review_manifest_changed:"O material desta revisão mudou. Atualize a página antes de responder.",
+  review_decision_check_required:"A verificação dos arquivos expirou. Confirme a decisão novamente.",
   review_already_decided:"A decisão desta versão já foi registrada.",
   review_invalid_input:"Revise os dados preenchidos e tente novamente.",
   review_version_changed:"Uma nova versão está disponível. Atualize a página e revise o material antes de responder.",
@@ -249,6 +251,7 @@ export function ReviewPortal({token}:{token:string}){
       videoRef.current.scrollIntoView({behavior:"smooth",block:"center"});
     }else setNotice("Não é possível avançar no vídeo neste momento. Verifique a prévia e tente novamente.");
   };
+  const pendingComment=useRef<{body:string;key:string}|null>(null);
   const action=async(kind:"comment"|"decide",status?:"approved"|"changes")=>{
     if(!name.trim()){setNotice("Informe seu nome antes de continuar.");return;}
     if(kind==="comment"&&!body.trim()){setNotice("Escreva sua observação.");return;}
@@ -256,11 +259,21 @@ export function ReviewPortal({token}:{token:string}){
     if(kind==="decide"&&status==="changes"&&!decisionText.trim()){setNotice("Explique quais ajustes são necessários.");return;}
     setBusy(true);setNotice("");
     try{
+      let proof:string|undefined;
+      if(virtual&&kind==="decide"){
+        for(let step=0;step<4;step++){
+          const check=await request<{ready:boolean;proof:string}>("/reviews/public/decision-check","POST",{version:data?.review.version,manifestHash:data?.manifestHash,proof});
+          proof=check.proof;if(check.ready)break;
+          if(step===3)throw new Error("Não foi possível concluir a verificação dos arquivos. Tente novamente.");
+        }
+      }
+      const commentBody=JSON.stringify([data?.review.version,active?.fileId,name.trim(),body.trim(),isVideo?seconds:null]);
+      if(kind==="comment"&&pendingComment.current?.body!==commentBody)pendingComment.current={body:commentBody,key:crypto.randomUUID()};
       await request(kind==="comment"?"/reviews/public/comment":"/reviews/public/decide","POST",
-        kind==="comment"?{version:data?.review.version,authorName:name.trim(),fileId:active?.fileId,
+        kind==="comment"?{version:data?.review.version,manifestHash:data?.manifestHash,idempotencyKey:pendingComment.current?.key,authorName:name.trim(),fileId:active?.fileId,
           body:body.trim(),seconds:isVideo?seconds:null}:
-          {version:data?.review.version,authorName:name.trim(),decision:status,message:decisionText.trim()});
-      if(kind==="comment"){setBody("");setMinutes("");setNotice("Comentário registrado com sucesso.");}
+          {version:data?.review.version,manifestHash:data?.manifestHash,authorName:name.trim(),decision:status,message:decisionText.trim(),proof});
+      if(kind==="comment"){pendingComment.current=null;setBody("");setMinutes("");setNotice("Comentário registrado com sucesso.");}
       else{setDecision(null);setDecisionText("");setNotice(status==="approved"?"Material aprovado com sucesso.":"Solicitação de ajustes registrada.");}
       await reload(true);
     }catch(e){setNotice(e instanceof Error?e.message:"Não foi possível registrar sua resposta.");}

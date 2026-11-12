@@ -96,7 +96,7 @@ test('minimum-scope cover selection releases the native dialog for Google Picker
   if(path==='/integrations/drive')return json({connections:[{id:connection,google_email:'qa@example.com',status:'connected',scopes:'https://www.googleapis.com/auth/drive.file'}]});
   if(path.endsWith('/picker/config'))return json({authorized:false,clientId:'synthetic-client',appId:'123',developerKey:'synthetic-key',accountId:'synthetic-account'});
   if(path.endsWith('/picker/verify')){verified=true;return json({verified:true});}
-  if(path.endsWith('/metadata')){expect(verified).toBe(true);return json({file:{id:'COVER_FILE_12345',name:'Capa autorizada.png',mimeType:'image/png',size:String(png.length)}});}
+  if(path.endsWith('/picker/file')){expect(verified).toBe(true);return json({file:{id:'COVER_FILE_12345',name:'Capa autorizada.png',mimeType:'image/png',size:String(png.length)}});}
   if(path.endsWith('/cover')||path.endsWith('/preview')||path.endsWith('/thumbnail'))return route.fulfill({headers,contentType:'image/png',body:png});
   return json({});
  });
@@ -119,4 +119,45 @@ test('minimum-scope cover selection releases the native dialog for Google Picker
  await page.getByRole('button',{name:'Salvar capa',exact:true}).click();
  await expect(page.locator('dialog.pc-dialog')).toHaveCount(0);
  await expect(page.locator('[aria-busy]').first()).toHaveAttribute('aria-busy','false');
+});
+test('assisted Dropbox organization previews only explicit selections and retries without duplicating its folder',async({page,context},info)=>{
+ const headers={'Access-Control-Allow-Origin':web,'Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Allow-Methods':'GET, POST, OPTIONS'};
+ const physical='id:PHYSICAL_FOLDER_12345',file='id:SELECTED_VIDEO_12345',virtual=crypto.randomUUID();let folderCreated=false,imported=false,structureCalls=0,importCalls=0;
+ const importedParents:string[]=[];
+ await context.route(api+'/**',async route=>{
+  const request=route.request(),url=new URL(request.url()),path=url.pathname;
+  const json=(body:unknown)=>route.fulfill({headers,json:body});
+  if(request.method()==='OPTIONS')return route.fulfill({status:204,headers});
+  if(path.startsWith('/account/')||path.startsWith('/access/'))return route.fallback();
+  if(path==='/integrations/drive')return json({connections:[]});
+  if(path==='/integrations/dropbox')return json({connections:[{id:connection,email:'qa@example.com',status:'connected',scopes:'files.content.read files.metadata.read files.content.write'}]});
+  if(path.startsWith('/integrations/dropbox/')&&path.endsWith('/items'))return json({files:path.includes('root')?[{id:physical,name:'Originais',isFolder:true}]:[{id:file,name:'Corte.mp4',isFolder:false}],nextPageToken:null});
+  if(path.endsWith('/inspect')){
+   const body=request.postDataJSON();return json({results:body.items.map((item:{fileId:string})=>({fileId:item.fileId,status:'ready',source:{provider:'dropbox',connectionId:connection,fileId:item.fileId,name:item.fileId===physical?'Originais':'Corte.mp4',kind:item.fileId===physical?'folder':'asset',parentIds:[],path:item.fileId===physical?'/originais':'/originais/corte.mp4'}}))});
+  }
+  if(path.endsWith('/structure')){structureCalls++;folderCreated=true;expect(request.postDataJSON().reuseExisting).toBe(true);return json({created:[{key:'source-folder-0',id:virtual}],completed:true});}
+  if(path.endsWith('/imports')){
+   importCalls++;const body=request.postDataJSON();importedParents.push(body.parentId);imported=importCalls>1;
+   return json({results:[{fileId:file,status:imported?'added':'failed',code:imported?undefined:'provider_rate_limited',id:imported?crypto.randomUUID():undefined}]});
+  }
+  if(path.endsWith('/nodes')){
+   const parent=url.searchParams.get('parent')||'root';return json({nodes:parent==='root'?(folderCreated?[{id:virtual,kind:'folder',name:'Materiais',revision:1}]:[]):imported?[{id:crypto.randomUUID(),kind:'asset',name:'Corte.mp4',mime_type:'video/mp4',provider:'dropbox',revision:1}]:[],trail:parent==='root'?[{id:'root',name:'Arquivos'}]:[{id:'root',name:'Arquivos'},{id:virtual,name:'Materiais'}],nextPage:null});
+  }
+  return json({});
+ });
+ await prepare(page,'assisted-'+info.project.name+'-'+Date.now()+'@example.com');await page.goto(web+'/biblioteca');
+ await chooseAppSelect(page,page.getByRole('combobox',{name:'Projeto dos arquivos'}),{label:'Projeto Biblioteca QA'});
+ await page.getByRole('button',{name:'Trazer organização do Dropbox',exact:true}).click();
+ const picker=page.getByRole('dialog',{name:'Adicionar do Dropbox'});
+ await picker.getByRole('checkbox',{name:'Selecionar pasta Originais'}).check();await picker.getByRole('button',{name:'Originais',exact:true}).click();
+ await picker.getByLabel('Corte.mp4').check();await picker.getByRole('button',{name:'Adicionar selecionados'}).click();
+ const preview=page.getByRole('dialog',{name:'Revisar organização selecionada'});
+ await expect(preview.getByRole('combobox',{name:'Destino de Corte.mp4'})).toContainText('Originais');
+ await preview.getByRole('textbox',{name:'Nome da pasta Originais'}).fill('Materiais');
+ await preview.getByRole('button',{name:'Criar estrutura e adicionar 1 arquivo(s)',exact:true}).click();
+ await expect(preview.getByRole('alert')).toContainText('itens confirmados');
+ await preview.getByRole('button',{name:'Repetir somente os arquivos pendentes',exact:true}).click();
+ await expect(preview).toHaveCount(0);await page.getByRole('button',{name:'Materiais',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Corte.mp4',exact:true})).toBeVisible();
+ expect(structureCalls).toBe(1);expect(importCalls).toBe(2);expect(importedParents).toEqual([virtual,virtual]);
 });

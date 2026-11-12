@@ -64,7 +64,7 @@ async function cached(env: Env, row: TokenConnection): Promise<AccessCredential 
   };
 }
 
-export async function accessCredential(env: Env, input: Connection, fetcher: typeof fetch = fetch): Promise<AccessCredential> {
+export async function accessCredential(env: Env, input: Pick<Connection,'owner_uid'|'id'>, fetcher: typeof fetch = fetch): Promise<AccessCredential> {
   const started = Date.now();
   let attempt = 0;
   while (true) {

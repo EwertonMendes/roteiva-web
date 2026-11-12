@@ -3,7 +3,7 @@ const DRIVE_SCOPE='https://www.googleapis.com/auth/drive.file';
 const SCOPE='openid '+DRIVE_SCOPE;
 export type PickerConfig={authorized:false;clientId:string;appId:string;developerKey:string;accountId:string};
 type TokenReply={access_token?:string;scope?:string;error?:string;expires_in?:number};
-type PickerReply={action:string;docs?:{id:string;name?:string}[]};
+type PickerReply={action:string;docs?:{id:string;name?:string;resourceKey?:string}[]};
 interface View {setIncludeFolders(value:boolean):View;setSelectFolderEnabled(value:boolean):View;setMode(value:unknown):View;setMimeTypes(value:string):View;}
 interface Picker {setVisible(value:boolean):void;dispose():void;}
 interface Builder {addView(view:View):Builder;setOAuthToken(token:string):Builder;setDeveloperKey(key:string):Builder;
@@ -34,7 +34,7 @@ export function preparePicker():Promise<void>{
 }
 
 /** Config/scripts are prepared before the click so GIS preserves the user gesture. */
-export function pickLibraryFiles(config:PickerConfig,verify:(token:string)=>Promise<unknown>,signal:AbortSignal,options?:{mimeTypes?:string;maxItems?:number;title?:string;onDocuments?:(docs:{id:string;name?:string}[])=>void}):Promise<string[]>{
+export function pickLibraryFiles(config:PickerConfig,verify:(token:string)=>Promise<unknown>,signal:AbortSignal,options?:{mimeTypes?:string;maxItems?:number;title?:string;includeFolders?:boolean;onDocuments?:(docs:{id:string;name?:string;resourceKey?:string}[])=>void}):Promise<string[]>{
  return new Promise((resolve,reject)=>{
  let picker:Picker|undefined,settled=false;
  const finish=(ids?:string[],error?:Error)=>{if(settled)return;settled=true;clearTimeout(timeout);signal.removeEventListener('abort',abort);picker?.dispose();error?reject(error):resolve(ids||[]);};
@@ -47,7 +47,7 @@ export function pickLibraryFiles(config:PickerConfig,verify:(token:string)=>Prom
  if(reply.error||!reply.access_token||scopes.size!==2||!scopes.has('openid')||!scopes.has(DRIVE_SCOPE)||!reply.expires_in||reply.expires_in<60)throw new Error('O Google não concedeu a autorização necessária.');
  await verify(reply.access_token);if(settled)return;
  const google=api().picker;
- const view=new google.DocsView(google.ViewId.DOCS).setIncludeFolders(false).setSelectFolderEnabled(false).setMode(google.DocsViewMode.LIST);
+ const view=new google.DocsView(google.ViewId.DOCS).setIncludeFolders(options?.includeFolders===true).setSelectFolderEnabled(options?.includeFolders===true).setMode(google.DocsViewMode.LIST);
  if(options?.mimeTypes)view.setMimeTypes(options.mimeTypes);
  const maxItems=options?.maxItems||100;
  picker=new google.PickerBuilder().addView(view)

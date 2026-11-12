@@ -18,6 +18,8 @@ import {useDriveTransfers} from './DriveTransfersProvider';
 import {importLibraryBatch,type LibraryImport,type FailedLibraryImport} from './library-import';
 import {LibraryConnections} from './LibraryConnections';
 import {LibraryStructureDialog} from './LibraryStructureDialog';
+import {AssistedLibraryImport} from './AssistedLibraryImport';
+import type {InspectedLibrarySource,LibraryInspection} from '../../../shared/library-selection';
 type Node={id:string;parent_id:string|null;kind:'folder'|'asset';name:string;revision:number;provider?:string;source_state?:string;mime_type?:string};
 type Page={nodes:Node[];trail:{id:string;name:string}[];nextPage:string|null};
 export function VirtualLibrary({projects,selectedProjectId}:{projects:readonly Project[];selectedProjectId?:number;onSelectProject:(id:string)=>void}){
@@ -33,8 +35,10 @@ export function VirtualLibrary({projects,selectedProjectId}:{projects:readonly P
  const [parent,setParent]=useState('root'),[loadedPage,setPage]=useState<(Page&{scope:string})|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const [edit,setEdit]=useState<{node?:Node;action:'create'|'rename'|'trash'|'restore'|'move'}|null>(null),[name,setName]=useState('');
  const [trash,setTrash]=useState(false),[moveParent,setMoveParent]=useState('root'),[movePage,setMovePage]=useState<Page|null>(null);
+ const moveGeneration=useRef(0),[moveBusy,setMoveBusy]=useState(false);
  const [preview,setPreview]=useState<Node|null>(null);
  const [structure,setStructure]=useState(false);
+ const [dropboxStructure,setDropboxStructure]=useState(false),[assisted,setAssisted]=useState<{parentId:string;sources:InspectedLibrarySource[];failed:{name:string;code:string}[]}|null>(null);
  const [search,setSearch]=useState(''),[term,setTerm]=useState('');
  const [failedImports,setFailedImports]=useState<{parentId:string;items:FailedLibraryImport[]}|null>(null);
  const generation=useRef(0),mutation=useRef<AbortController|null>(null);
@@ -87,11 +91,11 @@ export function VirtualLibrary({projects,selectedProjectId}:{projects:readonly P
   finally{if(mutation.current===controller){mutation.current=null;setProgress('');}if(scope===generation.current)setBusy(false);}
  }
  useEffect(()=>{
- setMovePage(null);if(edit?.action!=='move'||!base)return;const controller=new AbortController();
+ ++moveGeneration.current;setMoveBusy(false);setMovePage(null);if(edit?.action!=='move'||!base)return;const controller=new AbortController();
  void call<Page>(base+'?parent='+encodeURIComponent(moveParent),'GET',undefined,controller.signal).then(p=>{if(!controller.signal.aborted)setMovePage(p);}).catch(e=>{if(!controller.signal.aborted)setError(e instanceof Error?e.message:'Não foi possível carregar o destino.');});
  return()=>controller.abort();
  },[edit?.action,base,moveParent,call]);
- useEffect(()=>{setParent('root');setPage(null);setEdit(null);setPreview(null);setStructure(false);setDropboxPicker(false);setFailedImports(null);mutation.current?.abort();++generation.current;},[selectedProjectId,user?.uid]);
+ useEffect(()=>{setParent('root');setPage(null);setEdit(null);setPreview(null);setStructure(false);setAssisted(null);setDropboxPicker(false);setFailedImports(null);mutation.current?.abort();++generation.current;},[selectedProjectId,user?.uid]);
  useEffect(()=>{setPage(null);void load();return()=>{++generation.current;};},[load]);
  useEffect(()=>()=>mutation.current?.abort(),[]);
  async function performImport(items:LibraryImport[],target:string,controller:AbortController,scope:number){
@@ -99,20 +103,32 @@ export function VirtualLibrary({projects,selectedProjectId}:{projects:readonly P
   if(scope!==generation.current||controller.signal.aborted)return;
   setFailedImports(failed.length?{parentId:target,items:failed}:null);await load();
  }
+ async function inspectSelection(items:LibraryImport[],target:string,controller:AbortController,scope:number){
+  const sources:InspectedLibrarySource[]=[],failed:{name:string;code:string}[]=[];
+  for(let i=0;i<items.length;i+=3){
+   if(controller.signal.aborted)return;setProgress('Conferindo '+Math.min(i+3,items.length)+' de '+items.length+' itens selecionados…');
+   const batch=items.slice(i,i+3);
+   try{
+    const reply=await call<{results:LibraryInspection[]}>(base.replace('/nodes','/inspect'),'POST',{provider:batch[0].provider,connectionId:batch[0].connectionId,items:batch.map(x=>({fileId:x.fileId,resourceKey:x.resourceKey}))},controller.signal);
+    for(const item of batch){const result=reply.results.find(x=>x.fileId===item.fileId);if(result?.status==='ready')sources.push(result.source);else failed.push({name:item.name,code:result?.status==='failed'?result.code:'service_unavailable'});}
+   }catch(e){if(controller.signal.aborted)return;failed.push(...items.slice(i).map(x=>({name:x.name,code:(e as {code?:string}).code||'service_unavailable'})));break;}
+  }
+  if(scope===generation.current&&!controller.signal.aborted)setAssisted({parentId:target,sources,failed});
+ }
  async function addDropbox(ids:string[],names:Map<string,string>){
  if(!dropbox||busy)return;setDropboxPicker(false);const controller=new AbortController();mutation.current=controller;
  const scope=generation.current,target=parent;setBusy(true);setError('');
- try{await performImport(ids.map((fileId,i)=>({provider:'dropbox',connectionId:dropbox.id,fileId,name:names.get(fileId)||'Arquivo '+(i+1)})),target,controller,scope);
+ try{const items=ids.map((fileId,i)=>({provider:'dropbox' as const,connectionId:dropbox.id,fileId,name:names.get(fileId)||'Arquivo '+(i+1)}));if(dropboxStructure)await inspectSelection(items,target,controller,scope);else await performImport(items,target,controller,scope);
  }catch(e){if(!controller.signal.aborted&&scope===generation.current)setError(e instanceof Error?e.message:'Não foi possível adicionar os arquivos.');}
  finally{if(mutation.current===controller){mutation.current=null;setProgress('');}if(scope===generation.current)setBusy(false);}
  }
- async function addDrive(){
+ async function addDrive(withStructure=false){
  if(!picker||!account||picker.connectionId!==account.id||busy)return;
  const controller=new AbortController();mutation.current=controller;const scope=generation.current,target=parent;setBusy(true);setError('');
  try{
- const names=new Map<string,string>();
- const ids=await pickLibraryFiles(picker.config,accessToken=>call('/integrations/drive/'+account.id+'/picker/verify','POST',{accessToken},controller.signal),controller.signal,{onDocuments:docs=>{for(const doc of docs)if(doc.name)names.set(doc.id,doc.name);}});
- if(ids.length)await performImport(ids.map((fileId,i)=>({provider:'google_drive',connectionId:account.id,fileId,name:names.get(fileId)||'Arquivo '+(i+1)})),target,controller,scope);
+ const names=new Map<string,string>(),keys=new Map<string,string>();
+ const ids=await pickLibraryFiles(picker.config,accessToken=>call('/integrations/drive/'+account.id+'/picker/verify','POST',{accessToken},controller.signal),controller.signal,{includeFolders:withStructure,title:withStructure?'Selecionar pastas e arquivos para organizar no Roteiva':undefined,onDocuments:docs=>{for(const doc of docs){if(doc.name)names.set(doc.id,doc.name);if(doc.resourceKey)keys.set(doc.id,doc.resourceKey);}}});
+ if(ids.length){const items=ids.map((fileId,i)=>({provider:'google_drive' as const,connectionId:account.id,fileId,name:names.get(fileId)||'Arquivo '+(i+1),resourceKey:keys.get(fileId)}));if(withStructure)await inspectSelection(items,target,controller,scope);else await performImport(items,target,controller,scope);}
  }catch(e){if(!controller.signal.aborted&&scope===generation.current)setError(e instanceof Error?e.message:'Não foi possível adicionar os arquivos.');}
  finally{if(mutation.current===controller){mutation.current=null;setProgress('');}if(scope===generation.current)setBusy(false);}
  }
@@ -139,9 +155,9 @@ export function VirtualLibrary({projects,selectedProjectId}:{projects:readonly P
  <LibraryConnections busy={busy} onConnect={provider=>void connect(provider)}/>
  {base&&!trash&&<><div className="virtual-library-toolbar"><AppButton disabled={busy||!account} onClick={()=>{uploadProvider.current='google_drive';fileInput.current?.click();}}>Enviar ao Drive</AppButton><AppButton disabled={busy||!dropbox} onClick={()=>{uploadProvider.current='dropbox';fileInput.current?.click();}}>Enviar ao Dropbox</AppButton></div><AppInput ref={fileInput} type="file" multiple hidden onChange={e=>{const files=Array.from(e.target.files||[]);e.target.value='';void upload(files);}}/><p>Novos envios ficam em uma pasta Roteiva no provedor escolhido. A organização das pastas desta biblioteca é independente dos originais.</p></>}
  {storage.error&&<p role="alert">Não foi possível consultar {storage.error}. <AppButton disabled={storage.loading} onClick={()=>void storage.refresh(true)}>Atualizar conexões</AppButton></p>}
- {base&&!trash&&<div className="virtual-library-toolbar"><AppSelect aria-label="Conta Google Drive" value={account?.id||''} onValueChange={setAccountId} disabled={busy}><option value="">Selecione uma conta</option>{accounts.map(x=><option key={x.id} value={x.id}>{x.email}</option>)}</AppSelect><AppButton disabled={busy||!picker||picker.connectionId!==account?.id} onClick={()=>void addDrive()}>Adicionar do Drive</AppButton></div>}
+ {base&&!trash&&<div className="virtual-library-toolbar"><AppSelect aria-label="Conta Google Drive" value={account?.id||''} onValueChange={setAccountId} disabled={busy}><option value="">Selecione uma conta</option>{accounts.map(x=><option key={x.id} value={x.id}>{x.email}</option>)}</AppSelect><AppButton disabled={busy||!picker||picker.connectionId!==account?.id} onClick={()=>void addDrive()}>Adicionar do Drive</AppButton><AppButton disabled={busy||!picker||picker.connectionId!==account?.id} onClick={()=>void addDrive(true)}>Trazer organização do Drive</AppButton></div>}
  {progress&&<p role="status">{progress}</p>}
- {base&&!trash&&dropbox&&<div className="virtual-library-toolbar"><AppSelect aria-label="Conta Dropbox" value={dropbox.id} onValueChange={setDropboxId} disabled={busy}><option value="">Selecione uma conta</option>{dropboxAccounts.map(x=><option key={x.id} value={x.id}>{x.email}</option>)}</AppSelect><AppButton disabled={busy} onClick={()=>setDropboxPicker(true)}>Adicionar do Dropbox</AppButton></div>}
+ {base&&!trash&&dropbox&&<div className="virtual-library-toolbar"><AppSelect aria-label="Conta Dropbox" value={dropbox.id} onValueChange={setDropboxId} disabled={busy}><option value="">Selecione uma conta</option>{dropboxAccounts.map(x=><option key={x.id} value={x.id}>{x.email}</option>)}</AppSelect><AppButton disabled={busy} onClick={()=>{setDropboxStructure(false);setDropboxPicker(true);}}>Adicionar do Dropbox</AppButton><AppButton disabled={busy} onClick={()=>{setDropboxStructure(true);setDropboxPicker(true);}}>Trazer organização do Dropbox</AppButton></div>}
  {error&&<div role="alert" className="virtual-library-error">{error}</div>}
  {failedImports&&<div role="alert" className="virtual-library-error"><p>Alguns arquivos não foram adicionados. Os itens confirmados foram preservados.</p><ul>{failedImports.items.map(item=><li key={item.provider+item.connectionId+item.fileId}><strong>{item.name}</strong>: {messages[item.code]||'Não foi possível confirmar o arquivo. Tente novamente.'}</li>)}</ul><div className="virtual-library-toolbar"><AppButton disabled={busy} onClick={()=>void retryImports()}>Tentar somente os arquivos pendentes</AppButton><AppButton disabled={busy} onClick={()=>setFailedImports(null)}>Dispensar aviso</AppButton></div></div>}
  {base&&<nav aria-label="Caminho da pasta" className="virtual-library-path">{page?.trail.map(x=><AppButton key={x.id} disabled={busy} onClick={()=>setParent(x.id)}>{x.name}</AppButton>)}</nav>}
@@ -159,11 +175,12 @@ export function VirtualLibrary({projects,selectedProjectId}:{projects:readonly P
  {edit&&<div className="virtual-library-backdrop"><div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="virtual-library-title" className="virtual-library-editor">
  <h3 id="virtual-library-title">{{create:'Nova pasta',rename:'Renomear',move:'Mover para',restore:'Restaurar',trash:'Remover do Roteiva'}[edit.action]}</h3>
  {error&&<div role="alert" className="virtual-library-error">{error}</div>}
- <form onSubmit={e=>{e.preventDefault();void save();}}>{edit.action==='trash'?<p>Os arquivos originais permanecem no provedor. A organização desta pasta será removida da Biblioteca.</p>:edit.action==='restore'?<p>Restaurar esta referência na pasta anterior. Se ela também estiver na lixeira, restaure a pasta primeiro.</p>:edit.action==='move'?<><nav aria-label="Pasta de destino">{movePage?.trail.map(x=><AppButton type="button" key={x.id} onClick={()=>setMoveParent(x.id)}>{x.name}</AppButton>)}</nav>{movePage?.nodes.filter(x=>x.kind==='folder'&&x.id!==edit.node?.id).map(x=><AppButton type="button" key={x.id} onClick={()=>setMoveParent(x.id)}>{x.name}</AppButton>)}{movePage?.nextPage&&<AppButton type="button" onClick={()=>{const old=movePage;void call<Page>(base+'?parent='+encodeURIComponent(moveParent)+'&after='+old.nextPage).then(p=>setMovePage({...p,nodes:[...old.nodes,...p.nodes]})).catch(()=>setError('Não foi possível carregar mais pastas.'));}}>Mais pastas</AppButton>}</>:<label>Nome<AppInput autoFocus value={name} maxLength={120} onChange={e=>setName(e.target.value)} required/></label>}
+ <form onSubmit={e=>{e.preventDefault();void save();}}>{edit.action==='trash'?<p>Os arquivos originais permanecem no provedor. A organização desta pasta será removida da Biblioteca.</p>:edit.action==='restore'?<p>Restaurar esta referência na pasta anterior. Se ela também estiver na lixeira, restaure a pasta primeiro.</p>:edit.action==='move'?<><nav aria-label="Pasta de destino">{movePage?.trail.map(x=><AppButton type="button" key={x.id} onClick={()=>setMoveParent(x.id)}>{x.name}</AppButton>)}</nav>{movePage?.nodes.filter(x=>x.kind==='folder'&&x.id!==edit.node?.id).map(x=><AppButton type="button" key={x.id} onClick={()=>setMoveParent(x.id)}>{x.name}</AppButton>)}{movePage?.nextPage&&<AppButton type="button" disabled={moveBusy} onClick={()=>{const old=movePage,scope=moveGeneration.current;setMoveBusy(true);void call<Page>(base+'?parent='+encodeURIComponent(moveParent)+'&after='+old.nextPage).then(p=>{if(scope===moveGeneration.current)setMovePage({...p,nodes:[...old.nodes,...p.nodes]});}).catch(()=>{if(scope===moveGeneration.current)setError('Não foi possível carregar mais pastas.');}).finally(()=>{if(scope===moveGeneration.current)setMoveBusy(false);});}}>Mais pastas</AppButton>}</>:<label>Nome<AppInput autoFocus value={name} maxLength={120} onChange={e=>setName(e.target.value)} required/></label>}
  <div className="virtual-library-toolbar"><AppButton type="submit" disabled={busy||edit.action==='move'&&!movePage}>Confirmar</AppButton><AppButton type="button" disabled={busy} onClick={()=>setEdit(null)}>Cancelar</AppButton></div></form>
  </div></div>}
- {dropboxPicker&&dropbox&&<DropboxLibraryPicker key={dropbox.id} connectionId={dropbox.id} onClose={()=>setDropboxPicker(false)} onSelect={(ids,names)=>void addDropbox(ids,names)}/>}
+ {dropboxPicker&&dropbox&&<DropboxLibraryPicker key={dropbox.id+':'+dropboxStructure} connectionId={dropbox.id} includeFolders={dropboxStructure} onClose={()=>setDropboxPicker(false)} onSelect={(ids,names)=>void addDropbox(ids,names)}/>}
  {preview&&selectedProjectId&&<LibraryAssetPreview key={preview.id} projectId={selectedProjectId} node={preview} onClose={()=>{setPreview(null);void load();}}/>}
  {structure&&selectedProjectId&&<LibraryStructureDialog key={selectedProjectId+':'+parent} projectId={selectedProjectId} parentId={parent} onClose={()=>setStructure(false)} onApplied={()=>{setStructure(false);void load();}}/>}
+ {assisted&&selectedProjectId&&<AssistedLibraryImport key={selectedProjectId+':'+assisted.parentId} projectId={selectedProjectId} parentId={assisted.parentId} sources={assisted.sources} unavailable={assisted.failed} onClose={()=>{setAssisted(null);void load();}} onApplied={()=>{setAssisted(null);setSearch('');setTerm('');void load();}}/>}
  </section>;
 }

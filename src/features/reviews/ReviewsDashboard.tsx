@@ -246,6 +246,15 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
     }
     finally{setWorking(false);}
   };
+  const completePublication=async(endpoint:string,body?:unknown):Promise<Detail>=>{
+    let result=await call<{review:Detail;pending?:boolean}>(endpoint,"POST",body);
+    for(let step=0;result.pending&&step<8;step++){
+      setOpened(result.review);
+      result=await call<{review:Detail;pending?:boolean}>("/reviews/"+result.review.review.id+"/publish","POST");
+    }
+    if(result.pending)throw new Error("A verificação dos arquivos ainda está em andamento. Tente ativar novamente.");
+    return result.review;
+  };
   const submit=async()=>{
     if(shareDirect&&files.some(f=>f.provider==='dropbox')){
       setError('O compartilhamento direto do original ainda não está disponível para arquivos Dropbox. Desative essa opção para utilizar a aprovação segura do Roteiva.');
@@ -262,7 +271,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
         const endpoint="/reviews/"+replacement;
         let result:Detail;
         try{
-          result=(await call<{review:Detail}>(endpoint+"/revise","POST",{assets:selections})).review;
+          result=await completePublication(endpoint+"/revise",{assets:selections});
         }catch(original){
           // A request may have committed a version but lost its HTTP response.
           // Check the authoritative server state before allowing a retry.
@@ -271,7 +280,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
           if(latest.review.version>beforeVersion&&latest.review.status==="pending"){
             result=latest;
           }else if(["replacing","draft","publishing"].includes(latest.review.status)){
-            result=(await call<{review:Detail}>(endpoint+"/revise","POST",{assets:selections})).review;
+            result=await completePublication(endpoint+"/revise",{assets:selections});
           }else{
             throw original;
           }
@@ -292,8 +301,8 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
         });
         setOpened(await call<Detail>("/reviews/"+created.id));
         try{
-          const published=await call<{review:Detail}>("/reviews/"+created.id+"/publish","POST");
-          setOpened(published.review);
+          const published=await completePublication("/reviews/"+created.id+"/publish");
+          setOpened(published);
         }catch(e){
           publishWarning="A solicitação foi salva, mas ainda não foi ativada. "+
             (e instanceof Error?e.message:"Falha ao preparar os arquivos.")+
@@ -313,7 +322,8 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
     if(!opened)return;
     if(action==="close"&&!window.confirm("Encerrar esta revisão e revogar os acessos diretos concedidos aos materiais, quando aplicável?"))return;
     await run(async()=>{
-      await call("/reviews/"+opened.review.id+"/"+action,"POST");
+      if(action==="publish")await completePublication("/reviews/"+opened.review.id+"/publish");
+      else await call("/reviews/"+opened.review.id+"/"+action,"POST");
       if(action==="close")setOpened(null);
       else await openDetail(opened.review.id);
     });
@@ -395,8 +405,8 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
           onResume={withFiles=>{
             if(withFiles){beginRevision();return;}
             void run(async()=>{
-              const result=await call<{review:Detail}>("/reviews/"+opened.review.id+"/revise","POST",{assets:[]});
-              setOpened(result.review);
+              const result=await completePublication("/reviews/"+opened.review.id+"/revise",{assets:[]});
+              setOpened(result);
             });
           }}/>
       </section>

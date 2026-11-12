@@ -30,6 +30,7 @@ export async function disconnect(env: Env, uid: string, connectionId: string, fe
     }
   }
   if(env.VIRTUAL_LIBRARY_ENABLED==='true'){
+    await env.DB.prepare('DELETE FROM drive_resource_keys WHERE owner_uid=? AND connection_id=?').bind(uid,row.id).run();
     // Stable account identity lets explicit re-consent recover references without moving originals.
     await env.DB.prepare("UPDATE drive_connections SET status='reconnect_required',encrypted_refresh_token=NULL,encrypted_access_token=NULL,access_token_expires_at=0,access_token_version=NULL WHERE id=? AND owner_uid=? AND revision=? AND status='revocation_pending'")
       .bind(row.id,uid,row.revision+1).run();
