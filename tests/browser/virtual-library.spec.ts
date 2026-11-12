@@ -80,6 +80,9 @@ test('virtual navigation preserves folder commands and a partial Dropbox batch r
  await expect(page.locator('.rl-upload-queue')).toBeHidden();
  await page.getByRole('button',{name:'Fechar prévia'}).click();
  await expect(page.locator('.rl-upload-queue')).toBeVisible();
+ // Discard only the synthetic failed transfer before exercising the remaining mobile UI.
+ await page.getByRole('button',{name:'Dispensar queue-overlay.txt'}).click();
+ await expect(page.locator('.rl-upload-queue')).toHaveCount(0);
  await page.getByRole('button',{name:'Renomear Originais',exact:true}).click();await page.getByLabel('Nome',{exact:true}).fill('Brutos');await page.getByRole('button',{name:'Confirmar',exact:true}).click();
  await page.getByRole('button',{name:'Remover Brutos do Roteiva',exact:true}).click();await page.getByRole('button',{name:'Confirmar',exact:true}).click();
  await expect(page.getByRole('button',{name:'Brutos',exact:true})).toHaveCount(0);
@@ -211,6 +214,6 @@ test('OAuth return restores the same virtual project and folder after a full pag
  // A stale folder must not be trusted: server ownership and ancestor checks win.
  folderAvailable=false;
  await page.getByRole('button',{name:'Atualizar pasta'}).click();
- await expect(page.getByRole('status')).toContainText('A pasta anterior não está mais disponível');
+ await expect(page.getByRole('status').filter({hasText:'A pasta anterior não está mais disponível'})).toBeVisible();
  await expect(page.getByRole('navigation',{name:'Caminho da pasta'})).toContainText('Arquivos');
 });
