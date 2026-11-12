@@ -1,5 +1,5 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
-import {FolderOpen,FolderPlus,FolderTree,Plus,RefreshCw,Trash2,RotateCcw,Search,CloudUpload,FilePlus2,FolderInput,Image as ImageIcon,FileText,FileVideo,FileAudio,File,Pencil,MoveRight,AlertCircle} from 'lucide-react';
+import {FolderOpen,FolderPlus,FolderTree,RefreshCw,Trash2,RotateCcw,Search,CloudUpload,FilePlus2,FolderInput,Image as ImageIcon,FileText,FileVideo,FileAudio,File,Pencil,MoveRight,AlertCircle} from 'lucide-react';
 import type {Project} from '../../domain/workspace';
 import {useAuth} from '../auth/AuthProvider';
 import {useDriveApi} from './drive-api';
@@ -198,7 +198,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
   {busy&&!page?<div className="vl-empty-folder" role="status"><RefreshCw className="vl-loading" size={23} aria-hidden="true"/><p>Carregando pasta…</p></div>:
    <>
    <ul className="virtual-library-nodes">{page?.nodes.map(n=><li className="vl-file-row" key={n.id}>
-    <AppButton className="vl-file-open" disabled={busy||trash} onClick={()=>n.kind==='folder'?setParent(n.id):setPreview(n)}>
+    <AppButton className="vl-file-open" aria-label={n.name} disabled={busy||trash} onClick={()=>n.kind==='folder'?setParent(n.id):setPreview(n)}>
      <span className="vl-file-glyph">{n.kind==='folder'?<FolderOpen size={21} aria-hidden="true"/>:n.mime_type?.startsWith('image/')?<ImageIcon size={21} aria-hidden="true"/>:n.mime_type?.startsWith('video/')?<FileVideo size={21} aria-hidden="true"/>:n.mime_type?.startsWith('audio/')?<FileAudio size={21} aria-hidden="true"/>:n.mime_type==='application/pdf'?<FileText size={21} aria-hidden="true"/>:<File size={21} aria-hidden="true"/>}</span>
      <span className="vl-file-copy"><strong>{n.name}</strong><small>{n.kind==='folder'?'Pasta':n.provider==='google_drive'?'Google Drive':n.provider==='dropbox'?'Dropbox':'Arquivo'}{n.source_state&&n.source_state!=='available'?' · '+({unavailable:'Original indisponível',restricted:'Acesso restrito',source_trashed:'Original na lixeira'}[n.source_state]||'Verifique o original'):''}</small></span>
     </AppButton>
