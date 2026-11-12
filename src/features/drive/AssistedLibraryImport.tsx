@@ -7,7 +7,7 @@ import {useOverlayFocus} from './DriveLibraryUI';
 import {assistedLibraryPlan,type AssistedFile} from './assisted-library-plan';
 import {importLibraryBatch} from './library-import';
 import type {InspectedLibrarySource} from '../../../shared/library-selection';
-export function AssistedLibraryImport({projectId,parentId,sources,unavailable,onClose,onApplied}:{projectId:number;parentId:string;sources:InspectedLibrarySource[];unavailable:{name:string;code:string}[];onClose:()=>void;onApplied:()=>void}){
+export function AssistedLibraryImport({projectId,parentId,sources,unavailable,onClose,onApplied,recursive=false}:{projectId:number;parentId:string;sources:InspectedLibrarySource[];unavailable:{name:string;code:string}[];recursive?:boolean;onClose:()=>void;onApplied:()=>void}){
  const initial=useMemo(()=>{try{return {plan:assistedLibraryPlan(sources),error:''};}catch(e){return {plan:null,error:e instanceof Error?e.message:'Não foi possível preparar a organização.'};}},[sources]);
  const [folders,setFolders]=useState(initial.plan?.folders||[]),[files,setFiles]=useState<AssistedFile[]>(initial.plan?.files||[]);
  const [mapping,setMapping]=useState<Record<string,string>|null>(null),[started,setStarted]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[progress,setProgress]=useState('');
@@ -40,7 +40,7 @@ export function AssistedLibraryImport({projectId,parentId,sources,unavailable,on
   finally{if(!controller.signal.aborted){setBusy(false);setProgress('');}}
  }
  return <div className="virtual-library-backdrop"><div ref={dialog} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="assisted-library-title" className="virtual-library-editor virtual-library-preview">
-  <h3 id="assisted-library-title">Revisar organização selecionada</h3><p>Somente as pastas e os arquivos selecionados serão adicionados. Selecionar uma pasta não inclui seus arquivos automaticamente. Os originais permanecem no provedor.</p>
+  <h3 id="assisted-library-title">Revisar organização selecionada</h3><p>{recursive?'As subpastas e os arquivos encontrados dentro das pastas selecionadas no Dropbox foram incluídos nesta prévia. Confirme antes de importar.':'Somente os arquivos e pastas autorizados individualmente serão adicionados. No Google Drive, selecionar uma pasta não libera automaticamente seus arquivos internos.'} Os originais permanecem no provedor.</p>
   <p>Pastas virtuais com o mesmo nome no destino serão reutilizadas quando houver uma única correspondência. Arquivos sem pasta pai selecionada ficam na pasta atual; ajuste os destinos abaixo.</p>
   {Boolean(initial.plan?.adapted)&&<p>Alguns nomes foram adaptados para evitar barras e pastas repetidas. Confira os nomes antes de criar.</p>}
   {unavailable.length>0&&<div className="virtual-library-error" role="alert"><p>{unavailable.length} item(ns) não puderam ser conferidos e não serão adicionados:</p><ul>{unavailable.map((x,i)=><li key={i}>{x.name}: {messages[x.code]||'Item indisponível.'}</li>)}</ul></div>}
