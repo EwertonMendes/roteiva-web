@@ -1,5 +1,13 @@
 # Roadmap vivo — Roteiva MVP
 
+## Continuidade da Biblioteca virtual — 12/11/2026
+
+- [x] Base da Biblioteca virtual integrada na PR #121, SHA `957b75750db5477537d2bc521f5e1b039f4e2cbf`; DEV publicado (API #43166381703, frontend #43166381763) e E2E isolado #43166381710 concluídos com sucesso. Migrations 0021–0030 apenas em DEV; PROD permanece com as novas flags desligadas.
+- [x] **IMPLEMENTADO EM BRANCH, AINDA NÃO VALIDADO EM DEV:** continuação `codex/library-oauth-modal-fixes`: intenção curta de retorno OAuth vinculada ao UID em sessionStorage (não autoriza acesso); restauração de projeto/pasta revalidada pelo Worker/Firestore; retorno à raiz se a pasta não estiver disponível; fila de transferências escondida visualmente durante modais, sem desmontá-la.
+- [ ] Rodar testes CI, navegador desktop/mobile e OAuth real após publicação DEV; validar prévias e uploads em ambos os provedores e finalizar aprovação mista por revisão exata.
+- [ ] Promover versão aprovada para PROD somente após homologação DEV, manutenção aditiva/backup e verificações das credenciais e consentimentos, conforme procedimento de implantação existente.
+- [ ] As quatro alterações locais antigas de cache mencionadas pelo Codex em outro checkout **não estão neste PR**; preservar esse checkout e revisar as alterações separadamente no ambiente Windows.
+
 ## Biblioteca virtual e aprovações — implementação autorizada 11/11/2026
 
 - [x] Código local: árvore autorizada por projeto, CAS/ciclos/profundidade, registry/importação deduplicada; criar/renomear/mover/lixeira/restaurar e seletores múltiplos Drive/Dropbox. Exclusão de conta limpa metadados virtuais após encerrar revisões.
