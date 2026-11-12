@@ -912,9 +912,11 @@ async function publicReview(request:Request,env:Env,action:'view'|'comment'|'dec
     const key=session?inputText(data.idempotencyKey,36,true):'';
     if(session&&!UUID.test(key))throw new ApiError(400,'review_invalid_input');
     const commentId=session?await hash(r.id+':'+r.current_version+':'+session.id_hash+':'+key):crypto.randomUUID();
-    const saved=await env.DB.prepare("INSERT OR IGNORE INTO review_comments(id,review_id,version,file_id,author_name,author_email,body,seconds,created_at) SELECT ?,?,?,?,?,?,?,?,? FROM review_requests WHERE id=? AND status='pending' AND current_version=? AND token_hash=? AND expires_at>?")
+    const commentFence=session?" AND EXISTS(SELECT 1 FROM review_sessions s WHERE s.id_hash=? AND s.review_id=review_requests.id AND s.version=review_requests.current_version AND s.invite_hash=review_requests.token_hash AND s.expires_at>unixepoch()*1000) AND NOT EXISTS(SELECT 1 FROM account_deletions d WHERE d.owner_uid=review_requests.owner_uid)":"";
+    const roleFence=r.access_mode==='google'?" AND EXISTS(SELECT 1 FROM review_participants p WHERE p.review_id=review_requests.id AND p.email=? AND p.role='reviewer')":"";
+    const saved=await env.DB.prepare("INSERT OR IGNORE INTO review_comments(id,review_id,version,file_id,author_name,author_email,body,seconds,created_at) SELECT ?,?,?,?,?,?,?,?,? FROM review_requests WHERE id=? AND status='pending' AND current_version=? AND token_hash=? AND expires_at>?"+commentFence+roleFence)
       .bind(commentId,r.id,r.current_version,fileId,authorName,email||null,body,sec,now(),
-        r.id,r.current_version,r.token_hash,now()).run();
+        r.id,r.current_version,r.token_hash,now(),...(session?[session.id_hash]:[]),...(r.access_mode==='google'?[email]:[])).run();
     if(saved.meta.changes!==1){
       const prior=session?await env.DB.prepare('SELECT file_id,author_name,body,seconds FROM review_comments WHERE id=? AND review_id=? AND version=?').bind(commentId,r.id,r.current_version).first<{file_id:string;author_name:string;body:string;seconds:number|null}>():null;
       if(!prior||prior.file_id!==fileId||prior.author_name!==authorName||prior.body!==body||prior.seconds!==sec)throw new ApiError(409,'review_already_decided');
@@ -931,8 +933,8 @@ async function publicReview(request:Request,env:Env,action:'view'|'comment'|'dec
   const ts=now();
   if(r.access_mode==='google'){
     const eventId=crypto.randomUUID();
-    const vote=await env.DB.prepare("INSERT OR IGNORE INTO review_votes(review_id,version,email,decision,author_name,message,created_at) SELECT ?,?,?,?,?,?,? FROM review_requests WHERE id=? AND status='pending' AND current_version=? AND token_hash=? AND expires_at>?"+proofFence)
-      .bind(r.id,r.current_version,email,decision,authorName,message,ts,r.id,r.current_version,r.token_hash,ts,...proofArgs).run();
+    const vote=await env.DB.prepare("INSERT OR IGNORE INTO review_votes(review_id,version,email,decision,author_name,message,created_at) SELECT ?,?,?,?,?,?,? FROM review_requests WHERE id=? AND status='pending' AND current_version=? AND token_hash=? AND expires_at>? AND EXISTS(SELECT 1 FROM review_participants p WHERE p.review_id=review_requests.id AND p.email=? AND p.role='reviewer')"+proofFence)
+      .bind(r.id,r.current_version,email,decision,authorName,message,ts,r.id,r.current_version,r.token_hash,ts,email,...proofArgs).run();
     if(vote.meta.changes!==1)throw new ApiError(409,'review_already_decided');
     // One request for changes ends the round immediately. Otherwise every
     // registered reviewer must explicitly approve before the owner sees Approved.

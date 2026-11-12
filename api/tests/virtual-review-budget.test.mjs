@@ -11,11 +11,12 @@ import {createLibraryStructure} from '../src/library-structure.ts';
 
 async function fixture(t){
  const db=database();t.after(db.close);
+ const hooks={missing:null,changed:false,beforeComment:null};
  let used=0;const count=()=>{assert.ok(++used<=50,'D1 Free invocation limit exceeded: '+used);};
  const metered={batch:async statements=>{count();return db.DB.batch(statements);},prepare(query){
   const wrap=statement=>new Proxy(statement,{get(target,key){
    if(key==='bind')return(...args)=>wrap(target.bind(...args));
-   if(['first','all','run'].includes(key))return(...args)=>{count();return target[key](...args);};
+   if(['first','all','run'].includes(key))return(...args)=>{count();if(key==='run'&&query.includes('INSERT OR IGNORE INTO review_comments')&&hooks.beforeComment){const hook=hooks.beforeComment;hooks.beforeComment=null;hook();}return target[key](...args);};
    return target[key];
   }});return wrap(db.DB.prepare(query));
  }};
@@ -36,7 +37,7 @@ async function fixture(t){
  }
  const pair=await generateKeyPair('RS256'),jwk=await exportJWK(pair.publicKey);jwk.kid='budget';
  const iat=Math.floor(now/1000),jwt=await new SignJWT({auth_time:iat}).setProtectedHeader({alg:'RS256',kid:'budget'}).setAudience(env.FIREBASE_PROJECT_ID).setIssuer('https://securetoken.google.com/'+env.FIREBASE_PROJECT_ID).setSubject('alice').setIssuedAt(iat).setExpirationTime(iat+600).sign(pair.privateKey);
- const hooks={missing:null,changed:false},previous=globalThis.fetch;t.after(()=>{globalThis.fetch=previous;});
+ const previous=globalThis.fetch;t.after(()=>{globalThis.fetch=previous;});
  globalThis.fetch=async(url,init={})=>{
   const u=new URL(url);
   if(u.pathname.includes('/service_accounts/v1/jwk/'))return Response.json({keys:[jwk]});
@@ -115,6 +116,11 @@ test('decision receipts cannot be forged, reused by another session, or cover a 
  const missing=await f.call('/reviews/public/decision-check',{version:1},a,false);assert.equal(missing.response.status,404);assert.equal(f.sql.prepare('SELECT count(*) n FROM review_decisions').get().n,0);
  const original=Date.now;Date.now=()=>now+61000;t.after(()=>{Date.now=original;});
  const stale=await f.call('/reviews/public/decide',{...payload,proof:prepared.data.proof},a,false);assert.equal(stale.data.error.code,'review_decision_check_required');
+ Date.now=original;
+ const revoked=await hash(b);f.hooks.beforeComment=()=>f.sql.prepare('DELETE FROM review_sessions WHERE id_hash=?').run(revoked);
+ const comment=await f.call('/reviews/public/comment',{version:1,authorName:'Client',fileId:file.file,body:'Raced',idempotencyKey:crypto.randomUUID()},b,false);
+ assert.equal(comment.response.status,409);assert.equal(f.sql.prepare('SELECT count(*) n FROM review_comments').get().n,0);
+
 });
 
 test('bulk authorization denies trashed ancestors and foreign projects; eighty-folder reuse stays within budget',async t=>{
