@@ -7,7 +7,7 @@ import {useOverlayFocus} from './DriveLibraryUI';
 import {assistedLibraryPlan,type AssistedFile} from './assisted-library-plan';
 import {importLibraryBatch} from './library-import';
 import type {InspectedLibrarySource} from '../../../shared/library-selection';
-export function AssistedLibraryImport({projectId,parentId,sources,unavailable,onClose,onApplied,recursive=false,onExploreFolder}:{projectId:number;parentId:string;sources:InspectedLibrarySource[];unavailable:{name:string;code:string}[];recursive?:boolean;onExploreFolder?:(folder:InspectedLibrarySource)=>void;onExploreFolder?:(folder:InspectedLibrarySource)=>void;onClose:()=>void;onApplied:()=>void}){
+export function AssistedLibraryImport({projectId,parentId,sources,unavailable,onClose,onApplied,recursive=false,onExploreFolder}:{projectId:number;parentId:string;sources:InspectedLibrarySource[];unavailable:{name:string;code:string}[];recursive?:boolean;onExploreFolder?:(folder:InspectedLibrarySource)=>void;onClose:()=>void;onApplied:()=>void}){
  const initial=useMemo(()=>{try{return {plan:assistedLibraryPlan(sources),error:''};}catch(e){return {plan:null,error:e instanceof Error?e.message:'Não foi possível preparar a organização.'};}},[sources]);
  const [folders,setFolders]=useState(initial.plan?.folders||[]),[files,setFiles]=useState<AssistedFile[]>(initial.plan?.files||[]);
  const [mapping,setMapping]=useState<Record<string,string>|null>(null),[started,setStarted]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[progress,setProgress]=useState('');
