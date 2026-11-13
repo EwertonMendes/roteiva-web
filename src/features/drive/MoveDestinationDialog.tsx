@@ -1,12 +1,12 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
-import {ChevronRight,Folder,FolderOpen,LoaderCircle,MoveRight,X} from 'lucide-react';
+import {ChevronRight,Folder as FolderIcon,FolderOpen,LoaderCircle,MoveRight,X} from 'lucide-react';
 import {AppButton} from '../ui/AppButton';
 import {useDriveApi} from './drive-api';
 import {useOverlayFocus} from './DriveLibraryUI';
 import './library-dialog.css';
 
-type Folder={id:string;name:string;kind:'folder'|'asset'};
-type FolderPage={nodes:Folder[];trail:{id:string;name:string}[];nextPage:string|null};
+type FolderItem={id:string;name:string;kind:'folder'|'asset'};
+type FolderPage={nodes:FolderItem[];trail:{id:string;name:string}[];nextPage:string|null};
 type Source={id:string;name:string;parent_id:string|null;kind:'folder'|'asset'};
 const ROOT={id:'root',name:'Arquivos'};
 
@@ -56,7 +56,7 @@ export function MoveDestinationDialog({base,source,busy,onClose,onConfirm}:{
       :error?<div role="alert" className="lib-message lib-message--error"><p>{error}</p><AppButton type="button" onClick={()=>void load()}>Tentar novamente</AppButton></div>
       :childFolders.length?<ul className="lib-folder-list">
        {childFolders.map(item=><li key={item.id}><AppButton type="button" className="lib-folder-entry" disabled={busy} onClick={()=>setFolder(item.id)}>
-        <Folder size={19} aria-hidden="true"/><span>{item.name}</span><ChevronRight size={17} aria-hidden="true"/></AppButton></li>)}
+        <FolderIcon size={19} aria-hidden="true"/><span>{item.name}</span><ChevronRight size={17} aria-hidden="true"/></AppButton></li>)}
       </ul>:<div className="lib-message"><FolderOpen size={28} aria-hidden="true"/><p>Nenhuma subpasta disponível. Você pode escolher a pasta atual como destino.</p></div>}
      {page?.nextPage&&!loading&&<div className="lib-load-more"><AppButton type="button" disabled={paging||busy} onClick={()=>void load(page.nextPage!)}>{paging?'Carregando…':'Mostrar mais pastas'}</AppButton></div>}
     </div>
