@@ -111,6 +111,15 @@ test('virtual navigation preserves folder commands and a partial Dropbox batch r
  await page.getByRole('button',{name:'Dispensar queue-overlay.txt'}).click();
  await expect(page.locator('.rl-upload-queue')).toHaveCount(0);
  await libraryMenu(page,'Originais','Renomear');await page.getByLabel('Nome',{exact:true}).fill('Brutos');await page.getByRole('button',{name:'Confirmar',exact:true}).click();
+ // A folder picker must explain unchanged destinations and keep a cancel action.
+ await libraryMenu(page,'Brutos','Mover');
+ const move=page.getByRole('dialog',{name:'Mover para'});
+ await expect(move.getByRole('navigation',{name:'Pasta de destino'})).toBeVisible();
+ await expect(move.getByRole('button',{name:'Vídeos',exact:true})).toBeVisible();
+ await move.getByRole('button',{name:'Vídeos',exact:true}).click();
+ await expect(move.getByText('Este item já está nesta pasta.')).toBeVisible();
+ await expect(move.getByRole('button',{name:'Mover para cá'})).toBeDisabled();
+ await move.getByRole('button',{name:'Cancelar'}).click();
  await libraryMenu(page,'Brutos','Remover da Biblioteca');await page.getByRole('button',{name:'Confirmar',exact:true}).click();
  await expect(page.getByRole('button',{name:'Brutos',exact:true})).toHaveCount(0);
  await page.getByRole('button',{name:'Lixeira',exact:true}).click();await libraryMenu(page,'Brutos','Restaurar');await page.getByRole('button',{name:'Confirmar',exact:true}).click();
@@ -122,6 +131,13 @@ test('virtual navigation preserves folder commands and a partial Dropbox batch r
  await page.getByRole('button',{name:'Criar pastas',exact:true}).click();
  await page.getByRole('button',{name:'Entregas',exact:true}).click();
  await expect(page.getByRole('button',{name:'Em revisão',exact:true})).toBeVisible();
+ await expect(page.getByRole('button',{name:'Aprovados',exact:true})).toBeVisible();
+ await libraryMenu(page,'Aprovados','Mover');
+ const destination=page.getByRole('dialog',{name:'Mover para'});
+ await expect(destination.getByRole('button',{name:'Mover para cá'})).toBeEnabled();
+ await destination.getByRole('button',{name:'Mover para cá'}).click();
+ await expect(page.getByRole('button',{name:'Aprovados',exact:true})).toHaveCount(0);
+ await page.getByRole('navigation',{name:'Caminho da pasta'}).getByRole('button',{name:'Arquivos'}).click();
  await expect(page.getByRole('button',{name:'Aprovados',exact:true})).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1)).toBe(true);
  await page.screenshot({path:info.outputPath('library-ready.png'),fullPage:true});
