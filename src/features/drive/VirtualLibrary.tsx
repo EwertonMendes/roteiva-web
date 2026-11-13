@@ -1,5 +1,5 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
-import {FolderOpen,FolderPlus,FolderTree,RefreshCw,Trash2,RotateCcw,Search,CloudUpload,FilePlus2,FolderInput,Image as ImageIcon,FileText,FileVideo,FileAudio,File,Pencil,MoveRight,AlertCircle,Plus,LayoutGrid,List,MoreVertical,ChevronRight,X,HardDrive} from 'lucide-react';
+import {FolderOpen,FolderPlus,FolderTree,RefreshCw,Trash2,RotateCcw,Search,CloudUpload,FilePlus2,FolderInput,Pencil,MoveRight,AlertCircle,Plus,LayoutGrid,List,MoreVertical,ChevronRight,X,HardDrive} from 'lucide-react';
 import type {Project} from '../../domain/workspace';
 import {useAuth} from '../auth/AuthProvider';
 import {useDriveApi} from './drive-api';
@@ -25,12 +25,13 @@ import {LibraryConnections} from './LibraryConnections';
 import {LibraryStructureDialog} from './LibraryStructureDialog';
 import {MoveDestinationDialog} from './MoveDestinationDialog';
 import {LibraryLoadingRows} from './LibraryLoadingRows';
+import {LibraryThumbnail} from './LibraryThumbnail';
 import {AssistedLibraryImport} from './AssistedLibraryImport';
 import {expandDropboxTree} from './expand-dropbox-tree';
 import googleDriveMark from '../../assets/brand/google-drive.svg';
 import dropboxMark from '../../assets/brand/dropbox.svg';
 import type {InspectedLibrarySource,LibraryInspection} from '../../../shared/library-selection';
-type Node={id:string;parent_id:string|null;kind:'folder'|'asset';name:string;revision:number;provider?:string;source_state?:string;mime_type?:string;parent_name?:string};
+type Node={id:string;parent_id:string|null;kind:'folder'|'asset';name:string;revision:number;provider?:string;connection_id?:string;file_id?:string;source_revision?:string;source_state?:string;mime_type?:string;parent_name?:string};
 type Page={nodes:Node[];trail:{id:string;name:string}[];nextPage:string|null};
 export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{projects:readonly Project[];selectedProjectId?:number;onSelectProject:(id:string)=>void}){
  const {user}=useAuth(),call=useDriveApi();
@@ -278,10 +279,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
       <AppButton className="vl-explorer-file" disabled={trash||busy} aria-label={n.name} title={n.name}
        onClick={()=>{setMenuNode(null);if(n.kind==='folder'){setParent(n.id);setSearch('');setTerm('');}else setPreview(n);}}>
        <span className="vl-file-emblem">{n.kind==='folder'?<FolderOpen size={24}/>:
-         n.mime_type?.startsWith('image/')?<ImageIcon size={23}/>:
-         n.mime_type?.startsWith('video/')?<FileVideo size={23}/>:
-         n.mime_type?.startsWith('audio/')?<FileAudio size={23}/>:
-         n.mime_type==='application/pdf'?<FileText size={23}/>:<File size={23}/>}</span>
+         <LibraryThumbnail node={n} uid={user?.uid||''}/>}</span>
        <span className="vl-file-meta"><strong>{n.name}</strong><small>{term&&searchAll?n.parent_name||'Arquivos':n.kind==='folder'?'Pasta':n.provider==='google_drive'?'Google Drive':n.provider==='dropbox'?'Dropbox':'Arquivo'}</small></span>
       </AppButton>
       <div className="vl-menu-shell">
