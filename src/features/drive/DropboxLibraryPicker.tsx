@@ -25,9 +25,10 @@ export function DropboxLibraryPicker({connectionId,onClose,onSelect,includeFolde
  const getThumbnail=useStorageThumbnailFetch('dropbox');
  const [trail,setTrail]=useState([{id:'root',name:'Meu Dropbox'}]),[loaded,setPage]=useState<(Page&{scope:string})|null>(null);
  const [selected,setSelected]=useState<Map<string,string>>(new Map()),[loading,setLoading]=useState(true),[paging,setPaging]=useState(false);
- const [error,setError]=useState(''),[filter,setFilter]=useState('');
+ const [error,setError]=useState(''),[filter,setFilter]=useState(''),[term,setTerm]=useState('');
  const generation=useRef(0),selectedFolders=useRef(new Set<string>());
- const folder=trail.at(-1)!.id,scope=cacheKey(user?.uid||'anonymous',connectionId,folder,'library-picker','','dropbox');
+ useEffect(()=>{const timeout=setTimeout(()=>setTerm(filter.trim().length>=2?filter.trim():''),320);return()=>clearTimeout(timeout);},[filter]);
+ const folder=trail.at(-1)!.id,scope=cacheKey(user?.uid||'anonymous',connectionId,folder,'library-picker:'+term,'','dropbox');
  const stored=getCachedFolder(scope);
  const page=loaded?.scope===scope?loaded:stored?{files:stored.files as unknown as Item[],nextPageToken:stored.nextPageToken,scope}:null;
  const load=useCallback(async(cursor?:string)=>{
@@ -38,8 +39,9 @@ export function DropboxLibraryPicker({connectionId,onClose,onSelect,includeFolde
   if(cursor)setPaging(true);else if(!cached)setLoading(true);
   setError('');
   try{
+   const params=new URLSearchParams({...term?{search:term}:{},...cursor?{pageToken:cursor}:{}});
    const endpoint='/integrations/dropbox/'+connectionId+'/folders/'+encodeURIComponent(folder)+'/items'+
-    (cursor?'?pageToken='+encodeURIComponent(cursor):'');
+    (params.size?'?'+params.toString():'');
    const result=await onceFolderRequest(scope+':'+(cursor||'first'),()=>call<Page>(endpoint));
    if(request!==generation.current)return;
    const previous=cursor?getCachedFolder(scope)?.files as Item[]|undefined:undefined;
@@ -47,18 +49,18 @@ export function DropboxLibraryPicker({connectionId,onClose,onSelect,includeFolde
    setCachedFolder(scope,{files:next.files as unknown as DriveItem[],nextPageToken:next.nextPageToken});setPage(next);
   }catch(e){if(request===generation.current)setError(e instanceof Error?e.message:'Não foi possível abrir esta pasta.');}
   finally{if(request===generation.current){setLoading(false);setPaging(false);}}
- },[call,connectionId,folder,scope]);
+ },[call,connectionId,folder,scope,term]);
  useEffect(()=>{
   const cached=getCachedFolder(scope);
   setPage(cached?{files:cached.files as unknown as Item[],nextPageToken:cached.nextPageToken,scope}:null);
-  setFilter('');setLoading(!cached);void load();
+  setLoading(!cached);void load();
   return()=>{++generation.current;};
  },[load,scope]);
  const shown=useMemo(()=>{
-  const needle=filter.trim().toLocaleLowerCase('pt-BR');
+  const needle=(term?'':filter.trim()).toLocaleLowerCase('pt-BR');
   return [...(page?.files||[])].filter(x=>!needle||x.name.toLocaleLowerCase('pt-BR').includes(needle))
    .sort((a,b)=>Number(b.isFolder)-Number(a.isFolder)||a.name.localeCompare(b.name,'pt-BR',{numeric:true,sensitivity:'base'}));
- },[page?.files,filter]);
+ },[page?.files,filter,term]);
  function toggle(item:Item){
   if(!selected.has(item.id)&&selected.size>=MAX_SELECTED)return;
   setSelected(prev=>{
@@ -68,7 +70,7 @@ export function DropboxLibraryPicker({connectionId,onClose,onSelect,includeFolde
    return next;
   });
  }
- function chooseFolder(id:string,name:string){setTrail(old=>[...old,{id,name}]);}
+ function chooseFolder(id:string,name:string){setFilter('');setTerm('');setTrail(old=>[...old,{id,name}]);}
  return <div className="lib-dialog-backdrop">
   <div ref={dialog} tabIndex={-1} className="lib-dialog lib-dialog--dropbox" role="dialog" aria-modal="true" aria-labelledby="dropbox-library-title" aria-describedby="dropbox-library-description">
    <header className="lib-dialog-header">
@@ -79,11 +81,12 @@ export function DropboxLibraryPicker({connectionId,onClose,onSelect,includeFolde
    <div className="lib-dialog-content">
     <nav aria-label="Pastas do Dropbox" className="lib-breadcrumb">
      {trail.map((item,i)=><span className="lib-crumb" key={item.id}>{i>0&&<ChevronRight size={15} aria-hidden="true"/>}
-      <AppButton type="button" aria-current={i===trail.length-1?'location':undefined} onClick={()=>setTrail(items=>items.slice(0,i+1))}>{item.name}</AppButton></span>)}
+      <AppButton type="button" aria-current={i===trail.length-1?'location':undefined} onClick={()=>{setFilter('');setTerm('');setTrail(items=>items.slice(0,i+1));}}>{item.name}</AppButton></span>)}
     </nav>
     <label className="lib-picker-search"><Search size={18} aria-hidden="true"/>
-     <AppInput type="search" value={filter} onChange={e=>setFilter(e.target.value)} aria-label="Filtrar itens carregados" placeholder="Filtrar nesta pasta…" autoComplete="off"/></label>
-    {page?.nextPageToken&&filter&&<p className="lib-picker-note">Filtro aplicado apenas aos itens carregados. Use “Carregar mais” para ver os próximos.</p>}
+     <AppInput type="search" value={filter} onChange={e=>setFilter(e.target.value)} aria-label="Filtrar itens carregados" placeholder="Buscar arquivos nesta pasta…" autoComplete="off"/></label>
+    {term&&<p className="lib-picker-note" role="status">{loading?'Pesquisando no Dropbox…':'Resultados da pesquisa no Dropbox'}{page?.nextPageToken?' · Há mais resultados':''}</p>}
+    {!term&&filter&&page?.nextPageToken&&<p className="lib-picker-note">Para pesquisar além dos itens carregados, digite pelo menos duas letras.</p>}
     <div className="lib-picker-list lib-picker-list--grid" aria-busy={loading||paging}>
      {loading&&!page?<div className="lib-tile-skeleton" role="status" aria-label="Carregando pasta do Dropbox…" aria-busy="true">
        {Array.from({length:8},(_,index)=><div key={index} className="lib-tile-skeleton-card" aria-hidden="true"><span/><small/></div>)}
