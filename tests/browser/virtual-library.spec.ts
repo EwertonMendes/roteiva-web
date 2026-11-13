@@ -30,9 +30,11 @@ async function prepare(page:Page,email:string){
  await expect(page.locator('[aria-busy]').first()).toHaveAttribute('aria-busy','false');
 }
 test('virtual navigation preserves folder commands and a partial Dropbox batch retries only failed files',async({page,context},info)=>{
- type Node={id:string;parent_id:string|null;kind:'folder'|'asset';name:string;state:string;revision:number;asset_id?:string;provider?:string;mime_type?:string};
+ type Node={id:string;parent_id:string|null;kind:'folder'|'asset';name:string;state:string;revision:number;asset_id?:string;provider?:string;connection_id?:string;file_id?:string;source_revision?:string;mime_type?:string};
  const nodes:Node[]=[{id:'root',parent_id:null,kind:'folder',name:'Arquivos',state:'active',revision:1}];
  const batches:string[][]=[];let failure=true;
+ const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=','base64');
+ let requestedThumbnails=0,previewRequests=0;
  const headers={'Access-Control-Allow-Origin':web,'Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Allow-Methods':'GET, POST, OPTIONS'};
  await context.route(api+'/**',async route=>{
   const req=route.request(),url=new URL(req.url()),path=url.pathname;
@@ -41,13 +43,17 @@ test('virtual navigation preserves folder commands and a partial Dropbox batch r
   if(path.startsWith('/access/')||path.startsWith('/account/'))return route.fallback();
   if(path==='/integrations/drive')return json({connections:[]});
   if(path==='/integrations/dropbox')return json({connections:[{id:connection,email:'qa@example.com',status:'connected',scopes:'files.metadata.read files.content.read files.content.write'}]});
-  if(path.startsWith('/integrations/dropbox/')&&path.endsWith('/items'))return json({files:[{id:'id:FILE_SELECTED_A',name:'Imagem A.png',isFolder:false},{id:'id:FILE_SELECTED_B',name:'Imagem B.png',isFolder:false}],nextPageToken:null});
+  if(path.startsWith('/integrations/dropbox/')&&path.endsWith('/items'))return json({files:[{id:'id:FILE_SELECTED_A',name:'Imagem A.png',mimeType:'image/png',thumbnailFallback:true,isFolder:false},{id:'id:FILE_SELECTED_B',name:'Imagem B.png',mimeType:'image/png',thumbnailFallback:true,isFolder:false}],nextPageToken:null});
+   if(path.startsWith('/integrations/dropbox/')&&path.endsWith('/thumbnail')){requestedThumbnails++;return route.fulfill({status:200,headers:{...headers,'Content-Type':'image/png'},body:png});}
+   if(/\/library\/projects\/\d+\/nodes\/[0-9a-f-]+\/content$/.test(path)){
+    previewRequests++;return route.fulfill({status:200,headers:{...headers,'Content-Type':'image/png','Content-Length':String(png.length)},body:png});
+   }
   if(path.endsWith('/uploads/destination'))return json({targetFolderId:'managed-target'});
   if(path.endsWith('/imports')){
    const body=req.postDataJSON(),ids=body.items.map((x:{fileId:string})=>x.fileId);batches.push(ids);
    const results=ids.map((fileId:string)=>{
     if(fileId.endsWith('_B')&&failure)return {fileId,status:'failed',code:'dropbox_rate_limited'};
-    const id=crypto.randomUUID();nodes.push({id,parent_id:body.parentId,kind:'asset',asset_id:id,name:fileId.endsWith('_A')?'Imagem A.png':'Imagem B.png',state:'active',revision:1,provider:'dropbox',mime_type:'image/png'});return {fileId,status:'added',id};
+    const id=crypto.randomUUID();nodes.push({id,parent_id:body.parentId,kind:'asset',asset_id:id,name:fileId.endsWith('_A')?'Imagem A.png':'Imagem B.png',state:'active',revision:1,provider:'dropbox',connection_id:connection,file_id:fileId,source_revision:'r1',mime_type:'image/png'});return {fileId,status:'added',id};
    });failure=false;return json({results});
   }
   if(path.endsWith('/structure')){
@@ -89,6 +95,8 @@ test('virtual navigation preserves folder commands and a partial Dropbox batch r
  await expect(page.getByRole('button',{name:'Originais',exact:true})).toBeVisible();
  await libraryAdd(page,'Adicionar do Dropbox');
  const picker=page.getByRole('dialog',{name:'Adicionar do Dropbox'});
+ await expect(picker.locator('.lib-browser-grid .lib-picker-tile')).toHaveCount(2);
+ await expect.poll(async()=>picker.locator('.lib-picker-tile .rl-file-icon--image img').count()).toBeGreaterThan(0);
  await picker.getByLabel('Imagem A.png').check();await picker.getByLabel('Imagem B.png').check();await picker.getByRole('button',{name:'Adicionar selecionados'}).click();
  await expect(page.getByRole('button',{name:'Imagem A.png',exact:true})).toBeVisible();
  await expect(page.getByRole('alert').filter({hasText:'Imagem B.png'})).toBeVisible();
@@ -101,7 +109,12 @@ test('virtual navigation preserves folder commands and a partial Dropbox batch r
  await (await chooser).setFiles({name:'queue-overlay.txt',mimeType:'text/plain',buffer:Buffer.from('synthetic fixture')});
  await expect(page.getByRole('complementary',{name:'Transferências de arquivos'})).toBeVisible();
  await page.getByRole('button',{name:'Imagem A.png',exact:true}).click();
- await expect(page.getByRole('dialog',{name:'Prévia de Imagem A.png'})).toBeVisible();
+ const imageDialog=page.getByRole('dialog',{name:'Prévia de Imagem A.png'});
+ await expect(imageDialog).toBeVisible();
+ await expect(imageDialog.locator('.vl-preview-image')).toBeVisible();
+ await expect.poll(()=>imageDialog.locator('.vl-preview-image').evaluate(el=>(el as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+ expect(previewRequests).toBeGreaterThan(0);
+ expect(requestedThumbnails).toBeGreaterThan(0);
  await expect(page.locator('.rl-upload-queue')).toBeHidden();
  await page.getByRole('button',{name:'Fechar prévia'}).click();
  await expect(page.locator('.rl-upload-queue')).toBeVisible();
