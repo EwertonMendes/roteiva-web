@@ -222,7 +222,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
   else if(action==='drive-file'||action==='drive-tree')void addDrive(action==='drive-tree');
   else{setDropboxStructure(action==='dropbox-tree');setDropboxPicker(true);}
  };
- const renderNode=(n:Node)=>n=><li key={n.id} className="vl-explorer-item" data-kind={n.kind} data-menu-open={menuNode?.id===n.id} onContextMenu={e=>{e.preventDefault();e.stopPropagation();setSpaceMenu(null);setMenuNode(n);setAddOpen(false);}}>
+ const renderNode=(n:Node)=><li key={n.id} className="vl-explorer-item" data-kind={n.kind} data-menu-open={menuNode?.id===n.id} onContextMenu={e=>{e.preventDefault();e.stopPropagation();setSpaceMenu(null);setMenuNode(n);setAddOpen(false);}}>
       <AppButton className="vl-explorer-file" disabled={trash||busy} aria-label={n.name} title={n.name}
        onClick={()=>{setMenuNode(null);if(n.kind==='folder'){setParent(n.id);setSearch('');setTerm('');}else setPreview(n);}}>
        <span className="vl-file-emblem">{n.kind==='folder'?<FolderOpen size={24}/>:
