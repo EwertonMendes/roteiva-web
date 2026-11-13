@@ -1,27 +1,28 @@
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
-import {ChevronRight,File,FileAudio,FileImage,FileText,FileVideo,Folder,Search,X} from 'lucide-react';
+import {ChevronRight,Folder,Search,X} from 'lucide-react';
 import {AppButton} from '../ui/AppButton';
 import {AppInput} from '../ui/AppInput';
 import {useDriveApi} from './drive-api';
 import {useOverlayFocus,type DriveItem} from './DriveLibraryUI';
 import {useAuth} from '../auth/AuthProvider';
 import {cacheKey,getCachedFolder,setCachedFolder,onceFolderRequest} from './storage-folder-cache';
-import {LibraryLoadingRows} from './LibraryLoadingRows';
+import {DriveThumbnail} from './DriveThumbnail';
+import {useStorageThumbnailFetch} from './useStorageThumbnailFetch';
 import './library-dialog.css';
-type Item={id:string;name:string;isFolder:boolean};
+type Item=DriveItem&{isFolder:boolean};
 type Page={files:Item[];nextPageToken:string|null};
 const MAX_SELECTED=100;
-function fileIcon(name:string){
- const ext=name.split('.').at(-1)?.toLowerCase();
- if(['png','jpg','jpeg','webp','gif','avif'].includes(ext||''))return FileImage;
- if(['mp4','mov','webm','avi','mkv'].includes(ext||''))return FileVideo;
- if(['m4a','mp3','wav','ogg','flac'].includes(ext||''))return FileAudio;
- if(['pdf','doc','docx','txt','ppt','pptx'].includes(ext||''))return FileText;
- return File;
+function mimeByName(name:string){
+ const ext=name.split('.').at(-1)?.toLowerCase()||'';
+ if(['png','jpg','jpeg','webp','gif','avif'].includes(ext))return 'image/'+(ext==='jpg'?'jpeg':ext);
+ if(['mp4','mov','webm','avi','mkv'].includes(ext))return 'video/'+ext;
+ if(['m4a','mp3','wav','ogg','flac'].includes(ext))return 'audio/'+ext;
+ return ext==='pdf'?'application/pdf':'application/octet-stream';
 }
 /** Provider metadata stays cached by owner and connection; selected items survive folder navigation. */
 export function DropboxLibraryPicker({connectionId,onClose,onSelect,includeFolders=false}:{connectionId:string;onClose:()=>void;onSelect:(ids:string[],names:Map<string,string>,folders:Set<string>)=>void;includeFolders?:boolean}){
  const call=useDriveApi(),dialog=useOverlayFocus(onClose),{user}=useAuth();
+ const getThumbnail=useStorageThumbnailFetch('dropbox');
  const [trail,setTrail]=useState([{id:'root',name:'Meu Dropbox'}]),[loaded,setPage]=useState<(Page&{scope:string})|null>(null);
  const [selected,setSelected]=useState<Map<string,string>>(new Map()),[loading,setLoading]=useState(true),[paging,setPaging]=useState(false);
  const [error,setError]=useState(''),[filter,setFilter]=useState('');
@@ -31,7 +32,7 @@ export function DropboxLibraryPicker({connectionId,onClose,onSelect,includeFolde
  const page=loaded?.scope===scope?loaded:stored?{files:stored.files as unknown as Item[],nextPageToken:stored.nextPageToken,scope}:null;
  const load=useCallback(async(cursor?:string)=>{
   const request=++generation.current,cached=getCachedFolder(scope);
-  if(!cursor&&cached&&Date.now()-cached.fetchedAt<45_000){
+  if(!cursor&&cached&&Date.now()-cached.fetchedAt<120_000){
    setPage({files:cached.files as unknown as Item[],nextPageToken:cached.nextPageToken,scope});setLoading(false);setError('');return;
   }
   if(cursor)setPaging(true);else if(!cached)setLoading(true);
@@ -83,22 +84,39 @@ export function DropboxLibraryPicker({connectionId,onClose,onSelect,includeFolde
     <label className="lib-picker-search"><Search size={18} aria-hidden="true"/>
      <AppInput type="search" value={filter} onChange={e=>setFilter(e.target.value)} aria-label="Filtrar itens carregados" placeholder="Filtrar nesta pasta…" autoComplete="off"/></label>
     {page?.nextPageToken&&filter&&<p className="lib-picker-note">Filtro aplicado apenas aos itens carregados. Use “Carregar mais” para ver os próximos.</p>}
-    <div className="lib-picker-list" aria-busy={loading||paging}>
-     {loading&&!page?<LibraryLoadingRows count={5} label="Carregando pasta do Dropbox…"/>:error&&!page?
+    <div className="lib-picker-list lib-picker-list--grid" aria-busy={loading||paging}>
+     {loading&&!page?<div className="lib-tile-skeleton" role="status" aria-label="Carregando pasta do Dropbox…" aria-busy="true">
+       {Array.from({length:8},(_,index)=><div key={index} className="lib-tile-skeleton-card" aria-hidden="true"><span/><small/></div>)}
+      </div>:error&&!page?
       <div role="alert" className="lib-message lib-message--error"><p>{error}</p><AppButton type="button" onClick={()=>void load()}>Tentar novamente</AppButton></div>:
-      shown.length?<ul className="lib-browser-list">
-       {shown.map(item=><li key={item.id} className={'lib-picker-row '+(item.isFolder?'lib-picker-row--folder':'lib-picker-row--file')}>
-        {item.isFolder?<>
-         {includeFolders&&<label className="lib-picker-select"><AppInput type="checkbox" aria-label={'Selecionar pasta '+item.name}
-          checked={selected.has(item.id)} disabled={!selected.has(item.id)&&selected.size>=MAX_SELECTED} onChange={()=>toggle(item)}/></label>}
-         <AppButton type="button" className="lib-picker-entry" onClick={()=>chooseFolder(item.id,item.name)}>
-          <Folder size={20} aria-hidden="true"/><span>{item.name}</span><ChevronRight size={16} aria-hidden="true"/></AppButton>
-        </>:<label><AppInput type="checkbox" aria-label={item.name} checked={selected.has(item.id)}
-          disabled={!selected.has(item.id)&&selected.size>=MAX_SELECTED} onChange={()=>toggle(item)}/>
-          {(()=>{const Icon=fileIcon(item.name);return <Icon size={19} aria-hidden="true"/>;})()}<span title={item.name}>{item.name}</span></label>}
-       </li>)}
+      shown.length?<ul className="lib-browser-grid">
+       {shown.map(item=>{
+        const folder=item.isFolder;
+        const chosen=selected.has(item.id);
+        const file:DriveItem={...item,mimeType:item.mimeType||mimeByName(item.name),
+          thumbnailFallback:item.thumbnailFallback??/\.(jpe?g|png|webp|gif|avif|pdf)$/i.test(item.name)};
+        return <li key={item.id} className={'lib-picker-tile'+(folder?' lib-picker-tile--folder':'')}
+         data-selected={chosen}>
+         {folder?<>
+          {includeFolders&&<label className="lib-tile-check"><AppInput type="checkbox" aria-label={'Selecionar pasta '+item.name}
+           checked={chosen} disabled={!chosen&&selected.size>=MAX_SELECTED} onChange={()=>toggle(item)}/></label>}
+          <AppButton type="button" className="lib-tile-folder" aria-label={item.name}
+           title={'Abrir pasta '+item.name} onClick={()=>chooseFolder(item.id,item.name)}>
+           <span className="lib-tile-image"><Folder size={37} aria-hidden="true"/></span>
+           <strong>{item.name}</strong><small>Subpasta</small>
+          </AppButton>
+         </>:<label className="lib-tile-file" title={item.name}>
+          <span className="lib-tile-check"><AppInput type="checkbox" aria-label={item.name} checked={chosen}
+            disabled={!chosen&&selected.size>=MAX_SELECTED} onChange={()=>toggle(item)}/></span>
+          <span className="lib-tile-image"><DriveThumbnail item={file} scope={(user?.uid||'anonymous')+':'+connectionId}
+           provider="dropbox" getThumbnail={getThumbnail}/></span>
+          <strong>{item.name}</strong>
+          <small>{file.mimeType.startsWith('image/')?'Imagem':file.mimeType.startsWith('video/')?'Vídeo':file.mimeType.startsWith('audio/')?'Áudio':file.mimeType==='application/pdf'?'PDF':'Arquivo'}</small>
+         </label>}
+        </li>;
+       })}
       </ul>:<div className="lib-message"><Folder size={27} aria-hidden="true"/><p>{filter?'Nenhum item carregado corresponde à pesquisa.':'Esta pasta está vazia.'}</p></div>}
-     {page?.nextPageToken&&!loading&&<div className="lib-load-more"><AppButton type="button" disabled={paging} onClick={()=>void load(page.nextPageToken!)}>{paging?'Carregando…':'Carregar mais'}</AppButton></div>}
+     {page?.nextPageToken&&!loading&&<div className="lib-load-more"><AppButton type="button" disabled={paging} onClick={()=>void load(page.nextPageToken!)}>{paging?'Carregando…':'Carregar mais arquivos'}</AppButton></div>}
     </div>
     {error&&page&&<div role="alert" className="lib-picker-error">{error} <AppButton type="button" onClick={()=>void load()}>Tentar novamente</AppButton></div>}
     {loading&&page&&<p role="status" className="lib-picker-note">Atualizando pasta…</p>}
