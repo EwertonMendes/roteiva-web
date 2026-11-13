@@ -1,5 +1,5 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
-import {FolderOpen,FolderPlus,FolderTree,RefreshCw,Trash2,RotateCcw,Search,CloudUpload,FilePlus2,FolderInput,Pencil,MoveRight,AlertCircle,Plus,LayoutGrid,List,MoreVertical,ChevronRight,X,HardDrive} from 'lucide-react';
+import {FolderOpen,FolderPlus,FolderTree,RefreshCw,Trash2,RotateCcw,ArrowLeft,Search,CloudUpload,FilePlus2,FolderInput,Pencil,MoveRight,AlertCircle,Plus,LayoutGrid,List,MoreVertical,ChevronRight,X,HardDrive} from 'lucide-react';
 import type {Project} from '../../domain/workspace';
 import {useAuth} from '../auth/AuthProvider';
 import {useDriveApi} from './drive-api';
@@ -48,6 +48,8 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
  const [loadingPage,setLoadingPage]=useState(false),[refreshing,setRefreshing]=useState(false),[searchAll,setSearchAll]=useState(true);
  const [layout,setLayout]=useState<'list'|'grid'>(()=>{try{return localStorage.getItem('roteiva-library-layout')==='grid'?'grid':'list';}catch{return 'list';}});
  const [addOpen,setAddOpen]=useState(false),[settingsOpen,setSettingsOpen]=useState(false),[menuNode,setMenuNode]=useState<Node|null>(null);
+ const [spaceMenu,setSpaceMenu]=useState<{x:number;y:number}|null>(null);
+ const nameInput=useRef<HTMLInputElement>(null),previousFolder=useRef('root');
  const [edit,setEdit]=useState<{node?:Node;action:'create'|'rename'|'trash'|'restore'|'move'}|null>(null),[name,setName]=useState('');
  const [trash,setTrash]=useState(false);
  const [preview,setPreview]=useState<Node|null>(null);
@@ -57,22 +59,27 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
  const [failedImports,setFailedImports]=useState<{parentId:string;items:FailedLibraryImport[]}|null>(null);
  const generation=useRef(0),loadRevision=useRef(0),mutation=useRef<AbortController|null>(null);
  const dialogRef=useOverlayFocus(()=>{if(!busy)setEdit(null);},Boolean(edit&&edit.action!=='move'),edit?.action+':'+edit?.node?.id);
+ useEffect(()=>{
+  if(edit?.action!=='create'&&edit?.action!=='rename')return;
+  const frame=requestAnimationFrame(()=>{nameInput.current?.focus();if(edit.action==='rename')nameInput.current?.select();});
+  return()=>cancelAnimationFrame(frame);
+ },[edit?.action,edit?.node?.id]);
  const base=selectedProjectId?'/library/projects/'+selectedProjectId+'/nodes':'';
  const oauthReturned=new URLSearchParams(window.location.search).has('drive')||new URLSearchParams(window.location.search).has('dropbox');
  const pageScope=libraryFolderKey(user?.uid||'anonymous',selectedProjectId||0,parent,trash,term,searchAll);
  const page=loadedPage?.scope===pageScope?loadedPage:getLibraryFolder<Node>(pageScope)?.data||null;
  useEffect(()=>{try{localStorage.setItem('roteiva-library-layout',layout);}catch{/* optional preference */}},[layout]);
  useEffect(()=>{
-  if(!addOpen&&!settingsOpen&&!menuNode)return;
-  const onEscape=(e:KeyboardEvent)=>{if(e.key==='Escape'){setAddOpen(false);setSettingsOpen(false);setMenuNode(null);}};
+  if(!addOpen&&!settingsOpen&&!menuNode&&!spaceMenu)return;
+  const onEscape=(e:KeyboardEvent)=>{if(e.key==='Escape'){setAddOpen(false);setSettingsOpen(false);setMenuNode(null);setSpaceMenu(null);}};
   document.addEventListener('keydown',onEscape);
   const outside=(e:PointerEvent)=>{
-   if(!(e.target as Element)?.closest?.('.vl-add-shell,.vl-context-menu,.vl-menu-trigger,.vl-accounts-popover,.vl-settings-trigger')){
-    setAddOpen(false);setSettingsOpen(false);setMenuNode(null);
+   if(!(e.target as Element)?.closest?.('.vl-add-shell,.vl-context-menu,.vl-menu-trigger,.vl-space-context-menu,.vl-accounts-popover,.vl-settings-trigger')){
+    setAddOpen(false);setSettingsOpen(false);setMenuNode(null);setSpaceMenu(null);
    }
   };
   document.addEventListener('pointerdown',outside);return()=>{document.removeEventListener('pointerdown',outside);document.removeEventListener('keydown',onEscape);};
- },[addOpen,settingsOpen,menuNode]);
+ },[addOpen,settingsOpen,menuNode,spaceMenu]);
  useEffect(()=>{const timer=setTimeout(()=>setTerm(search.trim().length>=2?search.trim():''),280);return()=>clearTimeout(timer);},[search]);
  useEffect(()=>{setSearch('');setTerm('');},[parent,selectedProjectId,trash]);
  useEffect(()=>{
@@ -138,7 +145,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
   }catch(e){if(scope===generation.current&&!controller.signal.aborted)setError(e instanceof Error?e.message:'Não foi possível preparar o envio.');}
   finally{if(mutation.current===controller){mutation.current=null;setProgress('');}if(scope===generation.current)setBusy(false);}
  }
- useEffect(()=>{setParent('root');setPage(null);setEdit(null);setPreview(null);setStructure(false);setAssisted(null);setDropboxPicker(false);setFailedImports(null);mutation.current?.abort();++generation.current;},[selectedProjectId,user?.uid]);
+ useEffect(()=>{setParent('root');setSpaceMenu(null);setTrash(false);previousFolder.current='root';setPage(null);setEdit(null);setPreview(null);setStructure(false);setAssisted(null);setDropboxPicker(false);setFailedImports(null);mutation.current?.abort();++generation.current;},[selectedProjectId,user?.uid]);
  // OAuth reloads React; restore only a short-lived hint for the same UID.
  // The API revalidates project ownership and the selected folder ancestors.
  useEffect(()=>{
@@ -209,7 +216,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
   if(action==='rename')setName(node.name);
  };
  const showAdd=(action:'new'|'drive-upload'|'dropbox-upload'|'drive-file'|'dropbox-file'|'drive-tree'|'dropbox-tree')=>{
-  setAddOpen(false);setError('');
+  setAddOpen(false);setSpaceMenu(null);setError('');
   if(action==='new'){setName('');setEdit({action:'create'});}
   else if(action==='drive-upload'||action==='dropbox-upload'){uploadProvider.current=action==='drive-upload'?'google_drive':'dropbox';fileInput.current?.click();}
   else if(action==='drive-file'||action==='drive-tree')void addDrive(action==='drive-tree');
@@ -306,7 +313,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
   <h3 id="virtual-library-title">{{create:'Nova pasta',rename:'Renomear',restore:'Restaurar',trash:'Remover do Roteiva'}[edit.action]}</h3>
   {error&&<div role="alert" className="virtual-library-error">{error}</div>}
   <form onSubmit={e=>{e.preventDefault();void save();}}>
-   {(edit.action==='create'||edit.action==='rename')&&<label>Nome<AppInput aria-label="Nome" required maxLength={120} value={name} onChange={e=>setName(e.target.value)} autoFocus/></label>}
+   {(edit.action==='create'||edit.action==='rename')&&<label>Nome<AppInput ref={nameInput} aria-label="Nome" required maxLength={120} value={name} onChange={e=>setName(e.target.value)}/></label>}
    {edit.action==='trash'&&<p>Remover este item da Biblioteca? Os arquivos originais permanecem no Google Drive ou Dropbox.</p>}
    {edit.action==='restore'&&<p>Restaurar este item. Caso a pasta original também esteja na lixeira, restaure primeiro a pasta.</p>}
    <div className="virtual-library-toolbar">
