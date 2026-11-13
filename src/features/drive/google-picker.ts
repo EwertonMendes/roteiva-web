@@ -8,7 +8,7 @@ interface View {setIncludeFolders(value:boolean):View;setSelectFolderEnabled(val
 interface Picker {setVisible(value:boolean):void;dispose():void;}
 interface Builder {addView(view:View):Builder;setOAuthToken(token:string):Builder;setDeveloperKey(key:string):Builder;
   enableFeature(feature:unknown):Builder;setMaxItems(max:number):Builder;
-  setAppId(id:string):Builder;setOrigin(origin:string):Builder;setTitle(title:string):Builder;
+  setAppId(id:string):Builder;setOrigin(origin:string):Builder;setTitle(title:string):Builder;setLocale?(locale:'pt-BR'):Builder;
   setSize(width:number,height:number):Builder;setCallback(callback:(reply:PickerReply)=>void):Builder;build():Picker;}
 type Google={accounts:{oauth2:{initTokenClient(config:{client_id:string;scope:string;include_granted_scopes:false;
   login_hint:string;callback:(reply:TokenReply)=>void;error_callback:()=>void}):{requestAccessToken(config:{prompt:string}):void}}};
@@ -50,11 +50,12 @@ export function pickLibraryFiles(config:PickerConfig,verify:(token:string)=>Prom
  const view=new google.DocsView(google.ViewId.DOCS).setIncludeFolders(options?.includeFolders===true).setSelectFolderEnabled(options?.includeFolders===true).setMode(google.DocsViewMode.LIST);
  if(options?.mimeTypes)view.setMimeTypes(options.mimeTypes);
  const maxItems=options?.maxItems||100;
- picker=new google.PickerBuilder().addView(view)
+ let builder=new google.PickerBuilder().addView(view)
  .enableFeature(google.Feature.MULTISELECT_ENABLED).setMaxItems(maxItems).setAppId(config.appId).setDeveloperKey(config.developerKey).setOAuthToken(reply.access_token)
  .setOrigin(window.location.origin).setTitle(options?.title||'Adicionar arquivos ao Roteiva')
- .setSize(Math.max(280,Math.min(900,window.innerWidth-24)),Math.max(300,Math.min(600,window.innerHeight-40)))
- .setCallback(data=>{if(data.action==='cancel')abort();if(data.action==='picked'){
+ .setSize(Math.max(280,Math.min(900,window.innerWidth-24)),Math.max(300,Math.min(600,window.innerHeight-40)));
+ builder=builder.setLocale?.('pt-BR')||builder;
+ picker=builder.setCallback(data=>{if(data.action==='cancel')abort();if(data.action==='picked'){
  const ids=Array.from(new Set(data.docs?.map(x=>x.id)||[]));
  if(!ids.length||ids.length>maxItems||ids.some(id=>!/^[A-Za-z0-9_-]{10,200}$/.test(id)))finish(undefined,new Error('A seleção retornou arquivos inválidos.'));else{options?.onDocuments?.(data.docs||[]);finish(ids);}
  }}).build();picker.setVisible(true);
