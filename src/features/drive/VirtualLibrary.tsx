@@ -197,6 +197,46 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
  }catch(e){if(!controller.signal.aborted&&scope===generation.current)setError(e instanceof Error?e.message:'Não foi possível adicionar os arquivos.');}
  finally{if(mutation.current===controller){mutation.current=null;setProgress('');}if(scope===generation.current)setBusy(false);}
  }
+ /** The Picker is scoped to one folder already selected by the user. No recursive Drive access is inferred. */
+ async function addDriveFolderContents(folder:InspectedLibrarySource){
+  if(!picker||!account||!assisted||folder.provider!=='google_drive'||folder.connectionId!==account.id||busy)return;
+  const previous=assisted,scope=generation.current,controller=new AbortController();
+  mutation.current=controller;setAssisted(null);setBusy(true);setError('');
+  try{
+   const names=new Map<string,string>(),keys=new Map<string,string>();
+   const ids=await pickLibraryFiles(picker.config,
+    accessToken=>call('/integrations/drive/'+account.id+'/picker/verify','POST',{accessToken},controller.signal),
+    controller.signal,{includeFolders:true,parentId:folder.fileId,title:'Selecionar conteúdo de '+folder.name,
+     onDocuments:docs=>{for(const doc of docs){if(doc.name)names.set(doc.id,doc.name);if(doc.resourceKey)keys.set(doc.id,doc.resourceKey);}}});
+   if(scope!==generation.current||controller.signal.aborted)return;
+   if(!ids.length){setAssisted(previous);return;}
+   const existing=new Map(previous.sources.map(x=>[x.provider+':'+x.connectionId+':'+x.fileId,x]));
+   const failed=[...previous.failed];
+   for(let index=0;index<ids.length;index+=3){
+    if(scope!==generation.current||controller.signal.aborted)return;
+    const slice=ids.slice(index,index+3);
+    setProgress('Conferindo '+Math.min(index+3,ids.length)+' de '+ids.length+' itens da pasta…');
+    const reply=await call<{results:LibraryInspection[]}>(base.replace('/nodes','/inspect'),'POST',
+     {provider:'google_drive',connectionId:account.id,items:slice.map(fileId=>({fileId,resourceKey:keys.get(fileId)}))},controller.signal);
+    for(const fileId of slice){
+     const item=reply.results.find(x=>x.fileId===fileId);
+     if(item?.status==='ready')existing.set('google_drive:'+account.id+':'+fileId,item.source);
+     else failed.push({name:names.get(fileId)||'Arquivo selecionado',code:item?.status==='failed'?item.code:'service_unavailable'});
+    }
+   }
+   if(scope===generation.current&&!controller.signal.aborted){
+    setAssisted({...previous,sources:[...existing.values()],failed});
+   }
+  }catch(e){
+   if(!controller.signal.aborted&&scope===generation.current){
+    setAssisted(previous);
+    setError(e instanceof Error?e.message:'Não foi possível selecionar o conteúdo. A organização anterior foi preservada.');
+   }
+  }finally{
+   if(mutation.current===controller){mutation.current=null;setProgress('');}
+   if(scope===generation.current)setBusy(false);
+  }
+ }
  async function retryImports(){
   if(!failedImports||busy)return;const scope=generation.current,controller=new AbortController();mutation.current=controller;setBusy(true);setError('');
   try{await performImport(failedImports.items,failedImports.parentId,controller,scope);}
@@ -355,6 +395,6 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
  {dropboxPicker&&dropbox&&<DropboxLibraryPicker key={dropbox.id+':'+dropboxStructure} connectionId={dropbox.id} includeFolders={dropboxStructure} onClose={()=>setDropboxPicker(false)} onSelect={(ids,names,folderIds)=>void addDropbox(ids,names,folderIds)}/>}
  {preview&&selectedProjectId&&<LibraryAssetPreview key={preview.id} projectId={selectedProjectId} node={preview} onClose={()=>setPreview(null)}/>}
  {structure&&selectedProjectId&&<LibraryStructureDialog key={selectedProjectId+':'+parent} projectId={selectedProjectId} parentId={parent} onClose={()=>setStructure(false)} onApplied={()=>{setStructure(false);void load();}}/>}
- {assisted&&selectedProjectId&&<AssistedLibraryImport key={selectedProjectId+':'+assisted.parentId} projectId={selectedProjectId} parentId={assisted.parentId} sources={assisted.sources} unavailable={assisted.failed} recursive={assisted.recursive} onClose={()=>{setAssisted(null);void load();}} onApplied={()=>{setAssisted(null);setSearch('');setTerm('');void load();}}/>}
+ {assisted&&selectedProjectId&&<AssistedLibraryImport key={selectedProjectId+':'+assisted.parentId} projectId={selectedProjectId} parentId={assisted.parentId} sources={assisted.sources} unavailable={assisted.failed} recursive={assisted.recursive} onExploreFolder={folder=>void addDriveFolderContents(folder)} onClose={()=>{setAssisted(null);void load();}} onApplied={()=>{setAssisted(null);setSearch('');setTerm('');void load();}}/>}
  </section>;
 }
