@@ -84,3 +84,38 @@
 @media(prefers-reduced-motion:reduce){.lib-skeleton-icon,.lib-skeleton-line{animation:none}}
 
 .lib-move-error{border:1px solid var(--line);background:var(--subtle);border-radius:10px;padding:12px;color:var(--ink);font-size:13px;margin:0 0 12px}
+
+/* Compact, image-first provider picker. The content scrolls; the footer never does. */
+.lib-dialog--dropbox{height:min(82dvh,760px);min-height:min(490px,82dvh)}
+.lib-dialog--dropbox .lib-dialog-content{display:flex;flex:1;flex-direction:column;min-height:0;overflow:hidden}
+.lib-dialog--dropbox .lib-breadcrumb{flex-shrink:0;max-height:85px;overflow-y:auto}
+.lib-dialog--dropbox .lib-picker-search{flex-shrink:0}
+.lib-picker-list--grid{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;border:0;background:transparent}
+.lib-browser-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(142px,1fr));align-content:start;gap:11px;list-style:none;margin:0;padding:5px}
+.lib-picker-tile{position:relative;min-width:0;height:158px;border:1px solid var(--line);border-radius:12px;background:var(--card);overflow:hidden;transition:border-color .15s,background-color .15s}
+.lib-picker-tile:hover{background:var(--subtle)}
+.lib-picker-tile[data-selected=true]{border-color:var(--focus-outline);background:var(--subtle)}
+.lib-tile-file,.lib-tile-folder{position:relative;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:6px;width:100%;height:100%;padding:12px 10px 11px;background:none;border:0;color:var(--ink);font-size:13px;text-align:center;cursor:pointer}
+.lib-tile-file strong,.lib-tile-folder strong{display:block;width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px;font-weight:650;padding:0 2px}
+.lib-tile-file small,.lib-tile-folder small{font-size:11px;color:var(--muted);line-height:1.3}
+.lib-tile-image{position:relative;display:grid;place-items:center;width:88px;height:83px;max-width:100%;overflow:hidden;flex:0 0 83px;border-radius:10px;background:var(--subtle);color:var(--muted)}
+.lib-tile-image .rl-file-icon{width:100%;height:100%;border-radius:10px;border:0;background:transparent}
+.lib-tile-image .rl-file-icon img{width:100%;height:100%;object-fit:cover;display:block}
+.lib-tile-image .rl-file-icon>svg{width:27px;height:27px}
+.lib-tile-image .rl-thumb-loading{background:var(--subtle)}
+.lib-tile-image .rl-thumb-loading-spin{animation:lib-spin 1s linear infinite}
+.lib-picker-tile .lib-tile-check{position:absolute;top:7px;right:7px;z-index:2;display:grid;place-items:center;width:28px;height:28px;border-radius:8px;background:var(--paper);border:1px solid var(--line);cursor:pointer}
+.lib-tile-check .rt-input,.lib-tile-check input{margin:0;cursor:pointer}
+.lib-tile-folder:focus-visible,.lib-tile-file:focus-within{outline:2px solid var(--focus-outline);outline-offset:-3px}
+.lib-tile-skeleton{display:grid;grid-template-columns:repeat(auto-fill,minmax(142px,1fr));gap:11px;padding:5px}
+.lib-tile-skeleton-card{height:158px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:12px}
+.lib-tile-skeleton-card span{width:82px;height:83px;border-radius:10px;background:var(--subtle)}
+.lib-tile-skeleton-card small{width:65%;height:12px;border-radius:6px;background:var(--subtle)}
+.lib-tile-skeleton-card span,.lib-tile-skeleton-card small{animation:lib-pulse 1.4s ease-in-out infinite alternate}
+@media(max-width:600px){
+ .lib-dialog--dropbox{height:94dvh;min-height:0}
+ .lib-browser-grid,.lib-tile-skeleton{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+ .lib-picker-tile,.lib-tile-skeleton-card{height:148px}
+ .lib-tile-image{height:75px;flex-basis:75px;width:82px}
+}
+@media(prefers-reduced-motion:reduce){.lib-tile-skeleton-card span,.lib-tile-skeleton-card small,.lib-tile-image .rl-thumb-loading-spin{animation:none}}
