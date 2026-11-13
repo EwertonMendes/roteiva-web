@@ -95,3 +95,13 @@
  .vl-explorer .vl-explorer-items--grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media(prefers-reduced-motion:reduce){.vl-explorer .vl-loading{animation:none}}
+
+/* Shared provider artwork in virtual assets. Thumbnails fill their intrinsic icon surface. */
+.vl-explorer .vl-file-emblem .rl-file-icon{
+ display:grid;place-items:center;position:relative;overflow:hidden;width:40px;height:40px;
+ border-radius:9px;border:0;background:transparent;color:var(--muted)
+}
+.vl-explorer .vl-file-emblem .rl-file-icon img{display:block;width:100%;height:100%;object-fit:cover}
+.vl-explorer .vl-file-emblem .rl-file-icon .rl-thumb-loading{position:absolute;inset:0;display:grid;place-items:center}
+.vl-explorer .vl-explorer-items--grid .vl-file-emblem .rl-file-icon{width:48px;height:48px}
+.vl-explorer .vl-file-emblem .rl-file-icon--image{background:var(--card)}
