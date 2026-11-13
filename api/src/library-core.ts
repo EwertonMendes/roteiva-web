@@ -24,9 +24,13 @@ export async function authorizeLibraryProject(request:Request,env:Env,uid:string
  if(doc.fields?.ownerUid?.stringValue!==uid)throw new ApiError(403,'library_project_denied');
 }
 export async function libraryFor(env:Env,uid:string,projectId:number):Promise<Library>{
+ // Reads are the common case. Never issue two D1 writes on every folder navigation.
+ const lookup=()=>env.DB.prepare("SELECT id,owner_uid,project_id FROM libraries WHERE owner_uid=? AND project_id=? AND state='active'").bind(uid,projectId).first<Library>();
+ let library=await lookup();
+ if(library)return library;
  await env.DB.prepare("INSERT OR IGNORE INTO libraries(id,owner_uid,project_id,created_at) VALUES(?,?,?,?)")
- .bind(crypto.randomUUID(),uid,projectId,Date.now()).run();
- const library=await env.DB.prepare("SELECT id,owner_uid,project_id FROM libraries WHERE owner_uid=? AND project_id=? AND state='active'").bind(uid,projectId).first<Library>();
+  .bind(crypto.randomUUID(),uid,projectId,Date.now()).run();
+ library=await lookup();
  if(!library)throw new ApiError(409,'library_unavailable');
  await env.DB.prepare("INSERT OR IGNORE INTO library_nodes(library_id,id,parent_id,kind,name) VALUES(?,'root',NULL,'folder','Arquivos')").bind(library.id).run();
  return library;
@@ -35,6 +39,7 @@ export async function libraryNode(env:Env,lib:Library,id:string,allowTrashed=fal
  nodeId(id);
  const n=await env.DB.prepare('SELECT id,parent_id,kind,name,state,revision FROM library_nodes WHERE library_id=? AND id=?').bind(lib.id,id).first<LibraryNode>();
  if(!n||(!allowTrashed&&n.state!=='active'))throw new ApiError(404,'library_node_unavailable');
+ if(id==='root'&&n.parent_id===null)return n;
  const ancestors=await env.DB.prepare(`WITH RECURSIVE chain(id,parent_id,state,depth) AS (
  SELECT id,parent_id,state,0 FROM library_nodes WHERE library_id=? AND id=?
  UNION ALL SELECT n.id,n.parent_id,n.state,c.depth+1 FROM library_nodes n JOIN chain c ON n.id=c.parent_id WHERE n.library_id=? AND c.depth<17)
@@ -85,7 +90,7 @@ export async function listLibraryExplorer(env:Env,lib:Library,parentId:string,af
    WHERE child.library_id=? AND child.state='active' AND visible.depth<16
  )`:'';
  const sql=`${visible} SELECT n.id,n.asset_id,n.parent_id,n.kind,n.name,n.state,n.revision,
-  a.provider,a.source_name,a.mime_type,a.size,a.state AS source_state,
+  a.provider,a.connection_id,a.file_id,a.source_revision,a.source_name,a.mime_type,a.size,a.state AS source_state,
   parent.name AS parent_name
   FROM library_nodes n
   ${all?'JOIN visible ON visible.id=n.id':''}
