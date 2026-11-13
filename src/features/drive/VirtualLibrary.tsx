@@ -24,6 +24,7 @@ import {importLibraryBatch,type LibraryImport,type FailedLibraryImport} from './
 import {LibraryConnections} from './LibraryConnections';
 import {LibraryStructureDialog} from './LibraryStructureDialog';
 import {MoveDestinationDialog} from './MoveDestinationDialog';
+import {LibraryLoadingRows} from './LibraryLoadingRows';
 import {AssistedLibraryImport} from './AssistedLibraryImport';
 import {expandDropboxTree} from './expand-dropbox-tree';
 import googleDriveMark from '../../assets/brand/google-drive.svg';
@@ -43,7 +44,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
  const dropbox=dropboxAccounts.find(x=>x.id===dropboxId)||dropboxAccounts[0];
  const [parent,setParent]=useState('root'),[loadedPage,setPage]=useState<(Page&{scope:string})|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const [returnNotice,setReturnNotice]=useState('');
- const [loadingPage,setLoadingPage]=useState(false),[searchAll,setSearchAll]=useState(true);
+ const [loadingPage,setLoadingPage]=useState(false),[refreshing,setRefreshing]=useState(false),[searchAll,setSearchAll]=useState(true);
  const [layout,setLayout]=useState<'list'|'grid'>(()=>{try{return localStorage.getItem('roteiva-library-layout')==='grid'?'grid':'list';}catch{return 'list';}});
  const [addOpen,setAddOpen]=useState(false),[settingsOpen,setSettingsOpen]=useState(false),[menuNode,setMenuNode]=useState<Node|null>(null);
  const [edit,setEdit]=useState<{node?:Node;action:'create'|'rename'|'trash'|'restore'|'move'}|null>(null),[name,setName]=useState('');
@@ -62,12 +63,14 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
  useEffect(()=>{try{localStorage.setItem('roteiva-library-layout',layout);}catch{/* optional preference */}},[layout]);
  useEffect(()=>{
   if(!addOpen&&!settingsOpen&&!menuNode)return;
+  const onEscape=(e:KeyboardEvent)=>{if(e.key==='Escape'){setAddOpen(false);setSettingsOpen(false);setMenuNode(null);}};
+  document.addEventListener('keydown',onEscape);
   const outside=(e:PointerEvent)=>{
    if(!(e.target as Element)?.closest?.('.vl-add-shell,.vl-context-menu,.vl-menu-trigger,.vl-accounts-popover,.vl-settings-trigger')){
     setAddOpen(false);setSettingsOpen(false);setMenuNode(null);
    }
   };
-  document.addEventListener('pointerdown',outside);return()=>document.removeEventListener('pointerdown',outside);
+  document.addEventListener('pointerdown',outside);return()=>{document.removeEventListener('pointerdown',outside);document.removeEventListener('keydown',onEscape);};
  },[addOpen,settingsOpen,menuNode]);
  useEffect(()=>{const timer=setTimeout(()=>setTerm(search.trim().length>=2?search.trim():''),280);return()=>clearTimeout(timer);},[search]);
  useEffect(()=>{setSearch('');setTerm('');},[parent,selectedProjectId,trash]);
@@ -98,6 +101,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
   if(cached)setPage({...cached.data,scope:pageScope});
   if(cached&&!cached.stale&&!force)return;
   if(!cached&&!after)setLoadingPage(true);
+  else if(!after)setRefreshing(true);
   setError('');
   try{
    const path=base+'?'+new URLSearchParams({parent,...(trash?{trash:'1'}:{explorer:'1'}),
@@ -114,7 +118,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
    }else if(code==='library_project_denied'){
     setReturnNotice('O projeto anterior não está disponível. Selecione outro projeto.');onSelectProject('');
    }else setError(e instanceof Error?e.message:'Não foi possível carregar a pasta.');
-  }}finally{if(revision===loadRevision.current)setLoadingPage(false);}
+  }}finally{if(revision===loadRevision.current){setLoadingPage(false);setRefreshing(false);}}
  },[base,user?.uid,call,parent,trash,pageScope,term,searchAll,onSelectProject]);
  useEffect(()=>transfers.subscribe((_file,destination)=>{
   if(destination.projectId===selectedProjectId&&destination.linkedFolderId===parent&&!mutation.current){if(user?.uid&&selectedProjectId)invalidateLibraryFolders(user.uid,selectedProjectId);void load();}
@@ -215,7 +219,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
    <LibraryProjectPicker projects={projects} value={selectedProjectId} onChange={onSelectProject}/>
    <div className="vl-explorer-actions">
     <AppButton className="vl-settings-trigger" aria-label="Contas de armazenamento" title="Contas conectadas" aria-expanded={settingsOpen} onClick={()=>{setSettingsOpen(x=>!x);setAddOpen(false);setMenuNode(null);}}><HardDrive size={18}/><span>{storage.connections.filter(c=>c.status==='connected').length}</span></AppButton>
-    <AppButton className="vl-refresh" aria-label="Atualizar pasta" title="Atualizar pasta" disabled={!base||busy||loadingPage} onClick={()=>void load()}><RefreshCw size={18}/></AppButton>
+    <AppButton className="vl-refresh" aria-label="Atualizar pasta" title="Atualizar pasta" disabled={!base||busy||loadingPage||refreshing} onClick={()=>void load()}><RefreshCw size={18} className={loadingPage||refreshing?'vl-loading':''}/></AppButton>
     {base&&!trash&&<div className="vl-add-shell">
      <AppButton className="vl-primary-add" aria-label="Adicionar" aria-expanded={addOpen} onClick={()=>{setAddOpen(x=>!x);setMenuNode(null);setSettingsOpen(false);}}><Plus size={18}/>Adicionar</AppButton>
      {addOpen&&<div className="vl-add-menu" role="group" aria-label="Adicionar à Biblioteca">
@@ -264,9 +268,13 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
     {term&&<AppSelect aria-label="Pesquisar em" value={searchAll?'project':'folder'} onValueChange={v=>setSearchAll(v==='project')}><option value="project">Todo o projeto</option><option value="folder">Esta pasta</option></AppSelect>}
    </div>}
    {progress&&<p role="status" className="vl-import-status">{progress}</p>}
-   {loadingPage&&!page?<div role="status" className="vl-loading-area"><RefreshCw className="vl-loading" size={22}/>Carregando arquivos…</div>:<>
-    {page?.nodes.length?<ul className={'vl-explorer-items vl-explorer-items--'+layout} aria-label={trash?'Itens na lixeira':'Arquivos e pastas'}>
-     {page.nodes.map(n=><li key={n.id} className="vl-explorer-item" onContextMenu={e=>{e.preventDefault();setMenuNode(n);setAddOpen(false);}}>
+   {refreshing&&page&&<p role="status" className="vl-background-refresh">Atualizando arquivos…</p>}
+   {loadingPage&&!page?<LibraryLoadingRows label="Carregando arquivos…" count={4}/>:error&&!page?
+    <div role="alert" className="vl-explorer-empty"><AlertCircle size={26}/><h3>Não foi possível abrir esta pasta</h3><p>{error}</p><AppButton className="vl-retry-action" onClick={()=>void load()}>Tentar novamente</AppButton></div>:<>
+    {page?.nodes.length?<><div className="vl-explorer-count" role="status">{page.nodes.length}{page.nextPage?'+':''} {page.nodes.length===1?'item':'itens'}</div>
+     {layout==='list'&&<div className="vl-list-header" aria-hidden="true"><span>Nome</span><span>Ações</span></div>}
+     <ul className={'vl-explorer-items vl-explorer-items--'+layout} aria-label={trash?'Itens na lixeira':'Arquivos e pastas'}>
+     {page.nodes.map(n=><li key={n.id} className="vl-explorer-item" data-menu-open={menuNode?.id===n.id} onContextMenu={e=>{e.preventDefault();setMenuNode(n);setAddOpen(false);}}>
       <AppButton className="vl-explorer-file" disabled={trash||busy} aria-label={n.name} title={n.name}
        onClick={()=>{setMenuNode(null);if(n.kind==='folder'){setParent(n.id);setSearch('');setTerm('');}else setPreview(n);}}>
        <span className="vl-file-emblem">{n.kind==='folder'?<FolderOpen size={24}/>:
@@ -289,13 +297,13 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
        </div>}
       </div>
      </li>)}
-    </ul>:<div className="vl-explorer-empty vl-explorer-empty--folder"><FolderOpen size={32}/><h3>{term?'Nenhum resultado':trash?'Lixeira vazia':'Esta pasta está vazia'}</h3><p>{term?'Experimente outro nome ou escopo.':trash?'Itens removidos aparecem aqui.':'Use Adicionar para criar pastas e incluir arquivos.'}</p></div>}
+    </ul></>:<div className="vl-explorer-empty vl-explorer-empty--folder"><FolderOpen size={32}/><h3>{term?'Nenhum resultado':trash?'Lixeira vazia':'Esta pasta está vazia'}</h3><p>{term?'Experimente outro nome ou escopo.':trash?'Itens removidos aparecem aqui.':'Use Adicionar para criar pastas e incluir arquivos.'}</p></div>}
     {page?.nextPage&&<div className="vl-loadmore"><AppButton disabled={loadingPage} onClick={()=>void load(page.nextPage!,true)}>Carregar mais</AppButton></div>}
    </>}
   </>}
   {base&&<AppInput ref={fileInput} type="file" multiple hidden onChange={e=>{const files=Array.from(e.target.files||[]);e.target.value='';void upload(files);}}/>}
  {edit?.action==='move'&&edit.node&&<MoveDestinationDialog key={edit.node.id} base={base} source={edit.node}
-  busy={busy} onClose={()=>{setError('');setEdit(null);}} onConfirm={dest=>void save(dest)}/>}
+  busy={busy} error={error} onClose={()=>{setError('');setEdit(null);}} onConfirm={dest=>void save(dest)}/>}
  {edit&&edit.action!=='move'&&<div className="virtual-library-backdrop"><div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="virtual-library-title" className="virtual-library-editor">
   <h3 id="virtual-library-title">{{create:'Nova pasta',rename:'Renomear',restore:'Restaurar',trash:'Remover do Roteiva'}[edit.action]}</h3>
   {error&&<div role="alert" className="virtual-library-error">{error}</div>}
