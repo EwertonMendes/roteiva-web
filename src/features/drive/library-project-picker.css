@@ -19,3 +19,7 @@
 .lp-clear{width:100%;border-top:1px solid var(--line);padding:11px;background:transparent;color:var(--muted);text-align:left;font-size:12px}
 @media(max-width:800px){.lp-picker{width:100%}.lp-popover{left:0;right:auto;max-width:100%}}
 @media(prefers-reduced-motion:reduce){.lp-loading{animation:none}}
+
+.lp-more{width:100%;min-height:42px;border-top:1px solid var(--line);background:transparent;color:var(--ink);font-size:13px;font-weight:600;text-align:center}
+.lp-more:hover:not(:disabled){background:var(--subtle)}
+.lp-hint{margin:6px;padding:7px;color:var(--muted);font-size:12px;line-height:1.45}

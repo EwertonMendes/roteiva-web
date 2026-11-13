@@ -1,7 +1,7 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {ChevronDown,FolderKanban,Search,LoaderCircle} from 'lucide-react';
 import {isDemo} from '../../lib/firebase';
-import {searchLibraryProjects} from '../../data/firestore-project-search';
+import {searchLibraryProjectsPage,type LibraryProjectCursor} from '../../data/firestore-project-search';
 import {useAuth} from '../auth/AuthProvider';
 import {AppButton} from '../ui/AppButton';
 import {AppInput} from '../ui/AppInput';
@@ -21,6 +21,7 @@ export function LibraryProjectPicker({projects,value,onChange}:{projects:readonl
  const wrapper=useRef<HTMLDivElement>(null),input=useRef<HTMLInputElement>(null),serial=useRef(0);
  const [open,setOpen]=useState(false),[term,setTerm]=useState(''),[remote,setRemote]=useState<Choice[]>([]);
  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[index,setIndex]=useState(0);
+ const [cursor,setCursor]=useState<LibraryProjectCursor|null>(null);
  const [history,setHistory]=useState<Choice[]>(()=>recent(uid));
  useEffect(()=>{setHistory(recent(uid));setRemote([]);},[uid]);
  const loaded=useMemo(()=>projects.map(p=>({id:p.id,name:p.name})),[projects]);
@@ -28,18 +29,18 @@ export function LibraryProjectPicker({projects,value,onChange}:{projects:readonl
   const search=term.trim().toLocaleLowerCase('pt-BR');
   const input=search?[...loaded,...remote].filter(p=>p.name.toLocaleLowerCase('pt-BR').includes(search)):
    [...history,...loaded.slice(0,12)];
-  return Array.from(new Map(input.map(p=>[p.id,p])).values()).slice(0,40);
+  return Array.from(new Map(input.map(p=>[p.id,p])).values()).slice(0,160);
  },[loaded,remote,term,history]);
  const selected=[...loaded,...remote,...history].find(p=>p.id===value);
  useEffect(()=>{
-  if(!open||term.trim().length<2||isDemo||!user){setRemote([]);setBusy(false);return;}
-  const request=++serial.current;
+  if(!open||term.trim().length<2||isDemo||!user){setRemote([]);setCursor(null);setBusy(false);return;}
+  const request=++serial.current;setCursor(null);setRemote([]);
   const timer=window.setTimeout(async()=>{
    setBusy(true);setError('');
    try{
-    const results=await searchLibraryProjects(user.uid,term.trim());
+    const results=await searchLibraryProjectsPage(user.uid,term.trim());
     if(request!==serial.current)return;
-    setRemote(results);
+    setRemote(results.items);setCursor(results.cursor);
    }catch{
     if(request===serial.current)setError('Não foi possível pesquisar online. Você ainda pode escolher um projeto carregado.');
    }finally{if(request===serial.current)setBusy(false);}
@@ -52,6 +53,17 @@ export function LibraryProjectPicker({projects,value,onChange}:{projects:readonl
   document.addEventListener('pointerdown',outside);
   return()=>document.removeEventListener('pointerdown',outside);
  },[open]);
+ async function loadMore(){
+  if(busy||!cursor||!user||term.trim().length<2)return;
+  const request=serial.current;setBusy(true);setError('');
+  try{
+   const next=await searchLibraryProjectsPage(user.uid,term.trim(),cursor);
+   if(request!==serial.current)return;
+   setRemote(old=>Array.from(new Map([...old,...next.items].map(p=>[p.id,p])).values()));
+   setCursor(next.cursor);
+  }catch{if(request===serial.current)setError('Não foi possível carregar mais projetos. Tente novamente.');}
+  finally{if(request===serial.current)setBusy(false);}
+ }
  function choose(choice:Choice|null){
   onChange(choice?String(choice.id):'');
   if(choice){
@@ -84,6 +96,8 @@ export function LibraryProjectPicker({projects,value,onChange}:{projects:readonl
       <FolderKanban size={16} aria-hidden="true"/><span>{p.name}</span></AppButton>)}
     {!choices.length&&<div className="lp-empty">{busy?'Pesquisando…':term?'Nenhum projeto encontrado. Pesquise pelo início do nome.':'Nenhum projeto disponível.'}</div>}
    </div>
+   {cursor&&remote.length<160&&<AppButton type="button" className="lp-more" disabled={busy} onClick={()=>void loadMore()}>{busy?'Pesquisando…':'Mostrar mais projetos'}</AppButton>}
+   {cursor&&remote.length>=160&&<p className="lp-hint">Refine sua busca para encontrar outros projetos.</p>}
    {error&&<p role="alert" className="lp-error">{error}</p>}
    {value&&<AppButton className="lp-clear" onClick={()=>choose(null)}>Limpar seleção</AppButton>}
   </div>}
