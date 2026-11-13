@@ -323,7 +323,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
      </span>)}
     </nav>
     <div className="vl-toolbar-end">
-     <AppButton className={'vl-trash-switch'+(trash?' vl-trash-switch--back':'')} disabled={loadingPage||busy} aria-label={trash?'Voltar aos arquivos':'Abrir Lixeira'} onClick={()=>{
+     <AppButton className={'vl-trash-switch'+(trash?' vl-trash-switch--back':'')} disabled={loadingPage||busy} aria-label={trash?'Voltar aos arquivos':'Lixeira'} title={trash?'Retornar à Biblioteca':'Abrir área de itens removidos'} onClick={()=>{
        if(trash){setTrash(false);setParent(previousFolder.current);}
        else{previousFolder.current=parent;setTrash(true);setParent('root');}
        setMenuNode(null);setSpaceMenu(null);
