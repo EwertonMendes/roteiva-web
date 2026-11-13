@@ -82,3 +82,5 @@
 .lib-sr-only{position:absolute;width:1px;height:1px;clip:rect(0,0,0,0);overflow:hidden;white-space:nowrap}
 @media(max-width:600px){.lib-dialog--dropbox{height:96dvh}.lib-dialog--dropbox .lib-dialog-content{flex:1}.lib-picker-count{white-space:normal;flex:0 0 100%;margin-bottom:3px}.lib-dialog--dropbox .lib-dialog-footer{flex-wrap:wrap}.lib-dialog--dropbox .lib-dialog-footer>button{flex:1}}
 @media(prefers-reduced-motion:reduce){.lib-skeleton-icon,.lib-skeleton-line{animation:none}}
+
+.lib-move-error{border:1px solid var(--line);background:var(--subtle);border-radius:10px;padding:12px;color:var(--ink);font-size:13px;margin:0 0 12px}

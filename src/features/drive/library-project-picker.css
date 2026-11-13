@@ -2,10 +2,11 @@
 .lp-picker .lp-trigger{width:100%;min-height:44px;display:flex;align-items:center;gap:10px;padding:10px 13px;border:1px solid var(--line);border-radius:11px;background:var(--card);color:var(--ink);font-size:13px;text-align:left}
 .lp-trigger>span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
 .lp-trigger>svg{flex-shrink:0;color:var(--muted)}
-.lp-popover{position:absolute;z-index:100;width:min(380px,calc(100vw - 32px));right:0;top:calc(100% + 7px);border:1px solid var(--line);border-radius:14px;padding:10px;background:var(--paper);box-shadow:0 18px 55px rgba(0,0,0,.32)}
+.lp-popover{position:absolute;z-index:100;width:min(380px,calc(100vw - 32px));left:0;right:auto;top:calc(100% + 7px);border:1px solid var(--line);border-radius:14px;padding:10px;background:var(--paper);box-shadow:0 18px 55px rgba(0,0,0,.32)}
 .lp-search{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:10px;padding:0 11px;background:var(--subtle);color:var(--muted)}
 .lp-search .rt-input{min-height:42px;width:100%;border:0;background:transparent;padding:0;box-shadow:none}
 .lp-search:focus-within{outline:2px solid var(--focus-outline);outline-offset:1px}
+.lp-search .rt-input:focus,.lp-search .rt-input:focus-visible{outline:0;box-shadow:none}
 .lp-loading{animation:lp-spin 1s linear infinite}
 @keyframes lp-spin{to{transform:rotate(360deg)}}
 .lp-label{font-size:11px;color:var(--muted);padding:13px 8px 5px;font-weight:600;text-transform:uppercase;letter-spacing:.05em}

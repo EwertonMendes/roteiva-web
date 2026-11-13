@@ -11,15 +11,15 @@ type Source={id:string;name:string;parent_id:string|null;kind:'folder'|'asset'};
 const ROOT={id:'root',name:'Arquivos'};
 
 /** Select a virtual destination. No provider files are moved and no mutation is made until confirmation. */
-export function MoveDestinationDialog({base,source,busy,onClose,onConfirm}:{
- base:string;source:Source;busy:boolean;onClose:()=>void;onConfirm:(destinationId:string)=>void;
+export function MoveDestinationDialog({base,source,busy,error:saveError,onClose,onConfirm}:{
+ base:string;source:Source;busy:boolean;error?:string;onClose:()=>void;onConfirm:(destinationId:string)=>void;
 }){
  const call=useDriveApi(),dialog=useOverlayFocus(()=>{if(!busy)onClose();});
  const [folder,setFolder]=useState('root'),[page,setPage]=useState<FolderPage|null>(null);
  const [loading,setLoading]=useState(true),[paging,setPaging]=useState(false),[error,setError]=useState('');
- const version=useRef(0);
+ const version=useRef(0),active=useRef<AbortController|null>(null);
  const load=useCallback(async(after?:string)=>{
-  const current=++version.current,controller=new AbortController();
+  const current=++version.current;active.current?.abort();const controller=new AbortController();active.current=controller;
   if(!after){setLoading(true);setPage(null);}else setPaging(true);
   setError('');
   try{
@@ -28,12 +28,12 @@ export function MoveDestinationDialog({base,source,busy,onClose,onConfirm}:{
    if(current!==version.current)return;
    setPage(old=>after&&old?{...response,nodes:[...old.nodes,...response.nodes]}:response);
   }catch(e){
-   if(current===version.current)setError(e instanceof Error?e.message:'Não foi possível carregar as pastas.');
+   if(current===version.current&&!controller.signal.aborted)setError(e instanceof Error?e.message:'Não foi possível carregar as pastas.');
   }finally{
    if(current===version.current){setLoading(false);setPaging(false);}
   }
  },[base,folder,call]);
- useEffect(()=>{void load();return()=>{++version.current;};},[load]);
+ useEffect(()=>{void load();return()=>{++version.current;active.current?.abort();};},[load]);
  const trail=page?.trail?.length?page.trail:[ROOT];
  const blocked=folder===source.id||folder===source.parent_id||trail.some(x=>x.id===source.id);
  const childFolders=page?.nodes.filter(n=>n.kind==='folder'&&n.id!==source.id)||[];
@@ -51,6 +51,7 @@ export function MoveDestinationDialog({base,source,busy,onClose,onConfirm}:{
       <AppButton type="button" disabled={busy} aria-current={item.id===folder?'location':undefined} onClick={()=>setFolder(item.id)}>{item.name}</AppButton>
      </span>)}
     </nav>
+    {saveError&&<div role="alert" className="lib-move-error">{saveError}</div>}
     <div className="lib-folder-panel" aria-busy={loading||paging}>
      {loading?<div role="status" className="lib-dialog-loading"><LoaderCircle className="lib-spinner" size={20}/>Carregando pastas…</div>
       :error?<div role="alert" className="lib-message lib-message--error"><p>{error}</p><AppButton type="button" onClick={()=>void load()}>Tentar novamente</AppButton></div>
