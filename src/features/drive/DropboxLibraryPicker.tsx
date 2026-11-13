@@ -84,7 +84,7 @@ export function DropboxLibraryPicker({connectionId,onClose,onSelect,includeFolde
       <AppButton type="button" aria-current={i===trail.length-1?'location':undefined} onClick={()=>{setFilter('');setTerm('');setTrail(items=>items.slice(0,i+1));}}>{item.name}</AppButton></span>)}
     </nav>
     <label className="lib-picker-search"><Search size={18} aria-hidden="true"/>
-     <AppInput type="search" value={filter} onChange={e=>setFilter(e.target.value)} aria-label="Filtrar itens carregados" placeholder="Buscar arquivos nesta pasta…" autoComplete="off"/></label>
+     <AppInput type="search" value={filter} onChange={e=>setFilter(e.target.value)} aria-label="Buscar arquivos no Dropbox" placeholder="Buscar arquivos nesta pasta…" autoComplete="off"/></label>
     {term&&<p className="lib-picker-note" role="status">{loading?'Pesquisando no Dropbox…':'Resultados da pesquisa no Dropbox'}{page?.nextPageToken?' · Há mais resultados':''}</p>}
     {!term&&filter&&page?.nextPageToken&&<p className="lib-picker-note">Para pesquisar além dos itens carregados, digite pelo menos duas letras.</p>}
     <div className="lib-picker-list lib-picker-list--grid" aria-busy={loading||paging}>
