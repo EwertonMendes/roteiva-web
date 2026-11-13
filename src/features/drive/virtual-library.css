@@ -88,6 +88,7 @@
  .virtual-library-backdrop .virtual-library-editor .virtual-library-nodes li label{flex:1 1 100%}
 }
 /* Consistent protected-preview shell; the original never dictates dialog height. */
+.virtual-library-backdrop .vl-preview-modal:focus,.virtual-library-backdrop .vl-preview-modal:focus-visible{outline:none}
 .virtual-library-backdrop .virtual-library-editor.vl-preview-modal{
  width:min(1060px,100%);height:min(78dvh,700px);min-height:min(350px,calc(100dvh - 32px));
  max-height:calc(100dvh - 32px);display:flex;flex-direction:column;overflow:hidden;
