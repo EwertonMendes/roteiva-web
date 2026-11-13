@@ -93,6 +93,19 @@ test('virtual navigation preserves folder commands and a partial Dropbox batch r
  await page.getByRole('button',{name:'Vídeos',exact:true}).click();
  await libraryAdd(page,'Nova pasta');await page.getByLabel('Nome',{exact:true}).fill('Originais');await page.getByRole('button',{name:'Confirmar',exact:true}).click();
  await expect(page.getByRole('button',{name:'Originais',exact:true})).toBeVisible();
+ if(info.project.name==='desktop'){
+  await page.locator('.vl-file-area').click({button:'right',position:{x:12,y:14}});
+  const backgroundMenu=page.getByRole('group',{name:'Ações da pasta atual'});
+  await expect(backgroundMenu.getByRole('button',{name:'Nova pasta'})).toBeVisible();
+  await backgroundMenu.getByRole('button',{name:'Nova pasta'}).click();
+  await expect(page.getByLabel('Nome',{exact:true})).toBeFocused();
+  await page.getByLabel('Nome',{exact:true}).fill('Do contexto');
+  await page.getByRole('button',{name:'Confirmar',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Do contexto',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Exibir grade'}).click();
+  await expect(page.locator('.vl-explorer-folders [data-kind=folder]')).toHaveCount(2);
+  await page.getByRole('button',{name:'Exibir lista'}).click();
+ }
  await libraryAdd(page,'Adicionar do Dropbox');
  const picker=page.getByRole('dialog',{name:'Adicionar do Dropbox'});
  await expect(picker.locator('.lib-browser-grid .lib-picker-tile')).toHaveCount(2);
@@ -127,7 +140,9 @@ test('virtual navigation preserves folder commands and a partial Dropbox batch r
  if(await expand.isVisible())await expand.click();
  await page.getByRole('button',{name:'Dispensar queue-overlay.txt'}).click();
  await expect(page.locator('.rl-upload-queue')).toHaveCount(0);
- await libraryMenu(page,'Originais','Renomear');await page.getByLabel('Nome',{exact:true}).fill('Brutos');await page.getByRole('button',{name:'Confirmar',exact:true}).click();
+ await libraryMenu(page,'Originais','Renomear');
+ await expect(page.getByLabel('Nome',{exact:true})).toBeFocused();
+ await page.getByLabel('Nome',{exact:true}).fill('Brutos');await page.getByRole('button',{name:'Confirmar',exact:true}).click();
  // A folder picker must explain unchanged destinations and keep a cancel action.
  await libraryMenu(page,'Brutos','Mover');
  const move=page.getByRole('dialog',{name:'Mover para'});
@@ -139,7 +154,9 @@ test('virtual navigation preserves folder commands and a partial Dropbox batch r
  await move.getByRole('button',{name:'Cancelar'}).click();
  await libraryMenu(page,'Brutos','Remover da Biblioteca');await page.getByRole('button',{name:'Remover da Biblioteca',exact:true}).last().click();
  await expect(page.getByRole('button',{name:'Brutos',exact:true})).toHaveCount(0);
- await page.getByRole('button',{name:'Lixeira',exact:true}).click();await libraryMenu(page,'Brutos','Restaurar');await page.getByRole('dialog',{name:'Restaurar'}).getByRole('button',{name:'Restaurar',exact:true}).click();
+ await page.getByRole('button',{name:'Lixeira',exact:true}).click();
+ await expect(page.getByText('Itens removidos da Biblioteca. Os arquivos originais continuam no Google Drive ou Dropbox.')).toBeVisible();
+ await libraryMenu(page,'Brutos','Restaurar');await page.getByRole('dialog',{name:'Restaurar'}).getByRole('button',{name:'Restaurar',exact:true}).click();
  await expect(page.getByRole('button',{name:'Brutos',exact:true})).toHaveCount(0);
  await page.getByRole('button',{name:'Voltar aos arquivos',exact:true}).click();await page.getByRole('button',{name:'Vídeos',exact:true}).click();
  await expect(page.getByRole('button',{name:'Brutos',exact:true})).toBeVisible();
