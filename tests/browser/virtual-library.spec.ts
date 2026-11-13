@@ -120,9 +120,9 @@ test('virtual navigation preserves folder commands and a partial Dropbox batch r
  await expect(move.getByText('Este item já está nesta pasta.')).toBeVisible();
  await expect(move.getByRole('button',{name:'Mover para cá'})).toBeDisabled();
  await move.getByRole('button',{name:'Cancelar'}).click();
- await libraryMenu(page,'Brutos','Remover da Biblioteca');await page.getByRole('button',{name:'Confirmar',exact:true}).click();
+ await libraryMenu(page,'Brutos','Remover da Biblioteca');await page.getByRole('button',{name:'Remover da Biblioteca',exact:true}).last().click();
  await expect(page.getByRole('button',{name:'Brutos',exact:true})).toHaveCount(0);
- await page.getByRole('button',{name:'Lixeira',exact:true}).click();await libraryMenu(page,'Brutos','Restaurar');await page.getByRole('button',{name:'Confirmar',exact:true}).click();
+ await page.getByRole('button',{name:'Lixeira',exact:true}).click();await libraryMenu(page,'Brutos','Restaurar');await page.getByRole('dialog',{name:'Restaurar'}).getByRole('button',{name:'Restaurar',exact:true}).click();
  await expect(page.getByRole('button',{name:'Brutos',exact:true})).toHaveCount(0);
  await page.getByRole('button',{name:'Voltar aos arquivos',exact:true}).click();await page.getByRole('button',{name:'Vídeos',exact:true}).click();
  await expect(page.getByRole('button',{name:'Brutos',exact:true})).toBeVisible();
@@ -208,7 +208,7 @@ test('assisted Dropbox organization imports selected descendants and retries wit
  await prepare(page,'assisted-'+info.project.name+'-'+Date.now()+'@example.com');await page.goto(web+'/biblioteca');
  await chooseLibraryProject(page);
  await libraryAdd(page,'Trazer organização do Dropbox');
- const picker=page.getByRole('dialog',{name:'Adicionar do Dropbox'});
+ const picker=page.getByRole('dialog',{name:'Importar do Dropbox'});
  await picker.getByRole('checkbox',{name:'Selecionar pasta Originais'}).check();await picker.getByRole('button',{name:'Originais',exact:true}).click();
  await picker.getByLabel('Corte.mp4').check();
  // Returning to a previously visited Dropbox folder should reuse metadata
