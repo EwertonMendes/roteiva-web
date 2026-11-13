@@ -34,7 +34,7 @@ test('virtual navigation preserves folder commands and a partial Dropbox batch r
  const nodes:Node[]=[{id:'root',parent_id:null,kind:'folder',name:'Arquivos',state:'active',revision:1}];
  const batches:string[][]=[];let failure=true;
  const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=','base64');
- let requestedThumbnails=0,previewRequests=0;
+ let requestedThumbnails=0,previewRequests=0,searchRequests=0;
  const headers={'Access-Control-Allow-Origin':web,'Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Allow-Methods':'GET, POST, OPTIONS'};
  await context.route(api+'/**',async route=>{
   const req=route.request(),url=new URL(req.url()),path=url.pathname;
@@ -43,7 +43,7 @@ test('virtual navigation preserves folder commands and a partial Dropbox batch r
   if(path.startsWith('/access/')||path.startsWith('/account/'))return route.fallback();
   if(path==='/integrations/drive')return json({connections:[]});
   if(path==='/integrations/dropbox')return json({connections:[{id:connection,email:'qa@example.com',status:'connected',scopes:'files.metadata.read files.content.read files.content.write'}]});
-  if(path.startsWith('/integrations/dropbox/')&&path.endsWith('/items'))return json({files:[{id:'id:FILE_SELECTED_A',name:'Imagem A.png',mimeType:'image/png',thumbnailFallback:true,isFolder:false},{id:'id:FILE_SELECTED_B',name:'Imagem B.png',mimeType:'image/png',thumbnailFallback:true,isFolder:false}],nextPageToken:null});
+  if(path.startsWith('/integrations/dropbox/')&&path.endsWith('/items')){if(url.searchParams.get('search')==='Imagem')searchRequests++;return json({files:[{id:'id:FILE_SELECTED_A',name:'Imagem A.png',mimeType:'image/png',thumbnailFallback:true,isFolder:false},{id:'id:FILE_SELECTED_B',name:'Imagem B.png',mimeType:'image/png',thumbnailFallback:true,isFolder:false}],nextPageToken:null});}
    if(path.startsWith('/integrations/dropbox/')&&path.endsWith('/thumbnail')){requestedThumbnails++;return route.fulfill({status:200,headers:{...headers,'Content-Type':'image/png'},body:png});}
    if(/\/library\/projects\/\d+\/nodes\/[0-9a-f-]+\/content$/.test(path)){
     previewRequests++;return route.fulfill({status:200,headers:{...headers,'Content-Type':'image/png','Content-Length':String(png.length)},body:png});
@@ -96,6 +96,10 @@ test('virtual navigation preserves folder commands and a partial Dropbox batch r
  await libraryAdd(page,'Adicionar do Dropbox');
  const picker=page.getByRole('dialog',{name:'Adicionar do Dropbox'});
  await expect(picker.locator('.lib-browser-grid .lib-picker-tile')).toHaveCount(2);
+ await picker.getByRole('searchbox',{name:'Buscar arquivos no Dropbox'}).fill('Imagem');
+ await expect.poll(()=>searchRequests).toBeGreaterThan(0);
+ await expect(picker.locator('.lib-browser-grid .lib-picker-tile')).toHaveCount(2);
+ await picker.getByRole('searchbox',{name:'Buscar arquivos no Dropbox'}).fill('');
  await expect.poll(async()=>picker.locator('.lib-picker-tile .rl-file-icon--image img').count()).toBeGreaterThan(0);
  await picker.getByLabel('Imagem A.png').check();await picker.getByLabel('Imagem B.png').check();await picker.getByRole('button',{name:'Adicionar selecionados'}).click();
  await expect(page.getByRole('button',{name:'Imagem A.png',exact:true})).toBeVisible();
