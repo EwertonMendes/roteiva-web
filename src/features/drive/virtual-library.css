@@ -115,3 +115,48 @@
  .virtual-library-backdrop .virtual-library-editor.vl-preview-modal{height:min(84dvh,720px);padding:14px}
  .vl-preview-modal .vl-preview-body{margin-top:10px}
 }
+
+/* Guided Drive import: explicit selections and comfortable review before mutation. */
+.virtual-library-backdrop .virtual-library-editor.virtual-library-preview:not(.vl-preview-modal){
+ width:min(880px,100%);max-height:calc(100dvh - 36px);padding:23px 25px;overflow:auto
+}
+.virtual-library-backdrop .virtual-library-editor .vl-import-summary{
+ display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:13px 0 18px
+}
+.virtual-library-backdrop .virtual-library-editor .vl-import-summary strong{
+ display:inline-flex;align-items:center;justify-content:center;min-height:37px;padding:9px 13px;
+ background:var(--subtle);border:1px solid var(--line);border-radius:10px;
+ font-size:13px;font-weight:600;color:var(--ink)
+}
+.virtual-library-backdrop .virtual-library-editor .vl-import-explore-note{
+ margin:0 0 14px;padding:13px 15px;background:var(--subtle);
+ border:1px solid var(--line);border-radius:11px;color:var(--ink);line-height:1.55
+}
+.virtual-library-backdrop .virtual-library-editor .vl-import-folder-row{
+ display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:12px;padding:10px 4px;
+ border-bottom:1px solid var(--line)
+}
+.virtual-library-backdrop .virtual-library-editor .vl-import-folder-row:last-of-type{border-bottom:0}
+.virtual-library-backdrop .virtual-library-editor .vl-import-folder-row label{
+ display:grid;gap:7px;margin:0;min-width:0;font-size:12px;color:var(--muted);font-weight:550
+}
+.virtual-library-backdrop .virtual-library-editor .vl-import-folder-row input{width:100%;min-height:40px;font-weight:600}
+.virtual-library-backdrop .virtual-library-editor .vl-import-explore{
+ display:inline-flex;align-items:center;justify-content:center;min-height:40px;white-space:nowrap;
+ padding:9px 13px;background:var(--card);border:1px solid var(--line);border-radius:10px;
+ font-size:12px;font-weight:650;color:var(--ink)
+}
+.virtual-library-backdrop .virtual-library-editor .vl-import-explore:hover:not(:disabled){background:var(--subtle);border-color:var(--muted)}
+.virtual-library-backdrop .virtual-library-editor .vl-import-empty-warning{
+ margin:14px 0;padding:13px;border:1px solid var(--line);border-radius:11px;background:var(--subtle);color:var(--ink)
+}
+.virtual-library-backdrop .virtual-library-editor.virtual-library-preview:not(.vl-preview-modal) .virtual-library-toolbar{
+ position:sticky;bottom:-23px;z-index:2;background:var(--paper);
+ border-top:1px solid var(--line);padding:15px 0 3px;margin-top:22px
+}
+@media(max-width:650px){
+ .virtual-library-backdrop .virtual-library-editor.virtual-library-preview:not(.vl-preview-modal){padding:17px 15px;max-height:96dvh}
+ .virtual-library-backdrop .virtual-library-editor .vl-import-folder-row{grid-template-columns:1fr;gap:8px}
+ .virtual-library-backdrop .virtual-library-editor .vl-import-explore{width:100%;white-space:normal}
+ .virtual-library-backdrop .virtual-library-editor.virtual-library-preview:not(.vl-preview-modal) .virtual-library-toolbar{bottom:-17px}
+}
