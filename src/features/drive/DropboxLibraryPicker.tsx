@@ -39,7 +39,7 @@ export function DropboxLibraryPicker({connectionId,onClose,onSelect,includeFolde
   if(cursor)setPaging(true);else if(!cached)setLoading(true);
   setError('');
   try{
-   const params=new URLSearchParams({...term?{search:term}:{},...cursor?{pageToken:cursor}:{}});
+   const params=new URLSearchParams();if(term)params.set('search',term);if(cursor)params.set('pageToken',cursor);
    const endpoint='/integrations/dropbox/'+connectionId+'/folders/'+encodeURIComponent(folder)+'/items'+
     (params.size?'?'+params.toString():'');
    const result=await onceFolderRequest(scope+':'+(cursor||'first'),()=>call<Page>(endpoint));
