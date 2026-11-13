@@ -1,6 +1,6 @@
 /** Private, bounded virtual folder snapshots; metadata only. Never stores tokens or content bytes. */
 export type LibraryFolderPage<T>={scope:string;nodes:T[];trail:{id:string;name:string}[];nextPage:string|null;fetchedAt:number};
-const LIMIT=64,MAX_AGE=60_000,REVALIDATE=30_000;
+const LIMIT=64,MAX_AGE=5*60_000,REVALIDATE=2*60_000; // Same-user metadata cache; writes invalidate immediately.
 const pages=new Map<string,LibraryFolderPage<unknown>>();
 const flights=new Map<string,Promise<unknown>>();
 export function libraryFolderKey(uid:string,project:number,folder:string,trash:boolean,term:string,searchAll:boolean){
