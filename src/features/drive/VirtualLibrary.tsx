@@ -23,6 +23,7 @@ import {rememberLibraryOAuthReturn,readLibraryOAuthReturn,forgetLibraryOAuthRetu
 import {importLibraryBatch,type LibraryImport,type FailedLibraryImport} from './library-import';
 import {LibraryConnections} from './LibraryConnections';
 import {LibraryStructureDialog} from './LibraryStructureDialog';
+import {MoveDestinationDialog} from './MoveDestinationDialog';
 import {AssistedLibraryImport} from './AssistedLibraryImport';
 import {expandDropboxTree} from './expand-dropbox-tree';
 import googleDriveMark from '../../assets/brand/google-drive.svg';
@@ -46,15 +47,14 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
  const [layout,setLayout]=useState<'list'|'grid'>(()=>{try{return localStorage.getItem('roteiva-library-layout')==='grid'?'grid':'list';}catch{return 'list';}});
  const [addOpen,setAddOpen]=useState(false),[settingsOpen,setSettingsOpen]=useState(false),[menuNode,setMenuNode]=useState<Node|null>(null);
  const [edit,setEdit]=useState<{node?:Node;action:'create'|'rename'|'trash'|'restore'|'move'}|null>(null),[name,setName]=useState('');
- const [trash,setTrash]=useState(false),[moveParent,setMoveParent]=useState('root'),[movePage,setMovePage]=useState<Page|null>(null);
- const moveGeneration=useRef(0),[moveBusy,setMoveBusy]=useState(false);
+ const [trash,setTrash]=useState(false);
  const [preview,setPreview]=useState<Node|null>(null);
  const [structure,setStructure]=useState(false);
  const [dropboxStructure,setDropboxStructure]=useState(false),[assisted,setAssisted]=useState<{parentId:string;sources:InspectedLibrarySource[];failed:{name:string;code:string}[];recursive?:boolean}|null>(null);
  const [search,setSearch]=useState(''),[term,setTerm]=useState('');
  const [failedImports,setFailedImports]=useState<{parentId:string;items:FailedLibraryImport[]}|null>(null);
  const generation=useRef(0),loadRevision=useRef(0),mutation=useRef<AbortController|null>(null);
- const dialogRef=useOverlayFocus(()=>{if(!busy)setEdit(null);},Boolean(edit),edit?.action+':'+edit?.node?.id);
+ const dialogRef=useOverlayFocus(()=>{if(!busy)setEdit(null);},Boolean(edit&&edit.action!=='move'),edit?.action+':'+edit?.node?.id);
  const base=selectedProjectId?'/library/projects/'+selectedProjectId+'/nodes':'';
  const oauthReturned=new URLSearchParams(window.location.search).has('drive')||new URLSearchParams(window.location.search).has('dropbox');
  const pageScope=libraryFolderKey(user?.uid||'anonymous',selectedProjectId||0,parent,trash,term,searchAll);
@@ -133,11 +133,6 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
   }catch(e){if(scope===generation.current&&!controller.signal.aborted)setError(e instanceof Error?e.message:'Não foi possível preparar o envio.');}
   finally{if(mutation.current===controller){mutation.current=null;setProgress('');}if(scope===generation.current)setBusy(false);}
  }
- useEffect(()=>{
- ++moveGeneration.current;setMoveBusy(false);setMovePage(null);if(edit?.action!=='move'||!base)return;const controller=new AbortController();
- void call<Page>(base+'?parent='+encodeURIComponent(moveParent),'GET',undefined,controller.signal).then(p=>{if(!controller.signal.aborted)setMovePage(p);}).catch(e=>{if(!controller.signal.aborted)setError(e instanceof Error?e.message:'Não foi possível carregar o destino.');});
- return()=>controller.abort();
- },[edit?.action,base,moveParent,call]);
  useEffect(()=>{setParent('root');setPage(null);setEdit(null);setPreview(null);setStructure(false);setAssisted(null);setDropboxPicker(false);setFailedImports(null);mutation.current?.abort();++generation.current;},[selectedProjectId,user?.uid]);
  // OAuth reloads React; restore only a short-lived hint for the same UID.
  // The API revalidates project ownership and the selected folder ancestors.
@@ -196,10 +191,10 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
   catch(e){if(!controller.signal.aborted&&scope===generation.current)setError(e instanceof Error?e.message:'Não foi possível repetir a importação.');}
   finally{if(mutation.current===controller){mutation.current=null;setProgress('');}if(scope===generation.current)setBusy(false);}
  }
- async function save(){
- if(!edit||!base||busy)return;const operation=edit,scope=generation.current,controller=new AbortController();mutation.current=controller;setBusy(true);setError('');
+ async function save(destinationId?:string){
+ if(!edit||!base||busy||(edit.action==='move'&&!destinationId))return;const operation=edit,scope=generation.current,controller=new AbortController();mutation.current=controller;setBusy(true);setError('');
  try{await call(base+(operation.node?'/'+operation.node.id:''),'POST',operation.node?
- {action:operation.action,name,parentId:moveParent,revision:operation.node.revision}:{name,parentId:parent},controller.signal);
+ {action:operation.action,name,parentId:operation.action==='move'?destinationId:parent,revision:operation.node.revision}:{name,parentId:parent},controller.signal);
  if(scope===generation.current){setEdit(null);if(user?.uid&&selectedProjectId)invalidateLibraryFolders(user.uid,selectedProjectId);await load();}
  }catch(e){if(!controller.signal.aborted&&scope===generation.current)setError(e instanceof Error?e.message:'Não foi possível salvar.');}
  finally{if(mutation.current===controller)mutation.current=null;if(scope===generation.current)setBusy(false);}
@@ -207,7 +202,6 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
  const openEditor=(action:'rename'|'move'|'trash'|'restore',node:Node)=>{
   setMenuNode(null);setError('');setEdit({action,node});
   if(action==='rename')setName(node.name);
-  if(action==='move')setMoveParent('root');
  };
  const showAdd=(action:'new'|'drive-upload'|'dropbox-upload'|'drive-file'|'dropbox-file'|'drive-tree'|'dropbox-tree')=>{
   setAddOpen(false);setError('');
@@ -300,11 +294,20 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
    </>}
   </>}
   {base&&<AppInput ref={fileInput} type="file" multiple hidden onChange={e=>{const files=Array.from(e.target.files||[]);e.target.value='';void upload(files);}}/>}
- {edit&&<div className="virtual-library-backdrop"><div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="virtual-library-title" className="virtual-library-editor">
- <h3 id="virtual-library-title">{{create:'Nova pasta',rename:'Renomear',move:'Mover para',restore:'Restaurar',trash:'Remover do Roteiva'}[edit.action]}</h3>
- {error&&<div role="alert" className="virtual-library-error">{error}</div>}
- <form onSubmit={e=>{e.preventDefault();void save();}}>{(edit.action==='create'||edit.action==='rename')&&<label>Nome<AppInput aria-label="Nome" required maxLength={120} value={name} onChange={e=>setName(e.target.value)} autoFocus/></label>}{edit.action==='trash'?<p>Os arquivos originais permanecem no provedor. A organização desta pasta será removida da Biblioteca.</p>:edit.action==='restore'?<p>Restaurar esta referência na pasta anterior. Se ela também estiver na lixeira, restaure a pasta primeiro.</p>:edit.action==='move'?<><nav aria-label="Pasta de destino">{movePage?.trail.map(x=><AppButton type="button" key={x.id} onClick={()=>setMoveParent(x.id)}>{x.name}</AppButton>)}</nav>{movePage?.nodes.filter(x=>x.kind==='folder'&&x.id!==edit.node?.id).map(x=><AppButton type="button" key={x.id} onClick={()=>setMoveParent(x.id)}>{x.name}</AppButton>)}{movePage?.nextPage&&<AppButton type="button" disabled={moveBusy} onClick={()=>{const old=movePage,scope=moveGeneration.current;setMoveBusy(true);void call<Page>(base+'?parent='+encodeURIComponent(moveParent)+'&after='+old.nextPage).then(p=>{if(scope===moveGeneration.current)setMovePage({...p,nodes:[...old.nodes,...p.nodes]});}).catch(()=>{if(scope===moveGeneration.current)setError('Não foi possível carregar mais pastas.');}).finally(()=>{if(scope===moveGeneration.current)setMoveBusy(false);});}}>Mais pastas</AppButton>}</>:null}
- <div className="virtual-library-toolbar"><AppButton type="submit" disabled={busy||edit.action==='move'&&!movePage}>Confirmar</AppButton><AppButton type="button" disabled={busy} onClick={()=>setEdit(null)}>Cancelar</AppButton></div></form>
+ {edit?.action==='move'&&edit.node&&<MoveDestinationDialog key={edit.node.id} base={base} source={edit.node}
+  busy={busy} onClose={()=>{setError('');setEdit(null);}} onConfirm={dest=>void save(dest)}/>}
+ {edit&&edit.action!=='move'&&<div className="virtual-library-backdrop"><div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="virtual-library-title" className="virtual-library-editor">
+  <h3 id="virtual-library-title">{{create:'Nova pasta',rename:'Renomear',restore:'Restaurar',trash:'Remover do Roteiva'}[edit.action]}</h3>
+  {error&&<div role="alert" className="virtual-library-error">{error}</div>}
+  <form onSubmit={e=>{e.preventDefault();void save();}}>
+   {(edit.action==='create'||edit.action==='rename')&&<label>Nome<AppInput aria-label="Nome" required maxLength={120} value={name} onChange={e=>setName(e.target.value)} autoFocus/></label>}
+   {edit.action==='trash'&&<p>Remover este item da Biblioteca? Os arquivos originais permanecem no Google Drive ou Dropbox.</p>}
+   {edit.action==='restore'&&<p>Restaurar este item. Caso a pasta original também esteja na lixeira, restaure primeiro a pasta.</p>}
+   <div className="virtual-library-toolbar">
+    <AppButton type="submit" disabled={busy||((edit.action==='create'||edit.action==='rename')&&!name.trim())}>{busy?'Salvando…':edit.action==='trash'?'Remover da Biblioteca':edit.action==='restore'?'Restaurar':'Confirmar'}</AppButton>
+    <AppButton type="button" disabled={busy} onClick={()=>{setError('');setEdit(null);}}>Cancelar</AppButton>
+   </div>
+  </form>
  </div></div>}
  {dropboxPicker&&dropbox&&<DropboxLibraryPicker key={dropbox.id+':'+dropboxStructure} connectionId={dropbox.id} includeFolders={dropboxStructure} onClose={()=>setDropboxPicker(false)} onSelect={(ids,names,folderIds)=>void addDropbox(ids,names,folderIds)}/>}
  {preview&&selectedProjectId&&<LibraryAssetPreview key={preview.id} projectId={selectedProjectId} node={preview} onClose={()=>setPreview(null)}/>}
