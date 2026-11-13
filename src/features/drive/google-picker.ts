@@ -4,7 +4,7 @@ const SCOPE='openid '+DRIVE_SCOPE;
 export type PickerConfig={authorized:false;clientId:string;appId:string;developerKey:string;accountId:string};
 type TokenReply={access_token?:string;scope?:string;error?:string;expires_in?:number};
 type PickerReply={action:string;docs?:{id:string;name?:string;resourceKey?:string}[]};
-interface View {setIncludeFolders(value:boolean):View;setSelectFolderEnabled(value:boolean):View;setMode(value:unknown):View;setMimeTypes(value:string):View;}
+interface View {setIncludeFolders(value:boolean):View;setSelectFolderEnabled(value:boolean):View;setMode(value:unknown):View;setMimeTypes(value:string):View;setParent?(parentId:string):View;}
 interface Picker {setVisible(value:boolean):void;dispose():void;}
 interface Builder {addView(view:View):Builder;setOAuthToken(token:string):Builder;setDeveloperKey(key:string):Builder;
   enableFeature(feature:unknown):Builder;setMaxItems(max:number):Builder;
@@ -34,7 +34,7 @@ export function preparePicker():Promise<void>{
 }
 
 /** Config/scripts are prepared before the click so GIS preserves the user gesture. */
-export function pickLibraryFiles(config:PickerConfig,verify:(token:string)=>Promise<unknown>,signal:AbortSignal,options?:{mimeTypes?:string;maxItems?:number;title?:string;includeFolders?:boolean;onDocuments?:(docs:{id:string;name?:string;resourceKey?:string}[])=>void}):Promise<string[]>{
+export function pickLibraryFiles(config:PickerConfig,verify:(token:string)=>Promise<unknown>,signal:AbortSignal,options?:{mimeTypes?:string;maxItems?:number;title?:string;includeFolders?:boolean;parentId?:string;onDocuments?:(docs:{id:string;name?:string;resourceKey?:string}[])=>void}):Promise<string[]>{
  return new Promise((resolve,reject)=>{
  let picker:Picker|undefined,settled=false;
  const finish=(ids?:string[],error?:Error)=>{if(settled)return;settled=true;clearTimeout(timeout);signal.removeEventListener('abort',abort);picker?.dispose();error?reject(error):resolve(ids||[]);};
@@ -48,6 +48,7 @@ export function pickLibraryFiles(config:PickerConfig,verify:(token:string)=>Prom
  await verify(reply.access_token);if(settled)return;
  const google=api().picker;
  const view=new google.DocsView(google.ViewId.DOCS).setIncludeFolders(options?.includeFolders===true).setSelectFolderEnabled(options?.includeFolders===true).setMode(google.DocsViewMode.LIST);
+ if(options?.parentId){if(!/^[A-Za-z0-9_-]{10,200}$/.test(options.parentId)||!view.setParent)throw new Error('Não foi possível abrir esta pasta no seletor.');view.setParent(options.parentId);}
  if(options?.mimeTypes)view.setMimeTypes(options.mimeTypes);
  const maxItems=options?.maxItems||100;
  let builder=new google.PickerBuilder().addView(view)
