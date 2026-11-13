@@ -105,3 +105,93 @@
 .vl-explorer .vl-file-emblem .rl-file-icon .rl-thumb-loading{position:absolute;inset:0;display:grid;place-items:center}
 .vl-explorer .vl-explorer-items--grid .vl-file-emblem .rl-file-icon{width:48px;height:48px}
 .vl-explorer .vl-file-emblem .rl-file-icon--image{background:var(--card)}
+
+/* Drive-inspired organization: compact folder tiles, image-first file cards. */
+.vl-explorer .vl-file-area{position:relative;min-height:180px;outline:none}
+.vl-explorer .vl-drive-groups{padding:7px 18px 21px;display:grid;gap:24px}
+.vl-explorer .vl-drive-group h3{font-size:14px;font-weight:650;color:var(--ink);margin:8px 4px 13px}
+.vl-explorer .vl-drive-group .vl-explorer-items{padding:0;min-height:0}
+.vl-explorer .vl-explorer-folders{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,230px),1fr));gap:11px}
+.vl-explorer .vl-explorer-items--grid.vl-explorer-folders .vl-explorer-item[data-kind=folder]{
+  height:66px;min-height:66px;padding:3px 8px;border-radius:12px;background:var(--card);
+  justify-content:center;align-items:center;transition:background-color .14s,border-color .14s
+}
+.vl-explorer .vl-explorer-folders .vl-explorer-item[data-kind=folder] .vl-explorer-file{
+  flex-direction:row;align-items:center;justify-content:flex-start;gap:10px;
+  min-height:58px;width:100%;padding:7px 36px 7px 7px;text-align:left
+}
+.vl-explorer .vl-explorer-folders .vl-explorer-item[data-kind=folder] .vl-file-emblem{
+  width:39px;height:39px;flex:0 0 39px;border-radius:9px;background:var(--subtle)
+}
+.vl-explorer .vl-explorer-folders .vl-explorer-item[data-kind=folder] .vl-file-emblem svg{width:25px;height:25px}
+.vl-explorer .vl-explorer-folders .vl-explorer-item[data-kind=folder] .vl-file-meta{width:auto;flex:1}
+.vl-explorer .vl-explorer-folders .vl-explorer-item[data-kind=folder] .vl-file-meta strong{
+  font-size:13px;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap
+}
+.vl-explorer .vl-explorer-folders .vl-explorer-item[data-kind=folder] .vl-file-meta small{font-size:11px}
+.vl-explorer .vl-explorer-folders .vl-menu-shell{top:11px;right:5px}
+.vl-explorer .vl-explorer-assets{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,214px),1fr));gap:13px}
+.vl-explorer .vl-explorer-items--grid.vl-explorer-assets .vl-explorer-item[data-kind=asset]{
+ height:258px;min-height:258px;display:block;overflow:visible;padding:0;border:1px solid var(--line);border-radius:13px;background:var(--card)
+}
+.vl-explorer .vl-explorer-assets .vl-explorer-item[data-kind=asset] .vl-explorer-file{
+ display:block;position:absolute;inset:0;width:100%;min-height:0;height:100%;padding:0;text-align:left;border-radius:13px;overflow:hidden
+}
+.vl-explorer .vl-explorer-assets .vl-explorer-item[data-kind=asset] .vl-file-meta{
+ position:absolute;inset:0;pointer-events:none;display:block;width:100%;flex:none;z-index:1
+}
+.vl-explorer .vl-explorer-assets .vl-explorer-item[data-kind=asset] .vl-file-meta strong{
+ position:absolute;left:13px;right:44px;top:14px;display:block;overflow:hidden;text-overflow:ellipsis;
+ white-space:nowrap;font-size:13px;font-weight:650;color:var(--ink);text-align:left
+}
+.vl-explorer .vl-explorer-assets .vl-explorer-item[data-kind=asset] .vl-file-meta small{
+ position:absolute;left:14px;right:13px;bottom:14px;font-size:11px;text-align:left
+}
+.vl-explorer .vl-explorer-assets .vl-explorer-item[data-kind=asset] .vl-file-emblem{
+ position:absolute;left:9px;top:46px;width:calc(100% - 18px);height:171px;flex:none;
+ display:grid;place-items:center;border-radius:8px;background:var(--subtle);overflow:hidden
+}
+.vl-explorer .vl-explorer-assets .vl-explorer-item[data-kind=asset] .vl-file-emblem>.rl-file-icon{
+ width:100%;height:100%;border:0;border-radius:8px;background:transparent;overflow:hidden
+}
+.vl-explorer .vl-explorer-assets .vl-file-emblem .rl-file-icon img{
+ display:block;width:100%;height:100%;object-fit:contain;max-width:100%;max-height:100%
+}
+.vl-explorer .vl-explorer-assets .vl-file-emblem .rl-file-icon>svg{width:47px;height:47px}
+.vl-explorer .vl-explorer-assets .vl-file-emblem .rl-file-icon .rl-thumb-loading{inset:0;display:flex;align-items:center;justify-content:center}
+.vl-explorer .vl-explorer-assets .vl-file-emblem .rl-file-icon .rl-video-mark{bottom:8px;right:8px}
+.vl-explorer .vl-explorer-assets .vl-explorer-item[data-kind=asset] .vl-menu-shell{position:absolute;z-index:5;top:4px;right:5px}
+.vl-explorer .vl-explorer-assets .vl-explorer-item[data-kind=asset] .vl-context-menu{top:calc(100% + 4px)}
+.vl-explorer .vl-explorer-item[data-kind=folder]:hover,.vl-explorer .vl-explorer-item[data-kind=asset]:hover{border-color:var(--muted)}
+.vl-explorer .vl-explorer-item:focus-within{outline:2px solid var(--focus-outline);outline-offset:1px}
+.vl-explorer .vl-explorer-items--grid .vl-explorer-item .vl-explorer-file:focus-visible{outline:none}
+.vl-explorer .vl-trash-switch{
+ display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:39px;
+ border:1px solid var(--line);border-radius:10px;padding:8px 13px;background:var(--subtle);color:var(--ink);font-size:12px;font-weight:600
+}
+.vl-explorer .vl-trash-switch--back{background:var(--card);font-size:13px;border-color:var(--muted)}
+.vl-explorer .vl-trash-heading{display:flex;align-items:center;gap:14px;margin:17px 20px;padding:17px 18px;border:1px solid var(--line);background:var(--subtle);border-radius:12px}
+.vl-explorer .vl-trash-heading-icon{display:grid;place-items:center;width:46px;height:46px;flex:0 0 46px;color:var(--muted);background:var(--card);border-radius:12px}
+.vl-explorer .vl-trash-heading>span:last-child{display:grid;gap:4px}
+.vl-explorer .vl-trash-heading strong{font-size:17px;color:var(--ink)}
+.vl-explorer .vl-trash-heading small{font-size:12px;color:var(--muted);line-height:1.5}
+.vl-explorer .vl-space-context-menu{
+ position:fixed;z-index:120;width:min(275px,calc(100vw - 20px));max-height:min(70dvh,350px);overflow:auto;
+ padding:7px;background:var(--paper);border:1px solid var(--line);box-shadow:0 18px 42px #0006;border-radius:12px
+}
+.vl-explorer .vl-space-context-menu>button{display:flex;align-items:center;gap:11px;width:100%;padding:10px 12px;min-height:43px;border:0;border-radius:8px;background:transparent;color:var(--ink);text-align:left;font-size:13px}
+.vl-explorer .vl-space-context-menu>button:hover:not(:disabled){background:var(--subtle)}
+.vl-explorer .vl-space-context-menu img{width:18px;height:18px;object-fit:contain}
+@media(max-width:750px){
+ .vl-explorer .vl-drive-groups{padding:8px 10px 18px;gap:18px}
+ .vl-explorer .vl-explorer-folders{grid-template-columns:repeat(auto-fill,minmax(min(100%,180px),1fr));gap:9px}
+ .vl-explorer .vl-explorer-assets{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+ .vl-explorer .vl-explorer-items--grid.vl-explorer-assets .vl-explorer-item[data-kind=asset]{height:224px;min-height:224px}
+ .vl-explorer .vl-explorer-assets .vl-explorer-item[data-kind=asset] .vl-file-emblem{height:139px}
+ .vl-explorer .vl-trash-heading{margin:12px 10px;padding:13px}
+}
+@media(max-width:440px){
+ .vl-explorer .vl-explorer-folders{grid-template-columns:1fr}
+ .vl-explorer .vl-explorer-assets .vl-file-meta strong{font-size:12px}
+ .vl-explorer .vl-trash-switch span{display:inline}
+}
