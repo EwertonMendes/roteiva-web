@@ -4,11 +4,11 @@ const SCOPE='openid '+DRIVE_SCOPE;
 export type PickerConfig={authorized:false;clientId:string;appId:string;developerKey:string;accountId:string};
 type TokenReply={access_token?:string;scope?:string;error?:string;expires_in?:number};
 type PickerReply={action:string;docs?:{id:string;name?:string;resourceKey?:string}[]};
-interface View {setIncludeFolders(value:boolean):View;setSelectFolderEnabled(value:boolean):View;setMode(value:unknown):View;setMimeTypes(value:string):View;}
+interface View {setIncludeFolders(value:boolean):View;setSelectFolderEnabled(value:boolean):View;setMode(value:unknown):View;setMimeTypes(value:string):View;setParent?(parentId:string):View;}
 interface Picker {setVisible(value:boolean):void;dispose():void;}
 interface Builder {addView(view:View):Builder;setOAuthToken(token:string):Builder;setDeveloperKey(key:string):Builder;
   enableFeature(feature:unknown):Builder;setMaxItems(max:number):Builder;
-  setAppId(id:string):Builder;setOrigin(origin:string):Builder;setTitle(title:string):Builder;
+  setAppId(id:string):Builder;setOrigin(origin:string):Builder;setTitle(title:string):Builder;setLocale?(locale:'pt-BR'):Builder;
   setSize(width:number,height:number):Builder;setCallback(callback:(reply:PickerReply)=>void):Builder;build():Picker;}
 type Google={accounts:{oauth2:{initTokenClient(config:{client_id:string;scope:string;include_granted_scopes:false;
   login_hint:string;callback:(reply:TokenReply)=>void;error_callback:()=>void}):{requestAccessToken(config:{prompt:string}):void}}};
@@ -34,7 +34,7 @@ export function preparePicker():Promise<void>{
 }
 
 /** Config/scripts are prepared before the click so GIS preserves the user gesture. */
-export function pickLibraryFiles(config:PickerConfig,verify:(token:string)=>Promise<unknown>,signal:AbortSignal,options?:{mimeTypes?:string;maxItems?:number;title?:string;includeFolders?:boolean;onDocuments?:(docs:{id:string;name?:string;resourceKey?:string}[])=>void}):Promise<string[]>{
+export function pickLibraryFiles(config:PickerConfig,verify:(token:string)=>Promise<unknown>,signal:AbortSignal,options?:{mimeTypes?:string;maxItems?:number;title?:string;includeFolders?:boolean;parentId?:string;onDocuments?:(docs:{id:string;name?:string;resourceKey?:string}[])=>void}):Promise<string[]>{
  return new Promise((resolve,reject)=>{
  let picker:Picker|undefined,settled=false;
  const finish=(ids?:string[],error?:Error)=>{if(settled)return;settled=true;clearTimeout(timeout);signal.removeEventListener('abort',abort);picker?.dispose();error?reject(error):resolve(ids||[]);};
@@ -48,13 +48,15 @@ export function pickLibraryFiles(config:PickerConfig,verify:(token:string)=>Prom
  await verify(reply.access_token);if(settled)return;
  const google=api().picker;
  const view=new google.DocsView(google.ViewId.DOCS).setIncludeFolders(options?.includeFolders===true).setSelectFolderEnabled(options?.includeFolders===true).setMode(google.DocsViewMode.LIST);
+ if(options?.parentId){if(!/^[A-Za-z0-9_-]{10,200}$/.test(options.parentId)||!view.setParent)throw new Error('Não foi possível abrir esta pasta no seletor.');view.setParent(options.parentId);}
  if(options?.mimeTypes)view.setMimeTypes(options.mimeTypes);
  const maxItems=options?.maxItems||100;
- picker=new google.PickerBuilder().addView(view)
+ let builder=new google.PickerBuilder().addView(view)
  .enableFeature(google.Feature.MULTISELECT_ENABLED).setMaxItems(maxItems).setAppId(config.appId).setDeveloperKey(config.developerKey).setOAuthToken(reply.access_token)
  .setOrigin(window.location.origin).setTitle(options?.title||'Adicionar arquivos ao Roteiva')
- .setSize(Math.max(280,Math.min(900,window.innerWidth-24)),Math.max(300,Math.min(600,window.innerHeight-40)))
- .setCallback(data=>{if(data.action==='cancel')abort();if(data.action==='picked'){
+ .setSize(Math.max(280,Math.min(900,window.innerWidth-24)),Math.max(300,Math.min(600,window.innerHeight-40)));
+ builder=builder.setLocale?.('pt-BR')||builder;
+ picker=builder.setCallback(data=>{if(data.action==='cancel')abort();if(data.action==='picked'){
  const ids=Array.from(new Set(data.docs?.map(x=>x.id)||[]));
  if(!ids.length||ids.length>maxItems||ids.some(id=>!/^[A-Za-z0-9_-]{10,200}$/.test(id)))finish(undefined,new Error('A seleção retornou arquivos inválidos.'));else{options?.onDocuments?.(data.docs||[]);finish(ids);}
  }}).build();picker.setVisible(true);

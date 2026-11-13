@@ -10,7 +10,7 @@ export function DriveUploadQueue({uploads,onCancel,onRetry,onDismiss}:{
   onRetry:(id:string)=>void;
   onDismiss:(id:string)=>void;
 }){
-  const [collapsed,setCollapsed]=useState(false);
+  const [collapsed,setCollapsed]=useState(()=>typeof window!=='undefined'&&window.matchMedia('(max-width:680px)').matches);
   if(!uploads.length)return null;
   const running=uploads.filter(u=>active.has(u.status)).length;
   return <aside className="rl-upload-queue" aria-label="Transferências de arquivos">

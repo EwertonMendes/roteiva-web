@@ -1,3 +1,162 @@
-.virtual-library{position:relative;min-width:0;padding:24px}.virtual-library-toolbar,.virtual-library-path{display:flex;flex-wrap:wrap;gap:12px;align-items:center}.virtual-library-path{margin:20px 0}.virtual-library-error{margin:16px 0 20px;padding:16px;border:1px solid var(--danger,#bb4040);border-radius:12px}.virtual-library-nodes{list-style:none;padding:0;margin:16px 0}.virtual-library-nodes li{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 0;border-bottom:1px solid var(--border,#444)}.virtual-library-nodes li>button:first-child{flex:1;min-width:120px;overflow-wrap:anywhere;text-align:left}.virtual-library-editor{border:1px solid var(--border,#555);border-radius:16px;padding:24px;margin-top:24px}.virtual-library-editor label{display:grid;gap:8px}.virtual-library-editor .virtual-library-toolbar{margin-top:20px}@media(max-width:600px){.virtual-library{padding:16px}.virtual-library-nodes li{gap:8px}}
-.virtual-library-backdrop{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;background:#0009;padding:16px}.virtual-library-backdrop .virtual-library-editor{background:var(--surface,#171917);width:min(100%,480px);max-height:90dvh;overflow:auto;margin:0}
-.virtual-library-backdrop .virtual-library-preview{width:min(95vw,1100px)}.virtual-library-preview img,.virtual-library-preview video{display:block;max-width:100%;max-height:70dvh;margin:20px auto}.virtual-library-preview audio{width:100%;margin-top:24px}
+/* Virtual library — Roteiva's shared tokens and primitives, scoped to this feature. */
+.virtual-library{min-width:0;position:relative;overflow:visible;color:var(--ink)}
+.virtual-library *{min-width:0}
+.virtual-library .vl-section-heading{display:flex;align-items:center;gap:13px;min-width:0}
+.virtual-library .vl-section-heading p{margin:5px 0 0;color:var(--muted);font-size:var(--type-support,13px);line-height:1.5;overflow-wrap:anywhere}
+.virtual-library .vl-section-icon{flex:0 0 auto;display:grid;place-items:center;width:44px;height:44px;border:1px solid var(--line);border-radius:13px;background:var(--subtle);color:var(--ink)}
+.virtual-library .vl-section-icon{width:38px;height:38px;border-radius:11px}
+.virtual-library .vl-section-heading h3{font-size:17px;line-height:1.35;letter-spacing:-.02em;font-weight:650;margin:0}
+.virtual-library .vl-connection-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.virtual-library .vl-action,.virtual-library .vl-icon-action{appearance:none;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:9px 13px;border:1px solid var(--line);border-radius:10px;background:var(--subtle);color:var(--ink);font-size:var(--type-support,13px);font-weight:500;line-height:1.35;text-align:center;max-width:100%;transition:background-color .15s ease,border-color .15s ease}
+.virtual-library .vl-action:hover:not(:disabled),.virtual-library .vl-icon-action:hover:not(:disabled){background:var(--line)}
+.virtual-library .vl-icon-action{width:40px;height:40px;padding:0;flex:0 0 40px}
+.virtual-library button:disabled{opacity:.45;cursor:not-allowed}
+.virtual-library .ui-icon-label{justify-content:center;gap:7px;overflow-wrap:anywhere}
+.virtual-library .vl-connections{padding:18px 24px;border-bottom:1px solid var(--line);background:var(--subtle)}
+.virtual-library .vl-connections-heading{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.virtual-library .vl-connections .vl-section-heading h3{font-size:15px}
+.virtual-library .vl-connections .vl-section-heading p{font-size:12px}
+.virtual-library .vl-connect-button img{width:19px;height:19px;flex:0 0 19px;object-fit:contain}
+.virtual-library .vl-account-details{margin-top:13px;border:1px solid var(--line);border-radius:11px;background:var(--card);overflow:hidden}
+.virtual-library .vl-account-details summary{display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;padding:12px 15px;color:var(--ink);font-weight:500;font-size:13px;list-style:none}
+.virtual-library .vl-account-details summary::-webkit-details-marker{display:none}
+.virtual-library .vl-account-details summary:hover{background:var(--subtle)}
+.virtual-library .vl-account-details .vl-summary-title{display:flex;align-items:center;gap:9px}
+.virtual-library .vl-account-details .vl-summary-chevron{transition:transform .15s ease}
+.virtual-library .vl-account-details[open] .vl-summary-chevron{transform:rotate(180deg)}
+.virtual-library .vl-account-list{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
+.virtual-library .vl-account-list li{display:flex;align-items:center;gap:12px;padding:13px 15px;border-bottom:1px solid var(--line)}
+.virtual-library .vl-account-list li:last-child{border-bottom:0}
+.virtual-library .vl-account-logo{flex:0 0 35px;width:35px;height:35px;border-radius:10px;border:1px solid var(--line);background:var(--subtle);display:grid;place-items:center}
+.virtual-library .vl-account-logo img{width:21px;height:21px;object-fit:contain}
+.virtual-library .vl-account-copy{flex:1;display:grid;gap:3px;overflow:hidden}
+.virtual-library .vl-account-copy strong{font-size:13px;font-weight:600}
+.virtual-library .vl-account-copy>span{font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.virtual-library .vl-account-status{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--muted)}
+.virtual-library .vl-account-status--connected{color:var(--ink)}
+.virtual-library .vl-account-action{min-height:36px;padding:7px 10px}
+.virtual-library .virtual-library-nodes{list-style:none;margin:13px 0 0;padding:0}
+.virtual-library .vl-loading{animation:vl-spin 1.2s linear infinite}
+@keyframes vl-spin{to{transform:rotate(360deg)}}
+.virtual-library .virtual-library-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:18px}
+.virtual-library .virtual-library-error{display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;margin:14px 24px;padding:13px 15px;border:1px solid var(--line);border-radius:11px;color:var(--ink);background:var(--subtle);font-size:13px;line-height:1.5;overflow-wrap:anywhere}
+.virtual-library .virtual-library-error>svg{flex:0 0 auto;color:var(--muted)}
+.virtual-library input[type=file][hidden]{display:none}
+.virtual-library-backdrop{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;background:rgba(0,0,0,.68);padding:16px;overflow-y:auto;overscroll-behavior:contain}
+.virtual-library-backdrop .virtual-library-editor{min-width:0;width:min(100%,510px);max-height:calc(100dvh - 32px);overflow:auto;margin:auto;padding:24px;border:1px solid var(--line);border-radius:17px;background:var(--paper);color:var(--ink);box-shadow:0 24px 80px #0005}
+.virtual-library-backdrop .virtual-library-editor h3{margin:0 0 13px;font-size:19px;font-weight:650;letter-spacing:-.02em;line-height:1.3;overflow-wrap:anywhere}
+.virtual-library-backdrop .virtual-library-editor p{color:var(--muted);font-size:13px;line-height:1.6}
+.virtual-library-backdrop .virtual-library-editor label{display:grid;gap:8px;margin:13px 0;font-size:13px;font-weight:550}
+.virtual-library-backdrop .virtual-library-editor .virtual-library-error{margin:12px 0}
+.virtual-library-backdrop .virtual-library-editor .virtual-library-toolbar>button{min-height:40px;padding:9px 16px;border-radius:10px}
+.virtual-library-backdrop .virtual-library-preview{width:min(100%,1100px)}
+.virtual-library-backdrop .virtual-library-preview img,.virtual-library-backdrop .virtual-library-preview video{display:block;max-width:100%;max-height:70dvh;margin:20px auto}
+.virtual-library-backdrop .virtual-library-preview audio{width:100%;margin-top:24px}
+@media(max-width:900px){
+.virtual-library .vl-connections-heading{align-items:stretch;flex-direction:column}
+}
+@media(max-width:600px){
+ .virtual-library .vl-connections{padding:16px}
+ .virtual-library .vl-connection-actions{display:grid;grid-template-columns:1fr;width:100%}
+ .virtual-library .vl-connect-button{width:100%;justify-content:flex-start}
+ .virtual-library .vl-account-list li{display:grid;grid-template-columns:35px minmax(0,1fr);gap:8px 12px}
+ .virtual-library .vl-account-logo{grid-row:1 / 3}
+ .virtual-library .vl-account-status{grid-column:2}
+ .virtual-library .vl-account-action{grid-column:1 / -1;justify-self:start}
+ .virtual-library .virtual-library-error{margin:12px 14px}
+ .virtual-library-backdrop .virtual-library-editor{padding:20px 17px}
+ .virtual-library-backdrop .virtual-library-editor .virtual-library-toolbar>button{flex:1 1 130px}
+}
+@media(prefers-reduced-motion:reduce){.virtual-library .vl-loading{animation:none}.virtual-library .vl-action,.virtual-library .vl-icon-action,.virtual-library .vl-summary-chevron{transition:none}}
+/* Shared virtual-library dialogs also use the same button rhythm and list treatment. */
+.virtual-library-backdrop .virtual-library-editor .virtual-library-toolbar>button{border:1px solid var(--line);background:var(--subtle);color:var(--ink);font-weight:550}
+.virtual-library-backdrop .virtual-library-editor .virtual-library-toolbar>button:first-child{background:var(--accent);color:var(--on-accent);border-color:transparent}
+.virtual-library-backdrop .virtual-library-editor button:disabled{opacity:.45;cursor:not-allowed}
+.virtual-library-backdrop .virtual-library-editor .virtual-library-nodes{list-style:none;margin:14px 0;padding:0}
+.virtual-library-backdrop .virtual-library-editor .virtual-library-nodes li{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 0;border-bottom:1px solid var(--line);font-size:13px}
+.virtual-library-backdrop .virtual-library-editor .virtual-library-nodes li>button,.virtual-library-backdrop .virtual-library-editor nav>button{border:1px solid var(--line);background:var(--subtle);color:var(--ink);padding:8px 12px;min-height:38px;border-radius:9px}
+.virtual-library-backdrop .virtual-library-editor .virtual-library-nodes li>button:first-child{flex:1 1 auto;text-align:left}
+.virtual-library-backdrop .virtual-library-editor .virtual-library-nodes li label{display:flex;align-items:center;gap:9px;margin:0;min-width:0}
+.virtual-library-backdrop .virtual-library-editor .virtual-library-nodes li label .rt-select{flex:1 1 160px}
+.virtual-library-backdrop .virtual-library-editor nav{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin:14px 0}
+.virtual-library-backdrop .virtual-library-editor fieldset{border:1px solid var(--line);border-radius:12px;margin:15px 0;padding:12px}
+.virtual-library-backdrop .virtual-library-editor legend{font-size:13px;font-weight:600;padding:0 7px}
+.virtual-library-backdrop .virtual-library-editor .vl-preview-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line);padding-bottom:12px}
+.virtual-library-backdrop .virtual-library-editor .vl-preview-head h3{flex:1;min-width:0;margin:0}
+.virtual-library-backdrop .virtual-library-editor .vl-preview-head .vl-icon-action{flex:0 0 40px;width:40px;height:40px;border:1px solid var(--line);background:var(--subtle);border-radius:10px;color:var(--ink);display:grid;place-items:center}
+@media(max-width:440px){
+ .virtual-library-backdrop .virtual-library-editor .virtual-library-nodes li label{flex:1 1 100%}
+}
+/* Consistent protected-preview shell; the original never dictates dialog height. */
+.virtual-library-backdrop .vl-preview-modal:focus,.virtual-library-backdrop .vl-preview-modal:focus-visible{outline:none}
+.virtual-library-backdrop .virtual-library-editor.vl-preview-modal{
+ width:min(1060px,100%);height:min(78dvh,700px);min-height:min(350px,calc(100dvh - 32px));
+ max-height:calc(100dvh - 32px);display:flex;flex-direction:column;overflow:hidden;
+ padding:19px 22px 21px
+}
+.virtual-library-backdrop .vl-preview-modal .vl-preview-head{align-items:center;flex:0 0 auto;min-height:49px;padding-bottom:12px}
+.virtual-library-backdrop .vl-preview-modal .vl-preview-head h3{font-size:16px;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
+.vl-preview-modal .vl-preview-body{
+ flex:1;min-height:0;display:flex;align-items:center;justify-content:center;
+ overflow:hidden;border-radius:12px;background:var(--subtle);margin-top:13px
+}
+.virtual-library-backdrop .vl-preview-modal .vl-preview-body .vl-preview-image,
+.virtual-library-backdrop .vl-preview-modal .vl-preview-body .vl-preview-video{
+ display:block;width:100%;height:100%;min-height:0;max-height:none;max-width:none;object-fit:contain;margin:0
+}
+.virtual-library-backdrop .vl-preview-modal .vl-preview-body .vl-preview-audio{max-width:620px;width:calc(100% - 35px);margin:0}
+.vl-preview-modal .vl-preview-document{width:100%;height:100%;min-height:0;overflow:auto}
+.vl-preview-modal .vl-preview-state{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;min-height:180px;width:100%;padding:25px;text-align:center;font-size:13px;color:var(--muted)}
+.vl-preview-modal .vl-preview-state p{margin:0;max-width:500px;line-height:1.6}
+.vl-preview-modal .vl-preview-state svg{flex:0 0 auto}
+.vl-preview-modal .vl-preview-failed{color:var(--ink)}
+.vl-preview-modal .vl-preview-retry{display:inline-flex;align-items:center;gap:7px;min-height:40px;padding:8px 14px;border:1px solid var(--line);border-radius:9px;background:var(--card);color:var(--ink);font-size:13px;font-weight:600}
+@media(max-width:650px){
+ .virtual-library-backdrop .virtual-library-editor.vl-preview-modal{height:min(84dvh,720px);padding:14px}
+ .vl-preview-modal .vl-preview-body{margin-top:10px}
+}
+
+/* Guided Drive import: explicit selections and comfortable review before mutation. */
+.virtual-library-backdrop .virtual-library-editor.virtual-library-preview:not(.vl-preview-modal){
+ width:min(880px,100%);max-height:calc(100dvh - 36px);padding:23px 25px;overflow:auto
+}
+.virtual-library-backdrop .virtual-library-editor .vl-import-summary{
+ display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:13px 0 18px
+}
+.virtual-library-backdrop .virtual-library-editor .vl-import-summary strong{
+ display:inline-flex;align-items:center;justify-content:center;min-height:37px;padding:9px 13px;
+ background:var(--subtle);border:1px solid var(--line);border-radius:10px;
+ font-size:13px;font-weight:600;color:var(--ink)
+}
+.virtual-library-backdrop .virtual-library-editor .vl-import-explore-note{
+ margin:0 0 14px;padding:13px 15px;background:var(--subtle);
+ border:1px solid var(--line);border-radius:11px;color:var(--ink);line-height:1.55
+}
+.virtual-library-backdrop .virtual-library-editor .vl-import-folder-row{
+ display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:12px;padding:10px 4px;
+ border-bottom:1px solid var(--line)
+}
+.virtual-library-backdrop .virtual-library-editor .vl-import-folder-row:last-of-type{border-bottom:0}
+.virtual-library-backdrop .virtual-library-editor .vl-import-folder-row label{
+ display:grid;gap:7px;margin:0;min-width:0;font-size:12px;color:var(--muted);font-weight:550
+}
+.virtual-library-backdrop .virtual-library-editor .vl-import-folder-row input{width:100%;min-height:40px;font-weight:600}
+.virtual-library-backdrop .virtual-library-editor .vl-import-explore{
+ display:inline-flex;align-items:center;justify-content:center;min-height:40px;white-space:nowrap;
+ padding:9px 13px;background:var(--card);border:1px solid var(--line);border-radius:10px;
+ font-size:12px;font-weight:650;color:var(--ink)
+}
+.virtual-library-backdrop .virtual-library-editor .vl-import-explore:hover:not(:disabled){background:var(--subtle);border-color:var(--muted)}
+.virtual-library-backdrop .virtual-library-editor .vl-import-empty-warning{
+ margin:14px 0;padding:13px;border:1px solid var(--line);border-radius:11px;background:var(--subtle);color:var(--ink)
+}
+.virtual-library-backdrop .virtual-library-editor.virtual-library-preview:not(.vl-preview-modal) .virtual-library-toolbar{
+ position:sticky;bottom:-23px;z-index:2;background:var(--paper);
+ border-top:1px solid var(--line);padding:15px 0 3px;margin-top:22px
+}
+@media(max-width:650px){
+ .virtual-library-backdrop .virtual-library-editor.virtual-library-preview:not(.vl-preview-modal){padding:17px 15px;max-height:96dvh}
+ .virtual-library-backdrop .virtual-library-editor .vl-import-folder-row{grid-template-columns:1fr;gap:8px}
+ .virtual-library-backdrop .virtual-library-editor .vl-import-explore{width:100%;white-space:normal}
+ .virtual-library-backdrop .virtual-library-editor.virtual-library-preview:not(.vl-preview-modal) .virtual-library-toolbar{bottom:-17px}
+}

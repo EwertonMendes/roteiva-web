@@ -24,9 +24,13 @@ export async function authorizeLibraryProject(request:Request,env:Env,uid:string
  if(doc.fields?.ownerUid?.stringValue!==uid)throw new ApiError(403,'library_project_denied');
 }
 export async function libraryFor(env:Env,uid:string,projectId:number):Promise<Library>{
+ // Reads are the common case. Never issue two D1 writes on every folder navigation.
+ const lookup=()=>env.DB.prepare("SELECT id,owner_uid,project_id FROM libraries WHERE owner_uid=? AND project_id=? AND state='active'").bind(uid,projectId).first<Library>();
+ let library=await lookup();
+ if(library)return library;
  await env.DB.prepare("INSERT OR IGNORE INTO libraries(id,owner_uid,project_id,created_at) VALUES(?,?,?,?)")
- .bind(crypto.randomUUID(),uid,projectId,Date.now()).run();
- const library=await env.DB.prepare("SELECT id,owner_uid,project_id FROM libraries WHERE owner_uid=? AND project_id=? AND state='active'").bind(uid,projectId).first<Library>();
+  .bind(crypto.randomUUID(),uid,projectId,Date.now()).run();
+ library=await lookup();
  if(!library)throw new ApiError(409,'library_unavailable');
  await env.DB.prepare("INSERT OR IGNORE INTO library_nodes(library_id,id,parent_id,kind,name) VALUES(?,'root',NULL,'folder','Arquivos')").bind(library.id).run();
  return library;
@@ -35,6 +39,7 @@ export async function libraryNode(env:Env,lib:Library,id:string,allowTrashed=fal
  nodeId(id);
  const n=await env.DB.prepare('SELECT id,parent_id,kind,name,state,revision FROM library_nodes WHERE library_id=? AND id=?').bind(lib.id,id).first<LibraryNode>();
  if(!n||(!allowTrashed&&n.state!=='active'))throw new ApiError(404,'library_node_unavailable');
+ if(id==='root'&&n.parent_id===null)return n;
  const ancestors=await env.DB.prepare(`WITH RECURSIVE chain(id,parent_id,state,depth) AS (
  SELECT id,parent_id,state,0 FROM library_nodes WHERE library_id=? AND id=?
  UNION ALL SELECT n.id,n.parent_id,n.state,c.depth+1 FROM library_nodes n JOIN chain c ON n.id=c.parent_id WHERE n.library_id=? AND c.depth<17)
@@ -68,21 +73,34 @@ export async function listLibraryExplorer(env:Env,lib:Library,parentId:string,af
  const term=search.normalize('NFC').trim();
  if(term.length>100||/[\x00-\x1f\x7f]/.test(term))throw new ApiError(400,'invalid_search');
  const all=Boolean(term&&projectWide);
- const cursor=after?await env.DB.prepare("SELECT kind,name FROM library_nodes WHERE library_id=? AND id=? AND state='active'")
-  .bind(lib.id,after).first<{kind:string;name:string}>():null;
- if(after&&!cursor)throw new ApiError(409,'library_changed');
+ let cursor:{kind:string;name:string}|null=null;
+ if(after){
+  const previous=await libraryNode(env,lib,after);
+  if(!all&&previous.parent_id!==parentId)throw new ApiError(409,'library_changed');
+  cursor={kind:previous.kind,name:previous.name};
+ }
  const paging=cursor? ` AND (n.kind < ? OR (n.kind=? AND (n.name COLLATE NOCASE > ? COLLATE NOCASE OR (n.name = ? COLLATE NOCASE AND n.id > ?))))`:'';
- const sql=`SELECT n.id,n.asset_id,n.parent_id,n.kind,n.name,n.state,n.revision,
-  a.provider,a.source_name,a.mime_type,a.size,a.state AS source_state,
+ // Search results must be reachable from the active root. Trashed ancestors
+ // invalidate their descendants, even if the children have state='active'.
+ const visible=all?`WITH RECURSIVE visible(id,depth) AS (
+   SELECT id,0 FROM library_nodes WHERE library_id=? AND id='root' AND state='active'
+   UNION ALL
+   SELECT child.id,visible.depth+1 FROM library_nodes child
+   JOIN visible ON child.parent_id=visible.id
+   WHERE child.library_id=? AND child.state='active' AND visible.depth<16
+ )`:'';
+ const sql=`${visible} SELECT n.id,n.asset_id,n.parent_id,n.kind,n.name,n.state,n.revision,
+  a.provider,a.connection_id,a.file_id,a.source_revision,a.source_name,a.mime_type,a.size,a.state AS source_state,
   parent.name AS parent_name
   FROM library_nodes n
+  ${all?'JOIN visible ON visible.id=n.id':''}
   LEFT JOIN library_nodes parent ON parent.library_id=n.library_id AND parent.id=n.parent_id
   LEFT JOIN library_entries e ON e.library_id=n.library_id AND e.node_id=n.id
   LEFT JOIN library_assets a ON a.library_id=e.library_id AND a.id=e.asset_id
   WHERE n.library_id=? AND n.state='active' AND n.id!='root' ${all?'':'AND n.parent_id=?'}
    AND instr(lower(n.name),lower(?))>0${paging}
   ORDER BY n.kind DESC,n.name COLLATE NOCASE ASC,n.id ASC LIMIT 51`;
- const args:unknown[]=[lib.id,...(all?[]:[parentId]),term,
+ const args:unknown[]=[...(all?[lib.id,lib.id]:[]),lib.id,...(all?[]:[parentId]),term,
   ...(cursor?[cursor.kind,cursor.kind,cursor.name,cursor.name,after]:[])];
  const rows=await env.DB.prepare(sql).bind(...args).all<LibraryNode&{parent_name:string;mime_type?:string;provider?:string}>();
  const items=rows.results.slice(0,50);

@@ -1,5 +1,13 @@
 # Identidade visual e experiência — Roteiva
 
+## Biblioteca virtual — explorador compacto (12/11/2026)
+
+**IMPLEMENTADO EM BRANCH PR #123; ainda não VALIDADO com provedores reais:** a Biblioteca deixa de exibir os dois grandes cartões permanentes Drive/Dropbox e organiza o trabalho em um explorador com contexto visual consistente com Projetos e Clientes. Cabeçalho tem seletor de projeto com pesquisa e recentes, botões Contas, Atualizar e um único **Adicionar** com criar pasta, uploads, adicionar arquivos existentes e importar organização. A linha superior tem breadcrumbs, Lixeira, Pastas e controle lista/grade. Busca é por nome no projeto inteiro, com escopo alternativo da pasta atual. Menus ⋮ e clique direito permitem prévia/renomear/mover/remover e restauração na Lixeira, sem apagar originais. Contas de armazenamento ficam em um painel secundário, não na área principal.
+
+Reutilizar `AppButton`, `AppInput`, `AppSelect`, `IconLabel`, `lucide-react`, logos dos provedores e tokens `--card`, `--subtle`, `--ink`, `--muted`, `--line`, `--accent`, `--on-accent`. CSS fica em `src/features/drive/library-explorer.css` e `library-project-picker.css`, com controle de responsividade e áreas de toque. Preservar nome acessível exato dos itens e usar menus nomeados em botões. Sem scroll horizontal, inclusive no mobile. O cache é metadado apenas; imagens/capas têm fluxo próprio.
+
+A UX deve diferenciar **Selecionar do Google Drive** de importação com descendentes. Em `drive.file`, a seleção de pasta pelo Picker não autoriza todos os arquivos internos; não exibir promessa de importação completa. Na importação do Dropbox, uma pasta selecionada admite varredura paginada e limitada, sempre seguida de prévia antes de gravar. Reportar arquivos não autorizados e falhas por item. O usuário só deve validar depois de abrir em aparelho real, claro/escuro, com contas Google/Dropbox reais; E2E sintético não prova percepção visual ou permissões dos provedores.
+
 ## Aprovação e capas — 03/11/2026
 
 Busca de capa usa AppInput com ícone, altura do controle compartilhado e foco apenas no campo, sem halo no rótulo. Capas de projeto oferecem conexões Drive/Dropbox ativas. PDFs de aprovação têm controles de páginas e zoom no painel e portal, sem toolbar nativa de download. Mensagens usam “dados”, “salvamento” e nomes de provedores quando necessário; “alteração preparada” nunca significa persistência confirmada.

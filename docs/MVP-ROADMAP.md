@@ -1,11 +1,31 @@
 # Roadmap vivo — Roteiva MVP
 
-## Backend compatível do novo explorador — PR de infraestrutura DEV (12/11/2026)
+## Reconstrução integral da Biblioteca — PR #123 (12/11/2026)
 
-- [x] **IMPLEMENTADO EM BRANCH**: endpoint opcional `explorer=1` de árvore virtual com busca no projeto, paginação por pastas/nome, testes de isolamento e cursor, preservando contrato anterior e dados existentes.
-- [ ] Confirmar CI e publicação DEV pela `master` após merge aprovado; não supor deployment sem evidência.
-- [ ] Novo frontend está em [PR #123](https://github.com/EwertonMendes/roteiva-web/pull/123), aguardando homologação real de interface/Google Drive/Dropbox. PROD inalterado.
+- [x] **IMPLEMENTADO NA BRANCH** `codex/library-explorer-release`: explorador com botão Adicionar, projeto pesquisável, lista/grade, breadcrumbs, busca por projeto, menu de contexto, integração de UI e cache curto. Não está automaticamente homologado em DEV.
+- [x] **IMPLEMENTADO NA BRANCH**: contrato API `explorer=1` com paginação ordenada sem alterar contrato antigo, busca D1 com autorização por projeto; testes de escopo, paginação e isolamento.
+- [x] **IMPLEMENTADO NA BRANCH**: travessia limitada de subpastas selecionadas no Dropbox e prévia assistida, idempotência já existente; Google `drive.file` continua exigindo seleção explícita e não autoriza automaticamente descendentes.
+- [x] **IMPLEMENTADO NA BRANCH**: caminho de reautorização das capas Google antigas pelo Picker e preservação de recorte ao selecionar o mesmo arquivo; não equivale a recuperar automaticamente grants expirados.
+- [x] **CI base completo**: SHA `92faeea8`, quatro workflows verdes (Frontend DEV, API DEV, Firestore security DEV e Isolated SaaS access E2E); regressão de busca que oculta descendentes de pastas na lixeira passou em `Validate Worker and D1` no run #43330850222.
+- [ ] **VALIDAÇÃO OBRIGATÓRIA**: QA específico do cache de navegação Dropbox, regressões dos demais domínios e testes de perfis reais; publicar Worker DEV antes do Hosting DEV. **BLOQUEADO**: o environment `cloudflare-development` restringe deploy à `master`; job de deploy da branch recusado antes de executar, sem alterar Worker/D1.
+- [ ] **ACEITE REAL**: Google Drive/Dropbox autenticados com pastas e arquivos reais, capas de projetos e clientes existentes, velocidades cold/warm, teste 1000+ projetos, celulares, foco e tema. **Sem esta evidência não afirmar que está pronto para usuários finais.**
+- [ ] PROD: somente após aprovação explícita e testes reais de segurança/permissões, sem migração destrutiva, sem reintroduzir escopo restrito automaticamente.
 
+
+## Homologação de UX da Biblioteca virtual — 12/11/2026
+
+- [x] Implementado em `codex/library-oauth-modal-fixes`: hierarquia visual, grupos de ferramentas, SVGs existentes Drive/Dropbox, Lucide semântico, botões e campos compartilhados, estado vazio sem comandos inoperantes, gerenciamento de contas sem botão redundante de conexão, nomes acessíveis, lista de arquivos e modais responsivos. Alterações de UI somente; sem migration, OAuth scopes ou alteração de dados.
+- [ ] Verificar CI com E2E da Biblioteca e isolamento, incluindo navegação mobile, transições de projeto, pastas vazias, renomear/mover/lixeira/restaurar, fluxos Drive/Dropbox, preview e uploads.
+- [ ] Homologar visualmente em DEV com Chrome Android real e desktop, temas claro/escuro, diferentes larguras, menu de projeto e arquivos de nome longo; comparar com as telas Projetos/Clientes. A captura de 12/11 motivou a correção, não é evidência de aceite.
+- [ ] Manter PR draft e PROD inalterado até homologação real, então revisar merge/publicação conforme aprovações e pipeline.
+
+## Continuidade da Biblioteca virtual — 12/11/2026
+
+- [x] Base da Biblioteca virtual integrada na PR #121, SHA `957b75750db5477537d2bc521f5e1b039f4e2cbf`; DEV publicado (API #43166381703, frontend #43166381763) e E2E isolado #43166381710 concluídos com sucesso. Migrations 0021–0030 apenas em DEV; PROD permanece com as novas flags desligadas.
+- [x] **IMPLEMENTADO EM BRANCH, AINDA NÃO VALIDADO EM DEV:** continuação `codex/library-oauth-modal-fixes`: intenção curta de retorno OAuth vinculada ao UID em sessionStorage (não autoriza acesso); restauração de projeto/pasta revalidada pelo Worker/Firestore; retorno à raiz se a pasta não estiver disponível; fila de transferências escondida visualmente durante modais, sem desmontá-la.
+- [ ] Rodar testes CI, navegador desktop/mobile e OAuth real após publicação DEV; validar prévias e uploads em ambos os provedores e finalizar aprovação mista por revisão exata.
+- [ ] Promover versão aprovada para PROD somente após homologação DEV, manutenção aditiva/backup e verificações das credenciais e consentimentos, conforme procedimento de implantação existente.
+- [ ] As quatro alterações locais antigas de cache mencionadas pelo Codex em outro checkout **não estão neste PR**; preservar esse checkout e revisar as alterações separadamente no ambiente Windows.
 
 ## Biblioteca virtual e aprovações — implementação autorizada 11/11/2026
 

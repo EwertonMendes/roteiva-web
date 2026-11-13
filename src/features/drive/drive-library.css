@@ -534,9 +534,20 @@
   .rl-upload-items {max-height:calc(40dvh - 54px);}
 }
 
-/* The mobile navigation drawer is modal: its account actions must never sit
- * beneath an in-progress floating Drive upload queue. Preserve all transfer
- * state and resume its overlay as soon as the drawer closes. */
+/* Modal dialogs always take precedence over the floating transfer queue.
+ * Keep upload state mounted: the queue reappears when the dialog closes. */
+body:has(.virtual-library-backdrop) .rl-transfer-layer{visibility:hidden;pointer-events:none}
+
+/* Mobile navigation is modal too. Keep its account actions unobstructed. */
 @media(max-width:820px){
   body:has(.sidebar.mobile-open) .rl-transfer-layer{visibility:hidden;pointer-events:none}
+}
+
+/* Compact transfer status on mobile: never blanket the explorer. Active uploads remain mounted. */
+@media(max-width:680px){
+ .rl-upload-queue:not(:has(.rl-upload-items)){width:min(190px,calc(100vw - 24px));max-height:62px;}
+ .rl-upload-queue:not(:has(.rl-upload-items)) .rl-upload-heading{min-height:50px;padding:8px 11px;gap:6px;}
+ .rl-upload-queue:not(:has(.rl-upload-items)) .rl-upload-heading small{display:none;}
+ .rl-upload-queue:not(:has(.rl-upload-items)) .rl-upload-heading>span{font-size:12px;}
+ .rl-upload-queue:not(:has(.rl-upload-items)) .rl-upload-heading>span svg{width:15px;height:15px;}
 }
