@@ -1,5 +1,9 @@
 # Roteiva
 
+> **Revisão editorial em desenvolvimento (PR #125):** marca oficial monocromática, dashboard compacto, correção de capas, controle de visibilidade financeira, interação direta no calendário e lente vetorial de login. O trabalho está em branch de homologação; não presumir publicação em DEV/PROD nem compatibilidade real dos provedores até os testes finais. A atualização preserva os demais fluxos aprovados.
+
+
+
 > **Biblioteca — reimplementação em homologação (12/11/2026):** o explorador compacto, pesquisa de projetos, paginação e cache de pasta, menu Adicionar, lista/grade, ações por contexto e importação recursiva limitada do Dropbox estão na [PR #123](https://github.com/EwertonMendes/roteiva-web/pull/123), ainda em revisão. A PR #121 estabeleceu a árvore/Backend DEV. Esta nova versão **não está confirmada como publicada nem homologada no DEV**; PROD permanece inalterado. Escopo Google `drive.file` exige seleção explícita de arquivos, sem prometer leitura automática de todos os descendentes de uma pasta. Consulte [roadmap](docs/MVP-ROADMAP.md).
 
 ## Biblioteca virtual — implementação em andamento

@@ -109,7 +109,7 @@ test("Google emulator session, CRUD, restoration, themes and separate users",asy
   const emptyDay=page.locator(".calendar-grid > button:not(.outside):not(:has(.event-chip))").first();
   const day=Number(await emptyDay.locator("b").first().innerText());
   await emptyDay.click();
-  await expect(page.getByRole("dialog",{name:"Novo compromisso"})).toBeVisible();
+  await expect(page.locator("form.calendar-event-modal")).toBeVisible();
   await expect(page.getByLabel("Data do trabalho",{exact:true})).toHaveValue(today.slice(0,7)+"-"+String(day).padStart(2,"0"));
   await page.getByRole("button",{name:"Cancelar",exact:true}).click();
   await page.getByRole("button",{name:"Novo compromisso",exact:true}).click();

@@ -1,5 +1,16 @@
 # Identidade visual e experiência — Roteiva
 
+## Revisão editorial de produto — 13/11/2026 (PR #125, em homologação)
+Referência visual vinculante: `Roteiva-revisao-editorial-16x9.pdf`, páginas 2–9, especialmente os mockups 4 e 9. A revisão preserva as telas já aprovadas de Clientes, Aprovações, Biblioteca e Configurações.
+
+- **Identidade:** a marca oficial fornecida pelo responsável é preta ou branca, sem o detalhe verde. Os ativos `public/brand/roteiva-wordmark-{black,white}.svg` e `roteiva-symbol-{black,white}.svg` utilizam as imagens originais da [pasta de logos](https://drive.google.com/drive/folders/1X-dKFgg3tqyCSvnEpc3UNWk-WBxC8Smf?usp=sharing), recortadas por viewBox, sem filtro de cor. `BrandLogo` seleciona por tema. Cores funcionais (situação de projeto, saldos, gráficos, validações e foco) permanecem.
+- **Dashboard:** título, métricas e fluxo próximos; altura decorrente do conteúdo, largura limitada e histórico de atividade ao lado de próximo compromisso no desktop; empilhamento sem overflow no mobile. Em monitores baixos, a página pode rolar naturalmente em vez de cortar a informação.
+- **Capas:** projeto sem capa oferece a ação Adicionar capa mesmo antes de conectar Drive/Dropbox. Se não houver conta conectada, o editor orienta a conexão, sem solicitar escopos adicionais. Salvamento e recorte seguem o contrato `ProjectCover` existente.
+- **Financeiro:** o olho de Já recebido alterna entre mostrar e ocultar os valores visíveis daquele cartão. É exclusivamente estado de apresentação; não altera o cálculo, exportação ou persistência.
+- **Calendário:** clicar em dia vazio abre Novo compromisso com data selecionada; clicar em dia ocupado mostra a agenda e oferece Adicionar outro compromisso. Preservar o comportamento de edição e de sobreposição temporal.
+- **Login:** a ilustração abstrata foi trocada por lente/diafragma vetorial de linhas neutras; nenhuma alteração em OAuth, cadastro e links legais.
+- **QA:** diferenças visuais devem ser verificadas com capturas reais em desktop/mobile e dark/light. Implementado no PR não equivale a aprovado para PROD.
+
 ## Biblioteca virtual — explorador compacto (12/11/2026)
 
 **IMPLEMENTADO EM BRANCH PR #123; ainda não VALIDADO com provedores reais:** a Biblioteca deixa de exibir os dois grandes cartões permanentes Drive/Dropbox e organiza o trabalho em um explorador com contexto visual consistente com Projetos e Clientes. Cabeçalho tem seletor de projeto com pesquisa e recentes, botões Contas, Atualizar e um único **Adicionar** com criar pasta, uploads, adicionar arquivos existentes e importar organização. A linha superior tem breadcrumbs, Lixeira, Pastas e controle lista/grade. Busca é por nome no projeto inteiro, com escopo alternativo da pasta atual. Menus ⋮ e clique direito permitem prévia/renomear/mover/remover e restauração na Lixeira, sem apagar originais. Contas de armazenamento ficam em um painel secundário, não na área principal.

@@ -1,5 +1,14 @@
 # Desenvolvimento e deploy — Roteiva
 
+## Homologação da revisão editorial — PR #125 (13/11/2026)
+Branch `codex/editorial-review-final-20261113`, baseada no SHA `6628225566ebd43ead35c93f51107b9ffb5a4153`. Executar `pnpm typecheck`, `pnpm test`, `pnpm build:emulator` e os testes browser existentes, com destaque para `tests/browser/dashboard-viewport.spec.ts`, `finance-layout.spec.ts`, `project-covers.spec.ts`, `workspace.spec.ts`, `typography.spec.ts`, `sidebar.spec.ts` e `drive-folders.spec.ts` (Chromium desktop/mobile). Testar na suíte isolada do GitHub com emuladores Firebase, além do workflow de regressão manual.
+
+O teste de fila deve expandir explicitamente o painel inicialmente recolhido no mobile antes de verificar estados; o UX de manter transferências fora da frente da interface foi preservado. Confirmar que a falha de 13/11/2026 (run 43452580800, quatro casos mobile de upload) desaparece, sem enfraquecer as asserções de cancelamento, conclusão e retomada.
+
+Validar em DEV, com contas reais, conexões de Drive/Dropbox, múltiplos temas e persistência após reload. Capturar comparações das páginas 4 e 9 do PDF e preservar o restante do produto. O PR sozinho não publica PROD; conferir SHA, flags, migrations e autorização antes de qualquer promoção.
+
+
+
 ## Homologação e bloqueio do deploy DEV — PR #123 (12/11/2026)
 
 A branch `codex/library-explorer-release` permite QA isolado sem deploy: GitHub Actions > **Isolated SaaS access E2E** > Run workflow > selecionar a branch e definir `suite=virtual`. Essa opção roda testes de Biblioteca e portal protegido em emuladores desktop/mobile; `suite=full` conserva a regressão geral Firestore e navegador. Não confundir estes testes com Google/Dropbox reais.

@@ -47,7 +47,7 @@ function ProjectsGrid({projects,statusFilter,setStatusFilter,onOpen,onSaveCover,
    {!projects.length&&<div className="empty-state"><FolderOpen size={32}/><h3>{statusFilter==='Todos'?'Nenhum projeto encontrado':'Nenhum projeto nesta situação'}</h3><p>{statusFilter==='Todos'?'Crie um projeto ou ajuste sua busca para continuar.':'Selecione outra situação para ver seus projetos.'}</p></div>}
    {hasMore&&<div className="pc-more"><AppButton type="button" className="secondary-button" onClick={onMore}>Carregar mais projetos<ChevronDown size={16}/></AppButton></div>}
   </section>
-  {project&&context?.connections.length?<CoverEditor key={project.id} project={project} onClose={()=>setEditing(null)} onSave={cover=>onSaveCover(project.id,cover)}/>:null}
+  {project&&context?<CoverEditor key={project.id} project={project} onClose={()=>setEditing(null)} onSave={cover=>onSaveCover(project.id,cover)}/>:null}
  </>;
 }
 export function ProjectsView(props:Props){return isDemo?<ProjectsGrid {...props}/>:<DriveCoversProvider includeDropbox><ProjectsGrid {...props}/></DriveCoversProvider>;}
