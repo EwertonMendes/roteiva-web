@@ -1,11 +1,15 @@
 import assert from 'node:assert/strict';
 import {readFileSync,readdirSync} from 'node:fs';
 import {query,remoteMetadata,target} from './environment.mjs';
+import {isReviewedAdditiveMigration} from './reviewed-additive-migrations.mjs';
 await remoteMetadata();
 const applied=new Set(query('SELECT name FROM d1_migrations').map(row=>row.name));
 const pending=readdirSync('migrations').filter(name=>/^\d+_[\w-]+\.sql$/.test(name)&&!applied.has(name)).sort();
+const reviewed=pending.filter(name=>isReviewedAdditiveMigration(name,readFileSync('migrations/'+name,'utf8')));
 const destructive=pending.filter(name=>{
- const sql=readFileSync('migrations/'+name,'utf8').replace(/--[^\n]*/g,'').replace(/\/\*[\s\S]*?\*\//g,'');
+ const original=readFileSync('migrations/'+name,'utf8');
+ if(isReviewedAdditiveMigration(name,original))return false;
+ const sql=original.replace(/--[^\n]*/g,'').replace(/\/\*[\s\S]*?\*\//g,'');
  return /\b(?:DROP\s+(?:TABLE|INDEX|TRIGGER|VIEW)|ALTER\s+TABLE|TRUNCATE|DELETE\s+FROM|UPDATE\s+[\w"`]|INSERT\s+OR\s+REPLACE|REPLACE\s+INTO)/i.test(sql);
 });
 if(destructive.length){
@@ -19,4 +23,4 @@ if(destructive.length){
    'Pending migrations can change existing data; explicit reviewed maintenance is required: '+destructive.join(', '));
  }
 }
-console.log(JSON.stringify({environment:target,pendingMigrations:pending,guard:'passed'}));
+console.log(JSON.stringify({environment:target,pendingMigrations:pending,reviewedAdditiveMigrations:reviewed,guard:'passed'}));
