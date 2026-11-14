@@ -7,7 +7,7 @@ on:
         type: choice
         required: true
         default: full
-        options: [full, drive, pointer, review, money, finance, controls, workspace]
+        options: [full, overview, drive, pointer, review, money, finance, controls, workspace]
   schedule:
     - cron: '20 7 * * *'
 permissions:
@@ -52,6 +52,9 @@ jobs:
       - name: Run Firestore isolation and Chromium desktop/mobile suite
         if: github.event_name != 'workflow_dispatch' || inputs.suite == 'full'
         run: pnpm test:firebase
+      - name: Validate fluid dashboard layout and interaction (desktop/mobile)
+        if: github.event_name == 'workflow_dispatch' && inputs.suite == 'overview'
+        run: pnpm exec firebase emulators:exec --project demo-roteiva --only auth,firestore "pnpm exec playwright test tests/browser/dashboard-viewport.spec.ts"
       - name: Run isolated Drive browser scenarios
         if: github.event_name == 'workflow_dispatch' && inputs.suite == 'drive'
         run: pnpm exec firebase emulators:exec --project demo-roteiva --only auth,firestore "pnpm exec playwright test tests/browser/drive-folders.spec.ts"
@@ -74,7 +77,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && inputs.suite == 'workspace'
         run: pnpm exec firebase emulators:exec --project demo-roteiva --only auth,firestore "pnpm exec playwright test tests/browser/workspace.spec.ts"
       - name: Backend saga with isolated D1 and Firebase emulators
-        if: github.event_name != 'workflow_dispatch' || !contains(fromJSON('["pointer","review","money","finance","controls","workspace"]'), inputs.suite)
+        if: github.event_name != 'workflow_dispatch' || !contains(fromJSON('["overview","pointer","review","money","finance","controls","workspace"]'), inputs.suite)
         run: pnpm test:trial:e2e
       - name: Archive failure context
         if: failure()
