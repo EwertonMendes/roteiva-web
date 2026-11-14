@@ -114,6 +114,8 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
   const [deletingFinanceEntry, setDeletingFinanceEntry] = useState<FinanceEntry | null>(null);
   const [eventModalOpen, setEventModalOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  // Closing restores position; navigation from the drawer resets the next page.
+  const resetScrollAfterMobileNavigation = useRef(false);
   const [demoTheme, setDemoTheme] = useState<Theme>(()=>readStoredTheme(themeStorageKey()) ?? systemTheme());
   const theme = isDemo ? demoTheme : (initialTheme ?? "light");
   const [toast, setToast] = useState("");
@@ -245,6 +247,50 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     window.addEventListener("storage",onStorage);
     return ()=>window.removeEventListener("storage",onStorage);
   },[]);
+
+  // iOS Safari may scroll behind an overlay even with overflow:hidden.
+  // Fix the page at its existing scroll offset; the sidebar nav can still scroll.
+  useLayoutEffect(() => {
+    if (!mobileOpen) return;
+    const mobile = window.matchMedia("(max-width: 820px)");
+    if (!mobile.matches) { setMobileOpen(false); return; }
+    const root = document.documentElement;
+    const body = document.body;
+    const previous = {
+      position: body.style.position, top: body.style.top, left: body.style.left,
+      right: body.style.right, width: body.style.width,
+      bodyOverflow: body.style.overflow, rootOverflow: root.style.overflow,
+      overscroll: root.style.overscrollBehavior
+    };
+    const x = window.scrollX;
+    const y = window.scrollY;
+    body.style.position = "fixed";
+    body.style.top = `-${y}px`;
+    body.style.left = `-${x}px`;
+    body.style.right = "0";
+    body.style.width = "100%";
+    body.style.overflow = "hidden";
+    root.style.overflow = "hidden";
+    root.style.overscrollBehavior = "none";
+    const onBreakpointChange = (event: MediaQueryListEvent) => {
+      if (!event.matches) setMobileOpen(false);
+    };
+    mobile.addEventListener("change", onBreakpointChange);
+    return () => {
+      mobile.removeEventListener("change", onBreakpointChange);
+      body.style.position = previous.position;
+      body.style.top = previous.top;
+      body.style.left = previous.left;
+      body.style.right = previous.right;
+      body.style.width = previous.width;
+      body.style.overflow = previous.bodyOverflow;
+      root.style.overflow = previous.rootOverflow;
+      root.style.overscrollBehavior = previous.overscroll;
+      const reset = resetScrollAfterMobileNavigation.current;
+      resetScrollAfterMobileNavigation.current = false;
+      window.scrollTo(reset ? 0 : x, reset ? 0 : y);
+    };
+  }, [mobileOpen]);
 
   // The Pages demo preserves its existing browser-only snapshot contract.
   // Firebase never persists a render/effect: business mutations call commands.
@@ -451,6 +497,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
   }
 
   function navigateRoute(next:WorkspaceRoute,{replace=false}:{replace?:boolean}={}) {
+    if (mobileOpen) resetScrollAfterMobileNavigation.current = true;
     const target=hrefForWorkspaceRoute(next,routeEnvironment);
     if(window.location.pathname+window.location.hash!==target) {
       window.history[replace?"replaceState":"pushState"](null,"",target);
@@ -477,6 +524,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
 
   useEffect(()=>{
     const onNavigation=()=>{
+      if (mobileOpen) resetScrollAfterMobileNavigation.current = true;
       const next=routeFromLocation(window.location,routeEnvironment);
       applyRoute(next);
       onRouteChange?.(next);

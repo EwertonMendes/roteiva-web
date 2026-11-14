@@ -152,3 +152,6 @@ Na Visão Geral, a página ocupa a largura disponível da coluna principal, com 
 
 ### Gaveta de navegação mobile — 14/11/2026
 No menu hambúrguer (até 820px), aplicar glassmorphism de alta opacidade **no componente de sidebar mobile, incluindo o estado de transição, para evitar mudança abrupta do fundo ao abrir/fechar**: gradiente escuro ~94–96,5% ou claro ~94–97,5%, blur 20px, saturação 115%, borda e sombra suaves. O scrim externo fica mais escuro para destacar a gaveta. Em navegadores sem suporte a backdrop-filter, usar fundo sólido legível. Não modificar a sidebar fixa de desktop, o estado fechado, tipografia/nav items ou a lógica de abrir/fechar. QA deve verificar ambos os temas e a ausência de conteúdo da página atravessando as letras.
+
+### Scroll ao abrir a sidebar mobile — 14/11/2026
+A gaveta do menu hambúrguer impede o scroll da página ao fundo, inclusive em iOS Safari: `useLayoutEffect` fixa o body no offset de scroll atual, bloqueia overflow do html e preserva/recupera os estilos inline. Fechar o menu restaura a posição exata; navegar pelo menu leva a nova página ao topo. Ao mudar para breakpoint desktop ou desmontar, a limpeza remove o bloqueio. A lista interna de navegação conserva a rolagem vertical e o drawer mantém o glassmorphism existente. Sem alterar PROD.

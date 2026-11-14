@@ -499,3 +499,10 @@
     :root:not([data-theme="dark"]) .app-shell .sidebar {background:#f4f4f7;}
   }
 }
+
+/* The overlay consumes touch movement; only the menu's internal list scrolls. */
+@media(max-width:820px) {
+  .app-shell .mobile-scrim { touch-action:none; overscroll-behavior:contain; }
+  .app-shell .sidebar { overscroll-behavior:contain; }
+  .app-shell .sidebar nav { touch-action:pan-y; overscroll-behavior:contain; }
+}
