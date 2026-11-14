@@ -524,7 +524,11 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
 
   useEffect(()=>{
     const onNavigation=()=>{
-      if (mobileOpen) resetScrollAfterMobileNavigation.current = true;
+      // popstate/hashchange handler is registered once, so don't rely on a
+      // potentially stale mobileOpen closure when deciding the restore target.
+      if (document.body.style.position === "fixed" && window.matchMedia("(max-width: 820px)").matches) {
+        resetScrollAfterMobileNavigation.current = true;
+      }
       const next=routeFromLocation(window.location,routeEnvironment);
       applyRoute(next);
       onRouteChange?.(next);
