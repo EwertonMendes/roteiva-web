@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import {BrandLogo} from "./features/ui/BrandLogo";
 
 /** Decorative effects stay outside the workspace state and never delay data requests. */
 export function SiteExperience() {
@@ -45,7 +46,7 @@ export function SiteExperience() {
   // animation loops, portals or native cursor overrides are installed.
   return intro !== "done" ? <div className={`brand-intro brand-intro-${intro}`} aria-hidden="true">
     <div className="brand-intro-corner"><span>ROTEIVA</span><span>SEU ESPAÇO DE PRODUÇÃO</span></div>
-    <div className="brand-intro-center"><div className="brand-intro-wordmark"><img src={`${import.meta.env.BASE_URL}roteiva-logo-white.png`} alt=""/></div><div className="brand-intro-track"><span ref={bar}/></div></div>
+    <div className="brand-intro-center"><div className="brand-intro-wordmark"><BrandLogo theme="dark" alt=""/></div><div className="brand-intro-track"><span ref={bar}/></div></div>
     <div className="brand-intro-footer"><span>DA IDEIA À ENTREGA.</span><span>EM SINTONIA.</span></div>
   </div> : null;
 }

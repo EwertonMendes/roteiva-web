@@ -25,6 +25,7 @@ import { ClientDetail, StudioReviews, projectTemplates } from "./studio-features
 import {FinancePanel} from "./features/finance/FinancePanel";
 import {ReviewsDashboard} from "./features/reviews/ReviewsDashboard";
 import { TodayStudio } from "./features/dashboard/DashboardOverview";
+import {BrandLogo} from "./features/ui/BrandLogo";
 import { ActivityHistoryDrawer } from "./features/dashboard/ActivityHistory";
 import { validTimeRange, overlaps, eventRange, eventDuration } from "./studio-calendar";
 import { toISO as toISOAdded, parseMoney, splitInstallments } from "./studio-finance";
@@ -514,7 +515,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     <div className={`app-shell app-view-${view}${view==="clients"&&!selectedClient?" app-client-directory":""}`} inert={saving || undefined}>
       <aside className={`sidebar ${mobileOpen ? "mobile-open" : ""}`}>
         <div className="brand-lockup">
-          <img src={`${import.meta.env.BASE_URL}${theme === "light" ? "roteiva-logo-black.png" : "roteiva-logo-white.png"}`} alt="Roteiva" />
+          <BrandLogo theme={theme} />
           <AppButton className="mobile-close" onClick={() => setMobileOpen(false)} aria-label="Fechar menu"><X size={18} /></AppButton>
         </div>
         <nav>
