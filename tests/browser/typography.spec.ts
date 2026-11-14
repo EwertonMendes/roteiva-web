@@ -127,3 +127,19 @@ test("sidebar has no redundant workspace card and keeps user profile anchored", 
   expect(offsets.sidebarBottom - offsets.profileBottom).toBeGreaterThanOrEqual(0);
   expect(offsets.sidebarBottom - offsets.profileBottom).toBeLessThanOrEqual(40);
 });
+
+test("public institutional pages and auth use the official monochrome identity",async({page})=>{
+  await page.goto(app+"/");
+  const authLogo=page.locator(".auth-story-logo");
+  await expect(authLogo).toHaveAttribute("src","/brand/roteiva-wordmark-white.svg");
+  await expect.poll(()=>authLogo.evaluate((img:HTMLImageElement)=>img.complete&&img.naturalWidth>0)).toBe(true);
+  await expect(page.locator(".auth-story-art svg")).toBeVisible();
+  await expect(page.locator(".auth-art-dot")).toHaveCount(0);
+  for(const path of ["sobre.html","suporte.html","privacidade.html","termos.html"]){
+    await page.goto(app+"/"+path);
+    const logo=page.locator("header img");
+    await expect(logo).toHaveAttribute("src","/brand/roteiva-wordmark-black.svg");
+    await expect.poll(()=>logo.evaluate((img:HTMLImageElement)=>img.complete&&img.naturalWidth>0)).toBe(true);
+    await expect(page.locator('link[rel="icon"]')).toHaveAttribute("href","/brand/roteiva-symbol-black.svg");
+  }
+});

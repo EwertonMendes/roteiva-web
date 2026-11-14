@@ -118,7 +118,7 @@ A barra global de estúdio, busca e ações e a faixa “Seu espaço / Dados na 
 
 ## Cards de Projetos — 21/10/2026
 
-Layout inspirado no mockup aprovado: painel arredondado com filtros, contagem de resultados, cards com título, cliente, situação, progresso e rodapé de prazo/tipo. Manter Clapperboard, Eye, Wrench e BadgeCheck com azul, amarelo, roxo e verde. Sem Drive conectado, não reservar área de fotografia nem mostrar edição de capa. Com capa disponível, mídia 2,5:1, ações legíveis sobre a imagem e edição direta por arraste, roda e pinça, com botões compactos de zoom/redefinição e teclado. Claro/escuro, filtros roláveis no celular e foco visível são obrigatórios.
+Layout inspirado no mockup aprovado: painel arredondado com filtros, contagem de resultados, cards com título, cliente, situação, progresso e rodapé de prazo/tipo. Manter Clapperboard, Eye, Wrench e BadgeCheck com azul, amarelo, roxo e verde. Sem Google Drive/Dropbox conectado, mostrar a área vazia da capa com o botão Adicionar capa; o editor orienta a conexão sem conceder acesso a arquivos. Com capa disponível, mídia 2,5:1, ações legíveis sobre a imagem e edição direta por arraste, roda e pinça, com botões compactos de zoom/redefinição e teclado. Claro/escuro, filtros roláveis no celular e foco visível são obrigatórios.
 
 No editor, remover sliders de posição e zoom. Preservar o foco visual ao ampliar, mostrar guias durante o arraste e manter o recorte idêntico ao card. O botão “Carregar mais imagens” deve ter ícone, ficar centralizado e separado da grade por pelo menos 20 px. Modais mantêm cursor nativo visível, incluindo grab/grabbing na área de recorte.
 

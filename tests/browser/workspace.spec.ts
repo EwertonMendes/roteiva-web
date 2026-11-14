@@ -117,6 +117,12 @@ test("Google emulator session, CRUD, restoration, themes and separate users",asy
   await page.getByLabel("Data do trabalho",{exact:true}).fill(today);
   await page.getByLabel("Horário de término",{exact:true}).fill("10:00");
   await page.getByRole("button",{name:"Salvar compromisso"}).click();await settled(page);
+  const busyDay=page.locator(".calendar-grid > button:has(.event-chip)").filter({hasText:"Gravação Aurora"}).first();
+  await busyDay.click();
+  await expect(page.getByRole("button",{name:"Adicionar outro compromisso"})).toBeVisible();
+  await page.getByRole("button",{name:"Adicionar outro compromisso"}).click();
+  await expect(page.getByLabel("Data do trabalho",{exact:true})).toHaveValue(today);
+  await page.getByRole("button",{name:"Cancelar",exact:true}).click();
   if(info.project.name==="mobile")await page.getByRole("button",{name:"Abrir menu",exact:true}).click();
   await page.getByRole("button",{name:"Opções da conta",exact:true}).click();
   await page.getByRole("button",{name:"Ativar modo escuro",exact:true}).click();await settled(page);
