@@ -471,7 +471,7 @@
    page (including dense project cards and finance charts). Desktop unchanged.
    High-opacity glass reduces visual bleed; the blur provides soft depth. */
 @media (max-width:820px) {
-  .app-shell .sidebar.mobile-open {
+  .app-shell .sidebar {
     color:#f5f5f7;
     background:linear-gradient(155deg,rgba(24,25,28,.965),rgba(14,15,18,.94));
     border-right:1px solid rgba(255,255,255,.14);
@@ -479,7 +479,7 @@
     -webkit-backdrop-filter:blur(20px) saturate(115%);
     backdrop-filter:blur(20px) saturate(115%);
   }
-  :root:not([data-theme="dark"]) .app-shell .sidebar.mobile-open {
+  :root:not([data-theme="dark"]) .app-shell .sidebar {
     color:#18191d;
     background:linear-gradient(155deg,rgba(250,250,252,.975),rgba(237,239,244,.94));
     border-right:1px solid rgba(255,255,255,.72);
@@ -492,7 +492,7 @@
 /* Legible, opaque fallback on browsers without compositor backdrop filters. */
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
   @media (max-width:820px) {
-    .app-shell .sidebar.mobile-open {background:#191a1d;}
-    :root:not([data-theme="dark"]) .app-shell .sidebar.mobile-open {background:#f4f4f7;}
+    .app-shell .sidebar {background:#191a1d;}
+    :root:not([data-theme="dark"]) .app-shell .sidebar {background:#f4f4f7;}
   }
 }

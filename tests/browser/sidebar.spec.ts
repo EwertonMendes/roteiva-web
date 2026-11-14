@@ -68,7 +68,7 @@ test('mobile hamburger drawer uses readable glass in both themes without changin
  await expect(sidebar).toHaveClass(/mobile-open/);
  const inspect=()=>sidebar.evaluate(el=>{
    const style=getComputedStyle(el);
-   const stops=[...style.backgroundImage.matchAll(/rgba?\\(([^)]+)\\)/g)]
+   const stops=[...style.backgroundImage.matchAll(/rgba?\(([^)]+)\)/g)]
      .map(m=>m[1].split(',').map(c=>Number(c.trim())));
    return {stops,blur:style.backdropFilter||style.webkitBackdropFilter,
      text:style.color,nav:getComputedStyle(el.querySelector('nav > button')!).color,
