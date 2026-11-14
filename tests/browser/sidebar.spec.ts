@@ -104,7 +104,9 @@ test('mobile drawer locks page scroll, restores the position and permits routing
  const previous=await page.evaluate(()=>window.scrollY);
  expect(previous).toBeGreaterThan(30);
  const drawer=page.locator('.sidebar');
- const open=()=>page.getByRole('button',{name:'Abrir menu',exact:true}).click();
+ // The fixed bottom-bar More action is available at any scroll position.
+ // Clicking the top hamburger would make Playwright auto-scroll it into view.
+ const open=()=>page.getByRole('button',{name:'Mais opções de navegação',exact:true}).click();
  await open();
  await expect(drawer).toHaveClass(/mobile-open/);
  await expect.poll(()=>page.evaluate(()=>document.body.style.position)).toBe('fixed');
