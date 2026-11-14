@@ -716,3 +716,5 @@ button:disabled { opacity: .5; cursor: wait; }
 @media(max-width:820px) { .page-menu-button { display:grid; min-width:44px; min-height:44px; } }
 
 .workspace-save-warning { max-width: 360px; margin: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--subtle); color: var(--ink); font-size: var(--type-support); line-height: 1.45; }
+
+.agenda-add-another{display:inline-flex;align-items:center;gap:7px;min-height:42px;margin:14px 16px 0;padding:8px 13px;font-size:var(--type-support)}

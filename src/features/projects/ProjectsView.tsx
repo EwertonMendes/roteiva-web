@@ -14,7 +14,7 @@ function ProjectCard({project,onOpen,onEdit,eager=false}:{project:Project;onOpen
  const context=useDriveCovers();const box=useRef<HTMLElement>(null);const [visible,setVisible]=useState(eager);
  useEffect(()=>{if(eager||visible)return;const observer=new IntersectionObserver(([entry])=>{if(entry.isIntersecting){setVisible(true);observer.disconnect();}},{rootMargin:'320px'});if(box.current)observer.observe(box.current);return ()=>observer.disconnect();},[eager,visible]);
  const {src,error,loading}=useCoverImage(project.cover,eager||visible,true,true);
- const canEdit=!!context?.connections.length;
+ const canEdit=!!context; // Keep 'Adicionar capa' discoverable before a provider is connected.
  const hasCover=!!project.cover;
  return <article className="pc-card" ref={box}>
   <div className={"pc-photo"+(hasCover?"":" pc-photo--empty")} data-cover-state={!hasCover?"empty":src?"loaded":error?"unavailable":loading?"loading":"pending"}>

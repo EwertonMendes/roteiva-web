@@ -572,3 +572,9 @@
   .app-view-finance .heading-actions button,
   .app-view-finance .finance-layout button { transition: none !important; }
 }
+
+/* Functional privacy toggle, keeping the approved metric layout. */
+.app-view-finance .finance-received-visibility{display:inline-grid;place-items:center;flex:0 0 36px;width:36px;height:36px;padding:4px;margin:-6px -6px -6px 0;border:1px solid transparent;border-radius:9px;background:transparent;color:var(--finance-ink);cursor:pointer}
+.app-view-finance .finance-received-visibility:hover,.app-view-finance .finance-received-visibility:focus-visible{background:var(--subtle);border-color:var(--finance-line)}
+.app-view-finance .finance-received-visibility svg{width:23px;height:23px;opacity:.88}
+
