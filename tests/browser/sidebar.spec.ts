@@ -56,3 +56,41 @@ test('account menu reverses its animation safely and respects reduced motion',as
  expect(await panel.evaluate(el=>getComputedStyle(el).animationDuration)).toBe('0.001s');
  await page.keyboard.press('Escape');await expect(panel).toHaveCount(0);
 });
+
+test('mobile hamburger drawer uses readable glass in both themes without changing desktop',async({page},info)=>{
+ test.skip(info.project.name!=='mobile','Mobile drawer contract');
+ await page.setViewportSize({width:390,height:844});
+ await page.goto('http://127.0.0.1:4174/');
+ await expect(page.locator('.app-shell')).toBeVisible();
+ await page.locator('.brand-intro').waitFor({state:'detached'});
+ const sidebar=page.locator('.sidebar');
+ await page.getByRole('button',{name:'Abrir menu',exact:true}).click();
+ await expect(sidebar).toHaveClass(/mobile-open/);
+ const inspect=()=>sidebar.evaluate(el=>{
+   const style=getComputedStyle(el);
+   const stops=[...style.backgroundImage.matchAll(/rgba?\\(([^)]+)\\)/g)]
+     .map(m=>m[1].split(',').map(c=>Number(c.trim())));
+   return {stops,blur:style.backdropFilter||style.webkitBackdropFilter,
+     text:style.color,nav:getComputedStyle(el.querySelector('nav > button')!).color,
+     width:el.getBoundingClientRect().width};
+ });
+ const assertGlass=(glass:Awaited<ReturnType<typeof inspect>>)=>{
+   expect(glass.stops.length).toBeGreaterThanOrEqual(2);
+   expect(glass.stops.slice(0,2).every(stop=>stop[3]>=.93),'opaque enough for legibility').toBe(true);
+   expect(glass.blur).toContain('blur(');
+   expect(glass.width).toBeLessThanOrEqual(310);
+ };
+ let glass=await inspect();assertGlass(glass);
+ expect(glass.text).toBe('rgb(24, 25, 29)');
+ await expect(sidebar.getByRole('button',{name:/^Projetos/})).toBeVisible();
+ const scrim=page.getByRole('button',{name:'Fechar menu',exact:true}).last();
+ await expect(scrim).toBeVisible();
+ await page.getByRole('button',{name:'Opções da conta',exact:true}).click();
+ await page.getByRole('button',{name:'Ativar modo escuro',exact:true}).click();
+ await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
+ glass=await inspect();assertGlass(glass);
+ expect(glass.text).toBe('rgb(245, 245, 247)');
+ await expect(sidebar.getByRole('button',{name:/^Biblioteca/})).toBeVisible();
+ await page.getByRole('button',{name:'Fechar menu',exact:true}).first().click();
+ await expect(sidebar).not.toHaveClass(/mobile-open/);
+});
