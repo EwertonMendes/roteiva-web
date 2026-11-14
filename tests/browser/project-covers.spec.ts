@@ -47,6 +47,12 @@ test('project covers require Drive, persist crop, cancel safely and support remo
  let releaseList!:()=>void,releaseImage!:()=>void;
  const listGate=new Promise<void>(resolve=>{releaseList=resolve;}),imageGate=new Promise<void>(resolve=>{releaseImage=resolve;});
 
+ // Simulate both providers reliably: an unmocked Dropbox request is a
+ // connection error, not the expected state of no connected accounts.
+ await page.route('http://127.0.0.1:8787/integrations/dropbox**',route=>{
+  const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Allow-Methods':'GET, OPTIONS'};
+  return route.fulfill(route.request().method()==='OPTIONS'?{status:204,headers}:{headers,json:{connections:[]}});
+ });
  await page.route('http://127.0.0.1:8787/integrations/drive**',async route=>{
   const path=new URL(route.request().url()).pathname;
   const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Allow-Methods':'GET, OPTIONS'};
