@@ -283,6 +283,7 @@ test("upload uses file picker and drag-and-drop, confirms Drive and updates the 
     name:"Novo arquivo.txt",mimeType:"text/plain",buffer:Buffer.from("abc")
   });
   const queue=page.getByLabel("Transferências de arquivos");
+  if(info.project.name==="mobile")await queue.getByRole("button",{name:"Expandir transferências"}).click();
   await expect(queue.getByText("Arquivo enviado para Campanha de vídeos")).toBeVisible();
   await expect(panel.locator(".rl-files .rl-file-open").filter({hasText:"Novo arquivo.txt"})).toBeVisible();
   expect(seen.filter(x=>x.kind==="init")).toHaveLength(1);
@@ -328,6 +329,7 @@ test('queue limits concurrency, keeps its destination across workspace navigatio
   const panel=await openUploadFolder(page,'drive-queue-'+info.project.name+'@example.com');
   await panel.getByLabel('Selecionar arquivos para enviar').setInputFiles(['one','two','three'].map(name=>({name:name+'.txt',mimeType:'text/plain',buffer:Buffer.from('abc')})));
   const queue=page.getByLabel('Transferências de arquivos');
+  if(info.project.name==='mobile')await queue.getByRole('button',{name:'Expandir transferências'}).click();
   await expect.poll(()=>started).toBe(2);
   await expect(queue.getByText('Na fila')).toBeVisible();
   await queue.getByRole('button',{name:'Cancelar envio de three.txt'}).click();
@@ -385,6 +387,7 @@ test('failed confirmation retries only verification and keeps list/grid and loca
   const panel=await openUploadFolder(page,'drive-verify-'+info.project.name+'@example.com');
   await panel.getByLabel('Selecionar arquivos para enviar').setInputFiles({name:'Final.mp4',mimeType:'video/mp4',buffer:Buffer.from('abc')});
   const queue=page.getByLabel('Transferências de arquivos');
+  if(info.project.name==='mobile')await queue.getByRole('button',{name:'Expandir transferências'}).click();
   await expect(queue.getByRole('button',{name:'Verificar conclusão de Final.mp4'})).toBeVisible();
   await queue.getByRole('button',{name:'Verificar conclusão de Final.mp4'}).click();
   await expect(queue.getByText('Arquivo enviado para Campanha de vídeos')).toBeVisible();
@@ -462,6 +465,7 @@ test('network recovery resumes the same session after a fresh remote probe witho
   const panel=await openUploadFolder(page,'drive-resume-'+info.project.name+'@example.com');
   await panel.getByLabel('Selecionar arquivos para enviar').setInputFiles({name:file.name,mimeType:file.mimeType,buffer:Buffer.alloc(400000)});
   const queue=page.getByLabel('Transferências de arquivos');
+  if(info.project.name==='mobile')await queue.getByRole('button',{name:'Expandir transferências'}).click();
   const resume=queue.getByRole('button',{name:'Retomar envio de Retomavel.mp4'});
   await expect(resume).toBeVisible();outage=false;
   await resume.click();

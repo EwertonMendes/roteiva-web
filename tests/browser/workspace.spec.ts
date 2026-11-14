@@ -106,6 +106,12 @@ test("Google emulator session, CRUD, restoration, themes and separate users",asy
   await page.getByRole("button",{name:"Mostrar valores financeiros"}).click();
   await expect(page.locator(".flow-finance-amount")).toContainText("R$ 100,01");
   await navigate(page,"Calendário");
+  const emptyDay=page.locator(".calendar-grid > button:not(.outside):not(:has(.event-chip))").first();
+  const day=Number(await emptyDay.locator("b").first().innerText());
+  await emptyDay.click();
+  await expect(page.getByRole("dialog",{name:"Novo compromisso"})).toBeVisible();
+  await expect(page.getByLabel("Data do trabalho",{exact:true})).toHaveValue(today.slice(0,7)+"-"+String(day).padStart(2,"0"));
+  await page.getByRole("button",{name:"Cancelar",exact:true}).click();
   await page.getByRole("button",{name:"Novo compromisso",exact:true}).click();
   await page.getByLabel("Título",{exact:true}).fill("Gravação Aurora");
   await page.getByLabel("Data do trabalho",{exact:true}).fill(today);

@@ -16,7 +16,7 @@ test('sidebar unifies routes, preserves the brand colors and moves appearance in
  await page.screenshot({path:info.outputPath('sidebar-light.png')});
  await page.keyboard.press('Escape');await expect(menu).toHaveCount(0);await expect(page.getByRole('button',{name:'Opções da conta',exact:true})).toBeFocused();
  await page.getByRole('button',{name:'Opções da conta',exact:true}).click();await page.getByRole('button',{name:'Ativar modo escuro',exact:true}).click();
- await expect(page.locator('html')).toHaveAttribute('data-theme','dark');await expect(logo).toHaveAttribute('src','/roteiva-logo-white.png');expect(await logo.evaluate(el=>getComputedStyle(el).filter)).toBe('none');
+ await expect(page.locator('html')).toHaveAttribute('data-theme','dark');await expect(logo).toHaveAttribute('src','/brand/roteiva-wordmark-white.svg');expect(await logo.evaluate(el=>getComputedStyle(el).filter)).toBe('none');
  await expect(menu).toBeVisible();await expect(page.getByRole('button',{name:'Ativar modo claro',exact:true})).toBeFocused();
  await expect(page.locator('.toast')).toHaveCount(0);
  await page.screenshot({path:info.outputPath('sidebar-dark.png')});

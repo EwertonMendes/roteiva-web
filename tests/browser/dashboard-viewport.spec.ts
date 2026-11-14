@@ -21,7 +21,7 @@ async function createWorkspace(page:Page,email:string) {
   await expect(page.locator("[aria-busy]").first()).toHaveAttribute("aria-busy","false");
 }
 
-test("desktop overview fits viewport without page scrolling",async({page},info)=>{
+test("desktop overview stays content-sized and scrolls naturally only when needed",async({page},info)=>{
   test.skip(info.project.name==="mobile","Desktop-specific viewport contract");
   await createWorkspace(page,"dashboard-viewport-"+info.project.name+"@example.com");
   await expect(page.locator(".flow-overview")).toContainText("O ritmo do seu estúdio");
@@ -49,11 +49,10 @@ test("desktop overview fits viewport without page scrolling",async({page},info)=
         profile:el(".sidebar-profile"),
       };
     });
-    expect(sizes.bodyHeight,`body at ${width}x${height}`).toBeLessThanOrEqual(sizes.viewportHeight+2);
-    expect(sizes.docHeight,`document at ${width}x${height}`).toBeLessThanOrEqual(sizes.viewportHeight+2);
     expect(sizes.docWidth,`horizontal document at ${width}x${height}`).toBeLessThanOrEqual(sizes.viewportWidth+2);
-    expect(sizes.card.bottom,`card bottom at ${width}x${height}`).toBeLessThanOrEqual(sizes.viewportHeight+1);
-    expect(sizes.activity.bottom,`activity at ${width}x${height}`).toBeLessThanOrEqual(sizes.viewportHeight+1);
+    expect(sizes.card.width,`card width at ${width}x${height}`).toBeLessThan(1360);
+    expect(sizes.card.height,`content-sized dashboard at ${width}x${height}`).toBeLessThan(760);
+    expect(sizes.activity.bottom,`activity accessible at ${width}x${height}`).toBeLessThanOrEqual(sizes.bodyHeight+2);
     expect(sizes.activity.top,`activity remains visible at ${width}x${height}`).toBeGreaterThan(sizes.card.top);
     expect(sizes.profile.bottom,`profile at ${width}x${height}`).toBeLessThanOrEqual(sizes.viewportHeight+1);
     expect(sizes.heading.bottom,`heading precedes card at ${width}x${height}`).toBeLessThan(sizes.card.top+1);
