@@ -1,5 +1,10 @@
 # Roadmap vivo — Roteiva MVP
 
+## Correção pós-merge — legibilidade do panorama (14/11/2026)
+- [x] O QA integral da master mergeada `edfa60b7` identificou um único desvio de tipografia: subtítulo da Visão Geral com 15px no desktop, contra o limite de 16px do design system. Ajustado o mínimo para 16px.
+- [x] A suíte focada `overview` passou a incluir `tests/browser/typography.spec.ts` além das verificações geométricas de `dashboard-viewport.spec.ts`, para impedir regressão de legibilidade.
+- [ ] Validar a correção por QA focado e CI no SHA da PR; integrar na master e confirmar deploy DEV. Sem alteração de PROD.
+
 ## Revisão editorial final — PR #125 (13/11/2026)
 - [x] **IMPLEMENTADO EM BRANCH:** assets monocromáticos oficiais, marca compartilhada no login/navegação/splash, lente vetorial de referência, dashboard compacto e cards de agenda/atividade lado a lado.
 - [x] **IMPLEMENTADO EM BRANCH:** ação de adicionar capa disponível sem conexão, controle Já recebido, calendário por clique na data e botão Adicionar outro compromisso; sem alteração de schemas, de autorização ou de API.
