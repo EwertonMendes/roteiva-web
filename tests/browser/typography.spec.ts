@@ -83,19 +83,19 @@ test("settings forms stay at 16px or larger on mobile",async({page},info)=>{
 test("sidebar logo always loads from site root on nested Firebase routes and in both themes",async({page},info)=>{
   await enterWorkspace(page,"logo-base-"+info.project.name+"@example.com");
   const logo=page.locator(".brand-lockup img");
-  await expect(logo).toHaveAttribute("src",/^\/roteiva-logo-(black|white)\.png$/);
+  await expect(logo).toHaveAttribute("src",/^\/brand\/roteiva-wordmark-(black|white)\.svg$/);
   await expect.poll(()=>logo.evaluate((img:HTMLImageElement)=>img.complete && img.naturalWidth>0)).toBe(true);
   await page.goto(app+"/projetos/123");
   await expect(page.locator(".app-shell")).toBeVisible();
-  await expect(logo).toHaveAttribute("src",/^\/roteiva-logo-(black|white)\.png$/);
+  await expect(logo).toHaveAttribute("src",/^\/brand\/roteiva-wordmark-(black|white)\.svg$/);
   await expect.poll(()=>logo.evaluate((img:HTMLImageElement)=>img.complete && img.naturalWidth>0)).toBe(true);
   await page.reload();
-  await expect(logo).toHaveAttribute("src",/^\/roteiva-logo-(black|white)\.png$/);
+  await expect(logo).toHaveAttribute("src",/^\/brand\/roteiva-wordmark-(black|white)\.svg$/);
   await expect.poll(()=>logo.evaluate((img:HTMLImageElement)=>img.complete && img.naturalWidth>0)).toBe(true);
   if(info.project.name==="desktop"){
     await page.getByRole("button",{name:"Opções da conta",exact:true}).click();
     await page.getByRole("button",{name:"Ativar modo escuro"}).click();
-    await expect(logo).toHaveAttribute("src","/roteiva-logo-white.png");
+    await expect(logo).toHaveAttribute("src","/brand/roteiva-wordmark-white.svg");
     await expect.poll(()=>logo.evaluate((img:HTMLImageElement)=>img.complete && img.naturalWidth>0)).toBe(true);
   }
 });
@@ -104,7 +104,7 @@ test("local demo loads its logo from the site root, without the retired Pages pr
   await page.goto("http://127.0.0.1:4174/");
   const logo=page.locator(".brand-lockup img");
   await expect(logo).toBeVisible();
-  await expect(logo).toHaveAttribute("src",/^\/roteiva-logo-(black|white)\.png$/);
+  await expect(logo).toHaveAttribute("src",/^\/brand\/roteiva-wordmark-(black|white)\.svg$/);
   await expect.poll(()=>logo.evaluate((img:HTMLImageElement)=>img.complete && img.naturalWidth>0)).toBe(true);
 });
 
@@ -126,4 +126,27 @@ test("sidebar has no redundant workspace card and keeps user profile anchored", 
   });
   expect(offsets.sidebarBottom - offsets.profileBottom).toBeGreaterThanOrEqual(0);
   expect(offsets.sidebarBottom - offsets.profileBottom).toBeLessThanOrEqual(40);
+});
+
+test("public institutional pages and auth use the official monochrome identity",async({page})=>{
+  await page.goto(app+"/");
+  const authLogo=page.locator(".auth-story-logo");
+  await expect(authLogo).toHaveAttribute("src","/brand/roteiva-wordmark-white.svg");
+  await expect.poll(()=>authLogo.evaluate((img:HTMLImageElement)=>img.complete&&img.naturalWidth>0)).toBe(true);
+  await expect(page.locator(".auth-story-art svg")).toBeVisible();
+  await expect(page.locator(".camera-lens-blade")).toHaveCount(6);
+  const googleLogo=page.locator(".auth-google-g svg");
+  await expect(googleLogo).toBeVisible();
+  await expect(googleLogo.locator("path")).toHaveCount(4);
+  expect(await googleLogo.locator("path").evaluateAll(nodes=>nodes.map(node=>node.getAttribute("fill"))))
+    .toEqual(["#EA4335","#4285F4","#FBBC05","#34A853"]);
+  await expect(page.locator(".auth-google-g")).not.toHaveText("G");
+  await expect(page.locator(".auth-art-dot")).toHaveCount(0);
+  for(const path of ["sobre.html","suporte.html","privacidade.html","termos.html"]){
+    await page.goto(app+"/"+path);
+    const logo=page.locator("header img");
+    await expect(logo).toHaveAttribute("src","/brand/roteiva-wordmark-black.svg");
+    await expect.poll(()=>logo.evaluate((img:HTMLImageElement)=>img.complete&&img.naturalWidth>0)).toBe(true);
+    await expect(page.locator('link[rel="icon"]')).toHaveAttribute("href","/brand/roteiva-symbol-black.svg");
+  }
 });

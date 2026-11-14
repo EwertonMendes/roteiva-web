@@ -47,6 +47,12 @@ test('project covers require Drive, persist crop, cancel safely and support remo
  let releaseList!:()=>void,releaseImage!:()=>void;
  const listGate=new Promise<void>(resolve=>{releaseList=resolve;}),imageGate=new Promise<void>(resolve=>{releaseImage=resolve;});
 
+ // Simulate both providers reliably: an unmocked Dropbox request is a
+ // connection error, not the expected state of no connected accounts.
+ await page.route('http://127.0.0.1:8787/integrations/dropbox**',route=>{
+  const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Allow-Methods':'GET, OPTIONS'};
+  return route.fulfill(route.request().method()==='OPTIONS'?{status:204,headers}:{headers,json:{connections:[]}});
+ });
  await page.route('http://127.0.0.1:8787/integrations/drive**',async route=>{
   const path=new URL(route.request().url()).pathname;
   const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Allow-Methods':'GET, OPTIONS'};
@@ -56,8 +62,11 @@ test('project covers require Drive, persist crop, cancel safely and support remo
   return route.fulfill({headers,json:{connections:connected?[{id:activeConnectionId,google_email:'qa@example.com',status:'connected',scopes:'https://www.googleapis.com/auth/drive.readonly'}]:[]}});
  });
  await register(page,'cover-'+info.project.name+'@example.com');
- await expect(page.getByRole('button',{name:'Adicionar capa',exact:true})).toHaveCount(0);await expect(page.locator('.pc-photo')).toHaveCount(1);await expect(page.locator('.pc-photo')).toHaveAttribute('data-cover-state','empty');
+ await expect(page.getByRole('button',{name:'Adicionar capa',exact:true})).toHaveCount(1);await expect(page.locator('.pc-photo')).toHaveCount(1);await expect(page.locator('.pc-photo')).toHaveAttribute('data-cover-state','empty');
  const emptyCoverHeight=await page.locator('.pc-photo').evaluate(el=>el.getBoundingClientRect().height);
+ await page.getByRole('button',{name:'Adicionar capa',exact:true}).click();
+ await expect(page.getByText(/Nenhuma conta com acesso ativo/)).toBeVisible();
+ await page.getByRole('button',{name:'Fechar editor de capa'}).click();
  png=Buffer.from(await page.evaluate(()=>{const c=document.createElement('canvas');c.width=1200;c.height=800;const ctx=c.getContext('2d')!;const g=ctx.createLinearGradient(0,0,1200,800);g.addColorStop(0,'#08527d');g.addColorStop(.5,'#d88229');g.addColorStop(1,'#18182c');ctx.fillStyle=g;ctx.fillRect(0,0,1200,800);ctx.fillStyle='#ffffff30';for(let x=50;x<1200;x+=100)ctx.fillRect(x,100,20,600);return c.toDataURL('image/png').split(',')[1];}),'base64');
  connected=true;await page.reload();if(info.project.name==='desktop'){await page.getByRole('button',{name:'Opções da conta',exact:true}).click();await page.getByRole('button',{name:'Ativar modo escuro',exact:true}).click();}await page.getByRole('button',{name:'Adicionar capa',exact:true}).click();
  const modal=page.locator('.pc-dialog');

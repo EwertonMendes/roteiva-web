@@ -1,7 +1,7 @@
 import {useState} from "react";
 import {
   CalendarDays, CalendarRange, UsersRound, ListFilter, Download, TrendingUp,
-  Eye, ReceiptText, Scale, TriangleAlert, ChartColumnIncreasing,
+  Eye, EyeOff, ReceiptText, Scale, TriangleAlert, ChartColumnIncreasing,
   ChartPie, FileText, Plus, Pencil, Trash2, Clock3, CircleCheck,
 } from "lucide-react";
 import {AppButton} from "../ui/AppButton";
@@ -32,6 +32,7 @@ export function FinancePanel({entries,clients,onAdd,onEdit,onDelete,onPeriodChan
   const [month,setMonth]=useState(now.getMonth());
   const [client,setClient]=useState("");
   const [status,setStatus]=useState("");
+  const [receivedVisible,setReceivedVisible]=useState(true);
   const years=Array.from(new Set([
     now.getFullYear()+1,...Array.from({length:16},(_,i)=>now.getFullYear()-i),
     ...entries.map(e=>Number(toISO(e.date).slice(0,4))),
@@ -102,8 +103,14 @@ export function FinancePanel({entries,clients,onAdd,onEdit,onDelete,onPeriodChan
         <p>{incomes.length} {incomes.length===1?"lançamento":"lançamentos"} no período</p>
       </article>
       <article>
-        <small className="finance-metric-label"><span>JÁ RECEBIDO</span><Eye size={23} aria-hidden="true"/></small>
-        <strong>{formatMoney(received)}</strong><p>{formatMoney(pending)} a receber</p>
+        <small className="finance-metric-label"><span>JÁ RECEBIDO</span><AppButton type="button" className="finance-received-visibility"
+          aria-label={receivedVisible?"Ocultar valores recebidos":"Mostrar valores recebidos"}
+          aria-pressed={!receivedVisible} title={receivedVisible?"Ocultar valores":"Mostrar valores"}
+          onClick={()=>setReceivedVisible(value=>!value)}>
+          {receivedVisible?<Eye size={23} aria-hidden="true"/>:<EyeOff size={23} aria-hidden="true"/>}
+        </AppButton></small>
+        <strong>{receivedVisible?formatMoney(received):"••••••"}</strong>
+        <p>{receivedVisible?formatMoney(pending):"••••••"} a receber</p>
       </article>
       <article>
         <small className="finance-metric-label"><span>CUSTOS DO MÊS</span><ReceiptText size={23} aria-hidden="true"/></small>

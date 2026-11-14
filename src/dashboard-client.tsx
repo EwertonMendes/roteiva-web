@@ -25,6 +25,7 @@ import { ClientDetail, StudioReviews, projectTemplates } from "./studio-features
 import {FinancePanel} from "./features/finance/FinancePanel";
 import {ReviewsDashboard} from "./features/reviews/ReviewsDashboard";
 import { TodayStudio } from "./features/dashboard/DashboardOverview";
+import {BrandLogo} from "./features/ui/BrandLogo";
 import { ActivityHistoryDrawer } from "./features/dashboard/ActivityHistory";
 import { validTimeRange, overlaps, eventRange, eventDuration } from "./studio-calendar";
 import { toISO as toISOAdded, parseMoney, splitInstallments } from "./studio-finance";
@@ -113,6 +114,8 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
   const [deletingFinanceEntry, setDeletingFinanceEntry] = useState<FinanceEntry | null>(null);
   const [eventModalOpen, setEventModalOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  // Closing restores position; navigation from the drawer resets the next page.
+  const resetScrollAfterMobileNavigation = useRef(false);
   const [demoTheme, setDemoTheme] = useState<Theme>(()=>readStoredTheme(themeStorageKey()) ?? systemTheme());
   const theme = isDemo ? demoTheme : (initialTheme ?? "light");
   const [toast, setToast] = useState("");
@@ -244,6 +247,50 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     window.addEventListener("storage",onStorage);
     return ()=>window.removeEventListener("storage",onStorage);
   },[]);
+
+  // iOS Safari may scroll behind an overlay even with overflow:hidden.
+  // Fix the page at its existing scroll offset; the sidebar nav can still scroll.
+  useLayoutEffect(() => {
+    if (!mobileOpen) return;
+    const mobile = window.matchMedia("(max-width: 820px)");
+    if (!mobile.matches) { setMobileOpen(false); return; }
+    const root = document.documentElement;
+    const body = document.body;
+    const previous = {
+      position: body.style.position, top: body.style.top, left: body.style.left,
+      right: body.style.right, width: body.style.width,
+      bodyOverflow: body.style.overflow, rootOverflow: root.style.overflow,
+      overscroll: root.style.overscrollBehavior
+    };
+    const x = window.scrollX;
+    const y = window.scrollY;
+    body.style.position = "fixed";
+    body.style.top = `-${y}px`;
+    body.style.left = `-${x}px`;
+    body.style.right = "0";
+    body.style.width = "100%";
+    body.style.overflow = "hidden";
+    root.style.overflow = "hidden";
+    root.style.overscrollBehavior = "none";
+    const onBreakpointChange = (event: MediaQueryListEvent) => {
+      if (!event.matches) setMobileOpen(false);
+    };
+    mobile.addEventListener("change", onBreakpointChange);
+    return () => {
+      mobile.removeEventListener("change", onBreakpointChange);
+      body.style.position = previous.position;
+      body.style.top = previous.top;
+      body.style.left = previous.left;
+      body.style.right = previous.right;
+      body.style.width = previous.width;
+      body.style.overflow = previous.bodyOverflow;
+      root.style.overflow = previous.rootOverflow;
+      root.style.overscrollBehavior = previous.overscroll;
+      const reset = resetScrollAfterMobileNavigation.current;
+      resetScrollAfterMobileNavigation.current = false;
+      window.scrollTo(reset ? 0 : x, reset ? 0 : y);
+    };
+  }, [mobileOpen]);
 
   // The Pages demo preserves its existing browser-only snapshot contract.
   // Firebase never persists a render/effect: business mutations call commands.
@@ -450,6 +497,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
   }
 
   function navigateRoute(next:WorkspaceRoute,{replace=false}:{replace?:boolean}={}) {
+    if (mobileOpen) resetScrollAfterMobileNavigation.current = true;
     const target=hrefForWorkspaceRoute(next,routeEnvironment);
     if(window.location.pathname+window.location.hash!==target) {
       window.history[replace?"replaceState":"pushState"](null,"",target);
@@ -476,6 +524,11 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
 
   useEffect(()=>{
     const onNavigation=()=>{
+      // popstate/hashchange handler is registered once, so don't rely on a
+      // potentially stale mobileOpen closure when deciding the restore target.
+      if (document.body.style.position === "fixed" && window.matchMedia("(max-width: 820px)").matches) {
+        resetScrollAfterMobileNavigation.current = true;
+      }
       const next=routeFromLocation(window.location,routeEnvironment);
       applyRoute(next);
       onRouteChange?.(next);
@@ -514,7 +567,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     <div className={`app-shell app-view-${view}${view==="clients"&&!selectedClient?" app-client-directory":""}`} inert={saving || undefined}>
       <aside className={`sidebar ${mobileOpen ? "mobile-open" : ""}`}>
         <div className="brand-lockup">
-          <img src={`${import.meta.env.BASE_URL}${theme === "light" ? "roteiva-logo-black.png" : "roteiva-logo-white.png"}`} alt="Roteiva" />
+          <BrandLogo theme={theme} />
           <AppButton className="mobile-close" onClick={() => setMobileOpen(false)} aria-label="Fechar menu"><X size={18} /></AppButton>
         </div>
         <nav>
@@ -694,12 +747,13 @@ function CalendarView({ events, onAdd, onEdit, onDelete, onMonthChange }: { even
       <div className="calendar-week">{weekNames.map((name) => <span key={name}>{name}</span>)}</div>
       <div className="calendar-grid">{cells.map((cell) => {
         const dayEvents = events.filter((event) => event.date === cell.key);
-        return <AppButton key={cell.key} className={`${cell.current ? "" : "outside"} ${selectedDate === cell.key ? "selected" : ""}`} onClick={() => { setSelectedDate(cell.key); if (!cell.current) setCursor(new Date(`${cell.key}T12:00:00`)); }}><b>{cell.day}</b><div>{dayEvents.slice(0, 2).map((event) => <span className={`event-chip ${event.type.toLowerCase().replace("ã", "a")}`} key={event.id}><i />{event.time}{event.endTime ? `–${event.endTime}` : ""} {event.title}</span>)}{dayEvents.length > 2 && <small>+{dayEvents.length - 2} compromissos</small>}</div></AppButton>;
+        return <AppButton key={cell.key} className={`${cell.current ? "" : "outside"} ${selectedDate === cell.key ? "selected" : ""}`} onClick={() => { setSelectedDate(cell.key); if (!cell.current) setCursor(new Date(`${cell.key}T12:00:00`)); if(dayEvents.length===0)onAdd(cell.key); }}><b>{cell.day}</b><div>{dayEvents.slice(0, 2).map((event) => <span className={`event-chip ${event.type.toLowerCase().replace("ã", "a")}`} key={event.id}><i />{event.time}{event.endTime ? `–${event.endTime}` : ""} {event.title}</span>)}{dayEvents.length > 2 && <small>+{dayEvents.length - 2} compromissos</small>}</div></AppButton>;
       })}</div>
     </section>
     <aside className="panel agenda-panel">
       <div className="panel-head"><div><span>AGENDA DO DIA</span><h2>{new Date(`${selectedDate}T12:00:00`).toLocaleDateString("pt-BR", { day: "2-digit", month: "long" })}</h2></div><AppButton aria-label="Adicionar compromisso neste dia" onClick={() => onAdd(selectedDate)}><Plus size={17} /></AppButton></div>
-      <div className="day-agenda">{selectedEvents.length ? selectedEvents.map((event) => <article key={event.id}><time><b>{event.time}</b><span>{event.endTime || "Sem término"}</span></time><div><i className={event.type.toLowerCase().replace("ã", "a")} /><b>{event.title}</b><small>{event.client} · {event.type}{eventDuration(event) ? ` · ${eventDuration(event)}` : ""}</small>{selectedEvents.some(other=>overlaps(event,other)) && <span className="overlap-label">Horário sobreposto</span>}<span className="revenue-actions"><AppButton aria-label={`Editar ${event.title}`} onClick={() => onEdit(event)}><Pencil size={15}/></AppButton><AppButton aria-label={`Excluir ${event.title}`} onClick={() => onDelete(event)}><Trash2 size={15}/></AppButton></span></div></article>) : <div className="agenda-empty"><CalendarDays size={28} /><b>Dia livre</b><span>Nenhum compromisso nesta data.</span><AppButton onClick={() => onAdd(selectedDate)}>Adicionar compromisso</AppButton></div>}</div>
+      {selectedEvents.length>0&&<AppButton type="button" className="secondary-button agenda-add-another" onClick={()=>onAdd(selectedDate)}><Plus size={16} aria-hidden="true"/> Adicionar outro compromisso</AppButton>}
+       <div className="day-agenda">{selectedEvents.length ? selectedEvents.map((event) => <article key={event.id}><time><b>{event.time}</b><span>{event.endTime || "Sem término"}</span></time><div><i className={event.type.toLowerCase().replace("ã", "a")} /><b>{event.title}</b><small>{event.client} · {event.type}{eventDuration(event) ? ` · ${eventDuration(event)}` : ""}</small>{selectedEvents.some(other=>overlaps(event,other)) && <span className="overlap-label">Horário sobreposto</span>}<span className="revenue-actions"><AppButton aria-label={`Editar ${event.title}`} onClick={() => onEdit(event)}><Pencil size={15}/></AppButton><AppButton aria-label={`Excluir ${event.title}`} onClick={() => onDelete(event)}><Trash2 size={15}/></AppButton></span></div></article>) : <div className="agenda-empty"><CalendarDays size={28} /><b>Dia livre</b><span>Nenhum compromisso nesta data.</span><AppButton onClick={() => onAdd(selectedDate)}>Adicionar compromisso</AppButton></div>}</div>
       <div className="upcoming-list"><span>PRÓXIMOS COMPROMISSOS</span>{upcoming.map((event) => <article key={event.id}><div><b>{new Date(`${event.date}T12:00:00`).getDate()}</b><small>{monthLabels[new Date(`${event.date}T12:00:00`).getMonth()]}</small></div><p><b>{event.title}</b><small>{eventRange(event)} · {event.client}</small></p></article>)}</div>
     </aside>
   </div>;

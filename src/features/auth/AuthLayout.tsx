@@ -1,5 +1,7 @@
 import { useEffect, type ReactNode } from "react";
 import { ArrowUpRight, Film, ShieldCheck } from "lucide-react";
+import {BrandLogo} from "../ui/BrandLogo";
+import {CameraLensArt} from "./CameraLensArt";
 
 type AuthLayoutProps = {
   children: ReactNode;
@@ -16,15 +18,11 @@ export function AuthLayout({children,section,title,description}: AuthLayoutProps
   return <main className="auth-page auth-layout">
     <aside className="auth-story" aria-label="Apresentação do Roteiva">
       <div className="auth-story-top">
-        <img src={import.meta.env.BASE_URL+"roteiva-logo-white.png"} alt="Roteiva" className="auth-story-logo"/>
+        <BrandLogo theme="dark" className="auth-story-logo"/>
         <span className="auth-story-edition">SEU ESTÚDIO, CONECTADO</span>
       </div>
       <div className="auth-story-art" aria-hidden="true">
-        <span className="auth-art-ring auth-art-ring-one"/>
-        <span className="auth-art-ring auth-art-ring-two"/>
-        <span className="auth-art-ring auth-art-ring-three"/>
-        <span className="auth-art-axis"/>
-        <span className="auth-art-dot"/>
+        <CameraLensArt/>
         <span className="auth-art-frame">R / 001</span>
       </div>
       <div className="auth-story-copy">

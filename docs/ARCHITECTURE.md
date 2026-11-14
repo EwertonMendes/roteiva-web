@@ -1,5 +1,14 @@
 # Arquitetura do Roteiva — MVP SaaS
 
+## Decisão de UI editorial — 13/11/2026 (PR #125)
+A seleção de logos oficiais foi centralizada em `src/features/ui/BrandLogo.tsx`; imagens públicas são estáticas e não são alteradas por filtros no cliente. A lente do login é um SVG decorativo sem requests, eventos ou dados.
+
+O acesso ao editor de capa não depende de `connections.length`: a opção de adicionar capa permanece visível e o editor apresenta um estado de conexão ausente. **A leitura/escrita efetiva permanece protegida** pelos contratos existentes de Google Picker/Dropbox, `StorageConnectionsProvider` e Firestore; essa alteração não concede acesso novo a arquivos.
+
+O clique de dia vazio no calendário abre o formulário pré-preenchido; a gravação continua passando por `saveEvent`, com os mesmos vínculos opcionais a projetos e regras de intervalo. Ocultar valores em `FinancePanel` é apenas estado local de apresentação; as consultas, regras, valores, `FinanceEntry` e CSV não são modificados. Nenhuma migration D1/Firestore e nenhuma nova variável de ambiente foram necessárias.
+
+
+
 ## Decisão — Explorador virtual, cache, busca e importação (12/11/2026, PR #123)
 
 A UI de Biblioteca abandona componentes permanentes de provedores em favor de explorador enxuto com busca de projetos sob demanda (módulo de dados `src/data/firestore-project-search.ts`), breadcrumbs, lista/grade, contexto e único botão Adicionar. O frontend usa snapshots **somente de metadados** LRU 64 entradas, TTL 60 segundos, revalidação a partir de 30 segundos, chave por UID, projeto, pasta, pesquisa e tipo de listagem, além de deduplicação de requisições. A mudança de usuário invalida o cache anterior; a navegação entre telas preserva cache curto; as mutações invalidam a biblioteca do projeto. Binários privados e tokens ficam fora desse cache. 

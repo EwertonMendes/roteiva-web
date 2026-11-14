@@ -74,9 +74,9 @@ export function TodayStudio({projects,clients,entries,events,activities,onView,o
       </div>
       <div className="flow-legend">{phases.map(phase => { const StatusIcon=PROJECT_STATUS_ICONS[phase.status as Status]; return <span key={phase.status} style={{color:phase.color}}><StatusIcon size={17} strokeWidth={2} aria-hidden="true"/><span>{phase.label}</span><b>{phase.count}</b></span>; })}</div>
     </div>
-    <footer className="flow-next"><CalendarDays size={22} aria-hidden="true"/><div><span>Próximo compromisso</span>
+    <div className="flow-bottom"><footer className="flow-next"><CalendarDays size={22} aria-hidden="true"/><div><span>Próximo compromisso</span>
       <p>{next ? <><b>{next.title}</b> · {next.date.split("-").reverse().join("/")} · {eventRange(next)}</> : "Sua agenda está livre. Adicione a próxima produção."}</p>
     </div><AppButton className="secondary-button" type="button" onClick={() => onView("calendar")}>Ver agenda</AppButton></footer>
-    <ActivityPreview activities={activities} onOpen={onOpenActivity}/>
+    <ActivityPreview activities={activities} onOpen={onOpenActivity}/></div>
   </section>;
 }

@@ -74,6 +74,13 @@ test("financial mockup uses the viewport evenly in light/dark and on desktop/mob
   await expect(page.getByRole("button",{name:"Exportar CSV"})).toBeVisible();
   await expect(page.getByRole("button",{name:"Nova receita"})).toBeVisible();
   await expect(page.getByRole("button",{name:"Exportar cópia"})).toHaveCount(0);
+  const received=page.locator(".finance-metrics article").nth(1);
+  const before=await received.locator("strong").innerText();
+  await page.getByRole("button",{name:"Ocultar valores recebidos"}).click();
+  await expect(received.locator("strong")).toHaveText("••••••");
+  await expect(page.getByRole("button",{name:"Mostrar valores recebidos"})).toHaveAttribute("aria-pressed","true");
+  await page.getByRole("button",{name:"Mostrar valores recebidos"}).click();
+  await expect(received.locator("strong")).toHaveText(before);
 });
 
 test("financial entries, export, edit and month selection survive the new layout",async({page},info)=>{

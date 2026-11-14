@@ -16,7 +16,7 @@ test('sidebar unifies routes, preserves the brand colors and moves appearance in
  await page.screenshot({path:info.outputPath('sidebar-light.png')});
  await page.keyboard.press('Escape');await expect(menu).toHaveCount(0);await expect(page.getByRole('button',{name:'Opções da conta',exact:true})).toBeFocused();
  await page.getByRole('button',{name:'Opções da conta',exact:true}).click();await page.getByRole('button',{name:'Ativar modo escuro',exact:true}).click();
- await expect(page.locator('html')).toHaveAttribute('data-theme','dark');await expect(logo).toHaveAttribute('src','/roteiva-logo-white.png');expect(await logo.evaluate(el=>getComputedStyle(el).filter)).toBe('none');
+ await expect(page.locator('html')).toHaveAttribute('data-theme','dark');await expect(logo).toHaveAttribute('src','/brand/roteiva-wordmark-white.svg');expect(await logo.evaluate(el=>getComputedStyle(el).filter)).toBe('none');
  await expect(menu).toBeVisible();await expect(page.getByRole('button',{name:'Ativar modo claro',exact:true})).toBeFocused();
  await expect(page.locator('.toast')).toHaveCount(0);
  await page.screenshot({path:info.outputPath('sidebar-dark.png')});
@@ -55,4 +55,82 @@ test('account menu reverses its animation safely and respects reduced motion',as
  await trigger.click();await expect(panel).toBeVisible();
  expect(await panel.evaluate(el=>getComputedStyle(el).animationDuration)).toBe('0.001s');
  await page.keyboard.press('Escape');await expect(panel).toHaveCount(0);
+});
+
+test('mobile hamburger drawer uses readable glass in both themes without changing desktop',async({page},info)=>{
+ test.skip(info.project.name!=='mobile','Mobile drawer contract');
+ await page.setViewportSize({width:390,height:844});
+ await page.goto('http://127.0.0.1:4174/');
+ await expect(page.locator('.app-shell')).toBeVisible();
+ await page.locator('.brand-intro').waitFor({state:'detached'});
+ const sidebar=page.locator('.sidebar');
+ await page.getByRole('button',{name:'Abrir menu',exact:true}).click();
+ await expect(sidebar).toHaveClass(/mobile-open/);
+ const inspect=()=>sidebar.evaluate(el=>{
+   const style=getComputedStyle(el);
+   const stops=[...style.backgroundImage.matchAll(/rgba?\(([^)]+)\)/g)]
+     .map(m=>m[1].split(',').map(c=>Number(c.trim())));
+   return {stops,blur:style.backdropFilter||style.webkitBackdropFilter,
+     text:style.color,nav:getComputedStyle(el.querySelector('nav > button')!).color,
+     width:el.getBoundingClientRect().width};
+ });
+ const assertGlass=(glass:Awaited<ReturnType<typeof inspect>>)=>{
+   expect(glass.stops.length).toBeGreaterThanOrEqual(2);
+   expect(glass.stops.slice(0,2).every(stop=>stop[3]>=.93),'opaque enough for legibility').toBe(true);
+   expect(glass.blur).toContain('blur(');
+   expect(glass.width).toBeLessThanOrEqual(310);
+ };
+ let glass=await inspect();assertGlass(glass);
+ expect(glass.text).toBe('rgb(24, 25, 29)');
+ await expect(sidebar.getByRole('button',{name:/^Projetos/})).toBeVisible();
+ const scrim=page.getByRole('button',{name:'Fechar menu',exact:true}).last();
+ await expect(scrim).toBeVisible();
+ await page.getByRole('button',{name:'Opções da conta',exact:true}).click();
+ await page.getByRole('button',{name:'Ativar modo escuro',exact:true}).click();
+ await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
+ glass=await inspect();assertGlass(glass);
+ expect(glass.text).toBe('rgb(245, 245, 247)');
+ await expect(sidebar.getByRole('button',{name:/^Biblioteca/})).toBeVisible();
+ await page.getByRole('button',{name:'Fechar menu',exact:true}).first().click();
+ await expect(sidebar).not.toHaveClass(/mobile-open/);
+});
+
+test('mobile drawer locks page scroll, restores the position and permits routing',async({page},info)=>{
+ test.skip(info.project.name!=='mobile','Mobile drawer scroll lock');
+ await page.setViewportSize({width:390,height:640});
+ await page.goto('http://127.0.0.1:4174/');
+ await page.locator('.brand-intro').waitFor({state:'detached'});
+ await page.evaluate(()=>window.scrollTo(0,Math.min(360,document.documentElement.scrollHeight-window.innerHeight)));
+ const previous=await page.evaluate(()=>window.scrollY);
+ expect(previous).toBeGreaterThan(30);
+ const drawer=page.locator('.sidebar');
+ // The fixed bottom-bar More action is available at any scroll position.
+ // Clicking the top hamburger would make Playwright auto-scroll it into view.
+ const open=()=>page.getByRole('button',{name:'Mais opções de navegação',exact:true}).click();
+ await open();
+ await expect(drawer).toHaveClass(/mobile-open/);
+ await expect.poll(()=>page.evaluate(()=>document.body.style.position)).toBe('fixed');
+ expect(await page.evaluate(()=>document.body.style.top)).toBe(`-${previous}px`);
+ expect(await page.evaluate(()=>document.documentElement.style.overflow)).toBe('hidden');
+ const nav=drawer.locator('nav');
+ expect(await nav.evaluate(el=>getComputedStyle(el).overflowY)).toBe('auto');
+ expect(await nav.evaluate(el=>getComputedStyle(el).touchAction)).toBe('pan-y');
+ const fixedTop=await page.evaluate(()=>document.body.style.top);
+ await page.mouse.move(370,360);
+ await page.mouse.wheel(0,650);
+ expect(await page.evaluate(()=>document.body.style.top)).toBe(fixedTop);
+ await page.getByRole('button',{name:'Fechar menu',exact:true}).first().click();
+ await expect(drawer).not.toHaveClass(/mobile-open/);
+ await expect.poll(()=>page.evaluate(()=>window.scrollY)).toBe(previous);
+ expect(await page.evaluate(()=>document.body.style.position)).toBe('');
+ expect(await page.evaluate(()=>document.documentElement.style.overflow)).toBe('');
+ await open();
+ await drawer.locator('nav').getByRole('button',{name:/^Projetos/}).click();
+ await expect(drawer).not.toHaveClass(/mobile-open/);
+ await expect.poll(()=>page.evaluate(()=>window.scrollY)).toBe(0);
+ expect(await page.evaluate(()=>document.body.style.position)).toBe('');
+ await open();
+ await page.setViewportSize({width:1024,height:768});
+ await expect(drawer).not.toHaveClass(/mobile-open/);
+ expect(await page.evaluate(()=>document.body.style.position)).toBe('');
 });

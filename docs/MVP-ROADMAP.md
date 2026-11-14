@@ -1,5 +1,16 @@
 # Roadmap vivo — Roteiva MVP
 
+## Revisão editorial final — PR #125 (13/11/2026)
+- [x] **IMPLEMENTADO EM BRANCH:** assets monocromáticos oficiais, marca compartilhada no login/navegação/splash, lente vetorial de referência, dashboard compacto e cards de agenda/atividade lado a lado.
+- [x] **IMPLEMENTADO EM BRANCH:** ação de adicionar capa disponível sem conexão, controle Já recebido, calendário por clique na data e botão Adicionar outro compromisso; sem alteração de schemas, de autorização ou de API.
+- [x] **IMPLEMENTADO EM BRANCH:** testes atualizados para novos contratos, inclusive abertura da fila recolhida no mobile; ajustes de documentação.
+- [ ] **VALIDAR NO CI:** frontend/typecheck/build, testes Firestore, Playwright desktop/mobile e segurança no último SHA; não marcar como validado com checks anteriores.
+- [ ] **VALIDAR VISUALMENTE:** mockups páginas 4 e 9, resoluções de 27 polegadas, 1440/1280/1024px, mobile, light/dark, ausência de conteúdo cortado.
+- [ ] **VALIDAR COM PROVEDORES REAIS:** capa Google Picker/Dropbox, persistência/crop após recarga e os fluxos existentes da Biblioteca; checar fila, retomada, OAuth e modais em mobile.
+- [ ] **ANTES DE PROD:** revisar PR #122 divergente e pendências antigas da Biblioteca, homologar DEV e solicitar autorização explícita para promover SHA com backup quando necessário. **PROD não é alterado por esta PR.**
+
+
+
 ## Reconstrução integral da Biblioteca — PR #123 (12/11/2026)
 
 - [x] **IMPLEMENTADO NA BRANCH** `codex/library-explorer-release`: explorador com botão Adicionar, projeto pesquisável, lista/grade, breadcrumbs, busca por projeto, menu de contexto, integração de UI e cache curto. Não está automaticamente homologado em DEV.

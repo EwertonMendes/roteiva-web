@@ -1,5 +1,16 @@
 # Identidade visual e experiência — Roteiva
 
+## Revisão editorial de produto — 13/11/2026 (PR #125, em homologação)
+Referência visual vinculante: `Roteiva-revisao-editorial-16x9.pdf`, páginas 2–9, especialmente os mockups 4 e 9. A revisão preserva as telas já aprovadas de Clientes, Aprovações, Biblioteca e Configurações.
+
+- **Identidade:** a marca oficial fornecida pelo responsável é preta ou branca, sem o detalhe verde. Os ativos `public/brand/roteiva-wordmark-{black,white}.svg` e `roteiva-symbol-{black,white}.svg` utilizam as imagens originais da [pasta de logos](https://drive.google.com/drive/folders/1X-dKFgg3tqyCSvnEpc3UNWk-WBxC8Smf?usp=sharing), recortadas por viewBox, sem filtro de cor. `BrandLogo` seleciona por tema. Cores funcionais (situação de projeto, saldos, gráficos, validações e foco) permanecem.
+- **Dashboard:** título, métricas e fluxo próximos; altura decorrente do conteúdo, largura limitada e histórico de atividade ao lado de próximo compromisso no desktop; empilhamento sem overflow no mobile. Em monitores baixos, a página pode rolar naturalmente em vez de cortar a informação.
+- **Capas:** projeto sem capa oferece a ação Adicionar capa mesmo antes de conectar Drive/Dropbox. Se não houver conta conectada, o editor orienta a conexão, sem solicitar escopos adicionais. Salvamento e recorte seguem o contrato `ProjectCover` existente.
+- **Financeiro:** o olho de Já recebido alterna entre mostrar e ocultar os valores visíveis daquele cartão. É exclusivamente estado de apresentação; não altera o cálculo, exportação ou persistência.
+- **Calendário:** clicar em dia vazio abre Novo compromisso com data selecionada; clicar em dia ocupado mostra a agenda e oferece Adicionar outro compromisso. Preservar o comportamento de edição e de sobreposição temporal.
+- **Login:** a ilustração abstrata foi trocada por lente/diafragma vetorial de linhas neutras; nenhuma alteração em OAuth, cadastro e links legais.
+- **QA:** diferenças visuais devem ser verificadas com capturas reais em desktop/mobile e dark/light. Implementado no PR não equivale a aprovado para PROD.
+
 ## Biblioteca virtual — explorador compacto (12/11/2026)
 
 **IMPLEMENTADO EM BRANCH PR #123; ainda não VALIDADO com provedores reais:** a Biblioteca deixa de exibir os dois grandes cartões permanentes Drive/Dropbox e organiza o trabalho em um explorador com contexto visual consistente com Projetos e Clientes. Cabeçalho tem seletor de projeto com pesquisa e recentes, botões Contas, Atualizar e um único **Adicionar** com criar pasta, uploads, adicionar arquivos existentes e importar organização. A linha superior tem breadcrumbs, Lixeira, Pastas e controle lista/grade. Busca é por nome no projeto inteiro, com escopo alternativo da pasta atual. Menus ⋮ e clique direito permitem prévia/renomear/mover/remover e restauração na Lixeira, sem apagar originais. Contas de armazenamento ficam em um painel secundário, não na área principal.
@@ -107,7 +118,7 @@ A barra global de estúdio, busca e ações e a faixa “Seu espaço / Dados na 
 
 ## Cards de Projetos — 21/10/2026
 
-Layout inspirado no mockup aprovado: painel arredondado com filtros, contagem de resultados, cards com título, cliente, situação, progresso e rodapé de prazo/tipo. Manter Clapperboard, Eye, Wrench e BadgeCheck com azul, amarelo, roxo e verde. Sem Drive conectado, não reservar área de fotografia nem mostrar edição de capa. Com capa disponível, mídia 2,5:1, ações legíveis sobre a imagem e edição direta por arraste, roda e pinça, com botões compactos de zoom/redefinição e teclado. Claro/escuro, filtros roláveis no celular e foco visível são obrigatórios.
+Layout inspirado no mockup aprovado: painel arredondado com filtros, contagem de resultados, cards com título, cliente, situação, progresso e rodapé de prazo/tipo. Manter Clapperboard, Eye, Wrench e BadgeCheck com azul, amarelo, roxo e verde. Sem Google Drive/Dropbox conectado, mostrar a área vazia da capa com o botão Adicionar capa; o editor orienta a conexão sem conceder acesso a arquivos. Com capa disponível, mídia 2,5:1, ações legíveis sobre a imagem e edição direta por arraste, roda e pinça, com botões compactos de zoom/redefinição e teclado. Claro/escuro, filtros roláveis no celular e foco visível são obrigatórios.
 
 No editor, remover sliders de posição e zoom. Preservar o foco visual ao ampliar, mostrar guias durante o arraste e manter o recorte idêntico ao card. O botão “Carregar mais imagens” deve ter ícone, ficar centralizado e separado da grade por pelo menos 20 px. Modais mantêm cursor nativo visível, incluindo grab/grabbing na área de recorte.
 
@@ -132,3 +143,15 @@ Sem adicionar textos ou elementos na interface, `useReviewBrowserGuards` central
 ## Player de vídeo na página de aprovação (23/10/2026)
 
 O vídeo utiliza exclusivamente controles nativos do `<video controls>`, inclusive tela cheia. O Roteiva não adiciona botões de "Ampliar vídeo" ou "Fechar tela cheia", estado auxiliar de expansão, comportamento de Escape ou overlay de fullscreen. Os recursos de marcação de tempo, comentários, reprodução responsiva e restrições de download continuam independentes. Não reutilizar os estilos `review-video-fullscreen` ou `is-video-expanded`.
+
+### Ajuste posterior de login — 14/11/2026
+A lente da proposta da página 9 tem seis lâminas em espiral formando o diafragma; não usar a estrela/polígono abstrato da primeira implementação. A arte desenha o barril, a abertura e as lâminas com caminhos vetoriais geométricos e tons neutros. O botão de login/cadastro com Google usa o G de quatro cores reais (#EA4335, #4285F4, #FBBC05 e #34A853), em vez da letra G tipográfica. Mantém o mesmo fluxo OAuth. **Homologação solicitada no DEV principal, não em preview separado.**
+
+### Panorama desktop fluido — ajuste visual 14/11/2026
+Na Visão Geral, a página ocupa a largura disponível da coluna principal, com limite centralizado apenas em displays ultralargos. As métricas mantêm quatro colunas em desktop e passam a duas quando necessário. O respiro horizontal/vertical, títulos, KPIs, fluxo e os dois blocos inferiores usam escalas `clamp()` relacionadas à largura e altura da viewport; não fixar altura em `100dvh` para esticar o card ou forçar `overflow:clip`. Em 1280×720, 1366×768, 1440×900, 1746×864 e 1920×1080 a composição deve caber integralmente sem rolagem desnecessária, com a caixa horizontalmente centralizada. Em viewport muito baixo/zoom elevado é preferível rolagem a ocultar compromissos ou atividades. Mobile (até 820px) conserva fluxo e rolagem naturais. Os dados, cores de status, funcionalidades e páginas de outras áreas não foram alterados.
+
+### Gaveta de navegação mobile — 14/11/2026
+No menu hambúrguer (até 820px), aplicar glassmorphism de alta opacidade **no componente de sidebar mobile, incluindo o estado de transição, para evitar mudança abrupta do fundo ao abrir/fechar**: gradiente escuro ~94–96,5% ou claro ~94–97,5%, blur 20px, saturação 115%, borda e sombra suaves. O scrim externo fica mais escuro para destacar a gaveta. Em navegadores sem suporte a backdrop-filter, usar fundo sólido legível. Não modificar a sidebar fixa de desktop, o estado fechado, tipografia/nav items ou a lógica de abrir/fechar. QA deve verificar ambos os temas e a ausência de conteúdo da página atravessando as letras.
+
+### Scroll ao abrir a sidebar mobile — 14/11/2026
+A gaveta do menu hambúrguer impede o scroll da página ao fundo, inclusive em iOS Safari: `useLayoutEffect` fixa o body no offset de scroll atual, bloqueia overflow do html e preserva/recupera os estilos inline. Fechar o menu restaura a posição exata; navegar pelo menu leva a nova página ao topo. Ao mudar para breakpoint desktop ou desmontar, a limpeza remove o bloqueio. A lista interna de navegação conserva a rolagem vertical e o drawer mantém o glassmorphism existente. Sem alterar PROD.
