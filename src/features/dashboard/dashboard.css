@@ -125,102 +125,6 @@
 
 
 
-/* Overview desktop: use the available viewport instead of a scrolling document.
-   Keep other pages, mobile navigation and the modal layer unaffected. */
-@media (min-width: 821px) {
-  body:has(.app-view-overview) { overflow: hidden; }
-  .app-view-overview {
-    height: 100dvh;
-    min-height: 0;
-    overflow: clip;
-  }
-  .app-view-overview .main {
-    height: 100dvh;
-    min-height: 0;
-    overflow: clip;
-  }
-  .app-view-overview .page {
-    height: 100%;
-    min-height: 0;
-    max-height: 100%;
-    overflow: clip;
-    display: flex;
-    flex-direction: column;
-    gap: clamp(10px, 1.75dvh, 24px);
-    padding: clamp(12px, 2.5dvh, 32px) clamp(18px, 2.4vw, 44px);
-  }
-  .app-view-overview .page-heading {
-    flex: 0 0 auto;
-    min-height: 0;
-    margin-bottom: 0;
-  }
-  .app-view-overview .page-heading h1 {
-    font-size: clamp(2rem, min(3.8vw, 6dvh), 3.65rem);
-  }
-  .app-view-overview .heading-actions .workspace-tools .secondary-button,
-  .app-view-overview .heading-actions > .primary-button {
-    min-height: clamp(40px, 5.7dvh, 54px);
-  }
-  .app-view-overview .panel.flow-overview {
-    flex: 1 1 auto;
-    min-height: 0;
-    margin: 0;
-    display: grid;
-    grid-template-rows: auto minmax(0, 1fr) auto auto auto;
-    padding: clamp(14px, 2.5dvh, 34px) clamp(20px, 2.6vw, 36px) 0;
-  }
-  .app-view-overview .flow-overview-head h2 {
-    font-size: clamp(1.4rem, min(2vw, 3.4dvh), 2.15rem);
-  }
-  .app-view-overview .flow-numbers {
-    align-self: stretch;
-    align-content: center;
-    min-height: 0;
-    margin: clamp(8px, 2dvh, 28px) 0;
-  }
-  .app-view-overview .flow-numbers > button { gap: clamp(4px, 1dvh, 10px); }
-  .app-view-overview .flow-numbers strong { font-size: clamp(1.85rem, min(3vw, 5.6dvh), 3.2rem); }
-  .app-view-overview .flow-numbers .flow-money { font-size: clamp(1.65rem, min(2.7vw, 5dvh), 3rem); }
-  .app-view-overview .flow-progress { padding: clamp(10px, 1.75dvh, 28px) 0; }
-  .app-view-overview .flow-progress-title { margin-bottom: clamp(6px, 1.4dvh, 15px); }
-  .app-view-overview .flow-legend { margin-top: clamp(7px, 1.4dvh, 18px); }
-  .app-view-overview .flow-next {
-    min-height: 0;
-    padding: clamp(9px, 1.9dvh, 20px) 0;
-  }
-  .app-view-overview .flow-next p {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 100%;
-  }
-  .app-shell .sidebar { padding-top: clamp(12px, 2.6dvh, 24px); padding-bottom: clamp(10px, 1.75dvh, 16px); }
-  .app-shell .sidebar .brand-lockup { height: clamp(44px, 7dvh, 64px); }
-  .app-shell .sidebar nav {
-    margin-top: clamp(9px, 2dvh, 28px);
-    gap: clamp(1px, .45dvh, 5px);
-  }
-  .app-shell .sidebar nav > button { min-height: clamp(34px, 5.5dvh, 47px); }
-  .app-shell .sidebar-profile { padding-top: clamp(7px, 1.4dvh, 14px); }
-
-}
-@media (min-width: 821px) and (max-width: 1120px) {
-  .app-view-overview .page-heading { gap: 10px; }
-  .app-view-overview .flow-numbers { gap: clamp(8px, 1.8dvh, 20px) 0; }
-  .app-view-overview .flow-numbers strong { font-size: clamp(1.75rem, 4.5dvh, 2.6rem); }
-}
-@media (min-width: 821px) and (max-height: 680px) {
-  .app-view-overview .page { gap: 8px; padding-top: 10px; padding-bottom: 10px; }
-  .app-view-overview .page-heading h1 { font-size: clamp(1.75rem, 5dvh, 2.5rem); margin-bottom: 2px; }
-  .app-view-overview .page-heading p { font-size: .9375rem; }
-  .app-view-overview .flow-overview-head .eyebrow { font-size: .8125rem; }
-  .app-view-overview .flow-numbers { margin: 7px 0; }
-  .app-view-overview .flow-progress { padding: 8px 0; }
-  .app-view-overview .flow-legend { margin-top: 6px; }
-  .app-view-overview .flow-next { padding: 8px 0; }
-}
-
-
 /* Activity history: meaningful preview within the dashboard, full detail in a fixed drawer. */
 .flow-activity-preview {
   border-top:1px solid #363638;
@@ -285,11 +189,6 @@
 :root:not([data-theme="dark"]) .activity-history-item { border-color:#e8e8e9; }
 :root:not([data-theme="dark"]) .activity-drawer-empty { color:#666; }
 :root:not([data-theme="dark"]) .app-view-overview .flow-legend > span > span { color:#626267; }
-@media(min-width:821px) and (max-height:740px) {
-  .app-view-overview .flow-activity-rows > :nth-child(n+2) { display:none; }
-  .app-view-overview .flow-activity-preview { padding:8px 0 9px; }
-  .app-view-overview .flow-activity-header { margin-bottom:3px; }
-}
 @media(max-width:820px) {
   .app-view-overview .flow-activity-preview { margin:0 -20px; padding:18px 20px; }
   .app-view-overview .flow-activity-rows { grid-template-columns:1fr; gap:5px; }
@@ -310,42 +209,260 @@
   @keyframes activity-drawer-enter { from {transform:translateX(22px);opacity:.7;} to {transform:translateX(0);opacity:1;} }
 }
 
-/* Editorial review: natural dashboard height, compact grouping, side-by-side agenda/activity. */
-.app-view-overview .flow-bottom{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;border-top:1px solid #363638;padding:16px 0 20px;align-items:stretch}
-.app-view-overview .flow-bottom > *{min-width:0;margin:0;border:1px solid #363638;border-radius:14px;background:color-mix(in srgb,var(--card) 80%,transparent);padding:15px 16px;min-height:95px}
-.app-view-overview .flow-bottom .flow-next{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-.app-view-overview .flow-bottom .flow-next > div{flex:1 1 160px;min-width:0}
-.app-view-overview .flow-bottom .flow-next .secondary-button{margin-left:auto}
-.app-view-overview .flow-bottom .flow-activity-rows{grid-template-columns:1fr;gap:4px}
-.app-view-overview .flow-bottom .flow-activity-header{margin-bottom:5px}
-:root:not([data-theme="dark"]) .app-view-overview .flow-bottom{border-color:#e4e4e5}
-:root:not([data-theme="dark"]) .app-view-overview .flow-bottom > *{border-color:#e4e4e5;background:#fafafa}
-@media(min-width:821px){
-  body:has(.app-view-overview){overflow:auto}
-  .app-view-overview,.app-view-overview .main{height:auto;min-height:100dvh;overflow:visible}
-  .app-view-overview .page{width:100%;max-width:1360px;height:auto;min-height:0;max-height:none;margin-left:0;margin-right:auto;overflow:visible;display:flex;flex-direction:column;gap:20px;padding:clamp(28px,4vh,56px) clamp(20px,2.4vw,44px) 40px}
-  .app-view-overview .page-heading{margin-bottom:0;align-items:center}
-  .app-view-overview .page-heading h1{font-size:clamp(2.1rem,2.8vw,3.1rem)}
-  .app-view-overview .panel.flow-overview{flex:none;display:flex;flex-direction:column;min-height:0;border-radius:20px;padding:24px 28px 0}
-  .app-view-overview .flow-overview-head h2{font-size:clamp(1.5rem,1.8vw,1.9rem)}
-  .app-view-overview .flow-numbers{margin:25px 0 22px;align-content:initial;align-self:stretch;min-height:0}
-  .app-view-overview .flow-numbers strong{font-size:clamp(2.1rem,2.8vw,3rem)}
-  .app-view-overview .flow-numbers .flow-money{font-size:clamp(1.8rem,2.4vw,2.7rem)}
-  .app-view-overview .flow-progress{padding:20px 0}
-  .app-view-overview .flow-legend{margin-top:13px}
-  .app-view-overview .flow-bottom .flow-next p{white-space:normal;overflow:visible;text-overflow:clip}
+/* Overview editorial composition, 14/11/2026.
+   Desktop uses almost the entire main column, centered and scaled through
+   typography/spacing rather than stretching KPI or agenda cards vertically.
+   Mobile retains its existing natural-scroll layout. */
+.app-view-overview .flow-bottom {
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:clamp(10px,1vw,18px);
+  border-top:1px solid #363638;
+  padding:clamp(12px,2dvh,22px) 0 clamp(14px,2.2dvh,24px);
+  align-items:stretch;
 }
-@media(min-width:821px) and (max-width:1180px){
-  .app-view-overview .flow-bottom{grid-template-columns:1fr}
-  .app-view-overview .flow-numbers{grid-template-columns:repeat(2,minmax(0,1fr));gap:20px 0}
+.app-view-overview .flow-bottom > * {
+  min-width:0;
+  min-height:0;
+  margin:0;
+  border:1px solid #363638;
+  border-radius:clamp(12px,1vw,16px);
+  background:color-mix(in srgb,var(--card) 80%,transparent);
+  padding:clamp(14px,1.45vw,22px);
 }
-@media(max-width:820px){
-  .app-view-overview .flow-bottom{grid-template-columns:1fr;gap:10px;padding:12px 0 18px}
-  .app-view-overview .flow-bottom > *{padding:14px;min-height:0;margin:0}
-  .app-view-overview .flow-bottom .flow-next{padding:14px}
-  .app-view-overview .flow-bottom .flow-activity-preview{margin:0;padding:14px}
+.app-view-overview .flow-bottom .flow-next {
+  display:grid;
+  grid-template-columns:24px minmax(0,1fr) auto;
+  gap:clamp(8px,.7vw,14px);
+  align-items:center;
 }
-@media(max-width:430px){
-  .app-view-overview .flow-bottom .flow-next > svg{display:none}
-  .app-view-overview .flow-bottom .flow-next .secondary-button{width:100%;justify-content:center}
+.app-view-overview .flow-bottom .flow-next > svg {align-self:center;}
+.app-view-overview .flow-bottom .flow-next > div {min-width:0;}
+.app-view-overview .flow-bottom .flow-next p {
+  white-space:normal;
+  overflow:visible;
+  text-overflow:clip;
+  max-width:100%;
+  overflow-wrap:anywhere;
+}
+.app-view-overview .flow-bottom .flow-next .secondary-button {
+  margin:0;
+  white-space:nowrap;
+}
+.app-view-overview .flow-bottom .flow-activity-preview {border-top:0;}
+.app-view-overview .flow-bottom .flow-activity-rows {grid-template-columns:1fr;gap:3px;}
+.app-view-overview .flow-bottom .flow-activity-header {margin-bottom:5px;}
+.app-view-overview .flow-bottom .activity-history-item.is-compact {padding:4px 0;}
+:root:not([data-theme="dark"]) .app-view-overview .flow-bottom {border-color:#e4e4e5;}
+:root:not([data-theme="dark"]) .app-view-overview .flow-bottom > * {
+  border-color:#e4e4e5;
+  background:#fafafa;
+}
+
+/* One desktop scale system; the page itself has a size limit only on
+   exceptionally wide displays, and is always centered within .main. */
+@media(min-width:821px) {
+  body:has(.app-view-overview) {overflow-x:hidden;}
+  .app-view-overview,.app-view-overview .main {
+    height:auto;
+    min-height:100dvh;
+    overflow:visible;
+  }
+  .app-view-overview .page {
+    width:100%;
+    max-width:2200px;
+    min-height:100dvh;
+    height:auto;
+    margin-inline:auto;
+    padding:clamp(20px,3dvh,48px) clamp(22px,2.5vw,64px);
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    gap:clamp(14px,2.3dvh,28px);
+    overflow:visible;
+  }
+  .app-view-overview .page-heading {
+    flex:none;
+    min-width:0;
+    align-items:center;
+    margin:0;
+    gap:clamp(14px,2vw,32px);
+  }
+  .app-view-overview .page-heading > div:first-child {min-width:0;}
+  .app-view-overview .page-heading h1 {
+    font-size:clamp(35px,min(2.7vw,5.6dvh),54px);
+    line-height:1.08;
+    margin:0 0 clamp(5px,.75dvh,9px);
+  }
+  .app-view-overview .page-heading p {font-size:clamp(15px,min(1.15vw,2.2dvh),20px);}
+  .app-view-overview .heading-actions > .primary-button,
+  .app-view-overview .heading-actions .workspace-tools .secondary-button {
+    min-height:clamp(42px,5.5dvh,54px);
+    padding-inline:clamp(14px,1.35vw,22px);
+    font-size:clamp(14px,.95vw,16px);
+  }
+  .app-view-overview .panel.flow-overview {
+    flex:none;
+    display:flex;
+    flex-direction:column;
+    align-self:stretch;
+    min-width:0;
+    height:auto;
+    min-height:0;
+    max-height:none;
+    overflow:hidden;
+    border-radius:clamp(18px,1.5vw,28px);
+    padding:clamp(20px,3dvh,36px) clamp(20px,2.4vw,44px) 0;
+    margin:0;
+  }
+  .app-view-overview .flow-overview-head {
+    flex:none;
+    gap:18px;
+    align-items:center;
+  }
+  .app-view-overview .flow-overview-head h2 {
+    font-size:clamp(24px,min(1.85vw,3.6dvh),34px);
+    line-height:1.15;
+    margin-top:clamp(5px,.8dvh,9px);
+  }
+  .app-view-overview .flow-overview-head .eyebrow {
+    font-size:clamp(12px,.81vw,14px);
+  }
+  .app-view-overview .flow-total {
+    font-size:clamp(13px,.87vw,16px);
+    text-align:right;
+  }
+  .app-view-overview .flow-numbers {
+    align-self:stretch;
+    align-content:initial;
+    min-height:0;
+    grid-template-columns:repeat(4,minmax(0,1fr));
+    margin:clamp(20px,3.15dvh,33px) 0 clamp(18px,2.65dvh,29px);
+  }
+  .app-view-overview .flow-numbers > button,
+  .app-view-overview .flow-metric-finance {
+    min-width:0;
+    padding-inline:clamp(12px,1.75vw,32px);
+  }
+  .app-view-overview .flow-numbers > button:first-child {padding-left:0;}
+  .app-view-overview .flow-numbers > button {gap:clamp(5px,.9dvh,10px);}
+  .app-view-overview .flow-numbers > button > span,
+  .app-view-overview .flow-finance-top > button:first-child {
+    font-size:clamp(14px,.97vw,17px);
+  }
+  .app-view-overview .flow-numbers strong {
+    font-size:clamp(32px,min(2.7vw,5.4dvh),52px);
+    line-height:1.04;
+  }
+  .app-view-overview .flow-numbers .flow-money {
+    font-size:clamp(29px,min(2.45vw,5dvh),48px);
+  }
+  .app-view-overview .flow-numbers small {font-size:clamp(13px,.88vw,16px);}
+  .app-view-overview .flow-progress {
+    flex:none;
+    padding:clamp(15px,2.4dvh,25px) 0;
+  }
+  .app-view-overview .flow-progress-title {
+    font-size:clamp(14px,.97vw,17px);
+    margin-bottom:clamp(8px,1.45dvh,15px);
+  }
+  .app-view-overview .flow-legend {
+    margin-top:clamp(9px,1.5dvh,17px);
+    gap:10px clamp(15px,1.8vw,28px);
+  }
+  .app-view-overview .flow-legend > span {
+    font-size:clamp(13px,.86vw,16px);
+    gap:clamp(6px,.55vw,10px);
+  }
+  .app-view-overview .flow-track {height:clamp(8px,1.2dvh,11px);}
+  .app-view-overview .flow-bottom .flow-next {
+    gap:clamp(7px,.7vw,12px);
+  }
+  .app-view-overview .flow-next {min-height:0;}
+  .app-view-overview .flow-next > div > span,
+  .app-view-overview .flow-next p {font-size:clamp(13px,.88vw,16px);}
+  .app-view-overview .flow-next p {margin-top:clamp(4px,.6dvh,7px);}
+  .app-view-overview .flow-bottom .flow-next .secondary-button {
+    min-height:clamp(36px,4.5dvh,46px);
+    padding-inline:clamp(12px,1vw,18px);
+  }
+  .app-view-overview .flow-bottom .flow-activity-preview {
+    padding:clamp(13px,1.3vw,20px);
+  }
+  .app-view-overview .flow-bottom .flow-activity-header > span {
+    font-size:clamp(13px,.94vw,16px);
+  }
+  .app-view-overview .flow-bottom .flow-activity-open {
+    font-size:clamp(12px,.8vw,14px);
+  }
+}
+
+/* At narrower desktop widths, keep all indicators accessible without
+   squeezing the cash total or turning cards into oversized tall blocks. */
+@media(min-width:821px) and (max-width:1120px) {
+  .app-view-overview .flow-numbers {
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:clamp(12px,1.9dvh,20px) 0;
+    margin:clamp(13px,2dvh,22px) 0;
+  }
+  .app-view-overview .flow-numbers > button:nth-child(3) {
+    border-left:0;
+    padding-left:0;
+  }
+  .app-view-overview .flow-bottom {grid-template-columns:repeat(2,minmax(0,1fr));}
+  .app-view-overview .flow-bottom .flow-next {
+    grid-template-columns:22px minmax(0,1fr);
+  }
+  .app-view-overview .flow-bottom .flow-next .secondary-button {
+    grid-column:2;
+    justify-self:start;
+  }
+  .app-view-overview .flow-bottom .flow-activity-preview {
+    padding:clamp(11px,1.2vw,16px);
+  }
+}
+/* A low viewport gets denser spacing, not hidden activity rows. At extreme
+   zoom/short heights the content may scroll rather than become inaccessible. */
+@media(min-width:821px) and (max-height:760px) {
+  .app-view-overview .page {
+    gap:clamp(10px,1.7dvh,16px);
+    padding-block:clamp(12px,2.2dvh,22px);
+  }
+  .app-view-overview .page-heading h1 {
+    font-size:clamp(32px,min(2.65vw,5dvh),46px);
+  }
+  .app-view-overview .panel.flow-overview {
+    padding-top:clamp(14px,2.4dvh,22px);
+  }
+  .app-view-overview .flow-numbers {
+    margin-block:clamp(12px,2dvh,20px);
+  }
+  .app-view-overview .flow-progress {padding-block:clamp(12px,1.8dvh,18px);}
+  .app-view-overview .flow-bottom {padding-block:clamp(10px,1.5dvh,14px);}
+  .app-view-overview .flow-bottom > * {padding:clamp(10px,1vw,15px);}
+  .app-view-overview .flow-bottom .flow-activity-preview {padding:clamp(10px,1vw,15px);}
+  .app-view-overview .flow-bottom .activity-history-item.is-compact {padding:3px 0;}
+}
+@media(max-width:820px) {
+  .app-view-overview .flow-bottom {
+    grid-template-columns:1fr;
+    gap:10px;
+    padding:12px 0 18px;
+  }
+  .app-view-overview .flow-bottom > * {padding:14px;}
+  .app-view-overview .flow-bottom .flow-next {
+    display:flex;
+    flex-wrap:wrap;
+    padding:14px;
+  }
+  .app-view-overview .flow-bottom .flow-next > div {flex:1 1 160px;}
+  .app-view-overview .flow-bottom .flow-next .secondary-button {margin-left:auto;}
+  .app-view-overview .flow-bottom .flow-activity-preview {margin:0;padding:14px;}
+}
+@media(max-width:430px) {
+  .app-view-overview .flow-bottom .flow-next > svg {display:none;}
+  .app-view-overview .flow-bottom .flow-next .secondary-button {
+    width:100%;
+    justify-content:center;
+  }
 }

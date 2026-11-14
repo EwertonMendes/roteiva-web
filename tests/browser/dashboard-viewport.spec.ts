@@ -21,14 +21,17 @@ async function createWorkspace(page:Page,email:string) {
   await expect(page.locator("[aria-busy]").first()).toHaveAttribute("aria-busy","false");
 }
 
-test("desktop overview stays content-sized and scrolls naturally only when needed",async({page},info)=>{
+test("desktop overview fills the main canvas proportionally without clipping or unnecessary scrolling",async({page},info)=>{
   test.skip(info.project.name==="mobile","Desktop-specific viewport contract");
   await createWorkspace(page,"dashboard-viewport-"+info.project.name+"@example.com");
   await expect(page.locator(".flow-overview")).toContainText("O ritmo do seu estúdio");
   await expect(page.locator(".flow-overview")).toContainText("0 projetos no total");
   for(const {width,height} of [
+    {width:2560,height:1440},
     {width:1920,height:1080},
+    {width:1746,height:864},
     {width:1440,height:900},
+    {width:1366,height:768},
     {width:1280,height:720},
     {width:1024,height:768},
     {width:1024,height:650},
@@ -40,6 +43,7 @@ test("desktop overview stays content-sized and scrolls naturally only when neede
         viewportWidth:document.documentElement.clientWidth,
         viewportHeight:document.documentElement.clientHeight,
         bodyHeight:document.body.scrollHeight,
+        main:el(".main"),
         docHeight:document.documentElement.scrollHeight,
         docWidth:document.documentElement.scrollWidth,
         card:el(".flow-overview"),
@@ -50,8 +54,15 @@ test("desktop overview stays content-sized and scrolls naturally only when neede
       };
     });
     expect(sizes.docWidth,`horizontal document at ${width}x${height}`).toBeLessThanOrEqual(sizes.viewportWidth+2);
-    expect(sizes.card.width,`card width at ${width}x${height}`).toBeLessThan(1360);
-    expect(sizes.card.height,`content-sized dashboard at ${width}x${height}`).toBeLessThan(760);
+    const mainCenter=(sizes.main.left+sizes.main.right)/2;
+    const cardCenter=(sizes.card.left+sizes.card.right)/2;
+    expect(Math.abs(mainCenter-cardCenter),`card horizontally centered at ${width}x${height}`).toBeLessThanOrEqual(2);
+    expect(sizes.card.width / sizes.main.width,`card uses desktop main area at ${width}x${height}`).toBeGreaterThan(.85);
+    expect(sizes.card.height,`content-sized dashboard at ${width}x${height}`).toBeLessThan(840);
+    if(width>=1280&&height>=720) {
+      expect(sizes.docHeight,`no unnecessary scroll at ${width}x${height}`).toBeLessThanOrEqual(sizes.viewportHeight+2);
+      expect(sizes.card.bottom,`panel fully visible at ${width}x${height}`).toBeLessThanOrEqual(sizes.viewportHeight-12);
+    }
     expect(sizes.activity.bottom,`activity accessible at ${width}x${height}`).toBeLessThanOrEqual(sizes.bodyHeight+2);
     expect(sizes.activity.top,`activity remains visible at ${width}x${height}`).toBeGreaterThan(sizes.card.top);
     expect(sizes.profile.bottom,`profile at ${width}x${height}`).toBeLessThanOrEqual(sizes.viewportHeight+1);
