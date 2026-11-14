@@ -667,3 +667,6 @@ A aceitação requer comparação de Cloudflare/D1 com janelas equivalentes, obs
 
 ### Publicação solicitada — 14/11/2026
 Para este PR, o responsável requisitou implantação diretamente no Hosting de DEV, sem canal de preview. Após green dos checks obrigatórios do SHA, executar `Frontend DEV` por `workflow_dispatch` na branch atual da PR. O job tem guarda do SHA, verifica o projeto `roteiva-web-dev`, e publica exclusivamente Hosting DEV; não alterar as proteções de deploy, não fazer merge automaticamente e não publicar PROD. Conferir o log de publicação e `https://roteiva-web-dev.web.app` depois.
+
+### Tempo máximo de QA de regressão completa
+A regressão **manual/noturna** percorre Firebase Rules, mais de 150 testes Playwright desktop/mobile e saga D1/API no mesmo job. O limite de 15 minutos cancelou a execução #43551524956 após 153 testes de navegador aprovados, antes da etapa backend; por isso o teto desse job foi ampliado para 25 minutos. Não altera o tempo limite nem os recursos das pipelines automáticas de PR/DEV e não reduz a cobertura.
