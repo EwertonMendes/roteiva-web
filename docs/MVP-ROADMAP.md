@@ -1,5 +1,11 @@
 # Roadmap vivo — Roteiva MVP
 
+## Correção pós-merge — legibilidade do panorama (14/11/2026)
+- [x] O QA integral da master mergeada `edfa60b7` identificou subtítulo da Visão Geral com 15px em desktop (mínimo de 16px). A ampliação da suíte também identificou mínimos de 12px para a legenda e 14px para o botão principal (contrato: 13px e 15px). Todos os três mínimos foram corrigidos, preservando layout fluido.
+- [x] A suíte focada `overview` passou a incluir `tests/browser/typography.spec.ts` além das verificações geométricas de `dashboard-viewport.spec.ts`, para impedir regressão de legibilidade.
+- [x] **VALIDADO EM BRANCH:** frontend/typecheck/build [CI #43563613893](https://github.com/EwertonMendes/roteiva-web/actions/runs/43563613893) e testes dirigidos de viewport e tipografia [QA #43563617176](https://github.com/EwertonMendes/roteiva-web/actions/runs/43563617176) aprovados (18 aprovados, 2 ignorados por dispositivo), SHA `7a2a8b481697b593e89fea5e7c90b74bed49e51e`.
+O merge aprovado na master acionará o workflow protegido de publicação DEV; validar seu resultado no GitHub Actions e manter PROD intocado. A homologação em dispositivos reais segue como verificação de uso, não como condição para publicar DEV.
+
 ## Revisão editorial final — PR #125 (13/11/2026)
 - [x] **IMPLEMENTADO EM BRANCH:** assets monocromáticos oficiais, marca compartilhada no login/navegação/splash, lente vetorial de referência, dashboard compacto e cards de agenda/atividade lado a lado.
 - [x] **IMPLEMENTADO EM BRANCH:** ação de adicionar capa disponível sem conexão, controle Já recebido, calendário por clique na data e botão Adicionar outro compromisso; sem alteração de schemas, de autorização ou de API.
