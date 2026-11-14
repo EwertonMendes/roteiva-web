@@ -17,7 +17,13 @@ concurrency:
   cancel-in-progress: false
 jobs:
   validate:
-    if: github.ref == 'refs/heads/master' && vars.PRODUCTION_ENABLED == 'true'
+    # Explicit owner-confirmed manual promotion is authorized even if the
+    # optional PRODUCTION_ENABLED switch is off. A full exact SHA, current
+    # master, merged PR and protected production environments are still required.
+    if: >-
+      github.ref == 'refs/heads/master' &&
+      (vars.PRODUCTION_ENABLED == 'true' ||
+       (github.event_name == 'workflow_dispatch' && inputs.confirmation == 'DEPLOY ROTEIVA PROD'))
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -125,6 +131,7 @@ jobs:
       VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ vars.VITE_FIREBASE_MESSAGING_SENDER_ID }}
       VITE_FIREBASE_STORAGE_BUCKET: ${{ vars.VITE_FIREBASE_STORAGE_BUCKET }}
       VITE_DROPBOX_ENABLED: 'true'
+      VITE_VIRTUAL_LIBRARY: 'true'
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

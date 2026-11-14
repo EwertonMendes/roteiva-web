@@ -670,3 +670,6 @@ Para este PR, o responsável requisitou implantação diretamente no Hosting de 
 
 ### Tempo máximo de QA de regressão completa
 A regressão **manual/noturna** percorre Firebase Rules, mais de 150 testes Playwright desktop/mobile e saga D1/API no mesmo job. O limite de 15 minutos cancelou a execução #43551524956 após 153 testes de navegador aprovados, antes da etapa backend; por isso o teto desse job foi ampliado para 25 minutos. Não altera o tempo limite nem os recursos das pipelines automáticas de PR/DEV e não reduz a cobertura.
+
+### Release de PROD explicitamente autorizada — 14/11/2026
+A promoção manual aceita `confirmation=DEPLOY ROTEIVA PROD` na `master` mesmo com a chave opcional `PRODUCTION_ENABLED` desligada. Os controles de titularidade do proprietário, SHA completo idêntico à master vigente, commit mergeado, isolamento Firebase/Cloudflare e aprovação dos ambientes `cloudflare-production` e `firebase-production` seguem obrigatórios. Para que a Biblioteca funcione em PROD, o Worker `env.prod.vars.VIRTUAL_LIBRARY_ENABLED` e o build `VITE_VIRTUAL_LIBRARY` devem estar ativados juntos. Não confundir migrations em DEV com PROD; a promoção deve registrar as migrations reais executadas e checar a identidade D1.
