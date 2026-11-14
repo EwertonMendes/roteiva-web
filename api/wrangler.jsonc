@@ -79,6 +79,7 @@
       "account_id": "836f81609b80e6b75be8e33d80c59dd5",
       "vars": {
         "ENVIRONMENT": "prod",
+        "VIRTUAL_LIBRARY_ENABLED": "true",
         "ACCOUNT_DELETION_ENABLED": "true",
         "ACCESS_PROVISION_ON_DRIVE": "false",
         "FIREBASE_PROJECT_ID": "roteiva-web-prod",

@@ -1,5 +1,12 @@
 # Roadmap vivo — Roteiva MVP
 
+## Liberação de PROD solicitada — 14/11/2026
+- [x] Integração na master do ciclo editorial e revisão de UX: SHA base `a7d66160` já aprovado em DEV.
+- [x] Ativação explícita da Biblioteca virtual no Worker de PROD e no build do frontend de PROD.
+- [x] Promoção manual confirmada pelo proprietário aceita pela pipeline, mesmo quando a chave opcional `PRODUCTION_ENABLED` permanece desligada; mantidos ator-proprietário, SHA imutável, PR mergeado e aprovações dos environments de produção.
+- [ ] Concluir migrations remotas no D1 PROD e validações pós-release por workflow de promoção; confirmar conteúdo remoto e funcionamento das integrações autenticadas reais.
+
+
 ## Correção pós-merge — legibilidade do panorama (14/11/2026)
 - [x] O QA integral da master mergeada `edfa60b7` identificou subtítulo da Visão Geral com 15px em desktop (mínimo de 16px). A ampliação da suíte também identificou mínimos de 12px para a legenda e 14px para o botão principal (contrato: 13px e 15px). Todos os três mínimos foram corrigidos, preservando layout fluido.
 - [x] A suíte focada `overview` passou a incluir `tests/browser/typography.spec.ts` além das verificações geométricas de `dashboard-viewport.spec.ts`, para impedir regressão de legibilidade.

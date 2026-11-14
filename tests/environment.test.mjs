@@ -49,3 +49,19 @@ test('runtime source has no personal infrastructure endpoints',()=>{
   }}
   for(const path of ['src','api/src','public'])walk(path);
 });
+
+
+test('production virtual library and owner-confirmed release target are configured consistently',()=>{
+  const worker=JSON.parse(readFileSync('api/wrangler.jsonc','utf8'));
+  assert.equal(worker.env.prod.vars.VIRTUAL_LIBRARY_ENABLED,'true');
+  assert.equal(worker.env.prod.vars.FIREBASE_PROJECT_ID,'roteiva-web-prod');
+  const web=readFileSync('.env.production','utf8');
+  assert.match(web,/^VITE_VIRTUAL_LIBRARY=true$/m);
+  const release=readFileSync('.github/workflows/production.yml','utf8');
+  assert.match(release,/VITE_VIRTUAL_LIBRARY: 'true'/);
+  assert.match(release,/inputs\.confirmation == 'DEPLOY ROTEIVA PROD'/);
+  assert.match(release,/test "\$GITHUB_ACTOR" = "\$GITHUB_REPOSITORY_OWNER"/);
+  assert.match(release,/test "\$APPROVED_SHA" = "\$GITHUB_SHA"/);
+  assert.match(release,/environment: cloudflare-production/);
+  assert.match(release,/environment: firebase-production/);
+});
