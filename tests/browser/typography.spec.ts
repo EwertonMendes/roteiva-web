@@ -134,6 +134,13 @@ test("public institutional pages and auth use the official monochrome identity",
   await expect(authLogo).toHaveAttribute("src","/brand/roteiva-wordmark-white.svg");
   await expect.poll(()=>authLogo.evaluate((img:HTMLImageElement)=>img.complete&&img.naturalWidth>0)).toBe(true);
   await expect(page.locator(".auth-story-art svg")).toBeVisible();
+  await expect(page.locator(".camera-lens-blade")).toHaveCount(6);
+  const googleLogo=page.locator(".auth-google-g svg");
+  await expect(googleLogo).toBeVisible();
+  await expect(googleLogo.locator("path")).toHaveCount(4);
+  expect(await googleLogo.locator("path").evaluateAll(nodes=>nodes.map(node=>node.getAttribute("fill"))))
+    .toEqual(["#EA4335","#4285F4","#FBBC05","#34A853"]);
+  await expect(page.locator(".auth-google-g")).not.toHaveText("G");
   await expect(page.locator(".auth-art-dot")).toHaveCount(0);
   for(const path of ["sobre.html","suporte.html","privacidade.html","termos.html"]){
     await page.goto(app+"/"+path);

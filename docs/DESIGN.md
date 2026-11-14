@@ -143,3 +143,6 @@ Sem adicionar textos ou elementos na interface, `useReviewBrowserGuards` central
 ## Player de vídeo na página de aprovação (23/10/2026)
 
 O vídeo utiliza exclusivamente controles nativos do `<video controls>`, inclusive tela cheia. O Roteiva não adiciona botões de "Ampliar vídeo" ou "Fechar tela cheia", estado auxiliar de expansão, comportamento de Escape ou overlay de fullscreen. Os recursos de marcação de tempo, comentários, reprodução responsiva e restrições de download continuam independentes. Não reutilizar os estilos `review-video-fullscreen` ou `is-video-expanded`.
+
+### Ajuste posterior de login — 14/11/2026
+A lente da proposta da página 9 tem seis lâminas em espiral formando o diafragma; não usar a estrela/polígono abstrato da primeira implementação. A arte desenha o barril, a abertura e as lâminas com caminhos vetoriais geométricos e tons neutros. O botão de login/cadastro com Google usa o G de quatro cores reais (#EA4335, #4285F4, #FBBC05 e #34A853), em vez da letra G tipográfica. Mantém o mesmo fluxo OAuth. **Homologação solicitada no DEV principal, não em preview separado.**

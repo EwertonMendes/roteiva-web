@@ -3,6 +3,7 @@ import { useState } from "react";
 import { ArrowRight, Check, LockKeyhole } from "lucide-react";
 import { useAuth, type AuthIntent } from "./AuthProvider";
 import { AuthLayout } from "./AuthLayout";
+import {GoogleGMark} from "./GoogleGMark";
 
 export function LoginPage() {
   const {login,busy,error}=useAuth();
@@ -26,7 +27,7 @@ export function LoginPage() {
       <p className="auth-section-label">{joining?"SEU NOVO ESPAÇO":"ACESSO À SUA CONTA"}</p>
       {joining&&<div className="auth-benefits"><span><Check size={15}/> Cadastro rápido</span><span><Check size={15}/> Dados privados</span></div>}
       <AppButton className="auth-google" type="button" disabled={busy} onClick={()=>void login(intent)}>
-        <span className="auth-google-g" aria-hidden="true">G</span>
+        <span className="auth-google-g" aria-hidden="true"><GoogleGMark/></span>
         <span>{busy?"Conectando…":joining?"Cadastrar com Google":"Entrar com Google"}</span>
         <ArrowRight size={17} strokeWidth={1.8} aria-hidden="true"/>
       </AppButton>

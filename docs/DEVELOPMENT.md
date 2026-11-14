@@ -664,3 +664,6 @@ A aceitação requer comparação de Cloudflare/D1 com janelas equivalentes, obs
 ## Validação de capas de projetos
 
 `pnpm test` inclui geometria de recorte e round-trip do codec. `npm test --prefix api` inclui busca privada e download limitado, isolamento de conexão e middleware HTTP autenticado. `pnpm test:rules` verifica campos opcionais completos, limites em create/update e isolamento A/B. Depois de compilar emulador/demo, executar `pnpm exec firebase emulators:exec --project demo-roteiva --only auth,firestore "pnpm exec playwright test tests/browser/project-covers.spec.ts tests/browser/semantic-icons.spec.ts"`. Drive é simulado nesse E2E; não usa arquivos reais. Publicação exige workflows de API, regras Firestore e frontend verdes antes da homologação no DEV.
+
+### Publicação solicitada — 14/11/2026
+Para este PR, o responsável requisitou implantação diretamente no Hosting de DEV, sem canal de preview. Após green dos checks obrigatórios do SHA, executar `Frontend DEV` por `workflow_dispatch` na branch atual da PR. O job tem guarda do SHA, verifica o projeto `roteiva-web-dev`, e publica exclusivamente Hosting DEV; não alterar as proteções de deploy, não fazer merge automaticamente e não publicar PROD. Conferir o log de publicação e `https://roteiva-web-dev.web.app` depois.
