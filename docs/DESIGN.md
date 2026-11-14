@@ -158,3 +158,5 @@ A gaveta do menu hambúrguer impede o scroll da página ao fundo, inclusive em i
 
 ### Ajuste de legibilidade do subtítulo da Visão Geral — 14/11/2026
 Para desktop (largura maior que 820px), o texto auxiliar `.page-heading p` na Visão Geral usa um mínimo de 16px, mantendo escala proporcional até 20px. Não reduzir abaixo de 16px para forçar o encaixe do painel; permitir rolagem em situações extremas de viewport/zoom. O QA de panorama deve executar também o contrato de tipografia `tests/browser/typography.spec.ts`.
+
+A etiqueta `.flow-overview-head .eyebrow` deve manter ao menos 13px e o botão principal do cabeçalho ao menos 15px em desktop, mesmo em resoluções intermediárias. Esses mínimos são verificados conjuntamente no QA `typography.spec.ts`.
