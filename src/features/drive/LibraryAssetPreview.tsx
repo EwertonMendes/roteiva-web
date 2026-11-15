@@ -20,6 +20,9 @@ export function LibraryAssetPreview({projectId,node,onClose}:{projectId:number;n
  const {user}=useAuth();
  const [expanded,setExpanded]=useState(false),[muted,setMuted]=useState(true);
  const videoRef=useRef<HTMLVideoElement>(null);
+ const networkRetryCount=useRef(0);
+ const networkRetryTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
+
  const dialog=useOverlayFocus(()=>{
   // The shared image viewer handles its own fullscreen Escape first.
   if(document.querySelector('.review-private-viewer.is-expanded'))return;
@@ -76,7 +79,27 @@ export function LibraryAssetPreview({projectId,node,onClose}:{projectId:number;n
   void load();
   return()=>{alive=false;controller.abort();release?.();};
  },[user,projectId,node.id,node.revision,node.source_revision,mime,retry]);
+ useEffect(()=>{
+  networkRetryCount.current=0;
+  return()=>{if(networkRetryTimer.current)clearTimeout(networkRetryTimer.current);networkRetryTimer.current=null;};
+ },[url]);
  const fail=()=>{setURL('');setError('O navegador não conseguiu reproduzir o arquivo. Tente novamente.');};
+ const recoverVideo=(video:HTMLVideoElement)=>{
+  // Network interruptions (MEDIA_ERR_NETWORK) can occur after the first frame.
+  // Retry just once on the same authenticated URL; completed ranges remain
+  // in the worker's short-lived memory cache. Codec errors fail immediately.
+  if(video.error?.code!==2||networkRetryCount.current>=1){fail();return;}
+  networkRetryCount.current++;
+  const at=Number.isFinite(video.currentTime)?video.currentTime:0;
+  networkRetryTimer.current=setTimeout(()=>{
+   if(!video.isConnected)return;
+   video.addEventListener('loadedmetadata',()=>{
+    if(at>0&&Number.isFinite(video.duration)&&at<video.duration)video.currentTime=at;
+    void video.play().catch(()=>{});
+   },{once:true});
+   video.load();
+  },350);
+ };
  return <div className="virtual-library-backdrop">
   <div ref={dialog} tabIndex={-1} role="dialog" aria-modal="true" aria-label={'Prévia de '+node.name}
    className={'virtual-library-editor virtual-library-preview vl-preview-modal'+(expanded?' is-expanded':'')}>
@@ -101,7 +124,7 @@ export function LibraryAssetPreview({projectId,node,onClose}:{projectId:number;n
      mime.startsWith('video/')?<div className="vl-preview-media-stage">
       <video ref={videoRef} className="vl-preview-video" src={url} controls autoPlay muted={muted}
        playsInline preload="auto" onLoadedData={event=>{if(event.currentTarget.paused)void event.currentTarget.play().catch(()=>{});}}
-       onVolumeChange={event=>setMuted(event.currentTarget.muted)} onError={fail}/>
+       onVolumeChange={event=>setMuted(event.currentTarget.muted)} onError={event=>recoverVideo(event.currentTarget)}/>
       {muted&&<AppButton className="vl-preview-unmute" type="button" onClick={()=>{
        if(!videoRef.current)return;videoRef.current.muted=false;setMuted(false);
        if(videoRef.current.paused)void videoRef.current.play().catch(()=>{});
