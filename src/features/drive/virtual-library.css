@@ -74,7 +74,33 @@
  display:block;width:100%;height:100%;min-height:0;max-height:none;max-width:none;object-fit:contain;margin:0
 }
 .virtual-library-backdrop .vl-preview-modal .vl-preview-body .vl-preview-audio{max-width:620px;width:calc(100% - 35px);margin:0}
-.vl-preview-modal .vl-preview-document{width:100%;height:100%;min-height:0;overflow:auto}
+.vl-preview-modal .vl-preview-document{position:relative;width:100%;height:100%;min-height:0;overflow:hidden}
+.vl-preview-modal .vl-preview-body{position:relative}
+.vl-preview-modal .vl-preview-header-actions{display:flex;align-items:center;gap:8px;flex:0 0 auto}
+.virtual-library-backdrop .virtual-library-editor.vl-preview-modal.is-expanded{
+ position:fixed;inset:0;margin:0;width:100vw;height:100dvh;max-height:none;
+ border-radius:0;z-index:1;padding:16px clamp(12px,2vw,28px); 
+}
+.virtual-library-backdrop .vl-preview-modal .review-private-viewer img{
+ margin:0;max-width:none;max-height:none;
+}
+.vl-preview-modal .vl-preview-media-stage{position:relative;width:100%;height:100%;display:grid;place-items:center;min-width:0;min-height:0}
+.virtual-library-backdrop .vl-preview-modal .vl-preview-body .vl-preview-media-stage video{
+ display:block;width:100%;height:100%;max-height:none;object-fit:contain;margin:0
+}
+.vl-preview-modal .vl-preview-unmute{
+ position:absolute;top:14px;right:14px;display:flex;align-items:center;gap:8px;
+ border:1px solid #ffffff5e;border-radius:999px;background:#111c;color:white;
+ padding:9px 13px;font-size:13px;font-weight:600;backdrop-filter:blur(10px);z-index:2
+}
+.vl-preview-modal .vl-preview-unmute:hover{background:#1e1e1ee8}
+.vl-preview-modal .vl-preview-audio-stage{
+ width:min(620px,calc(100% - 36px));display:flex;flex-direction:column;align-items:center;justify-content:center;
+ gap:20px;padding:24px 10px;min-width:0;color:var(--ink);text-align:center
+}
+.vl-preview-modal .vl-preview-audio-stage span{font-size:14px;font-weight:600;overflow-wrap:anywhere}
+.virtual-library-backdrop .vl-preview-modal .vl-preview-audio-stage .vl-preview-audio{width:100%;max-width:620px;margin:0}
+@media(max-width:650px){.vl-preview-modal .vl-preview-unmute{top:8px;right:8px;font-size:12px;padding:8px 10px}}
 .vl-preview-modal .vl-preview-state{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;min-height:180px;width:100%;padding:25px;text-align:center;font-size:13px;color:var(--muted)}
 .vl-preview-modal .vl-preview-state p{margin:0;max-width:500px;line-height:1.6}
 .vl-preview-modal .vl-preview-state svg{flex:0 0 auto}
