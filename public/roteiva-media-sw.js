@@ -90,7 +90,7 @@ self.addEventListener('fetch',event=>{
  const range=event.request.headers.get('Range');if(range)headers.set('Range',range);
  // A token still comes from the active tab on every read. Cache matching
  // ranges only for a known same-user library binding; never cache review links.
- const key=entry?.scope&&!current.review&&range&&event.request.method==='GET'
+ const key=entry?.scope&&range&&event.request.method==='GET'
   ?chunkKey(event.clientId,entry.scope,current.url,range):null;
  const hit=key?getChunk(key):null;
  if(hit)return new Response(hit.data.slice(0),{status:206,headers:new Headers(hit.headers)});
