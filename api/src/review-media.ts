@@ -70,6 +70,17 @@ export async function streamReviewMedia(request:Request,env:Env,url:URL):Promise
     .bind(p.r).first<{id:string;owner_uid:string;status:string;current_version:number;expires_at:number;token_hash:string;access_mode:string}>();
   if(!r||r.expires_at<=Date.now()||r.current_version!==p.v||r.token_hash!==p.h||
      !['pending','changes','approved'].includes(r.status))throw new ApiError(404,'review_not_found');
+  // These records are independent once the signed ticket and current review
+  // have been checked. Read them concurrently to reduce per-range D1 latency.
+  const [asset,session,permitted]=await Promise.all([
+    env.DB.prepare("SELECT file_id,connection_id,mime_type,provider,source_revision,source_size FROM review_assets WHERE review_id=? AND version=? AND file_id=? AND grant_state='granted'")
+      .bind(p.r,p.v,p.f).first<{file_id:string;connection_id:string;mime_type:string;provider:StorageProviderId;source_revision:string|null;source_size:string|null}>(),
+    env.VIRTUAL_LIBRARY_ENABLED==='true'
+      ?loadReviewSession(env,request.headers.get('X-Review-Session')||''):Promise.resolve(null),
+    r.access_mode==='google'&&p.s
+      ?env.DB.prepare("SELECT email FROM review_participants WHERE review_id=?").bind(r.id).all<{email:string}>()
+      :Promise.resolve({results:[] as {email:string}[]}),
+  ]);
   let viewerSubject:string|null=null;
   if(r.access_mode==='google'){
     if(!p.s)throw new ApiError(404,'review_not_found');
@@ -78,8 +89,6 @@ export async function streamReviewMedia(request:Request,env:Env,url:URL):Promise
       viewerSubject=await sessionSubject(principal.uid,principal.googleSubject);
       if(await reviewMediaSubject(env,r.id,principal.verifiedEmail,p.k)!==p.s)throw new ApiError(404,'review_not_found');
     }
-    const permitted=await env.DB.prepare("SELECT email FROM review_participants WHERE review_id=?")
-      .bind(r.id).all<{email:string}>();
     // Rechecking membership for every range revokes outstanding playback tickets
     // when access is removed; subject is a hash, not an email in a shared URL.
     let allowed=false;
@@ -89,12 +98,9 @@ export async function streamReviewMedia(request:Request,env:Env,url:URL):Promise
     if(!allowed)throw new ApiError(404,'review_not_found');
   }else if(p.s)throw new ApiError(404,'review_not_found');
   if(env.VIRTUAL_LIBRARY_ENABLED==='true'){
-    const session=await loadReviewSession(env,request.headers.get('X-Review-Session')||'');
-    if(p.j!==session.id_hash)throw new ApiError(404,'review_not_found');
+    if(!session||p.j!==session.id_hash)throw new ApiError(404,'review_not_found');
     assertReviewSession(session,r,viewerSubject);
   }
-  const asset=await env.DB.prepare("SELECT file_id,connection_id,mime_type,provider,source_revision,source_size FROM review_assets WHERE review_id=? AND version=? AND file_id=? AND grant_state='granted'")
-    .bind(p.r,p.v,p.f).first<{file_id:string;connection_id:string;mime_type:string;provider:StorageProviderId;source_revision:string|null;source_size:string|null}>();
   if(!asset||!(/^(video|image|audio)\//.test(asset.mime_type)||asset.mime_type==='application/pdf'))throw new ApiError(404,'review_not_found');
   if(env.VIRTUAL_LIBRARY_ENABLED==='true')return readPublishedSource(request,env,r.owner_uid,asset);
   const range=request.headers.get('Range');
