@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {database} from './helpers/database.mjs';
-import {libraryFor,libraryNode,listLibrary,listLibraryExplorer,mutateLibrary,libraryRouter} from '../src/library.ts';
+import {authorizeLibraryProject,libraryFor,libraryNode,listLibrary,listLibraryExplorer,mutateLibrary,libraryRouter} from '../src/library.ts';
 test('virtual folder commands preserve isolation, CAS and ancestor visibility',async t=>{
  const f=database();t.after(f.close);const env={DB:f.DB};
  const a=await libraryFor(env,'alice',1),b=await libraryFor(env,'bob',1);
@@ -83,4 +83,19 @@ test('project-wide explorer search hides descendants of trashed ancestor and rej
  assert.deepEqual(result.nodes.map(x=>x.name),['hiddenVisibleRoot']);
  await assert.rejects(listLibraryExplorer(env,lib,'root',child,'hidden',true),e=>e.code==='library_node_unavailable');
  await assert.rejects(listLibraryExplorer(env,lib,otherFolder,item,'hidden',false),e=>e.code==='library_changed');
+});
+
+test('adjacent private media ranges reuse a successful Firestore permission check only for the same token and project',async()=>{
+ const env={FIREBASE_PROJECT_ID:'media-test-project'};
+ const route=new Request('https://example.invalid/library/projects/999100/nodes/id/content',{headers:{Authorization:'Bearer unit-perf-999100'}});
+ let checks=0;
+ const grant=async()=>{checks++;return Response.json({fields:{ownerUid:{stringValue:'media-user-unique'}}});};
+ await authorizeLibraryProject(route,env,'media-user-unique',999100,grant,true);
+ await authorizeLibraryProject(route,env,'media-user-unique',999100,grant,true);
+ assert.equal(checks,1,'adjacent media ranges must not requery Firestore');
+ await authorizeLibraryProject(route,env,'media-user-unique',999100,grant,false);
+ assert.equal(checks,2,'ordinary library commands must retain fresh authorization');
+ await authorizeLibraryProject(new Request(route.url,{headers:{Authorization:'Bearer different-token'}}),
+  env,'media-user-unique',999100,grant,true);
+ assert.equal(checks,3,'another signed token must not share the cached grant');
 });
