@@ -133,7 +133,7 @@
 .vl-oauth-pending strong{font-size:13px;color:var(--ink)}
 .vl-oauth-pending span{font-size:12px;line-height:1.5;color:var(--muted)}
 .vl-oauth-pending button{min-height:36px;padding:7px 10px;flex:0 0 auto;border:1px solid var(--line);border-radius:9px;background:var(--card);color:var(--ink)}
-.vl-oauth-manual-link{display:inline-flex;align-items:center;justify-content:center;min-height:36px;padding:7px 12px;border:1px solid var(--accent);border-radius:9px;color:var(--ink);font-weight:600;text-decoration:underline;text-underline-offset:3px;text-align:center;overflow-wrap:anywhere}
+.vl-oauth-manual-link{display:inline-flex;align-items:center;justify-content:center;min-height:36px;padding:7px 12px;border:1px solid var(--lime);border-radius:9px;color:var(--ink);font-weight:600;text-decoration:underline;text-underline-offset:3px;text-align:center;overflow-wrap:anywhere}
 .vl-oauth-manual-link:focus-visible{outline:2px solid var(--focus,#2bd88c);outline-offset:3px}
 @media(max-width:650px){.vl-oauth-pending{align-items:stretch;flex-direction:column}.vl-oauth-pending button,.vl-oauth-manual-link{align-self:stretch}}
 
