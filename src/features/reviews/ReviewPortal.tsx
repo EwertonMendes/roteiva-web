@@ -6,7 +6,7 @@ import {useCallback,useEffect,useRef,useState} from "react";
 import {Check,CheckCircle2,Clock3,ExternalLink,FileAudio,FileImage,FileText,FileVideo,
   LoaderCircle,MessageSquare,Moon,Pause,Play,Send,ShieldCheck,Sun,Video,X} from "lucide-react";
 import {useAuth} from "../auth/AuthProvider";
-import {authenticatedReviewMedia} from '../drive/authenticated-media';
+import {authenticatedReviewMedia,warmAuthenticatedMedia} from '../drive/authenticated-media';
 import {useOverlayFocus} from "../drive/DriveLibraryUI";
 import {ReviewImageViewer} from "./ReviewImageViewer";
 import {ReviewPdfViewer} from "./ReviewPdfViewer";
@@ -65,6 +65,7 @@ function initialTheme():Mode{
 }
 export function ReviewPortal({token}:{token:string}){
   useReviewBrowserGuards();
+  useEffect(()=>{if(import.meta.env.VITE_VIRTUAL_LIBRARY==='true')warmAuthenticatedMedia();},[]);
   const {user,loading:authLoading,busy:authBusy,login,error:authError}=useAuth();
   const virtual=import.meta.env.VITE_VIRTUAL_LIBRARY==='true';
   const portalSession=useRef<PortalSession|null>(token?null:readPortalSession());
@@ -325,11 +326,11 @@ export function ReviewPortal({token}:{token:string}){
                  onDragStart={event=>event.preventDefault()}>
                 {previewMode==="loading"&&<div className="review-media-state review-private-preview-state" role="status">
                   <LoaderCircle className="rl-spin" size={25}/>
-                  "Preparando visualização segura…"
+                  "Carregando arquivo…"
                 </div>}
                 {playableVideo&&<video ref={videoRef} key={activeFileId}
                   controls controlsList="nodownload noremoteplayback" disablePictureInPicture disableRemotePlayback
-                   playsInline preload="metadata" src={previewUrl} aria-label={"Reproduzir "+active?.name}
+                   playsInline preload="auto" src={previewUrl} aria-label={"Reproduzir "+active?.name}
                   onTimeUpdate={e=>setPlayhead(e.currentTarget.currentTime)}
                   onLoadedMetadata={e=>{
                     const player=e.currentTarget;
@@ -356,7 +357,7 @@ export function ReviewPortal({token}:{token:string}){
                 {!active&&<p>Nenhum material disponível.</p>}
               </div>
               <div className="review-portal-stage-footer">
-                <div><strong>{active?.name}</strong><small>{playableVideo?"Player com marcação de instantes":"Visualização segura no Roteiva"}</small></div>
+                <div><strong>{active?.name}</strong><small>{playableVideo?"Player com marcação de instantes":"Visualização no Roteiva"}</small></div>
                 
                 {active&&data.review.driveShareEnabled&&<a href={reviewFileURL(active.fileId)} target="_blank" rel="noreferrer">
                   <ExternalLink size={15}/> Abrir no Drive</a>}

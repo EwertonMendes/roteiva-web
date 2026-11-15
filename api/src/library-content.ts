@@ -5,8 +5,11 @@ import {connection} from './repository.ts';
 import {accessCredential} from './google.ts';
 import {dropboxConnection,dropboxAccess} from './dropbox.ts';
 import {sourceRange} from './library-source.ts';
-import {driveResourceHeaders} from './drive-resource-keys.ts';
-type Asset={id:string;provider:'google_drive'|'dropbox';connection_id:string;file_id:string;mime_type:string};
+import {driveResourceHeaders,storedDriveResourceKey} from './drive-resource-keys.ts';
+type Asset={id:string;provider:'google_drive'|'dropbox';connection_id:string;file_id:string;mime_type:string;source_name:string;size:string|null;source_revision:string|null;observed_at:number;state:string};
+// The original provider remains authoritative for bytes and revocation. Reuse
+// recently verified metadata only for adjacent player/PDF range requests.
+const MEDIA_METADATA_FRESH_MS=15000;
 /** Identity/project are verified by the router; the reference and origin are checked on every read. */
 export async function libraryContent(request:Request,env:Env,uid:string,projectId:number,nodeId:string,fetcher:typeof fetch=fetch){
  const observationStarted=Date.now();
@@ -14,8 +17,16 @@ export async function libraryContent(request:Request,env:Env,uid:string,projectI
  if(node.kind!=='asset')throw new ApiError(404,'source_unavailable');
  const asset=await env.DB.prepare('SELECT a.* FROM library_entries e JOIN library_assets a ON a.library_id=e.library_id AND a.id=e.asset_id WHERE e.library_id=? AND e.node_id=?').bind(lib.id,node.id).first<Asset>();
  if(!asset)throw new ApiError(404,'source_unavailable');
+ const reuse=!!request.headers.get('Range')&&asset.state==='available'&&
+  typeof asset.size==='string'&&asset.size.length>0&&typeof asset.source_name==='string'&&
+  Number.isFinite(asset.observed_at)&&observationStarted>=asset.observed_at&&
+  observationStarted-asset.observed_at<MEDIA_METADATA_FRESH_MS;
+ const startMetadata=performance.now();
  let source;
- try{source=await readLibrarySource(env,uid,{provider:asset.provider,connectionId:asset.connection_id,fileId:asset.file_id},fetcher);}
+ try{source=reuse?
+  {name:asset.source_name,mimeType:asset.mime_type,size:asset.size,revision:asset.source_revision,
+   resourceKey:asset.provider==='google_drive'?await storedDriveResourceKey(env,uid,asset.connection_id,asset.file_id):undefined}:
+  await readLibrarySource(env,uid,{provider:asset.provider,connectionId:asset.connection_id,fileId:asset.file_id},fetcher);}
  catch(error){
  if(error instanceof ApiError){
  const state=error.code==='source_trashed'?'source_trashed':error.status===403?'restricted':error.status===404?'unavailable':null;
@@ -27,6 +38,8 @@ export async function libraryContent(request:Request,env:Env,uid:string,projectI
  const full=!request.headers.has('Range')&&(source.mimeType.startsWith('image/')||source.mimeType==='application/pdf');
  if(full&&Number(source.size)>(source.mimeType.startsWith('image/')?24:64)*1024*1024)throw new ApiError(413,'library_preview_too_large');
  const range=full?'bytes=0-'+(Number(source.size)-1):sourceRange(request.headers.get('Range'),source.size);
+ const metadataMs=Math.round(performance.now()-startMetadata);
+ const startOrigin=performance.now();
  let upstream:Response;
  if(asset.provider==='google_drive'){
  const row=await connection(env,uid,asset.connection_id),credential=await accessCredential(env,row,fetcher);
@@ -38,6 +51,9 @@ export async function libraryContent(request:Request,env:Env,uid:string,projectI
  method:'POST',headers:{Authorization:'Bearer '+credential,'Dropbox-API-Arg':JSON.stringify({path:asset.file_id}),Range:range},redirect:'manual',signal:AbortSignal.timeout(24000)});
  }
  if(!upstream.ok){await upstream.body?.cancel();throw new ApiError(upstream.status===429?429:502,upstream.status===429?'provider_rate_limited':'source_unavailable');}
+ const originMs=Math.round(performance.now()-startOrigin);
+ if(metadataMs+originMs>750)console.info(JSON.stringify({event:'media_origin_timing',kind:'library',provider:asset.provider,
+  metadataMs,originMs,reusedMetadata:reuse}));
  const match=/^bytes (\d+)-(\d+)\/(\d+)$/.exec(upstream.headers.get('Content-Range')||'');
  const matchingPartial=upstream.status===206&&!!match&&'bytes='+match[1]+'-'+match[2]===range&&match[3]===source.size;
  // Some providers answer a full-object request with 200 even when Range is present.
@@ -50,7 +66,7 @@ export async function libraryContent(request:Request,env:Env,uid:string,projectI
  const current=asset.provider==='google_drive'?await connection(env,uid,asset.connection_id):await dropboxConnection(env,uid,asset.connection_id);
  if(current.status!=='connected')throw new ApiError(409,'reconnect_required');
  }catch(error){await upstream.body?.cancel();throw error;}
- await env.DB.prepare("UPDATE library_assets SET source_name=?,mime_type=?,size=?,source_revision=?,state='available',observed_at=? WHERE library_id=? AND id=? AND observed_at<=?")
+ if(!reuse)await env.DB.prepare("UPDATE library_assets SET source_name=?,mime_type=?,size=?,source_revision=?,state='available',observed_at=? WHERE library_id=? AND id=? AND observed_at<=?")
  .bind(source.name,source.mimeType,source.size,source.revision,observationStarted,lib.id,asset.id,observationStarted).run();
  const headers=new Headers({'Content-Type':source.mimeType,'Accept-Ranges':'bytes',
  'Content-Length':String(matchingFull?Number(source.size):Number(match![2])-Number(match![1])+1),'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer',

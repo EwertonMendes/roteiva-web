@@ -16,6 +16,7 @@ import {useStorageConnections} from './StorageConnectionsProvider';
 import {preparePicker,pickLibraryFiles,type PickerConfig} from './google-picker';
 import {DropboxLibraryPicker} from './DropboxLibraryPicker';
 import {LibraryAssetPreview} from './LibraryAssetPreview';
+import {warmAuthenticatedMedia} from './authenticated-media';
 import {API_BASE_URL} from '../../lib/environment';
 import {messages} from './drive-api';
 import {useDriveTransfers} from './DriveTransfersProvider';
@@ -36,6 +37,7 @@ type Node={id:string;parent_id:string|null;kind:'folder'|'asset';name:string;rev
 type Page={nodes:Node[];trail:{id:string;name:string}[];nextPage:string|null};
 export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{projects:readonly Project[];selectedProjectId?:number;onSelectProject:(id:string)=>void}){
  const {user}=useAuth(),call=useDriveApi();
+ useEffect(()=>{if(user)warmAuthenticatedMedia();},[user]);
  const storage=useStorageConnections();
  const transfers=useDriveTransfers(),fileInput=useRef<HTMLInputElement>(null),uploadProvider=useRef<'google_drive'|'dropbox'>('google_drive');
  const [accountId,setAccountId]=useState(''),[picker,setPicker]=useState<{connectionId:string;config:PickerConfig}|null>(null),[progress,setProgress]=useState('');

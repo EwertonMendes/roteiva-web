@@ -140,6 +140,12 @@ test('virtual navigation preserves folder commands and a partial Dropbox batch r
  expect(requestedThumbnails).toBeGreaterThan(0);
  await expect(page.locator('.rl-upload-queue')).toBeHidden();
  await page.getByRole('button',{name:'Fechar prévia'}).click();
+ const beforeRepeat=previewRequests;
+ await page.getByRole('button',{name:'Imagem A.png',exact:true}).click();
+ await expect(page.getByRole('dialog',{name:'Prévia de Imagem A.png'}).locator('.vl-preview-image')).toBeVisible();
+ await expect.poll(()=>page.getByRole('dialog',{name:'Prévia de Imagem A.png'}).locator('.vl-preview-image').evaluate(el=>(el as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+ expect(previewRequests).toBe(beforeRepeat);
+ await page.getByRole('button',{name:'Fechar prévia'}).click();
  await expect(page.locator('.rl-upload-queue')).toBeVisible();
  // Discard only the synthetic failed transfer before exercising the remaining mobile UI.
  const expand=page.getByRole('button',{name:'Expandir transferências'});

@@ -20,7 +20,7 @@ import {dropboxEnabled,dropboxStart,dropboxLaunch,dropboxCallback,dropboxConnect
 import {startDropboxUpload,appendDropboxUpload,finishDropboxUpload,cleanupDropboxUploads} from './dropbox-uploads.ts';
 import {issueDropboxPreview,streamDropboxPreview} from './dropbox-preview.ts';
 /** Route categories are intentionally static: never log tokens, file IDs or URL params. */
-function mediaRoute(path:string){return path.endsWith('/thumbnail')||path.endsWith('/cover')||path==='/reviews/media'||/^\/(library\/projects\/[0-9]+\/nodes\/[0-9a-f-]{36}|reviews\/[0-9a-f-]{36})\/content$/.test(path);}
+function mediaRoute(path:string){return path.endsWith('/thumbnail')||path.endsWith('/cover')||path==='/reviews/media'||path==='/integrations/dropbox/media'||/^\/(library\/projects\/[0-9]+\/nodes\/[0-9a-f-]{36}|reviews\/[0-9a-f-]{36})\/content$/.test(path);}
 function libraryBatchRoute(path:string){return /^\/library\/projects\/[0-9]+\/(imports|inspect|structure|uploads\/destination)$/.test(path);}
 function operationName(path:string):string{
   if(mediaRoute(path))return 'thumbnail_or_media';
@@ -112,7 +112,6 @@ export async function handle(request: Request, env: Env): Promise<Response> {
         : await finishDropboxUpload(env,uid,parts[3],parts[5],request);
     } else if (url.pathname === '/integrations/dropbox/media') {
       dropboxEnabled(env);
-      if(!(await env.API_THUMB_LIMIT.limit({key:env.ENVIRONMENT+':media:'+sourceIp.slice(0,64)})).success)throw new ApiError(429,'rate_limited');
       response=await streamDropboxPreview(env,request,url);
     } else if (/^\/integrations\/dropbox\/[^/]+\/files\/[^/]+\/cover$/.test(url.pathname) && request.method==='GET') {
        dropboxEnabled(env);

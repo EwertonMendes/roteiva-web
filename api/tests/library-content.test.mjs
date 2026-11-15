@@ -9,25 +9,28 @@ const conn='aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa',fileId='FILE_123456789';
 async function fixture(t){
  const env={ENVIRONMENT:'dev',TOKEN_KEY_VERSION:'v1',TOKEN_KEYS:JSON.stringify({v1:base64url(crypto.getRandomValues(new Uint8Array(32)))}),GOOGLE_CLIENT_ID:'test',GOOGLE_CLIENT_SECRET:'test'};
  const f=database({id:conn,owner_uid:'alice',google_account_id:'alice-google',status:'connected',revision:1,scopes:'https://www.googleapis.com/auth/drive.file',encrypted_refresh_token:await encrypt(env,'refresh',context(env,'alice','alice-google'))});env.DB=f.DB;t.after(f.close);
- const state={missing:false,download:true,body:'test',total:'4',streams:0,fullStatus:206};
+ const state={missing:false,download:true,body:'test',total:'4',streams:0,fullStatus:206,metadataReads:0};
  const fetcher=async(url,options)=>{
  if(String(url).startsWith('https://oauth2.googleapis.com/token'))return Response.json({access_token:'mock',token_type:'Bearer',expires_in:3600});
  if(new URL(url).searchParams.get('alt')==='media'){
  state.streams++;assert.equal(options.redirect,'manual');assert.equal(options.headers.Range,'bytes=0-3');
  return new Response(state.body,{status:state.fullStatus,headers:state.fullStatus===200?{'Content-Length':state.total}:{'Content-Range':'bytes 0-3/'+state.total}});
  }
+ state.metadataReads++;
  if(state.missing)return new Response(null,{status:404});
  return Response.json({id:fileId,name:'photo.jpg',mimeType:'image/jpeg',size:'4',headRevisionId:'v1',isAppAuthorized:true,capabilities:{canDownload:state.download}});
  };
  const imported=await (await importLibraryAssets(env,'alice',17,{parentId:'root',items:[{provider:'google_drive',connectionId:conn,fileId}]},fetcher)).json();
  return {...f,env,state,fetcher,id:imported.results[0].id};
 }
-test('owner preview checks resource each time and streams bounded content without redirect credentials',async t=>{
+test('owner preview verifies full downloads, reuses recent metadata for ranges and streams bounded bytes',async t=>{
  const {env,id,fetcher,state,sql}=await fixture(t);
  const response=await libraryContent(new Request('https://api.example/content'),env,'alice',17,id,fetcher);
  assert.equal(response.status,200);assert.equal(await response.text(),'test');assert.equal(response.headers.get('Content-Length'),'4');
+ const previousMetadata=state.metadataReads;
  const r=await libraryContent(new Request('https://api.example/content',{headers:{Range:'bytes=0-3'}}),env,'alice',17,id,fetcher);
  assert.equal(r.status,206);assert.equal(await r.text(),'test');
+ assert.equal(state.metadataReads,previousMetadata,'adjacent video ranges must not re-fetch the same metadata');
  state.missing=true;
  await assert.rejects(libraryContent(new Request('https://api.example/content'),env,'alice',17,id,fetcher),e=>e.code==='source_unavailable');
  assert.equal(sql.prepare('SELECT state FROM library_assets').get().state,'unavailable');

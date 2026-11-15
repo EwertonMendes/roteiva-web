@@ -3,6 +3,7 @@ import { browserLocalPersistence, GoogleAuthProvider, onAuthStateChanged, setPer
 import { firebaseServices, persistentCacheEnabled, purgePrivateCache } from "../../lib/firebase";
 import { authErrorMessage } from "./errors";
 import {clearStorageImageCache} from "../drive/storage-image-cache";
+import {libraryPreviewCache} from "../drive/library-preview-cache";
 
 export type AuthIntent = "login" | "register";
 type AuthState = { user: User | null; loading: boolean; busy: boolean; error: string; intent: AuthIntent; login: (intent?: AuthIntent) => Promise<void>; logout: () => Promise<void> };
@@ -25,7 +26,7 @@ export function AuthProvider({children}: {children: ReactNode}) {
     setPersistence(auth,browserLocalPersistence).then(()=>{
       if (!active) return;
       unsubscribe=onAuthStateChanged(auth,next=>{
-        if(previousUid&&previousUid!==next?.uid)void clearStorageImageCache();
+        if(previousUid&&previousUid!==next?.uid){void clearStorageImageCache();libraryPreviewCache.clear();}
         previousUid=next?.uid||null;
         setUser(next);setLoading(false);
       },reason=>{
@@ -51,6 +52,7 @@ export function AuthProvider({children}: {children: ReactNode}) {
     try {
       await signOut(firebaseServices().auth);
       await clearStorageImageCache();
+      libraryPreviewCache.clear();
       setUser(null);setIntent("login");
       if (persistentCacheEnabled()) {
         await purgePrivateCache();
