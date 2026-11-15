@@ -6,10 +6,10 @@ const media=new Map();
 const chunks=new Map();
 const CHUNK_TTL=3*60*1000,MAX_CHUNK=8*1024*1024,MAX_CACHED=48*1024*1024;
 let cachedBytes=0;
-const MEDIA_CACHE='roteiva-private-media-v1';
+const MEDIA_CACHE='roteiva-private-media-v2';
 const DISK_MAX_ENTRIES=6,DISK_TTL=10*60*1000;
 let cacheGeneration=0;
-function diskEligible(range){return !range||/^bytes=0-\d*$/.test(range);}
+function diskEligible(range){return typeof range==='string'&&/^bytes=0-\d+$/.test(range);}
 async function cacheRequest(key){
  const bytes=new TextEncoder().encode(key);
  const hash=await crypto.subtle.digest('SHA-256',bytes);
@@ -89,7 +89,7 @@ function target(value){
  return {url:url.href,review};
 }
 self.addEventListener('install',event=>event.waitUntil(self.skipWaiting()));
-self.addEventListener('activate',event=>event.waitUntil(self.clients.claim()));
+self.addEventListener('activate',event=>event.waitUntil(Promise.all([self.clients.claim(),self.caches?.delete('roteiva-private-media-v1').catch(()=>{})||Promise.resolve()])));
 self.addEventListener('message',event=>{
  const source=event.source,data=event.data,port=event.ports[0];
  if(!source?.id||!source.url||new URL(source.url).origin!==self.location.origin||!port)return;
