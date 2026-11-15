@@ -26,6 +26,7 @@ export function LibraryAssetPreview({projectId,node,onClose}:{projectId:number;n
  const {user}=useAuth();
  const [expanded,setExpanded]=useState(false),[muted,setMuted]=useState(true);
  const videoRef=useRef<HTMLVideoElement>(null);
+ const resumeVideoTime=useRef(0);
  // Optional DEV-only adaptive preview: no background transcoding or extra cost.
  const [optimized,setOptimized]=useState<{state:'absent'|'processing'|'ready'|'failed'|'unavailable';embedUrl?:string}>({state:'absent'});
  const [streamStart,setStreamStart]=useState(0);
@@ -48,7 +49,7 @@ export function LibraryAssetPreview({projectId,node,onClose}:{projectId:number;n
  useEffect(()=>{
   let alive=true,release:(()=>void)|undefined;
   const controller=new AbortController();
-  setURL('');setError('');setLoading(true);setMuted(true);setNativeFailed(false);setStreamStart(0);
+  setURL('');setError('');setLoading(true);setMuted(true);setNativeFailed(false);setStreamStart(0);resumeVideoTime.current=0;
   if(!user){setLoading(false);setError('Entre novamente no Roteiva para abrir este arquivo.');return()=>controller.abort();}
   if(!image&&!stream){setLoading(false);return()=>controller.abort();}
   libraryPreviewCache.scope(user.uid);
@@ -117,7 +118,7 @@ export function LibraryAssetPreview({projectId,node,onClose}:{projectId:number;n
     if(cancelled)return;
     if(data.state==='ready'&&validStreamEmbed(data.embedUrl)){
      const video=videoRef.current;
-     setStreamStart(video&&Number.isFinite(video.currentTime)?Math.floor(video.currentTime):0);
+     setStreamStart(Math.floor(video&&Number.isFinite(video.currentTime)?video.currentTime:resumeVideoTime.current));
      setOptimized({state:'ready',embedUrl:data.embedUrl});return;
     }
     if(data.state==='processing'&&Date.now()-began<10*60*1000){
@@ -144,7 +145,8 @@ export function LibraryAssetPreview({projectId,node,onClose}:{projectId:number;n
   // in the worker's short-lived memory cache. Codec errors fail immediately.
   if(video.error?.code!==2||networkRetryCount.current>=1){fail();return;}
   networkRetryCount.current++;
-  const at=Number.isFinite(video.currentTime)?video.currentTime:0;
+  const at=Number.isFinite(video.currentTime)?video.currentTime:resumeVideoTime.current;
+  resumeVideoTime.current=at;
   networkRetryTimer.current=setTimeout(()=>{
    if(!video.isConnected)return;
    video.addEventListener('loadedmetadata',()=>{
@@ -181,6 +183,7 @@ export function LibraryAssetPreview({projectId,node,onClose}:{projectId:number;n
          allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowFullScreen referrerPolicy="strict-origin-when-cross-origin"/>:
        nativeFailed?<div className="vl-preview-state" role="status"><LoaderCircle className="vl-loading" size={27}/><span>Preparando reprodução contínua…</span></div>:
        <video ref={videoRef} className="vl-preview-video" src={url} controls autoPlay muted={muted}
+        onTimeUpdate={event=>{resumeVideoTime.current=event.currentTarget.currentTime;}}
         playsInline preload="auto" onLoadedData={event=>{if(event.currentTarget.paused)void event.currentTarget.play().catch(()=>{});}}
         onVolumeChange={event=>setMuted(event.currentTarget.muted)} onError={event=>recoverVideo(event.currentTarget)}/>}
       {optimized.state!=='ready'&&muted&&<AppButton className="vl-preview-unmute" type="button" onClick={()=>{
