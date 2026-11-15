@@ -5,7 +5,7 @@ test('native media transport binds the URL to its tab and forwards authenticated
  await withMediaServer(async received=>{
  await page.goto(origin+'/sobre.html');
  const url=await page.evaluate(async()=>{
- await navigator.serviceWorker.register('/roteiva-media-sw.js',{scope:'/'});
+ await navigator.serviceWorker.register('/roteiva-media-sw.js?mediaProtocol=2',{scope:'/'});
  await navigator.serviceWorker.ready;
  if(!navigator.serviceWorker.controller)await new Promise<void>(resolve=>navigator.serviceWorker.addEventListener('controllerchange',()=>resolve(),{once:true}));
  navigator.serviceWorker.addEventListener('message',event=>{if(event.data?.type==='media-authorization')event.ports[0].postMessage({authorization:'Bearer browser-synthetic'});});
@@ -31,7 +31,7 @@ test('cold browser takes SW control without a page reload and native audio/video
   await page.goto(origin+'/sobre.html');
   const result=await page.evaluate(async()=>{
    const initialUrl=location.href;
-   const registration=await navigator.serviceWorker.register('/roteiva-media-sw.js',{scope:'/',updateViaCache:'none'});
+   const registration=await navigator.serviceWorker.register('/roteiva-media-sw.js?mediaProtocol=2',{scope:'/',updateViaCache:'none'});
    await navigator.serviceWorker.ready;
    if(!navigator.serviceWorker.controller){
     const controlled=new Promise<void>((resolve,reject)=>{
@@ -89,4 +89,42 @@ test('cold browser takes SW control without a page reload and native audio/video
   expect(received.filter(x=>x.path.includes('bbbbbbbb')&&x.authorization==='Bearer browser-synthetic'&&!!x.range).length).toBeGreaterThan(0);
   expect(received.filter(x=>x.path.includes('cccccccc')&&x.authorization==='Bearer browser-synthetic'&&!!x.range).length).toBeGreaterThan(0);
  });
+});
+
+test('an already-open tab upgrades its old worker to the media protocol without page refresh',async({page})=>{
+ await page.goto(origin+'/sobre.html');
+ const state=await page.evaluate(async()=>{
+  const beforeNavigation=performance.getEntriesByType('navigation').length;
+  (window as unknown as {mediaUpgradeMarker?:string}).mediaUpgradeMarker='preserved';
+  const old=await navigator.serviceWorker.register('/roteiva-media-sw.js',{scope:'/',updateViaCache:'none'});
+  await navigator.serviceWorker.ready;
+  if(!navigator.serviceWorker.controller){
+   await new Promise<void>((resolve,reject)=>{
+    const timeout=setTimeout(()=>reject(new Error('old worker not controlling')),5000);
+    navigator.serviceWorker.addEventListener('controllerchange',()=>{
+     clearTimeout(timeout);resolve();
+    },{once:true});
+   });
+  }
+  const oldScript=navigator.serviceWorker.controller?.scriptURL||'';
+  const updated=await navigator.serviceWorker.register('/roteiva-media-sw.js?mediaProtocol=2',{scope:'/',updateViaCache:'none'});
+  await new Promise<void>((resolve,reject)=>{
+   const ready=()=>navigator.serviceWorker.controller?.scriptURL.includes('?mediaProtocol=2');
+   if(ready()){resolve();return;}
+   const timeout=setTimeout(()=>{cleanup();reject(new Error('protocol upgrade did not claim this tab'));},8000);
+   const check=()=>{if(ready()){cleanup();resolve();}};
+   const cleanup=()=>{clearTimeout(timeout);navigator.serviceWorker.removeEventListener('controllerchange',check);updated.removeEventListener('updatefound',check);};
+   navigator.serviceWorker.addEventListener('controllerchange',check);
+   updated.addEventListener('updatefound',check);
+   check();
+  });
+  return {oldScript,updatedScript:navigator.serviceWorker.controller?.scriptURL,
+   marker:(window as unknown as {mediaUpgradeMarker?:string}).mediaUpgradeMarker,
+   sameNavigation:performance.getEntriesByType('navigation').length===beforeNavigation};
+ });
+ expect(state.oldScript).toContain('/roteiva-media-sw.js');
+ expect(state.oldScript).not.toContain('mediaProtocol=2');
+ expect(state.updatedScript).toContain('?mediaProtocol=2');
+ expect(state.marker).toBe('preserved');
+ expect(state.sameNavigation).toBe(true);
 });
