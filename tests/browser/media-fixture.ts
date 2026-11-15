@@ -20,7 +20,7 @@ export async function withMediaServer(job:(requests:Received[])=>Promise<void>,h
    response.setHeader('Content-Type','image/png');response.end(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=','base64'));return;
   }
   if(path==='/library/projects/17/nodes/cccccccc-cccc-4ccc-cccc-cccccccccccc/content'&&request.headers.authorization==='Bearer browser-synthetic'){
-   const match=/^bytes=(\\d+)-(\\d*)$/.exec(request.headers.range||'bytes=0-');
+   const match=/^bytes=(\d+)-(\d*)$/.exec(request.headers.range||'bytes=0-');
    if(!match){response.writeHead(416);response.end();return;}
    const first=Number(match[1]),last=match[2]?Math.min(Number(match[2]),smallMp4.length-1):smallMp4.length-1;
    if(first>=smallMp4.length||last<first){response.writeHead(416);response.end();return;}
@@ -40,7 +40,7 @@ export async function withMediaServer(job:(requests:Received[])=>Promise<void>,h
    wav.writeUInt16LE(1,22);wav.writeUInt32LE(8000,24);wav.writeUInt32LE(16000,28);
    wav.writeUInt16LE(2,32);wav.writeUInt16LE(16,34);wav.write('data',36);
    wav.writeUInt32LE(pcm.length,40);pcm.copy(wav,44);
-   const match=/^bytes=(\\d+)-(\\d*)$/.exec(request.headers.range||'bytes=0-');
+   const match=/^bytes=(\d+)-(\d*)$/.exec(request.headers.range||'bytes=0-');
    if(!match){response.writeHead(416);response.end();return;}
    const first=Number(match[1]),last=match[2]?Math.min(Number(match[2]),wav.length-1):wav.length-1;
    if(first>=wav.length||last<first){response.writeHead(416);response.end();return;}
