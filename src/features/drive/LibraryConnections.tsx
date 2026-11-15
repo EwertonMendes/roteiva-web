@@ -12,10 +12,11 @@ type Provider='google_drive'|'dropbox';
 type ConnectProvider='drive'|'dropbox';
 
 export function LibraryConnections({
- busy,onConnect,selectedDriveId,selectedDropboxId,onSelectDrive,onSelectDropbox
+ busy,onConnect,selectedDriveId,selectedDropboxId,onSelectDrive,onSelectDropbox,pendingProvider,onCancelConnect
 }:{
  busy:boolean;
- onConnect:(provider:ConnectProvider)=>void;
+ onConnect:(provider:ConnectProvider,reconnecting?:string)=>void;
+ pendingProvider?:ConnectProvider|null;onCancelConnect?:()=>void;
  selectedDriveId?:string;selectedDropboxId?:string;
  onSelectDrive:(id:string)=>void;onSelectDropbox:(id:string)=>void;
 }){
@@ -109,7 +110,7 @@ export function LibraryConnections({
         </>:needsConsent?
          <AppButton type="button" className="vl-account-fix" disabled={disabled} onClick={()=>askDisconnect(account)} aria-label={'Atualizar autorização de '+account.email}><RefreshCw size={15} aria-hidden="true"/> Atualizar acesso</AppButton>
         :reconnect?
-         <AppButton type="button" className="vl-account-fix" disabled={disabled} onClick={()=>onConnect(provider.connect)} aria-label={'Reconectar '+account.email}><Link2 size={15} aria-hidden="true"/> Reconectar</AppButton>
+         <AppButton type="button" className="vl-account-fix" disabled={disabled} onClick={()=>onConnect(provider.connect,account.id)} aria-label={'Reconectar '+account.email}><Link2 size={15} aria-hidden="true"/> Reconectar</AppButton>
         :<span className="vl-account-wait" role="status">Aguarde a desconexão</span>}
        </div>
       </li>;
@@ -136,6 +137,10 @@ export function LibraryConnections({
  }
  return <div className="vl-accounts-content" aria-label="Gerenciar contas de armazenamento">
   <p className="vl-accounts-intro">Escolha as contas que o Roteiva pode usar. Você pode conectar mais de uma por serviço.</p>
+  {pendingProvider&&<div className="vl-oauth-pending" role="status">
+   <div><strong>Autorizando {pendingProvider==='drive'?'Google Drive':'Dropbox'}…</strong><span>Conclua a conexão na janela que foi aberta. A Biblioteca continuará disponível aqui.</span></div>
+   <AppButton type="button" onClick={onCancelConnect}>Cancelar</AppButton>
+  </div>}
   {storage.loading&&!storage.connections.length&&<p className="vl-accounts-loading" role="status"><RefreshCw size={16} className="vl-loading" aria-hidden="true"/> Buscando contas conectadas…</p>}
   <div className="vl-provider-list">{providers.map(renderProvider)}</div>
   <p className="vl-accounts-footnote"><ShieldCheck size={15} aria-hidden="true"/> Os arquivos continuam no Google Drive ou Dropbox. O Roteiva apenas organiza o acesso.</p>

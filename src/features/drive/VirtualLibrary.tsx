@@ -20,6 +20,7 @@ import {API_BASE_URL} from '../../lib/environment';
 import {messages} from './drive-api';
 import {useDriveTransfers} from './DriveTransfersProvider';
 import {rememberLibraryOAuthReturn,readLibraryOAuthReturn,forgetLibraryOAuthReturn} from './library-oauth-return';
+import {openStorageOAuthWindow,awaitStorageOAuthWindow,type StorageOAuthWindow,type StorageOAuthProvider} from './storage-oauth-popup';
 import {importLibraryBatch,type LibraryImport,type FailedLibraryImport} from './library-import';
 import {LibraryConnections} from './LibraryConnections';
 import {LibraryStructureDialog} from './LibraryStructureDialog';
@@ -45,6 +46,8 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
  const dropbox=dropboxAccounts.find(x=>x.id===dropboxId)||dropboxAccounts[0];
  const [parent,setParent]=useState('root'),[loadedPage,setPage]=useState<(Page&{scope:string})|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const [returnNotice,setReturnNotice]=useState('');
+ const [connectingProvider,setConnectingProvider]=useState<StorageOAuthProvider|null>(null);
+ const oauthController=useRef<AbortController|null>(null),oauthWindow=useRef<StorageOAuthWindow|null>(null);
  const [loadingPage,setLoadingPage]=useState(false),[refreshing,setRefreshing]=useState(false),[searchAll,setSearchAll]=useState(true);
  const [layout,setLayout]=useState<'list'|'grid'>(()=>{try{return localStorage.getItem('roteiva-library-layout')==='grid'?'grid':'list';}catch{return 'list';}});
  const [addOpen,setAddOpen]=useState(false),[settingsOpen,setSettingsOpen]=useState(false),[menuNode,setMenuNode]=useState<Node|null>(null);
@@ -87,14 +90,59 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
   const params=new URLSearchParams(window.location.search),result=params.get('drive')||params.get('dropbox');
   if(result&&result!=='connected'&&result!=='cancelled')setError(messages[result]||'Não foi possível conectar a conta. Tente novamente.');
  },[]);
- async function connect(provider:'drive'|'dropbox'){
-  if(busy)return;setBusy(true);setError('');
-  try{const result=await call<{launchUrl:string}>('/oauth/'+provider+'/start','POST');const target=new URL(result.launchUrl);
-   if(target.origin!==API_BASE_URL||target.pathname!=='/oauth/'+provider+'/launch')throw new Error('O endereço de conexão recebido não é válido.');
-   if(user?.uid&&selectedProjectId)rememberLibraryOAuthReturn(user.uid,selectedProjectId,parent);
-   else forgetLibraryOAuthReturn();
-   window.location.assign(target.href);
-  }catch(e){setError(e instanceof Error?e.message:'Não foi possível conectar a conta.');setBusy(false);}
+ async function connect(provider:'drive'|'dropbox',reconnecting?:string){
+  if(busy||connectingProvider)return;
+  // Open synchronously during the click. OAuth remains a first-party top-level
+  // navigation in this popup, but the user's workspace is never reloaded.
+  const popup=openStorageOAuthWindow();
+  const controller=new AbortController();
+  oauthController.current=controller;oauthWindow.current=popup;
+  setConnectingProvider(provider);setError('');
+  const before=new Set(storage.connections.filter(x=>x.provider===(provider==='drive'?'google_drive':'dropbox')).map(x=>x.id));
+  try{
+   const result=await call<{launchUrl:string}>('/oauth/'+provider+'/start','POST',undefined,controller.signal);
+   if(controller.signal.aborted)return;
+   const target=new URL(result.launchUrl);
+   if(target.origin!==API_BASE_URL||target.pathname!=='/oauth/'+provider+'/launch')
+    throw new Error('O endereço de conexão recebido não é válido.');
+   if(!popup){
+    // Popup blockers are rare when opening synchronously. Preserve the existing
+    // full-page OAuth path as a safe, functional fallback.
+    if(user?.uid&&selectedProjectId)rememberLibraryOAuthReturn(user.uid,selectedProjectId,parent);
+    else forgetLibraryOAuthReturn();
+    window.location.assign(target.href);
+    return;
+   }
+   popup.popup.location.replace(target.href);
+   const reply=await awaitStorageOAuthWindow(popup,controller.signal);
+   if(controller.signal.aborted)return;
+   if(!reply){setError('A autorização não foi concluída. Abra a conexão novamente.');return;}
+   if(reply.provider!==provider)throw new Error('A autorização retornou um provedor inesperado.');
+   if(reply.status==='cancelled'){setReturnNotice('Conexão cancelada. Suas contas anteriores foram preservadas.');return;}
+   if(reply.status!=='connected'){setError(messages[reply.status]||'A autorização não foi concluída. Tente novamente.');return;}
+   const refreshed=await storage.refresh(true);
+   if(refreshed.failed.includes(provider==='drive'?'google_drive':'dropbox'))
+    throw new Error('Conta autorizada, mas não foi possível atualizar a lista. Use Atualizar contas.');
+   const entries=provider==='drive'?refreshed.drive:refreshed.dropbox;
+   const newlyAdded=entries.find(x=>x.status==='connected'&&!before.has(x.id));
+   const linked= new Set(entries.filter(x=>x.status==='connected').map(x=>x.id));
+   const selected=newlyAdded?.id||(reconnecting&&linked.has(reconnecting)?reconnecting:null);
+   if(selected){if(provider==='drive')setAccountId(selected);else setDropboxId(selected);}
+   setReturnNotice(newlyAdded?'Nova conta conectada com sucesso.':
+    'Autorização atualizada. Se você queria outra conta, selecione um login diferente no provedor.');
+  }catch(e){
+   if(!controller.signal.aborted)setError(e instanceof Error?e.message:'Não foi possível conectar a conta.');
+  }finally{
+   if(popup&&!popup.popup.closed)popup.popup.close();
+   if(oauthController.current===controller){
+    oauthController.current=null;oauthWindow.current=null;setConnectingProvider(null);
+   }
+  }
+ }
+ function cancelConnection(){
+  oauthController.current?.abort();
+  oauthWindow.current?.popup.close();
+  oauthWindow.current=null;setConnectingProvider(null);
  }
  useEffect(()=>{
  setPicker(null);if(!base||!account)return;const controller=new AbortController();
@@ -158,7 +206,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
  useEffect(()=>{const cached=getLibraryFolder<Node>(pageScope);setPage(cached?{...cached.data,scope:pageScope}:null);void load(undefined,false);return()=>{++loadRevision.current;++generation.current;};},[pageScope]);
  const lastCacheUser=useRef(user?.uid);
  useEffect(()=>{if(lastCacheUser.current&&lastCacheUser.current!==user?.uid)clearLibraryFolders(lastCacheUser.current);lastCacheUser.current=user?.uid;},[user?.uid]);
- useEffect(()=>()=>mutation.current?.abort(),[]);
+ useEffect(()=>()=>{mutation.current?.abort();oauthController.current?.abort();oauthWindow.current?.popup.close();},[]);
  async function performImport(items:LibraryImport[],target:string,controller:AbortController,scope:number){
   const failed=await importLibraryBatch(call,base.replace('/nodes','/imports'),target,items,controller.signal,(done,total)=>setProgress('Adicionando '+done+' de '+total+' arquivos…'));
   if(scope!==generation.current||controller.signal.aborted)return;
@@ -315,7 +363,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
      </div>
     </header>
     {storage.error&&<div role="alert" className="vl-accounts-provider-error">Não foi possível atualizar {storage.error}. Tente novamente.</div>}
-    <LibraryConnections busy={busy} selectedDriveId={account?.id} selectedDropboxId={dropbox?.id} onSelectDrive={setAccountId} onSelectDropbox={setDropboxId} onConnect={provider=>void connect(provider)}/>
+    <LibraryConnections busy={busy||Boolean(connectingProvider)} pendingProvider={connectingProvider} onCancelConnect={cancelConnection} selectedDriveId={account?.id} selectedDropboxId={dropbox?.id} onSelectDrive={setAccountId} onSelectDropbox={setDropboxId} onConnect={(provider,accountId)=>void connect(provider,accountId)}/>
    </div>
   </div>}
   {storage.error&&<div role="alert" className="vl-compact-alert"><AlertCircle size={17}/><span>Falha ao verificar {storage.error}.</span><AppButton onClick={()=>void storage.refresh(true)}>Tentar novamente</AppButton></div>}
