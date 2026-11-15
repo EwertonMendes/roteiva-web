@@ -21,13 +21,13 @@ async function macKey(env:Env,version:string){
  if(bytes.byteLength!==32)throw new ApiError(503,'invalid_key');
  return crypto.subtle.importKey('raw',bytes,{name:'HMAC',hash:'SHA-256'},false,['sign','verify']);
 }
-async function mint(env:Env,body:Omit<Ticket,'k'>):Promise<string>{
+export async function mintStreamIngestTicket(env:Env,body:Omit<Ticket,'k'>):Promise<string>{
  const ticket:Ticket={...body,k:env.TOKEN_KEY_VERSION};
  const data=base64url(encoder.encode(JSON.stringify(ticket)));
  const sig=await crypto.subtle.sign('HMAC',await macKey(env,ticket.k),encoder.encode('roteiva/stream-ingest/v1/'+data));
  return data+'.'+base64url(new Uint8Array(sig));
 }
-async function checkTicket(env:Env,token:string):Promise<Ticket>{
+export async function verifyStreamIngestTicket(env:Env,token:string):Promise<Ticket>{
  if(token.length>1100||!/^[-_A-Za-z0-9]+\.[-_A-Za-z0-9]+$/.test(token))throw new ApiError(404,'not_found');
  const [data,signature]=token.split('.');
  let p:Ticket;
@@ -118,7 +118,7 @@ export async function previewRequest(request:Request,env:Env,uid:string,projectI
    .bind(now,now,...args(uid,actual,meta.revision)).run();
  }
  try{
-  const ticket=await mint(env,{u:uid,p:projectId,n:nodeId,r:meta.revision,s:meta.size,e:Date.now()+90*60*1000});
+  const ticket=await mintStreamIngestTicket(env,{u:uid,p:projectId,n:nodeId,r:meta.revision,s:meta.size,e:Date.now()+90*60*1000});
   const input=apiOrigin(env)+'/stream/ingest/'+ticket;
   const video=await stream(env).upload(input,{
    requireSignedURLs:true,allowedOrigins:[new URL(env.FRONTEND_ORIGIN).hostname],
@@ -143,7 +143,7 @@ export async function previewRequest(request:Request,env:Env,uid:string,projectI
 export async function streamIngest(request:Request,env:Env,token:string){
  stream(env);
  if(request.method!=='GET'&&request.method!=='HEAD')throw new ApiError(405,'method_not_allowed');
- const ticket=await checkTicket(env,token);
+ const ticket=await verifyStreamIngestTicket(env,token);
  const a=await assetFor(env,ticket.u,ticket.p,ticket.n);
  if(a.source_revision!==ticket.r||a.size!==ticket.s)throw new ApiError(409,'source_changed');
  const media=await libraryContent(request,env,ticket.u,ticket.p,ticket.n);
