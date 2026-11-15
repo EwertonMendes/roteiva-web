@@ -1,5 +1,5 @@
-import {useEffect,useState} from 'react';
-import {AlertCircle,LoaderCircle,RefreshCcw,X} from 'lucide-react';
+import {useEffect,useRef,useState} from 'react';
+import {AlertCircle,Expand,FileAudio,LoaderCircle,Minimize,RefreshCcw,Volume2,X} from 'lucide-react';
 import {API_BASE_URL} from '../../lib/environment';
 import {useAuth} from '../auth/AuthProvider';
 import {AppButton} from '../ui/AppButton';
@@ -8,6 +8,7 @@ import {authenticatedMedia} from './authenticated-media';
 import {libraryPreviewCache} from './library-preview-cache';
 import {messages} from './drive-api';
 import {ReviewPdfViewer} from '../reviews/ReviewPdfViewer';
+import {ReviewImageViewer} from '../reviews/ReviewImageViewer';
 
 const imageLimit=24*1024*1024;
 
@@ -16,7 +17,15 @@ const imageLimit=24*1024*1024;
  * download or a public provider URL.
  */
 export function LibraryAssetPreview({projectId,node,onClose}:{projectId:number;node:{id:string;name:string;mime_type?:string;source_revision?:string;revision?:number};onClose:()=>void}){
- const {user}=useAuth(),dialog=useOverlayFocus(onClose);
+ const {user}=useAuth();
+ const [expanded,setExpanded]=useState(false),[muted,setMuted]=useState(true);
+ const videoRef=useRef<HTMLVideoElement>(null);
+ const dialog=useOverlayFocus(()=>{
+  // The shared image viewer handles its own fullscreen Escape first.
+  if(document.querySelector('.review-private-viewer.is-expanded'))return;
+  if(expanded){setExpanded(false);return;}
+  onClose();
+ });
  const [url,setURL]=useState(''),[error,setError]=useState(''),[retry,setRetry]=useState(0),[loading,setLoading]=useState(true);
  const mime=node.mime_type||'';
  const image=mime.startsWith('image/'),pdf=mime==='application/pdf';
@@ -24,7 +33,7 @@ export function LibraryAssetPreview({projectId,node,onClose}:{projectId:number;n
  useEffect(()=>{
   let alive=true,release:(()=>void)|undefined;
   const controller=new AbortController();
-  setURL('');setError('');setLoading(true);
+  setURL('');setError('');setLoading(true);setMuted(true);
   if(!user){setLoading(false);setError('Entre novamente no Roteiva para abrir este arquivo.');return()=>controller.abort();}
   if(!image&&!stream){setLoading(false);return()=>controller.abort();}
   libraryPreviewCache.scope(user.uid);
@@ -70,10 +79,15 @@ export function LibraryAssetPreview({projectId,node,onClose}:{projectId:number;n
  const fail=()=>{setURL('');setError('O navegador não conseguiu reproduzir o arquivo. Tente novamente.');};
  return <div className="virtual-library-backdrop">
   <div ref={dialog} tabIndex={-1} role="dialog" aria-modal="true" aria-label={'Prévia de '+node.name}
-   className="virtual-library-editor virtual-library-preview vl-preview-modal">
+   className={'virtual-library-editor virtual-library-preview vl-preview-modal'+(expanded?' is-expanded':'')}>
    <header className="vl-preview-head">
     <h3 title={node.name}>{node.name}</h3>
-    <AppButton className="vl-icon-action" type="button" aria-label="Fechar prévia" title="Fechar prévia" onClick={onClose}><X size={19} aria-hidden="true"/></AppButton>
+    <div className="vl-preview-header-actions">
+     {!image&&<AppButton className="vl-icon-action" type="button" aria-label={expanded?'Sair da tela cheia':'Visualizar em tela cheia'}
+       title={expanded?'Sair da tela cheia':'Visualizar em tela cheia'} aria-pressed={expanded}
+       onClick={()=>setExpanded(v=>!v)}>{expanded?<Minimize size={18} aria-hidden="true"/>:<Expand size={18} aria-hidden="true"/>}</AppButton>}
+     <AppButton className="vl-icon-action" type="button" aria-label="Fechar prévia" title="Fechar prévia" onClick={onClose}><X size={19} aria-hidden="true"/></AppButton>
+    </div>
    </header>
    <div className="vl-preview-body">
     {loading?<div className="vl-preview-state" role="status"><LoaderCircle className="vl-loading" size={27}/><span>Carregando arquivo…</span></div>:
@@ -83,9 +97,19 @@ export function LibraryAssetPreview({projectId,node,onClose}:{projectId:number;n
      </div>:
      !url?<div className="vl-preview-state"><p>Não há prévia integrada para este formato de arquivo.</p></div>:
      pdf?<div className="vl-preview-document"><ReviewPdfViewer src={url} name={node.name}/></div>:
-     image?<img className="vl-preview-image" src={url} alt={node.name} onError={fail}/>:
-     mime.startsWith('video/')?<video className="vl-preview-video" src={url} controls playsInline preload="auto" onError={fail}/>:
-     <audio className="vl-preview-audio" src={url} controls preload="metadata" onError={fail}/>}
+     image?<ReviewImageViewer src={url} name={node.name} onError={fail}/>:
+     mime.startsWith('video/')?<div className="vl-preview-media-stage">
+      <video ref={videoRef} className="vl-preview-video" src={url} controls autoPlay muted={muted}
+       playsInline preload="auto" onCanPlay={event=>{if(event.currentTarget.paused)void event.currentTarget.play().catch(()=>{});}}
+       onVolumeChange={event=>setMuted(event.currentTarget.muted)} onError={fail}/>
+      {muted&&<AppButton className="vl-preview-unmute" type="button" onClick={()=>{
+       if(!videoRef.current)return;videoRef.current.muted=false;setMuted(false);
+      }}><Volume2 size={17} aria-hidden="true"/>Ativar som</AppButton>}
+     </div>:
+     <div className="vl-preview-audio-stage"><FileAudio size={40} aria-hidden="true"/>
+      <span>{node.name}</span>
+      <audio className="vl-preview-audio" src={url} controls preload="metadata" onError={fail}/>
+     </div>}
    </div>
   </div>
  </div>;
