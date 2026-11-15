@@ -1,51 +1,86 @@
 import {API_BASE_URL} from '../../lib/environment';
 
 const WORKER_PATH='/roteiva-media-sw.js';
+// The query is a transport-protocol version, not a per-request cache buster.
+// A version change replaces an older worker under the same '/' registration.
+const WORKER_URL=WORKER_PATH+'?mediaProtocol=2';
+const PUBLIC_MEDIA_ERROR='Não foi possível abrir este arquivo agora. Tente novamente.';
 const providers=new Map<string,{getToken:()=>Promise<string>;getReviewSession?:()=>string;url:string}>();
 let setup:Promise<void>|undefined;
 let listening=false;
 
+function isExpectedWorker(worker:ServiceWorker|null):boolean{
+ if(!worker)return false;
+ try{
+  const script=new URL(worker.scriptURL);
+  return script.origin===location.origin&&script.pathname===WORKER_PATH&&script.searchParams.get('mediaProtocol')==='2';
+ }catch{return false;}
+}
 function controllerIsReady():boolean{
- const controller=navigator.serviceWorker.controller;
- return !!controller&&controller.scriptURL===new URL(WORKER_PATH,location.origin).href;
+ return isExpectedWorker(navigator.serviceWorker.controller);
 }
 
-/** An active SW may not yet control an already-open page. Explicitly request
- * control instead of waiting ten seconds and asking users to reload.
+/** Wait for the *newly activated* media worker, never issue a claim request to
+ * the previous version which may not implement the current protocol. 
+ * The active worker's activate event claims clients; this is a backup for
+ * pages that were opened while the new registration was installing.
  */
-async function claimCurrentPage(registration:ServiceWorkerRegistration):Promise<void>{
+async function awaitMediaControl(registration:ServiceWorkerRegistration):Promise<void>{
  if(controllerIsReady())return;
  await new Promise<void>((resolve,reject)=>{
   let finished=false;
-  const complete=(error?:Error)=>{
+  const observed=new Set<ServiceWorker>();
+  let claimSent:ServiceWorker|null=null;
+  const dispose=()=>{
+   clearTimeout(timer);
+   navigator.serviceWorker.removeEventListener('controllerchange',onController);
+   registration.removeEventListener('updatefound',onUpdate);
+   for(const worker of observed)worker.removeEventListener('statechange',onState);
+  };
+  const finish=(ready:boolean)=>{
    if(finished)return;
-   finished=true;clearTimeout(timer);
-   navigator.serviceWorker.removeEventListener('controllerchange',onControllerChange);
-   if(error)reject(error);else resolve();
+   finished=true;dispose();
+   ready?resolve():reject(new Error(PUBLIC_MEDIA_ERROR));
   };
-  const onControllerChange=()=>{if(controllerIsReady())complete();};
-  const timer=setTimeout(()=>{
-   if(controllerIsReady())complete();
-   else complete(new Error('Não foi possível iniciar o visualizador de mídia neste navegador. Verifique se os Service Workers estão habilitados e tente novamente.'));
-  },4000);
-  navigator.serviceWorker.addEventListener('controllerchange',onControllerChange);
-  if(controllerIsReady()){complete();return;}
-  const worker=registration.active;
-  if(!worker){complete(new Error('Não foi possível ativar o visualizador de mídia. Tente novamente.'));return;}
-  // No bearer token or provider identity crosses this control handshake.
-  const channel=new MessageChannel();
-  channel.port1.onmessage=event=>{
-   channel.port1.close();
-   if(event.data?.ok===false)complete(new Error('Não foi possível ativar o visualizador de mídia.'));
-   else onControllerChange();
+  const observe=(worker:ServiceWorker|null)=>{
+   if(worker&&!observed.has(worker)){
+    observed.add(worker);worker.addEventListener('statechange',onState);
+   }
   };
-  try{worker.postMessage({type:'claim-media-clients'},[channel.port2]);}
-  catch{channel.port1.close();complete(new Error('Não foi possível comunicar com o visualizador de mídia.'));}
+  const attempt=()=>{
+   if(controllerIsReady()){finish(true);return;}
+   observe(registration.installing);
+   observe(registration.waiting);
+   observe(registration.active);
+   const worker=registration.active;
+   if(!worker||worker.state!=='activated'||!isExpectedWorker(worker)||claimSent===worker)return;
+   claimSent=worker;
+   const channel=new MessageChannel();
+   const cleanup=setTimeout(()=>channel.port1.close(),1200);
+   channel.port1.onmessage=()=>{
+    clearTimeout(cleanup);channel.port1.close();
+    if(controllerIsReady())finish(true);
+   };
+   try{worker.postMessage({type:'claim-media-clients'},[channel.port2]);}
+   catch{clearTimeout(cleanup);channel.port1.close();}
+  };
+  const onController=()=>attempt();
+  const onState=()=>attempt();
+  const onUpdate=()=>attempt();
+  const timer=setTimeout(()=>finish(controllerIsReady()),8000);
+  navigator.serviceWorker.addEventListener('controllerchange',onController);
+  registration.addEventListener('updatefound',onUpdate);
+  attempt();
+  // register() normally starts the upgrade. When an old active worker has no
+  // replacement installing yet, ask the browser once to check the server.
+  if(registration.active&&!isExpectedWorker(registration.active)&&!registration.installing){
+   void registration.update().then(attempt).catch(()=>{});
+  }
  });
 }
 
 async function prepare(){
- if(!('serviceWorker' in navigator))throw new Error('Este navegador não oferece suporte à reprodução integrada.');
+ if(!('serviceWorker' in navigator))throw new Error(PUBLIC_MEDIA_ERROR);
  setup??=(async()=>{
   if(!listening){
    listening=true;
@@ -58,26 +93,29 @@ async function prepare(){
      .catch(()=>port.postMessage({}));
    });
   }
-  const registration=await navigator.serviceWorker.register(WORKER_PATH,{scope:'/',updateViaCache:'none'});
-  // An active registration is not necessarily controlling the current document.
-  const active=registration.active?registration:await navigator.serviceWorker.ready;
-  await claimCurrentPage(active);
- })().catch(error=>{setup=undefined;throw error;});
+  const registration=await navigator.serviceWorker.register(WORKER_URL,{scope:'/',updateViaCache:'none'});
+  await awaitMediaControl(registration);
+ })().catch(error=>{
+  setup=undefined;
+  // Only a category is logged: no filenames, accounts, tokens or provider URLs.
+  console.warn('[Roteiva] A visualização de mídia não pôde ser inicializada.',{phase:'media-transport',kind:error instanceof TypeError?'browser':'activation'});
+  throw new Error(PUBLIC_MEDIA_ERROR);
+ });
  await setup;
 }
 
 function message(data:unknown):Promise<void>{
  return new Promise((resolve,reject)=>{
   const channel=new MessageChannel(),timer=setTimeout(()=>{
-   channel.port1.close();reject(new Error('Não foi possível iniciar o arquivo. Tente novamente.'));
+   channel.port1.close();reject(new Error(PUBLIC_MEDIA_ERROR));
   },3500);
   channel.port1.onmessage=e=>{
    clearTimeout(timer);channel.port1.close();
-   e.data?.ok?resolve():reject(new Error('Não foi possível iniciar o arquivo.'));
+   e.data?.ok?resolve():reject(new Error(PUBLIC_MEDIA_ERROR));
   };
   if(!controllerIsReady()){
    clearTimeout(timer);channel.port1.close();
-   reject(new Error('O visualizador de mídia perdeu a conexão. Tente abrir o arquivo novamente.'));
+   reject(new Error(PUBLIC_MEDIA_ERROR));
    return;
   }
   navigator.serviceWorker.controller!.postMessage(data,[channel.port2]);
