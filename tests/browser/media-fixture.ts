@@ -17,6 +17,26 @@ export async function withMediaServer(job:(requests:Received[])=>Promise<void>,h
   if(path==='/reviews/media'&&request.headers['x-review-session']==='s'.repeat(43)){
    response.setHeader('Content-Type','image/png');response.end(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=','base64'));return;
   }
+  if(path==='/library/projects/17/nodes/bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb/content'&&request.headers.authorization==='Bearer browser-synthetic'){
+   // Small real 8-kHz mono PCM WAV; exercises HTMLAudioElement's native Range
+   // loading, rather than only testing generic fetch() with synthetic text.
+   const pcm=Buffer.alloc(16000);
+   for(let i=0;i<8000;i++)pcm.writeInt16LE(Math.round(Math.sin(i*2*Math.PI*440/8000)*8000),i*2);
+   const wav=Buffer.alloc(44+pcm.length);
+   wav.write('RIFF',0);wav.writeUInt32LE(wav.length-8,4);wav.write('WAVE',8);
+   wav.write('fmt ',12);wav.writeUInt32LE(16,16);wav.writeUInt16LE(1,20);
+   wav.writeUInt16LE(1,22);wav.writeUInt32LE(8000,24);wav.writeUInt32LE(16000,28);
+   wav.writeUInt16LE(2,32);wav.writeUInt16LE(16,34);wav.write('data',36);
+   wav.writeUInt32LE(pcm.length,40);pcm.copy(wav,44);
+   const match=/^bytes=(\\d+)-(\\d*)$/.exec(request.headers.range||'bytes=0-');
+   if(!match){response.writeHead(416);response.end();return;}
+   const first=Number(match[1]),last=match[2]?Math.min(Number(match[2]),wav.length-1):wav.length-1;
+   if(first>=wav.length||last<first){response.writeHead(416);response.end();return;}
+   const chunk=wav.subarray(first,last+1);
+   response.writeHead(206,{'Content-Type':'audio/wav','Content-Length':String(chunk.length),
+    'Content-Range':'bytes '+first+'-'+last+'/'+wav.length,'Accept-Ranges':'bytes'});
+   response.end(chunk);return;
+  }
   if(path==='/library/projects/17/nodes/aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa/content'&&request.headers.authorization==='Bearer browser-synthetic'&&request.headers.range==='bytes=0-3'){
    response.writeHead(206,{'Content-Range':'bytes 0-3/4','Content-Length':'4'});response.end('test');return;
   }
