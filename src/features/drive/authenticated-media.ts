@@ -3,7 +3,7 @@ import {API_BASE_URL} from '../../lib/environment';
 const WORKER_PATH='/roteiva-media-sw.js';
 // The query is a transport-protocol version, not a per-request cache buster.
 // A version change replaces an older worker under the same '/' registration.
-const WORKER_URL=WORKER_PATH+'?mediaProtocol=3';
+const WORKER_URL=WORKER_PATH+'?mediaProtocol=4';
 const PUBLIC_MEDIA_ERROR='Não foi possível abrir este arquivo agora. Tente novamente.';
 const providers=new Map<string,{getToken:()=>Promise<string>;getReviewSession?:()=>string;url:string;scope:string}>();
 let setup:Promise<void>|undefined;
@@ -13,7 +13,7 @@ function isExpectedWorker(worker:ServiceWorker|null):boolean{
  if(!worker)return false;
  try{
   const script=new URL(worker.scriptURL);
-  return script.origin===location.origin&&script.pathname===WORKER_PATH&&script.searchParams.get('mediaProtocol')==='3';
+  return script.origin===location.origin&&script.pathname===WORKER_PATH&&script.searchParams.get('mediaProtocol')==='4';
  }catch{return false;}
 }
 function controllerIsReady():boolean{
@@ -129,7 +129,7 @@ export async function authenticatedMedia(projectId:number,nodeId:string,getToken
 }
 /** Clear tab-scoped private media buffers when a user signs out or changes. */
 export function clearAuthenticatedMediaCache(){
- if('caches' in window)void caches.delete('roteiva-private-media-v1').catch(()=>{});
+ if('caches' in window)for(const key of ['roteiva-private-media-v1','roteiva-private-media-v2'])void caches.delete(key).catch(()=>{});
  if(!('serviceWorker' in navigator))return;
  try{
   const channel=new MessageChannel();
