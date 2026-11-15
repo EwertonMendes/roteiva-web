@@ -169,7 +169,7 @@ export function LibraryAssetPreview({projectId,node,onClose}:{projectId:number;n
      mime.startsWith('video/')?<div className="vl-preview-media-stage">
       {optimized.state==='ready'&&optimized.embedUrl?
        <iframe className="vl-preview-stream-frame" src={optimized.embedUrl} title={'Reprodução otimizada de '+node.name}
-         allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowFullScreen referrerPolicy="no-referrer"/>:
+         allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowFullScreen referrerPolicy="strict-origin-when-cross-origin"/>:
        <video ref={videoRef} className="vl-preview-video" src={url} controls autoPlay muted={muted}
         playsInline preload="auto" onLoadedData={event=>{if(event.currentTarget.paused)void event.currentTarget.play().catch(()=>{});}}
         onVolumeChange={event=>setMuted(event.currentTarget.muted)} onError={event=>recoverVideo(event.currentTarget)}/>}
