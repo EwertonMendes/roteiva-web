@@ -67,7 +67,7 @@ test('cold browser takes SW control without a page reload and native audio/video
     bind('cccccccc-cccc-4ccc-cccc-cccccccccccc'),
    ]);
    const audio=document.createElement('audio'),video=document.createElement('video');
-   audio.preload='metadata';video.preload='metadata';video.muted=true;
+   audio.preload='metadata';video.preload='auto';video.muted=true;video.autoplay=true;video.playsInline=true;
    document.body.append(audio,video);
    const metadata=(element:HTMLMediaElement,label:string)=>new Promise<number>((resolve,reject)=>{
     const timer=setTimeout(()=>reject(new Error(label+' metadata timeout')),10000);
@@ -77,8 +77,14 @@ test('cold browser takes SW control without a page reload and native audio/video
     },{once:true});
    });
    const readyAudio=metadata(audio,'wav'),readyVideo=metadata(video,'mp4');
+   const autoPlaying=new Promise<void>((resolve,reject)=>{
+    const timeout=setTimeout(()=>reject(new Error('muted video did not autoplay')),8000);
+    video.addEventListener('playing',()=>{clearTimeout(timeout);resolve();},{once:true});
+    video.addEventListener('error',()=>{clearTimeout(timeout);reject(new Error('video decode failed'));},{once:true});
+   });
    audio.src=wav;video.src=mp4;
    const [audioDuration,videoDuration]=await Promise.all([readyAudio,readyVideo]);
+   await autoPlaying;
    audio.remove();video.remove();
    return {audioDuration,videoDuration,unchanged:location.href===initialUrl,controlled:!!navigator.serviceWorker.controller};
   });
