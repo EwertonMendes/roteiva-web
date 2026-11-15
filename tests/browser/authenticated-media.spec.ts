@@ -163,12 +163,15 @@ test('reopening the same private media in one tab reuses completed ranges withou
    };
    const firstId=await bind(),first=await read(firstId);await revoke(firstId);
    // A 4-byte range finishes immediately; allow clone/stream completion in SW.
-   await new Promise(r=>setTimeout(r,100));
+   await new Promise(r=>setTimeout(r,250));
+   const cache=await caches.open('roteiva-private-media-v1');
+   const stored=await cache.keys();
    const secondId=await bind(),second=await read(secondId);await revoke(secondId);
-   return {first,second};
+   return {first,second,persistent:stored.length>0};
   });
   expect(answers.first).toEqual({status:206,body:'test'});
   expect(answers.second).toEqual({status:206,body:'test'});
+  expect(answers.persistent).toBe(true);
   expect(received.filter(x=>x.path.includes('/nodes/aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa/content'))).toHaveLength(1);
  });
 });
