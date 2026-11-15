@@ -131,3 +131,44 @@ test('an already-open tab upgrades its old worker to the media protocol without 
  expect(state.marker).toBe('preserved');
  expect(state.sameNavigation).toBe(true);
 });
+
+test('reopening the same private media in one tab reuses completed ranges without contacting API twice',async({page})=>{
+ await withMediaServer(async received=>{
+  await page.goto(origin+'/sobre.html');
+  const answers=await page.evaluate(async()=>{
+   await navigator.serviceWorker.register('/roteiva-media-sw.js?mediaProtocol=2',{scope:'/',updateViaCache:'none'});
+   await navigator.serviceWorker.ready;
+   if(!navigator.serviceWorker.controller)await new Promise<void>(resolve=>navigator.serviceWorker.addEventListener('controllerchange',()=>resolve(),{once:true}));
+   navigator.serviceWorker.addEventListener('message',event=>{
+    if(event.data?.type==='media-authorization')event.ports[0].postMessage({authorization:'Bearer browser-synthetic'});
+   });
+   const url='http://127.0.0.1:8787/library/projects/17/nodes/aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa/content';
+   const bind=async()=>{
+    const id=crypto.randomUUID(),channel=new MessageChannel();
+    const ready=new Promise<void>((resolve,reject)=>{
+     channel.port1.onmessage=e=>{channel.port1.close();e.data?.ok?resolve():reject(new Error('binding rejected'));};
+    });
+    navigator.serviceWorker.controller!.postMessage({type:'bind-media',id,url,scope:'test-owner'},[channel.port2]);
+    await ready;return id;
+   };
+   const revoke=async(id:string)=>{
+    const channel=new MessageChannel();
+    const done=new Promise<void>(resolve=>{channel.port1.onmessage=()=>{channel.port1.close();resolve();};});
+    navigator.serviceWorker.controller!.postMessage({type:'revoke-media',id},[channel.port2]);
+    await done;
+   };
+   const read=async(id:string)=>{
+    const response=await fetch('/__roteiva_media/'+id,{headers:{Range:'bytes=0-3'}});
+    return {status:response.status,body:await response.text()};
+   };
+   const firstId=await bind(),first=await read(firstId);await revoke(firstId);
+   // A 4-byte range finishes immediately; allow clone/stream completion in SW.
+   await new Promise(r=>setTimeout(r,100));
+   const secondId=await bind(),second=await read(secondId);await revoke(secondId);
+   return {first,second};
+  });
+  expect(answers.first).toEqual({status:206,body:'test'});
+  expect(answers.second).toEqual({status:206,body:'test'});
+  expect(received.filter(x=>x.path.includes('/nodes/aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa/content'))).toHaveLength(1);
+ });
+});
