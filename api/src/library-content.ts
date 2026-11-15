@@ -4,7 +4,7 @@ import {readLibrarySource} from './library-assets.ts';
 import {connection} from './repository.ts';
 import {accessCredential} from './google.ts';
 import {dropboxConnection,dropboxAccess} from './dropbox.ts';
-import {sourceRange} from './library-source.ts';
+import {sourceRange,playbackRange} from './library-source.ts';
 import {streamHeaders} from './media-fetch.ts';
 import {driveResourceHeaders,storedDriveResourceKey} from './drive-resource-keys.ts';
 type Asset={id:string;provider:'google_drive'|'dropbox';connection_id:string;file_id:string;mime_type:string;source_name:string;size:string|null;source_revision:string|null;observed_at:number;state:string};
@@ -38,7 +38,8 @@ export async function libraryContent(request:Request,env:Env,uid:string,projectI
  sourceRange(null,source.size); // validate provider size even for a full PDF/image stream
  const full=!request.headers.has('Range')&&(source.mimeType.startsWith('image/')||source.mimeType==='application/pdf');
  if(full&&Number(source.size)>(source.mimeType.startsWith('image/')?24:64)*1024*1024)throw new ApiError(413,'library_preview_too_large');
- const range=full?'bytes=0-'+(Number(source.size)-1):sourceRange(request.headers.get('Range'),source.size);
+ const range=full?'bytes=0-'+(Number(source.size)-1):
+    /^(video|audio)\//.test(source.mimeType)?playbackRange(request.headers.get('Range'),source.size):sourceRange(request.headers.get('Range'),source.size);
  const metadataMs=Math.round(performance.now()-startMetadata);
  const startOrigin=performance.now();
  let upstream:Response;
