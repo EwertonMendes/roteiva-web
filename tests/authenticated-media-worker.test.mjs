@@ -9,13 +9,13 @@ test('media worker origin allowlist matches the environment contract',()=>{
  for(const env of Object.values(environments))assert.ok(source.includes(env.apiOrigin));
 });
 function fixture(){
- const events={},requests=[],state={claims:0};
+ const events={},requests=[],state={claims:0,tasks:[]};
  const client={id:'alice-tab',url:origin+'/biblioteca',sourceURL:undefined,reviewSession:undefined,postMessage(data,ports){ports[0].postMessage({authorization:'Bearer synthetic-identity',reviewSession:this.reviewSession,url:this.sourceURL});ports[0].close();}};
  const self={location:{origin},addEventListener:(kind,handler)=>events[kind]=handler,clients:{get:async key=>key===client.id?client:null,claim:async()=>{state.claims++;}},skipWaiting:async()=>{}};
  vm.runInNewContext(source,{self,URL,Response,Headers,Map,Set,Date,MessageChannel,setTimeout,clearTimeout,AbortSignal,
- fetch:async(url,options)=>{requests.push({url,options});return new Response('test',{status:206,headers:{'Content-Range':'bytes 0-3/4'}});}});
+ fetch:async(url,options)=>{requests.push({url,options});return new Response('test',{status:206,headers:{'Content-Range':'bytes 0-3/4','Content-Length':'4'}});}});
  const bind=(data,who=client)=>{let ack;events.message({source:who,data,ports:[{postMessage:value=>ack=value}]});return ack;};
- const read=async(who='alice-tab',options={})=>{let pending;events.fetch({clientId:who,request:{url:origin+'/__roteiva_media/'+id,method:'GET',mode:'cors',headers:new Headers({Range:'bytes=0-3'}),...options},respondWith:p=>pending=p});return pending;};
+ const read=async(who='alice-tab',options={})=>{let pending;events.fetch({clientId:who,request:{url:origin+'/__roteiva_media/'+id,method:'GET',mode:'cors',headers:new Headers({Range:'bytes=0-3'}),...options},respondWith:p=>pending=p,waitUntil:p=>state.tasks.push(p)});return pending;};
  return {events,requests,bind,read,client,state};
 }
 test('media streaming forwards range and identity only for the binding tab',async()=>{
@@ -75,4 +75,32 @@ test('the playback transport exposes only friendly messages to end users',()=>{
  assert.ok(app.includes('Não foi possível abrir este arquivo agora. Tente novamente.'));
  assert.equal(app.includes('Verifique se os Service Workers estão habilitados'),false);
  assert.ok(app.includes('mediaProtocol=2'));
+});
+
+test('completed ranges are reused on reopen without another provider call, then cleared at logout',async()=>{
+ const f=fixture(),url='https://api.roteiva.com/library/projects/17/nodes/'+id+'/content';
+ const first='bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb';
+ assert.equal(f.bind({type:'bind-media',id,url,scope:'uid-alice'}).ok,true);
+ const original=await f.read();assert.equal(original.status,206);assert.equal(await original.text(),'test');
+ await Promise.all(f.state.tasks);
+ assert.equal(f.requests.length,1);
+ // Closing a modal revokes only its binding, not the short-lived private chunks.
+ f.bind({type:'revoke-media',id});
+ assert.equal(f.bind({type:'bind-media',id,url,scope:'uid-alice'}).ok,true);
+ const cached=await f.read();assert.equal(cached.status,206);assert.equal(await cached.text(),'test');
+ assert.equal(f.requests.length,1,'a replayed range should not repeat the network request');
+ assert.equal(f.bind({type:'clear-media-cache'}).ok,true);
+ const again=await f.read();assert.equal(await again.text(),'test');
+ assert.equal(f.requests.length,2,'logout must force a fresh download');
+ await Promise.all(f.state.tasks);
+});
+
+test('in-memory chunks never cross client IDs or account scopes',async()=>{
+ const f=fixture(),url='https://api.roteiva.com/library/projects/17/nodes/'+id+'/content';
+ f.bind({type:'bind-media',id,url,scope:'first-owner'});
+ assert.equal(await (await f.read()).text(),'test');await Promise.all(f.state.tasks);
+ f.bind({type:'revoke-media',id});f.bind({type:'bind-media',id,url,scope:'other-owner'});
+ assert.equal(await (await f.read()).text(),'test');
+ assert.equal(f.requests.length,2,'a different signed-in owner must not receive cached bytes');
+ assert.equal((await f.read('other-tab')).status,403);
 });
