@@ -300,6 +300,9 @@ test('OAuth return restores the same virtual project and folder after a full pag
  await page.getByRole('button',{name:'Confirmar',exact:true}).click();
  await page.getByRole('button',{name:'Originais',exact:true}).click();
  await expect(page.getByRole('navigation',{name:'Caminho da pasta'})).toContainText('Originais');
+ // Explicit popup-blocker fallback: top-level OAuth must still restore the
+ // project/folder instead of silently losing navigation state.
+ await page.evaluate(()=>{window.open=()=>null;});
  await page.getByRole('button',{name:'Contas de armazenamento'}).click();
  await page.getByRole('button',{name:'Conectar Dropbox',exact:true}).click();
  await expect(page).toHaveURL(/\/biblioteca\?dropbox=connected/);
