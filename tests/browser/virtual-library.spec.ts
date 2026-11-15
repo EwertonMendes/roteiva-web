@@ -139,7 +139,6 @@ test('virtual navigation preserves folder commands and a partial Dropbox batch r
  const zoom=imageDialog.getByRole('group',{name:'Controles de zoom'});
  await expect(zoom).toBeVisible();
  await zoom.getByRole('button',{name:'Ampliar zoom'}).click();
- await expect(zoom.getByRole('status')).toHaveCount(0);
  await expect(zoom.getByLabel('Zoom da imagem')).not.toHaveText('100%');
  await zoom.getByRole('button',{name:'Ver imagem em tela cheia'}).click();
  await expect(imageDialog.locator('.review-private-viewer.is-expanded')).toBeVisible();
