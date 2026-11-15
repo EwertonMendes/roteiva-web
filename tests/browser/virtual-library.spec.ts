@@ -269,7 +269,7 @@ test('assisted Dropbox organization imports selected descendants and retries wit
  expect(structureCalls).toBe(1);expect(importCalls).toBe(2);expect(importedParents).toEqual([virtual,virtual]);
 });
 
-test('OAuth return restores the same virtual project and folder after a full page navigation',async({page,context},info)=>{
+test('blocked OAuth popup never reloads the library or loses the selected folder',async({page,context},info)=>{
  const headers={'Access-Control-Allow-Origin':web,'Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Allow-Methods':'GET, POST, OPTIONS'};
  let folderId='',folderAvailable=true;
  await context.route(api+'/**',async route=>{
@@ -300,12 +300,15 @@ test('OAuth return restores the same virtual project and folder after a full pag
  await page.getByRole('button',{name:'Confirmar',exact:true}).click();
  await page.getByRole('button',{name:'Originais',exact:true}).click();
  await expect(page.getByRole('navigation',{name:'Caminho da pasta'})).toContainText('Originais');
- // Explicit popup-blocker fallback: top-level OAuth must still restore the
- // project/folder instead of silently losing navigation state.
- await page.evaluate(()=>{window.open=()=>null;});
+ // A popup blocker must not trigger a full-page redirect. The user gets an
+ // explicit new-tab link; project/folder and JavaScript state survive.
+ await page.evaluate(()=>{(window as unknown as {libraryMarker?:number}).libraryMarker=2026;window.open=()=>null;});
  await page.getByRole('button',{name:'Contas de armazenamento'}).click();
  await page.getByRole('button',{name:'Conectar Dropbox',exact:true}).click();
- await expect(page).toHaveURL(/\/biblioteca\?dropbox=connected/);
+ await expect(page).toHaveURL(/\/biblioteca$/);
+ await expect(page.getByRole('alert')).toContainText('bloqueou a janela de autorização');
+ await expect(page.getByRole('link',{name:'Abrir autorização do Dropbox em nova aba'})).toHaveAttribute('target','_blank');
+ expect(await page.evaluate(()=>(window as unknown as {libraryMarker?:number}).libraryMarker)).toBe(2026);
  await expect(page.getByRole('button',{name:'Projeto dos arquivos'})).toContainText('Projeto Biblioteca QA');
  await expect(page.getByRole('navigation',{name:'Caminho da pasta'})).toContainText('Originais');
  // A stale folder must not be trusted: server ownership and ancestor checks win.
