@@ -201,7 +201,7 @@ export function ReviewPortal({token}:{token:string}){
           throw new Error("Endereço de mídia inválido.");
         let sourceURL=ticket.url;
         if(import.meta.env.VITE_VIRTUAL_LIBRARY==='true'){
-          const binding=await authenticatedReviewMedia(ticket.url,()=>user?user.getIdToken():Promise.resolve(''),()=>portalSession.current?.session||'');
+          const binding=await authenticatedReviewMedia(ticket.url,()=>user?user.getIdToken():Promise.resolve(''),()=>portalSession.current?.session||'',user?.uid||'review-session');
           if(!alive){binding.close();return;}
           releaseMedia.push(binding.close);sourceURL=binding.url;
         }
