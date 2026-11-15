@@ -209,7 +209,7 @@ test('minimum-scope cover selection releases the native dialog for Google Picker
  png=Buffer.from(await page.evaluate(()=>{const c=document.createElement('canvas');c.width=160;c.height=90;const ctx=c.getContext('2d')!;ctx.fillStyle='#b9c980';ctx.fillRect(0,0,160,90);return c.toDataURL('image/png').split(',')[1];}),'base64');
  await page.getByRole('button',{name:'Adicionar capa',exact:true}).click();
  await page.getByRole('button',{name:'Selecionar imagem no Google Drive',exact:true}).click();
- expect(await page.locator('dialog.pc-dialog').evaluate(el=>(el as HTMLDialogElement).open)).toBe(false);
+ await expect.poll(()=>page.locator('dialog.pc-dialog').evaluate(el=>(el as HTMLDialogElement).open)).toBe(false);
  await page.getByRole('button',{name:'Escolher imagem no Picker',exact:true}).click();
  await expect(page.locator('dialog.pc-dialog')).toBeVisible();
  await expect.poll(()=>page.locator('.pc-editor-preview img').evaluate(el=>(el as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
