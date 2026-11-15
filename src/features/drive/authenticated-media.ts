@@ -136,12 +136,12 @@ export function clearAuthenticatedMediaCache(){
   navigator.serviceWorker.controller?.postMessage({type:'clear-media-cache'},[channel.port2]);
  }catch{/* A missing controller has no reusable media buffers. */}
 }
-export async function authenticatedReviewMedia(url:string,getToken:()=>Promise<string>,getReviewSession:()=>string){
+export async function authenticatedReviewMedia(url:string,getToken:()=>Promise<string>,getReviewSession:()=>string,scope=''){
  if(!url.startsWith(API_BASE_URL+'/reviews/media?ticket='))throw new Error('Endereço de mídia inválido.');
- return bindMedia(url,getToken,getReviewSession);
+ return bindMedia(url,getToken,getReviewSession,scope);
 }
-export async function authenticatedOwnerReviewMedia(reviewId:string,fileId:string,getToken:()=>Promise<string>){
- return bindMedia(API_BASE_URL+'/reviews/'+reviewId+'/content?fileId='+encodeURIComponent(fileId),getToken);
+export async function authenticatedOwnerReviewMedia(reviewId:string,fileId:string,getToken:()=>Promise<string>,scope=''){
+ return bindMedia(API_BASE_URL+'/reviews/'+reviewId+'/content?fileId='+encodeURIComponent(fileId),getToken,undefined,scope);
 }
 async function bindMedia(url:string,getToken:()=>Promise<string>,getReviewSession?:()=>string,scope=''){
  await prepare();
