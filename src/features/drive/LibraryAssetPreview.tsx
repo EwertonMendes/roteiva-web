@@ -28,9 +28,8 @@ export function LibraryAssetPreview({projectId,node,onClose}:{projectId:number;n
  const videoRef=useRef<HTMLVideoElement>(null);
  // Optional DEV-only adaptive preview: no background transcoding or extra cost.
  const [optimized,setOptimized]=useState<{state:'absent'|'processing'|'ready'|'failed'|'unavailable';embedUrl?:string}>({state:'absent'});
- const [streamTrigger,setStreamTrigger]=useState(0);
- const [streamBusy,setStreamBusy]=useState(false);
- const [streamMessage,setStreamMessage]=useState('');
+ const [streamStart,setStreamStart]=useState(0);
+ const [nativeFailed,setNativeFailed]=useState(false);
  const eligible=appEnvironment.appEnv==='dev'&&mimeIsVideo(node.mime_type);
 
  const networkRetryCount=useRef(0);
@@ -49,7 +48,7 @@ export function LibraryAssetPreview({projectId,node,onClose}:{projectId:number;n
  useEffect(()=>{
   let alive=true,release:(()=>void)|undefined;
   const controller=new AbortController();
-  setURL('');setError('');setLoading(true);setMuted(true);
+  setURL('');setError('');setLoading(true);setMuted(true);setNativeFailed(false);setStreamStart(0);
   if(!user){setLoading(false);setError('Entre novamente no Roteiva para abrir este arquivo.');return()=>controller.abort();}
   if(!image&&!stream){setLoading(false);return()=>controller.abort();}
   libraryPreviewCache.scope(user.uid);
@@ -96,39 +95,49 @@ export function LibraryAssetPreview({projectId,node,onClose}:{projectId:number;n
   networkRetryCount.current=0;
   return()=>{if(networkRetryTimer.current)clearTimeout(networkRetryTimer.current);networkRetryTimer.current=null;};
  },[url]);
+ // Only opening a video can start the DEV optimization. The read-only GET is
+ // cheap and reuses an already encoded revision; an absent revision is ingested
+ // automatically once on the backend, never from a folder listing or prefetch.
  useEffect(()=>{
   if(!eligible||!user)return;
-  let cancelled=false;
-  let timer:ReturnType<typeof setTimeout>|undefined;
+  let cancelled=false,timer:ReturnType<typeof setTimeout>|undefined;
+  const began=Date.now();
   const endpoint=API_BASE_URL+'/library/projects/'+projectId+'/nodes/'+node.id+'/stream';
+  setOptimized({state:'absent'});
+  async function request(method:'GET'|'POST'){
+   const response=await fetch(endpoint,{method,headers:{Authorization:'Bearer '+await user!.getIdToken()},cache:'no-store'});
+   if(!response.ok)throw new Error('stream_unavailable');
+   return response.json() as Promise<{state:string;embedUrl?:string}>;
+  }
   async function check(){
    try{
-    const response=await fetch(endpoint,{headers:{Authorization:'Bearer '+await user!.getIdToken()},cache:'no-store'});
-    if(!response.ok)throw new Error('stream_unavailable');
-    const data=await response.json() as {state:string;embedUrl?:string};
+    let data=await request('GET');
     if(cancelled)return;
-    if(data.state==='ready'&&validStreamEmbed(data.embedUrl)){setOptimized({state:'ready',embedUrl:data.embedUrl});return;}
-    if(data.state==='processing'){setOptimized({state:'processing'});timer=setTimeout(check,5000);return;}
-    if(data.state==='failed'){setOptimized({state:'failed'});return;}
-    setOptimized({state:'absent'});
+    if(data.state==='absent')data=await request('POST');
+    if(cancelled)return;
+    if(data.state==='ready'&&validStreamEmbed(data.embedUrl)){
+     const video=videoRef.current;
+     setStreamStart(video&&Number.isFinite(video.currentTime)?Math.floor(video.currentTime):0);
+     setOptimized({state:'ready',embedUrl:data.embedUrl});return;
+    }
+    if(data.state==='processing'&&Date.now()-began<10*60*1000){
+     setOptimized({state:'processing'});timer=setTimeout(check,5000);return;
+    }
+    setOptimized({state:'unavailable'});
    }catch{if(!cancelled)setOptimized({state:'unavailable'});}
   }
   void check();
   return()=>{cancelled=true;if(timer)clearTimeout(timer);};
- },[eligible,user,projectId,node.id,node.source_revision,streamTrigger]);
- async function prepareOptimized(){
-  if(!user||!eligible||streamBusy)return;
-  setStreamBusy(true);setStreamMessage('');
-  try{
-   const endpoint=API_BASE_URL+'/library/projects/'+projectId+'/nodes/'+node.id+'/stream';
-   const response=await fetch(endpoint,{method:'POST',headers:{Authorization:'Bearer '+await user.getIdToken()},cache:'no-store'});
-   if(!response.ok)throw new Error('prepare_failed');
-   setOptimized({state:'processing'});
-   setStreamTrigger(v=>v+1);
-  }catch{setStreamMessage('Não foi possível preparar a reprodução otimizada. O vídeo original continua disponível.');}
-  finally{setStreamBusy(false);}
- }
- const fail=()=>{setURL('');setError('O navegador não conseguiu reproduzir o arquivo. Tente novamente.');};
+ },[eligible,user,projectId,node.id,node.source_revision]);
+ useEffect(()=>{
+  if(nativeFailed&&optimized.state==='unavailable'){
+   setError('Não foi possível reproduzir o vídeo. Tente novamente.');
+  }
+ },[nativeFailed,optimized.state]);
+ const fail=()=>{
+  if(eligible&&optimized.state==='processing'){setNativeFailed(true);return;}
+  setURL('');setError('O navegador não conseguiu reproduzir o arquivo. Tente novamente.');
+ };
  const recoverVideo=(video:HTMLVideoElement)=>{
   // Network interruptions (MEDIA_ERR_NETWORK) can occur after the first frame.
   // Retry just once on the same authenticated URL; completed ranges remain
@@ -158,18 +167,19 @@ export function LibraryAssetPreview({projectId,node,onClose}:{projectId:number;n
     </div>
    </header>
    <div className="vl-preview-body">
-    {loading?<div className="vl-preview-state" role="status"><LoaderCircle className="vl-loading" size={27}/><span>Carregando arquivo…</span></div>:
-     error?<div className="vl-preview-state vl-preview-failed" role="alert">
+    {loading&&optimized.state!=='ready'?<div className="vl-preview-state" role="status"><LoaderCircle className="vl-loading" size={27}/><span>Carregando arquivo…</span></div>:
+     error&&optimized.state!=='ready'?<div className="vl-preview-state vl-preview-failed" role="alert">
       <AlertCircle size={27} aria-hidden="true"/><p>{error}</p>
       <AppButton className="vl-preview-retry" type="button" onClick={()=>setRetry(n=>n+1)}><RefreshCcw size={16}/>Tentar novamente</AppButton>
      </div>:
-     !url?<div className="vl-preview-state"><p>Não há prévia integrada para este formato de arquivo.</p></div>:
+     !url&&optimized.state!=='ready'?<div className="vl-preview-state"><p>Não há prévia integrada para este formato de arquivo.</p></div>:
      pdf?<div className="vl-preview-document"><ReviewPdfViewer src={url} name={node.name}/></div>:
      image?<ReviewImageViewer src={url} name={node.name} onError={fail}/>:
      mime.startsWith('video/')?<div className="vl-preview-media-stage">
       {optimized.state==='ready'&&optimized.embedUrl?
-       <iframe className="vl-preview-stream-frame" src={optimized.embedUrl} title={'Reprodução otimizada de '+node.name}
+       <iframe className="vl-preview-stream-frame" src={optimized.embedUrl+(streamStart>1?'&startTime='+streamStart:'')} title={'Reprodução otimizada de '+node.name}
          allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowFullScreen referrerPolicy="strict-origin-when-cross-origin"/>:
+       nativeFailed?<div className="vl-preview-state" role="status"><LoaderCircle className="vl-loading" size={27}/><span>Preparando reprodução contínua…</span></div>:
        <video ref={videoRef} className="vl-preview-video" src={url} controls autoPlay muted={muted}
         playsInline preload="auto" onLoadedData={event=>{if(event.currentTarget.paused)void event.currentTarget.play().catch(()=>{});}}
         onVolumeChange={event=>setMuted(event.currentTarget.muted)} onError={event=>recoverVideo(event.currentTarget)}/>}
@@ -177,15 +187,7 @@ export function LibraryAssetPreview({projectId,node,onClose}:{projectId:number;n
        if(!videoRef.current)return;videoRef.current.muted=false;setMuted(false);
        if(videoRef.current.paused)void videoRef.current.play().catch(()=>{});
       }}><Volume2 size={17} aria-hidden="true"/>Ativar som</AppButton>}
-      {eligible&&optimized.state!=='ready'&&<div className="vl-stream-actions">
-       {optimized.state==='absent'||optimized.state==='failed'?
-        <AppButton type="button" onClick={()=>void prepareOptimized()} disabled={streamBusy}>
-         {streamBusy?'Iniciando preparação…':'Preparar reprodução otimizada'}
-        </AppButton>:null}
-       {optimized.state==='processing'&&<span role="status">Preparando versão otimizada para reprodução contínua…</span>}
-       {optimized.state==='unavailable'&&<span>Reprodução original disponível</span>}
-       {streamMessage&&<span role="alert">{streamMessage}</span>}
-      </div>}
+
      </div>:
      <div className="vl-preview-audio-stage"><FileAudio size={40} aria-hidden="true"/>
       <span>{node.name}</span>
