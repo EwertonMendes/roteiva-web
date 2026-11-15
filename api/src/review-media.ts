@@ -6,6 +6,7 @@ import type {StorageProviderId} from './storage.ts';
 import {base64url,decode} from './crypto.ts';
 import {verifiedTrialPrincipal} from './auth.ts';
 import {readPublishedSource} from './review-source.ts';
+import {streamHeaders} from './media-fetch.ts';
 import {loadReviewSession,assertReviewSession,sessionSubject} from './review-sessions.ts';
 
 type Ticket={r:string;f:string;v:number;e:number;k:string;h:string;s?:string;j?:string};
@@ -137,7 +138,7 @@ export async function streamReviewMedia(request:Request,env:Env,url:URL):Promise
     endpoint.searchParams.set('alt','media');
     endpoint.searchParams.set('supportsAllDrives','true');
     try{
-      upstream=await fetch(endpoint,{method:request.method,redirect:'manual',signal:AbortSignal.timeout(24000),
+      upstream=await streamHeaders(fetch,endpoint.href,{method:request.method,redirect:'manual',
         headers:{Authorization:'Bearer '+token.value,...(upstreamRange?{'Range':upstreamRange}:{})}});
     }catch{throw new ApiError(502,'media_unavailable');}
   }
