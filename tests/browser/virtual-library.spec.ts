@@ -367,3 +367,80 @@ test('account manager keeps long emails readable and makes multi-account actions
  await expect(modal).toHaveCount(0);
  await expect(page.getByRole('button',{name:'Contas de armazenamento'})).toBeFocused();
 });
+
+
+test('additional Google and Dropbox accounts connect in popup without reloading workspace',async({page,context},info)=>{
+ const existingDbx='11111111-1111-4111-8111-111111111111';
+ const newDbx='22222222-2222-4222-8222-222222222222';
+ const existingGoogle='33333333-3333-4333-8333-333333333333';
+ const newGoogle='44444444-4444-4444-8444-444444444444';
+ const google=[{id:existingGoogle,google_email:'workspace@roteiva.local',status:'connected',scopes:'https://www.googleapis.com/auth/drive.file'}];
+ const dropbox=[{id:existingDbx,email:'primeiro@dropbox.local',status:'connected',scopes:'files.content.read'}];
+ const json=(data:unknown,status=200)=>({status,contentType:'application/json',body:JSON.stringify(data)});
+ await context.route(api+'/**',async route=>{
+  const request=route.request(),url=new URL(request.url()),path=url.pathname;
+  if(path.startsWith('/access/')||path.startsWith('/account/'))return route.fallback();
+  if(path==='/integrations/drive')return route.fulfill(json({connections:google}));
+  if(path==='/integrations/dropbox')return route.fulfill(json({connections:dropbox}));
+  if(path==='/oauth/dropbox/start')return route.fulfill(json({launchUrl:api+'/oauth/dropbox/launch?ticket=dropbox'}));
+  if(path==='/oauth/drive/start')return route.fulfill(json({launchUrl:api+'/oauth/drive/launch?ticket=drive'}));
+  if(path==='/oauth/dropbox/launch'){
+   dropbox.push({id:newDbx,email:'segundo@dropbox.local',status:'connected',scopes:'files.content.read'});
+   return route.fulfill({status:302,headers:{Location:web+'/biblioteca?dropbox=connected'}});
+  }
+  if(path==='/oauth/drive/launch'){
+   google.push({id:newGoogle,google_email:'conta.diferente@google.local',status:'connected',scopes:'https://www.googleapis.com/auth/drive.file'});
+   return route.fulfill({status:302,headers:{Location:web+'/biblioteca?drive=connected'}});
+  }
+  return route.fulfill(json({error:{code:'not_found'}},404));
+ });
+ await prepare(page,'multi-oauth-'+info.project.name+'-'+Date.now()+'@example.com');
+ await page.goto(web+'/biblioteca');
+ await page.evaluate(()=>{(window as unknown as {roteivaStateMarker?:number}).roteivaStateMarker=1337;});
+ await page.getByRole('button',{name:'Contas de armazenamento'}).click();
+ const modal=page.getByRole('dialog',{name:'Contas de armazenamento'});
+ await expect(modal.getByText('primeiro@dropbox.local',{exact:true})).toBeVisible();
+ const dropboxPopup=page.waitForEvent('popup');
+ await modal.getByRole('button',{name:'Adicionar outra conta Dropbox'}).click();
+ await dropboxPopup;
+ await expect(modal.getByText('segundo@dropbox.local',{exact:true})).toBeVisible();
+ await expect(modal.locator('.vl-connected-account').filter({hasText:'segundo@dropbox.local'}).getByText('Em uso')).toBeVisible();
+ expect(await page.evaluate(()=>(window as unknown as {roteivaStateMarker?:number}).roteivaStateMarker)).toBe(1337);
+ expect(new URL(page.url()).pathname).toBe('/biblioteca');
+ const googlePopup=page.waitForEvent('popup');
+ await modal.getByRole('button',{name:'Adicionar outra conta Google Drive'}).click();
+ await googlePopup;
+ await expect(modal.getByText('conta.diferente@google.local',{exact:true})).toBeVisible();
+ await expect(modal.locator('.vl-connected-account').filter({hasText:'conta.diferente@google.local'}).getByText('Em uso')).toBeVisible();
+ expect(await page.evaluate(()=>(window as unknown as {roteivaStateMarker?:number}).roteivaStateMarker)).toBe(1337);
+ await modal.getByRole('button',{name:'Fechar contas'}).click();
+ await expect(page.getByRole('button',{name:'Contas de armazenamento'})).toBeFocused();
+});
+
+test('third-party authorization failure remains isolated; user can cancel without losing the library',async({page,context},info)=>{
+ const json=(data:unknown)=>({contentType:'application/json',body:JSON.stringify(data)});
+ await context.route(api+'/**',async route=>{
+  const path=new URL(route.request().url()).pathname;
+  if(path.startsWith('/access/')||path.startsWith('/account/'))return route.fallback();
+  if(path==='/integrations/drive')return route.fulfill(json({connections:[{id:connection,google_email:'first@google.local',status:'connected',scopes:'https://www.googleapis.com/auth/drive.file'}]}));
+  if(path==='/integrations/dropbox')return route.fulfill(json({connections:[]}));
+  if(path==='/oauth/drive/start')return route.fulfill(json({launchUrl:api+'/oauth/drive/launch?ticket=blocked'}));
+  if(path==='/oauth/drive/launch')return route.fulfill({status:403,contentType:'text/html',body:'<html><body><h1>403: access_denied</h1></body></html>'});
+  return route.fulfill({status:404,body:'Not found'});
+ });
+ await prepare(page,'blocked-google-'+info.project.name+'-'+Date.now()+'@example.com');
+ await page.goto(web+'/biblioteca');
+ await page.evaluate(()=>{(window as unknown as {stateStillHere?:boolean}).stateStillHere=true;});
+ await page.getByRole('button',{name:'Contas de armazenamento'}).click();
+ const modal=page.getByRole('dialog',{name:'Contas de armazenamento'});
+ const popupPromise=page.waitForEvent('popup');
+ await modal.getByRole('button',{name:'Adicionar outra conta Google Drive'}).click();
+ const popup=await popupPromise;
+ await expect(popup.getByRole('heading',{name:'403: access_denied'})).toBeVisible();
+ await expect(modal.getByText('Autorizando Google Drive…')).toBeVisible();
+ expect(await page.evaluate(()=>(window as unknown as {stateStillHere?:boolean}).stateStillHere)).toBe(true);
+ await modal.getByRole('button',{name:'Cancelar',exact:true}).click();
+ await expect(modal.getByText('Autorizando Google Drive…')).toHaveCount(0);
+ await expect(popup).toHaveJSProperty('closed',true);
+ await expect(modal.getByText('first@google.local',{exact:true})).toBeVisible();
+});
