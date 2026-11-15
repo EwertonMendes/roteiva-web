@@ -156,9 +156,15 @@ self.addEventListener('fetch',event=>{
   clearTimeout(timer);
  }
  const responseHeaders=new Headers(upstream.headers);responseHeaders.set('Cache-Control','no-store');
- if(key&&upstream.ok&&upstream.status===206){
-  // Tee the response: the player streams immediately while the completed
-  // chunk becomes reusable on a subsequent seek or reopening.
+ // Cloning a large response creates an unread stream branch when the
+ // snapshot is rejected for size; that branch can buffer the full movie
+ // without backpressure and starve playback. Only clone a known, small,
+ // valid partial response that the cache is actually going to consume.
+ const length=Number(upstream.headers.get('Content-Length')||0);
+ const contentRange=upstream.headers.get('Content-Range')||'';
+ const canCache=key&&upstream.status===206&&Number.isSafeInteger(length)&&
+  length>0&&length<=MAX_CHUNK&&/^bytes \d+-\d+\/\d+$/.test(contentRange);
+ if(canCache){
   const snapshot=upstream.clone();
   const task=saveChunk(key,snapshot,diskEligible(range));
   event.waitUntil?.(task);
