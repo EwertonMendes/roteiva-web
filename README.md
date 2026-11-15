@@ -1,5 +1,7 @@
 # Roteiva
 
+**OAuth — atualização de 15/11/2026:** Google Drive DEV/PROD em produção no console, marca verificada/publicada e apenas escopos não sensíveis declarados (`drive.file` e identidade). Dropbox DEV/PROD permitem usuários adicionais; pedido de produção e revisão antecipada do app PROD enviado, aguardando elegibilidade/revisão. A gestão multiconta sem reiniciar a Biblioteca está em DEV na PR #129; não houve merge ou publicação em PROD nesta auditoria. A conta Drive PROD existente ainda precisa de reconsentimento para o acesso mínimo. Evidências e pendências no [roadmap](docs/MVP-ROADMAP.md#configuração-oauth-comercial--auditoria-de-15112026); descrições antigas abaixo preservam contexto histórico.
+
 > **Revisão editorial em desenvolvimento (PR #125):** marca oficial monocromática, dashboard compacto, correção de capas, controle de visibilidade financeira, interação direta no calendário e lente vetorial de login. O trabalho está em branch de homologação; não presumir publicação em DEV/PROD nem compatibilidade real dos provedores até os testes finais. A atualização preserva os demais fluxos aprovados.
 
 

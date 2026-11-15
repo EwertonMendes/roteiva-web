@@ -1,5 +1,30 @@
 # Desenvolvimento e deploy — Roteiva
 
+## OAuth comercial — estado verificado em 15/11/2026
+
+Este estado substitui as instruções históricas abaixo que ainda mencionam Testing, upload pendente de ícones ou necessidade de `drive.readonly`. Não reintroduzir o escopo amplo para resolver navegação de biblioteca virtual.
+
+| Configuração | DEV | PROD |
+|---|---|---|
+| Projeto OAuth Drive | `roteiva-drive-dev` | `roteiva-drive-prod` |
+| Client ID (prefixo; completo no wrangler) | `479738001561-4gu97o42` | `18860974410-ji942jb4` |
+| Estado Google | External / Em produção; marca verificada/publicada | External / Em produção; marca verificada/publicada |
+| Escopos declarados Google | `openid`, `userinfo.email`, `drive.file` | `openid`, `userinfo.email`, `drive.file` |
+| App Dropbox | Roteiva DEV / `cwnnrvq2vx1qj10` | Roteiva / `ee9yahu6fciiz9t` |
+| Estado Dropbox | Development, usuários adicionais habilitados | Pedido enviado; aguardando revisão pendente de elegibilidade |
+| Callback Google | `https://roteiva-api-dev.roteiva-dev.workers.dev/oauth/drive/callback` | `https://api.roteiva.com/oauth/drive/callback` |
+| Callback Dropbox | `https://roteiva-api-dev.roteiva-dev.workers.dev/oauth/dropbox/callback` | `https://api.roteiva.com/oauth/dropbox/callback` |
+
+Nos dois projetos Google, a Central de verificação confirmou que revisão de dados não é necessária para a lista atual de escopos. O contador de 100 da página Audience refere-se a escopos sensíveis/restritos não aprovados; não relatar essa indicação isolada como limite ativo de `drive.file`. Políticas de conta/Workspace e cotas continuam aplicáveis. Não alterar Client IDs nem segredos existentes para publicar a marca. Página inicial/privacidade/termos e suporte usam URLs institucionais públicas. DEV usa nome Roteiva DEV e origens/callbacks próprios, ainda que compartilhe os documentos institucionais do produto.
+
+Dropbox: quatro escopos preservados (`account_info.read`, `files.metadata.read`, `files.content.read`, `files.content.write`), ícones oficiais 64/256 salvos nos dois apps e usuários adicionais confirmados em 1/500 na conferência. O pedido PROD contém instruções de cadastro/teste gratuito via Google, link público e revisão antecipada solicitada; nenhuma senha pessoal foi fornecida. Acompanhar [status oficial](https://www.dropbox.com/developers/console/apps/ee9yahu6fciiz9t/settings). A revisão antecipada é discricionária; após 50 contas vinculadas, observar a janela de duas semanas descrita no [guia oficial](https://docs.dropboxapi.com/dropbox-api/docs/developer-resources/developer-guide#production-approval). Não solicitar Production para DEV sem necessidade real de uso, nem criar novos apps para contornar limites.
+
+Settings ativos dos Workers foram conferidos por leitura: projetos Firebase, origem, callbacks, Client IDs e D1 próprios; `VIRTUAL_LIBRARY_ENABLED=true` nos dois. Sete nomes de secrets presentes; valores não foram lidos do Worker. As cópias privadas existentes foram comparadas em memória para conferir separação das chaves de cifra, HMAC, Google/Picker, Dropbox e identidade administrativa, sem registrar valores ou hashes. O OAuth Dropbox real DEV confirmou a App Key e callback atuais.
+
+Validação executada: `node --experimental-strip-types scripts/launch-preflight.mjs dev` e `prod`; API `npm test` no SHA DEV `256b3db4a399fb1ede75de84c496cfbe9887dc0f` (260/260); reconexão Dropbox real em popup e alternância de duas contas Google DEV sem perder projeto/pasta. Ao executar localmente testes que conferem hash imutável de migrations, usar os bytes LF originais do Git; checkout CRLF causa falha correta de hash, sem justificar alteração dos hashes/migrations. [CI desktop/mobile e isolamento conferido](https://github.com/EwertonMendes/roteiva-web/actions/runs/43673723194) no mesmo SHA; não foi rodada nova suíte browser nesta auditoria. A emulação de viewport da extensão não alterou a dimensão real e não é evidência de homologação mobile.
+
+Pendências: decisão Dropbox PROD; testar segunda conta Dropbox real e uma conta Google fora da antiga allowlist; Safari/iOS físico; reconsentimento mínimo da conta Drive PROD já marcada como reconexão necessária. Esta última ação revoga grant antigo e pode afetar aprovações, por isso foi preservada. Não compartilhar credenciais pessoais com revisores nem criar contas de teste com faturamento. O fluxo sem reload da [PR #129](https://github.com/EwertonMendes/roteiva-web/pull/129) continua somente em DEV; merge/promoção PROD requerem aprovação explícita. Resultado detalhado no [roadmap](MVP-ROADMAP.md#configuração-oauth-comercial--auditoria-de-15112026).
+
 ## Homologação da revisão editorial — PR #125 (13/11/2026)
 Branch `codex/editorial-review-final-20261113`, baseada no SHA `6628225566ebd43ead35c93f51107b9ffb5a4153`. Executar `pnpm typecheck`, `pnpm test`, `pnpm build:emulator` e os testes browser existentes, com destaque para `tests/browser/dashboard-viewport.spec.ts`, `finance-layout.spec.ts`, `project-covers.spec.ts`, `workspace.spec.ts`, `typography.spec.ts`, `sidebar.spec.ts` e `drive-folders.spec.ts` (Chromium desktop/mobile). Testar na suíte isolada do GitHub com emuladores Firebase, além do workflow de regressão manual.
 

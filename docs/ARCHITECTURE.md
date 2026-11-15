@@ -1,5 +1,19 @@
 # Arquitetura do Roteiva — MVP SaaS
 
+## OAuth multiconta e separação — auditoria de 15/11/2026
+
+**DECISÃO MANTIDA:** identidade de login Firebase e identidade do armazenamento são independentes. Google usa unicidade `(owner_uid, google_account_id)` e Dropbox `(owner_uid, dropbox_account_id)`; operações recebem `connectionId` e conferem proprietário no servidor. Reconectar a mesma identidade atualiza somente sua conexão; não substituir outras contas do usuário. Tokens de refresh ficam cifrados no backend, com contexto de ambiente/proprietário/identidade e revisão contra concorrência. Guardas de remoção e leases de refresh permanecem; não foi necessário alterar persistência nesta auditoria.
+
+Workers ativos DEV/PROD confirmaram `VIRTUAL_LIBRARY_ENABLED=true`. Google pede `openid email drive.file`; o `drive.readonly` que permanecia apenas na declaração do console PROD foi removido. Ambos os projetos Drive estão External / Em produção, com marca verificada/publicada e dispensa de verificação de dados indicada pelo Google. Esta redução declarativa não revoga credenciais existentes nem substitui reconsentimento de grants antigos amplos; conexões incompatíveis continuam exigindo atualização explícita.
+
+Projetos Drive `roteiva-drive-dev`/`roteiva-drive-prod`, Client IDs, apps Dropbox, Workers, Firebase, D1, callbacks e credenciais são separados. As páginas institucionais compartilhadas em `roteiva.com` representam o mesmo produto e não autorizam callbacks/origens PROD no cliente DEV. Endereços legados do mesmo ambiente foram preservados. Não se rotacionam segredos nem chaves de cifra para mudar estado de publicação.
+
+Dropbox DEV/PROD permitem usuários adicionais até o limite Development, com os quatro escopos existentes. PROD foi submetido com revisão antecipada solicitada; estado real: aguardando revisão pendente de elegibilidade. DEV continua destinado à homologação. Aprovação não é presumida por envio, por branding ou pelo aumento de usuários permitidos.
+
+**IMPLEMENTADO EM DEV NA PR #129; NÃO PROMOVIDO NESTA AUDITORIA:** OAuth em popup mantém a árvore/projeto/pasta da aba principal; mensagem de retorno exige origem e nonce corretos, sem tokens no payload. Popup bloqueado oferece link explícito em nova aba. Modelo e testes suportam múltiplas contas, inclusive identidade Google diferente do Firebase. O frontend PROD no SHA `985613a` conserva o fluxo anterior até aprovação de merge/promoção. Escalabilidade por cliente depende também de cotas D1/provedores e observação operacional; testes de 24 contas e concorrência não são prova de carga comercial irrestrita.
+
+Resultados e limites de homologação estão no [roadmap](MVP-ROADMAP.md#configuração-oauth-comercial--auditoria-de-15112026). Sem mudança funcional/schema neste registro, sem deploy e sem reautorização destrutiva em PROD.
+
 ## Decisão de UI editorial — 13/11/2026 (PR #125)
 A seleção de logos oficiais foi centralizada em `src/features/ui/BrandLogo.tsx`; imagens públicas são estáticas e não são alteradas por filtros no cliente. A lente do login é um SVG decorativo sem requests, eventos ou dados.
 
