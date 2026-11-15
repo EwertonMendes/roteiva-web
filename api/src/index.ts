@@ -10,6 +10,7 @@ import { metadata, disconnect, about } from './drive.ts';
 import { listFolders, listFolderItems } from './folders.ts';
 import { thumbnail } from './thumbnails.ts';
 import {libraryRouter} from './library.ts';
+import {streamIngest} from './stream-preview.ts';
 import { startUpload, completeUpload, authorizeUploadFolder, cleanupUploads } from './uploads.ts';
 import { verifyPickerToken,pickerConfiguration,pickedDriveFile } from './picker.ts';
 import { deletionStatus, requestDeletion, runPendingDeletions, runDeletionMaintenance } from './account-deletion.ts';
@@ -95,6 +96,10 @@ export async function handle(request: Request, env: Env): Promise<Response> {
       const principal=await verifiedTrialPrincipal(request,env);
       if(!(await env.API_RATE_LIMIT.limit({key:env.ENVIRONMENT+':access:'+principal.uid})).success)throw new ApiError(429,'rate_limited');
       response=await ensureAccess(env,principal.uid,undefined,principal);
+    } else if (/^\/stream\/ingest\/[-_A-Za-z0-9.]+$/.test(url.pathname)) {
+      // Signed ingest requests come from the Stream transcoder, not a browser.
+      // Do not require a Firebase token for this narrowly scoped temporary URL.
+      response=await streamIngest(request,env,url.pathname.slice('/stream/ingest/'.length));
     } else if (url.pathname.startsWith('/library/')) {
       if(env.VIRTUAL_LIBRARY_ENABLED!=='true')throw new ApiError(404,'not_found');
       if(request.method==='POST'&&!allowedFrontend(env,origin))throw new ApiError(403,'origin_required');
