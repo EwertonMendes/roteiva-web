@@ -444,6 +444,6 @@ test('third-party authorization failure remains isolated; user can cancel withou
  expect(await page.evaluate(()=>(window as unknown as {stateStillHere?:boolean}).stateStillHere)).toBe(true);
  await modal.getByRole('button',{name:'Cancelar',exact:true}).click();
  await expect(modal.getByText('Autorizando Google Drive…')).toHaveCount(0);
- await expect(popup).toHaveJSProperty('closed',true);
+ await expect.poll(()=>popup.isClosed()).toBe(true);
  await expect(modal.getByText('first@google.local',{exact:true})).toBeVisible();
 });
