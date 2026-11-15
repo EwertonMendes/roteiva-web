@@ -4,6 +4,7 @@ import {revisionEndpoint,sourceRange,type SourceVersion} from './library-source.
 import {accessCredential} from './google.ts';
 import {dropboxConnection,dropboxAccess} from './dropbox.ts';
 import {driveResourceHeaders} from './drive-resource-keys.ts';
+import {streamHeaders} from './media-fetch.ts';
 export type PublishedSource={provider:'google_drive'|'dropbox';connection_id:string;file_id:string;mime_type:string;source_revision?:string|null;source_size?:string|null};
 /** Current availability is checked, but bytes always come from the published revision. */
 export async function readPublishedSource(request:Request,env:Env,uid:string,asset:PublishedSource,probe=false,fetcher:typeof fetch=fetch):Promise<Response>{
@@ -17,7 +18,7 @@ export async function readPublishedSource(request:Request,env:Env,uid:string,ass
  const token=source.provider==='google_drive'?(await accessCredential(env,{owner_uid:uid,id:asset.connection_id},fetcher)).value:
  await dropboxAccess(env,await dropboxConnection(env,uid,asset.connection_id),fetcher);
  let response:Response;
- try{response=await fetcher(target.url,{method:target.method,headers:{...target.headers,...(source.provider==='google_drive'?driveResourceHeaders(source.fileId,observed.resourceKey):{}),Authorization:'Bearer '+token,Range:range},redirect:'manual',signal:AbortSignal.timeout(24000)});}
+ try{response=await streamHeaders(fetcher,target.url,{method:target.method,headers:{...target.headers,...(source.provider==='google_drive'?driveResourceHeaders(source.fileId,observed.resourceKey):{}),Authorization:'Bearer '+token,Range:range},redirect:'manual'});}
  catch{throw new ApiError(503,'provider_temporary_failure');}
  if(!response.ok){
   const status=response.status;
