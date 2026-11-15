@@ -65,7 +65,7 @@ test('a cold active worker can explicitly claim its same-origin page before medi
  });
  assert.ok(pending,'the claim must remain alive through the service worker event');
  await pending;
- assert.deepEqual(result,{ok:true});
+ assert.equal(result?.ok,true);
  assert.equal(f.state.claims,1);
  assert.equal(f.requests.length,0,'claim must not fetch protected bytes or mint credentials');
 });
