@@ -331,6 +331,8 @@ test('Dropbox PKCE OAuth callback creates persistent connection and refreshes wi
  const oauthUrl=new URL(launch.headers.get('Location'));
  assert.equal(oauthUrl.searchParams.get('token_access_type'),'offline');
  assert.equal(oauthUrl.searchParams.get('code_challenge_method'),'S256');
+ assert.equal(oauthUrl.searchParams.get('force_reauthentication'),'true',
+  'Adding a Dropbox account must ask for a fresh identity, not silently reuse the connected account');
  const cookie=launch.headers.get('Set-Cookie').split(';')[0];
  const callback=await dropboxCallback(new Request(API+'/oauth/dropbox/callback?code=one-use&state='+
    encodeURIComponent(oauthUrl.searchParams.get('state')),{headers:{Cookie:cookie}}),f.env);
@@ -366,4 +368,24 @@ test('Dropbox invalid OAuth code is not reported as an expired connected session
  }),f.env);
  assert.match(callback.headers.get('Location'),/dropbox=dropbox_oauth_code_invalid$/);
  assert.doesNotMatch(callback.headers.get('Location'),/dropbox_reconnect_required/);
+});
+
+test('Dropbox first connection skips forced sign-in, later connections require another identity',async t=>{
+ const f=await fixture(t),now=Date.now();
+ f.sql.prepare('INSERT INTO access_accounts(owner_uid,trial_started_at,trial_ends_at,created_at,updated_at) VALUES(?,?,?,?,?)')
+  .run(uid,now-86400000,now+518400000,now-86400000,now);
+ f.sql.prepare('DELETE FROM dropbox_connections WHERE owner_uid=?').run(uid);
+ const first=await (await dropboxStart(f.env,uid)).json();
+ const launch=await dropboxLaunch(new Request(first.launchUrl),f.env);
+ assert.equal(launch.status,303);
+ const url=new URL(launch.headers.get('Location'));
+ assert.equal(url.searchParams.get('force_reauthentication'),null);
+ f.sql.prepare("INSERT INTO dropbox_connections(id,owner_uid,dropbox_account_id,dropbox_email,scopes,status,revision,created_at,updated_at) VALUES(?,?,?,?,?,'reconnect_required',1,?,?)")
+  .run(conn,uid,'dbid:old-account','old@example.com','account_info.read',now,now);
+ const second=await (await dropboxStart(f.env,uid)).json();
+ const another=await dropboxLaunch(new Request(second.launchUrl),f.env);
+ const params=new URL(another.headers.get('Location')).searchParams;
+ assert.equal(params.get('force_reauthentication'),'true');
+ assert.equal(params.get('client_id'),f.env.DROPBOX_APP_KEY);
+ assert.equal(params.get('scope'), 'account_info.read files.metadata.read files.content.read files.content.write');
 });

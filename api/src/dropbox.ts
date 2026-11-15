@@ -187,10 +187,19 @@ export async function dropboxLaunch(request:Request,env:Env):Promise<Response>{
  await assertActiveAccess(env,row.owner_uid);
  const state=await decrypt(env,row.encrypted_state,context(env,row.owner_uid,row.state_hash,'dropbox-state'));
  const verifier=await decrypt(env,row.encrypted_verifier,context(env,row.owner_uid,row.state_hash,'dropbox-pkce'));
+ // Dropbox skips its authorization screen for a previously approved web
+ // session by default. With an existing Roteiva account, the user explicitly
+ // requested an additional/reconnected Dropbox identity: let them sign in as
+ // a different account without altering or revoking the first connection.
+ const existing=await env.DB.prepare(
+  "SELECT COUNT(*) AS total FROM dropbox_connections WHERE owner_uid=? AND status!='revocation_pending'"
+ ).bind(row.owner_uid).first<{total:number}>();
  const target=new URL('https://www.dropbox.com/oauth2/authorize');
  target.search=new URLSearchParams({client_id:env.DROPBOX_APP_KEY!,redirect_uri:env.DROPBOX_OAUTH_REDIRECT_URI!,
   response_type:'code',token_access_type:'offline',state,code_challenge:await hash(verifier),
-  code_challenge_method:'S256',scope:DROPBOX_SCOPE.join(' ')}).toString();
+  code_challenge_method:'S256',scope:DROPBOX_SCOPE.join(' '),
+  ...((existing?.total||0)>0?{force_reauthentication:'true'}:{})
+ }).toString();
  return new Response(null,{status:303,headers:{Location:target.href,
   'Set-Cookie':COOKIE+'='+browser+'; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=600'}});
 }
