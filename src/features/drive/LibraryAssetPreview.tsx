@@ -65,7 +65,7 @@ export function LibraryAssetPreview({projectId,node,onClose}:{projectId:number;n
      });
      if(alive)setURL(local);
     }else{
-     const media=await authenticatedMedia(projectId,node.id,()=>user!.getIdToken());
+     const media=await authenticatedMedia(projectId,node.id,()=>user!.getIdToken(),user!.uid);
      if(!alive){media.close();return;}
      release=media.close;setURL(media.url);
     }
