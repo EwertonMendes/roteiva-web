@@ -6,6 +6,7 @@ import {accessCredential} from './google.ts';
 import {dropboxConnection,dropboxAccess} from './dropbox.ts';
 import {sourceRange,playbackRange} from './library-source.ts';
 import {streamHeaders} from './media-fetch.ts';
+import {stitchedVideoResponse,MAX_STITCHED_VIDEO} from './media-range-chunks.ts';
 import {driveResourceHeaders,storedDriveResourceKey} from './drive-resource-keys.ts';
 type Asset={id:string;provider:'google_drive'|'dropbox';connection_id:string;file_id:string;mime_type:string;source_name:string;size:string|null;source_revision:string|null;observed_at:number;state:string};
 // The original provider remains authoritative for bytes and revocation. Reuse
@@ -42,16 +43,30 @@ export async function libraryContent(request:Request,env:Env,uid:string,projectI
     /^(video|audio)\//.test(source.mimeType)?playbackRange(request.headers.get('Range'),source.size):sourceRange(request.headers.get('Range'),source.size);
  const metadataMs=Math.round(performance.now()-startMetadata);
  const startOrigin=performance.now();
- let upstream:Response;
+ let readRange:(requested:string,signal?:AbortSignal)=>Promise<Response>;
  if(asset.provider==='google_drive'){
  const row=await connection(env,uid,asset.connection_id),credential=await accessCredential(env,row,fetcher);
- upstream=await streamHeaders(fetcher,'https://www.googleapis.com/drive/v3/files/'+asset.file_id+'?alt=media&supportsAllDrives=true',{
- method:'GET',headers:{Authorization:'Bearer '+credential.value,...driveResourceHeaders(asset.file_id,source.resourceKey),Range:range},redirect:'manual'});
+ readRange=(requested,signal)=>streamHeaders(fetcher,'https://www.googleapis.com/drive/v3/files/'+asset.file_id+'?alt=media&supportsAllDrives=true',{
+ method:'GET',headers:{Authorization:'Bearer '+credential.value,...driveResourceHeaders(asset.file_id,source.resourceKey),Range:requested},redirect:'manual',signal});
  }else{
  const row=await dropboxConnection(env,uid,asset.connection_id),credential=await dropboxAccess(env,row,fetcher);
- upstream=await streamHeaders(fetcher,'https://content.dropboxapi.com/2/files/download',{
- method:'POST',headers:{Authorization:'Bearer '+credential,'Dropbox-API-Arg':JSON.stringify({path:asset.file_id}),Range:range},redirect:'manual'});
+ readRange=(requested,signal)=>streamHeaders(fetcher,'https://content.dropboxapi.com/2/files/download',{
+ method:'POST',headers:{Authorization:'Bearer '+credential,'Dropbox-API-Arg':JSON.stringify({path:asset.file_id}),Range:requested},redirect:'manual',signal});
  }
+ // DEV-only: one browser response is stitched from short upstream reads. Avoid
+ // the original long-lived provider connection, which can stop after ~40s.
+ // Limit the total size to bound subrequests on a Worker Free account.
+ const requested=/^bytes=(\d+)-(\d+)$/.exec(range);
+ const canStitch=env.ENVIRONMENT==='dev'&&request.method==='GET'&&source.mimeType.startsWith('video/')&&
+  Number(source.size)<=MAX_STITCHED_VIDEO&&requested&&Number(requested[2])-Number(requested[1])+1>8*1024*1024;
+ if(canStitch){
+  const response=await stitchedVideoResponse(range,source.size,source.mimeType,
+   (slice,signal)=>readRange(slice,signal),request.signal);
+  if(!reuse)await env.DB.prepare("UPDATE library_assets SET source_name=?,mime_type=?,size=?,source_revision=?,state='available',observed_at=? WHERE library_id=? AND id=? AND observed_at<=?")
+   .bind(source.name,source.mimeType,source.size,source.revision,observationStarted,lib.id,asset.id,observationStarted).run();
+  return response;
+ }
+ const upstream=await readRange(range,request.signal);
  if(!upstream.ok){await upstream.body?.cancel();throw new ApiError(upstream.status===429?429:502,upstream.status===429?'provider_rate_limited':'source_unavailable');}
  const originMs=Math.round(performance.now()-startOrigin);
  if(metadataMs+originMs>750)console.info(JSON.stringify({event:'media_origin_timing',kind:'library',provider:asset.provider,
