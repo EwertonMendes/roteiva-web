@@ -307,10 +307,19 @@ test('blocked OAuth popup never reloads the library or loses the selected folder
  await page.getByRole('button',{name:'Conectar Dropbox',exact:true}).click();
  await expect(page).toHaveURL(/\/biblioteca$/);
  await expect(page.getByRole('alert')).toContainText('bloqueou a janela de autorização');
- await expect(page.getByRole('link',{name:'Abrir autorização do Dropbox em nova aba'})).toHaveAttribute('target','_blank');
+ const newTabLink=page.getByRole('link',{name:'Abrir autorização do Dropbox em nova aba'});
+ await expect(newTabLink).toHaveAttribute('target','_blank');
+ const tabOpened=context.waitForEvent('page');
+ await newTabLink.click();
+ const newTab=await tabOpened;
+ await expect(newTab).toHaveURL(/\/biblioteca\?dropbox=connected/);
+ await newTab.close();
+ await page.getByRole('button',{name:'Atualizar contas',exact:true}).last().click();
  expect(await page.evaluate(()=>(window as unknown as {libraryMarker?:number}).libraryMarker)).toBe(2026);
  await expect(page.getByRole('button',{name:'Projeto dos arquivos'})).toContainText('Projeto Biblioteca QA');
  await expect(page.getByRole('navigation',{name:'Caminho da pasta'})).toContainText('Originais');
+ // The modal was not dismissed by any OAuth navigation: close it deliberately.
+ await page.getByRole('button',{name:'Fechar contas'}).click();
  // A stale folder must not be trusted: server ownership and ancestor checks win.
  folderAvailable=false;
  await page.getByRole('button',{name:'Atualizar pasta'}).click();
