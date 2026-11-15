@@ -175,3 +175,60 @@ test('reopening the same private media in one tab reuses completed ranges withou
   expect(received.filter(x=>x.path.includes('/nodes/aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa/content'))).toHaveLength(1);
  });
 });
+
+test('a real 60-second, >8MiB MP4 plays across the previous 40-second stall boundary',async({page})=>{
+ test.setTimeout(90000);
+ await withMediaServer(async received=>{
+  await page.goto(origin+'/sobre.html');
+  await page.evaluate(async()=>{
+   const registration=await navigator.serviceWorker.register('/roteiva-media-sw.js?mediaProtocol=3',{scope:'/',updateViaCache:'none'});
+   await navigator.serviceWorker.ready;
+   if(!navigator.serviceWorker.controller){
+    await new Promise<void>((resolve,reject)=>{
+     const timer=setTimeout(()=>reject(new Error('worker takeover timed out')),6000);
+     const onChange=()=>{if(navigator.serviceWorker.controller){clearTimeout(timer);resolve();}};
+     navigator.serviceWorker.addEventListener('controllerchange',onChange,{once:true});
+     registration.active?.postMessage({type:'claim-media-clients'},[new MessageChannel().port2]);
+     onChange();
+    });
+   }
+   navigator.serviceWorker.addEventListener('message',event=>{
+    if(event.data?.type==='media-authorization')event.ports[0].postMessage({authorization:'Bearer browser-synthetic'});
+   });
+   const id=crypto.randomUUID(),channel=new MessageChannel();
+   const bound=new Promise<void>((resolve,reject)=>{
+    channel.port1.onmessage=event=>{channel.port1.close();event.data?.ok?resolve():reject(new Error('media bind rejected'));};
+   });
+   const url='http://127.0.0.1:8787/library/projects/17/nodes/dddddddd-dddd-4ddd-dddd-dddddddddddd/content';
+   navigator.serviceWorker.controller!.postMessage({type:'bind-media',id,url,scope:'long-test-user'},[channel.port2]);
+   await bound;
+   const video=document.createElement('video');
+   video.id='long-stream-test';video.muted=true;video.playsInline=true;video.preload='auto';
+   video.src='/__roteiva_media/'+id;
+   video.style.width='300px';document.body.appendChild(video);
+   const button=document.createElement('button');button.textContent='Iniciar vídeo longo';
+   button.addEventListener('click',()=>void video.play());
+   document.body.append(button);
+  });
+  await page.waitForFunction(()=>{
+   const v=document.querySelector<HTMLVideoElement>('#long-stream-test');
+   return !!v&&v.readyState>=1&&v.duration>=59;
+  },{timeout:30000});
+  await page.evaluate(()=>{const video=document.querySelector<HTMLVideoElement>('#long-stream-test')!;video.currentTime=38;});
+  await page.waitForFunction(()=>{
+   const v=document.querySelector<HTMLVideoElement>('#long-stream-test')!;
+   return !v.seeking&&v.currentTime>=37&&v.readyState>=2;
+  },{timeout:20000});
+  await page.getByRole('button',{name:'Iniciar vídeo longo'}).click();
+  await page.waitForFunction(()=>{
+   const v=document.querySelector<HTMLVideoElement>('#long-stream-test')!;
+   return v.currentTime>44&&!v.error&&!v.paused;
+  },{timeout:25000});
+  const result=await page.locator('#long-stream-test').evaluate(v=>({
+   time:(v as HTMLVideoElement).currentTime,
+   error:(v as HTMLVideoElement).error?.code||null
+  }));
+  expect(result.time).toBeGreaterThan(44);expect(result.error).toBeNull();
+  expect(received.some(r=>r.path.includes('/dddddddd-')&&r.range?.startsWith('bytes='))).toBe(true);
+ });
+});
