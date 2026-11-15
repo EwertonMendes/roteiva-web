@@ -1,4 +1,4 @@
-/* Authenticated streaming only. No caching, offline behavior, credentials in URLs, or generic proxy. */
+/* Private native-media streaming; initial media chunks have bounded local cache. */
 const media=new Map();
 // Small, short-lived, tab-scoped memory cache for completed video/audio ranges.
 // Never writes private bytes to CacheStorage, disk, IndexedDB or CDN. Closing
@@ -6,11 +6,53 @@ const media=new Map();
 const chunks=new Map();
 const CHUNK_TTL=3*60*1000,MAX_CHUNK=8*1024*1024,MAX_CACHED=48*1024*1024;
 let cachedBytes=0;
+const MEDIA_CACHE='roteiva-private-media-v1';
+const DISK_MAX_ENTRIES=6,DISK_TTL=10*60*1000;
+let cacheGeneration=0;
+function diskEligible(range){return !range||/^bytes=0-\d*$/.test(range);}
+async function cacheRequest(key){
+ const bytes=new TextEncoder().encode(key);
+ const hash=await crypto.subtle.digest('SHA-256',bytes);
+ const digest=Array.from(new Uint8Array(hash),x=>x.toString(16).padStart(2,'0')).join('');
+ return new Request(self.location.origin+'/__roteiva_cached/'+digest);
+}
+async function readDiskChunk(key){
+ if(!self.caches)return null;
+ try{
+  const request=await cacheRequest(key),cache=await self.caches.open(MEDIA_CACHE);
+  const stored=await cache.match(request);if(!stored)return null;
+  const until=Number(stored.headers.get('X-Roteiva-Expires')||0);
+  if(until<=Date.now()){await cache.delete(request);return null;}
+  const range=stored.headers.get('Content-Range')||'';
+  const length=Number(stored.headers.get('Content-Length')||0);
+  if(!/^bytes \d+-\d+\/\d+$/.test(range)||length<1||length>MAX_CHUNK){await cache.delete(request);return null;}
+  const data=await stored.arrayBuffer();
+  if(data.byteLength!==length){await cache.delete(request);return null;}
+  return {data,headers:Array.from(stored.headers.entries()).filter(([k])=>!k.startsWith('x-roteiva-'))};
+ }catch{return null;}
+}
+async function persistChunk(key,data,headers,generation){
+ if(!self.caches||generation!==cacheGeneration)return;
+ try{
+  const cache=await self.caches.open(MEDIA_CACHE);
+  if(generation!==cacheGeneration)return;
+  const request=await cacheRequest(key);
+  const output=new Headers(headers);
+  output.delete('Cache-Control');
+  output.set('X-Roteiva-Expires',String(Date.now()+DISK_TTL));
+  await cache.put(request,new Response(data.slice(0),{status:200,headers:output}));
+  if(generation!==cacheGeneration){await cache.delete(request);return;}
+  const keys=await cache.keys();
+  // No shared CDN or remote writes: at most 48 MiB total local startup bytes.
+  for(let i=0;i<keys.length-DISK_MAX_ENTRIES;i++)await cache.delete(keys[i]);
+ }catch{/* Storage quota, private browsing and eviction must not break playback. */}
+}
+
 function forget(key){
  const value=chunks.get(key);
  if(value){cachedBytes-=value.data.byteLength;chunks.delete(key);}
 }
-function clearChunks(){chunks.clear();cachedBytes=0;}
+function clearChunks(){chunks.clear();cachedBytes=0;cacheGeneration++;return self.caches?.delete(MEDIA_CACHE).catch(()=>{})||Promise.resolve();}
 function chunkKey(client,scope,url,range){return JSON.stringify([client,scope,url,range]);}
 function getChunk(key){
  const v=chunks.get(key);
@@ -18,18 +60,21 @@ function getChunk(key){
  if(v.expires<Date.now()){forget(key);return null;}
  chunks.delete(key);chunks.set(key,v);return v;
 }
-function saveChunk(key,response){
+function saveChunk(key,response,writeDisk){
  const length=Number(response.headers.get('Content-Length')||0);
  if(response.status!==206||!Number.isSafeInteger(length)||length<1||length>MAX_CHUNK||
     !/^bytes \d+-\d+\/\d+$/.test(response.headers.get('Content-Range')||''))return Promise.resolve();
- return response.arrayBuffer().then(data=>{
-  if(data.byteLength!==length)return;
+ const generation=cacheGeneration;
+ return response.arrayBuffer().then(async data=>{
+  if(data.byteLength!==length||generation!==cacheGeneration)return;
+  const headers=Array.from(response.headers.entries());
   forget(key);
-  chunks.set(key,{data,headers:Array.from(response.headers.entries()),expires:Date.now()+CHUNK_TTL});
+  chunks.set(key,{data,headers,expires:Date.now()+CHUNK_TTL});
   cachedBytes+=length;
   while(cachedBytes>MAX_CACHED){
    const old=chunks.keys().next().value;if(!old)break;forget(old);
   }
+  if(writeDisk)await persistChunk(key,data,headers,generation);
  }).catch(()=>{});
 }
 
@@ -56,7 +101,7 @@ self.addEventListener('message',event=>{
   return;
  }
  if(data?.type==='clear-media-cache'){
-  clearChunks();port.postMessage({ok:true});return;
+  event.waitUntil(clearChunks().then(()=>port.postMessage({ok:true}),()=>port.postMessage({ok:false})));return;
  }
  if(data?.type==='revoke-media'&&typeof data.id==='string'){
  const entry=media.get(data.id);if(entry?.client===source.id)media.delete(data.id);port.postMessage({ok:true});return;
@@ -88,12 +133,16 @@ self.addEventListener('fetch',event=>{
  const headers=new Headers(token?{Authorization:token}:{});
  if(current.review){if(!/^[A-Za-z0-9_-]{43}$/.test(reply?.reviewSession||''))return deny();headers.set('X-Review-Session',reply.reviewSession);}
  const range=event.request.headers.get('Range');if(range)headers.set('Range',range);
- // Native media players sometimes request the first chunk without Range.
- // Cache those 206 responses as well, but never cache 200/full-file responses.
- // Always ask the active tab for an authorized token before a cache hit.
- const key=entry?.scope&&event.request.method==='GET'
-  ?chunkKey(event.clientId,entry.scope,current.url,range||'initial'):null;
- const hit=key?getChunk(key):null;
+ // Every response is authorized by the current tab before reading cached data.
+ // Scope rehydrates after the browser restarts an idle Service Worker.
+ const scope=entry?.scope||reply?.scope;
+ const key=typeof scope==='string'&&scope.length>0&&scope.length<=180&&event.request.method==='GET'
+  ?chunkKey(event.clientId,scope,current.url,range||'initial'):null;
+ let hit=key?getChunk(key):null;
+ if(!hit&&key&&diskEligible(range)){hit=await readDiskChunk(key);if(hit){
+  forget(key);chunks.set(key,{...hit,expires:Date.now()+CHUNK_TTL});cachedBytes+=hit.data.byteLength;
+  while(cachedBytes>MAX_CACHED){const old=chunks.keys().next().value;if(!old)break;forget(old);}
+ }}
  if(hit)return new Response(hit.data.slice(0),{status:206,headers:new Headers(hit.headers)});
  try{
  const controller=new AbortController();
@@ -111,7 +160,7 @@ self.addEventListener('fetch',event=>{
   // Tee the response: the player streams immediately while the completed
   // chunk becomes reusable on a subsequent seek or reopening.
   const snapshot=upstream.clone();
-  const task=saveChunk(key,snapshot);
+  const task=saveChunk(key,snapshot,diskEligible(range));
   event.waitUntil?.(task);
  }
  return new Response(upstream.body,{status:upstream.status,headers:responseHeaders});
