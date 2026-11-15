@@ -5,11 +5,12 @@ import {connection} from './repository.ts';
 import {accessCredential} from './google.ts';
 import {dropboxConnection,dropboxAccess} from './dropbox.ts';
 import {sourceRange} from './library-source.ts';
+import {streamHeaders} from './media-fetch.ts';
 import {driveResourceHeaders,storedDriveResourceKey} from './drive-resource-keys.ts';
 type Asset={id:string;provider:'google_drive'|'dropbox';connection_id:string;file_id:string;mime_type:string;source_name:string;size:string|null;source_revision:string|null;observed_at:number;state:string};
 // The original provider remains authoritative for bytes and revocation. Reuse
 // recently verified metadata only for adjacent player/PDF range requests.
-const MEDIA_METADATA_FRESH_MS=15000;
+const MEDIA_METADATA_FRESH_MS=90000;
 /** Identity/project are verified by the router; the reference and origin are checked on every read. */
 export async function libraryContent(request:Request,env:Env,uid:string,projectId:number,nodeId:string,fetcher:typeof fetch=fetch){
  const observationStarted=Date.now();
@@ -43,12 +44,12 @@ export async function libraryContent(request:Request,env:Env,uid:string,projectI
  let upstream:Response;
  if(asset.provider==='google_drive'){
  const row=await connection(env,uid,asset.connection_id),credential=await accessCredential(env,row,fetcher);
- upstream=await fetcher('https://www.googleapis.com/drive/v3/files/'+asset.file_id+'?alt=media&supportsAllDrives=true',{
- method:'GET',headers:{Authorization:'Bearer '+credential.value,...driveResourceHeaders(asset.file_id,source.resourceKey),Range:range},redirect:'manual',signal:AbortSignal.timeout(24000)});
+ upstream=await streamHeaders(fetcher,'https://www.googleapis.com/drive/v3/files/'+asset.file_id+'?alt=media&supportsAllDrives=true',{
+ method:'GET',headers:{Authorization:'Bearer '+credential.value,...driveResourceHeaders(asset.file_id,source.resourceKey),Range:range},redirect:'manual'});
  }else{
  const row=await dropboxConnection(env,uid,asset.connection_id),credential=await dropboxAccess(env,row,fetcher);
- upstream=await fetcher('https://content.dropboxapi.com/2/files/download',{
- method:'POST',headers:{Authorization:'Bearer '+credential,'Dropbox-API-Arg':JSON.stringify({path:asset.file_id}),Range:range},redirect:'manual',signal:AbortSignal.timeout(24000)});
+ upstream=await streamHeaders(fetcher,'https://content.dropboxapi.com/2/files/download',{
+ method:'POST',headers:{Authorization:'Bearer '+credential,'Dropbox-API-Arg':JSON.stringify({path:asset.file_id}),Range:range},redirect:'manual'});
  }
  if(!upstream.ok){await upstream.body?.cancel();throw new ApiError(upstream.status===429?429:502,upstream.status===429?'provider_rate_limited':'source_unavailable');}
  const originMs=Math.round(performance.now()-startOrigin);
@@ -61,11 +62,8 @@ export async function libraryContent(request:Request,env:Env,uid:string,projectI
  const matchingFull=full&&upstream.status===200&&
    (!upstream.headers.has('Content-Length')||upstream.headers.get('Content-Length')===source.size);
  if(!matchingPartial&&!matchingFull){await upstream.body?.cancel();throw new ApiError(502,'media_range_unsupported');}
- try{
- await libraryNode(env,lib,nodeId); // revoke a reference removed while origin I/O was in progress
- const current=asset.provider==='google_drive'?await connection(env,uid,asset.connection_id):await dropboxConnection(env,uid,asset.connection_id);
- if(current.status!=='connected')throw new ApiError(409,'reconnect_required');
- }catch(error){await upstream.body?.cancel();throw error;}
+ // The node and provider connection were already checked on this request.
+ // Do not repeat two D1 round trips after receiving each media chunk's headers.
  if(!reuse)await env.DB.prepare("UPDATE library_assets SET source_name=?,mime_type=?,size=?,source_revision=?,state='available',observed_at=? WHERE library_id=? AND id=? AND observed_at<=?")
  .bind(source.name,source.mimeType,source.size,source.revision,observationStarted,lib.id,asset.id,observationStarted).run();
  const headers=new Headers({'Content-Type':source.mimeType,'Accept-Ranges':'bytes',
