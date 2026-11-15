@@ -100,7 +100,7 @@ export function LibraryAssetPreview({projectId,node,onClose}:{projectId:number;n
      image?<ReviewImageViewer src={url} name={node.name} onError={fail}/>:
      mime.startsWith('video/')?<div className="vl-preview-media-stage">
       <video ref={videoRef} className="vl-preview-video" src={url} controls autoPlay muted={muted}
-       playsInline preload="auto" onCanPlay={event=>{if(event.currentTarget.paused)void event.currentTarget.play().catch(()=>{});}}
+       playsInline preload="auto" onLoadedData={event=>{if(event.currentTarget.paused)void event.currentTarget.play().catch(()=>{});}}
        onVolumeChange={event=>setMuted(event.currentTarget.muted)} onError={fail}/>
       {muted&&<AppButton className="vl-preview-unmute" type="button" onClick={()=>{
        if(!videoRef.current)return;videoRef.current.muted=false;setMuted(false);
