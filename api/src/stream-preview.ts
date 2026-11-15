@@ -50,7 +50,7 @@ async function assetFor(env:Env,uid:string,projectId:number,nodeId:string){
  if(!asset||!asset.mime_type.startsWith('video/'))throw new ApiError(415,'stream_video_only');
  return asset;
 }
-function args(uid:string,a:Asset,revision:string){
+function args(uid:string,a:Pick<Asset,'provider'|'connection_id'|'file_id'>,revision:string){
  return [uid,a.provider,a.connection_id,a.file_id,revision] as const;
 }
 async function stored(env:Env,uid:string,a:Asset,revision:string){
