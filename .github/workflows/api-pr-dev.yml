@@ -129,11 +129,20 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           node scripts/guard-token-scope.mjs dev
-          node scripts/guard-migrations.mjs dev
-          node scripts/check-access-migration.mjs --before
+          audit="$(node scripts/guard-migrations.mjs dev)"
+          printf '%s\n' "$audit"
+          pending="$(printf '%s\n' "$audit" | tail -n 1 | jq -er '.pendingMigrations | length')"
+          if [ "$pending" -gt 0 ]; then
+            node scripts/check-access-migration.mjs --before
+          else
+            echo "No pending migrations; skip volatile OAuth transaction row-count snapshots."
+          fi
           npm run migrate:dev
           node scripts/guard-environment.mjs dev --seal
-          node scripts/check-access-migration.mjs
+          node scripts/guard-environment.mjs dev
+          if [ "$pending" -gt 0 ]; then
+            node scripts/check-access-migration.mjs
+          fi
       - name: Publish verified SHA to the DEV Worker only
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
