@@ -134,3 +134,6 @@
 .vl-oauth-pending span{font-size:12px;line-height:1.5;color:var(--muted)}
 .vl-oauth-pending button{min-height:36px;padding:7px 10px;flex:0 0 auto;border:1px solid var(--line);border-radius:9px;background:var(--card);color:var(--ink)}
 @media(max-width:480px){.vl-oauth-pending{align-items:stretch;flex-direction:column}.vl-oauth-pending button{align-self:flex-start}}
+
+.vl-accounts-provider-error{margin:13px 26px 0;padding:11px 13px;background:var(--subtle);border:1px solid var(--line);border-radius:10px;color:var(--ink);font-size:13px;line-height:1.5;overflow-wrap:anywhere}
+@media(max-width:650px){.vl-accounts-provider-error{margin:12px 13px 0}}

@@ -446,4 +446,14 @@ test('third-party authorization failure remains isolated; user can cancel withou
  await expect(modal.getByText('Autorizando Google Drive…')).toHaveCount(0);
  await expect.poll(()=>popup.isClosed()).toBe(true);
  await expect(modal.getByText('first@google.local',{exact:true})).toBeVisible();
+ // If a provider rejects access and the user just closes its tab, the
+ // workspace releases the pending state automatically without a ten-minute wait.
+ const secondAttempt=page.waitForEvent('popup');
+ await modal.getByRole('button',{name:'Adicionar outra conta Google Drive'}).click();
+ const closedPopup=await secondAttempt;
+ await expect(closedPopup.getByRole('heading',{name:'403: access_denied'})).toBeVisible();
+ await closedPopup.close();
+ await expect(modal.getByText('Autorizando Google Drive…')).toHaveCount(0);
+ await expect(modal.getByRole('alert')).toContainText('O Google não concluiu a autorização');
+ await expect(modal.getByText('first@google.local',{exact:true})).toBeVisible();
 });

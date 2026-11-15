@@ -46,6 +46,7 @@ export function awaitStorageOAuthWindow(session:StorageOAuthWindow,signal:AbortS
    signal.removeEventListener('abort',onAbort);
    if(channel){channel.removeEventListener('message',onBroadcast);channel.close();}
    window.clearTimeout(timeout);
+   window.clearInterval(closeCheck);
    resolve(out);
   };
   const onMessage=(event:MessageEvent)=>{
@@ -60,6 +61,9 @@ export function awaitStorageOAuthWindow(session:StorageOAuthWindow,signal:AbortS
   try{channel=new BroadcastChannel(CHANNEL);channel.addEventListener('message',onBroadcast);}catch{/* postMessage fallback */}
   signal.addEventListener('abort',onAbort,{once:true});
   const timeout=window.setTimeout(()=>done(null),EXPIRES);
+  // OAuth providers can reject access on their own origin and never redirect
+  // back to Roteiva. Closing that tab must release the UI immediately.
+  const closeCheck=window.setInterval(()=>{if(session.popup.closed)done(null);},700);
   if(signal.aborted)onAbort();
  });
 }

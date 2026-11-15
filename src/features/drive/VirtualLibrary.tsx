@@ -46,7 +46,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
  const dropbox=dropboxAccounts.find(x=>x.id===dropboxId)||dropboxAccounts[0];
  const [parent,setParent]=useState('root'),[loadedPage,setPage]=useState<(Page&{scope:string})|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const [returnNotice,setReturnNotice]=useState('');
- const [connectingProvider,setConnectingProvider]=useState<StorageOAuthProvider|null>(null);
+ const [connectingProvider,setConnectingProvider]=useState<StorageOAuthProvider|null>(null),[connectionError,setConnectionError]=useState('');
  const oauthController=useRef<AbortController|null>(null),oauthWindow=useRef<StorageOAuthWindow|null>(null);
  const [loadingPage,setLoadingPage]=useState(false),[refreshing,setRefreshing]=useState(false),[searchAll,setSearchAll]=useState(true);
  const [layout,setLayout]=useState<'list'|'grid'>(()=>{try{return localStorage.getItem('roteiva-library-layout')==='grid'?'grid':'list';}catch{return 'list';}});
@@ -97,7 +97,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
   const popup=openStorageOAuthWindow();
   const controller=new AbortController();
   oauthController.current=controller;oauthWindow.current=popup;
-  setConnectingProvider(provider);setError('');
+  setConnectingProvider(provider);setConnectionError('');setError('');
   const before=new Set(storage.connections.filter(x=>x.provider===(provider==='drive'?'google_drive':'dropbox')).map(x=>x.id));
   try{
    const result=await call<{launchUrl:string}>('/oauth/'+provider+'/start','POST',undefined,controller.signal);
@@ -116,10 +116,10 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
    popup.popup.location.replace(target.href);
    const reply=await awaitStorageOAuthWindow(popup,controller.signal);
    if(controller.signal.aborted)return;
-   if(!reply){setError('A autorização não foi concluída. Abra a conexão novamente.');return;}
+   if(!reply){setConnectionError(provider==='drive'?'O Google não concluiu a autorização. Se apareceu “Acesso bloqueado”, verifique os usuários de teste do OAuth DEV.':'A autorização do Dropbox não foi concluída. Tente conectar novamente.');return;}
    if(reply.provider!==provider)throw new Error('A autorização retornou um provedor inesperado.');
    if(reply.status==='cancelled'){setReturnNotice('Conexão cancelada. Suas contas anteriores foram preservadas.');return;}
-   if(reply.status!=='connected'){setError(messages[reply.status]||'A autorização não foi concluída. Tente novamente.');return;}
+   if(reply.status!=='connected'){setConnectionError(messages[reply.status]||'A autorização não foi concluída. Tente novamente.');return;}
    const refreshed=await storage.refresh(true);
    if(refreshed.failed.includes(provider==='drive'?'google_drive':'dropbox'))
     throw new Error('Conta autorizada, mas não foi possível atualizar a lista. Use Atualizar contas.');
@@ -131,7 +131,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
    setReturnNotice(newlyAdded?'Nova conta conectada com sucesso.':
     'Autorização atualizada. Se você queria outra conta, selecione um login diferente no provedor.');
   }catch(e){
-   if(!controller.signal.aborted)setError(e instanceof Error?e.message:'Não foi possível conectar a conta.');
+   if(!controller.signal.aborted)setConnectionError(e instanceof Error?e.message:'Não foi possível conectar a conta.');
   }finally{
    if(popup&&!popup.popup.closed)popup.popup.close();
    if(oauthController.current===controller){
@@ -140,6 +140,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
   }
  }
  function cancelConnection(){
+  setConnectionError('');
   oauthController.current?.abort();
   oauthWindow.current?.popup.close();
   oauthWindow.current=null;setConnectingProvider(null);
@@ -363,6 +364,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
      </div>
     </header>
     {storage.error&&<div role="alert" className="vl-accounts-provider-error">Não foi possível atualizar {storage.error}. Tente novamente.</div>}
+    {connectionError&&<div role="alert" className="vl-accounts-provider-error">{connectionError}</div>}
     <LibraryConnections busy={busy||Boolean(connectingProvider)} pendingProvider={connectingProvider} onCancelConnect={cancelConnection} selectedDriveId={account?.id} selectedDropboxId={dropbox?.id} onSelectDrive={setAccountId} onSelectDropbox={setDropboxId} onConnect={(provider,accountId)=>void connect(provider,accountId)}/>
    </div>
   </div>}
