@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {database} from './helpers/database.mjs';
 import {encrypt,context,base64url} from '../src/crypto.ts';
-import {dropboxAccess,dropboxConnection,dropboxList,dropboxStart,dropboxLaunch,dropboxCallback,dropboxNormalize,dropboxThumbnail} from '../src/dropbox.ts';
+import {dropboxAccess,dropboxConnection,dropboxList,dropboxStart,dropboxLaunch,dropboxCallback,dropboxConnections,dropboxNormalize,dropboxThumbnail} from '../src/dropbox.ts';
 import {startDropboxUpload,appendDropboxUpload,finishDropboxUpload} from '../src/dropbox-uploads.ts';
 import {issueDropboxPreview,streamDropboxPreview} from '../src/dropbox-preview.ts';
 import {libraryFor,mutateLibrary} from '../src/library.ts';
@@ -406,4 +406,17 @@ test('Dropbox first connection skips forced sign-in, later connections require a
  assert.equal(params.get('force_reauthentication'),'true');
  assert.equal(params.get('client_id'),f.env.DROPBOX_APP_KEY);
  assert.equal(params.get('scope'), 'account_info.read files.metadata.read files.content.read files.content.write');
+});
+
+test('Dropbox account listing returns every owned account without an invisible 20-account cap',async t=>{
+ const f=await fixture(t),ts=Date.now();
+ const insert=f.sql.prepare("INSERT INTO dropbox_connections(id,owner_uid,dropbox_account_id,dropbox_email,status,scopes,revision,created_at,updated_at) VALUES(?,?,?,?,'reconnect_required','account_info.read',1,?,?)");
+ for(let n=1;n<=23;n++){
+  const serial=String(n).padStart(12,'0');
+  insert.run('00000000-0000-4000-8000-'+serial,uid,'dbid:account'+n,'account'+n+'@example.com',ts+n,ts+n);
+ }
+ const list=await (await dropboxConnections(f.env,uid)).json();
+ assert.equal(list.connections.length,24,'one existing plus 23 additional accounts must remain visible');
+ assert.equal(new Set(list.connections.map(c=>c.id)).size,24);
+ assert.ok(list.connections.some(c=>c.email==='account23@example.com'));
 });

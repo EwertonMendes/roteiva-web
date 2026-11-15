@@ -155,7 +155,7 @@ export async function handle(request: Request, env: Env): Promise<Response> {
       const uid = await identity(request,env);
       await assertActiveAccess(env,uid);
       if (!(await env.API_RATE_LIMIT.limit({key:env.ENVIRONMENT+':uid:'+uid})).success) throw new ApiError(429,'rate_limited');
-      const rows = await env.DB.prepare('SELECT id,google_email,status,scopes,updated_at FROM drive_connections WHERE owner_uid=? ORDER BY created_at LIMIT 20').bind(uid).all();
+      const rows = await env.DB.prepare('SELECT id,google_email,status,scopes,updated_at FROM drive_connections WHERE owner_uid=? ORDER BY created_at,id').bind(uid).all();
       response = Response.json({connections:rows.results.map(row=>{
         const c=row as {status?:string;scopes?:string};
         return env.VIRTUAL_LIBRARY_ENABLED==='true'&&c.status==='connected'&&c.scopes?.trim()!==DRIVE_SCOPE?{...row,status:'minimum_reconsent_required'}:row;

@@ -243,7 +243,7 @@ export async function dropboxCallback(request:Request,env:Env):Promise<Response>
  }
 }
 export async function dropboxConnections(env:Env,uid:string):Promise<Response>{
- const rows=await env.DB.prepare('SELECT id,dropbox_email AS email,status,scopes,updated_at FROM dropbox_connections WHERE owner_uid=? ORDER BY created_at LIMIT 20').bind(uid).all();
+ const rows=await env.DB.prepare('SELECT id,dropbox_email AS email,status,scopes,updated_at FROM dropbox_connections WHERE owner_uid=? ORDER BY created_at,id').bind(uid).all();
  return Response.json({connections:rows.results});
 }
 export async function dropboxRevoke(env:Env,uid:string,id:string,accountDeletion=false):Promise<Response>{
