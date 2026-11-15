@@ -25,3 +25,68 @@ test('native media transport binds the URL to its tab and forwards authenticated
  expect(await page.evaluate(async url=>(await fetch(url)).status,url)).toBe(403);
  });
 });
+
+test('cold browser takes SW control without a page reload and native audio/video players load real bytes',async({page})=>{
+ await withMediaServer(async received=>{
+  await page.goto(origin+'/sobre.html');
+  const result=await page.evaluate(async()=>{
+   const initialUrl=location.href;
+   const registration=await navigator.serviceWorker.register('/roteiva-media-sw.js',{scope:'/',updateViaCache:'none'});
+   await navigator.serviceWorker.ready;
+   if(!navigator.serviceWorker.controller){
+    const controlled=new Promise<void>((resolve,reject)=>{
+     const timer=setTimeout(()=>reject(new Error('Worker did not claim the current tab')),5000);
+     const changed=()=>{if(navigator.serviceWorker.controller){clearTimeout(timer);resolve();}};
+     navigator.serviceWorker.addEventListener('controllerchange',changed,{once:true});
+     changed();
+    });
+    const channel=new MessageChannel();
+    registration.active?.postMessage({type:'claim-media-clients'},[channel.port2]);
+    await controlled;
+   }
+   navigator.serviceWorker.addEventListener('message',event=>{
+    if(event.data?.type==='media-authorization')event.ports[0].postMessage({authorization:'Bearer browser-synthetic'});
+   });
+   const bind=async(node:string)=>{
+    const id=crypto.randomUUID();
+    const url='http://127.0.0.1:8787/library/projects/17/nodes/'+node+'/content';
+    const channel=new MessageChannel();
+    const ready=new Promise<void>((resolve,reject)=>{
+     const timer=setTimeout(()=>reject(new Error('Media binding timed out')),3000);
+     channel.port1.onmessage=event=>{
+      clearTimeout(timer);channel.port1.close();
+      event.data?.ok?resolve():reject(new Error('Media binding was rejected'));
+     };
+    });
+    navigator.serviceWorker.controller!.postMessage({type:'bind-media',id,url},[channel.port2]);
+    await ready;
+    return '/__roteiva_media/'+id;
+   };
+   const [wav,mp4]=await Promise.all([
+    bind('bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb'),
+    bind('cccccccc-cccc-4ccc-cccc-cccccccccccc'),
+   ]);
+   const audio=document.createElement('audio'),video=document.createElement('video');
+   audio.preload='metadata';video.preload='metadata';video.muted=true;
+   document.body.append(audio,video);
+   const metadata=(element:HTMLMediaElement,label:string)=>new Promise<number>((resolve,reject)=>{
+    const timer=setTimeout(()=>reject(new Error(label+' metadata timeout')),10000);
+    element.addEventListener('loadedmetadata',()=>{clearTimeout(timer);resolve(element.duration);},{once:true});
+    element.addEventListener('error',()=>{
+     clearTimeout(timer);reject(new Error(label+' media error '+element.error?.code));
+    },{once:true});
+   });
+   const readyAudio=metadata(audio,'wav'),readyVideo=metadata(video,'mp4');
+   audio.src=wav;video.src=mp4;
+   const [audioDuration,videoDuration]=await Promise.all([readyAudio,readyVideo]);
+   audio.remove();video.remove();
+   return {audioDuration,videoDuration,unchanged:location.href===initialUrl,controlled:!!navigator.serviceWorker.controller};
+  });
+  expect(result.unchanged).toBe(true);
+  expect(result.controlled).toBe(true);
+  expect(result.audioDuration).toBeGreaterThan(0);
+  expect(result.videoDuration).toBeGreaterThan(0);
+  expect(received.filter(x=>x.path.includes('bbbbbbbb')&&x.authorization==='Bearer browser-synthetic'&&!!x.range).length).toBeGreaterThan(0);
+  expect(received.filter(x=>x.path.includes('cccccccc')&&x.authorization==='Bearer browser-synthetic'&&!!x.range).length).toBeGreaterThan(0);
+ });
+});
