@@ -72,13 +72,13 @@ export async function libraryContent(request:Request,env:Env,uid:string,projectI
  const headers=new Headers({'Content-Type':source.mimeType,'Accept-Ranges':'bytes',
  'Content-Length':String(matchingFull?Number(source.size):Number(match![2])-Number(match![1])+1),'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer',
  'Access-Control-Expose-Headers':'Content-Length, Content-Range, Accept-Ranges'});
- if(!matchingFull)headers.set('Content-Range',upstream.headers.get('Content-Range')!);
+ if(!full&&!matchingFull)headers.set('Content-Range',upstream.headers.get('Content-Range')!);
  if(source.mimeType==='image/svg+xml')headers.set('Content-Security-Policy',"sandbox; default-src 'none'");
- if(request.method==='HEAD'){await upstream.body?.cancel();return new Response(null,{status:matchingFull?200:206,headers});}
+ if(request.method==='HEAD'){await upstream.body?.cancel();return new Response(null,{status:full||matchingFull?200:206,headers});}
  const expected=matchingFull?Number(source.size):Number(match![2])-Number(match![1])+1;let received=0;
  const body=upstream.body?.pipeThrough(new TransformStream<Uint8Array,Uint8Array>({
  transform(chunk,controller){received+=chunk.byteLength;if(received>expected){controller.error(new Error('source_size_changed'));return;}controller.enqueue(chunk);},
  flush(controller){if(received!==expected)controller.error(new Error('source_size_changed'));}
  }));
- return new Response(body,{status:matchingFull?200:206,headers});
+ return new Response(body,{status:full||matchingFull?200:206,headers});
 }
