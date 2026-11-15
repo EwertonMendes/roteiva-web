@@ -8,7 +8,7 @@ export function ReviewSourcePreview({reviewId,asset}:{reviewId:string;asset:Asse
  const {user}=useAuth(),[url,setURL]=useState(''),[error,setError]=useState('');
  useEffect(()=>{
   setURL('');setError('');if(!user)return;let alive=true,release:(()=>void)|undefined;
-  void authenticatedOwnerReviewMedia(reviewId,asset.fileId,()=>user.getIdToken()).then(binding=>{
+  void authenticatedOwnerReviewMedia(reviewId,asset.fileId,()=>user.getIdToken(),user.uid).then(binding=>{
    if(!alive){binding.close();return;}release=binding.close;setURL(binding.url);
   }).catch(e=>{if(alive)setError(e instanceof Error?e.message:'Não foi possível abrir a versão enviada.');});
   return()=>{alive=false;release?.();};
