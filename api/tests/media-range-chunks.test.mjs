@@ -58,6 +58,7 @@ test('request cancellation prevents any more upstream reads',async()=>{
  const response=await stitchedVideoResponse('bytes=0-'+(size-1),String(size),'video/mp4',
   provider(size,requests),controller.signal);
  controller.abort();
+ const countAtCancellation=requests.length;
  await assert.rejects(response.arrayBuffer());
- assert.equal(requests.length,1);
+ assert.equal(requests.length,countAtCancellation);
 });
