@@ -58,9 +58,11 @@ export async function libraryContent(request:Request,env:Env,uid:string,projectI
   metadataMs,originMs,reusedMetadata:reuse}));
  const match=/^bytes (\d+)-(\d+)\/(\d+)$/.exec(upstream.headers.get('Content-Range')||'');
  const matchingPartial=upstream.status===206&&!!match&&'bytes='+match[1]+'-'+match[2]===range&&match[3]===source.size;
- // Some providers answer a full-object request with 200 even when Range is present.
- // Accept it only for images/PDF with a verified full size. Partial media MUST be 206.
- const matchingFull=full&&upstream.status===200&&
+ // Some providers answer a complete download with 200 despite our
+ // upstream bytes=0-EOF request. Accept it only if no Range was requested
+ // by the browser and the source's expected total size is verified.
+ const wholeObject=full||(!request.headers.has('Range')&&/^(video|audio)\//.test(source.mimeType));
+ const matchingFull=wholeObject&&upstream.status===200&&
    (!upstream.headers.has('Content-Length')||upstream.headers.get('Content-Length')===source.size);
  if(!matchingPartial&&!matchingFull){await upstream.body?.cancel();throw new ApiError(502,'media_range_unsupported');}
  // The node and provider connection were already checked on this request.
@@ -70,13 +72,13 @@ export async function libraryContent(request:Request,env:Env,uid:string,projectI
  const headers=new Headers({'Content-Type':source.mimeType,'Accept-Ranges':'bytes',
  'Content-Length':String(matchingFull?Number(source.size):Number(match![2])-Number(match![1])+1),'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer',
  'Access-Control-Expose-Headers':'Content-Length, Content-Range, Accept-Ranges'});
- if(!full)headers.set('Content-Range',upstream.headers.get('Content-Range')!);
+ if(!matchingFull)headers.set('Content-Range',upstream.headers.get('Content-Range')!);
  if(source.mimeType==='image/svg+xml')headers.set('Content-Security-Policy',"sandbox; default-src 'none'");
- if(request.method==='HEAD'){await upstream.body?.cancel();return new Response(null,{status:full?200:206,headers});}
+ if(request.method==='HEAD'){await upstream.body?.cancel();return new Response(null,{status:matchingFull?200:206,headers});}
  const expected=matchingFull?Number(source.size):Number(match![2])-Number(match![1])+1;let received=0;
  const body=upstream.body?.pipeThrough(new TransformStream<Uint8Array,Uint8Array>({
  transform(chunk,controller){received+=chunk.byteLength;if(received>expected){controller.error(new Error('source_size_changed'));return;}controller.enqueue(chunk);},
  flush(controller){if(received!==expected)controller.error(new Error('source_size_changed'));}
  }));
- return new Response(body,{status:full?200:206,headers});
+ return new Response(body,{status:matchingFull?200:206,headers});
 }
