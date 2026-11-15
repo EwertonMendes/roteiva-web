@@ -8,12 +8,12 @@ const origin='https://roteiva.com',id='aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa';
 test('media worker origin allowlist matches the environment contract',()=>{
  for(const env of Object.values(environments))assert.ok(source.includes(env.apiOrigin));
 });
-function fixture(){
+function fixture(fetchImpl){
  const events={},requests=[],state={claims:0,tasks:[]};
  const client={id:'alice-tab',url:origin+'/biblioteca',sourceURL:undefined,reviewSession:undefined,postMessage(data,ports){ports[0].postMessage({authorization:'Bearer synthetic-identity',reviewSession:this.reviewSession,url:this.sourceURL});ports[0].close();}};
  const self={location:{origin},addEventListener:(kind,handler)=>events[kind]=handler,clients:{get:async key=>key===client.id?client:null,claim:async()=>{state.claims++;}},skipWaiting:async()=>{}};
  vm.runInNewContext(source,{self,URL,Response,Headers,Map,Set,Date,MessageChannel,setTimeout,clearTimeout,AbortSignal,AbortController,
- fetch:async(url,options)=>{requests.push({url,options});return new Response('test',{status:206,headers:{'Content-Range':'bytes 0-3/4','Content-Length':'4'}});}});
+ fetch:async(url,options)=>{requests.push({url,options});return fetchImpl?fetchImpl(url,options):new Response('test',{status:206,headers:{'Content-Range':'bytes 0-3/4','Content-Length':'4'}});}});
  const bind=(data,who=client)=>{let ack;events.message({source:who,data,ports:[{postMessage:value=>ack=value}]});return ack;};
  const read=async(who='alice-tab',options={})=>{let pending;events.fetch({clientId:who,request:{url:origin+'/__roteiva_media/'+id,method:'GET',mode:'cors',headers:new Headers({Range:'bytes=0-3'}),...options},respondWith:p=>pending=p,waitUntil:p=>state.tasks.push(p)});return pending;};
  return {events,requests,bind,read,client,state};
@@ -103,4 +103,28 @@ test('in-memory chunks never cross client IDs or account scopes',async()=>{
  assert.equal(await (await f.read()).text(),'test');
  assert.equal(f.requests.length,2,'a different signed-in owner must not receive cached bytes');
  assert.equal((await f.read('other-tab')).status,403);
+});
+
+test('a large progressive movie must NEVER clone an unconsumed response stream',async()=>{
+ // An unconsumed clone is an unbounded tee branch and can OOM an idle worker.
+ // Test the actual fetch handler, not merely a source-code string.
+ const large=16*1024*1024,first=8*1024*1024;
+ let cloneAttempts=0;
+ const f=fixture(async()=>{
+  const response=new Response(new ReadableStream({
+   start(controller){controller.enqueue(new TextEncoder().encode('streamed'));controller.close();}
+  }),{status:206,headers:{
+   'Content-Length':String(large),
+   'Content-Range':'bytes '+first+'-'+(first+large-1)+'/'+(first+large)
+  }});
+  response.clone=()=>{cloneAttempts++;throw new Error('large stream was cloned');};
+  return response;
+ });
+ const url='https://api.roteiva.com/library/projects/17/nodes/'+id+'/content';
+ assert.equal(f.bind({type:'bind-media',id,url,scope:'alice'}).ok,true);
+ const response=await f.read();
+ assert.equal(response.status,206);
+ assert.equal(await response.text(),'streamed');
+ assert.equal(cloneAttempts,0,'never tee a large body that cannot be cached');
+ assert.equal(f.requests.length,1);
 });
