@@ -1,0 +1,155 @@
+name: Owner-authorized PR Worker to DEV
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'Open same-repo PR number targeting master'
+        required: true
+        type: string
+      pr_sha:
+        description: 'Exact current PR head SHA (40 hex)'
+        required: true
+        type: string
+      confirmation:
+        description: 'Type PUBLICAR_API_PR_DEV'
+        required: true
+        type: string
+permissions:
+  contents: read
+  pull-requests: read
+  checks: read
+concurrency:
+  group: api-worker-dev
+  cancel-in-progress: false
+jobs:
+  validate:
+    name: Verify PR head, checks, build and Worker tests
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      sha: ${{ steps.guard.outputs.sha }}
+    steps:
+      - name: Authorize exact PR with green CI (no production credentials)
+        id: guard
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ inputs.pr_sha }}
+          PR: ${{ inputs.pr_number }}
+          CONFIRM: ${{ inputs.confirmation }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTOR" = "$GITHUB_REPOSITORY_OWNER"
+          test "$CONFIRM" = 'PUBLICAR_API_PR_DEV'
+          [[ "$SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$PR" =~ ^[1-9][0-9]*$ ]]
+          payload="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR")"
+          jq -e --arg repo "$GITHUB_REPOSITORY" --arg sha "$SHA" '
+            .state == "open" and .base.ref == "master" and
+            .head.repo.full_name == $repo and .head.sha == $sha
+          ' <<<"$payload" >/dev/null
+          checks="$(gh api "repos/$GITHUB_REPOSITORY/commits/$SHA/check-runs?per_page=100")"
+          for required in 'Validate Worker and D1' 'Validate frontend' 'Worker tests, emulator rules and desktop/mobile E2E'; do
+            jq -e --arg n "$required" 'any(.check_runs[]; .name == $n and .conclusion == "success")' <<<"$checks" >/dev/null || {
+              echo "::error::Missing green required CI: $required"; exit 1;
+            }
+          done
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.guard.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+      - name: Revalidate same SHA in unprivileged runner
+        working-directory: api
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ steps.guard.outputs.sha }}"
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run typecheck
+          npm test
+          npm run migrate:local
+          npm run build
+          node scripts/ci-security-audit.mjs
+  deploy:
+    name: Publish exact PR Worker in protected Cloudflare DEV
+    needs: validate
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: cloudflare-development
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_D1_DATABASE_ID: ${{ vars.CLOUDFLARE_D1_DATABASE_ID }}
+      API_BASE_URL: ${{ vars.API_BASE_URL }}
+      WRANGLER_SEND_METRICS: 'false'
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Reverify still-current PR and dedicated DEV identity
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ needs.validate.outputs.sha }}
+          PR: ${{ inputs.pr_number }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTOR" = "$GITHUB_REPOSITORY_OWNER"
+          test "$(git rev-parse HEAD)" = "$SHA"
+          test -n "$CLOUDFLARE_API_TOKEN"
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$PR" | jq -e --arg sha "$SHA" --arg repo "$GITHUB_REPOSITORY" '
+            .state == "open" and .head.sha == $sha and
+            .base.ref == "master" and .head.repo.full_name == $repo
+          ' >/dev/null
+          test "$CLOUDFLARE_ACCOUNT_ID" = "71d7d72a003796ba12b6bf23d149916c"
+          test "$CLOUDFLARE_D1_DATABASE_ID" = "4fa31040-0cde-45dc-8140-cd784b5463a0"
+          grep -q '"name": "roteiva-api-dev"' wrangler.jsonc
+          node scripts/guard-environment.mjs dev --before-migrations
+      - name: Verify Worker secret names
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: node scripts/guard-secrets.mjs dev
+      - name: Guard D1, migrate and verify identity
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          node scripts/guard-token-scope.mjs dev
+          node scripts/guard-migrations.mjs dev
+          node scripts/check-access-migration.mjs --before
+          npm run migrate:dev
+          node scripts/guard-environment.mjs dev --seal
+          node scripts/check-access-migration.mjs
+      - name: Publish verified SHA to the DEV Worker only
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npm run deploy:dev
+      - name: Live smoke on DEV, no test account credentials
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          const base='https://roteiva-api-dev.roteiva-dev.workers.dev';
+          const health=await fetch(base+'/health',{cache:'no-store'});
+          assert.equal(health.status,200);
+          assert.deepEqual(await health.json(),{status:'ok',environment:'dev'});
+          for(const provider of ['drive','dropbox']){
+            const response=await fetch(base+'/integrations/'+provider,{
+              headers:{Authorization:'Bearer invalid'},cache:'no-store'
+            });
+            assert.equal(response.status,401);
+          }
+          NODE
