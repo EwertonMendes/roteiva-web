@@ -1,5 +1,11 @@
 # Roadmap vivo — Roteiva MVP
 
+## Correção regressiva de conexão de contas — PR #129 (15/11/2026)
+- [x] **IMPLEMENTADO EM BRANCH:** removido o redirect automático da aba principal quando o popup de Drive/Dropbox é bloqueado; link explícito em nova aba, retorno pela lista de contas e manutenção do estado local. Teste Playwright atualizado para rejeitar reinício da Biblioteca (`tests/browser/virtual-library.spec.ts`).
+- [ ] **VALIDAÇÃO:** executar frontend typecheck/build + Playwright navegador desktop/mobile e publicar exclusivamente Hosting DEV no SHA validado. Conferir em navegador real com popup bloqueado e com duas identidades Dropbox distintas.
+- [ ] **DEPENDÊNCIA EXTERNA:** Google Drive DEV permanece em modo OAuth Testing. Para autorizar qualquer conta Google, o proprietário deve publicar/verificar o cliente no Google Auth Platform conforme escopos aplicáveis; contas fora de Test users serão bloqueadas pelo Google até essa mudança. Não alegar liberação universal antes de verificar configuração e consentimento real.
+- [ ] Homologação de contas reais Google/Dropbox e merge PR somente após aprovação; PROD intocado.
+
 ## Liberação de PROD solicitada — 14/11/2026
 - [x] Integração na master do ciclo editorial e revisão de UX: SHA base `a7d66160` já aprovado em DEV.
 - [x] Ativação explícita da Biblioteca virtual no Worker de PROD e no build do frontend de PROD.

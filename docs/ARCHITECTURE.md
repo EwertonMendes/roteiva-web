@@ -1,5 +1,9 @@
 # Arquitetura do Roteiva — MVP SaaS
 
+## Decisão — OAuth de armazenamento e bloqueadores de popup (15/11/2026, PR #129)
+
+O frontend não faz `window.location.assign` quando a janela OAuth é bloqueada: o redirecionamento da aba principal descartava estado React da Biblioteca. A ação secundária abre explicitamente uma nova aba com o ticket de curta duração validado pelo Worker, e o usuário atualiza a lista de conexões ao retornar. No fluxo normal, popup isolado + `postMessage`/`BroadcastChannel` atualizam a conta sem remontar o workspace. Não se alteram PKCE, cookie `SameSite=Lax`, controle de UID ou armazenamento de tokens. O retorno na aba secundária pode abrir o app completo; não é evidência de autorização até `GET /integrations/{provider}` confirmar a conta. Google DEV em `Testing` mantém allowlist externa obrigatória: nenhuma regra interna do Roteiva pode suprimir `access_denied` do Google.
+
 ## Decisão de UI editorial — 13/11/2026 (PR #125)
 A seleção de logos oficiais foi centralizada em `src/features/ui/BrandLogo.tsx`; imagens públicas são estáticas e não são alteradas por filtros no cliente. A lente do login é um SVG decorativo sem requests, eventos ou dados.
 

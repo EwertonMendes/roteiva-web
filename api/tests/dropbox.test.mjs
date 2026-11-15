@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {database} from './helpers/database.mjs';
 import {encrypt,context,base64url} from '../src/crypto.ts';
-import {dropboxAccess,dropboxConnection,dropboxList,dropboxStart,dropboxLaunch,dropboxCallback,dropboxNormalize,dropboxThumbnail} from '../src/dropbox.ts';
+import {dropboxAccess,dropboxConnection,dropboxList,dropboxStart,dropboxLaunch,dropboxCallback,dropboxConnections,dropboxNormalize,dropboxThumbnail} from '../src/dropbox.ts';
 import {startDropboxUpload,appendDropboxUpload,finishDropboxUpload} from '../src/dropbox-uploads.ts';
 import {issueDropboxPreview,streamDropboxPreview} from '../src/dropbox-preview.ts';
 import {libraryFor,mutateLibrary} from '../src/library.ts';
@@ -299,6 +299,7 @@ test('Fail closed: malformed uploads, reconnects and different owners never star
 
 test('Dropbox PKCE OAuth callback creates persistent connection and refreshes without app secret',async t=>{
  const f=await fixture(t),now=Date.now(),seen=[];
+ let identity='dbid:someaccount';
  f.sql.prepare('INSERT INTO access_accounts(owner_uid,trial_started_at,trial_ends_at,created_at,updated_at) VALUES(?,?,?,?,?)')
    .run(uid,now-86400000,now+518400000,now-86400000,now);
  const original=global.fetch;t.after(()=>{global.fetch=original});
@@ -314,14 +315,14 @@ test('Dropbox PKCE OAuth callback creates persistent connection and refreshes wi
        assert.equal(params.get('redirect_uri'),f.env.DROPBOX_OAUTH_REDIRECT_URI);
        return Response.json({access_token:'pkce-access',refresh_token:'pkce-refresh',expires_in:14400,
          token_type:'bearer',scope:'account_info.read files.metadata.read files.content.read files.content.write',
-         account_id:'dbid:someaccount'});
+         account_id:identity});
      }
      assert.equal(params.get('grant_type'),'refresh_token');
      assert.equal(params.get('refresh_token'),'pkce-refresh');
      return Response.json({access_token:'renewed-access',expires_in:14400,token_type:'bearer'});
    }
    if(path.endsWith('/users/get_current_account'))return Response.json({
-     account_id:'dbid:someaccount',email:'alice@example.com',email_verified:true,disabled:false
+     account_id:identity,email:identity==='dbid:someaccount'?'alice@example.com':'second@example.com',email_verified:true,disabled:false
    });
    throw Error('Unexpected external endpoint: '+path);
  };
@@ -331,6 +332,8 @@ test('Dropbox PKCE OAuth callback creates persistent connection and refreshes wi
  const oauthUrl=new URL(launch.headers.get('Location'));
  assert.equal(oauthUrl.searchParams.get('token_access_type'),'offline');
  assert.equal(oauthUrl.searchParams.get('code_challenge_method'),'S256');
+ assert.equal(oauthUrl.searchParams.get('force_reauthentication'),'true',
+  'Adding a Dropbox account must ask for a fresh identity, not silently reuse the connected account');
  const cookie=launch.headers.get('Set-Cookie').split(';')[0];
  const callback=await dropboxCallback(new Request(API+'/oauth/dropbox/callback?code=one-use&state='+
    encodeURIComponent(oauthUrl.searchParams.get('state')),{headers:{Cookie:cookie}}),f.env);
@@ -348,6 +351,23 @@ test('Dropbox PKCE OAuth callback creates persistent connection and refreshes wi
  const refreshed=await dropboxConnection(f.env,uid,conn);
  assert.ok(refreshed.access_token_expires_at>Date.now()+3600000);
  assert.equal(refreshed.encrypted_refresh_token,row.encrypted_refresh_token,'refresh must preserve the long-lived token');
+ // A second Dropbox identity belongs to the same Roteiva owner, not the
+ // Firebase sign-in address. The first grant must remain independent.
+ identity='dbid:anotheraccount';
+ const nextLaunch=(await (await dropboxStart(f.env,uid)).json()).launchUrl;
+ const nextAuth=await dropboxLaunch(new Request(nextLaunch),f.env);
+ const nextUrl=new URL(nextAuth.headers.get('Location'));
+ assert.equal(nextUrl.searchParams.get('force_reauthentication'),'true');
+ const secondCallback=await dropboxCallback(new Request(API+'/oauth/dropbox/callback?code=another&state='+
+  nextUrl.searchParams.get('state'),{headers:{Cookie:nextAuth.headers.get('Set-Cookie').split(';')[0]}}),f.env);
+ assert.match(secondCallback.headers.get('Location'),/dropbox=connected$/);
+ const rows=f.sql.prepare('SELECT id,dropbox_email FROM dropbox_connections WHERE owner_uid=? ORDER BY dropbox_email').all(uid);
+ assert.equal(rows.length,2);
+ assert.deepEqual(rows.map(x=>x.dropbox_email),['alice@example.com','second@example.com']);
+ assert.equal(rows.find(x=>x.dropbox_email==='alice@example.com').id,conn);
+ assert.notEqual(rows.find(x=>x.dropbox_email==='second@example.com').id,conn);
+ const originalAfter=await dropboxConnection(f.env,uid,conn);
+ assert.equal(originalAfter.encrypted_refresh_token,row.encrypted_refresh_token);
 });
 
 test('Dropbox invalid OAuth code is not reported as an expired connected session',async t=>{
@@ -366,4 +386,37 @@ test('Dropbox invalid OAuth code is not reported as an expired connected session
  }),f.env);
  assert.match(callback.headers.get('Location'),/dropbox=dropbox_oauth_code_invalid$/);
  assert.doesNotMatch(callback.headers.get('Location'),/dropbox_reconnect_required/);
+});
+
+test('Dropbox first connection skips forced sign-in, later connections require another identity',async t=>{
+ const f=await fixture(t),now=Date.now();
+ f.sql.prepare('INSERT INTO access_accounts(owner_uid,trial_started_at,trial_ends_at,created_at,updated_at) VALUES(?,?,?,?,?)')
+  .run(uid,now-86400000,now+518400000,now-86400000,now);
+ f.sql.prepare('DELETE FROM dropbox_connections WHERE owner_uid=?').run(uid);
+ const first=await (await dropboxStart(f.env,uid)).json();
+ const launch=await dropboxLaunch(new Request(first.launchUrl),f.env);
+ assert.equal(launch.status,303);
+ const url=new URL(launch.headers.get('Location'));
+ assert.equal(url.searchParams.get('force_reauthentication'),null);
+ f.sql.prepare("INSERT INTO dropbox_connections(id,owner_uid,dropbox_account_id,dropbox_email,scopes,status,revision,created_at,updated_at) VALUES(?,?,?,?,?,'reconnect_required',1,?,?)")
+  .run(conn,uid,'dbid:old-account','old@example.com','account_info.read',now,now);
+ const second=await (await dropboxStart(f.env,uid)).json();
+ const another=await dropboxLaunch(new Request(second.launchUrl),f.env);
+ const params=new URL(another.headers.get('Location')).searchParams;
+ assert.equal(params.get('force_reauthentication'),'true');
+ assert.equal(params.get('client_id'),f.env.DROPBOX_APP_KEY);
+ assert.equal(params.get('scope'), 'account_info.read files.metadata.read files.content.read files.content.write');
+});
+
+test('Dropbox account listing returns every owned account without an invisible 20-account cap',async t=>{
+ const f=await fixture(t),ts=Date.now();
+ const insert=f.sql.prepare("INSERT INTO dropbox_connections(id,owner_uid,dropbox_account_id,dropbox_email,status,scopes,revision,created_at,updated_at) VALUES(?,?,?,?,'reconnect_required','account_info.read',1,?,?)");
+ for(let n=1;n<=23;n++){
+  const serial=String(n).padStart(12,'0');
+  insert.run('00000000-0000-4000-8000-'+serial,uid,'dbid:account'+n,'account'+n+'@example.com',ts+n,ts+n);
+ }
+ const list=await (await dropboxConnections(f.env,uid)).json();
+ assert.equal(list.connections.length,24,'one existing plus 23 additional accounts must remain visible');
+ assert.equal(new Set(list.connections.map(c=>c.id)).size,24);
+ assert.ok(list.connections.some(c=>c.email==='account23@example.com'));
 });

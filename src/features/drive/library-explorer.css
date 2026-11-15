@@ -12,13 +12,6 @@
 .vl-explorer .vl-add-menu>button:disabled{opacity:.42}
 .vl-explorer .vl-add-menu img{width:18px;height:18px;object-fit:contain}
 .vl-explorer .vl-menu-divider{height:1px;margin:5px 3px;background:var(--line)}
-.vl-explorer .vl-accounts-popover{position:absolute;right:18px;top:76px;z-index:85;width:min(490px,calc(100% - 24px));padding:13px;border:1px solid var(--line);border-radius:14px;background:var(--paper);box-shadow:0 22px 50px rgba(0,0,0,.35)}
-.vl-explorer .vl-popover-head{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:1px 0 11px;font-size:14px}
-.vl-explorer .vl-popover-head>button{display:grid;place-items:center;min-width:40px;min-height:40px;border:1px solid var(--line);border-radius:10px;color:var(--ink);background:var(--subtle)}
-.vl-explorer .vl-accounts-popover>label{display:grid;gap:7px;margin:8px 0;font-size:12px}
-.vl-explorer .vl-connections{background:transparent;padding:7px 0;border:0}
-.vl-explorer .vl-connections-heading{gap:10px;align-items:center}
-.vl-explorer .vl-account-details{margin-top:10px}
 .vl-explorer .vl-explorer-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 20px;border-bottom:1px solid var(--line)}
 .vl-explorer .vl-explorer-breadcrumb{display:flex;align-items:center;gap:4px;flex-wrap:wrap;min-height:40px;min-width:0}
 .vl-explorer .vl-path-part{display:flex;align-items:center;gap:5px}
@@ -85,7 +78,6 @@
  .vl-explorer .vl-query-input{max-width:none}
  .vl-explorer .vl-explorer-items{padding:5px 10px 15px}
  .vl-explorer .vl-explorer-items--grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
- .vl-explorer .vl-accounts-popover{top:118px;right:7px;width:calc(100% - 14px)}
  .vl-explorer .vl-menu-trigger{min-width:44px;min-height:44px}
 }
 @media(max-width:410px){.vl-explorer .vl-small-tool span{display:none}
@@ -194,4 +186,14 @@
  .vl-explorer .vl-explorer-folders{grid-template-columns:1fr}
  .vl-explorer .vl-explorer-assets .vl-file-meta strong{font-size:12px}
  .vl-explorer .vl-trash-switch span{display:inline}
+}
+
+/* Explicit management entry point, not an unlabeled icon/count. */
+.vl-explorer .vl-settings-trigger{padding:0 11px;white-space:nowrap}
+.vl-explorer .vl-settings-trigger>span{font-size:12px;font-weight:600}
+.vl-explorer .vl-settings-trigger .vl-settings-count{min-width:20px;min-height:20px;display:grid;place-items:center;border-radius:7px;padding:1px 5px;background:var(--card);border:1px solid var(--line);font-size:11px}
+.vl-explorer .vl-settings-trigger[aria-expanded=true]{border-color:var(--muted);background:var(--card)}
+@media(max-width:380px){
+ .vl-explorer .vl-settings-trigger{gap:5px;padding:0 8px}
+ .vl-explorer .vl-settings-trigger>span:not(.vl-settings-count){font-size:11px}
 }

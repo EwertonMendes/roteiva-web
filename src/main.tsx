@@ -1,4 +1,5 @@
 import {canonicalFrontendUrl} from './lib/canonical-frontend.ts';
+import {completeStorageOAuthPopupReturn} from './features/drive/storage-oauth-popup.ts';
 import {appEnvironment} from './lib/environment.ts';
 import {AppButton} from "./features/ui/AppButton";
 import React, { Component, type ReactNode } from "react";
@@ -47,6 +48,7 @@ const publicToken=/^\/review\/([A-Za-z0-9_-]{43})\/?$/.exec(window.location.path
 const publicReviewRoute=Boolean(publicToken)||(import.meta.env.VITE_VIRTUAL_LIBRARY==='true'&&window.location.pathname.replace(/\/+$/,'')==='/review');
 const canonicalUrl=canonicalFrontendUrl(window.location.href,appEnvironment.appEnv);
 if(canonicalUrl)window.location.replace(canonicalUrl);
+else if(completeStorageOAuthPopupReturn()){/* Return handled in the isolated OAuth tab. */}
 else createRoot(document.getElementById("root")!).render(<React.StrictMode>
   <SiteExperience />
   <AppErrorBoundary>{isDemo ? review ? <ReviewUnavailable /> : <DashboardClient firstName="Visitante" email="demo@roteiva.local" /> :

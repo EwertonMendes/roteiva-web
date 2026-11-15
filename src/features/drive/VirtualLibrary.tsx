@@ -19,7 +19,8 @@ import {LibraryAssetPreview} from './LibraryAssetPreview';
 import {API_BASE_URL} from '../../lib/environment';
 import {messages} from './drive-api';
 import {useDriveTransfers} from './DriveTransfersProvider';
-import {rememberLibraryOAuthReturn,readLibraryOAuthReturn,forgetLibraryOAuthReturn} from './library-oauth-return';
+import {readLibraryOAuthReturn,forgetLibraryOAuthReturn} from './library-oauth-return';
+import {openStorageOAuthWindow,awaitStorageOAuthWindow,type StorageOAuthWindow,type StorageOAuthProvider} from './storage-oauth-popup';
 import {importLibraryBatch,type LibraryImport,type FailedLibraryImport} from './library-import';
 import {LibraryConnections} from './LibraryConnections';
 import {LibraryStructureDialog} from './LibraryStructureDialog';
@@ -45,6 +46,9 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
  const dropbox=dropboxAccounts.find(x=>x.id===dropboxId)||dropboxAccounts[0];
  const [parent,setParent]=useState('root'),[loadedPage,setPage]=useState<(Page&{scope:string})|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const [returnNotice,setReturnNotice]=useState('');
+ const [connectingProvider,setConnectingProvider]=useState<StorageOAuthProvider|null>(null),[connectionError,setConnectionError]=useState('');
+ const [manualOAuth,setManualOAuth]=useState<{provider:StorageOAuthProvider;url:string}|null>(null);
+ const oauthController=useRef<AbortController|null>(null),oauthWindow=useRef<StorageOAuthWindow|null>(null);
  const [loadingPage,setLoadingPage]=useState(false),[refreshing,setRefreshing]=useState(false),[searchAll,setSearchAll]=useState(true);
  const [layout,setLayout]=useState<'list'|'grid'>(()=>{try{return localStorage.getItem('roteiva-library-layout')==='grid'?'grid':'list';}catch{return 'list';}});
  const [addOpen,setAddOpen]=useState(false),[settingsOpen,setSettingsOpen]=useState(false),[menuNode,setMenuNode]=useState<Node|null>(null);
@@ -59,6 +63,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
  const [failedImports,setFailedImports]=useState<{parentId:string;items:FailedLibraryImport[]}|null>(null);
  const generation=useRef(0),loadRevision=useRef(0),mutation=useRef<AbortController|null>(null);
  const dialogRef=useOverlayFocus(()=>{if(!busy)setEdit(null);},Boolean(edit&&edit.action!=='move'),edit?.action+':'+edit?.node?.id);
+ const accountsDialogRef=useOverlayFocus(()=>setSettingsOpen(false),settingsOpen);
  useEffect(()=>{
   if(edit?.action!=='create'&&edit?.action!=='rename')return;
   const frame=requestAnimationFrame(()=>{nameInput.current?.focus();if(edit.action==='rename')nameInput.current?.select();});
@@ -70,30 +75,75 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
  const page=loadedPage?.scope===pageScope?loadedPage:getLibraryFolder<Node>(pageScope)?.data||null;
  useEffect(()=>{try{localStorage.setItem('roteiva-library-layout',layout);}catch{/* optional preference */}},[layout]);
  useEffect(()=>{
-  if(!addOpen&&!settingsOpen&&!menuNode&&!spaceMenu)return;
-  const onEscape=(e:KeyboardEvent)=>{if(e.key==='Escape'){setAddOpen(false);setSettingsOpen(false);setMenuNode(null);setSpaceMenu(null);}};
+  if(!addOpen&&!menuNode&&!spaceMenu)return;
+  const onEscape=(e:KeyboardEvent)=>{if(e.key==='Escape'){setAddOpen(false);setMenuNode(null);setSpaceMenu(null);}};
   document.addEventListener('keydown',onEscape);
   const outside=(e:PointerEvent)=>{
-   if(!(e.target as Element)?.closest?.('.vl-add-shell,.vl-context-menu,.vl-menu-trigger,.vl-space-context-menu,.vl-accounts-popover,.vl-settings-trigger')){
-    setAddOpen(false);setSettingsOpen(false);setMenuNode(null);setSpaceMenu(null);
+   if(!(e.target as Element)?.closest?.('.vl-add-shell,.vl-context-menu,.vl-menu-trigger,.vl-space-context-menu,.vl-settings-trigger')){
+    setAddOpen(false);setMenuNode(null);setSpaceMenu(null);
    }
   };
   document.addEventListener('pointerdown',outside);return()=>{document.removeEventListener('pointerdown',outside);document.removeEventListener('keydown',onEscape);};
- },[addOpen,settingsOpen,menuNode,spaceMenu]);
+ },[addOpen,menuNode,spaceMenu]);
  useEffect(()=>{const timer=setTimeout(()=>setTerm(search.trim().length>=2?search.trim():''),280);return()=>clearTimeout(timer);},[search]);
  useEffect(()=>{setSearch('');setTerm('');},[parent,selectedProjectId,trash]);
  useEffect(()=>{
   const params=new URLSearchParams(window.location.search),result=params.get('drive')||params.get('dropbox');
   if(result&&result!=='connected'&&result!=='cancelled')setError(messages[result]||'Não foi possível conectar a conta. Tente novamente.');
  },[]);
- async function connect(provider:'drive'|'dropbox'){
-  if(busy)return;setBusy(true);setError('');
-  try{const result=await call<{launchUrl:string}>('/oauth/'+provider+'/start','POST');const target=new URL(result.launchUrl);
-   if(target.origin!==API_BASE_URL||target.pathname!=='/oauth/'+provider+'/launch')throw new Error('O endereço de conexão recebido não é válido.');
-   if(user?.uid&&selectedProjectId)rememberLibraryOAuthReturn(user.uid,selectedProjectId,parent);
-   else forgetLibraryOAuthReturn();
-   window.location.assign(target.href);
-  }catch(e){setError(e instanceof Error?e.message:'Não foi possível conectar a conta.');setBusy(false);}
+ async function connect(provider:'drive'|'dropbox',reconnecting?:string){
+  if(busy||connectingProvider)return;
+  // Open synchronously during the click. OAuth remains a first-party top-level
+  // navigation in this popup, but the user's workspace is never reloaded.
+  const popup=openStorageOAuthWindow();
+  const controller=new AbortController();
+  oauthController.current=controller;oauthWindow.current=popup;
+  setConnectingProvider(provider);setConnectionError('');setManualOAuth(null);setError('');
+  const before=new Set(storage.connections.filter(x=>x.provider===(provider==='drive'?'google_drive':'dropbox')).map(x=>x.id));
+  try{
+   const result=await call<{launchUrl:string}>('/oauth/'+provider+'/start','POST',undefined,controller.signal);
+   if(controller.signal.aborted)return;
+   const target=new URL(result.launchUrl);
+   if(target.origin!==API_BASE_URL||target.pathname!=='/oauth/'+provider+'/launch')
+    throw new Error('O endereço de conexão recebido não é válido.');
+   if(!popup){
+    // A blocked popup must never navigate the current SPA or discard library state.
+    // Offer an explicit new tab; the single-use Worker ticket expires in ten minutes.
+    setManualOAuth({provider,url:target.href});
+    setConnectionError('O navegador bloqueou a janela de autorização. Abra a conexão em uma nova aba pelo link abaixo; esta Biblioteca não será reiniciada.');
+    return;
+   }
+   popup.popup.location.replace(target.href);
+   const reply=await awaitStorageOAuthWindow(popup,controller.signal);
+   if(controller.signal.aborted)return;
+   if(!reply){setConnectionError(provider==='drive'?'O Google não concluiu a autorização. Se apareceu “Acesso bloqueado”, verifique os usuários de teste do OAuth DEV.':'A autorização do Dropbox não foi concluída. Tente conectar novamente.');return;}
+   if(reply.provider!==provider)throw new Error('A autorização retornou um provedor inesperado.');
+   if(reply.status==='cancelled'){setReturnNotice('Conexão cancelada. Suas contas anteriores foram preservadas.');return;}
+   if(reply.status!=='connected'){setConnectionError(messages[reply.status]||'A autorização não foi concluída. Tente novamente.');return;}
+   const refreshed=await storage.refresh(true);
+   if(refreshed.failed.includes(provider==='drive'?'google_drive':'dropbox'))
+    throw new Error('Conta autorizada, mas não foi possível atualizar a lista. Use Atualizar contas.');
+   const entries=provider==='drive'?refreshed.drive:refreshed.dropbox;
+   const newlyAdded=entries.find(x=>x.status==='connected'&&!before.has(x.id));
+   const linked= new Set(entries.filter(x=>x.status==='connected').map(x=>x.id));
+   const selected=newlyAdded?.id||(reconnecting&&linked.has(reconnecting)?reconnecting:null);
+   if(selected){if(provider==='drive')setAccountId(selected);else setDropboxId(selected);}
+   setReturnNotice(newlyAdded?'Nova conta conectada com sucesso.':
+    'Autorização atualizada. Se você queria outra conta, selecione um login diferente no provedor.');
+  }catch(e){
+   if(!controller.signal.aborted)setConnectionError(e instanceof Error?e.message:'Não foi possível conectar a conta.');
+  }finally{
+   if(popup&&!popup.popup.closed)popup.popup.close();
+   if(oauthController.current===controller){
+    oauthController.current=null;oauthWindow.current=null;setConnectingProvider(null);
+   }
+  }
+ }
+ function cancelConnection(){
+  setConnectionError('');
+  oauthController.current?.abort();
+  oauthWindow.current?.popup.close();
+  oauthWindow.current=null;setConnectingProvider(null);
  }
  useEffect(()=>{
  setPicker(null);if(!base||!account)return;const controller=new AbortController();
@@ -157,7 +207,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
  useEffect(()=>{const cached=getLibraryFolder<Node>(pageScope);setPage(cached?{...cached.data,scope:pageScope}:null);void load(undefined,false);return()=>{++loadRevision.current;++generation.current;};},[pageScope]);
  const lastCacheUser=useRef(user?.uid);
  useEffect(()=>{if(lastCacheUser.current&&lastCacheUser.current!==user?.uid)clearLibraryFolders(lastCacheUser.current);lastCacheUser.current=user?.uid;},[user?.uid]);
- useEffect(()=>()=>mutation.current?.abort(),[]);
+ useEffect(()=>()=>{mutation.current?.abort();oauthController.current?.abort();oauthWindow.current?.popup.close();},[]);
  async function performImport(items:LibraryImport[],target:string,controller:AbortController,scope:number){
   const failed=await importLibraryBatch(call,base.replace('/nodes','/imports'),target,items,controller.signal,(done,total)=>setProgress('Adicionando '+done+' de '+total+' arquivos…'));
   if(scope!==generation.current||controller.signal.aborted)return;
@@ -286,7 +336,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
   <header className="vl-explorer-head">
    <LibraryProjectPicker projects={projects} value={selectedProjectId} onChange={onSelectProject}/>
    <div className="vl-explorer-actions">
-    <AppButton className="vl-settings-trigger" aria-label="Contas de armazenamento" title="Contas conectadas" aria-expanded={settingsOpen} onClick={()=>{setSettingsOpen(x=>!x);setAddOpen(false);setMenuNode(null);}}><HardDrive size={18}/><span>{storage.connections.filter(c=>c.status==='connected').length}</span></AppButton>
+    <AppButton className="vl-settings-trigger" aria-label="Contas de armazenamento" title="Gerenciar contas conectadas" aria-haspopup="dialog" aria-expanded={settingsOpen} onClick={()=>{setSettingsOpen(true);setAddOpen(false);setMenuNode(null);}}><HardDrive size={18} aria-hidden="true"/><span>Contas</span><span className="vl-settings-count">{storage.connections.filter(c=>c.status==='connected').length}</span></AppButton>
     <AppButton className="vl-refresh" aria-label="Atualizar pasta" title="Atualizar pasta" disabled={!base||busy||loadingPage||refreshing} onClick={()=>void load()}><RefreshCw size={18} className={loadingPage||refreshing?'vl-loading':''}/></AppButton>
     {base&&!trash&&<div className="vl-add-shell">
      <AppButton className="vl-primary-add" aria-label="Adicionar" aria-expanded={addOpen} onClick={()=>{setAddOpen(x=>!x);setMenuNode(null);setSettingsOpen(false);}}><Plus size={18}/>Adicionar</AppButton>
@@ -304,11 +354,24 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
     </div>}
    </div>
   </header>
-  {settingsOpen&&<div className="vl-accounts-popover">
-   <div className="vl-popover-head"><strong>Contas de armazenamento</strong><AppButton aria-label="Fechar contas" onClick={()=>setSettingsOpen(false)}><X size={18}/></AppButton></div>
-   {accounts.length>1&&<label>Google Drive<AppSelect aria-label="Conta Google Drive" value={account?.id||''} onValueChange={setAccountId}>{accounts.map(x=><option key={x.id} value={x.id}>{x.email}</option>)}</AppSelect></label>}
-   {dropboxAccounts.length>1&&<label>Dropbox<AppSelect aria-label="Conta Dropbox" value={dropbox?.id||''} onValueChange={setDropboxId}>{dropboxAccounts.map(x=><option key={x.id} value={x.id}>{x.email}</option>)}</AppSelect></label>}
-   <LibraryConnections busy={busy} onConnect={provider=>void connect(provider)}/>
+  {settingsOpen&&<div className="vl-accounts-backdrop" onPointerDown={event=>{if(event.target===event.currentTarget)setSettingsOpen(false);}}>
+   <div ref={accountsDialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="vl-accounts-title" aria-describedby="vl-accounts-description" className="vl-accounts-dialog">
+    <header className="vl-accounts-header">
+     <div className="vl-accounts-heading"><h2 id="vl-accounts-title">Contas de armazenamento</h2><p id="vl-accounts-description">Gerencie o acesso aos seus arquivos em um só lugar.</p></div>
+     <div className="vl-accounts-header-actions">
+      <AppButton type="button" aria-label="Atualizar contas" title="Atualizar contas" disabled={storage.loading} onClick={()=>void storage.refresh(true)}><RefreshCw size={18} className={storage.loading?'vl-loading':''} aria-hidden="true"/></AppButton>
+      <AppButton type="button" aria-label="Fechar contas" title="Fechar" onClick={()=>setSettingsOpen(false)}><X size={18} aria-hidden="true"/></AppButton>
+     </div>
+    </header>
+    {storage.error&&<div role="alert" className="vl-accounts-provider-error">Não foi possível atualizar {storage.error}. Tente novamente.</div>}
+    {connectionError&&<div role="alert" className="vl-accounts-provider-error">{connectionError}</div>}
+    {manualOAuth&&<div className="vl-oauth-pending" role="status">
+     <div><strong>Conexão em outra aba</strong><span>Após autorizar, volte a esta aba e atualize as contas. Seu projeto e sua pasta permanecem abertos.</span></div>
+     <a className="vl-oauth-manual-link" href={manualOAuth.url} target="_blank" rel="noopener noreferrer">Abrir autorização do {manualOAuth.provider==='drive'?'Google Drive':'Dropbox'} em nova aba</a>
+     <AppButton type="button" onClick={()=>{void storage.refresh(true).then(()=>setManualOAuth(null));}}>Atualizar contas</AppButton>
+    </div>}
+    <LibraryConnections busy={busy||Boolean(connectingProvider)} pendingProvider={connectingProvider} onCancelConnect={cancelConnection} selectedDriveId={account?.id} selectedDropboxId={dropbox?.id} onSelectDrive={setAccountId} onSelectDropbox={setDropboxId} onConnect={(provider,accountId)=>void connect(provider,accountId)}/>
+   </div>
   </div>}
   {storage.error&&<div role="alert" className="vl-compact-alert"><AlertCircle size={17}/><span>Falha ao verificar {storage.error}.</span><AppButton onClick={()=>void storage.refresh(true)}>Tentar novamente</AppButton></div>}
   {returnNotice&&<div role="status" className="vl-compact-alert"><AlertCircle size={17}/><span>{returnNotice}</span><AppButton onClick={()=>setReturnNotice('')}>Dispensar</AppButton></div>}
