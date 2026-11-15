@@ -104,6 +104,7 @@ export function LibraryAssetPreview({projectId,node,onClose}:{projectId:number;n
        onVolumeChange={event=>setMuted(event.currentTarget.muted)} onError={fail}/>
       {muted&&<AppButton className="vl-preview-unmute" type="button" onClick={()=>{
        if(!videoRef.current)return;videoRef.current.muted=false;setMuted(false);
+       if(videoRef.current.paused)void videoRef.current.play().catch(()=>{});
       }}><Volume2 size={17} aria-hidden="true"/>Ativar som</AppButton>}
      </div>:
      <div className="vl-preview-audio-stage"><FileAudio size={40} aria-hidden="true"/>
