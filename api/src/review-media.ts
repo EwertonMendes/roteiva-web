@@ -70,17 +70,7 @@ export async function streamReviewMedia(request:Request,env:Env,url:URL):Promise
     .bind(p.r).first<{id:string;owner_uid:string;status:string;current_version:number;expires_at:number;token_hash:string;access_mode:string}>();
   if(!r||r.expires_at<=Date.now()||r.current_version!==p.v||r.token_hash!==p.h||
      !['pending','changes','approved'].includes(r.status))throw new ApiError(404,'review_not_found');
-  // These records are independent once the signed ticket and current review
-  // have been checked. Read them concurrently to reduce per-range D1 latency.
-  const [asset,session,permitted]=await Promise.all([
-    env.DB.prepare("SELECT file_id,connection_id,mime_type,provider,source_revision,source_size FROM review_assets WHERE review_id=? AND version=? AND file_id=? AND grant_state='granted'")
-      .bind(p.r,p.v,p.f).first<{file_id:string;connection_id:string;mime_type:string;provider:StorageProviderId;source_revision:string|null;source_size:string|null}>(),
-    env.VIRTUAL_LIBRARY_ENABLED==='true'
-      ?loadReviewSession(env,request.headers.get('X-Review-Session')||''):Promise.resolve(null),
-    r.access_mode==='google'&&p.s
-      ?env.DB.prepare("SELECT email FROM review_participants WHERE review_id=?").bind(r.id).all<{email:string}>()
-      :Promise.resolve({results:[] as {email:string}[]}),
-  ]);
+  // Reject an invalid identity before starting parallel database reads.
   let viewerSubject:string|null=null;
   if(r.access_mode==='google'){
     if(!p.s)throw new ApiError(404,'review_not_found');
@@ -89,14 +79,27 @@ export async function streamReviewMedia(request:Request,env:Env,url:URL):Promise
       viewerSubject=await sessionSubject(principal.uid,principal.googleSubject);
       if(await reviewMediaSubject(env,r.id,principal.verifiedEmail,p.k)!==p.s)throw new ApiError(404,'review_not_found');
     }
-    // Rechecking membership for every range revokes outstanding playback tickets
-    // when access is removed; subject is a hash, not an email in a shared URL.
+  }else if(p.s)throw new ApiError(404,'review_not_found');
+  // With a valid signed ticket and viewer identity, these three reads are
+  // independent. Preserve every authorization check, but eliminate D1 RTTs.
+  const [asset,session,permitted]=await Promise.all([
+    env.DB.prepare("SELECT file_id,connection_id,mime_type,provider,source_revision,source_size FROM review_assets WHERE review_id=? AND version=? AND file_id=? AND grant_state='granted'")
+      .bind(p.r,p.v,p.f).first<{file_id:string;connection_id:string;mime_type:string;provider:StorageProviderId;source_revision:string|null;source_size:string|null}>(),
+    env.VIRTUAL_LIBRARY_ENABLED==='true'
+      ?loadReviewSession(env,request.headers.get('X-Review-Session')||''):Promise.resolve(null),
+    r.access_mode==='google'
+      ?env.DB.prepare("SELECT email FROM review_participants WHERE review_id=?").bind(r.id).all<{email:string}>()
+      :Promise.resolve({results:[] as {email:string}[]}),
+  ]);
+  if(r.access_mode==='google'){
+    // Membership is rechecked for every video range, so removed participants
+    // cannot use an otherwise valid ticket.
     let allowed=false;
     for(const person of permitted.results){
       if(await reviewMediaSubject(env,r.id,person.email,p.k)===p.s){allowed=true;break;}
     }
     if(!allowed)throw new ApiError(404,'review_not_found');
-  }else if(p.s)throw new ApiError(404,'review_not_found');
+  }
   if(env.VIRTUAL_LIBRARY_ENABLED==='true'){
     if(!session||p.j!==session.id_hash)throw new ApiError(404,'review_not_found');
     assertReviewSession(session,r,viewerSubject);
