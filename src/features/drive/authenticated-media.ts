@@ -3,9 +3,9 @@ import {API_BASE_URL} from '../../lib/environment';
 const WORKER_PATH='/roteiva-media-sw.js';
 // The query is a transport-protocol version, not a per-request cache buster.
 // A version change replaces an older worker under the same '/' registration.
-const WORKER_URL=WORKER_PATH+'?mediaProtocol=2';
+const WORKER_URL=WORKER_PATH+'?mediaProtocol=3';
 const PUBLIC_MEDIA_ERROR='Não foi possível abrir este arquivo agora. Tente novamente.';
-const providers=new Map<string,{getToken:()=>Promise<string>;getReviewSession?:()=>string;url:string}>();
+const providers=new Map<string,{getToken:()=>Promise<string>;getReviewSession?:()=>string;url:string;scope:string}>();
 let setup:Promise<void>|undefined;
 let listening=false;
 
@@ -13,7 +13,7 @@ function isExpectedWorker(worker:ServiceWorker|null):boolean{
  if(!worker)return false;
  try{
   const script=new URL(worker.scriptURL);
-  return script.origin===location.origin&&script.pathname===WORKER_PATH&&script.searchParams.get('mediaProtocol')==='2';
+  return script.origin===location.origin&&script.pathname===WORKER_PATH&&script.searchParams.get('mediaProtocol')==='3';
  }catch{return false;}
 }
 function controllerIsReady():boolean{
@@ -89,7 +89,7 @@ async function prepare(){
     const provider=providers.get(event.data.id),port=event.ports[0];
     if(!provider){port.postMessage({});return;}
     void provider.getToken()
-     .then(token=>port.postMessage({authorization:token?'Bearer '+token:'',reviewSession:provider.getReviewSession?.(),url:provider.url}))
+     .then(token=>port.postMessage({authorization:token?'Bearer '+token:'',reviewSession:provider.getReviewSession?.(),url:provider.url,scope:provider.scope}))
      .catch(()=>port.postMessage({}));
    });
   }
@@ -129,6 +129,7 @@ export async function authenticatedMedia(projectId:number,nodeId:string,getToken
 }
 /** Clear tab-scoped private media buffers when a user signs out or changes. */
 export function clearAuthenticatedMediaCache(){
+ if('caches' in window)void caches.delete('roteiva-private-media-v1').catch(()=>{});
  if(!('serviceWorker' in navigator))return;
  try{
   const channel=new MessageChannel();
@@ -146,7 +147,7 @@ export async function authenticatedOwnerReviewMedia(reviewId:string,fileId:strin
 async function bindMedia(url:string,getToken:()=>Promise<string>,getReviewSession?:()=>string,scope=''){
  await prepare();
  const id=crypto.randomUUID();
- providers.set(id,{getToken,url,getReviewSession});
+ providers.set(id,{getToken,url,getReviewSession,scope});
  try{await message({type:'bind-media',id,url,scope});}
  catch(error){providers.delete(id);throw error;}
  return {url:'/__roteiva_media/'+id,close:()=>{
