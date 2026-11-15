@@ -9,14 +9,14 @@ test('media worker origin allowlist matches the environment contract',()=>{
  for(const env of Object.values(environments))assert.ok(source.includes(env.apiOrigin));
 });
 function fixture(){
- const events={},requests=[];
+ const events={},requests=[],state={claims:0};
  const client={id:'alice-tab',url:origin+'/biblioteca',sourceURL:undefined,reviewSession:undefined,postMessage(data,ports){ports[0].postMessage({authorization:'Bearer synthetic-identity',reviewSession:this.reviewSession,url:this.sourceURL});ports[0].close();}};
- const self={location:{origin},addEventListener:(kind,handler)=>events[kind]=handler,clients:{get:async key=>key===client.id?client:null,claim:async()=>{}},skipWaiting:async()=>{}};
+ const self={location:{origin},addEventListener:(kind,handler)=>events[kind]=handler,clients:{get:async key=>key===client.id?client:null,claim:async()=>{state.claims++;}},skipWaiting:async()=>{}};
  vm.runInNewContext(source,{self,URL,Response,Headers,Map,Set,Date,MessageChannel,setTimeout,clearTimeout,AbortSignal,
  fetch:async(url,options)=>{requests.push({url,options});return new Response('test',{status:206,headers:{'Content-Range':'bytes 0-3/4'}});}});
  const bind=(data,who=client)=>{let ack;events.message({source:who,data,ports:[{postMessage:value=>ack=value}]});return ack;};
  const read=async(who='alice-tab',options={})=>{let pending;events.fetch({clientId:who,request:{url:origin+'/__roteiva_media/'+id,method:'GET',mode:'cors',headers:new Headers({Range:'bytes=0-3'}),...options},respondWith:p=>pending=p});return pending;};
- return {events,requests,bind,read,client};
+ return {events,requests,bind,read,client,state};
 }
 test('media streaming forwards range and identity only for the binding tab',async()=>{
  const f=fixture();assert.equal(f.bind({type:'bind-media',id,url:'https://api.roteiva.com/library/projects/17/nodes/'+id+'/content'}).ok,true);
@@ -52,4 +52,20 @@ test('review streaming requires the live tab session as well as the signed ticke
  assert.equal((await f.read()).status,206);
  assert.equal(f.requests[0].options.headers.get('X-Review-Session'),'a'.repeat(43));
  assert.equal((await f.read('other-tab')).status,403);
+});
+
+test('a cold active worker can explicitly claim its same-origin page before media is bound',async()=>{
+ const f=fixture();
+ let result,pending;
+ f.events.message({
+  source:f.client,
+  data:{type:'claim-media-clients'},
+  ports:[{postMessage:value=>result=value}],
+  waitUntil:value=>{pending=value;}
+ });
+ assert.ok(pending,'the claim must remain alive through the service worker event');
+ await pending;
+ assert.deepEqual(result,{ok:true});
+ assert.equal(f.state.claims,1);
+ assert.equal(f.requests.length,0,'claim must not fetch protected bytes or mint credentials');
 });
