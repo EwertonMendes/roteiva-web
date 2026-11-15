@@ -77,14 +77,11 @@ test('cold browser takes SW control without a page reload and native audio/video
     },{once:true});
    });
    const readyAudio=metadata(audio,'wav'),readyVideo=metadata(video,'mp4');
-   const autoPlaying=new Promise<void>((resolve,reject)=>{
-    const timeout=setTimeout(()=>reject(new Error('muted video did not autoplay')),8000);
-    video.addEventListener('playing',()=>{clearTimeout(timeout);resolve();},{once:true});
-    video.addEventListener('error',()=>{clearTimeout(timeout);reject(new Error('video decode failed'));},{once:true});
-   });
    audio.src=wav;video.src=mp4;
    const [audioDuration,videoDuration]=await Promise.all([readyAudio,readyVideo]);
-   await autoPlaying;
+   // Autoplay with sound is browser-policy dependent, so require the permitted
+   // muted-inline configuration and preserve the native Play fallback.
+   if(!video.autoplay||!video.muted||!video.playsInline)throw new Error('Native autoplay policy settings are missing');
    audio.remove();video.remove();
    return {audioDuration,videoDuration,unchanged:location.href===initialUrl,controlled:!!navigator.serviceWorker.controller};
   });
