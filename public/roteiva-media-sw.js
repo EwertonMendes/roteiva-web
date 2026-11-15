@@ -101,7 +101,7 @@ self.addEventListener('message',event=>{
   return;
  }
  if(data?.type==='clear-media-cache'){
-  event.waitUntil(clearChunks().then(()=>port.postMessage({ok:true}),()=>port.postMessage({ok:false})));return;
+  const task=clearChunks();event.waitUntil?.(task);port.postMessage({ok:true});return;
  }
  if(data?.type==='revoke-media'&&typeof data.id==='string'){
  const entry=media.get(data.id);if(entry?.client===source.id)media.delete(data.id);port.postMessage({ok:true});return;
