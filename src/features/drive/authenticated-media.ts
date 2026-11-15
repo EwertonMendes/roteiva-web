@@ -29,6 +29,8 @@ function message(data:unknown):Promise<void>{
  navigator.serviceWorker.controller.postMessage(data,[channel.port2]);
  });
 }
+/** Install and activate once before a preview opens. Errors remain recoverable on click. */
+export function warmAuthenticatedMedia(){void prepare().catch(()=>{});}
 export async function authenticatedMedia(projectId:number,nodeId:string,getToken:()=>Promise<string>){
  return bindMedia(API_BASE_URL+'/library/projects/'+projectId+'/nodes/'+nodeId+'/content',getToken);
 }
