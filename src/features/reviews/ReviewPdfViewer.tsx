@@ -21,7 +21,7 @@ export function ReviewPdfViewer({src,name}:{src:string;name:string}){
   void import('pdfjs-dist').then(pdf=>{
    if(!alive)return;
    pdf.GlobalWorkerOptions.workerSrc=new URL('pdfjs-dist/build/pdf.worker.min.mjs',import.meta.url).toString();
-   task=pdf.getDocument({url:src,rangeChunkSize:256*1024,disableAutoFetch:true,disableStream:true});
+   task=pdf.getDocument({url:src,rangeChunkSize:512*1024,disableAutoFetch:true,disableStream:true});
    return task.promise.then(value=>{if(alive)setDocument(value);});
   }).catch(()=>{if(alive){setError('Não foi possível ler este PDF. Confira se o arquivo está disponível e não exige senha.');setRendering(false);}});
   return()=>{alive=false;void task?.destroy();};
