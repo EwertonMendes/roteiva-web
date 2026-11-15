@@ -6,24 +6,10 @@ import {dropboxConnection,dropboxAccess} from './dropbox.ts';
 import {driveResourceHeaders} from './drive-resource-keys.ts';
 import {streamHeaders} from './media-fetch.ts';
 export type PublishedSource={provider:'google_drive'|'dropbox';connection_id:string;file_id:string;mime_type:string;source_revision?:string|null;source_size?:string|null};
-// Review bytes are immutable published revisions. Cache only successful metadata
-// observations for adjacent player ranges; never store media bytes at the edge.
-type Observation=Awaited<ReturnType<typeof readLibrarySource>>;
-const reviewObservations=new Map<string,{value:Observation;expires:number}>();
-async function observedReviewSource(env:Env,uid:string,asset:PublishedSource,fetcher:typeof fetch){
- const key=[env.ENVIRONMENT,uid,asset.provider,asset.connection_id,asset.file_id,asset.source_revision].join('|');
- const existing=reviewObservations.get(key);
- if(existing&&existing.expires>Date.now())return existing.value;
- reviewObservations.delete(key);
- const value=await readLibrarySource(env,uid,{provider:asset.provider,connectionId:asset.connection_id,fileId:asset.file_id},fetcher);
- if(reviewObservations.size>=256)reviewObservations.clear();
- reviewObservations.set(key,{value,expires:Date.now()+90000});
- return value;
-}
 /** Current availability is checked, but bytes always come from the published revision. */
 export async function readPublishedSource(request:Request,env:Env,uid:string,asset:PublishedSource,probe=false,fetcher:typeof fetch=fetch):Promise<Response>{
  if(!asset.source_revision||!asset.source_size)throw new ApiError(409,'review_source_version_unsupported');
- const observed=await observedReviewSource(env,uid,asset,fetcher);
+ const observed=await readLibrarySource(env,uid,{provider:asset.provider,connectionId:asset.connection_id,fileId:asset.file_id},fetcher);
  const source:SourceVersion={provider:asset.provider,fileId:asset.file_id,revision:asset.source_revision,size:asset.source_size,mimeType:asset.mime_type};
  const target=revisionEndpoint(source);sourceRange(null,source.size);
  const full=!probe&&!request.headers.has('Range')&&(source.mimeType.startsWith('image/')||source.mimeType==='application/pdf');
