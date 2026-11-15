@@ -15,6 +15,13 @@ self.addEventListener('activate',event=>event.waitUntil(self.clients.claim()));
 self.addEventListener('message',event=>{
  const source=event.source,data=event.data,port=event.ports[0];
  if(!source?.id||!source.url||new URL(source.url).origin!==self.location.origin||!port)return;
+ if(data?.type==='claim-media-clients'){
+  // The cold SPA may be open before this worker becomes its controller.
+  // Claiming it explicitly does not grant access to any media; every range
+  // still requires the requesting live tab's authorization handshake.
+  event.waitUntil(self.clients.claim().then(()=>port.postMessage({ok:true}),()=>port.postMessage({ok:false})));
+  return;
+ }
  if(data?.type==='revoke-media'&&typeof data.id==='string'){
  const entry=media.get(data.id);if(entry?.client===source.id)media.delete(data.id);port.postMessage({ok:true});return;
  }
