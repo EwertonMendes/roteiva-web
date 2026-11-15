@@ -65,8 +65,21 @@ function playbackOrigin(video:Video){
  return u.origin;
 }
 function publicState(status:Row['status']){return status==='creating'||status==='processing'?'processing':status;}
+const FAILED_RETRY_DELAY=30*60*1000;
 async function state(env:Env,row:Row):Promise<Response>{
- if(!row.stream_uid)return Response.json({state:publicState(row.status)},{headers:{'Cache-Control':'no-store'}});
+ // A failed import must not be billed again on every modal reopening. After
+ // cooling down a GET offers one new attempt through the existing atomic POST.
+ if(row.status==='failed')return Response.json(
+  {state:Date.now()-row.updated_at>=FAILED_RETRY_DELAY?'absent':'unavailable'},
+  {headers:{'Cache-Control':'no-store'}});
+ if(!row.stream_uid){
+  if(row.status==='creating'&&Date.now()-row.created_at>5*60*1000){
+   await env.DB.prepare("UPDATE optimized_media_previews SET status='failed',updated_at=? WHERE owner_uid=? AND provider=? AND connection_id=? AND file_id=? AND source_revision=?")
+    .bind(Date.now(),...args(row.owner_uid,row,row.source_revision)).run();
+   return Response.json({state:'unavailable'},{headers:{'Cache-Control':'no-store'}});
+  }
+  return Response.json({state:publicState(row.status)},{headers:{'Cache-Control':'no-store'}});
+ }
  const handle=stream(env).video(row.stream_uid);
  if(row.status!=='ready'){
   // Avoid repeated Stream metadata calls while the provider is downloading/encoding.
@@ -101,13 +114,13 @@ export async function previewRequest(request:Request,env:Env,uid:string,projectI
  if(!a.source_revision||!a.size)throw new ApiError(409,'stream_source_not_versioned');
  let row=await stored(env,uid,a,a.source_revision);
  if(request.method==='GET')return row?state(env,row):Response.json({state:'absent'});
- if(row&&(row.status==='ready'||row.status==='processing'||row.status==='creating'&&Date.now()-row.created_at<10*60*1000))return state(env,row);
+ if(row&&(row.status==='ready'||row.status==='processing'||row.status==='creating'&&Date.now()-row.created_at<5*60*1000||row.status==='failed'&&Date.now()-row.updated_at<FAILED_RETRY_DELAY))return state(env,row);
  // Preparing a new video costs Stream storage/encoding. Only explicit owner POST.
  const meta=await readLibrarySource(env,uid,{provider:a.provider,connectionId:a.connection_id,fileId:a.file_id});
  if(meta.mimeType!==a.mime_type||!meta.revision||!meta.size)throw new ApiError(409,'source_changed');
  const actual={...a,source_revision:meta.revision,size:meta.size};
  row=await stored(env,uid,actual,meta.revision);
- if(row&&(row.status==='ready'||row.status==='processing'||row.status==='creating'&&Date.now()-row.created_at<10*60*1000))return state(env,row);
+ if(row&&(row.status==='ready'||row.status==='processing'||row.status==='creating'&&Date.now()-row.created_at<5*60*1000||row.status==='failed'&&Date.now()-row.updated_at<FAILED_RETRY_DELAY))return state(env,row);
  const now=Date.now();
  if(!row){
   const insert=await env.DB.prepare("INSERT OR IGNORE INTO optimized_media_previews(owner_uid,provider,connection_id,file_id,source_revision,source_size,status,created_at,updated_at) VALUES(?,?,?,?,?,?,'creating',?,?)")
@@ -132,7 +145,10 @@ export async function previewRequest(request:Request,env:Env,uid:string,projectI
   await env.DB.prepare("UPDATE optimized_media_previews SET status='failed',updated_at=? WHERE owner_uid=? AND provider=? AND connection_id=? AND file_id=? AND source_revision=?")
    .bind(Date.now(),...args(uid,actual,meta.revision)).run();
   // Never send upstream account or API diagnostics to the client.
-  console.warn(JSON.stringify({event:'stream_upload_failed',type:error instanceof ApiError?error.code:'provider_unavailable'}));
+  const providerCategory=error instanceof Error&&
+   ['BadRequestError','QuotaReachedError','MaxFileSizeError','RateLimitedError','AlreadyUploadedError','InternalError'].includes(error.name)
+    ?error.name:'provider_unavailable';
+  console.warn(JSON.stringify({event:'stream_upload_failed',type:error instanceof ApiError?error.code:providerCategory}));
   throw new ApiError(503,'stream_upload_unavailable');
  }
 }
@@ -152,10 +168,14 @@ export async function streamIngest(request:Request,env:Env,token:string){
  // A full GET without Range is a 200 body; a requested Range stays 206.
  if(request.headers.has('Range'))return media;
  const headers=new Headers(media.headers);
- if(request.method==='HEAD'){
-  headers.set('Content-Range','bytes 0-'+(Number(ticket.s)-1)+'/'+ticket.s);
-  return new Response(null,{status:200,headers});
+ // Stream's URL importer probes HEAD and later downloads a complete GET.
+ // Advertising 200 with a partial Content-Range or incorrect Content-Length
+ // makes the ingestion fail before adaptive playback can ever start.
+ if(headers.get('Content-Length')!==ticket.s){
+  await media.body?.cancel();
+  throw new ApiError(502,'stream_ingest_length_mismatch');
  }
  headers.delete('Content-Range');
- return new Response(media.body,{status:200,headers});
+ headers.set('Content-Length',ticket.s);
+ return new Response(request.method==='HEAD'?null:media.body,{status:200,headers});
 }
