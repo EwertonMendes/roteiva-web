@@ -59,6 +59,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
  const [failedImports,setFailedImports]=useState<{parentId:string;items:FailedLibraryImport[]}|null>(null);
  const generation=useRef(0),loadRevision=useRef(0),mutation=useRef<AbortController|null>(null);
  const dialogRef=useOverlayFocus(()=>{if(!busy)setEdit(null);},Boolean(edit&&edit.action!=='move'),edit?.action+':'+edit?.node?.id);
+ const accountsDialogRef=useOverlayFocus(()=>setSettingsOpen(false),settingsOpen);
  useEffect(()=>{
   if(edit?.action!=='create'&&edit?.action!=='rename')return;
   const frame=requestAnimationFrame(()=>{nameInput.current?.focus();if(edit.action==='rename')nameInput.current?.select();});
@@ -70,16 +71,16 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
  const page=loadedPage?.scope===pageScope?loadedPage:getLibraryFolder<Node>(pageScope)?.data||null;
  useEffect(()=>{try{localStorage.setItem('roteiva-library-layout',layout);}catch{/* optional preference */}},[layout]);
  useEffect(()=>{
-  if(!addOpen&&!settingsOpen&&!menuNode&&!spaceMenu)return;
-  const onEscape=(e:KeyboardEvent)=>{if(e.key==='Escape'){setAddOpen(false);setSettingsOpen(false);setMenuNode(null);setSpaceMenu(null);}};
+  if(!addOpen&&!menuNode&&!spaceMenu)return;
+  const onEscape=(e:KeyboardEvent)=>{if(e.key==='Escape'){setAddOpen(false);setMenuNode(null);setSpaceMenu(null);}};
   document.addEventListener('keydown',onEscape);
   const outside=(e:PointerEvent)=>{
-   if(!(e.target as Element)?.closest?.('.vl-add-shell,.vl-context-menu,.vl-menu-trigger,.vl-space-context-menu,.vl-accounts-popover,.vl-settings-trigger')){
-    setAddOpen(false);setSettingsOpen(false);setMenuNode(null);setSpaceMenu(null);
+   if(!(e.target as Element)?.closest?.('.vl-add-shell,.vl-context-menu,.vl-menu-trigger,.vl-space-context-menu,.vl-settings-trigger')){
+    setAddOpen(false);setMenuNode(null);setSpaceMenu(null);
    }
   };
   document.addEventListener('pointerdown',outside);return()=>{document.removeEventListener('pointerdown',outside);document.removeEventListener('keydown',onEscape);};
- },[addOpen,settingsOpen,menuNode,spaceMenu]);
+ },[addOpen,menuNode,spaceMenu]);
  useEffect(()=>{const timer=setTimeout(()=>setTerm(search.trim().length>=2?search.trim():''),280);return()=>clearTimeout(timer);},[search]);
  useEffect(()=>{setSearch('');setTerm('');},[parent,selectedProjectId,trash]);
  useEffect(()=>{
@@ -286,7 +287,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
   <header className="vl-explorer-head">
    <LibraryProjectPicker projects={projects} value={selectedProjectId} onChange={onSelectProject}/>
    <div className="vl-explorer-actions">
-    <AppButton className="vl-settings-trigger" aria-label="Contas de armazenamento" title="Contas conectadas" aria-expanded={settingsOpen} onClick={()=>{setSettingsOpen(x=>!x);setAddOpen(false);setMenuNode(null);}}><HardDrive size={18}/><span>{storage.connections.filter(c=>c.status==='connected').length}</span></AppButton>
+    <AppButton className="vl-settings-trigger" aria-label="Contas de armazenamento" title="Gerenciar contas conectadas" aria-haspopup="dialog" aria-expanded={settingsOpen} onClick={()=>{setSettingsOpen(true);setAddOpen(false);setMenuNode(null);}}><HardDrive size={18} aria-hidden="true"/><span>Contas</span><span className="vl-settings-count">{storage.connections.filter(c=>c.status==='connected').length}</span></AppButton>
     <AppButton className="vl-refresh" aria-label="Atualizar pasta" title="Atualizar pasta" disabled={!base||busy||loadingPage||refreshing} onClick={()=>void load()}><RefreshCw size={18} className={loadingPage||refreshing?'vl-loading':''}/></AppButton>
     {base&&!trash&&<div className="vl-add-shell">
      <AppButton className="vl-primary-add" aria-label="Adicionar" aria-expanded={addOpen} onClick={()=>{setAddOpen(x=>!x);setMenuNode(null);setSettingsOpen(false);}}><Plus size={18}/>Adicionar</AppButton>
@@ -304,11 +305,18 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
     </div>}
    </div>
   </header>
-  {settingsOpen&&<div className="vl-accounts-popover">
-   <div className="vl-popover-head"><strong>Contas de armazenamento</strong><AppButton aria-label="Fechar contas" onClick={()=>setSettingsOpen(false)}><X size={18}/></AppButton></div>
-   {accounts.length>1&&<label>Google Drive<AppSelect aria-label="Conta Google Drive" value={account?.id||''} onValueChange={setAccountId}>{accounts.map(x=><option key={x.id} value={x.id}>{x.email}</option>)}</AppSelect></label>}
-   {dropboxAccounts.length>1&&<label>Dropbox<AppSelect aria-label="Conta Dropbox" value={dropbox?.id||''} onValueChange={setDropboxId}>{dropboxAccounts.map(x=><option key={x.id} value={x.id}>{x.email}</option>)}</AppSelect></label>}
-   <LibraryConnections busy={busy} onConnect={provider=>void connect(provider)}/>
+  {settingsOpen&&<div className="vl-accounts-backdrop" onPointerDown={event=>{if(event.target===event.currentTarget)setSettingsOpen(false);}}>
+   <div ref={accountsDialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="vl-accounts-title" aria-describedby="vl-accounts-description" className="vl-accounts-dialog">
+    <header className="vl-accounts-header">
+     <div className="vl-accounts-heading"><h2 id="vl-accounts-title">Contas de armazenamento</h2><p id="vl-accounts-description">Gerencie o acesso aos seus arquivos em um só lugar.</p></div>
+     <div className="vl-accounts-header-actions">
+      <AppButton type="button" aria-label="Atualizar contas" title="Atualizar contas" disabled={storage.loading} onClick={()=>void storage.refresh(true)}><RefreshCw size={18} className={storage.loading?'vl-loading':''} aria-hidden="true"/></AppButton>
+      <AppButton type="button" aria-label="Fechar contas" title="Fechar" onClick={()=>setSettingsOpen(false)}><X size={18} aria-hidden="true"/></AppButton>
+     </div>
+    </header>
+    {storage.error&&<div role="alert" className="vl-accounts-provider-error">Não foi possível atualizar {storage.error}. Tente novamente.</div>}
+    <LibraryConnections busy={busy} selectedDriveId={account?.id} selectedDropboxId={dropbox?.id} onSelectDrive={setAccountId} onSelectDropbox={setDropboxId} onConnect={provider=>void connect(provider)}/>
+   </div>
   </div>}
   {storage.error&&<div role="alert" className="vl-compact-alert"><AlertCircle size={17}/><span>Falha ao verificar {storage.error}.</span><AppButton onClick={()=>void storage.refresh(true)}>Tentar novamente</AppButton></div>}
   {returnNotice&&<div role="status" className="vl-compact-alert"><AlertCircle size={17}/><span>{returnNotice}</span><AppButton onClick={()=>setReturnNotice('')}>Dispensar</AppButton></div>}
