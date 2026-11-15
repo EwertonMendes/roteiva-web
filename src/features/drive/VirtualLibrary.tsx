@@ -19,7 +19,7 @@ import {LibraryAssetPreview} from './LibraryAssetPreview';
 import {API_BASE_URL} from '../../lib/environment';
 import {messages} from './drive-api';
 import {useDriveTransfers} from './DriveTransfersProvider';
-import {rememberLibraryOAuthReturn,readLibraryOAuthReturn,forgetLibraryOAuthReturn} from './library-oauth-return';
+import {readLibraryOAuthReturn,forgetLibraryOAuthReturn} from './library-oauth-return';
 import {openStorageOAuthWindow,awaitStorageOAuthWindow,type StorageOAuthWindow,type StorageOAuthProvider} from './storage-oauth-popup';
 import {importLibraryBatch,type LibraryImport,type FailedLibraryImport} from './library-import';
 import {LibraryConnections} from './LibraryConnections';
@@ -47,6 +47,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
  const [parent,setParent]=useState('root'),[loadedPage,setPage]=useState<(Page&{scope:string})|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const [returnNotice,setReturnNotice]=useState('');
  const [connectingProvider,setConnectingProvider]=useState<StorageOAuthProvider|null>(null),[connectionError,setConnectionError]=useState('');
+ const [manualOAuth,setManualOAuth]=useState<{provider:StorageOAuthProvider;url:string}|null>(null);
  const oauthController=useRef<AbortController|null>(null),oauthWindow=useRef<StorageOAuthWindow|null>(null);
  const [loadingPage,setLoadingPage]=useState(false),[refreshing,setRefreshing]=useState(false),[searchAll,setSearchAll]=useState(true);
  const [layout,setLayout]=useState<'list'|'grid'>(()=>{try{return localStorage.getItem('roteiva-library-layout')==='grid'?'grid':'list';}catch{return 'list';}});
@@ -97,7 +98,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
   const popup=openStorageOAuthWindow();
   const controller=new AbortController();
   oauthController.current=controller;oauthWindow.current=popup;
-  setConnectingProvider(provider);setConnectionError('');setError('');
+  setConnectingProvider(provider);setConnectionError('');setManualOAuth(null);setError('');
   const before=new Set(storage.connections.filter(x=>x.provider===(provider==='drive'?'google_drive':'dropbox')).map(x=>x.id));
   try{
    const result=await call<{launchUrl:string}>('/oauth/'+provider+'/start','POST',undefined,controller.signal);
@@ -106,11 +107,10 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
    if(target.origin!==API_BASE_URL||target.pathname!=='/oauth/'+provider+'/launch')
     throw new Error('O endereço de conexão recebido não é válido.');
    if(!popup){
-    // Popup blockers are rare when opening synchronously. Preserve the existing
-    // full-page OAuth path as a safe, functional fallback.
-    if(user?.uid&&selectedProjectId)rememberLibraryOAuthReturn(user.uid,selectedProjectId,parent);
-    else forgetLibraryOAuthReturn();
-    window.location.assign(target.href);
+    // A blocked popup must never navigate the current SPA or discard library state.
+    // Offer an explicit new tab; the single-use Worker ticket expires in ten minutes.
+    setManualOAuth({provider,url:target.href});
+    setConnectionError('O navegador bloqueou a janela de autorização. Abra a conexão em uma nova aba pelo link abaixo; esta Biblioteca não será reiniciada.');
     return;
    }
    popup.popup.location.replace(target.href);
@@ -365,6 +365,11 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
     </header>
     {storage.error&&<div role="alert" className="vl-accounts-provider-error">Não foi possível atualizar {storage.error}. Tente novamente.</div>}
     {connectionError&&<div role="alert" className="vl-accounts-provider-error">{connectionError}</div>}
+    {manualOAuth&&<div className="vl-oauth-pending" role="status">
+     <div><strong>Conexão em outra aba</strong><span>Após autorizar, volte a esta aba e atualize as contas. Seu projeto e sua pasta permanecem abertos.</span></div>
+     <a className="vl-oauth-manual-link" href={manualOAuth.url} target="_blank" rel="noopener noreferrer">Abrir autorização do {manualOAuth.provider==='drive'?'Google Drive':'Dropbox'} em nova aba</a>
+     <AppButton type="button" onClick={()=>{void storage.refresh(true).then(()=>setManualOAuth(null));}}>Atualizar contas</AppButton>
+    </div>}
     <LibraryConnections busy={busy||Boolean(connectingProvider)} pendingProvider={connectingProvider} onCancelConnect={cancelConnection} selectedDriveId={account?.id} selectedDropboxId={dropbox?.id} onSelectDrive={setAccountId} onSelectDropbox={setDropboxId} onConnect={(provider,accountId)=>void connect(provider,accountId)}/>
    </div>
   </div>}
