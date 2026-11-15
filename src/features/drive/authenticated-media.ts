@@ -124,8 +124,17 @@ function message(data:unknown):Promise<void>{
 
 /** Warm up once, without interrupting navigation. The interactive path retries. */
 export function warmAuthenticatedMedia(){void prepare().catch(()=>{});}
-export async function authenticatedMedia(projectId:number,nodeId:string,getToken:()=>Promise<string>){
- return bindMedia(API_BASE_URL+'/library/projects/'+projectId+'/nodes/'+nodeId+'/content',getToken);
+export async function authenticatedMedia(projectId:number,nodeId:string,getToken:()=>Promise<string>,scope=''){
+ return bindMedia(API_BASE_URL+'/library/projects/'+projectId+'/nodes/'+nodeId+'/content',getToken,undefined,scope);
+}
+/** Clear tab-scoped private media buffers when a user signs out or changes. */
+export function clearAuthenticatedMediaCache(){
+ if(!('serviceWorker' in navigator))return;
+ try{
+  const channel=new MessageChannel();
+  channel.port1.onmessage=()=>channel.port1.close();
+  navigator.serviceWorker.controller?.postMessage({type:'clear-media-cache'},[channel.port2]);
+ }catch{/* A missing controller has no reusable media buffers. */}
 }
 export async function authenticatedReviewMedia(url:string,getToken:()=>Promise<string>,getReviewSession:()=>string){
  if(!url.startsWith(API_BASE_URL+'/reviews/media?ticket='))throw new Error('Endereço de mídia inválido.');
@@ -134,11 +143,11 @@ export async function authenticatedReviewMedia(url:string,getToken:()=>Promise<s
 export async function authenticatedOwnerReviewMedia(reviewId:string,fileId:string,getToken:()=>Promise<string>){
  return bindMedia(API_BASE_URL+'/reviews/'+reviewId+'/content?fileId='+encodeURIComponent(fileId),getToken);
 }
-async function bindMedia(url:string,getToken:()=>Promise<string>,getReviewSession?:()=>string){
+async function bindMedia(url:string,getToken:()=>Promise<string>,getReviewSession?:()=>string,scope=''){
  await prepare();
  const id=crypto.randomUUID();
  providers.set(id,{getToken,url,getReviewSession});
- try{await message({type:'bind-media',id,url});}
+ try{await message({type:'bind-media',id,url,scope});}
  catch(error){providers.delete(id);throw error;}
  return {url:'/__roteiva_media/'+id,close:()=>{
   providers.delete(id);void message({type:'revoke-media',id}).catch(()=>{});
