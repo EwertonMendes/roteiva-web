@@ -330,7 +330,7 @@ export function ReviewPortal({token}:{token:string}){
                 </div>}
                 {playableVideo&&<video ref={videoRef} key={activeFileId}
                   controls controlsList="nodownload noremoteplayback" disablePictureInPicture disableRemotePlayback
-                   playsInline preload="metadata" src={previewUrl} aria-label={"Reproduzir "+active?.name}
+                   playsInline preload="auto" src={previewUrl} aria-label={"Reproduzir "+active?.name}
                   onTimeUpdate={e=>setPlayhead(e.currentTarget.currentTime)}
                   onLoadedMetadata={e=>{
                     const player=e.currentTarget;
