@@ -1,4 +1,6 @@
 import {createServer} from 'node:http';
+// Generated silent-color 1-second H.264/MP4 fixture (not user media).
+const smallMp4=Buffer.from('AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAALobW9vdgAAAGxtdmhkAAAAAAAAAAAAAAAAAAAD6AAAA+gAAQAAAQAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAjd0cmFrAAAAXHRraGQAAAADAAAAAAAAAAAAAAABAAAAAAAAA+gAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAABAAAAAABAAAAAQAAAAAAAkZWR0cwAAABxlbHN0AAAAAAAAAAEAAAPoAAAAAAABAAAAAAGvbWRpYQAAACBtZGhkAAAAAAAAAAAAAAAAAABAAAAAQABVxAAAAAAALWhkbHIAAAAAAAAAAHZpZGUAAAAAAAAAAAAAAABWaWRlb0hhbmRsZXIAAAABWm1pbmYAAAAUdm1oZAAAAAEAAAAAAAAAAAAAACRkaW5mAAAAHGRyZWYAAAAAAAAAAQAAAAx1cmwgAAAAAQAAARpzdGJsAAAAtnN0c2QAAAAAAAAAAQAAAKZhdmMxAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAABAAEABIAAAASAAAAAAAAAABDExhdmMgbGlieDI2NAAAAAAAAAAAAAAAAAAAAAAAAAAAGP//AAAALGF2Y0MBQsAK/+EAFWdCwAraewEQAAADABAAAAMAIPEiagEABGjOD8gAAAAQcGFzcAAAAAEAAAABAAAAFGJ0cnQAAAAAAAAAuAAAAAAAAAAYc3R0cwAAAAAAAAABAAAAAQAAQAAAAAAcc3RzYwAAAAAAAAABAAAAAQAAAAEAAAABAAAAFHN0c3oAAAAAAAAAFwAAAAEAAAAUc3RjbwAAAAAAAAABAAADGAAAAD11ZHRhAAAANW1ldGEAAAAAAAAAIWhkbHIAAAAAAAAAAG1kaXJhcHBsAAAAAAAAAAAAAAAACGlsc3QAAAAIZnJlZQAAAB9tZGF0AAAAE2WIhDoRigACMXHAAEPKOAAIBeA=','base64');
 type Received={path:string;method:string;authorization?:string;session?:string;range?:string;invite?:string;body?:Record<string,unknown>};
 /** Real HTTP transport: WebKit does not route Service Worker fetches through context.route(). */
 export async function withMediaServer(job:(requests:Received[])=>Promise<void>,handler?:(request:Received)=>{status?:number;json:unknown}|undefined){
@@ -16,6 +18,36 @@ export async function withMediaServer(job:(requests:Received[])=>Promise<void>,h
   const result=handler?.(item);if(result){response.writeHead(result.status||200,{'Content-Type':'application/json'});response.end(JSON.stringify(result.json));return;}
   if(path==='/reviews/media'&&request.headers['x-review-session']==='s'.repeat(43)){
    response.setHeader('Content-Type','image/png');response.end(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=','base64'));return;
+  }
+  if(path==='/library/projects/17/nodes/cccccccc-cccc-4ccc-cccc-cccccccccccc/content'&&request.headers.authorization==='Bearer browser-synthetic'){
+   const match=/^bytes=(\d+)-(\d*)$/.exec(request.headers.range||'bytes=0-');
+   if(!match){response.writeHead(416);response.end();return;}
+   const first=Number(match[1]),last=match[2]?Math.min(Number(match[2]),smallMp4.length-1):smallMp4.length-1;
+   if(first>=smallMp4.length||last<first){response.writeHead(416);response.end();return;}
+   const chunk=smallMp4.subarray(first,last+1);
+   response.writeHead(206,{'Content-Type':'video/mp4','Content-Length':String(chunk.length),
+    'Content-Range':'bytes '+first+'-'+last+'/'+smallMp4.length,'Accept-Ranges':'bytes'});
+   response.end(chunk);return;
+  }
+  if(path==='/library/projects/17/nodes/bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb/content'&&request.headers.authorization==='Bearer browser-synthetic'){
+   // Small real 8-kHz mono PCM WAV; exercises HTMLAudioElement's native Range
+   // loading, rather than only testing generic fetch() with synthetic text.
+   const pcm=Buffer.alloc(16000);
+   for(let i=0;i<8000;i++)pcm.writeInt16LE(Math.round(Math.sin(i*2*Math.PI*440/8000)*8000),i*2);
+   const wav=Buffer.alloc(44+pcm.length);
+   wav.write('RIFF',0);wav.writeUInt32LE(wav.length-8,4);wav.write('WAVE',8);
+   wav.write('fmt ',12);wav.writeUInt32LE(16,16);wav.writeUInt16LE(1,20);
+   wav.writeUInt16LE(1,22);wav.writeUInt32LE(8000,24);wav.writeUInt32LE(16000,28);
+   wav.writeUInt16LE(2,32);wav.writeUInt16LE(16,34);wav.write('data',36);
+   wav.writeUInt32LE(pcm.length,40);pcm.copy(wav,44);
+   const match=/^bytes=(\d+)-(\d*)$/.exec(request.headers.range||'bytes=0-');
+   if(!match){response.writeHead(416);response.end();return;}
+   const first=Number(match[1]),last=match[2]?Math.min(Number(match[2]),wav.length-1):wav.length-1;
+   if(first>=wav.length||last<first){response.writeHead(416);response.end();return;}
+   const chunk=wav.subarray(first,last+1);
+   response.writeHead(206,{'Content-Type':'audio/wav','Content-Length':String(chunk.length),
+    'Content-Range':'bytes '+first+'-'+last+'/'+wav.length,'Accept-Ranges':'bytes'});
+   response.end(chunk);return;
   }
   if(path==='/library/projects/17/nodes/aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa/content'&&request.headers.authorization==='Bearer browser-synthetic'&&request.headers.range==='bytes=0-3'){
    response.writeHead(206,{'Content-Range':'bytes 0-3/4','Content-Length':'4'});response.end('test');return;
