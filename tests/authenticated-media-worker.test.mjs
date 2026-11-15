@@ -69,3 +69,10 @@ test('a cold active worker can explicitly claim its same-origin page before medi
  assert.equal(f.state.claims,1);
  assert.equal(f.requests.length,0,'claim must not fetch protected bytes or mint credentials');
 });
+
+test('the playback transport exposes only friendly messages to end users',()=>{
+ const app=readFileSync(new URL('../src/features/drive/authenticated-media.ts',import.meta.url),'utf8');
+ assert.ok(app.includes('Não foi possível abrir este arquivo agora. Tente novamente.'));
+ assert.equal(app.includes('Verifique se os Service Workers estão habilitados'),false);
+ assert.ok(app.includes('mediaProtocol=2'));
+});
