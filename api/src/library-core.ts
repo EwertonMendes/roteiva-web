@@ -9,8 +9,26 @@ function label(value:unknown):string{
  const name=value.normalize('NFC').trim();
  if(!name||name.length>120||/[\x00-\x1f\x7f/\\]/.test(name))throw new ApiError(400,'invalid_library_name');return name;
 }
-/** Project authorization uses the caller's Firebase token and Firestore Rules, never an admin bypass. */
-export async function authorizeLibraryProject(request:Request,env:Env,uid:string,projectId:number,fetcher:typeof fetch=fetch){
+/** Briefly reuse successful Firestore authorization for adjacent media chunks.
+ * The request still requires a valid Firebase token at the HTTP router.
+ * This 45s window trades instant project revocation for faster playback.
+ */
+const mediaProjectChecks=new Map<string,number>();
+const AUTH_TTL=45000,AUTH_LIMIT=256;
+async function mediaCheckKey(request:Request,env:Env,uid:string,projectId:number){
+ const header=request.headers.get('Authorization')||'';
+ const bytes=new TextEncoder().encode(env.FIREBASE_PROJECT_ID+'|'+uid+'|'+projectId+'|'+header);
+ const hash=await crypto.subtle.digest('SHA-256',bytes);
+ return Array.from(new Uint8Array(hash),b=>b.toString(16).padStart(2,'0')).join('');
+}
+export async function authorizeLibraryProject(request:Request,env:Env,uid:string,projectId:number,fetcher:typeof fetch=fetch,media=false){
+ const key=media&&request.method==='GET'?await mediaCheckKey(request,env,uid,projectId):null;
+ if(key){
+  const until=mediaProjectChecks.get(key)||0;
+  if(until>Date.now())return;
+  mediaProjectChecks.delete(key);
+ }
+
  if(!Number.isSafeInteger(projectId)||projectId<=0)throw new ApiError(400,'invalid_project');
  const auth=request.headers.get('Authorization')||'';
  const url='https://firestore.googleapis.com/v1/projects/'+encodeURIComponent(env.FIREBASE_PROJECT_ID)+
@@ -22,6 +40,10 @@ export async function authorizeLibraryProject(request:Request,env:Env,uid:string
  if(!response.ok)throw new ApiError(503,'library_authorization_unavailable');
  const doc=await response.json() as {fields?:{ownerUid?:{stringValue?:string}}};
  if(doc.fields?.ownerUid?.stringValue!==uid)throw new ApiError(403,'library_project_denied');
+ if(key){
+  if(mediaProjectChecks.size>=AUTH_LIMIT)mediaProjectChecks.clear();
+  mediaProjectChecks.set(key,Date.now()+AUTH_TTL);
+ }
 }
 export async function libraryFor(env:Env,uid:string,projectId:number):Promise<Library>{
  // Reads are the common case. Never issue two D1 writes on every folder navigation.
