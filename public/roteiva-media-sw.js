@@ -88,10 +88,11 @@ self.addEventListener('fetch',event=>{
  const headers=new Headers(token?{Authorization:token}:{});
  if(current.review){if(!/^[A-Za-z0-9_-]{43}$/.test(reply?.reviewSession||''))return deny();headers.set('X-Review-Session',reply.reviewSession);}
  const range=event.request.headers.get('Range');if(range)headers.set('Range',range);
- // A token still comes from the active tab on every read. Cache matching
- // ranges only for a known same-user library binding; never cache review links.
- const key=entry?.scope&&range&&event.request.method==='GET'
-  ?chunkKey(event.clientId,entry.scope,current.url,range):null;
+ // Native media players sometimes request the first chunk without Range.
+ // Cache those 206 responses as well, but never cache 200/full-file responses.
+ // Always ask the active tab for an authorized token before a cache hit.
+ const key=entry?.scope&&event.request.method==='GET'
+  ?chunkKey(event.clientId,entry.scope,current.url,range||'initial'):null;
  const hit=key?getChunk(key):null;
  if(hit)return new Response(hit.data.slice(0),{status:206,headers:new Headers(hit.headers)});
  try{
