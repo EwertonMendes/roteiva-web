@@ -81,6 +81,7 @@ function message(data:unknown):Promise<void>{
    return;
   }
   navigator.serviceWorker.controller!.postMessage(data,[channel.port2]);
+ });
 }
 
 /** Warm up once, without interrupting navigation. The interactive path retries. */
