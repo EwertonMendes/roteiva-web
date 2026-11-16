@@ -13,7 +13,7 @@ const clamp=(number:number,min:number,max:number)=>Math.max(min,Math.min(max,num
  * Zoom is relative to the *contained* image, not its original pixel dimensions.
  * Panning is constrained to the displayed image's actual (letterboxed) bounds.
  */
-export function ReviewImageViewer({src,name,onError}:{src:string;name:string;onError?:()=>void}){
+export function ReviewImageViewer({src,name,onError,onLoad}:{src:string;name:string;onError?:()=>void;onLoad?:()=>void}){
   const [view,setView]=useState<View>(FIT);
   const [natural,setNatural]=useState<Position|null>(null);
   const [expanded,setExpanded]=useState(false);
@@ -137,7 +137,7 @@ export function ReviewImageViewer({src,name,onError}:{src:string;name:string;onE
       onKeyDown={onKeys}
       onDoubleClick={()=>view.scale>1?reset():changeZoom(2)}>
       <img className="review-private-preview-image" src={src} alt={name} draggable={false}
-        onLoad={e=>setNatural({x:e.currentTarget.naturalWidth,y:e.currentTarget.naturalHeight})}
+        onLoad={e=>{setNatural({x:e.currentTarget.naturalWidth,y:e.currentTarget.naturalHeight});onLoad?.();}}
         onError={onError}
         style={natural&&size.x&&size.y?{
           width:natural.x*Math.min(size.x/natural.x,size.y/natural.y)*view.scale,
