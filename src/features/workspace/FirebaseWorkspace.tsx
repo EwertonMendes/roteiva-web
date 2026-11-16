@@ -10,7 +10,9 @@ import type { Domain } from "../../data/firestore-sync";
 import type { WorkspaceCommand } from "../../data/firestore-commands";
 import { useAuth } from "../auth/AuthProvider";
 import { useRegistrationProfile } from "../auth/RegistrationGate";
-import { retryFirestoreRead,transientFirestoreRead,firestoreCode } from "../../data/firestore-recovery";
+import { retryFirestoreRead,retryVerifiedInitialRead,transientFirestoreRead,firestoreCode } from "../../data/firestore-recovery";
+import {readOwnServerDocument} from "../../data/firestore-server-read";
+import {parseAccessRest} from "../../data/access-state";
 import {applyTheme,chooseThemePreference,parseThemePreference,readStoredPreference,systemTheme,themeStorageKey,writeStoredPreference,type Theme} from "../../lib/theme-preference";
 
 export function FirebaseWorkspace() {
@@ -67,7 +69,7 @@ export function FirebaseWorkspace() {
     setRemoteChanges(false);setSyncWarning("");
     setError("");setFailedWrite(false); setInitial(undefined);setBusinessLoaded(false);setOverviewMetrics(undefined);setProjectPage(undefined);setClientPage(undefined);setFinancePeriod(undefined);setFinanceBars(undefined);setCalendarPeriod(undefined);
     (async()=>{
-      await retryFirestoreRead(async()=>{
+      await retryVerifiedInitialRead(async()=>{
       const route=routeFromLocation(window.location,{base:import.meta.env.BASE_URL,useHash:false});
       const domains=domainsForRoute(route);
       const themeReadRevision=themeRevision.current;
@@ -127,6 +129,17 @@ export function FirebaseWorkspace() {
         }
         setInitial({workspace:workspaceState.workspace});
       }
+      },async()=>{
+        // Reconcile entitlement against the authenticated Firestore REST
+        // projection, not a possibly stale local cache. This refreshes the
+        // Firebase token before retrying the original Rules-protected query.
+        const db=firebaseServices().db,uid=user!.uid;
+        const document=await readOwnServerDocument(db,uid,'access/current');
+        if(!document)return false;
+        const entitlement=parseAccessRest(document,document.name,uid);
+        if(entitlement.suspended||(!entitlement.unlimited&&entitlement.accessUntil.getTime()<=Date.now()))return false;
+        // Firestore member() also requires the registered owner document.
+        return !!(await readOwnServerDocument(db,uid));
       },{isCurrent:()=>active});
     })().catch(reason=>{
       if(!active)return;
