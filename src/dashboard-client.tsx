@@ -27,7 +27,10 @@ import {ReviewsDashboard} from "./features/reviews/ReviewsDashboard";
 import { TodayStudio } from "./features/dashboard/DashboardOverview";
 import {BrandLogo} from "./features/ui/BrandLogo";
 import { ActivityHistoryDrawer } from "./features/dashboard/ActivityHistory";
-import { validTimeRange, overlaps, eventRange, eventDuration } from "./studio-calendar";
+import {timeMinutes,validTimeRange} from "./studio-calendar";
+import {CalendarView} from "./features/calendar/CalendarView";
+import {CalendarEventDialog,type CalendarDraft} from "./features/calendar/CalendarEventDialog";
+import {isValidCivilDate,todayKey} from "./features/calendar/calendar-dates";
 import { toISO as toISOAdded, parseMoney, splitInstallments } from "./studio-finance";
 import { FormEvent, useEffect, useLayoutEffect, useMemo, useState, useCallback, useRef } from "react";
 
@@ -130,8 +133,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [eventDate, setEventDate] = useState("");
-  const [eventDraft, setEventDraft] = useState({date:"",time:"09:00",endTime:""});
-  const [eventError, setEventError] = useState("");
+  const [calendarFocus,setCalendarFocus]=useState<{date:string;revision:number}|null>(null);
   const [demoStorageWarning, setDemoStorageWarning] = useState(false);
   const [libraryProject, setLibraryProject] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -162,11 +164,10 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     setReviewState(data.reviewState || "pending");setActivities(next.activities);
   }, []);
   function openEvent(entry: CalendarEvent | null = null, date = "") {
-    setEditingEvent(entry); setEventDate(date); setEventError("");
-    setEventDraft({date:entry?.date || date || new Date().toLocaleDateString("en-CA"),time:entry?.time || "09:00",endTime:entry?.endTime || ""});
+    setEditingEvent(entry);
+    setEventDate(entry?.date || date || todayKey());
     setEventModalOpen(true);
   }
-  const overlappingEvents = calendarEvents.filter(e => overlaps({...eventDraft,id:editingEvent?.id || -1},e));
   function updateProject(updated: Project) {
     const old = projects.find(p => p.id === updated.id);
     setProjects(current => current.map(p => p.id === updated.id ? updated : p));
@@ -455,33 +456,46 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     notifyChange("Receita excluída e indicadores atualizados");
   }
 
-  function addCalendarEvent(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const title = String(form.get("title") || "Novo compromisso").trim();
-    const date = String(form.get("date") || "");
-    const time = String(form.get("time") || "09:00");
-    const endTime = String(form.get("endTime") || "");
-    if (!validTimeRange(time,endTime)) { setEventError("O término precisa ser depois do início, no mesmo dia."); return; }
-    const type = String(form.get("type") || "Produção") as CalendarEvent["type"];
-    const client = String(form.get("client") || "Interno").trim();
-    if (!date) return notify("Escolha a data do compromisso");
-    const entry: CalendarEvent = { autoDeadline:editingEvent?.autoDeadline && type === "Entrega", id: editingEvent?.id || newId(), title, date, time, endTime, type, client, projectId: Number(form.get("projectId")) || undefined };
+  function saveCalendarEvent(draft:CalendarDraft) {
+    const {title,date,time,endTime,type,client,projectId}=draft;
+    if(!title.trim()||!isValidCivilDate(date)||!Number.isFinite(timeMinutes(time))||(endTime&&!validTimeRange(time,endTime))){
+      notify("Revise os dados do compromisso.");return;
+    }
+    if(editingEvent?.autoDeadline && (type!=="Entrega"||editingEvent.projectId!==projectId)){
+      notify("Um prazo automático deve continuar vinculado ao projeto original.");return;
+    }
+    const entry:CalendarEvent={
+      id:editingEvent?.id||newId(),autoDeadline:!!editingEvent?.autoDeadline&&type==="Entrega",
+      title:title.trim(),date,time,endTime,type,client,projectId,
+    };
     commitCommands([{kind:"saveEvent",event:entry}]);
-    setCalendarEvents(current => (editingEvent ? current.map(e => e.id === entry.id ? entry : e) : [...current, entry]).sort((a,b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`)));
-    if (entry.autoDeadline && entry.projectId) {
+    setCalendarEvents(current=>(editingEvent?current.map(item=>item.id===entry.id?entry:item):[...current,entry])
+      .sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time)));
+    if(entry.autoDeadline&&entry.projectId) {
       const linked=projects.find(p=>p.id===entry.projectId);
       if(linked){
         const modified:Project={...linked,dueDate:date,
-          due:new Date(`${date}T12:00:00`).toLocaleDateString("pt-BR",{day:"2-digit",month:"short"})};
+          due:new Date(date+"T12:00:00").toLocaleDateString("pt-BR",{day:"2-digit",month:"short"})};
         setProjects(current=>current.map(p=>p.id===modified.id?modified:p));
         commitCommands([{kind:"saveProject",project:modified}]);
       }
     }
-    logActivity(`Compromisso salvo: ${title}`); setEditingEvent(null);
-    setEventModalOpen(false);
+    logActivity("Compromisso salvo: "+entry.title);
+    setEditingEvent(null);setEventModalOpen(false);
+    setCalendarFocus(previous=>({date,revision:(previous?.revision||0)+1}));
     changeView("calendar");
-    notifyChange("Compromisso adicionado ao calendário");
+    notifyChange("Compromisso salvo no calendário");
+  }
+  function deleteCalendarEvent(entry:CalendarEvent) {
+    if(entry.autoDeadline) {
+      notify("Prazos automáticos são removidos ao alterar o prazo do projeto.");return;
+    }
+    if(!window.confirm("Excluir o compromisso “"+entry.title+"”?"))return;
+    commitCommands([{kind:"deleteEvent",id:entry.id}]);
+    setCalendarEvents(current=>current.filter(e=>e.id!==entry.id));
+    logActivity("Compromisso excluído: "+entry.title);
+    setEditingEvent(null);setEventModalOpen(false);
+    notifyChange("Compromisso excluído do calendário");
   }
 
   function uploadAssets(_files: FileList | null, _projectId?: number) {
@@ -623,7 +637,10 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
                   hasMore={!!clientPage?.hasMore&&!query.trim()} onMore={onMoreClients} />)}
           {view === "reviews" && (isDemo ? <StudioReviews /> : <ReviewsDashboard onStartConsumed={consumeReviewStart} clients={clientList} projects={projects} studioName={workspaceName} onLibrary={()=>changeView("library")} startClientId={reviewStart?.clientId} startProjectId={reviewStart?.projectId} />)}
           {view === "finance" && <FinancePanel entries={financeEntries} clients={clientList} onPeriodChange={onFinancePeriodChange} serverBars={financeBars} onAdd={() => openFinanceModal()} onEdit={(entry) => openFinanceModal(entry)} onDelete={setDeletingFinanceEntry} />}
-          {view === "calendar" && <CalendarView events={calendarEvents} onMonthChange={onCalendarMonthChange} onAdd={(date) => openEvent(null, date)} onEdit={(entry) => openEvent(entry)} onDelete={(entry) => { if (window.confirm(`Excluir o compromisso “${entry.title}”?`)) { commitCommands([{kind:"deleteEvent",id:entry.id}]); setCalendarEvents(current => current.filter(e => e.id !== entry.id)); logActivity(`Compromisso excluído: ${entry.title}`); } }} />}
+          {view === "calendar" && <CalendarView events={calendarEvents} projects={projects} focusDate={calendarFocus}
+            onMonthChange={onCalendarMonthChange} onAdd={date=>openEvent(null,date)}
+            onEdit={openEvent} onDelete={deleteCalendarEvent}/>}
+
           {view === "library" && <LibraryView assets={libraryAssets} query={query} onUpload={(files) => uploadAssets(files, Number(libraryProject) || undefined)} projects={projects} selectedProjectId={Number(libraryProject)||undefined} onSelectProject={setLibraryProject} />}
         </section>
       </main>
@@ -661,21 +678,11 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
           </section>
         </div>
       )}
-      {eventModalOpen && (
-        <div className="modal-backdrop" onMouseDown={() => setEventModalOpen(false)}>
-          <form key={editingEvent?.id || eventDate || "new-event"} className="project-modal calendar-event-modal" role="dialog" aria-modal="true" aria-labelledby="event-title" onSubmit={addCalendarEvent} onMouseDown={(event) => event.stopPropagation()}>
-            <div className="modal-head"><div><span>{editingEvent ? "EDITAR COMPROMISSO" : "NOVO COMPROMISSO"}</span><h2 id="event-title">{editingEvent ? "Atualize sua agenda" : "Reserve um horário"}</h2><p>Defina o intervalo de cada trabalho e visualize sua disponibilidade.</p></div><AppButton type="button" onClick={() => setEventModalOpen(false)}><X size={19} /></AppButton></div>
-            <label>Título<AppInput name="title" defaultValue={editingEvent?.title} required autoFocus placeholder="Ex.: Gravação externa — campanha verão" /></label>
-            <label>Data do trabalho<AppInput name="date" type="date" required defaultValue={eventDraft.date} onInput={e=>{const value=e.currentTarget.value;setEventDraft(d=>({...d,date:value}));setEventError("");}} /></label>
-            <div className="form-grid time-range-fields"><label>Horário de início<AppInput name="time" type="time" required defaultValue={eventDraft.time} onInput={e=>{const value=e.currentTarget.value;setEventDraft(d=>({...d,time:value}));setEventError("");}} /></label><label>Horário de término<AppInput name="endTime" type="time" required defaultValue={eventDraft.endTime} onInput={e=>{const value=e.currentTarget.value;setEventDraft(d=>({...d,endTime:value}));setEventError("");}} /></label></div>
-            {eventError && <p className="event-form-error" role="alert">{eventError}</p>}
-            {validTimeRange(eventDraft.time,eventDraft.endTime) && <div className={`event-availability ${overlappingEvents.length ? "has-overlap" : ""}`} role="status"><Clock3 size={16}/><div><b>{eventDuration(eventDraft)} de duração{overlappingEvents.length ? " · atenção ao horário" : " · horário disponível"}</b><span>{overlappingEvents.length ? `Coincide com: ${overlappingEvents.map(e=>`${e.title} (${eventRange(e)})`).join("; ")}. Você pode salvar se os trabalhos forem simultâneos.` : "Nenhum outro compromisso com duração definida neste intervalo."}</span></div></div>}
-            <div className="form-grid"><label>Tipo<AppSelect aria-label="Tipo" name="type" defaultValue={editingEvent?.type || "Produção"}><option>Produção</option><option>Entrega</option><option>Reunião</option><option>Aprovação</option></AppSelect></label><label>Cliente<AppInput name="client" defaultValue={editingEvent?.client} placeholder="Nome do cliente ou Interno" /></label></div>
-            <label>Projeto vinculado<AppSelect aria-label="Projeto vinculado" name="projectId" defaultValue={editingEvent?.projectId || selectedProject || ""}><option value="">Sem projeto</option>{projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</AppSelect></label>
-            <div className="modal-actions"><AppButton type="button" className="secondary-button" onClick={() => setEventModalOpen(false)}>Cancelar</AppButton><AppButton className="primary-button" type="submit">Salvar compromisso <CalendarDays size={16} /></AppButton></div>
-          </form>
-        </div>
-      )}
+      {eventModalOpen && <CalendarEventDialog key={editingEvent?.id||eventDate||"new-event"}
+        editing={editingEvent} date={eventDate} projects={projects} clients={clientList}
+        preferredProjectId={selectedProject} events={calendarEvents}
+        onSave={saveCalendarEvent} onCancel={()=>{setEventModalOpen(false);setEditingEvent(null);}}
+        onDelete={deleteCalendarEvent}/>}
       <nav className="mobile-bottom-nav" aria-label="Navegação no celular">
         <AppButton className={view === "overview" ? "active" : ""} aria-current={view === "overview" ? "page" : undefined} onClick={()=>changeView("overview")}><LayoutDashboard size={20}/><span>Início</span></AppButton>
         <AppButton className={view === "projects" ? "active" : ""} aria-current={view === "projects" ? "page" : undefined} onClick={()=>changeView("projects")}><Folder size={20}/><span>Projetos</span></AppButton>
@@ -711,52 +718,6 @@ function ProjectRow({ project, onOpen }: { project: Project; onOpen: () => void 
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
-}
-
-const calendarMonthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
-const weekNames = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
-
-function dateKey(year: number, month: number, day: number) {
-  const date = new Date(year, month, day);
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-}
-
-function CalendarView({ events, onAdd, onEdit, onDelete, onMonthChange }: { events: CalendarEvent[]; onAdd: (date: string) => void; onEdit: (entry: CalendarEvent) => void; onDelete: (entry: CalendarEvent) => void;onMonthChange?:(year:number,month:number)=>void }) {
-  const now = new Date();
-  const today = dateKey(now.getFullYear(), now.getMonth(), now.getDate());
-  const [cursor, setCursor] = useState(new Date(now.getFullYear(), now.getMonth(), 1));
-  const [selectedDate, setSelectedDate] = useState(today);
-  const year = cursor.getFullYear();
-  const month = cursor.getMonth();
-  useEffect(()=>onMonthChange?.(year,month),[year,month,onMonthChange]);
-  const firstWeekday = new Date(year, month, 1).getDay();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const previousDays = new Date(year, month, 0).getDate();
-  const cells = Array.from({ length: 42 }, (_, index) => {
-    const raw = index - firstWeekday + 1;
-    if (raw < 1) return { day: previousDays + raw, current: false, key: dateKey(year, month - 1, previousDays + raw) };
-    if (raw > daysInMonth) return { day: raw - daysInMonth, current: false, key: dateKey(year, month + 1, raw - daysInMonth) };
-    return { day: raw, current: true, key: dateKey(year, month, raw) };
-  });
-  const selectedEvents = events.filter((event) => event.date === selectedDate).sort((a, b) => a.time.localeCompare(b.time));
-  const upcoming = events.filter((event) => event.date >= selectedDate).sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`)).slice(0, 4);
-
-  return <div className="calendar-layout">
-    <section className="panel calendar-panel">
-      <div className="calendar-toolbar"><div><AppButton aria-label="Mês anterior" onClick={() => setCursor(new Date(year, month - 1, 1))}><ChevronLeft size={17} /></AppButton><AppButton aria-label="Próximo mês" onClick={() => setCursor(new Date(year, month + 1, 1))}><ChevronRight size={17} /></AppButton></div><h2>{calendarMonthNames[month]} <span>{year}</span></h2><AppButton className="secondary-button" onClick={() => { const current = new Date(); setCursor(new Date(current.getFullYear(), current.getMonth(), 1)); setSelectedDate(dateKey(current.getFullYear(), current.getMonth(), current.getDate())); }}>Hoje</AppButton></div>
-      <div className="calendar-week">{weekNames.map((name) => <span key={name}>{name}</span>)}</div>
-      <div className="calendar-grid">{cells.map((cell) => {
-        const dayEvents = events.filter((event) => event.date === cell.key);
-        return <AppButton key={cell.key} className={`${cell.current ? "" : "outside"} ${selectedDate === cell.key ? "selected" : ""}`} onClick={() => { setSelectedDate(cell.key); if (!cell.current) setCursor(new Date(`${cell.key}T12:00:00`)); if(dayEvents.length===0)onAdd(cell.key); }}><b>{cell.day}</b><div>{dayEvents.slice(0, 2).map((event) => <span className={`event-chip ${event.type.toLowerCase().replace("ã", "a")}`} key={event.id}><i />{event.time}{event.endTime ? `–${event.endTime}` : ""} {event.title}</span>)}{dayEvents.length > 2 && <small>+{dayEvents.length - 2} compromissos</small>}</div></AppButton>;
-      })}</div>
-    </section>
-    <aside className="panel agenda-panel">
-      <div className="panel-head"><div><span>AGENDA DO DIA</span><h2>{new Date(`${selectedDate}T12:00:00`).toLocaleDateString("pt-BR", { day: "2-digit", month: "long" })}</h2></div><AppButton aria-label="Adicionar compromisso neste dia" onClick={() => onAdd(selectedDate)}><Plus size={17} /></AppButton></div>
-      {selectedEvents.length>0&&<AppButton type="button" className="secondary-button agenda-add-another" onClick={()=>onAdd(selectedDate)}><Plus size={16} aria-hidden="true"/> Adicionar outro compromisso</AppButton>}
-       <div className="day-agenda">{selectedEvents.length ? selectedEvents.map((event) => <article key={event.id}><time><b>{event.time}</b><span>{event.endTime || "Sem término"}</span></time><div><i className={event.type.toLowerCase().replace("ã", "a")} /><b>{event.title}</b><small>{event.client} · {event.type}{eventDuration(event) ? ` · ${eventDuration(event)}` : ""}</small>{selectedEvents.some(other=>overlaps(event,other)) && <span className="overlap-label">Horário sobreposto</span>}<span className="revenue-actions"><AppButton aria-label={`Editar ${event.title}`} onClick={() => onEdit(event)}><Pencil size={15}/></AppButton><AppButton aria-label={`Excluir ${event.title}`} onClick={() => onDelete(event)}><Trash2 size={15}/></AppButton></span></div></article>) : <div className="agenda-empty"><CalendarDays size={28} /><b>Dia livre</b><span>Nenhum compromisso nesta data.</span><AppButton onClick={() => onAdd(selectedDate)}>Adicionar compromisso</AppButton></div>}</div>
-      <div className="upcoming-list"><span>PRÓXIMOS COMPROMISSOS</span>{upcoming.map((event) => <article key={event.id}><div><b>{new Date(`${event.date}T12:00:00`).getDate()}</b><small>{monthLabels[new Date(`${event.date}T12:00:00`).getMonth()]}</small></div><p><b>{event.title}</b><small>{eventRange(event)} · {event.client}</small></p></article>)}</div>
-    </aside>
-  </div>;
 }
 
 function assetIcon(kind: AssetKind) {
