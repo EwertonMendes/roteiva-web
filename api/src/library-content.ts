@@ -94,17 +94,21 @@ export async function libraryContent(request:Request,env:Env,uid:string,projectI
  const trustedImageLength=source.mimeType.startsWith('image/')&&upstream.headers.has('Content-Length')&&
   upstream.headers.get('Content-Length')===headers.get('Content-Length');
  if(/^(video|audio)\//.test(source.mimeType)||trustedImageLength){
-  // Forward verified origin streams as-is. Video remains unchanged. Small
+  // A provider may answer a full-image GET with HTTP 206 because the backend
+  // requested bytes=0-EOF. The browser requested an entire image without Range,
+  // so return HTTP 200 (and no Content-Range) to permit native image decoding
+  // and the Service Worker's bounded, private image cache. Video remains 206.
+  // Forward verified origin streams as-is. Small
   // full-image responses with a matching declared length can progressively
   // decode in <img> without exhausting the free-tier CPU budget per chunk.
   headers.set('X-Roteiva-Media-Transport','origin-pass-through');
   if(env.ENVIRONMENT==='dev')console.info(JSON.stringify({
    event:'media_proxy_headers',provider:asset.provider,
    kind:source.mimeType.startsWith('video/')?'video':source.mimeType.startsWith('audio/')?'audio':'image',
-   status:matchingFull?200:206,metadataMs,originMs,
+   status:full||matchingFull?200:206,metadataMs,originMs,
    bytes:Number(headers.get('Content-Length')),mode:'pass_through'
   }));
-  return new Response(upstream.body,{status:matchingFull?200:206,headers});
+  return new Response(upstream.body,{status:full||matchingFull?200:206,headers});
  }
  // Bounded images/PDF retain the pre-existing body length verification.
  const expected=matchingFull?Number(source.size):Number(match![2])-Number(match![1])+1;let received=0;
