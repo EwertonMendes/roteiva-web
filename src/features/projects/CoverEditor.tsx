@@ -68,7 +68,7 @@ export function CoverEditor({project,client,onClose,onSave}:{project?:Project;cl
    const blob=await response.blob();
    return blob.type.startsWith('image/')&&blob.size<=1024*1024?blob:null;
  },[getDriveThumbnail,provider,account,user]);
- useEffect(()=>{const el=dialog.current!;el.showModal();const old=document.body.style.overflow;document.body.style.overflow='hidden';return ()=>{document.body.style.overflow=old;el.close();};},[]);
+ useEffect(()=>{const el=dialog.current!;el.showModal();return ()=>{if(el.open)el.close();};},[]);
  useEffect(()=>{if(search.trim()===term)return;const timer=setTimeout(()=>{setPage({files:[],nextPageToken:null});setMoreToken('');setTerm(search.trim());},300);return ()=>clearTimeout(timer);},[search,term]);
  useEffect(()=>{
   if(!choosing||!account||!canRead||virtual&&provider==='google_drive'){setBusy(false);return;}
