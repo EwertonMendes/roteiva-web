@@ -1,5 +1,11 @@
 # Identidade visual e experiência — Roteiva
 
+## Contrato global de modais e confirmações (16/11/2026, validação DEV)
+- Qualquer modal nativo `dialog[open]`, overlay ARIA `aria-modal=true` ou backdrop legado bloqueia a rolagem do documento e da área de trabalho enquanto existir. A regra fica no estilo global `src/features/ui/modal-scroll.css` e não em overrides que dependam da página ou da ordem de fechamento.
+- Modais nativos empilham na top-layer: abrir "Novo compromisso", "Editar" ou "Excluir" a partir de "Compromissos do dia" preserva o modal anterior; fechar o filho restaura o pai, sem alterar a seleção. Escape atua apenas no diálogo superior, e handlers de focus trap antigos ignoram um diálogo superior.
+- `ConfirmationDialog` é componente reutilizável, acessível e responsivo (título, descrição, rótulos, cor de risco e operações assíncronas). As confirmações nativas de exclusão de calendário e encerramento de aprovações são substituídas por ele.
+- A tentativa de copiar um link após falha da API de clipboard seleciona o link e exibe instrução inline, sem `window.prompt`. Confirmar/cancelar nunca deve alterar dados até a confirmação real.
+
 ## Calendário 09 — refinamento visual e seletores (16/11/2026, DEV)
 - O título/subtítulo, mês, rótulos de dias, agenda lateral, estados vazios e botão Novo compromisso seguem a hierarquia/contraste do mockup. A cor de destaque é reservada à data selecionada e à ação de adicionar na agenda.
 - O formulário padroniza a linha Data, Início, Término (opcional): mesmo alinhamento de rótulo, altura e bordas. Campos usam digitação direta (DD/MM/AAAA e HH:mm) e popovers com navegação acessível, em vez do calendário/relógio nativos específicos de cada sistema operacional.

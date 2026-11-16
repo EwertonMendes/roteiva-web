@@ -105,9 +105,12 @@ export function CalendarView({events,projects,onAdd,onEdit,onDelete,onMonthChang
     setCursor(next);setSelectedDate(dateKey(next.getFullYear(),next.getMonth(),day));
     setOpenedDay(null);
   }
-  function closeAndAdd(date:string){setOpenedDay(null);onAdd(date);}
-  function closeAndEdit(item:CalendarEvent){setOpenedDay(null);onEdit(item);}
-  function closeAndDelete(item:CalendarEvent){setOpenedDay(null);onDelete(item);}
+  // Keep the day sheet mounted under the child editor/confirmation. Native
+  // dialogs are stacked by the browser's top layer; closing a child restores
+  // the day sheet and its selection without destroying state.
+  function openChildAdd(date:string){onAdd(date);}
+  function openChildEdit(item:CalendarEvent){onEdit(item);}
+  function openChildDelete(item:CalendarEvent){onDelete(item);}
   return <div className="calendar-layout roteiva-calendar">
     <section className="panel calendar-panel" aria-label="Calendário mensal">
       <div className="calendar-toolbar"><div>
@@ -153,6 +156,6 @@ export function CalendarView({events,projects,onAdd,onEdit,onDelete,onMonthChang
       </div>
     </aside>
     {openedDay&&<DayEventsDialog key={openedDay} date={openedDay} events={perDate.get(openedDay)||[]} projects={projects}
-      onClose={()=>setOpenedDay(null)} onAdd={()=>closeAndAdd(openedDay)} onEdit={closeAndEdit} onDelete={closeAndDelete}/>}
+      onClose={()=>setOpenedDay(null)} onAdd={()=>openChildAdd(openedDay)} onEdit={openChildEdit} onDelete={openChildDelete}/>}
   </div>;
 }

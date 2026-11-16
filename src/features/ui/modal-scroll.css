@@ -1,0 +1,22 @@
+/* Global modal invariant. :has() tracks actual open layers, so nested dialogs
+ * never unlock the background until the LAST modal is gone. Covers native
+ * showModal(), ARIA overlays in Drive/Dropbox/Reviews, and legacy backdrops.
+ * Keep scrolling *inside* each modal; only the document/workspace is frozen.
+ * Native dialog top-layer owns focus and Escape independently per layer. */
+:root:has(dialog[open], [aria-modal="true"], .modal-backdrop) {
+  overflow:hidden !important;
+  overscroll-behavior:none;
+}
+:root:has(dialog[open], [aria-modal="true"], .modal-backdrop) body {
+  overflow:hidden !important;
+  overscroll-behavior:none;
+}
+:root:has(dialog[open], [aria-modal="true"], .modal-backdrop) .app-shell > .main,
+:root:has(dialog[open], [aria-modal="true"], .modal-backdrop) .app-shell > .sidebar,
+:root:has(dialog[open], [aria-modal="true"], .modal-backdrop) .app-shell > .mobile-bottom-nav {
+  overflow:hidden !important;
+  overscroll-behavior:none;
+}
+dialog[open], [aria-modal="true"] {
+  overscroll-behavior:contain;
+}
