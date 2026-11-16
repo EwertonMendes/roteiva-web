@@ -67,9 +67,9 @@ export function CalendarDateField({value,onChange}:{value:string;onChange:(value
     setFocused(key);setCursor(new Date(next.getFullYear(),next.getMonth(),1,12));
     requestAnimationFrame(()=>root.current?.querySelector<HTMLButtonElement>('[data-date-key="'+key+'"]')?.focus());
   }
-  return <div className="calendar-picker" ref={root}>
+  return <div className="calendar-picker" ref={root} onKeyDown={event=>{if(open&&event.key==="Escape"){event.preventDefault();event.stopPropagation();setOpen(false);trigger.current?.focus();}}}>
     <div className="calendar-picker-control">
-      <AppInput ref={input} aria-label="Data do compromisso" inputMode="numeric" autoComplete="off"
+      <AppInput type="text" ref={input} aria-label="Data do compromisso" inputMode="numeric" autoComplete="off"
         placeholder="dd/mm/aaaa" maxLength={10} value={draft}
         onChange={event=>{
           const next=maskDate(event.target.value);
@@ -129,7 +129,7 @@ export function CalendarTimeField({value,onChange,optional=false,label}:{
   function choose(nextHour:number,nextMinute:number){
     onChange(String(nextHour).padStart(2,"0")+":"+String(nextMinute).padStart(2,"0"));
   }
-  return <div className="calendar-picker" ref={root}>
+  return <div className="calendar-picker" ref={root} onKeyDown={event=>{if(open&&event.key==="Escape"){event.preventDefault();event.stopPropagation();setOpen(false);trigger.current?.focus();}}}>
     <div className="calendar-picker-control">
       <AppInput type="text" inputMode="numeric" maxLength={5} autoComplete="off" value={value}
         aria-label={label} placeholder={optional?"Definir":"HH:mm"}
