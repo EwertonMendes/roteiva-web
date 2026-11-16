@@ -88,7 +88,7 @@ export function CalendarView({events,projects,onAdd,onEdit,onDelete,onMonthChang
     return map;
   },[events]);
   const selectedEvents=perDate.get(selectedDate)||[];
-  const upcoming=useMemo(()=>sorted(events).filter(e=>e.date>=today&&e.date>=selectedDate).slice(0,4),[events,today,selectedDate]);
+  const upcoming=useMemo(()=>sorted(events).filter(e=>e.date>=today&&e.date>=selectedDate).slice(0,50),[events,today,selectedDate]);
   function selectDate(key:string){
     setSelectedDate(key);
     const next=localDate(key);
