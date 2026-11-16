@@ -74,7 +74,7 @@ test('the playback transport exposes only friendly messages to end users',()=>{
  const app=readFileSync(new URL('../src/features/drive/authenticated-media.ts',import.meta.url),'utf8');
  assert.ok(app.includes('Não foi possível abrir este arquivo agora. Tente novamente.'));
  assert.equal(app.includes('Verifique se os Service Workers estão habilitados'),false);
- assert.ok(app.includes('mediaProtocol=4'));
+ assert.ok(app.includes('mediaProtocol=5'));
 });
 
 test('completed ranges are reused on reopen without another provider call, then cleared at logout',async()=>{
