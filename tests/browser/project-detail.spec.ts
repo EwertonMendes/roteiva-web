@@ -53,11 +53,13 @@ test('project detail: tasks, drafts, finance, agenda, materials and responsive t
   await expect(page.locator('.finance-modal input[name="projectId"]')).toHaveValue('11');
   await page.getByRole('button',{name:'Cancelar',exact:true}).click();
   await page.getByRole('button',{name:'Agendar',exact:true}).click();
-  await expect(page.locator('.calendar-event-modal input[name="projectId"]')).toHaveValue('11');
-  await page.getByRole('button',{name:'Cancelar',exact:true}).click();
+  const eventDialog=page.locator('dialog.roteiva-calendar-form');
+  await expect(eventDialog).toBeVisible();
+  await expect(eventDialog.getByRole('combobox',{name:'Projeto do compromisso'})).toContainText('Projeto atualizado');
+  await eventDialog.getByRole('button',{name:'Cancelar',exact:true}).click();
   await page.getByRole('button',{name:/Editar compromisso Entrega/}).click();
-  await expect(page.getByRole('heading',{name:'Atualize sua agenda'})).toBeVisible();
-  await page.getByRole('button',{name:'Cancelar',exact:true}).click();
+  await expect(eventDialog.getByRole('heading',{name:'Editar compromisso'})).toBeVisible();
+  await eventDialog.getByRole('button',{name:'Cancelar',exact:true}).click();
   await page.getByRole('button',{name:'Abrir Biblioteca',exact:true}).click();
   await expect(page).toHaveURL(/#\/biblioteca$/);
 });
