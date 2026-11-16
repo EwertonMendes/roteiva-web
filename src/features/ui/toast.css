@@ -1,0 +1,43 @@
+/* Global Roteiva feedback: single neutral surface, semantic colored indicator. */
+:root .rt-toast.toast {
+  position:fixed;z-index:10000;left:50%;bottom:24px;
+  transform:translateX(-50%);box-sizing:border-box;
+  width:max-content;max-width:min(480px,calc(100vw - 28px));min-height:55px;
+  display:flex;align-items:center;gap:12px;
+  padding:12px 12px 12px 16px;border:1px solid var(--line);
+  border-left:3px solid var(--toast-edge,#6c94c7);border-radius:14px;
+  background:var(--card);color:var(--ink);
+  box-shadow:0 20px 65px #0005;backdrop-filter:blur(12px);
+  font-size:var(--type-support);line-height:1.45;font-weight:550;
+  animation:rt-toast-enter .2s ease-out;
+  pointer-events:auto;
+}
+:root .rt-toast--success {--toast-edge:#5daf77;--toast-icon:#58b87a}
+:root .rt-toast--error {--toast-edge:#da6669;--toast-icon:#e0787b}
+:root .rt-toast--warning {--toast-edge:#dfaa53;--toast-icon:#d8aa60}
+:root .rt-toast--info {--toast-edge:#83a3d6;--toast-icon:#83a3d6}
+:root .rt-toast .rt-toast-icon {flex:none;color:var(--toast-icon)}
+:root .rt-toast .rt-toast-message {min-width:0;overflow-wrap:anywhere;flex:1}
+:root .rt-toast .rt-toast-close {
+  width:30px;height:30px;flex:none;display:grid;place-items:center;
+  border:1px solid transparent;border-radius:8px;
+  background:transparent;color:var(--muted);cursor:pointer;padding:0;
+}
+:root .rt-toast .rt-toast-close:hover {background:var(--subtle);color:var(--ink)}
+:root .rt-toast .rt-toast-close:focus-visible {
+  outline:2px solid var(--field-focus-border);outline-offset:2px;
+}
+@keyframes rt-toast-enter {
+  from {opacity:0;transform:translate(-50%,10px)}
+  to {opacity:1;transform:translate(-50%,0)}
+}
+@media(max-width:640px){
+  :root .rt-toast.toast {
+    bottom:calc(84px + env(safe-area-inset-bottom));
+    width:calc(100vw - 28px);max-width:none;
+    padding:12px 10px 12px 13px;border-radius:12px;
+  }
+}
+@media(prefers-reduced-motion:reduce){
+  :root .rt-toast.toast {animation:none}
+}

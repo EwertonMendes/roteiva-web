@@ -58,9 +58,6 @@ function DayEventsDialog({date,events,projects,onClose,onAdd,onEdit,onDelete}:{
         </article>;
       })}
     </div>
-    <div className="calendar-day-footer"><span>Compromissos organizados por horário de início.</span>
-      <AppButton className="secondary-button" onClick={onClose}>Fechar</AppButton>
-    </div>
   </dialog>;
 }
 

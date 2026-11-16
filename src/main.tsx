@@ -2,6 +2,7 @@ import {canonicalFrontendUrl} from './lib/canonical-frontend.ts';
 import {completeStorageOAuthPopupReturn} from './features/drive/storage-oauth-popup.ts';
 import {appEnvironment} from './lib/environment.ts';
 import {AppButton} from "./features/ui/AppButton";
+import {ToastProvider} from "./features/ui/ToastProvider";
 import React, { Component, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import DashboardClient from "./dashboard-client";
@@ -37,6 +38,7 @@ import "./features/finance/finance.css";
 import "./features/calendar/calendar.css";
 import "./features/ui/confirmation-dialog.css";
 import "./features/ui/modal-scroll.css";
+import "./features/ui/toast.css";
 
 class AppErrorBoundary extends Component<{children:ReactNode},{error:string}> {
   state={error:""};
@@ -53,8 +55,10 @@ const canonicalUrl=canonicalFrontendUrl(window.location.href,appEnvironment.appE
 if(canonicalUrl)window.location.replace(canonicalUrl);
 else if(completeStorageOAuthPopupReturn()){/* Return handled in the isolated OAuth tab. */}
 else createRoot(document.getElementById("root")!).render(<React.StrictMode>
+  <ToastProvider>
   <SiteExperience />
   <AppErrorBoundary>{isDemo ? review ? <ReviewUnavailable /> : <DashboardClient firstName="Visitante" email="demo@roteiva.local" /> :
     <AuthProvider>{publicReviewRoute ? <ReviewPortal token={publicToken||''}/> : <ProtectedRoute><RegistrationGate><AccessGate>{review ? <ReviewUnavailable /> : <DriveTransfersProvider><StorageConnectionsProvider><FirebaseWorkspace /></StorageConnectionsProvider></DriveTransfersProvider>}</AccessGate></RegistrationGate></ProtectedRoute>}</AuthProvider>}
   </AppErrorBoundary>
+  </ToastProvider>
 </React.StrictMode>);

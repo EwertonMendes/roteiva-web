@@ -70,7 +70,6 @@
   .mobile-bottom-nav button.active { color: #4b6020; background: #cfff4733; }
   [data-theme="dark"] .mobile-bottom-nav { background: rgba(18,22,15,.95); }
   [data-theme="dark"] .mobile-bottom-nav button.active { color: #d5ed9b; background: #cfff4714; }
-  .toast { bottom: calc(92px + env(safe-area-inset-bottom)); max-width: calc(100vw - 30px); font-size: var(--type-support); }
   .flow-overview { padding: 22px 20px 0; border-radius: 22px; margin-bottom: 18px; }
   .flow-overview-head { gap: 10px; }
   .flow-overview-head h2 { font-size: 21px; }

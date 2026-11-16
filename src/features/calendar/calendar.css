@@ -218,7 +218,6 @@
 .roteiva-calendar-dialog .calendar-delete-action {background:transparent;border:0;color:var(--muted);padding:8px;border-radius:10px}
 .roteiva-calendar-dialog .calendar-record-delete:hover,
 .roteiva-calendar-dialog .calendar-delete-action:hover {color:#dc6565;background:#e73e3e12}
-.roteiva-calendar-dialog .calendar-day-footer {display:flex;align-items:center;justify-content:space-between;gap:14px;color:var(--muted);font-size:var(--type-support);padding-top:20px}
 /* Event form */
 .roteiva-calendar-form {width:min(800px,calc(100vw - 36px));padding:30px 34px 24px}
 .roteiva-calendar-form .calendar-form-title {align-items:flex-start;gap:19px}
@@ -295,7 +294,6 @@
   .roteiva-calendar-dialog .calendar-record-time {grid-column:1/-1;border-right:0}
   .roteiva-calendar-dialog .calendar-record-info {grid-column:1}
   .roteiva-calendar-dialog .calendar-record-actions {grid-column:2;grid-row:2;flex-direction:column;align-self:center}
-  .roteiva-calendar-dialog .calendar-day-footer {align-items:stretch;flex-direction:column}
   .roteiva-calendar-form .calendar-form-title {gap:12px}
   .roteiva-calendar-form .calendar-form-title h2 {font-size:26px}
   .roteiva-calendar-form .calendar-form-title p {font-size:var(--type-support)}
