@@ -13,7 +13,7 @@ export function observeAccess(
   readServer:()=>Promise<AccessInfo|null>,
   onValue:(access:AccessInfo)=>void,onError:(error:Error)=>void,
 ):()=>void{
-  let active=true,generation=0,consecutiveFailures=0,unsubscribe=()=>{};
+  let active=true,generation=0,listenerVersion=0,consecutiveFailures=0,unsubscribe=()=>{};
   let reconnectTimer:ReturnType<typeof setTimeout>|null=null;
   const clearReconnect=()=>{
     if(reconnectTimer!==null){clearTimeout(reconnectTimer);reconnectTimer=null;}
@@ -38,8 +38,9 @@ export function observeAccess(
   };
   const start=()=>{
     if(!active)return;
+    const version=++listenerVersion;
     unsubscribe=subscribe(snapshot=>{
-      if(!active||snapshot.fromCache)return;
+      if(!active||version!==listenerVersion||snapshot.fromCache)return;
       if(snapshot.value){
         clearReconnect();
         consecutiveFailures=0;
@@ -47,7 +48,8 @@ export function observeAccess(
         onValue(snapshot.value);
       }else reconcile(false);
     },()=>{
-      if(!active)return;
+      if(!active||version!==listenerVersion)return;
+      ++listenerVersion; // Ignore callbacks from the terminated subscription.
       if(consecutiveFailures>=RECONNECT_DELAYS_MS.length){
         ++generation;
         unsubscribe();
@@ -62,5 +64,5 @@ export function observeAccess(
     });
   };
   start();
-  return()=>{active=false;++generation;clearReconnect();unsubscribe();};
+  return()=>{active=false;++generation;++listenerVersion;clearReconnect();unsubscribe();};
 }
