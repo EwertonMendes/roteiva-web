@@ -128,3 +128,11 @@ test('a large progressive movie must NEVER clone an unconsumed response stream',
  assert.equal(cloneAttempts,0,'never tee a large body that cannot be cached');
  assert.equal(f.requests.length,1);
 });
+
+test('Biblioteca native preview never triggers paid Stream uploads or embeds',()=>{
+ const preview=readFileSync(new URL('../src/features/drive/LibraryAssetPreview.tsx',import.meta.url),'utf8');
+ assert.equal(preview.includes('/stream'),false);
+ assert.equal(preview.includes('cloudflarestream.com'),false);
+ assert.equal(preview.includes('Preparar reprodução otimizada'),false);
+ assert.ok(preview.includes('authenticatedMedia('),'the private native media transport remains active');
+});
