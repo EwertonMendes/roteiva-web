@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {mintStreamIngestTicket,verifyStreamIngestTicket,streamPreviewEnabled} from '../src/stream-preview.ts';
 const secret=Buffer.alloc(32,5).toString('base64url');
 const env={ENVIRONMENT:'dev',STREAM_PREVIEW_ENABLED:'true',STREAM:{},TOKEN_KEYS:JSON.stringify({v1:secret}),TOKEN_KEY_VERSION:'v1'};
@@ -22,4 +23,13 @@ test('private ingest URL requires valid signed, scoped and unexpired payload',as
  await assert.rejects(verifyStreamIngestTicket(env,changed+'.'+signature));
  const expired=await mintStreamIngestTicket(env,{...claims(),e:Date.now()-1});
  await assert.rejects(verifyStreamIngestTicket(env,expired));
+});
+
+test('deployed DEV/PROD remain free-tier only: Stream disabled without billable binding',()=>{
+ const wrangler=JSON.parse(readFileSync(new URL('../wrangler.jsonc',import.meta.url),'utf8'));
+ for(const stage of ['dev','prod']){
+  assert.equal(wrangler.env[stage].vars.STREAM_PREVIEW_ENABLED,stage==='dev'?'false':undefined);
+  assert.equal(wrangler.env[stage].stream,undefined);
+ }
+ assert.equal(streamPreviewEnabled({...env,STREAM_PREVIEW_ENABLED:'false',STREAM:undefined}),false);
 });
