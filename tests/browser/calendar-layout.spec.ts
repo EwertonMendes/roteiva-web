@@ -350,3 +350,61 @@ test("legacy overlays and native AppDialog share the global scroll lock",async({
   await expect(dialog).toHaveCount(0);
   await expect(page.locator("html")).not.toHaveCSS("overflow-y","hidden");
 });
+
+
+test("modal surfaces are opaque and identical across calendar, confirmations and clients in both themes",async({page},info)=>{
+  await enterCalendar(page,"modal-surface-"+info.project.name+"@example.com");
+  const edit=page.locator("dialog.roteiva-calendar-form");
+  const day=page.locator("dialog.day-events-dialog");
+  const confirm=page.locator("dialog.rt-confirm-dialog");
+  const clientDialog=page.locator("dialog.cd-form-dialog");
+  const selected=page.locator(".roteiva-calendar .calendar-grid>button.selected");
+  const menu=page.getByRole("button",{name:"Abrir menu",exact:true});
+  async function goTo(name:RegExp){
+    if(await menu.isVisible())await menu.click();
+    await page.locator(".sidebar nav").getByRole("button",{name}).click();
+    await expect(page.locator(".studio-loading")).toHaveCount(0);
+    await expect(page.locator("[inert]")).toHaveCount(0);
+  }
+  async function colorOf(selector:string){
+    return page.locator(selector).evaluate(node=>getComputedStyle(node).backgroundColor);
+  }
+  // Create a real event so we can exercise the nested confirmation as well.
+  await page.getByRole("button",{name:"Novo compromisso",exact:true}).first().click();
+  await edit.getByLabel("Título do compromisso").fill("Superfície de modal");
+  await edit.getByRole("button",{name:"Salvar compromisso"}).click();
+  await expect(edit).toHaveCount(0);
+  await expect(selected.locator(".calendar-event-counter")).toHaveText("1");
+
+  for(const theme of ["light","dark"] as const){
+    await page.evaluate(value=>{document.documentElement.dataset.theme=value;},theme);
+    const expected=theme==="light"?"rgb(245, 245, 245)":"rgb(16, 16, 16)";
+
+    await selected.click();
+    await expect(day).toBeVisible();
+    const dayColor=await colorOf("dialog.day-events-dialog");
+    expect(dayColor).toBe(expected);
+
+    await day.getByRole("button",{name:"Novo compromisso"}).click();
+    await expect(edit).toBeVisible();
+    expect(await colorOf("dialog.roteiva-calendar-form")).toBe(expected);
+    await edit.getByRole("button",{name:"Cancelar"}).click();
+    await expect(day).toBeVisible();
+
+    await day.getByRole("button",{name:"Excluir Superfície de modal"}).click();
+    await expect(confirm).toBeVisible();
+    expect(await colorOf("dialog.rt-confirm-dialog")).toBe(expected);
+    await confirm.getByRole("button",{name:"Manter compromisso"}).click();
+    await expect(day).toBeVisible();
+    await day.getByRole("button",{name:"Fechar compromissos do dia"}).click();
+
+    await goTo(/^Clientes/);
+    await page.getByRole("button",{name:"Novo cliente"}).first().click();
+    await expect(clientDialog).toBeVisible();
+    expect(await colorOf("dialog.cd-form-dialog")).toBe(expected);
+    await clientDialog.getByRole("button",{name:"Fechar cadastro"}).click();
+    await goTo(/^Calendário/);
+    await expect(page.locator(".roteiva-calendar")).toBeVisible();
+    await expect(selected.locator(".calendar-event-counter")).toHaveText("1");
+  }
+});
