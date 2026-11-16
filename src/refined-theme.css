@@ -132,8 +132,6 @@ a { text-underline-offset: 3px; }
 :root .mobile-bottom-nav button.active { color: var(--ink); background: var(--subtle); }
 :root .mobile-bottom-nav button { font-weight: 400; }
 :root .mobile-bottom-nav button.active { font-weight: 500; }
-:root .toast { color: var(--on-accent); background: var(--accent); box-shadow: 0 8px 30px rgba(0,0,0,.12); }
-:root .toast svg { color: inherit; }
 .portal-page { font-family: Ubuntu, sans-serif; background: #121212; color: #f1f1f1; }
 .portal-page header img { filter: brightness(0) invert(1); }
 .portal-page header span { color: #aaa; }
