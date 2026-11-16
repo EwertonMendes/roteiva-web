@@ -1,5 +1,6 @@
 import {File,FileAudio,FileImage,FileText,FileVideo} from 'lucide-react';
 import {DriveThumbnail} from './DriveThumbnail';
+import {FileTypeArtwork,fileArtwork} from './FileTypeArtwork';
 import {useStorageThumbnailFetch} from './useStorageThumbnailFetch';
 import type {DriveItem} from './DriveLibraryUI';
 import type {MediaProvider} from './storage-image-cache';
@@ -22,7 +23,8 @@ export function LibraryThumbnail({node,uid}:{node:LibraryThumbnailSource;uid:str
  const mime=node.mime_type||'';
  const supported=mime.startsWith('image/')||mime.startsWith('video/')||mime==='application/pdf';
  if(node.kind!=='asset'||!node.file_id||!node.connection_id||!uid||!supported){
-  const Icon=glyph(mime);return <Icon size={23} aria-hidden="true"/>;
+  const Icon=glyph(mime);
+  return <span className="rl-file-icon" data-mime={mime} aria-hidden="true">{fileArtwork(node.name)?<FileTypeArtwork name={node.name}/>:<Icon size={23}/>}</span>;
  }
  const item:DriveItem={id:node.file_id,name:node.name,mimeType:mime,
   modifiedTime:node.source_revision,thumbnailFallback:true};
