@@ -23,7 +23,7 @@
         "DROPBOX_OAUTH_REDIRECT_URI": "https://roteiva-api-dev.roteiva-dev.workers.dev/oauth/dropbox/callback",
         "TOKEN_KEY_VERSION": "v1",
         "GOOGLE_CLIENT_ID": "479738001561-4gu97o42v4m8kiq1bga8ck3msmjp0me3.apps.googleusercontent.com",
-        "STREAM_PREVIEW_ENABLED": "true"
+        "STREAM_PREVIEW_ENABLED": "false"
       },
       "triggers": {
         "crons": [
@@ -71,10 +71,7 @@
             "period": 60
           }
         }
-      ],
-      "stream": {
-        "binding": "STREAM"
-      }
+      ]
     },
     "prod": {
       "name": "roteiva-api-prod",
