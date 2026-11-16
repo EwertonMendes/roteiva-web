@@ -167,3 +167,86 @@ test("desktop calendar fits the viewport and scrolls only upcoming events",async
     expect(measured.upcomingOverflow).toBe("auto");
   }
 });
+
+
+test("masked times, invalid dates, inline validation and label spacing on desktop/mobile",async({page},info)=>{
+  await enterCalendar(page,"calendar-validation-"+info.project.name+"@example.com");
+  await page.getByRole("button",{name:"Novo compromisso",exact:true}).first().click();
+  const form=page.locator("dialog.roteiva-calendar-form");
+  const title=form.getByRole("textbox",{name:"Título do compromisso"});
+  const date=form.getByRole("textbox",{name:"Data do compromisso"});
+  const start=form.getByRole("textbox",{name:"Início do compromisso"});
+  const end=form.getByRole("textbox",{name:"Término do compromisso"});
+  await title.fill("Teste de validação");
+
+  // Regression: raw numeric strings from phone numeric keyboards must be formatted.
+  await start.fill("");
+  await start.pressSequentially("0922");
+  await expect(start).toHaveValue("09:22");
+  await end.fill("12221");
+  await expect(end).toHaveValue("12:22");
+  await end.fill("2460");
+  await end.blur();
+  await expect(end).toHaveAttribute("aria-invalid","true");
+  await expect(form).toContainText("Horário inválido.");
+  await form.getByRole("button",{name:"Salvar compromisso"}).click();
+  await expect(form).toBeVisible();
+
+  // Cross-field check: an otherwise valid end must be strictly after start.
+  await end.fill("0810");
+  await end.blur();
+  await expect(end).toHaveValue("08:10");
+  await expect(end).toHaveAttribute("aria-invalid","true");
+  await expect(form).toContainText("O término precisa ser após o início.");
+  await end.fill("1030");
+  await end.blur();
+  await expect(end).toHaveValue("10:30");
+  await expect(end).toHaveAttribute("aria-invalid","false");
+
+  await date.fill("31/02/2026");
+  await date.blur();
+  await expect(date).toHaveAttribute("aria-invalid","true");
+  await expect(form).toContainText("Data inválida.");
+  await form.getByRole("button",{name:"Salvar compromisso"}).click();
+  await expect(form).toBeVisible();
+  await date.fill("16/12/2222");
+  await date.blur();
+  await expect(date).toHaveAttribute("aria-invalid","true");
+  await date.fill("29/02/2028");
+  await date.blur();
+  await expect(date).toHaveValue("29/02/2028");
+  await expect(date).toHaveAttribute("aria-invalid","false");
+
+  // Invalid state reserves room for feedback instead of shifting modal controls.
+  const measurements=await form.evaluate(root=>{
+    const basic=[...root.querySelectorAll(".calendar-form-basic>.calendar-basic-field")];
+    const link=root.querySelector(".calendar-link-fields>label")!;
+    function gap(el:Element,control:Element){
+      const range=document.createRange();
+      range.selectNodeContents(el.firstChild!);
+      return control.getBoundingClientRect().top-range.getBoundingClientRect().bottom;
+    }
+    const first=basic[0],second=basic[1];
+    const field=first.querySelector("input")!;
+    const secondField=second.querySelector(".calendar-field-with-icon")!;
+    const linkField=link.querySelector(".calendar-field-with-icon")!;
+    const row=[...root.querySelectorAll(".calendar-datetime-field .calendar-picker-control")];
+    return {
+      titleGap:gap(first,field),typeGap:gap(second,secondField),clientGap:gap(link,linkField),
+      startHeight:row[1].getBoundingClientRect().height,
+      endHeight:row[2].getBoundingClientRect().height,
+      dialogWidth:root.getBoundingClientRect().width,
+      viewport:window.innerWidth,
+      maxScroll:document.documentElement.scrollWidth,
+    };
+  });
+  expect(measurements.titleGap).toBeGreaterThanOrEqual(8);
+  expect(measurements.typeGap).toBeGreaterThanOrEqual(8);
+  expect(Math.abs(measurements.titleGap-measurements.clientGap)).toBeLessThan(3);
+  expect(Math.abs(measurements.typeGap-measurements.clientGap)).toBeLessThan(3);
+  expect(Math.abs(measurements.startHeight-measurements.endHeight)).toBeLessThan(2);
+  expect(measurements.dialogWidth).toBeLessThanOrEqual(measurements.viewport);
+  expect(measurements.maxScroll).toBeLessThanOrEqual(measurements.viewport+2);
+  await form.getByRole("button",{name:"Salvar compromisso"}).click();
+  await expect(form).toHaveCount(0);
+});

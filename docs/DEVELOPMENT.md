@@ -302,6 +302,12 @@ O runner Node usa `--test-force-exit` após todos os testes e hooks de cleanup: 
 
 **Limite da evidência:** emuladores não comprovam OAuth do Google em produção, duas contas Google reais, Safari/iOS ou cotas reais. Ver status/evidências no roadmap. Artefatos de QA são mantidos por sete dias no Actions. Não marcar testes planejados como executados.
 
+## Revisão final do formulário de compromissos (16/11/2026, DEV)
+- Os campos de início e término compartilham máscara `HH:mm`: digitar quatro dígitos (ex.: `0922`) apresenta `09:22`, com suporte a horas editadas e seleção pelo popup. Inputs impedem caracteres não numéricos e excesso de dígitos, mas mantêm conteúdo incompleto editável para correção.
+- Data DD/MM/AAAA e horários 00:00–23:59 expõem feedback individual com aria-invalid e aria-describedby no blur e após tentativa de salvar; fim opcional vazio permanece válido, fim menor/igual ao início exibe erro. Validação no salvamento bloqueia persistência de registros inválidos.
+- Feedback tem espaço reservado para não alterar a altura do campo/modal ao surgir em desktop ou mobile. Os dois primeiros campos de texto/select usam o mesmo grid e espaçamento label-input de Cliente/Projeto.
+- QA: `pnpm test:calendar` e E2E `tests/browser/calendar-layout.spec.ts` (máscara, entrada por teclado, datas bissextas/impossíveis, limite de ano, erro ao salvar, geometria e foco), mais checagens CI padrão.
+
 ## QA visual e de entrada do Calendário 09 (16/11/2026)
 - Playwright tests/browser/calendar-layout.spec.ts valida formulário com calendário/relógio próprios, digitação DD/MM/AAAA e HH:mm, horários com minutos exatos, alinhamento visual e ausência de submit acidental ao selecionar opções.
 - Testes geométricos em 1700×900, 1440×800 e 1280×760 verificam viewport sem scroll do documento e overflow-y auto apenas na lista de próximos compromissos; largura <1151px ou altura <720px devem permitir scroll natural.

@@ -3,6 +3,7 @@ import {CalendarDays,ChevronLeft,ChevronRight,Check,Clock3,X} from "lucide-react
 import {AppButton} from "../ui/AppButton";
 import {AppInput} from "../ui/AppInput";
 import {calendarCells,dateKey,isValidCivilDate,localDate,todayKey} from "./calendar-dates";
+import {dateInputError,maskDateText,maskTimeText,normalizeTimeText,parseDateText,timeInputError} from "./calendar-input";
 
 const MONTHS=["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 const WEEKDAYS=["D","S","T","Q","Q","S","S"];
@@ -22,18 +23,11 @@ function displayDate(iso:string){
   const [year,month,day]=iso.split("-");
   return day+"/"+month+"/"+year;
 }
-function parseDateText(value:string){
-  const parts=/^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value);
-  if(!parts)return "";
-  const iso=parts[3]+"-"+parts[2]+"-"+parts[1];
-  return isValidCivilDate(iso)?iso:"";
-}
-function maskDate(raw:string){
-  const parts=raw.replace(/\D/g,"").slice(0,8);
-  return [parts.slice(0,2),parts.slice(2,4),parts.slice(4,8)].filter(Boolean).join("/");
-}
-export function CalendarDateField({value,onChange}:{value:string;onChange:(value:string)=>void}){
+export function CalendarDateField({value,onChange,showValidation=false}:{value:string;onChange:(value:string)=>void;showValidation?:boolean}){
   const [draft,setDraft]=useState(()=>displayDate(value));
+  const [touched,setTouched]=useState(false);
+  const helpId=useId();
+  const fieldError=(touched||showValidation)?dateInputError(draft):"";
   const [open,setOpen]=useState(false);
   const [cursor,setCursor]=useState(()=>localDate(isValidCivilDate(value)?value:todayKey()));
   const root=useRef<HTMLDivElement>(null);
@@ -47,7 +41,7 @@ export function CalendarDateField({value,onChange}:{value:string;onChange:(value
   const selected=isValidCivilDate(value)?value:todayKey();
   const [focused,setFocused]=useState(selected);
   function select(key:string){
-    setDraft(displayDate(key));onChange(key);setFocused(key);setOpen(false);trigger.current?.focus();
+    setDraft(displayDate(key));onChange(key);setTouched(true);setFocused(key);setOpen(false);trigger.current?.focus();
   }
   function reveal(){
     const origin=isValidCivilDate(value)?localDate(value):localDate(todayKey());
@@ -70,17 +64,19 @@ export function CalendarDateField({value,onChange}:{value:string;onChange:(value
   return <div className="calendar-picker" ref={root} onKeyDown={event=>{if(open&&event.key==="Escape"){event.preventDefault();event.stopPropagation();setOpen(false);trigger.current?.focus();}}}>
     <div className="calendar-picker-control">
       <AppInput type="text" ref={input} aria-label="Data do compromisso" inputMode="numeric" autoComplete="off"
-        placeholder="dd/mm/aaaa" maxLength={10} value={draft}
+        placeholder="dd/mm/aaaa" maxLength={10} value={draft} invalid={!!fieldError}
+        aria-describedby={fieldError?helpId:undefined}
         onChange={event=>{
-          const next=maskDate(event.target.value);
+          const next=maskDateText(event.target.value);
           setDraft(next);onChange(parseDateText(next));
         }}
-        onBlur={()=>{if(value&&isValidCivilDate(value))setDraft(displayDate(value));}}
+        onBlur={()=>setTouched(true)}
         onKeyDown={event=>{if(event.key==="Escape"&&open){event.stopPropagation();setOpen(false);}}}/>
       <AppButton ref={trigger} type="button" className="calendar-picker-toggle"
         aria-label="Abrir calendário de data" aria-expanded={open} aria-controls={open?popupId:undefined}
         onClick={reveal}><CalendarDays size={20}/></AppButton>
     </div>
+    <span className="calendar-field-feedback" id={helpId} aria-live="polite">{fieldError}</span>
     {open&&<div id={popupId} role="dialog" aria-label="Escolher data" className="calendar-picker-popover calendar-date-popover">
       <div className="calendar-picker-top">
         <strong>{MONTHS[month]} {year}</strong>
@@ -101,24 +97,13 @@ export function CalendarDateField({value,onChange}:{value:string;onChange:(value
     </div>}
   </div>;
 }
-function normalizeTime(value:string){
-  const raw=value.trim().replace(/[hH.]/g,":");
-  if(!raw)return "";
-  let h:number,m:number;
-  if(/^\d{1,2}:\d{1,2}$/.test(raw)){
-    [h,m]=raw.split(":").map(Number);
-  }else if(/^\d{3,4}$/.test(raw)){
-    h=Number(raw.slice(0,-2));m=Number(raw.slice(-2));
-  }else if(/^\d{1,2}$/.test(raw)){
-    h=Number(raw);m=0;
-  }else return value;
-  if(h>23||m>59||h<0||m<0)return value;
-  return String(h).padStart(2,"0")+":"+String(m).padStart(2,"0");
-}
-export function CalendarTimeField({value,onChange,optional=false,label}:{
-  value:string;onChange:(value:string)=>void;optional?:boolean;label:string;
+export function CalendarTimeField({value,onChange,optional=false,label,showValidation=false,rangeError=""}:{
+  value:string;onChange:(value:string)=>void;optional?:boolean;label:string;showValidation?:boolean;rangeError?:string;
 }){
   const [open,setOpen]=useState(false);
+  const [touched,setTouched]=useState(false);
+  const helpId=useId();
+  const fieldError=(touched||showValidation)?(timeInputError(value,optional)||rangeError):"";
   const root=useRef<HTMLDivElement>(null);
   const trigger=useRef<HTMLButtonElement>(null);
   const popupId=useId();
@@ -127,20 +112,22 @@ export function CalendarTimeField({value,onChange,optional=false,label}:{
   const hour=valid?Number(value.slice(0,2)):9;
   const minute=valid?Number(value.slice(3,5)):0;
   function choose(nextHour:number,nextMinute:number){
-    onChange(String(nextHour).padStart(2,"0")+":"+String(nextMinute).padStart(2,"0"));
+    onChange(String(nextHour).padStart(2,"0")+":"+String(nextMinute).padStart(2,"0"));setTouched(true);
   }
   return <div className="calendar-picker" ref={root} onKeyDown={event=>{if(open&&event.key==="Escape"){event.preventDefault();event.stopPropagation();setOpen(false);trigger.current?.focus();}}}>
     <div className="calendar-picker-control">
       <AppInput type="text" inputMode="numeric" maxLength={5} autoComplete="off" value={value}
-        aria-label={label} placeholder={optional?"Definir":"HH:mm"}
-        onChange={event=>onChange(event.target.value)}
-        onBlur={event=>{const fixed=normalizeTime(event.target.value);if(fixed!==value)onChange(fixed);}}
+        aria-label={label} placeholder={optional?"Definir":"HH:mm"} invalid={!!fieldError}
+        aria-describedby={fieldError?helpId:undefined}
+        onChange={event=>onChange(maskTimeText(event.target.value))}
+        onBlur={event=>{setTouched(true);const fixed=normalizeTimeText(event.target.value);if(fixed!==value)onChange(fixed);}}
         onKeyDown={event=>{if(event.key==="Escape"&&open){event.stopPropagation();setOpen(false);}}}/>
       {optional&&value&&<AppButton type="button" className="calendar-picker-clear" aria-label="Limpar horário de término" title="Limpar horário" onClick={()=>onChange("")}><X size={14}/></AppButton>}
       <AppButton ref={trigger} type="button" className="calendar-picker-toggle" aria-label={"Escolher "+label.toLowerCase()}
         aria-expanded={open} aria-controls={open?popupId:undefined}
         onClick={()=>setOpen(v=>!v)}><Clock3 size={20}/></AppButton>
     </div>
+    <span className="calendar-field-feedback" id={helpId} aria-live="polite">{fieldError}</span>
     {open&&<div id={popupId} role="dialog" className="calendar-picker-popover calendar-time-popover" aria-label={"Selecionar "+label.toLowerCase()}>
       <div className="calendar-time-title"><Clock3 size={17}/><strong>Escolher horário</strong></div>
       <div className="calendar-time-columns">
