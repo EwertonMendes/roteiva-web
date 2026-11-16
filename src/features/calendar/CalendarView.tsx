@@ -98,14 +98,21 @@ export function CalendarView({events,projects,onAdd,onEdit,onDelete,onMonthChang
     if((perDate.get(key)||[]).length)setOpenedDay(key);
     else onAdd(key);
   }
+  function navigateMonth(delta:number) {
+    const next=new Date(year,month+delta,1,12);
+    const currentDay=localDate(selectedDate).getDate();
+    const day=Math.min(currentDay,new Date(next.getFullYear(),next.getMonth()+1,0,12).getDate());
+    setCursor(next);setSelectedDate(dateKey(next.getFullYear(),next.getMonth(),day));
+    setOpenedDay(null);
+  }
   function closeAndAdd(date:string){setOpenedDay(null);onAdd(date);}
   function closeAndEdit(item:CalendarEvent){setOpenedDay(null);onEdit(item);}
   function closeAndDelete(item:CalendarEvent){setOpenedDay(null);onDelete(item);}
   return <div className="calendar-layout roteiva-calendar">
     <section className="panel calendar-panel" aria-label="Calendário mensal">
       <div className="calendar-toolbar"><div>
-        <AppButton aria-label="Mês anterior" onClick={()=>setCursor(new Date(year,month-1,1,12))}><ChevronLeft size={20}/></AppButton>
-        <AppButton aria-label="Próximo mês" onClick={()=>setCursor(new Date(year,month+1,1,12))}><ChevronRight size={20}/></AppButton>
+        <AppButton aria-label="Mês anterior" onClick={()=>navigateMonth(-1)}><ChevronLeft size={20}/></AppButton>
+        <AppButton aria-label="Próximo mês" onClick={()=>navigateMonth(1)}><ChevronRight size={20}/></AppButton>
       </div><h2>{months[month]} <span>{year}</span></h2>
       <AppButton className="secondary-button" onClick={()=>{
         const now=new Date();setCursor(new Date(now.getFullYear(),now.getMonth(),1,12));setSelectedDate(dateKey(now.getFullYear(),now.getMonth(),now.getDate()));
