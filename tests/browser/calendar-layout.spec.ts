@@ -40,12 +40,17 @@ test("calendar empty day creation, optional ending, review category, editing and
   await page.getByRole("option",{name:"Revisão"}).click();
   await form.getByRole("button",{name:"Salvar compromisso"}).click();
   await expect(form).toHaveCount(0);
+  await expect(page.locator(".rt-toast--success")).toContainText("Compromisso salvo.");
+  await expect(page.locator(".toast")).toHaveCount(1);
+  await expect(page.locator(".cloud-operation")).toHaveCount(0);
   await expect(page.locator(".roteiva-calendar .calendar-grid>button.selected .calendar-event-counter")).toHaveText("1");
 
   await selected.click();
   const day=page.locator("dialog.day-events-dialog");
   await expect(day).toBeVisible();
   await expect(day.locator(".calendar-day-record")).toHaveCount(1);
+  await expect(day.locator(".calendar-day-footer")).toHaveCount(0);
+  await expect(day.getByRole("button",{name:"Fechar",exact:true})).toHaveCount(0);
   await expect(day).toContainText("Revisão");
   await expect(day).toContainText("Sem término");
   await day.getByRole("button",{name:/Editar Gravação externa/}).click();
@@ -62,7 +67,7 @@ test("calendar empty day creation, optional ending, review category, editing and
   await expect(form).toHaveCount(0);
   await expect(day).toBeVisible();
   await expect(day).toContainText("09:00 – 10:00");
-  await day.getByRole("button",{name:"Fechar",exact:true}).click();
+  await day.getByRole("button",{name:"Fechar compromissos do dia"}).click();
   // Wait for the cloud command queue; a render update is not a durable write.
   await expect(page.locator("[aria-busy]").first()).toHaveAttribute("aria-busy","false");
   await expect(page.locator(".cloud-operation")).toBeHidden();
