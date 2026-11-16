@@ -144,9 +144,9 @@ export function CalendarTimeField({value,onChange,optional=false,label}:{
     {open&&<div id={popupId} role="dialog" className="calendar-picker-popover calendar-time-popover" aria-label={"Selecionar "+label.toLowerCase()}>
       <div className="calendar-time-title"><Clock3 size={17}/><strong>Escolher horário</strong></div>
       <div className="calendar-time-columns">
-        <div><span>Hora</span><div className="calendar-time-options" role="group" aria-label="Horas">{Array.from({length:24},(_,i)=><AppButton key={i}
+        <div><span>Hora</span><div className="calendar-time-options" role="group" aria-label="Horas">{Array.from({length:24},(_,i)=><AppButton key={i} type="button"
           className={i===hour?"active":""} aria-pressed={i===hour} onClick={()=>choose(i,minute)}>{String(i).padStart(2,"0")}</AppButton>)}</div></div>
-        <div><span>Minuto</span><div className="calendar-time-options" role="group" aria-label="Minutos">{Array.from({length:12},(_,i)=>i*5).map(i=><AppButton key={i}
+        <div><span>Minuto</span><div className="calendar-time-options" role="group" aria-label="Minutos">{Array.from({length:12},(_,i)=>i*5).map(i=><AppButton key={i} type="button"
           className={i===minute?"active":""} aria-pressed={i===minute} onClick={()=>choose(hour,i)}>{String(i).padStart(2,"0")}</AppButton>)}</div></div>
       </div>
       <p>Você também pode digitar um horário exato (HH:mm).</p>
