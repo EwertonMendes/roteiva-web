@@ -2,6 +2,7 @@ import { API_BASE_URL } from "../../lib/environment.ts";
 import {AppInput} from "../ui/AppInput";
 import {AppTextarea} from "../ui/AppTextarea";
 import {AppButton} from "../ui/AppButton";
+import {ConfirmationDialog} from "../ui/ConfirmationDialog";
 import {CollectionState} from "../ui/CollectionState";
 import { AppSelect } from "../ui/AppSelect";
 import {useCallback,useEffect,useMemo,useRef,useState} from "react";
@@ -45,6 +46,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
   const [summary,setSummary]=useState<ReviewSummary>({pending:0,changes:0,approved:0});
   const [loading,setLoading]=useState(true),[working,setWorking]=useState(false),[error,setError]=useState("");
   const [opened,setOpened]=useState<Detail|null>(null);
+  const [confirmClosingReview,setConfirmClosingReview]=useState(false);
   const [composer,setComposer]=useState(false),[replacement,setReplacement]=useState<string|null>(null);
   const [composerStep,setComposerStep]=useState<"details"|"materials">("details");
   const composerBodyRef=useRef<HTMLDivElement>(null);
@@ -320,7 +322,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
   };
   const mutate=async(action:"publish"|"rotate"|"close")=>{
     if(!opened)return;
-    if(action==="close"&&!window.confirm("Encerrar esta revisão e revogar os acessos diretos concedidos aos materiais, quando aplicável?"))return;
+    if(action==="close"){setConfirmClosingReview(true);return;}
     await run(async()=>{
       if(action==="publish")await completePublication("/reviews/"+opened.review.id+"/publish");
       else await call("/reviews/"+opened.review.id+"/"+action,"POST");
@@ -328,6 +330,16 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
       else await openDetail(opened.review.id);
     });
   };
+  async function closeReviewConfirmed(){
+    if(!opened)return;
+    setWorking(true);
+    try{
+      await call("/reviews/"+opened.review.id+"/close","POST");
+      setRefresh(n=>n+1);
+      setOpened(null);
+      setConfirmClosingReview(false);
+    }finally{setWorking(false);}
+  }
   const chosenClient=clients.find(c=>c.id===clientId);
   const chosenProject=projects.find(p=>p.id===projectId);
   const reviewEmails=mode==="google"?splitEmails(recipient):[];
@@ -396,6 +408,12 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
       <AppButton type="button" className="secondary-button" disabled={!hasMore} onClick={()=>setPage(n=>n+1)}>Próxima</AppButton>
     </nav>}
 
+    {confirmClosingReview&&opened&&<ConfirmationDialog
+      title="Encerrar esta aprovação?"
+      description="A aprovação será encerrada e os acessos diretos concedidos aos materiais serão revogados quando aplicável. Essa ação não pode ser desfeita."
+      confirmLabel="Encerrar aprovação" cancelLabel="Manter aprovação"
+      onCancel={()=>setConfirmClosingReview(false)}
+      onConfirm={closeReviewConfirmed}/>}
     {opened&&!composer&&createPortal(<div className="review-modal-backdrop" ref={dialogRef} tabIndex={-1} onMouseDown={e=>{if(e.target===e.currentTarget&&!working)setOpened(null);}}>
       <section role="dialog" aria-modal="true" aria-label="Detalhes da revisão" className="review-dialog rowner-dialog">
         <ReviewOwnerWorkspace key={opened.review.id} detail={opened} working={working} error={error}
