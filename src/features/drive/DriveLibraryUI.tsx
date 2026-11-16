@@ -59,10 +59,14 @@ export function useOverlayFocus(onClose:()=>void,enabled=true,overlayKey?:string
   useEffect(()=>{
     if(!enabled)return;
     const previous=document.activeElement instanceof HTMLElement?document.activeElement:null;
-    const oldOverflow=document.body.style.overflow;
-    document.body.style.overflow="hidden";
+    // Global modal styles lock scrolling for the entire active stack.
     dialogRef.current?.focus();
     function onKeyDown(event:KeyboardEvent){
+      // A native confirmation opened on top must own Escape and focus. Never
+      // dismiss an underlying Drive/Review overlay when the child is active.
+      if(document.querySelector("dialog:modal"))return;
+      const topModal=Array.from(document.querySelectorAll('[aria-modal="true"]')).at(-1);
+      if(topModal&&!dialogRef.current?.contains(topModal))return;
       if(event.key==="Escape"){event.preventDefault();closeRef.current();return;}
       if(event.key!=="Tab")return;
       const dialog=dialogRef.current;
@@ -75,7 +79,7 @@ export function useOverlayFocus(onClose:()=>void,enabled=true,overlayKey?:string
       else if(!event.shiftKey && document.activeElement===last){event.preventDefault();first.focus();}
     }
     document.addEventListener("keydown",onKeyDown);
-    return ()=>{document.removeEventListener("keydown",onKeyDown);document.body.style.overflow=oldOverflow;previous?.focus();};
+    return ()=>{document.removeEventListener("keydown",onKeyDown);previous?.focus();};
   },[enabled,overlayKey]);
   return dialogRef;
 }
