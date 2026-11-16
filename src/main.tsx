@@ -35,6 +35,8 @@ import "./features/ui/collection-state.css";
 // Financial mockup overrides are scoped to the finance route and loaded after legacy themes.
 import "./features/finance/finance.css";
 import "./features/calendar/calendar.css";
+import "./features/ui/confirmation-dialog.css";
+import "./features/ui/modal-scroll.css";
 
 class AppErrorBoundary extends Component<{children:ReactNode},{error:string}> {
   state={error:""};
