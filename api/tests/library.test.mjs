@@ -99,3 +99,32 @@ test('adjacent private media ranges reuse a successful Firestore permission chec
   env,'media-user-unique',999100,grant,true);
  assert.equal(checks,3,'another signed token must not share the cached grant');
 });
+
+
+test('project file count includes nested active assets without pagination or trashed descendants',async t=>{
+ const f=database();t.after(f.close);
+ const env={DB:f.DB,FIREBASE_PROJECT_ID:'demo-roteiva'};
+ const alice=await libraryFor(env,'alice',30),bob=await libraryFor(env,'bob',30);
+ const folder=await (await mutateLibrary(env,alice,null,{name:'Media'})).json();
+ const nested=await (await mutateLibrary(env,alice,null,{name:'Raw',parentId:folder.id})).json();
+ const hidden=await (await mutateLibrary(env,alice,null,{name:'Trash'})).json();
+ const insert=(lib,parent,name)=>{
+  const id=crypto.randomUUID();
+  f.sql.prepare('INSERT INTO library_nodes(library_id,id,parent_id,kind,name) VALUES(?,?,?,?,?)')
+   .run(lib.id,id,parent,'asset',name);
+  return id;
+ };
+ for(let i=0;i<58;i++)insert(alice,'root','File '+i+'.mp4');
+ insert(alice,nested.id,'Nested.mp4');
+ insert(alice,hidden.id,'Trashed descendant.mp4');
+ insert(bob,'root','Private.mp4');
+ await mutateLibrary(env,alice,hidden.id,{action:'trash',revision:1});
+ const auth=async()=>Response.json({fields:{ownerUid:{stringValue:'alice'}}});
+ const request=new Request('https://example.test/library/projects/30/count',{headers:{Authorization:'Bearer alice'}});
+ const response=await libraryRouter(request,env,'alice',new URL(request.url),auth);
+ assert.equal(response.status,200);
+ assert.deepEqual(await response.json(),{count:59});
+ assert.equal(response.headers.get('Cache-Control'),'private, no-store');
+ const denied=async()=>Response.json({fields:{ownerUid:{stringValue:'bob'}}});
+ await assert.rejects(libraryRouter(request,env,'alice',new URL(request.url),denied),e=>e.code==='library_project_denied');
+});
