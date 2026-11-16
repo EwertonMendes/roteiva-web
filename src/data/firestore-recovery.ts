@@ -34,3 +34,30 @@ export async function retryFirestoreRead<T>(
   }
   throw Error("Leitura esgotada.");
 }
+
+/** Bootstrap-only recovery for a multi-tab Auth/Firestore token handoff.
+ * A permission error is NEVER treated as successful authorization: refresh the
+ * currently authenticated identity, then repeat the actual Rules-checked read.
+ * A permanent denial still terminates after two refresh attempts. Do not use
+ * for writes, which must never be repeated on uncertain outcomes.
+ */
+export async function retryVerifiedBootstrapRead<T>(
+  read:()=>Promise<T>,
+  refreshCredentials:()=>Promise<void>,
+  options:{isCurrent?:()=>boolean;denialDelaysMs?:readonly number[]}={},
+):Promise<T>{
+  const current=()=>!options.isCurrent||options.isCurrent();
+  for(let retry=0;retry<=2;retry++){
+    if(!current())throw Error("Leitura cancelada.");
+    try{return await retryFirestoreRead(read,{isCurrent:current});}
+    catch(error){
+      if(!["permission-denied","unauthenticated"].includes(firestoreCode(error))||retry===2)throw error;
+      if(!current())throw Error("Leitura cancelada.");
+      await refreshCredentials();
+      if(!current())throw Error("Leitura cancelada.");
+      const pause=options.denialDelaysMs?.[retry]??[200,500][retry];
+      if(pause>0)await new Promise<void>(resolve=>setTimeout(resolve,pause));
+    }
+  }
+  throw Error("Leitura esgotada.");
+}

@@ -1,6 +1,6 @@
 import {test} from "node:test";
 import assert from "node:assert/strict";
-import {firestoreCode,missingQueryIndex,transientFirestoreRead,retryFirestoreRead} from "../src/data/firestore-recovery.ts";
+import {firestoreCode,missingQueryIndex,transientFirestoreRead,retryFirestoreRead,retryVerifiedBootstrapRead} from "../src/data/firestore-recovery.ts";
 
 test("recognize missing indexes without retrying permanent security failures",()=>{
   assert.equal(missingQueryIndex({code:"failed-precondition",message:"The query requires an index."}),true);
@@ -30,4 +30,32 @@ test("never retry permission failures or exhausted outages indefinitely",async()
     calls++;throw {code:"unavailable"};
   },{attempts:2,delaysMs:[0]}));
   assert.equal(calls,3);
+});
+
+test("bootstrap refreshes the same identity only before retrying an actual secured read",async()=>{
+  let reads=0,refreshes=0;
+  const result=await retryVerifiedBootstrapRead(async()=>{
+    if(++reads<3)throw {code:"permission-denied"};
+    return "confirmed private records";
+  },async()=>{refreshes++;},{denialDelaysMs:[0,0]});
+  assert.equal(result,"confirmed private records");
+  assert.equal(reads,3);assert.equal(refreshes,2);
+});
+test("permanent permission denial stays denied after bounded reauthentication",async()=>{
+  let reads=0,refreshes=0;
+  await assert.rejects(()=>retryVerifiedBootstrapRead(async()=>{
+    reads++;throw {code:"permission-denied"};
+  },async()=>{refreshes++;},{denialDelaysMs:[0,0]}),e=>e.code==="permission-denied");
+  assert.equal(reads,3);assert.equal(refreshes,2);
+});
+test("bootstrap never refreshes on unrelated errors or continues after account change",async()=>{
+  let refreshed=0;
+  await assert.rejects(()=>retryVerifiedBootstrapRead(async()=>{throw {code:"failed-precondition"};},
+    async()=>{refreshed++;},{denialDelaysMs:[0,0]}),e=>e.code==="failed-precondition");
+  assert.equal(refreshed,0);
+  let active=true,reads=0;
+  await assert.rejects(()=>retryVerifiedBootstrapRead(async()=>{
+    reads++;throw {code:"permission-denied"};
+  },async()=>{active=false;refreshed++;},{isCurrent:()=>active,denialDelaysMs:[0,0]}),/Leitura cancelada/);
+  assert.equal(reads,1);assert.equal(refreshed,1);
 });
