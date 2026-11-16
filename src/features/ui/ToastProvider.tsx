@@ -1,6 +1,7 @@
 import {createContext,useCallback,useContext,useEffect,useRef,useState,type ReactNode} from "react";
 import {createPortal} from "react-dom";
 import {AlertCircle,CheckCircle2,Info,TriangleAlert,X} from "lucide-react";
+import {AppButton} from "./AppButton";
 
 export type ToastTone="success"|"error"|"warning"|"info";
 export type ToastNotify=(message:string,tone?:ToastTone)=>void;
@@ -51,8 +52,8 @@ export function ToastProvider({children}:{children:ReactNode}){
         aria-live={current.tone==="error"?"assertive":"polite"} aria-atomic="true">
         <Icon className="rt-toast-icon" size={20} aria-hidden="true"/>
         <span className="rt-toast-message">{current.message}</span>
-        <button className="rt-toast-close" type="button" aria-label="Dispensar notificação"
-          onClick={()=>setCurrent(null)}><X size={17}/></button>
+        <AppButton className="rt-toast-close" type="button" aria-label="Dispensar notificação"
+          onClick={()=>setCurrent(null)}><X size={17}/></AppButton>
       </div>,portalTarget)}
   </ToastContext.Provider>;
 }
