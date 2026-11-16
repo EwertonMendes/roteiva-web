@@ -58,7 +58,7 @@ test("calendar empty day creation, optional ending, review category, editing and
   await expect(form).toHaveCount(0);
   await selected.click();
   await expect(day).toContainText("09:00 – 10:00");
-  await day.getByRole("button",{name:"Fechar"}).click();
+  await day.getByRole("button",{name:"Fechar",exact:true}).click();
   // Wait for the cloud command queue; a render update is not a durable write.
   await expect(page.locator(".app-shell")).toHaveAttribute("aria-busy","false");
   await expect(page.locator(".cloud-operation")).toBeHidden();
