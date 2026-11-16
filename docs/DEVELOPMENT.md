@@ -302,6 +302,12 @@ O runner Node usa `--test-force-exit` após todos os testes e hooks de cleanup: 
 
 **Limite da evidência:** emuladores não comprovam OAuth do Google em produção, duas contas Google reais, Safari/iOS ou cotas reais. Ver status/evidências no roadmap. Artefatos de QA são mantidos por sete dias no Actions. Não marcar testes planejados como executados.
 
+## QA global da pilha de modais (16/11/2026)
+- `tests/browser/calendar-layout.spec.ts` cobre dia → editor → cancelar/Escape, dia → confirmação de exclusão → cancelar/confirmar, foco/rolagem com duas camadas e overlay legado de Projetos e cadastro nativo de Clientes.
+- Validar desktop e mobile em tema claro/escuro, inclusive tela que requer scroll: o overlay pode rolar internamente; `html`, `body`, `.app-shell > .main` e navegação atrás não podem rolar enquanto houver qualquer modal. Após fechar a última camada o overflow anterior volta automaticamente.
+- A regra `:has()` acompanha modais nativos e overlays ARIA presentes no DOM, sem contagem manual vulnerável a desmontagem em ordem diferente.
+- Confirmar visualmente o novo `ConfirmationDialog` em exclusão de compromisso e encerramento de revisão. Revisões continuam exigindo confirmação explícita antes da chamada à API. As regras do Firestore e PROD permanecem intocadas.
+
 ## Revisão final do formulário de compromissos (16/11/2026, DEV)
 - Os campos de início e término compartilham máscara `HH:mm`: digitar quatro dígitos (ex.: `0922`) apresenta `09:22`, com suporte a horas editadas e seleção pelo popup. Inputs impedem caracteres não numéricos e excesso de dígitos, mas mantêm conteúdo incompleto editável para correção.
 - Data DD/MM/AAAA e horários 00:00–23:59 expõem feedback individual com aria-invalid e aria-describedby no blur e após tentativa de salvar; fim opcional vazio permanece válido, fim menor/igual ao início exibe erro. Validação no salvamento bloqueia persistência de registros inválidos.
