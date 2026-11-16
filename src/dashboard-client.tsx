@@ -1,6 +1,7 @@
 import {AppInput} from "./features/ui/AppInput";
 import {AppTextarea} from "./features/ui/AppTextarea";
 import {AppButton} from "./features/ui/AppButton";
+import {useToast} from "./features/ui/ToastProvider";
 import { AppSelect } from "./features/ui/AppSelect";
 import { MoneyInput } from "./features/ui/MoneyInput";
 import {ProjectDetail} from './features/projects/ProjectDetail';
@@ -88,7 +89,7 @@ type DashboardProps = {
   initialWorkspace?: WorkspaceData; initialTheme?: "light"|"dark";
   onThemeChange?:(theme:"light"|"dark")=>void;
   onRouteChange?:(route:WorkspaceRoute)=>void;
-  onCommands?:(commands:readonly WorkspaceCommand[])=>void;
+  onCommands?:(commands:readonly WorkspaceCommand[])=>Promise<boolean>|void;
   overviewMetrics?:{clientCount?:number;receivableAmount?:number;cashBalance?:number;projectCount?:number;projectStatuses?:Record<Status,number>}; projectPage?:{total:number;hasMore:boolean;status:string};
   onMoreProjects?:()=>void;onProjectStatus?:(status:Status|"Todos")=>void;
   onSearchProjects?:()=>void; clientPage?:{total:number;recurring:number;hasMore:boolean};
@@ -101,6 +102,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
   const initialRoute=()=>routeFromLocation(window.location,routeEnvironment);
   const [initialBrowserRoute]=useState<WorkspaceRoute>(initialRoute);
   const [view, setView] = useState<View>(initialBrowserRoute.view);
+  const notify=useToast();
   const workspaceName=profile?.studioName.trim() || "Roteiva Studio";
   const [projects, setProjects] = useState(initialProjects);
   const [clientList, setClientList] = useState(initialClients);
@@ -123,7 +125,6 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
   const resetScrollAfterMobileNavigation = useRef(false);
   const [demoTheme, setDemoTheme] = useState<Theme>(()=>readStoredTheme(themeStorageKey()) ?? systemTheme());
   const theme = isDemo ? demoTheme : (initialTheme ?? "light");
-  const [toast, setToast] = useState("");
   const [reviewState, setReviewState] = useState<"pending" | "changes" | "approved">("pending");
   
   const [comments, setComments] = useState<{ name: string; initials: string; time: string; text: string; when: string }[]>([]);
@@ -143,10 +144,15 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
   const [activities, setActivities] = useState<Activity[]>([]);
   const [activityOpen, setActivityOpen] = useState(false);
 
-  function commitCommands(commands:WorkspaceCommand[]){
-    // The cloud is persisted only through explicit typed business commands.
-    // The demo retains its independent localStorage snapshot.
-    if (!isDemo && onCommands && commands.length)onCommands(commands);
+  function commitCommands(commands:WorkspaceCommand[],successMessage?:string,failureMessage="Não foi possível salvar as alterações. Confira sua conexão e tente novamente."){
+    // Only an acknowledged Firestore write may produce a success toast.
+    // The demo retains its own local snapshot and does not access Firestore.
+    if(isDemo){if(successMessage)notify(successMessage,"success");return;}
+    if(!onCommands||!commands.length)return;
+    const outcome=onCommands(commands);
+    if(!successMessage||!outcome)return;
+    void outcome.then(saved=>notify(saved?successMessage:failureMessage,saved?"success":"error"))
+      .catch(()=>notify(failureMessage,"error"));
   }
   function logActivity(text: string) {
     const activity:Activity={id:crypto.randomUUID(),text,when:new Date().toISOString()};
@@ -196,8 +202,8 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
       if(deadline)commands.push({kind:"saveEvent",event:deadline});
       else if(existing)commands.push({kind:"deleteEvent",id:existing.id});
     }
-    commitCommands(commands);
-    logActivity(`Projeto atualizado: ${updated.name}`); notifyChange("Projeto salvo");
+    commitCommands(commands,"Projeto atualizado.");
+    logActivity(`Projeto atualizado: ${updated.name}`);
   }
   function saveClientPackage(client: Client) {
     setClientList(current => current.map(c => c.id === client.id ? client : c));
@@ -211,7 +217,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
       old.delete(delivery.id);
     }
     for(const id of old.keys())commands.push({kind:"deleteDelivery",id});
-    commitCommands(commands);
+    commitCommands(commands,"Entregas do cliente atualizadas.");
     logActivity(`Entregas atualizadas: ${client.name}`);
   }
   function addLinkedRevenue(project: Project) { openFinanceModal(); setSelectedProject(project.id); }
@@ -322,13 +328,6 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     } else onThemeChange?.(next);
   }
 
-  const notify = useCallback((message: string) => {
-    setToast(message);
-    window.setTimeout(() => setToast(""), 2600);
-  }, []);
-
-  function notifyChange(message: string) { notify(isDemo ? message : "Alteração preparada · aguarde a confirmação do salvamento"); }
-
   function addProject(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -352,11 +351,10 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     if(deadline)setCalendarEvents(current=>[deadline,...current]);
     commitCommands([{kind:"saveProject",project:created},
       ...tasks.map(task=>({kind:"saveTask" as const,projectId,task})),
-      ...(deadline?[{kind:"saveEvent" as const,event:deadline}]:[])]);
+      ...(deadline?[{kind:"saveEvent" as const,event:deadline}]:[])],"Projeto criado.");
     setModalOpen(false);
     openProject(projectId);
     logActivity(`Projeto criado: ${name}`);
-    notifyChange("Projeto criado com sucesso");
   }
 
   function saveClientPhoto(id:number,photo:Client["photo"]){
@@ -364,8 +362,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     if(!client)return;
     const updated={...client,photo};
     setClientList(current=>current.map(item=>item.id===id?updated:item));
-    commitCommands([{kind:"saveClient",client:updated}]);
-    notify(photo?"Foto do cliente atualizada":"Foto do cliente removida");
+    commitCommands([{kind:"saveClient",client:updated}],photo?"Foto do cliente atualizada.":"Foto do cliente removida.");
   }
   function addClient(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -401,10 +398,9 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
       })));
     }
     if(!editingClient)onClientCreated?.(updated);
-    commitCommands(commands);
+    commitCommands(commands,"Cliente salvo.");
     setClientModalOpen(false); setEditingClient(null);
     logActivity(`Cliente ${editingClient ? "atualizado" : "cadastrado"}: ${name}`);
-    notifyChange("Cliente salvo com sucesso");
   }
 
   function addFinanceEntry(event: FormEvent<HTMLFormElement>) {
@@ -419,24 +415,24 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     const status = String(form.get("status") || "A receber") as FinanceEntry["status"];
     const dateValue = String(form.get("date") || "");
     const entryDate = dateValue ? new Date(`${dateValue}T12:00:00`) : new Date();
-    if (!Number.isFinite(entryDate.getTime()) || !Number.isFinite(amount) || amount <= 0) return notify("Informe um valor válido");
+    if (!Number.isFinite(entryDate.getTime()) || !Number.isFinite(amount) || amount <= 0) return notify("Informe um valor válido.","error");
     const projectId = Number(form.get("projectId")) || undefined;
     const kind = form.get("kind") === "expense" ? "expense" : "income";
     const updatedEntry: FinanceEntry = { projectId, kind, id: editingFinanceEntry?.id || newId(), project, client, clientId, amount, date: entryDate.toLocaleDateString("pt-BR"), status };
+    const savedMessage=editingFinanceEntry?"Lançamento atualizado.":kind==="expense"?"Custo registrado.":"Receita registrada.";
     if (editingFinanceEntry) {
       setFinanceEntries((current) => current.map((entry) => entry.id === editingFinanceEntry.id ? updatedEntry : entry));
-      commitCommands([{kind:"saveFinance",entry:updatedEntry}]);
+      commitCommands([{kind:"saveFinance",entry:updatedEntry}],savedMessage);
     } else {
       const count = Math.max(1, Math.min(24, Number(form.get("installments")) || 1));
-      if (Math.round(amount * 100) < count) return notify("Valor insuficiente para dividir em parcelas");
+      if (Math.round(amount * 100) < count) return notify("O valor não é suficiente para dividir entre as parcelas.","error");
       const parts: FinanceEntry[] = splitInstallments(amount, count, entryDate).map((part,i) => ({...updatedEntry, id: newId(), project: count > 1 ? `${project} · ${i+1}/${count}` : project, ...part, status: i === 0 ? status : "A receber"}));
       setFinanceEntries((current) => [...parts, ...current]);
-      commitCommands(parts.map(entry=>({kind:"saveFinance",entry})));
+      commitCommands(parts.map(entry=>({kind:"saveFinance",entry})),savedMessage);
     }
     logActivity(`${kind === "expense" ? "Despesa" : "Receita"} ${editingFinanceEntry ? "atualizada" : "registrada"}: ${project}`);
     setFinanceModalOpen(false);
     setEditingFinanceEntry(null);
-    notifyChange(editingFinanceEntry ? "Lançamento atualizado com sucesso" : kind === "expense" ? "Custo registrado no financeiro" : linkedClient ? `Receita vinculada a ${linkedClient.name}` : "Receita adicionada sem cliente vinculado");
   }
 
   function openFinanceModal(entry: FinanceEntry | null = null) {
@@ -451,20 +447,19 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
 
   function deleteFinanceEntry() {
     if (!deletingFinanceEntry) return;
-    commitCommands([{kind:"deleteFinance",id:deletingFinanceEntry.id}]);
+    commitCommands([{kind:"deleteFinance",id:deletingFinanceEntry.id}],"Lançamento excluído.");
     setFinanceEntries((current) => current.filter((entry) => entry.id !== deletingFinanceEntry.id));
     logActivity(`Lançamento excluído: ${deletingFinanceEntry.project}`);
     setDeletingFinanceEntry(null);
-    notifyChange("Receita excluída e indicadores atualizados");
   }
 
   function saveCalendarEvent(draft:CalendarDraft) {
     const {title,date,time,endTime,type,client,projectId}=draft;
     if(!title.trim()||!isValidCivilDate(date)||!Number.isFinite(timeMinutes(time))||(endTime&&!validTimeRange(time,endTime))){
-      notify("Revise os dados do compromisso.");return;
+      notify("Confira a data, os horários e o título do compromisso.","error");return;
     }
     if(editingEvent?.autoDeadline && (type!=="Entrega"||editingEvent.projectId!==projectId)){
-      notify("Um prazo automático deve continuar vinculado ao projeto original.");return;
+      notify("Este prazo é automático e precisa manter o tipo e o projeto originais.","warning");return;
     }
     const entry:CalendarEvent={
       id:editingEvent?.id||newId(),autoDeadline:!!editingEvent?.autoDeadline&&type==="Entrega",
@@ -482,32 +477,30 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
         commands.push({kind:"saveProject",project:modified});
       }
     }
-    commitCommands(commands); // Event and linked deadline update share one Firestore transaction.
+    commitCommands(commands,editingEvent?"Compromisso atualizado.":"Compromisso salvo.","Não foi possível salvar o compromisso. Confira sua conexão e tente novamente."); // One atomic transaction.
     logActivity("Compromisso salvo: "+entry.title);
     setEditingEvent(null);setEventModalOpen(false);
     setCalendarFocus(previous=>({date,revision:(previous?.revision||0)+1}));
     changeView("calendar");
-    notifyChange("Compromisso salvo no calendário");
   }
   function deleteCalendarEvent(entry:CalendarEvent) {
     if(entry.autoDeadline) {
-      notify("Prazos automáticos são removidos ao alterar o prazo do projeto.");return;
+      notify("Para remover um prazo automático, altere a data de entrega do projeto.","warning");return;
     }
     setDeletingCalendarEvent(entry);
   }
   function confirmDeleteCalendarEvent() {
     if(!deletingCalendarEvent)return;
     const entry=deletingCalendarEvent;
-    commitCommands([{kind:"deleteEvent",id:entry.id}]);
+    commitCommands([{kind:"deleteEvent",id:entry.id}],"Compromisso excluído.","Não foi possível excluir o compromisso. Confira sua conexão e tente novamente.");
     setCalendarEvents(current=>current.filter(e=>e.id!==entry.id));
     logActivity("Compromisso excluído: "+entry.title);
     setDeletingCalendarEvent(null);
     setEditingEvent(null);setEventModalOpen(false);
-    notifyChange("Compromisso excluído do calendário");
   }
 
   function uploadAssets(_files: FileList | null, _projectId?: number) {
-    notify("Envio de arquivos ficará disponível após a integração com Google Drive.");
+    notify("O envio de arquivos estará disponível após conectar o Google Drive.","info");
   }
 
   function applyRoute(next:WorkspaceRoute) {
@@ -704,7 +697,6 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
         <AppButton className={view === "finance" ? "active" : ""} aria-current={view === "finance" ? "page" : undefined} onClick={()=>changeView("finance")}><WalletCards size={20}/><span>Financeiro</span></AppButton>
         <AppButton className={["clients","reviews","library"].includes(view) ? "active" : ""} aria-label="Mais opções de navegação" onClick={()=>setMobileOpen(true)}><Menu size={20}/><span>Mais</span></AppButton>
       </nav>
-      {toast && <div className="toast"><Check size={16} /> {toast}</div>}
     </div>
   );
 }
