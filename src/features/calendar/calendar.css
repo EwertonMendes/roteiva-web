@@ -643,6 +643,12 @@
 .roteiva-calendar-form .calendar-time-done {gap:5px}
 
 @media (min-width:1151px) and (min-height:720px) {
+  .app-shell.app-view-calendar {
+    height:100dvh;
+    min-height:0;
+    overflow:hidden;
+    grid-template-rows:minmax(0,1fr);
+  }
   /* A full-height workspace owns the available viewport; only upcoming
      appointments scroll. Short screens and narrower layouts remain document-scrollable. */
   .app-view-calendar .main {height:100dvh;min-height:0;overflow:hidden}
