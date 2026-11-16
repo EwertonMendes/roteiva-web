@@ -1,16 +1,12 @@
 import {useEffect,useRef,useState} from 'react';
 import {AlertCircle,Expand,FileAudio,LoaderCircle,Minimize,RefreshCcw,Volume2,X} from 'lucide-react';
-import {API_BASE_URL} from '../../lib/environment';
 import {useAuth} from '../auth/AuthProvider';
 import {AppButton} from '../ui/AppButton';
 import {useOverlayFocus} from './DriveLibraryUI';
 import {authenticatedMedia} from './authenticated-media';
-import {libraryPreviewCache} from './library-preview-cache';
-import {messages} from './drive-api';
 import {ReviewPdfViewer} from '../reviews/ReviewPdfViewer';
 import {ReviewImageViewer} from '../reviews/ReviewImageViewer';
 
-const imageLimit=24*1024*1024;
 /** Image previews reuse tab-memory bytes. PDFs and video/audio stream over the
  * existing authenticated same-origin media transport, without a full PDF blob
  * download or a public provider URL.
@@ -57,48 +53,26 @@ export function LibraryAssetPreview({projectId,node,onClose}:{projectId:number;n
  };
  useEffect(()=>()=>{clearPlaybackDiagnostic();},[]);
  const [url,setURL]=useState(''),[error,setError]=useState(''),[retry,setRetry]=useState(0),[loading,setLoading]=useState(true);
+ const [imageLoaded,setImageLoaded]=useState(false);
  const mime=node.mime_type||'';
  const image=mime.startsWith('image/'),pdf=mime==='application/pdf';
  const stream=pdf||mime.startsWith('audio/')||mime.startsWith('video/');
  useEffect(()=>{
   let alive=true,release:(()=>void)|undefined;
   const controller=new AbortController();
-  setURL('');setError('');setLoading(true);setMuted(true);resumeVideoTime.current=0;
+  setURL('');setError('');setLoading(true);setImageLoaded(false);setMuted(true);resumeVideoTime.current=0;
   if(!user){setLoading(false);setError('Entre novamente no Roteiva para abrir este arquivo.');return()=>controller.abort();}
   if(!image&&!stream){setLoading(false);return()=>controller.abort();}
-  libraryPreviewCache.scope(user.uid);
-  const cacheKey=[projectId,node.id,node.revision||0,node.source_revision||'',mime].join(':');
   async function load(){
    try{
-    if(image){
-     const cached=libraryPreviewCache.get(cacheKey);
-     if(cached){if(alive)setURL(cached);return;}
-     const local=await libraryPreviewCache.image(cacheKey,async()=>{
-      const endpoint=API_BASE_URL+'/library/projects/'+projectId+'/nodes/'+node.id+'/content';
-      let response:Response|null=null;
-      for(let attempt=0;attempt<2;attempt++){
-       const token=await user!.getIdToken(attempt>0);
-       response=await fetch(endpoint,{method:'GET',headers:{Authorization:'Bearer '+token},cache:'no-store'});
-       if(response.status!==401)break;
-      }
-      if(!response?.ok){
-       const body=await response?.json().catch(()=>null) as {error?:{code?:string}}|null;
-       throw new Error(messages[body?.error?.code||'']||'Não foi possível abrir o arquivo. Confira a conexão com o provedor.');
-      }
-      const contentType=(response.headers.get('Content-Type')||'').split(';')[0].trim().toLowerCase();
-      if(!contentType.startsWith('image/'))throw new Error('O provedor respondeu com um formato de arquivo inesperado.');
-      const declared=Number(response.headers.get('Content-Length')||0);
-      if(declared>imageLimit){await response.body?.cancel();throw new Error('A imagem excede o limite de visualização.');}
-      const blob=await response.blob();
-      if(!blob.size||blob.size>imageLimit)throw new Error('A imagem retornada está vazia ou excede o limite da prévia.');
-      return blob;
-     });
-     if(alive)setURL(local);
-    }else{
-     const media=await authenticatedMedia(projectId,node.id,()=>user!.getIdToken(),[user!.uid,node.revision||0,node.source_revision||''].join('|'));
-     if(!alive){media.close();return;}
-     release=media.close;setURL(media.url);
-    }
+    // Use the same tab-bound, identity-verified transport as native video.
+    // The <img> can decode progressively; we do not wait for response.blob().
+    // Small completed image responses are reused by the SW's private memory
+    // cache on re-open, without keeping a durable copy of source bytes.
+    const media=await authenticatedMedia(projectId,node.id,()=>user!.getIdToken(),
+     [user!.uid,node.revision||0,node.source_revision||''].join('|'));
+    if(!alive){media.close();return;}
+    release=media.close;setURL(media.url);
    }catch(e){
     if(alive&&!controller.signal.aborted)setError(e instanceof Error?e.message:'Não foi possível carregar o arquivo.');
    }finally{if(alive)setLoading(false);}
@@ -110,7 +84,7 @@ export function LibraryAssetPreview({projectId,node,onClose}:{projectId:number;n
   networkRetryCount.current=0;
   return()=>{if(networkRetryTimer.current)clearTimeout(networkRetryTimer.current);networkRetryTimer.current=null;};
  },[url]);
- const fail=()=>{setURL('');setError('O navegador não conseguiu reproduzir o arquivo. Tente novamente.');};
+ const fail=()=>{setURL('');setError(image?'Não foi possível exibir a imagem. Tente novamente.':'O navegador não conseguiu reproduzir o arquivo. Tente novamente.');};
  const recoverVideo=(video:HTMLVideoElement)=>{
   // Network interruptions (MEDIA_ERR_NETWORK) can occur after the first frame.
   // Retry just once on the same authenticated URL; completed ranges remain
@@ -148,7 +122,10 @@ export function LibraryAssetPreview({projectId,node,onClose}:{projectId:number;n
      </div>:
      !url?<div className="vl-preview-state"><p>Não há prévia integrada para este formato de arquivo.</p></div>:
      pdf?<div className="vl-preview-document"><ReviewPdfViewer src={url} name={node.name}/></div>:
-     image?<ReviewImageViewer src={url} name={node.name} onError={fail}/>:
+     image?<div className="vl-preview-image-stage">
+       <ReviewImageViewer src={url} name={node.name} onLoad={()=>setImageLoaded(true)} onError={fail}/>
+       {!imageLoaded&&<span className="vl-preview-image-loading" role="status">Carregando imagem…</span>}
+      </div>:
      mime.startsWith('video/')?<div className="vl-preview-media-stage">
       <video ref={videoRef} className="vl-preview-video" src={url} controls autoPlay muted={muted}
         onTimeUpdate={event=>{resumeVideoTime.current=event.currentTarget.currentTime;}}
