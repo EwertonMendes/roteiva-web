@@ -9,14 +9,14 @@
 .vl-accounts-dialog{
  width:min(700px,100%);max-height:calc(100dvh - 28px);
  overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;
- background:var(--paper);color:var(--ink);border:1px solid var(--line);
+ background:var(--modal-surface);color:var(--ink);border:1px solid var(--line);
  border-radius:20px;box-shadow:0 28px 85px rgba(0,0,0,.4);
  scrollbar-width:thin;
 }
 .vl-accounts-header{
  position:sticky;top:0;z-index:1;display:flex;align-items:flex-start;justify-content:space-between;
  gap:16px;padding:23px 26px 18px;border-bottom:1px solid var(--line);
- background:var(--paper);
+ background:var(--modal-surface);
 }
 .vl-accounts-heading{min-width:0;flex:1}
 .vl-accounts-heading h2{font-size:21px;line-height:1.2;font-weight:700;letter-spacing:-.025em;margin:0}

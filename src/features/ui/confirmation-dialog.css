@@ -10,7 +10,7 @@
   margin:auto;
   padding:28px;
   border-radius:20px;
-  background:var(--card);
+  background:var(--modal-surface);
   color:var(--ink);
   border:1px solid var(--line);
   box-shadow:0 30px 95px #0008;

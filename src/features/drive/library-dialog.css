@@ -1,6 +1,6 @@
 /* Shared dialogs for file browsing, selection, and virtual destination moves. */
 .lib-dialog-backdrop{position:fixed;inset:0;z-index:1500;display:flex;align-items:center;justify-content:center;padding:clamp(12px,3vw,26px);background:rgba(0,0,0,.72);overscroll-behavior:contain}
-.lib-dialog{display:flex;flex-direction:column;min-height:0;width:min(100%,700px);max-height:min(88dvh,760px);border:1px solid var(--line);border-radius:18px;background:var(--paper);color:var(--ink);box-shadow:0 24px 70px rgba(0,0,0,.4);overflow:hidden}
+.lib-dialog{display:flex;flex-direction:column;min-height:0;width:min(100%,700px);max-height:min(88dvh,760px);border:1px solid var(--line);border-radius:18px;background:var(--modal-surface);color:var(--ink);box-shadow:0 24px 70px rgba(0,0,0,.4);overflow:hidden}
 .lib-dialog:focus{outline:none}
 .lib-dialog--move{width:min(100%,535px)}
 .lib-dialog-header{display:flex;gap:14px;justify-content:space-between;align-items:flex-start;padding:20px 22px 15px;border-bottom:1px solid var(--line)}
@@ -8,7 +8,7 @@
 .lib-dialog-header p{font-size:13px;line-height:1.5;color:var(--muted);margin:7px 0 0;overflow-wrap:anywhere}
 .lib-dialog .lib-icon-button{flex:0 0 40px;display:grid;place-items:center;width:40px;height:40px;border:1px solid var(--line);border-radius:10px;background:var(--subtle);color:var(--ink)}
 .lib-dialog-content{padding:17px 22px;min-height:0;overflow:auto;overscroll-behavior:contain}
-.lib-dialog-footer{display:flex;align-items:center;justify-content:flex-end;gap:9px;flex-shrink:0;padding:13px 22px;border-top:1px solid var(--line);background:var(--paper)}
+.lib-dialog-footer{display:flex;align-items:center;justify-content:flex-end;gap:9px;flex-shrink:0;padding:13px 22px;border-top:1px solid var(--line);background:var(--modal-surface)}
 .lib-dialog-footer .lib-primary-button,.lib-dialog-footer .lib-secondary-button{display:inline-flex;align-items:center;justify-content:center;min-height:42px;gap:8px;padding:10px 17px;border:1px solid var(--line);border-radius:10px;font-size:13px;font-weight:650;white-space:nowrap}
 .lib-dialog .lib-primary-button{background:var(--accent);color:var(--on-accent);border-color:transparent}
 .lib-dialog .lib-secondary-button{background:var(--subtle);color:var(--ink)}

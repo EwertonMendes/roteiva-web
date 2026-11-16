@@ -177,7 +177,7 @@
   padding:28px 32px 23px;
   border:1px solid var(--line);
   border-radius:22px;
-  background:var(--card);
+  background:var(--modal-surface);
   color:var(--ink);
   box-shadow:0 30px 110px #0008;
 }
