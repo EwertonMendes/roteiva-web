@@ -302,6 +302,11 @@ O runner Node usa `--test-force-exit` após todos os testes e hooks de cleanup: 
 
 **Limite da evidência:** emuladores não comprovam OAuth do Google em produção, duas contas Google reais, Safari/iOS ou cotas reais. Ver status/evidências no roadmap. Artefatos de QA são mantidos por sete dias no Actions. Não marcar testes planejados como executados.
 
+## QA visual e de entrada do Calendário 09 (16/11/2026)
+- Playwright tests/browser/calendar-layout.spec.ts valida formulário com calendário/relógio próprios, digitação DD/MM/AAAA e HH:mm, horários com minutos exatos, alinhamento visual e ausência de submit acidental ao selecionar opções.
+- Testes geométricos em 1700×900, 1440×800 e 1280×760 verificam viewport sem scroll do documento e overflow-y auto apenas na lista de próximos compromissos; largura <1151px ou altura <720px devem permitir scroll natural.
+- Suíte via QA regression workflow_dispatch: calendar, além dos checks comuns e Firestore. Não publicar PROD sem homologação.
+
 ## QA do Calendário 09 (16/11/2026)
 Executar pnpm test:calendar, pnpm typecheck, pnpm build e pnpm test:rules. O fluxo de navegador está em tests/browser/calendar-layout.spec.ts, com cadastro sem término, categoria Revisão, consulta/edição por dia, cancelamento, persistência após reload e geometria em light/dark desktop/mobile. O workflow qa-regression.yml aceita workflow_dispatch com suite=calendar; suite=full também o executa. Rodar no emulador antes do merge e revisar visualmente no DEV real. A alteração de firestore.rules exige confirmar publicação do workflow firebase-infra.yml em DEV além do frontend.yml; PROD não deve receber essas regras até promoção autorizada.
 
