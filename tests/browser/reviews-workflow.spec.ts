@@ -341,9 +341,12 @@ test('profissional cria, cliente comenta/pede ajustes, V2 aprovada e encerrament
   await approvedDetail.getByText('Histórico das versões anteriores').click();
   await expect(approvedDetail.getByText('Ajustar encerramento',{exact:true})).toBeVisible();
   await expect(approvedDetail.getByText('Aumentar legenda',{exact:true})).toBeVisible();
-  page.once('dialog',dialog=>dialog.accept());
   await page.getByRole('button',{name:'Encerrar revisão',exact:true}).click();
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  const closeConfirmation=page.getByRole('dialog',{name:'Encerrar esta aprovação?'});
+  await expect(closeConfirmation).toBeVisible();
+  await closeConfirmation.getByRole('button',{name:'Encerrar aprovação'}).click();
+  await expect(closeConfirmation).toHaveCount(0);
+  await expect(page.getByRole('dialog',{name:'Detalhes da revisão'})).toHaveCount(0);
   await guest.reload();await expect(guest.getByRole('heading',{name:'Material indisponível'})).toBeVisible();
   expect(thumbCalls).toBeGreaterThan(0);
   expect({createCalls,publishCalls,revisionCalls,closeCalls}).toEqual({createCalls:1,publishCalls:1,revisionCalls:1,closeCalls:1});
