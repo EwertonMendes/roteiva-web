@@ -1,5 +1,21 @@
 # Arquitetura do Roteiva — MVP SaaS
 
+> **Registro histórico (15/11/2026):** os estados de consoles e pendências abaixo foram observados nessa data. PR #125 e PR #129 foram mergeados posteriormente; DEV já contém essas alterações. A implantação em PROD depende de workflows protegidos; este documento não comprova a publicação nem a aprovação do Dropbox.
+
+## OAuth multiconta e separação — auditoria de 15/11/2026
+
+**DECISÃO MANTIDA:** identidade de login Firebase e identidade do armazenamento são independentes. Google usa unicidade `(owner_uid, google_account_id)` e Dropbox `(owner_uid, dropbox_account_id)`; operações recebem `connectionId` e conferem proprietário no servidor. Reconectar a mesma identidade atualiza somente sua conexão; não substituir outras contas do usuário. Tokens de refresh ficam cifrados no backend, com contexto de ambiente/proprietário/identidade e revisão contra concorrência. Guardas de remoção e leases de refresh permanecem; não foi necessário alterar persistência nesta auditoria.
+
+Workers ativos DEV/PROD confirmaram `VIRTUAL_LIBRARY_ENABLED=true`. Google pede `openid email drive.file`; o `drive.readonly` que permanecia apenas na declaração do console PROD foi removido. Ambos os projetos Drive estão External / Em produção, com marca verificada/publicada e dispensa de verificação de dados indicada pelo Google. Esta redução declarativa não revoga credenciais existentes nem substitui reconsentimento de grants antigos amplos; conexões incompatíveis continuam exigindo atualização explícita.
+
+Projetos Drive `roteiva-drive-dev`/`roteiva-drive-prod`, Client IDs, apps Dropbox, Workers, Firebase, D1, callbacks e credenciais são separados. As páginas institucionais compartilhadas em `roteiva.com` representam o mesmo produto e não autorizam callbacks/origens PROD no cliente DEV. Endereços legados do mesmo ambiente foram preservados. Não se rotacionam segredos nem chaves de cifra para mudar estado de publicação.
+
+Dropbox DEV/PROD permitem usuários adicionais até o limite Development, com os quatro escopos existentes. PROD foi submetido com revisão antecipada solicitada; estado real: aguardando revisão pendente de elegibilidade. DEV continua destinado à homologação. Aprovação não é presumida por envio, por branding ou pelo aumento de usuários permitidos.
+
+**PR #129 foi posteriormente integrado à `master`; no momento desta auditoria, estava apenas em DEV.** OAuth em popup mantém a árvore/projeto/pasta da aba principal; mensagem de retorno exige origem e nonce corretos, sem tokens no payload. Popup bloqueado oferece link explícito em nova aba. Modelo e testes suportam múltiplas contas, inclusive identidade Google diferente do Firebase. Na data da auditoria, o frontend PROD no SHA `985613a` conservava o fluxo anterior; conferir deploy de produção atual para confirmar a versão efetivamente publicada. Escalabilidade por cliente depende também de cotas D1/provedores e observação operacional; testes de 24 contas e concorrência não são prova de carga comercial irrestrita.
+
+Resultados e limites de homologação estão no [roadmap](MVP-ROADMAP.md#configuração-oauth-comercial--auditoria-de-15112026). Sem mudança funcional/schema neste registro, sem deploy e sem reautorização destrutiva em PROD.
+
 ## Decisão — OAuth de armazenamento e bloqueadores de popup (15/11/2026, PR #129)
 
 O frontend não faz `window.location.assign` quando a janela OAuth é bloqueada: o redirecionamento da aba principal descartava estado React da Biblioteca. A ação secundária abre explicitamente uma nova aba com o ticket de curta duração validado pelo Worker, e o usuário atualiza a lista de conexões ao retornar. No fluxo normal, popup isolado + `postMessage`/`BroadcastChannel` atualizam a conta sem remontar o workspace. Não se alteram PKCE, cookie `SameSite=Lax`, controle de UID ou armazenamento de tokens. O retorno na aba secundária pode abrir o app completo; não é evidência de autorização até `GET /integrations/{provider}` confirmar a conta. Google DEV em `Testing` mantém allowlist externa obrigatória: nenhuma regra interna do Roteiva pode suprimir `access_denied` do Google.

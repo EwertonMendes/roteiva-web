@@ -1,5 +1,7 @@
 # Roteiva
 
+**OAuth — registro comercial de 15/11/2026 (atualizado em 16/11):** Google Drive DEV/PROD foi registrado nos consoles como External / Em produção com escopos de identidade e `drive.file`; Dropbox teve pedido de revisão PROD enviado, sem aprovação confirmada nesta auditoria. A gestão multiconta do [PR #129](https://github.com/EwertonMendes/roteiva-web/pull/129) já foi integrada à `master`; a publicação efetiva em PROD deve ser confirmada no workflow protegido. A conta Drive PROD anteriormente marcada para reconsentimento exige ação explícita, sem revogação automática. Veja o [roadmap](docs/MVP-ROADMAP.md#configuração-oauth-comercial--auditoria-de-15112026). Os parágrafos anteriores que falam de PRs abertos descrevem a situação histórica de suas datas.
+
 > **Revisão editorial em desenvolvimento (PR #125):** marca oficial monocromática, dashboard compacto, correção de capas, controle de visibilidade financeira, interação direta no calendário e lente vetorial de login. O trabalho está em branch de homologação; não presumir publicação em DEV/PROD nem compatibilidade real dos provedores até os testes finais. A atualização preserva os demais fluxos aprovados.
 
 
