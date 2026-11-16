@@ -29,8 +29,9 @@ const longDate=(time:number)=>new Date(time).toLocaleString("pt-BR",{day:"2-digi
 function InfoEmpty({text}:{text:string}){return <p className="rowner-empty">{text}</p>;}
 function ShareArea({detail}:{detail:Detail}){
   const {title,url="",expiresAt}=detail.review;
-  const [copied,setCopied]=useState(false);
-  useEffect(()=>setCopied(false),[url]);
+  const [copied,setCopied]=useState(false),[copyFailed,setCopyFailed]=useState(false);
+  const copyInput=useRef<HTMLInputElement>(null);
+  useEffect(()=>{setCopied(false);setCopyFailed(false);},[url]);
   const content="Olá! Seu material está disponível para revisão: "+title+"\n"+url;
   return <section className="rowner-share" aria-label="Compartilhar aprovação">
     <div className="rowner-share-heading">
@@ -38,16 +39,17 @@ function ShareArea({detail}:{detail:Detail}){
       <small>Válido até {fmt(expiresAt)}</small>
     </div>
     <div className="rowner-share-controls">
-      <AppInput type="text" readOnly aria-label="Link da revisão" value={url} onFocus={e=>e.currentTarget.select()}/>
+      <AppInput ref={copyInput} type="text" readOnly aria-label="Link da revisão" value={url} onFocus={e=>e.currentTarget.select()}/>
       <AppButton className="rowner-share-copy" disabled={!url} onClick={async()=>{
-        try{await navigator.clipboard.writeText(url);setCopied(true);}
-        catch{window.prompt("Copie o link:",url);}
+        try{await navigator.clipboard.writeText(url);setCopied(true);setCopyFailed(false);}
+        catch{setCopyFailed(true);copyInput.current?.focus();copyInput.current?.select();}
       }}><Copy size={15}/>{copied?"Copiado!":"Copiar link"}</AppButton>
       <a href={"https://wa.me/?text="+encodeURIComponent(content)} target="_blank" rel="noopener noreferrer"
         aria-label="Compartilhar aprovação por WhatsApp">WhatsApp <ExternalLink size={14}/></a>
       <a href={"mailto:?subject="+encodeURIComponent("Material para aprovação · "+title)+"&body="+encodeURIComponent(content)}
         aria-label="Enviar aprovação por e-mail">E-mail <Send size={14}/></a>
     </div>
+    {copyFailed&&<p className="rowner-share-copy-help" role="status">Não foi possível copiar automaticamente. O link foi selecionado acima; copie usando Ctrl+C ou o menu do dispositivo.</p>}
     <details className="rowner-share-help"><summary>Como funciona o acesso?</summary>
       <p>O link permite abrir os arquivos desta revisão. Permissões preexistentes no Google Drive continuam sob controle do proprietário, mesmo após encerrar a revisão.</p>
     </details>
