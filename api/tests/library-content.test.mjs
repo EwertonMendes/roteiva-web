@@ -9,12 +9,12 @@ const conn='aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa',fileId='FILE_123456789';
 async function fixture(t){
  const env={ENVIRONMENT:'dev',TOKEN_KEY_VERSION:'v1',TOKEN_KEYS:JSON.stringify({v1:base64url(crypto.getRandomValues(new Uint8Array(32)))}),GOOGLE_CLIENT_ID:'test',GOOGLE_CLIENT_SECRET:'test'};
  const f=database({id:conn,owner_uid:'alice',google_account_id:'alice-google',status:'connected',revision:1,scopes:'https://www.googleapis.com/auth/drive.file',encrypted_refresh_token:await encrypt(env,'refresh',context(env,'alice','alice-google'))});env.DB=f.DB;t.after(f.close);
- const state={missing:false,download:true,body:'test',total:'4',streams:0,fullStatus:206,metadataReads:0};
+ const state={missing:false,download:true,body:'test',total:'4',streams:0,fullStatus:206,partialHasLength:false,metadataReads:0};
  const fetcher=async(url,options)=>{
  if(String(url).startsWith('https://oauth2.googleapis.com/token'))return Response.json({access_token:'mock',token_type:'Bearer',expires_in:3600});
  if(new URL(url).searchParams.get('alt')==='media'){
  state.streams++;assert.equal(options.redirect,'manual');assert.equal(options.headers.Range,'bytes=0-3');
- return new Response(state.body,{status:state.fullStatus,headers:state.fullStatus===200?{'Content-Length':state.total}:{'Content-Range':'bytes 0-3/'+state.total}});
+ return new Response(state.body,{status:state.fullStatus,headers:state.fullStatus===200?{'Content-Length':state.total}:{'Content-Range':'bytes 0-3/'+state.total,...(state.partialHasLength?{'Content-Length':state.total}:{})}});
  }
  state.metadataReads++;
  if(state.missing)return new Response(null,{status:404});
@@ -59,4 +59,35 @@ test('image previews accept exactly sized complete 200 responses but reject part
  );
  state.total='5';
  await assert.rejects(libraryContent(new Request('https://api.example/content'),env,'alice',17,id,fetcher),e=>e.code==='media_range_unsupported');
+});
+
+test('full images keep fresh provider authorization but forward verified image streams without JS buffering',async t=>{
+ const {env,id,fetcher,state}=await fixture(t);
+ state.fullStatus=200;
+ const priorMetadata=state.metadataReads;
+ const response=await libraryContent(new Request('https://api.example/content'),env,'alice',17,id,fetcher);
+ assert.equal(response.status,200);
+ assert.equal(response.headers.get('X-Roteiva-Media-Transport'),'origin-pass-through');
+ assert.equal(response.headers.get('Content-Type'),'image/jpeg');
+ assert.equal(response.headers.get('Content-Length'),'4');
+ assert.ok(Number.isFinite(Number(response.headers.get('X-Roteiva-Metadata-Ms'))));
+ assert.ok(Number.isFinite(Number(response.headers.get('X-Roteiva-Origin-Headers-Ms'))));
+ assert.equal(await response.text(),'test');
+ assert.equal(state.metadataReads,priorMetadata+1,'full image must check permissions again');
+ const second=await libraryContent(new Request('https://api.example/content'),env,'alice',17,id,fetcher);
+ await second.body?.cancel();
+ assert.equal(state.metadataReads,priorMetadata+2,'memory cache must not weaken API authorization on misses');
+});
+
+test('whole-image upstream 206 with valid Content-Length becomes client 200 and is cacheable',async t=>{
+ const {env,id,fetcher,state}=await fixture(t);
+ state.partialHasLength=true;
+ const response=await libraryContent(new Request('https://api.example/content'),env,'alice',17,id,fetcher);
+ assert.equal(response.status,200,'a complete image without a client Range must be HTTP 200');
+ assert.equal(response.headers.get('Content-Range'),null,'do not attach a partial Content-Range to an entire image');
+ assert.equal(response.headers.get('Content-Length'),'4');
+ assert.equal(response.headers.get('X-Roteiva-Media-Transport'),'origin-pass-through');
+ assert.equal(response.headers.get('Content-Type'),'image/jpeg');
+ assert.equal(await response.text(),'test');
+ assert.equal(state.streams,1,'full-image rendering should make only one provider content request');
 });

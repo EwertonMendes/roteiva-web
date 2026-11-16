@@ -11,10 +11,20 @@ export function assertEnvironment(env: Env): void {
   } catch { throw new ApiError(503, 'invalid_environment'); }
 }
 
-/** Durable identity is sealed during provisioning, never inferred from user data. */
-export async function assertDatabaseEnvironment(env: Env): Promise<void> {
+/** The deployment identity is immutable for the lifetime of a Worker version.
+ * On media GETs, a 30-second isolate-local memo avoids burning a D1 read on
+ * every video segment; configuration changes still revalidate after deployment.
+ */
+const deploymentMediaChecks=new Map<string,number>();
+export async function assertDatabaseEnvironment(env: Env,media=false): Promise<void> {
+  const key=env.ENVIRONMENT+'|'+env.FIREBASE_PROJECT_ID;
+  if(media&&(deploymentMediaChecks.get(key)||0)>Date.now())return;
   const identity = await env.DB.prepare('SELECT environment FROM deployment_identity WHERE singleton=1').first<{environment:string}>();
   if (identity?.environment !== env.ENVIRONMENT) throw new ApiError(503, 'invalid_database_environment');
+  if(media){
+    if(deploymentMediaChecks.size>16)deploymentMediaChecks.clear();
+    deploymentMediaChecks.set(key,Date.now()+30000);
+  }
 }
 
 export function apiOrigin(env: Env): string {

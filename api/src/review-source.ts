@@ -1,9 +1,10 @@
 import {ApiError,type Env} from './types.ts';
 import {readLibrarySource} from './library-assets.ts';
-import {revisionEndpoint,sourceRange,type SourceVersion} from './library-source.ts';
+import {revisionEndpoint,sourceRange,playbackRange,type SourceVersion} from './library-source.ts';
 import {accessCredential} from './google.ts';
 import {dropboxConnection,dropboxAccess} from './dropbox.ts';
 import {driveResourceHeaders} from './drive-resource-keys.ts';
+import {streamHeaders} from './media-fetch.ts';
 export type PublishedSource={provider:'google_drive'|'dropbox';connection_id:string;file_id:string;mime_type:string;source_revision?:string|null;source_size?:string|null};
 /** Current availability is checked, but bytes always come from the published revision. */
 export async function readPublishedSource(request:Request,env:Env,uid:string,asset:PublishedSource,probe=false,fetcher:typeof fetch=fetch):Promise<Response>{
@@ -13,11 +14,12 @@ export async function readPublishedSource(request:Request,env:Env,uid:string,ass
  const target=revisionEndpoint(source);sourceRange(null,source.size);
  const full=!probe&&!request.headers.has('Range')&&(source.mimeType.startsWith('image/')||source.mimeType==='application/pdf');
  if(full&&Number(source.size)>(source.mimeType.startsWith('image/')?24:64)*1024*1024)throw new ApiError(413,'library_preview_too_large');
- const range=probe?'bytes=0-0':full?'bytes=0-'+(Number(source.size)-1):sourceRange(request.headers.get('Range'),source.size);
+ const range=probe?'bytes=0-0':full?'bytes=0-'+(Number(source.size)-1):
+  /^(video|audio)\//.test(source.mimeType)?playbackRange(request.headers.get('Range'),source.size):sourceRange(request.headers.get('Range'),source.size);
  const token=source.provider==='google_drive'?(await accessCredential(env,{owner_uid:uid,id:asset.connection_id},fetcher)).value:
  await dropboxAccess(env,await dropboxConnection(env,uid,asset.connection_id),fetcher);
  let response:Response;
- try{response=await fetcher(target.url,{method:target.method,headers:{...target.headers,...(source.provider==='google_drive'?driveResourceHeaders(source.fileId,observed.resourceKey):{}),Authorization:'Bearer '+token,Range:range},redirect:'manual',signal:AbortSignal.timeout(24000)});}
+ try{response=await streamHeaders(fetcher,target.url,{method:target.method,headers:{...target.headers,...(source.provider==='google_drive'?driveResourceHeaders(source.fileId,observed.resourceKey):{}),Authorization:'Bearer '+token,Range:range},redirect:'manual'});}
  catch{throw new ApiError(503,'provider_temporary_failure');}
  if(!response.ok){
   const status=response.status;

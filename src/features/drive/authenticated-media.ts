@@ -3,9 +3,9 @@ import {API_BASE_URL} from '../../lib/environment';
 const WORKER_PATH='/roteiva-media-sw.js';
 // The query is a transport-protocol version, not a per-request cache buster.
 // A version change replaces an older worker under the same '/' registration.
-const WORKER_URL=WORKER_PATH+'?mediaProtocol=2';
+const WORKER_URL=WORKER_PATH+'?mediaProtocol=5';
 const PUBLIC_MEDIA_ERROR='Não foi possível abrir este arquivo agora. Tente novamente.';
-const providers=new Map<string,{getToken:()=>Promise<string>;getReviewSession?:()=>string;url:string}>();
+const providers=new Map<string,{getToken:()=>Promise<string>;getReviewSession?:()=>string;url:string;scope:string}>();
 let setup:Promise<void>|undefined;
 let listening=false;
 
@@ -13,7 +13,7 @@ function isExpectedWorker(worker:ServiceWorker|null):boolean{
  if(!worker)return false;
  try{
   const script=new URL(worker.scriptURL);
-  return script.origin===location.origin&&script.pathname===WORKER_PATH&&script.searchParams.get('mediaProtocol')==='2';
+  return script.origin===location.origin&&script.pathname===WORKER_PATH&&script.searchParams.get('mediaProtocol')==='5';
  }catch{return false;}
 }
 function controllerIsReady():boolean{
@@ -89,7 +89,7 @@ async function prepare(){
     const provider=providers.get(event.data.id),port=event.ports[0];
     if(!provider){port.postMessage({});return;}
     void provider.getToken()
-     .then(token=>port.postMessage({authorization:token?'Bearer '+token:'',reviewSession:provider.getReviewSession?.(),url:provider.url}))
+     .then(token=>port.postMessage({authorization:token?'Bearer '+token:'',reviewSession:provider.getReviewSession?.(),url:provider.url,scope:provider.scope}))
      .catch(()=>port.postMessage({}));
    });
   }
@@ -124,21 +124,31 @@ function message(data:unknown):Promise<void>{
 
 /** Warm up once, without interrupting navigation. The interactive path retries. */
 export function warmAuthenticatedMedia(){void prepare().catch(()=>{});}
-export async function authenticatedMedia(projectId:number,nodeId:string,getToken:()=>Promise<string>){
- return bindMedia(API_BASE_URL+'/library/projects/'+projectId+'/nodes/'+nodeId+'/content',getToken);
+export async function authenticatedMedia(projectId:number,nodeId:string,getToken:()=>Promise<string>,scope=''){
+ return bindMedia(API_BASE_URL+'/library/projects/'+projectId+'/nodes/'+nodeId+'/content',getToken,undefined,scope);
 }
-export async function authenticatedReviewMedia(url:string,getToken:()=>Promise<string>,getReviewSession:()=>string){
+/** Clear tab-scoped private media buffers when a user signs out or changes. */
+export function clearAuthenticatedMediaCache(){
+ if('caches' in window)for(const key of ['roteiva-private-media-v1','roteiva-private-media-v2'])void caches.delete(key).catch(()=>{});
+ if(!('serviceWorker' in navigator))return;
+ try{
+  const channel=new MessageChannel();
+  channel.port1.onmessage=()=>channel.port1.close();
+  navigator.serviceWorker.controller?.postMessage({type:'clear-media-cache'},[channel.port2]);
+ }catch{/* A missing controller has no reusable media buffers. */}
+}
+export async function authenticatedReviewMedia(url:string,getToken:()=>Promise<string>,getReviewSession:()=>string,scope=''){
  if(!url.startsWith(API_BASE_URL+'/reviews/media?ticket='))throw new Error('Endereço de mídia inválido.');
- return bindMedia(url,getToken,getReviewSession);
+ return bindMedia(url,getToken,getReviewSession,scope);
 }
-export async function authenticatedOwnerReviewMedia(reviewId:string,fileId:string,getToken:()=>Promise<string>){
- return bindMedia(API_BASE_URL+'/reviews/'+reviewId+'/content?fileId='+encodeURIComponent(fileId),getToken);
+export async function authenticatedOwnerReviewMedia(reviewId:string,fileId:string,getToken:()=>Promise<string>,scope=''){
+ return bindMedia(API_BASE_URL+'/reviews/'+reviewId+'/content?fileId='+encodeURIComponent(fileId),getToken,undefined,scope);
 }
-async function bindMedia(url:string,getToken:()=>Promise<string>,getReviewSession?:()=>string){
+async function bindMedia(url:string,getToken:()=>Promise<string>,getReviewSession?:()=>string,scope=''){
  await prepare();
  const id=crypto.randomUUID();
- providers.set(id,{getToken,url,getReviewSession});
- try{await message({type:'bind-media',id,url});}
+ providers.set(id,{getToken,url,getReviewSession,scope});
+ try{await message({type:'bind-media',id,url,scope});}
  catch(error){providers.delete(id);throw error;}
  return {url:'/__roteiva_media/'+id,close:()=>{
   providers.delete(id);void message({type:'revoke-media',id}).catch(()=>{});

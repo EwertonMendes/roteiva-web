@@ -13,6 +13,15 @@ export interface Env {
   GOOGLE_PICKER_API_KEY?: string;
   DROPBOX_ENABLED?: string;
   VIRTUAL_LIBRARY_ENABLED?: string;
+  STREAM_PREVIEW_ENABLED?: string;
+  STREAM?: {
+    upload(input:string,params?:{requireSignedURLs?:boolean;allowedOrigins?:string[];meta?:Record<string,string>}):Promise<{id:string;readyToStream:boolean;status?:{state:string};preview?:string;hlsPlaybackUrl?:string}>;
+    video(id:string):{
+      details():Promise<{id:string;readyToStream:boolean;status?:{state:string};preview?:string;hlsPlaybackUrl?:string}>;
+      generateToken():Promise<string>;
+      delete():Promise<void>;
+    };
+  };
   DROPBOX_APP_KEY?: string;
   DROPBOX_APP_SECRET?: string;
   DROPBOX_OAUTH_REDIRECT_URI?: string;

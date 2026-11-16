@@ -50,3 +50,23 @@ export function sourceRange(value:string|null,size:string,max=8*1024*1024):strin
   if(!Number.isSafeInteger(start)||!Number.isSafeInteger(end)||start>=length||end<start)throw new ApiError(416,'media_invalid_range');
   return 'bytes='+start+'-'+Math.min(end,length-1,start+max-1);
 }
+
+/** Native video/audio should obey the browser's requested byte range.
+ * The previous forced 8 MiB response boundary interrupted the open-ended
+ * fetch around 40 seconds of playback. Send bytes progressively until the
+ * browser stops reading; Cloudflare Streams do not buffer the whole file.
+ * Keep sourceRange()'s bounded behavior for images, PDFs and probes.
+ */
+export function playbackRange(value:string|null,size:string):string {
+ sourceRange(value,size); // Size, syntax and bounds validation
+ const total=Number(size);
+ if(!value)return 'bytes=0-'+(total-1);
+ const suffix=/^bytes=-(\d{1,16})$/.exec(value);
+ if(suffix){
+  const count=Number(suffix[1]);
+  return 'bytes='+Math.max(0,total-count)+'-'+(total-1);
+ }
+ const requested=/^bytes=(\d{1,16})-(\d{0,16})$/.exec(value)!;
+ const start=Number(requested[1]),end=requested[2]?Number(requested[2]):total-1;
+ return 'bytes='+start+'-'+Math.min(end,total-1);
+}

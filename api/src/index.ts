@@ -10,6 +10,7 @@ import { metadata, disconnect, about } from './drive.ts';
 import { listFolders, listFolderItems } from './folders.ts';
 import { thumbnail } from './thumbnails.ts';
 import {libraryRouter} from './library.ts';
+import {streamIngest} from './stream-preview.ts';
 import { startUpload, completeUpload, authorizeUploadFolder, cleanupUploads } from './uploads.ts';
 import { verifyPickerToken,pickerConfiguration,pickedDriveFile } from './picker.ts';
 import { deletionStatus, requestDeletion, runPendingDeletions, runDeletionMaintenance } from './account-deletion.ts';
@@ -19,6 +20,20 @@ import { backfillAccess } from './access-backfill.ts';
 import {dropboxEnabled,dropboxStart,dropboxLaunch,dropboxCallback,dropboxConnections,dropboxList,dropboxMetadata,dropboxRevoke,dropboxThumbnail} from './dropbox.ts';
 import {startDropboxUpload,appendDropboxUpload,finishDropboxUpload,cleanupDropboxUploads} from './dropbox-uploads.ts';
 import {issueDropboxPreview,streamDropboxPreview} from './dropbox-preview.ts';
+// A media player can request several chunks within seconds. Access checks
+// remain mandatory on cache misses and non-media routes, but successful grants
+// are reused very briefly for the same environment and signed-in owner.
+// Account revocation may take at most 15 seconds to become visible to a player.
+const mediaAccessChecks=new Map<string,number>();
+async function requireLibraryAccess(env:Env,uid:string,streaming:boolean){
+ const key=env.ENVIRONMENT+'|'+uid;
+ if(streaming&&(mediaAccessChecks.get(key)||0)>Date.now())return;
+ await assertActiveAccess(env,uid);
+ if(streaming){
+  if(mediaAccessChecks.size>=256)mediaAccessChecks.clear();
+  mediaAccessChecks.set(key,Date.now()+15000);
+ }
+}
 /** Route categories are intentionally static: never log tokens, file IDs or URL params. */
 function mediaRoute(path:string){return path.endsWith('/thumbnail')||path.endsWith('/cover')||path==='/reviews/media'||path==='/integrations/dropbox/media'||/^\/(library\/projects\/[0-9]+\/nodes\/[0-9a-f-]{36}|reviews\/[0-9a-f-]{36})\/content$/.test(path);}
 function libraryBatchRoute(path:string){return /^\/library\/projects\/[0-9]+\/(imports|inspect|structure|uploads\/destination)$/.test(path);}
@@ -49,7 +64,7 @@ export async function handle(request: Request, env: Env): Promise<Response> {
     if (request.method !== 'OPTIONS') {
       const limiter=mediaRoute(url.pathname) ? env.API_THUMB_LIMIT : libraryBatchRoute(url.pathname)?env.API_UPLOAD_LIMIT:env.API_RATE_LIMIT;
       if (!(await limiter.limit({key:env.ENVIRONMENT+':ip:'+sourceIp.slice(0,64)})).success) throw new ApiError(429,'rate_limited');
-      await assertDatabaseEnvironment(env);
+      await assertDatabaseEnvironment(env,mediaRoute(url.pathname));
     }
     if (request.method === 'OPTIONS') {
       if (!origin) throw new ApiError(403,'origin_required');
@@ -81,10 +96,14 @@ export async function handle(request: Request, env: Env): Promise<Response> {
       const principal=await verifiedTrialPrincipal(request,env);
       if(!(await env.API_RATE_LIMIT.limit({key:env.ENVIRONMENT+':access:'+principal.uid})).success)throw new ApiError(429,'rate_limited');
       response=await ensureAccess(env,principal.uid,undefined,principal);
+    } else if (/^\/stream\/ingest\/[-_A-Za-z0-9.]+$/.test(url.pathname)) {
+      // Signed ingest requests come from the Stream transcoder, not a browser.
+      // Do not require a Firebase token for this narrowly scoped temporary URL.
+      response=await streamIngest(request,env,url.pathname.slice('/stream/ingest/'.length));
     } else if (url.pathname.startsWith('/library/')) {
       if(env.VIRTUAL_LIBRARY_ENABLED!=='true')throw new ApiError(404,'not_found');
       if(request.method==='POST'&&!allowedFrontend(env,origin))throw new ApiError(403,'origin_required');
-      const uid=await identity(request,env);await assertActiveAccess(env,uid);
+      const uid=await identity(request,env);await requireLibraryAccess(env,uid,mediaRoute(url.pathname));
       response=await libraryRouter(request,env,uid,url);
     } else if (url.pathname === '/reviews' || url.pathname.startsWith('/reviews/')) {
       if (request.method === 'POST' && !allowedFrontend(env,origin)) throw new ApiError(403,'origin_required');

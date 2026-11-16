@@ -8,14 +8,14 @@ const origin='https://roteiva.com',id='aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa';
 test('media worker origin allowlist matches the environment contract',()=>{
  for(const env of Object.values(environments))assert.ok(source.includes(env.apiOrigin));
 });
-function fixture(){
- const events={},requests=[],state={claims:0};
+function fixture(fetchImpl){
+ const events={},requests=[],state={claims:0,tasks:[]};
  const client={id:'alice-tab',url:origin+'/biblioteca',sourceURL:undefined,reviewSession:undefined,postMessage(data,ports){ports[0].postMessage({authorization:'Bearer synthetic-identity',reviewSession:this.reviewSession,url:this.sourceURL});ports[0].close();}};
  const self={location:{origin},addEventListener:(kind,handler)=>events[kind]=handler,clients:{get:async key=>key===client.id?client:null,claim:async()=>{state.claims++;}},skipWaiting:async()=>{}};
- vm.runInNewContext(source,{self,URL,Response,Headers,Map,Set,Date,MessageChannel,setTimeout,clearTimeout,AbortSignal,
- fetch:async(url,options)=>{requests.push({url,options});return new Response('test',{status:206,headers:{'Content-Range':'bytes 0-3/4'}});}});
+ vm.runInNewContext(source,{self,URL,Response,Headers,Map,Set,Date,MessageChannel,setTimeout,clearTimeout,AbortSignal,AbortController,
+ fetch:async(url,options)=>{requests.push({url,options});return fetchImpl?fetchImpl(url,options):new Response('test',{status:206,headers:{'Content-Range':'bytes 0-3/4','Content-Length':'4'}});}});
  const bind=(data,who=client)=>{let ack;events.message({source:who,data,ports:[{postMessage:value=>ack=value}]});return ack;};
- const read=async(who='alice-tab',options={})=>{let pending;events.fetch({clientId:who,request:{url:origin+'/__roteiva_media/'+id,method:'GET',mode:'cors',headers:new Headers({Range:'bytes=0-3'}),...options},respondWith:p=>pending=p});return pending;};
+ const read=async(who='alice-tab',options={})=>{let pending;events.fetch({clientId:who,request:{url:origin+'/__roteiva_media/'+id,method:'GET',mode:'cors',headers:new Headers({Range:'bytes=0-3'}),...options},respondWith:p=>pending=p,waitUntil:p=>state.tasks.push(p)});return pending;};
  return {events,requests,bind,read,client,state};
 }
 test('media streaming forwards range and identity only for the binding tab',async()=>{
@@ -74,5 +74,115 @@ test('the playback transport exposes only friendly messages to end users',()=>{
  const app=readFileSync(new URL('../src/features/drive/authenticated-media.ts',import.meta.url),'utf8');
  assert.ok(app.includes('Não foi possível abrir este arquivo agora. Tente novamente.'));
  assert.equal(app.includes('Verifique se os Service Workers estão habilitados'),false);
- assert.ok(app.includes('mediaProtocol=2'));
+ assert.ok(app.includes('mediaProtocol=5'));
+});
+
+test('completed ranges are reused on reopen without another provider call, then cleared at logout',async()=>{
+ const f=fixture(),url='https://api.roteiva.com/library/projects/17/nodes/'+id+'/content';
+ const first='bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb';
+ assert.equal(f.bind({type:'bind-media',id,url,scope:'uid-alice'}).ok,true);
+ const original=await f.read();assert.equal(original.status,206);assert.equal(await original.text(),'test');
+ await Promise.all(f.state.tasks);
+ assert.equal(f.requests.length,1);
+ // Closing a modal revokes only its binding, not the short-lived private chunks.
+ f.bind({type:'revoke-media',id});
+ assert.equal(f.bind({type:'bind-media',id,url,scope:'uid-alice'}).ok,true);
+ const cached=await f.read();assert.equal(cached.status,206);assert.equal(await cached.text(),'test');
+ assert.equal(f.requests.length,1,'a replayed range should not repeat the network request');
+ assert.equal(f.bind({type:'clear-media-cache'}).ok,true);
+ const again=await f.read();assert.equal(await again.text(),'test');
+ assert.equal(f.requests.length,2,'logout must force a fresh download');
+ await Promise.all(f.state.tasks);
+});
+
+test('in-memory chunks never cross client IDs or account scopes',async()=>{
+ const f=fixture(),url='https://api.roteiva.com/library/projects/17/nodes/'+id+'/content';
+ f.bind({type:'bind-media',id,url,scope:'first-owner'});
+ assert.equal(await (await f.read()).text(),'test');await Promise.all(f.state.tasks);
+ f.bind({type:'revoke-media',id});f.bind({type:'bind-media',id,url,scope:'other-owner'});
+ assert.equal(await (await f.read()).text(),'test');
+ assert.equal(f.requests.length,2,'a different signed-in owner must not receive cached bytes');
+ assert.equal((await f.read('other-tab')).status,403);
+});
+
+test('a large progressive movie must NEVER clone an unconsumed response stream',async()=>{
+ // An unconsumed clone is an unbounded tee branch and can OOM an idle worker.
+ // Test the actual fetch handler, not merely a source-code string.
+ const large=16*1024*1024,first=8*1024*1024;
+ let cloneAttempts=0;
+ const f=fixture(async()=>{
+  const response=new Response(new ReadableStream({
+   start(controller){controller.enqueue(new TextEncoder().encode('streamed'));controller.close();}
+  }),{status:206,headers:{
+   'Content-Length':String(large),
+   'Content-Range':'bytes '+first+'-'+(first+large-1)+'/'+(first+large)
+  }});
+  response.clone=()=>{cloneAttempts++;throw new Error('large stream was cloned');};
+  return response;
+ });
+ const url='https://api.roteiva.com/library/projects/17/nodes/'+id+'/content';
+ assert.equal(f.bind({type:'bind-media',id,url,scope:'alice'}).ok,true);
+ const response=await f.read();
+ assert.equal(response.status,206);
+ assert.equal(await response.text(),'streamed');
+ assert.equal(cloneAttempts,0,'never tee a large body that cannot be cached');
+ assert.equal(f.requests.length,1);
+});
+
+test('Biblioteca native preview never triggers paid Stream uploads or embeds',()=>{
+ const preview=readFileSync(new URL('../src/features/drive/LibraryAssetPreview.tsx',import.meta.url),'utf8');
+ assert.equal(preview.includes('/stream'),false);
+ assert.equal(preview.includes('cloudflarestream.com'),false);
+ assert.equal(preview.includes('Preparar reprodução otimizada'),false);
+ assert.ok(preview.includes('authenticatedMedia('),'the private native media transport remains active');
+});
+
+test('small original images stream via the authorized tab and reopen from private memory only',async()=>{
+ let upstreamReads=0;
+ const pixels=new Uint8Array([137,80,78,71,13,10,26,10]);
+ const f=fixture(async()=>{
+  upstreamReads++;
+  return new Response(pixels,{status:200,headers:{'Content-Type':'image/png','Content-Length':String(pixels.byteLength)}});
+ });
+ const url='https://api.roteiva.com/library/projects/17/nodes/'+id+'/content';
+ assert.equal(f.bind({type:'bind-media',id,url,scope:'userA|rev1'}).ok,true);
+ const noRange={headers:new Headers()};
+ const first=await f.read('alice-tab',noRange);
+ assert.equal(first.status,200);
+ assert.deepEqual(new Uint8Array(await first.arrayBuffer()),pixels);
+ await Promise.all(f.state.tasks);
+ assert.equal(upstreamReads,1);
+ f.bind({type:'revoke-media',id});
+ assert.equal(f.bind({type:'bind-media',id,url,scope:'userA|rev1'}).ok,true);
+ const reused=await f.read('alice-tab',noRange);
+ assert.equal(reused.status,200,'original images must never be mislabeled 206');
+ assert.deepEqual(new Uint8Array(await reused.arrayBuffer()),pixels);
+ assert.equal(upstreamReads,1,'reopening a small image must avoid a second provider read');
+ f.bind({type:'revoke-media',id});
+ assert.equal(f.bind({type:'bind-media',id,url,scope:'userB|rev1'}).ok,true);
+ await (await f.read('alice-tab',noRange)).arrayBuffer();
+ assert.equal(upstreamReads,2,'a different user scope must not receive prior private bytes');
+ assert.equal(f.bind({type:'clear-media-cache'}).ok,true);
+ await (await f.read('alice-tab',noRange)).arrayBuffer();
+ assert.equal(upstreamReads,3,'session cleanup must invalidate the private memory image');
+});
+
+test('non-image 200 and oversized images are never cloned or cached',async()=>{
+ let clones=0,requests=0;
+ const huge=new Uint8Array([1,2,3]);
+ const f=fixture(async()=>{
+  requests++;
+  const response=new Response(huge,{status:200,headers:{
+   'Content-Type':'image/jpeg','Content-Length':String(9*1024*1024),
+  }});
+  response.clone=()=>{clones++;throw new Error('oversized image unexpectedly cloned');};
+  return response;
+ });
+ const url='https://api.roteiva.com/library/projects/17/nodes/'+id+'/content';
+ f.bind({type:'bind-media',id,url,scope:'userA'});
+ const noRange={headers:new Headers()};
+ assert.equal((await f.read('alice-tab',noRange)).status,200);
+ assert.equal((await f.read('alice-tab',noRange)).status,200);
+ assert.equal(clones,0);
+ assert.equal(requests,2);
 });

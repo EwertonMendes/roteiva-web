@@ -3,6 +3,7 @@ import {uploadBody} from './uploads.ts';
 import {importLibraryAssets} from './library-assets.ts';
 import {connection} from './repository.ts';
 import {libraryContent} from './library-content.ts';
+import {previewRequest} from './stream-preview.ts';
 import {prepareLibraryUploadTarget} from './library-upload-target.ts';
 import {createLibraryStructure} from './library-structure.ts';
 import {inspectLibrarySelection} from './library-inspect.ts';
@@ -22,9 +23,14 @@ export async function libraryRouter(request:Request,env:Env,uid:string,url:URL,f
  }
  const upload=/^\/library\/projects\/([1-9][0-9]{0,14})\/uploads\/destination$/.exec(url.pathname);
  if(upload&&request.method==='POST')return prepareLibraryUploadTarget(request,env,uid,Number(upload[1]),await uploadBody(request),fetcher);
+ const optimized=/^\/library\/projects\/([1-9][0-9]{0,14})\/nodes\/([0-9a-f-]{36})\/stream$/.exec(url.pathname);
+ if(optimized&&(request.method==='GET'||request.method==='POST')){
+  await authorizeLibraryProject(request,env,uid,Number(optimized[1]),fetcher);
+  return previewRequest(request,env,uid,Number(optimized[1]),optimized[2]);
+ }
  const content=/^\/library\/projects\/([1-9][0-9]{0,14})\/nodes\/([0-9a-f-]{36})\/content$/.exec(url.pathname);
  if(content&&(request.method==='GET'||request.method==='HEAD')){
- await authorizeLibraryProject(request,env,uid,Number(content[1]),fetcher);
+ await authorizeLibraryProject(request,env,uid,Number(content[1]),fetcher,true);
  return libraryContent(request,env,uid,Number(content[1]),content[2],fetcher);
  }
  const picker=/^\/library\/projects\/([1-9][0-9]{0,14})\/picker\/([0-9a-f-]{36})$/.exec(url.pathname);

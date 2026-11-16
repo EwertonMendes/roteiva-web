@@ -1,5 +1,87 @@
-/* Authenticated streaming only. No caching, offline behavior, credentials in URLs, or generic proxy. */
+/* Private native-media streaming; initial media chunks have bounded local cache. */
 const media=new Map();
+// Small, short-lived, tab-scoped memory cache for completed video/audio ranges.
+// Never writes private bytes to CacheStorage, disk, IndexedDB or CDN. Closing
+// a preview preserves a recent chunk; logout/account switch clears everything.
+const chunks=new Map();
+const CHUNK_TTL=3*60*1000,MAX_CHUNK=8*1024*1024,MAX_IMAGE=8*1024*1024,MAX_CACHED=48*1024*1024;
+const SAFE_IMAGE=/^image\/(?:jpeg|png|webp|avif|gif|bmp|tiff)(?:$|;)/i;
+let cachedBytes=0;
+const MEDIA_CACHE='roteiva-private-media-v2';
+const DISK_MAX_ENTRIES=6,DISK_TTL=10*60*1000;
+let cacheGeneration=0;
+function diskEligible(range){return typeof range==='string'&&/^bytes=0-\d+$/.test(range);}
+async function cacheRequest(key){
+ const bytes=new TextEncoder().encode(key);
+ const hash=await crypto.subtle.digest('SHA-256',bytes);
+ const digest=Array.from(new Uint8Array(hash),x=>x.toString(16).padStart(2,'0')).join('');
+ return new Request(self.location.origin+'/__roteiva_cached/'+digest);
+}
+async function readDiskChunk(key){
+ if(!self.caches)return null;
+ try{
+  const request=await cacheRequest(key),cache=await self.caches.open(MEDIA_CACHE);
+  const stored=await cache.match(request);if(!stored)return null;
+  const until=Number(stored.headers.get('X-Roteiva-Expires')||0);
+  if(until<=Date.now()){await cache.delete(request);return null;}
+  const range=stored.headers.get('Content-Range')||'';
+  const length=Number(stored.headers.get('Content-Length')||0);
+  if(!/^bytes \d+-\d+\/\d+$/.test(range)||length<1||length>MAX_CHUNK){await cache.delete(request);return null;}
+  const data=await stored.arrayBuffer();
+  if(data.byteLength!==length){await cache.delete(request);return null;}
+  return {data,headers:Array.from(stored.headers.entries()).filter(([k])=>!k.startsWith('x-roteiva-'))};
+ }catch{return null;}
+}
+async function persistChunk(key,data,headers,generation){
+ if(!self.caches||generation!==cacheGeneration)return;
+ try{
+  const cache=await self.caches.open(MEDIA_CACHE);
+  if(generation!==cacheGeneration)return;
+  const request=await cacheRequest(key);
+  const output=new Headers(headers);
+  output.delete('Cache-Control');
+  output.set('X-Roteiva-Expires',String(Date.now()+DISK_TTL));
+  await cache.put(request,new Response(data.slice(0),{status:200,headers:output}));
+  if(generation!==cacheGeneration){await cache.delete(request);return;}
+  const keys=await cache.keys();
+  // No shared CDN or remote writes: at most 48 MiB total local startup bytes.
+  for(let i=0;i<keys.length-DISK_MAX_ENTRIES;i++)await cache.delete(keys[i]);
+ }catch{/* Storage quota, private browsing and eviction must not break playback. */}
+}
+
+function forget(key){
+ const value=chunks.get(key);
+ if(value){cachedBytes-=value.data.byteLength;chunks.delete(key);}
+}
+function clearChunks(){chunks.clear();cachedBytes=0;cacheGeneration++;return self.caches?.delete(MEDIA_CACHE).catch(()=>{})||Promise.resolve();}
+function chunkKey(client,scope,url,range){return JSON.stringify([client,scope,url,range]);}
+function getChunk(key){
+ const v=chunks.get(key);
+ if(!v)return null;
+ if(v.expires<Date.now()){forget(key);return null;}
+ chunks.delete(key);chunks.set(key,v);return v;
+}
+function saveChunk(key,response,writeDisk){
+ const length=Number(response.headers.get('Content-Length')||0);
+ const rangeOK=response.status===206&&/^bytes \d+-\d+\/\d+$/.test(response.headers.get('Content-Range')||'');
+ // A private full-size image may be decoded by <img> while its bounded
+ // response is copied to tab-local memory. Never persist original images to disk.
+ const imageOK=response.status===200&&SAFE_IMAGE.test(response.headers.get('Content-Type')||'')&&length<=MAX_IMAGE;
+ if(!Number.isSafeInteger(length)||length<1||length>MAX_CHUNK||(!rangeOK&&!imageOK))return Promise.resolve();
+ const generation=cacheGeneration;
+ return response.arrayBuffer().then(async data=>{
+  if(data.byteLength!==length||generation!==cacheGeneration)return;
+  const headers=Array.from(response.headers.entries());
+  forget(key);
+  chunks.set(key,{data,headers,status:response.status,expires:Date.now()+CHUNK_TTL});
+  cachedBytes+=length;
+  while(cachedBytes>MAX_CACHED){
+   const old=chunks.keys().next().value;if(!old)break;forget(old);
+  }
+  if(writeDisk&&rangeOK)await persistChunk(key,data,headers,generation);
+ }).catch(()=>{});
+}
+
 const origins=new Set(['https://api.roteiva.com','https://roteiva-api-dev.roteiva-dev.workers.dev']);
 const path=/^\/library\/projects\/[1-9][0-9]{0,14}\/nodes\/[0-9a-f-]{36}\/content$/;
 function target(value){
@@ -11,7 +93,7 @@ function target(value){
  return {url:url.href,review};
 }
 self.addEventListener('install',event=>event.waitUntil(self.skipWaiting()));
-self.addEventListener('activate',event=>event.waitUntil(self.clients.claim()));
+self.addEventListener('activate',event=>event.waitUntil(Promise.all([self.clients.claim(),self.caches?.delete('roteiva-private-media-v1').catch(()=>{})||Promise.resolve()])));
 self.addEventListener('message',event=>{
  const source=event.source,data=event.data,port=event.ports[0];
  if(!source?.id||!source.url||new URL(source.url).origin!==self.location.origin||!port)return;
@@ -22,6 +104,9 @@ self.addEventListener('message',event=>{
   event.waitUntil(self.clients.claim().then(()=>port.postMessage({ok:true}),()=>port.postMessage({ok:false})));
   return;
  }
+ if(data?.type==='clear-media-cache'){
+  const task=clearChunks();event.waitUntil?.(task);port.postMessage({ok:true});return;
+ }
  if(data?.type==='revoke-media'&&typeof data.id==='string'){
  const entry=media.get(data.id);if(entry?.client===source.id)media.delete(data.id);port.postMessage({ok:true});return;
  }
@@ -29,7 +114,7 @@ self.addEventListener('message',event=>{
  const sourceURL=target(data.url);if(!sourceURL)return;
  for(const [id,entry] of media)if(entry.expires<Date.now())media.delete(id);
  if(media.size>=200){port.postMessage({ok:false});return;}
- media.set(data.id,{client:source.id,...sourceURL,expires:Date.now()+20*60*1000});port.postMessage({ok:true});
+ media.set(data.id,{client:source.id,...sourceURL,scope:typeof data.scope==='string'&&data.scope.length<=180?data.scope:'',expires:Date.now()+20*60*1000});port.postMessage({ok:true});
 });
 function deny(){return new Response('Prévia indisponível. Abra o arquivo novamente no Roteiva.',{status:403,headers:{'Cache-Control':'no-store','Content-Type':'text/plain; charset=utf-8'}});}
 self.addEventListener('fetch',event=>{
@@ -52,9 +137,43 @@ self.addEventListener('fetch',event=>{
  const headers=new Headers(token?{Authorization:token}:{});
  if(current.review){if(!/^[A-Za-z0-9_-]{43}$/.test(reply?.reviewSession||''))return deny();headers.set('X-Review-Session',reply.reviewSession);}
  const range=event.request.headers.get('Range');if(range)headers.set('Range',range);
+ // Every response is authorized by the current tab before reading cached data.
+ // Scope rehydrates after the browser restarts an idle Service Worker.
+ const scope=entry?.scope||reply?.scope;
+ const key=typeof scope==='string'&&scope.length>0&&scope.length<=180&&event.request.method==='GET'
+  ?chunkKey(event.clientId,scope,current.url,range||'initial'):null;
+ let hit=key?getChunk(key):null;
+ if(!hit&&key&&diskEligible(range)){hit=await readDiskChunk(key);if(hit){
+  forget(key);chunks.set(key,{...hit,expires:Date.now()+CHUNK_TTL});cachedBytes+=hit.data.byteLength;
+  while(cachedBytes>MAX_CACHED){const old=chunks.keys().next().value;if(!old)break;forget(old);}
+ }}
+ if(hit)return new Response(hit.data.slice(0),{status:hit.status||206,headers:new Headers(hit.headers)});
  try{
- const upstream=await fetch(current.url,{method:event.request.method,headers,credentials:'omit',cache:'no-store',redirect:'error',signal:AbortSignal.timeout(30000)});
+ const controller=new AbortController();
+ const timer=setTimeout(()=>controller.abort(),20000);
+ let upstream;
+ try{
+  upstream=await fetch(current.url,{method:event.request.method,headers,credentials:'omit',cache:'no-store',redirect:'error',signal:controller.signal});
+ }finally{
+  // A timeout on the whole streamed fetch aborts video midway through playback.
+  // Limit header establishment only, not an actively delivered chunk.
+  clearTimeout(timer);
+ }
  const responseHeaders=new Headers(upstream.headers);responseHeaders.set('Cache-Control','no-store');
+ // Cloning a large response creates an unread stream branch when the
+ // snapshot is rejected for size; that branch can buffer the full movie
+ // without backpressure and starve playback. Only clone a known, small,
+ // valid partial response that the cache is actually going to consume.
+ const length=Number(upstream.headers.get('Content-Length')||0);
+ const contentRange=upstream.headers.get('Content-Range')||'';
+ const partialCache=upstream.status===206&&/^bytes \d+-\d+\/\d+$/.test(contentRange);
+ const imageCache=!range&&upstream.status===200&&SAFE_IMAGE.test(upstream.headers.get('Content-Type')||'')&&length<=MAX_IMAGE;
+ const canCache=key&&Number.isSafeInteger(length)&&length>0&&length<=MAX_CHUNK&&(partialCache||imageCache);
+ if(canCache){
+  const snapshot=upstream.clone();
+  const task=saveChunk(key,snapshot,partialCache&&diskEligible(range));
+  event.waitUntil?.(task);
+ }
  return new Response(upstream.body,{status:upstream.status,headers:responseHeaders});
  }catch{return new Response('O provedor não respondeu. Tente novamente.',{status:503,headers:{'Cache-Control':'no-store'}});}
  })());

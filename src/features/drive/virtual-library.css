@@ -74,7 +74,33 @@
  display:block;width:100%;height:100%;min-height:0;max-height:none;max-width:none;object-fit:contain;margin:0
 }
 .virtual-library-backdrop .vl-preview-modal .vl-preview-body .vl-preview-audio{max-width:620px;width:calc(100% - 35px);margin:0}
-.vl-preview-modal .vl-preview-document{width:100%;height:100%;min-height:0;overflow:auto}
+.vl-preview-modal .vl-preview-document{position:relative;width:100%;height:100%;min-height:0;overflow:hidden}
+.vl-preview-modal .vl-preview-body{position:relative}
+.vl-preview-modal .vl-preview-header-actions{display:flex;align-items:center;gap:8px;flex:0 0 auto}
+.virtual-library-backdrop .virtual-library-editor.vl-preview-modal.is-expanded{
+ position:fixed;inset:0;margin:0;width:100vw;height:100dvh;max-height:none;
+ border-radius:0;z-index:1;padding:16px clamp(12px,2vw,28px); 
+}
+.virtual-library-backdrop .vl-preview-modal .review-private-viewer img{
+ margin:0;max-width:none;max-height:none;
+}
+.vl-preview-modal .vl-preview-media-stage{position:relative;width:100%;height:100%;display:grid;place-items:center;min-width:0;min-height:0}
+.virtual-library-backdrop .vl-preview-modal .vl-preview-body .vl-preview-media-stage video{
+ display:block;width:100%;height:100%;max-height:none;object-fit:contain;margin:0
+}
+.vl-preview-modal .vl-preview-unmute{
+ position:absolute;top:14px;right:14px;display:flex;align-items:center;gap:8px;
+ border:1px solid #ffffff5e;border-radius:999px;background:#111c;color:white;
+ padding:9px 13px;font-size:13px;font-weight:600;backdrop-filter:blur(10px);z-index:2
+}
+.vl-preview-modal .vl-preview-unmute:hover{background:#1e1e1ee8}
+.vl-preview-modal .vl-preview-audio-stage{
+ width:min(620px,calc(100% - 36px));display:flex;flex-direction:column;align-items:center;justify-content:center;
+ gap:20px;padding:24px 10px;min-width:0;color:var(--ink);text-align:center
+}
+.vl-preview-modal .vl-preview-audio-stage span{font-size:14px;font-weight:600;overflow-wrap:anywhere}
+.virtual-library-backdrop .vl-preview-modal .vl-preview-audio-stage .vl-preview-audio{width:100%;max-width:620px;margin:0}
+@media(max-width:650px){.vl-preview-modal .vl-preview-unmute{top:8px;right:8px;font-size:12px;padding:8px 10px}}
 .vl-preview-modal .vl-preview-state{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;min-height:180px;width:100%;padding:25px;text-align:center;font-size:13px;color:var(--muted)}
 .vl-preview-modal .vl-preview-state p{margin:0;max-width:500px;line-height:1.6}
 .vl-preview-modal .vl-preview-state svg{flex:0 0 auto}
@@ -129,3 +155,25 @@
  .virtual-library-backdrop .virtual-library-editor .vl-import-explore{width:100%;white-space:normal}
  .virtual-library-backdrop .virtual-library-editor.virtual-library-preview:not(.vl-preview-modal) .virtual-library-toolbar{bottom:-17px}
 }
+
+/* Adaptive Stream is optional and isolated from the existing original player. */
+.virtual-library-backdrop .vl-preview-modal .vl-preview-body .vl-preview-stream-frame{
+ display:block;width:100%;height:100%;min-height:250px;border:0;border-radius:10px;background:#0b0b0c;
+}
+.vl-preview-modal .vl-stream-actions{
+ position:absolute;bottom:48px;left:12px;z-index:2;
+ display:flex;align-items:center;gap:8px;max-width:calc(100% - 24px);flex-wrap:wrap;
+ padding:8px 10px;border-radius:10px;background:rgba(15,15,17,.88);
+ color:#e8e8eb;font-size:12px;box-shadow:0 4px 20px rgba(0,0,0,.25);
+}
+.vl-preview-modal .vl-stream-actions button{max-width:100%;white-space:normal;}
+@media(max-width:650px){.vl-preview-modal .vl-stream-actions{bottom:42px;left:6px;padding:6px;font-size:11px}}
+
+
+/* Private image bytes render as they arrive; keep a small, non-blocking
+   progress label until native decoding finishes. No full-blob gate. */
+.vl-preview-modal .vl-preview-image-stage{position:relative;width:100%;height:100%;min-width:0;min-height:0}
+.vl-preview-modal .vl-preview-image-stage .review-private-viewer{width:100%;height:100%}
+.vl-preview-modal .vl-preview-image-loading{position:absolute;z-index:2;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;white-space:nowrap;
+ padding:7px 11px;border-radius:999px;background:var(--subtle);border:1px solid var(--line);
+ color:var(--ink);font-size:12px;font-weight:500}

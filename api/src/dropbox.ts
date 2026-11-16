@@ -1,4 +1,5 @@
 import {ApiError,type Env} from './types.ts';
+import {streamHeaders} from './media-fetch.ts';
 import {context,decrypt,encrypt,hash,random} from './crypto.ts';
 import {assertActiveAccess} from './access.ts';
 import {beginExchange,rememberGrant,finishExchange} from './oauth-guard.ts';
@@ -379,8 +380,7 @@ export async function dropboxMedia(env:Env,uid:string,connectionId:string,fileId
  const row=await dropboxConnection(env,uid,connectionId);
  const bearer=await dropboxAccess(env,row,fetcher);
  let response:Response;
- try{response=await fetcher(CONTENT+'files/download',{method:'POST',redirect:'manual',
-    signal:AbortSignal.timeout(24000),
+ try{response=await streamHeaders(fetcher,CONTENT+'files/download',{method:'POST',redirect:'manual',
     headers:{Authorization:'Bearer '+bearer,'Dropbox-API-Arg':JSON.stringify({path:fileId}),
       ...(range?{Range:range}:{})}});}
  catch{throw new ApiError(502,'media_unavailable');}

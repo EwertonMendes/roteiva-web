@@ -5,7 +5,7 @@ test('native media transport binds the URL to its tab and forwards authenticated
  await withMediaServer(async received=>{
  await page.goto(origin+'/sobre.html');
  const url=await page.evaluate(async()=>{
- await navigator.serviceWorker.register('/roteiva-media-sw.js?mediaProtocol=2',{scope:'/'});
+ await navigator.serviceWorker.register('/roteiva-media-sw.js?mediaProtocol=4',{scope:'/'});
  await navigator.serviceWorker.ready;
  if(!navigator.serviceWorker.controller)await new Promise<void>(resolve=>navigator.serviceWorker.addEventListener('controllerchange',()=>resolve(),{once:true}));
  navigator.serviceWorker.addEventListener('message',event=>{if(event.data?.type==='media-authorization')event.ports[0].postMessage({authorization:'Bearer browser-synthetic'});});
@@ -31,7 +31,7 @@ test('cold browser takes SW control without a page reload and native audio/video
   await page.goto(origin+'/sobre.html');
   const result=await page.evaluate(async()=>{
    const initialUrl=location.href;
-   const registration=await navigator.serviceWorker.register('/roteiva-media-sw.js?mediaProtocol=2',{scope:'/',updateViaCache:'none'});
+   const registration=await navigator.serviceWorker.register('/roteiva-media-sw.js?mediaProtocol=4',{scope:'/',updateViaCache:'none'});
    await navigator.serviceWorker.ready;
    if(!navigator.serviceWorker.controller){
     const controlled=new Promise<void>((resolve,reject)=>{
@@ -67,7 +67,7 @@ test('cold browser takes SW control without a page reload and native audio/video
     bind('cccccccc-cccc-4ccc-cccc-cccccccccccc'),
    ]);
    const audio=document.createElement('audio'),video=document.createElement('video');
-   audio.preload='metadata';video.preload='metadata';video.muted=true;
+   audio.preload='metadata';video.preload='auto';video.muted=true;video.autoplay=true;video.playsInline=true;
    document.body.append(audio,video);
    const metadata=(element:HTMLMediaElement,label:string)=>new Promise<number>((resolve,reject)=>{
     const timer=setTimeout(()=>reject(new Error(label+' metadata timeout')),10000);
@@ -79,6 +79,9 @@ test('cold browser takes SW control without a page reload and native audio/video
    const readyAudio=metadata(audio,'wav'),readyVideo=metadata(video,'mp4');
    audio.src=wav;video.src=mp4;
    const [audioDuration,videoDuration]=await Promise.all([readyAudio,readyVideo]);
+   // Autoplay with sound is browser-policy dependent, so require the permitted
+   // muted-inline configuration and preserve the native Play fallback.
+   if(!video.autoplay||!video.muted||!video.playsInline)throw new Error('Native autoplay policy settings are missing');
    audio.remove();video.remove();
    return {audioDuration,videoDuration,unchanged:location.href===initialUrl,controlled:!!navigator.serviceWorker.controller};
   });
@@ -107,9 +110,9 @@ test('an already-open tab upgrades its old worker to the media protocol without 
    });
   }
   const oldScript=navigator.serviceWorker.controller?.scriptURL||'';
-  const updated=await navigator.serviceWorker.register('/roteiva-media-sw.js?mediaProtocol=2',{scope:'/',updateViaCache:'none'});
+  const updated=await navigator.serviceWorker.register('/roteiva-media-sw.js?mediaProtocol=4',{scope:'/',updateViaCache:'none'});
   await new Promise<void>((resolve,reject)=>{
-   const ready=()=>navigator.serviceWorker.controller?.scriptURL.includes('?mediaProtocol=2');
+   const ready=()=>navigator.serviceWorker.controller?.scriptURL.includes('?mediaProtocol=4');
    if(ready()){resolve();return;}
    const timeout=setTimeout(()=>{cleanup();reject(new Error('protocol upgrade did not claim this tab'));},8000);
    const check=()=>{if(ready()){cleanup();resolve();}};
@@ -123,8 +126,109 @@ test('an already-open tab upgrades its old worker to the media protocol without 
    sameNavigation:performance.getEntriesByType('navigation').length===beforeNavigation};
  });
  expect(state.oldScript).toContain('/roteiva-media-sw.js');
- expect(state.oldScript).not.toContain('mediaProtocol=2');
- expect(state.updatedScript).toContain('?mediaProtocol=2');
+ expect(state.oldScript).not.toContain('mediaProtocol=4');
+ expect(state.updatedScript).toContain('?mediaProtocol=4');
  expect(state.marker).toBe('preserved');
  expect(state.sameNavigation).toBe(true);
+});
+
+test('reopening the same private media in one tab reuses completed ranges without contacting API twice',async({page})=>{
+ await withMediaServer(async received=>{
+  await page.goto(origin+'/sobre.html');
+  const answers=await page.evaluate(async()=>{
+   await navigator.serviceWorker.register('/roteiva-media-sw.js?mediaProtocol=4',{scope:'/',updateViaCache:'none'});
+   await navigator.serviceWorker.ready;
+   if(!navigator.serviceWorker.controller)await new Promise<void>(resolve=>navigator.serviceWorker.addEventListener('controllerchange',()=>resolve(),{once:true}));
+   navigator.serviceWorker.addEventListener('message',event=>{
+    if(event.data?.type==='media-authorization')event.ports[0].postMessage({authorization:'Bearer browser-synthetic'});
+   });
+   const url='http://127.0.0.1:8787/library/projects/17/nodes/aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa/content';
+   const bind=async()=>{
+    const id=crypto.randomUUID(),channel=new MessageChannel();
+    const ready=new Promise<void>((resolve,reject)=>{
+     channel.port1.onmessage=e=>{channel.port1.close();e.data?.ok?resolve():reject(new Error('binding rejected'));};
+    });
+    navigator.serviceWorker.controller!.postMessage({type:'bind-media',id,url,scope:'test-owner'},[channel.port2]);
+    await ready;return id;
+   };
+   const revoke=async(id:string)=>{
+    const channel=new MessageChannel();
+    const done=new Promise<void>(resolve=>{channel.port1.onmessage=()=>{channel.port1.close();resolve();};});
+    navigator.serviceWorker.controller!.postMessage({type:'revoke-media',id},[channel.port2]);
+    await done;
+   };
+   const read=async(id:string)=>{
+    const response=await fetch('/__roteiva_media/'+id,{headers:{Range:'bytes=0-3'}});
+    return {status:response.status,body:await response.text()};
+   };
+   const firstId=await bind(),first=await read(firstId);await revoke(firstId);
+   // A 4-byte range finishes immediately; allow clone/stream completion in SW.
+   await new Promise(r=>setTimeout(r,250));
+   const cache=await caches.open('roteiva-private-media-v2');
+   const stored=await cache.keys();
+   const secondId=await bind(),second=await read(secondId);await revoke(secondId);
+   return {first,second,persistent:stored.length>0};
+  });
+  expect(answers.first).toEqual({status:206,body:'test'});
+  expect(answers.second).toEqual({status:206,body:'test'});
+  expect(answers.persistent).toBe(true);
+  expect(received.filter(x=>x.path.includes('/nodes/aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa/content'))).toHaveLength(1);
+ });
+});
+
+test('a real 60-second, >8MiB MP4 plays across the previous 40-second stall boundary',async({page})=>{
+ test.setTimeout(90000);
+ await withMediaServer(async received=>{
+  await page.goto(origin+'/sobre.html');
+  await page.evaluate(async()=>{
+   const registration=await navigator.serviceWorker.register('/roteiva-media-sw.js?mediaProtocol=4',{scope:'/',updateViaCache:'none'});
+   await navigator.serviceWorker.ready;
+   if(!navigator.serviceWorker.controller){
+    await new Promise<void>((resolve,reject)=>{
+     const timer=setTimeout(()=>reject(new Error('worker takeover timed out')),6000);
+     const onChange=()=>{if(navigator.serviceWorker.controller){clearTimeout(timer);resolve();}};
+     navigator.serviceWorker.addEventListener('controllerchange',onChange,{once:true});
+     registration.active?.postMessage({type:'claim-media-clients'},[new MessageChannel().port2]);
+     onChange();
+    });
+   }
+   navigator.serviceWorker.addEventListener('message',event=>{
+    if(event.data?.type==='media-authorization')event.ports[0].postMessage({authorization:'Bearer browser-synthetic'});
+   });
+   const id=crypto.randomUUID(),channel=new MessageChannel();
+   const bound=new Promise<void>((resolve,reject)=>{
+    channel.port1.onmessage=event=>{channel.port1.close();event.data?.ok?resolve():reject(new Error('media bind rejected'));};
+   });
+   const url='http://127.0.0.1:8787/library/projects/17/nodes/dddddddd-dddd-4ddd-dddd-dddddddddddd/content';
+   navigator.serviceWorker.controller!.postMessage({type:'bind-media',id,url,scope:'long-test-user'},[channel.port2]);
+   await bound;
+   const video=document.createElement('video');
+   video.id='long-stream-test';video.muted=true;video.playsInline=true;video.preload='auto';
+   video.src='/__roteiva_media/'+id;
+   video.style.width='300px';document.body.appendChild(video);
+   const button=document.createElement('button');button.textContent='Iniciar vídeo longo';
+   button.addEventListener('click',()=>void video.play());
+   document.body.append(button);
+  });
+  await page.waitForFunction(()=>{
+   const v=document.querySelector<HTMLVideoElement>('#long-stream-test');
+   return !!v&&v.readyState>=1&&v.duration>=59;
+  },{timeout:30000});
+  await page.evaluate(()=>{const video=document.querySelector<HTMLVideoElement>('#long-stream-test')!;video.currentTime=38;});
+  await page.waitForFunction(()=>{
+   const v=document.querySelector<HTMLVideoElement>('#long-stream-test')!;
+   return !v.seeking&&v.currentTime>=37&&v.readyState>=2;
+  },{timeout:20000});
+  await page.getByRole('button',{name:'Iniciar vídeo longo'}).click();
+  await page.waitForFunction(()=>{
+   const v=document.querySelector<HTMLVideoElement>('#long-stream-test')!;
+   return v.currentTime>44&&!v.error&&!v.paused;
+  },{timeout:25000});
+  const result=await page.locator('#long-stream-test').evaluate(v=>({
+   time:(v as HTMLVideoElement).currentTime,
+   error:(v as HTMLVideoElement).error?.code||null
+  }));
+  expect(result.time).toBeGreaterThan(44);expect(result.error).toBeNull();
+  expect(received.some(r=>r.path.includes('/dddddddd-')&&r.range?.startsWith('bytes='))).toBe(true);
+ });
 });

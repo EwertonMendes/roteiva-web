@@ -4,6 +4,7 @@ import { firebaseServices, persistentCacheEnabled, purgePrivateCache } from "../
 import { authErrorMessage } from "./errors";
 import {clearStorageImageCache} from "../drive/storage-image-cache";
 import {libraryPreviewCache} from "../drive/library-preview-cache";
+import {clearAuthenticatedMediaCache,warmAuthenticatedMedia} from "../drive/authenticated-media";
 
 export type AuthIntent = "login" | "register";
 type AuthState = { user: User | null; loading: boolean; busy: boolean; error: string; intent: AuthIntent; login: (intent?: AuthIntent) => Promise<void>; logout: () => Promise<void> };
@@ -26,8 +27,11 @@ export function AuthProvider({children}: {children: ReactNode}) {
     setPersistence(auth,browserLocalPersistence).then(()=>{
       if (!active) return;
       unsubscribe=onAuthStateChanged(auth,next=>{
-        if(previousUid&&previousUid!==next?.uid){void clearStorageImageCache();libraryPreviewCache.clear();}
+        if(previousUid&&previousUid!==next?.uid){void clearStorageImageCache();libraryPreviewCache.clear();clearAuthenticatedMediaCache();}
         previousUid=next?.uid||null;
+        // Register the private-media transport while navigation proceeds, not
+        // only after a preview click. No Drive/Dropbox request or file prefetch.
+        if(next)warmAuthenticatedMedia();
         setUser(next);setLoading(false);
       },reason=>{
         setUser(null);setError(authErrorMessage(reason));setLoading(false);
@@ -53,6 +57,7 @@ export function AuthProvider({children}: {children: ReactNode}) {
       await signOut(firebaseServices().auth);
       await clearStorageImageCache();
       libraryPreviewCache.clear();
+      clearAuthenticatedMediaCache();
       setUser(null);setIntent("login");
       if (persistentCacheEnabled()) {
         await purgePrivateCache();
