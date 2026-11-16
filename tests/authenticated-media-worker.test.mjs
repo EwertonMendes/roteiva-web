@@ -136,3 +136,53 @@ test('Biblioteca native preview never triggers paid Stream uploads or embeds',()
  assert.equal(preview.includes('Preparar reprodução otimizada'),false);
  assert.ok(preview.includes('authenticatedMedia('),'the private native media transport remains active');
 });
+
+test('small original images stream via the authorized tab and reopen from private memory only',async()=>{
+ let upstreamReads=0;
+ const pixels=new Uint8Array([137,80,78,71,13,10,26,10]);
+ const f=fixture(async()=>{
+  upstreamReads++;
+  return new Response(pixels,{status:200,headers:{'Content-Type':'image/png','Content-Length':String(pixels.byteLength)}});
+ });
+ const url='https://api.roteiva.com/library/projects/17/nodes/'+id+'/content';
+ assert.equal(f.bind({type:'bind-media',id,url,scope:'userA|rev1'}).ok,true);
+ const noRange={headers:new Headers()};
+ const first=await f.read('alice-tab',noRange);
+ assert.equal(first.status,200);
+ assert.deepEqual(new Uint8Array(await first.arrayBuffer()),pixels);
+ await Promise.all(f.state.tasks);
+ assert.equal(upstreamReads,1);
+ f.bind({type:'revoke-media',id});
+ assert.equal(f.bind({type:'bind-media',id,url,scope:'userA|rev1'}).ok,true);
+ const reused=await f.read('alice-tab',noRange);
+ assert.equal(reused.status,200,'original images must never be mislabeled 206');
+ assert.deepEqual(new Uint8Array(await reused.arrayBuffer()),pixels);
+ assert.equal(upstreamReads,1,'reopening a small image must avoid a second provider read');
+ f.bind({type:'revoke-media',id});
+ assert.equal(f.bind({type:'bind-media',id,url,scope:'userB|rev1'}).ok,true);
+ await (await f.read('alice-tab',noRange)).arrayBuffer();
+ assert.equal(upstreamReads,2,'a different user scope must not receive prior private bytes');
+ assert.equal(f.bind({type:'clear-media-cache'}).ok,true);
+ await (await f.read('alice-tab',noRange)).arrayBuffer();
+ assert.equal(upstreamReads,3,'session cleanup must invalidate the private memory image');
+});
+
+test('non-image 200 and oversized images are never cloned or cached',async()=>{
+ let clones=0,requests=0;
+ const huge=new Uint8Array([1,2,3]);
+ const f=fixture(async()=>{
+  requests++;
+  const response=new Response(huge,{status:200,headers:{
+   'Content-Type':'image/jpeg','Content-Length':String(9*1024*1024),
+  }});
+  response.clone=()=>{clones++;throw new Error('oversized image unexpectedly cloned');};
+  return response;
+ });
+ const url='https://api.roteiva.com/library/projects/17/nodes/'+id+'/content';
+ f.bind({type:'bind-media',id,url,scope:'userA'});
+ const noRange={headers:new Headers()};
+ assert.equal((await f.read('alice-tab',noRange)).status,200);
+ assert.equal((await f.read('alice-tab',noRange)).status,200);
+ assert.equal(clones,0);
+ assert.equal(requests,2);
+});
