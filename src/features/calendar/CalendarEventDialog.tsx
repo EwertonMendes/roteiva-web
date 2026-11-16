@@ -1,11 +1,12 @@
 import {useEffect,useMemo,useRef,useState,type FormEvent} from "react";
-import {CalendarDays,CalendarPlus2,Check,Clock3,Folder,Info,Plus,Trash2,UserRound,Video,X} from "lucide-react";
+import {CalendarDays,Check,Clock3,Folder,Info,Trash2,UserRound,Video,X} from "lucide-react";
 import {AppButton} from "../ui/AppButton";
 import {AppInput} from "../ui/AppInput";
 import {AppSelect} from "../ui/AppSelect";
 import type {CalendarEvent,Client,Project} from "../../domain/workspace";
 import {eventDuration,eventRange,overlaps,timeMinutes,validTimeRange} from "../../studio-calendar";
 import {isValidCivilDate,todayKey} from "./calendar-dates";
+import {CalendarDateField,CalendarTimeField} from "./CalendarDateTimeField";
 
 export type CalendarDraft={
   title:string;type:CalendarEvent["type"];date:string;time:string;endTime:string;
@@ -97,14 +98,18 @@ export function CalendarEventDialog({editing,date,projects,clients,events,prefer
       <div className="calendar-form-section">
         <h3><CalendarDays size={19} aria-hidden="true"/>Data e horário</h3>
         <div className="calendar-date-fields">
-          <label>Data<AppInput aria-label="Data do compromisso" type="date" value={eventDate} required
-            onChange={event=>{setEventDate(event.target.value);setError("");}}/></label>
-          <label>Início<AppInput aria-label="Início do compromisso" type="time" value={time} required
-            onChange={event=>{setTime(event.target.value);setError("");}}/></label>
-          <label>Término <span>(opcional)</span><div className="calendar-optional-end"><AppInput aria-label="Término do compromisso" type="time" value={endTime}
-            onChange={event=>{setEndTime(event.target.value);setError("");}}/>
-            {endTime&&<AppButton type="button" aria-label="Limpar horário de término" onClick={()=>setEndTime("")}><X size={14}/></AppButton>}
-          </div></label>
+          <div className="calendar-datetime-field">
+            <span className="calendar-field-caption">Data</span>
+            <CalendarDateField value={eventDate} onChange={value=>{setEventDate(value);setError("");}}/>
+          </div>
+          <div className="calendar-datetime-field">
+            <span className="calendar-field-caption">Início</span>
+            <CalendarTimeField label="Início do compromisso" value={time} onChange={value=>{setTime(value);setError("");}}/>
+          </div>
+          <div className="calendar-datetime-field">
+            <span className="calendar-field-caption">Término <em>(opcional)</em></span>
+            <CalendarTimeField label="Término do compromisso" optional value={endTime} onChange={value=>{setEndTime(value);setError("");}}/>
+          </div>
         </div>
         {!endTime&&<p className="calendar-form-hint"><Info size={16}/>Sem término definido, apenas o início será registrado.</p>}
         {endTime&&validTimeRange(time,endTime)&&<div className={"event-availability"+(conflict.length?" has-overlap":"")} role="status">
