@@ -10,7 +10,7 @@ import type { Domain } from "../../data/firestore-sync";
 import type { WorkspaceCommand } from "../../data/firestore-commands";
 import { useAuth } from "../auth/AuthProvider";
 import { useRegistrationProfile } from "../auth/RegistrationGate";
-import { retryFirestoreRead,transientFirestoreRead,firestoreCode } from "../../data/firestore-recovery";
+import { retryFirestoreRead,retryVerifiedBootstrapRead,transientFirestoreRead,firestoreCode } from "../../data/firestore-recovery";
 import {applyTheme,chooseThemePreference,parseThemePreference,readStoredPreference,systemTheme,themeStorageKey,writeStoredPreference,type Theme} from "../../lib/theme-preference";
 
 export function FirebaseWorkspace() {
@@ -67,7 +67,7 @@ export function FirebaseWorkspace() {
     setRemoteChanges(false);setSyncWarning("");
     setError("");setFailedWrite(false); setInitial(undefined);setBusinessLoaded(false);setOverviewMetrics(undefined);setProjectPage(undefined);setClientPage(undefined);setFinancePeriod(undefined);setFinanceBars(undefined);setCalendarPeriod(undefined);
     (async()=>{
-      await retryFirestoreRead(async()=>{
+      await retryVerifiedBootstrapRead(async()=>{
       const route=routeFromLocation(window.location,{base:import.meta.env.BASE_URL,useHash:false});
       const domains=domainsForRoute(route);
       const themeReadRevision=themeRevision.current;
@@ -127,6 +127,15 @@ export function FirebaseWorkspace() {
         }
         setInitial({workspace:workspaceState.workspace});
       }
+      },async()=>{
+        // This can occur when another tab owns Firestore persistence while
+        // restored Auth credentials are still propagating to the SDK.
+        // Refresh only the same signed-in account, then re-run a secured read.
+        const current=firebaseServices().auth.currentUser;
+        if(!current||current.uid!==user!.uid)throw Object.assign(new Error("Sua sessão expirou."),{code:"unauthenticated"});
+        await current.getIdToken(true);
+        if(firebaseServices().auth.currentUser?.uid!==user!.uid)
+          throw Object.assign(new Error("Sua sessão foi alterada."),{code:"unauthenticated"});
       },{isCurrent:()=>active});
     })().catch(reason=>{
       if(!active)return;
