@@ -16,7 +16,7 @@ test("transient denied initial read retries exactly once after fresh server veri
   const result=await retryVerifiedInitialRead(async()=>{
     if(++reads===1)throw denied();
     return "verified workspace";
-  },async()=>{checks++;return true;});
+  },async()=>{checks++;return true;},{delaysMs:[0,0,0]});
   assert.equal(result,"verified workspace");
   assert.equal(reads,2);
   assert.equal(checks,1);
@@ -34,10 +34,11 @@ test("failed server verification denies, not retries, initial workspace loading"
   assert.equal(reads,1);
 });
 
-test("a second permission denial is final even if entitlement was verified",async()=>{
-  let reads=0;
-  await assert.rejects(retryVerifiedInitialRead(async()=>{reads++;throw denied();},async()=>true),/Firestore Rules rejected/);
-  assert.equal(reads,2);
+test("repeated permission denial exhausts a finite budget and remains blocked",async()=>{
+  let reads=0,checks=0;
+  await assert.rejects(retryVerifiedInitialRead(async()=>{reads++;throw denied();},async()=>{checks++;return true;},{delaysMs:[0,0,0]}),/Firestore Rules rejected/);
+  assert.equal(reads,4);
+  assert.equal(checks,3);
 });
 
 test("other authorization errors are never masked by the retry path",async()=>{
