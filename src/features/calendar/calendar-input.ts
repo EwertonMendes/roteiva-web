@@ -1,5 +1,5 @@
-import {isValidCivilDate} from "./calendar-dates";
-import {timeMinutes} from "../../studio-calendar";
+import {isValidCivilDate} from "./calendar-dates.ts";
+import {timeMinutes} from "../../studio-calendar.ts";
 
 /** Keep drafts editable. Validate the completed value, not each keystroke. */
 export function maskDateText(raw:string):string {
