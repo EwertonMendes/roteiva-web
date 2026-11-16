@@ -319,14 +319,14 @@
 /* Mockup 09 refinement — use the calendar route's own hierarchy, without
    changing typography/controls used by Projects, Finance or other screens. */
 .app-view-calendar .page > .page-heading {margin-bottom:22px}
-.app-view-calendar .page > .page-heading h1 {
+.app-shell.app-view-calendar .page > .page-heading h1 {
   font-size:clamp(2.6rem,3.2vw,3.35rem);
   line-height:1.06;
   font-weight:760;
   letter-spacing:-.045em;
   margin-bottom:12px;
 }
-.app-view-calendar .page > .page-heading p {
+.app-shell.app-view-calendar .page > .page-heading p {
   font-size:clamp(.98rem,1.13vw,1.12rem);
   line-height:1.45;
 }
@@ -698,7 +698,7 @@
   .app-view-calendar .roteiva-calendar .upcoming-list {overflow:visible}
 }
 @media (max-width:700px) {
-  .app-view-calendar .page > .page-heading h1 {font-size:2.25rem}
+  .app-shell.app-view-calendar .page > .page-heading h1 {font-size:2.25rem}
   .app-view-calendar .roteiva-calendar .calendar-toolbar h2 {font-size:1.03rem}
   .app-view-calendar .roteiva-calendar .calendar-week {font-size:.75rem}
   .app-view-calendar .roteiva-calendar .calendar-grid>button b {font-size:.88rem}
