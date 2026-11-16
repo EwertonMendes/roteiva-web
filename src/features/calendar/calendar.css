@@ -725,3 +725,47 @@
   .roteiva-calendar-form .calendar-field-caption {font-size:.89rem}
   .roteiva-calendar-form .calendar-field-caption em {font-size:.78rem}
 }
+
+
+/* Input polish: the first section follows the same nested label/field spacing
+   as Cliente and Projeto. Errors have reserved height to prevent layout jumps. */
+.roteiva-calendar-form .calendar-form-basic>.calendar-basic-field {
+  display:grid;
+  gap:10px;
+  min-width:0;
+  font-size:var(--type-body);
+  font-weight:700;
+  color:var(--ink);
+}
+.roteiva-calendar-form .calendar-form-basic>.calendar-basic-field+.calendar-basic-field {
+  margin-top:22px;
+}
+.roteiva-calendar-form .calendar-basic-field>.calendar-field-with-icon {
+  width:100%;
+}
+.roteiva-calendar-form .calendar-field-feedback {
+  display:block;
+  min-height:31px;
+  margin-top:7px;
+  font-size:.75rem;
+  line-height:1.3;
+  font-weight:550;
+  color:#c44343;
+  overflow-wrap:anywhere;
+}
+:root[data-theme="dark"] .roteiva-calendar-form .calendar-field-feedback {
+  color:#ff9191;
+}
+.roteiva-calendar-form .calendar-picker:has(input[aria-invalid="true"]) .calendar-picker-control {
+  border-color:#c44343;
+}
+.roteiva-calendar-form .calendar-picker:has(input[aria-invalid="true"]) .calendar-picker-control:focus-within {
+  box-shadow:0 0 0 3px #c4434322;
+}
+.roteiva-calendar-form .calendar-picker-popover {
+  top:calc(52px + 9px);
+}
+@media (max-width:700px){
+  .roteiva-calendar-form .calendar-form-basic>.calendar-basic-field+.calendar-basic-field {margin-top:20px}
+  .roteiva-calendar-form .calendar-field-feedback {min-height:38px;font-size:.73rem}
+}
