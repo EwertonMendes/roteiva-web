@@ -20,6 +20,7 @@ export function LibraryAssetPreview({projectId,node,onClose}:{projectId:number;n
  const [expanded,setExpanded]=useState(false),[muted,setMuted]=useState(true);
  const videoRef=useRef<HTMLVideoElement>(null);
  const resumeVideoTime=useRef(0);
+ const playbackDiagnosticTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
  const networkRetryCount=useRef(0);
  const networkRetryTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
 
@@ -29,6 +30,32 @@ export function LibraryAssetPreview({projectId,node,onClose}:{projectId:number;n
   if(expanded){setExpanded(false);return;}
   onClose();
  });
+ const clearPlaybackDiagnostic=()=>{
+  if(playbackDiagnosticTimer.current!==null){clearTimeout(playbackDiagnosticTimer.current);playbackDiagnosticTimer.current=null;}
+ };
+ const checkPlaybackStall=(video:HTMLVideoElement)=>{
+  clearPlaybackDiagnostic();
+  if(video.paused||video.seeking)return;
+  playbackDiagnosticTimer.current=setTimeout(()=>{
+   if(!video.isConnected||video.paused||video.seeking)return;
+   let ahead=0;
+   for(let i=0;i<video.buffered.length;i++){
+    if(video.buffered.start(i)<=video.currentTime&&video.currentTime<=video.buffered.end(i)){
+     ahead=Math.max(0,video.buffered.end(i)-video.currentTime);break;
+    }
+   }
+   const quality=video.getVideoPlaybackQuality?.();
+   // Diagnostics stay in the user's browser. Never include media URL, file ID,
+   // account, token or project data, nor transmit analytics to a server.
+   console.info('[Roteiva] Diagnóstico local de reprodução',{
+    currentSecond:Math.floor(video.currentTime),bufferedAheadSeconds:Math.round(ahead*10)/10,
+    readyState:video.readyState,networkState:video.networkState,
+    droppedVideoFrames:quality?.droppedVideoFrames??null,
+    totalVideoFrames:quality?.totalVideoFrames??null,
+   });
+  },800);
+ };
+ useEffect(()=>()=>{clearPlaybackDiagnostic();},[]);
  const [url,setURL]=useState(''),[error,setError]=useState(''),[retry,setRetry]=useState(0),[loading,setLoading]=useState(true);
  const mime=node.mime_type||'';
  const image=mime.startsWith('image/'),pdf=mime==='application/pdf';
@@ -126,7 +153,11 @@ export function LibraryAssetPreview({projectId,node,onClose}:{projectId:number;n
       <video ref={videoRef} className="vl-preview-video" src={url} controls autoPlay muted={muted}
         onTimeUpdate={event=>{resumeVideoTime.current=event.currentTarget.currentTime;}}
         playsInline preload="auto" onLoadedData={event=>{if(event.currentTarget.paused)void event.currentTarget.play().catch(()=>{});}}
-        onVolumeChange={event=>setMuted(event.currentTarget.muted)} onError={event=>recoverVideo(event.currentTarget)}/>
+        onVolumeChange={event=>setMuted(event.currentTarget.muted)}
+        onWaiting={event=>checkPlaybackStall(event.currentTarget)}
+        onStalled={event=>checkPlaybackStall(event.currentTarget)}
+        onPlaying={clearPlaybackDiagnostic}
+        onError={event=>{clearPlaybackDiagnostic();recoverVideo(event.currentTarget);}}/>
       {muted&&<AppButton className="vl-preview-unmute" type="button" onClick={()=>{
        if(!videoRef.current)return;videoRef.current.muted=false;setMuted(false);
        if(videoRef.current.paused)void videoRef.current.play().catch(()=>{});
