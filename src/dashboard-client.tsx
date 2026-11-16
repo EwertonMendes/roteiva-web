@@ -30,6 +30,7 @@ import { ActivityHistoryDrawer } from "./features/dashboard/ActivityHistory";
 import {timeMinutes,validTimeRange} from "./studio-calendar";
 import {CalendarView} from "./features/calendar/CalendarView";
 import {CalendarEventDialog,type CalendarDraft} from "./features/calendar/CalendarEventDialog";
+import {ConfirmationDialog} from "./features/ui/ConfirmationDialog";
 import {isValidCivilDate,todayKey} from "./features/calendar/calendar-dates";
 import { toISO as toISOAdded, parseMoney, splitInstallments } from "./studio-finance";
 import { FormEvent, useEffect, useLayoutEffect, useMemo, useState, useCallback, useRef } from "react";
@@ -116,6 +117,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
   const [editingFinanceEntry, setEditingFinanceEntry] = useState<FinanceEntry | null>(null);
   const [deletingFinanceEntry, setDeletingFinanceEntry] = useState<FinanceEntry | null>(null);
   const [eventModalOpen, setEventModalOpen] = useState(false);
+  const [deletingCalendarEvent,setDeletingCalendarEvent]=useState<CalendarEvent|null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   // Closing restores position; navigation from the drawer resets the next page.
   const resetScrollAfterMobileNavigation = useRef(false);
@@ -491,10 +493,15 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     if(entry.autoDeadline) {
       notify("Prazos automáticos são removidos ao alterar o prazo do projeto.");return;
     }
-    if(!window.confirm("Excluir o compromisso “"+entry.title+"”?"))return;
+    setDeletingCalendarEvent(entry);
+  }
+  function confirmDeleteCalendarEvent() {
+    if(!deletingCalendarEvent)return;
+    const entry=deletingCalendarEvent;
     commitCommands([{kind:"deleteEvent",id:entry.id}]);
     setCalendarEvents(current=>current.filter(e=>e.id!==entry.id));
     logActivity("Compromisso excluído: "+entry.title);
+    setDeletingCalendarEvent(null);
     setEditingEvent(null);setEventModalOpen(false);
     notifyChange("Compromisso excluído do calendário");
   }
@@ -684,6 +691,12 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
         preferredProjectId={selectedProject} events={calendarEvents}
         onSave={saveCalendarEvent} onCancel={()=>{setEventModalOpen(false);setEditingEvent(null);}}
         onDelete={deleteCalendarEvent}/>}
+      {deletingCalendarEvent&&<ConfirmationDialog key={deletingCalendarEvent.id}
+        title="Excluir compromisso?"
+        description={"“"+deletingCalendarEvent.title+"” será removido permanentemente do calendário."}
+        confirmLabel="Excluir compromisso" cancelLabel="Manter compromisso"
+        onCancel={()=>setDeletingCalendarEvent(null)}
+        onConfirm={confirmDeleteCalendarEvent}/>}
       <nav className="mobile-bottom-nav" aria-label="Navegação no celular">
         <AppButton className={view === "overview" ? "active" : ""} aria-current={view === "overview" ? "page" : undefined} onClick={()=>changeView("overview")}><LayoutDashboard size={20}/><span>Início</span></AppButton>
         <AppButton className={view === "projects" ? "active" : ""} aria-current={view === "projects" ? "page" : undefined} onClick={()=>changeView("projects")}><Folder size={20}/><span>Projetos</span></AppButton>
