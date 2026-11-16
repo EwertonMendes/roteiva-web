@@ -31,7 +31,7 @@ test("calendar empty day creation, optional ending, review category, editing and
   const form=page.locator("dialog.roteiva-calendar-form");
   await expect(form).toBeVisible();
   await form.getByLabel("Título do compromisso").fill("Gravação externa — campanha verão");
-  await expect(form.getByLabel("Término do compromisso")).toHaveValue("");
+  await expect(form.getByRole("textbox",{name:"Término do compromisso"})).toHaveValue("");
   await form.getByRole("combobox",{name:"Tipo de compromisso"}).click();
   await page.getByRole("option",{name:"Revisão"}).click();
   await form.getByRole("button",{name:"Salvar compromisso"}).click();
@@ -47,13 +47,13 @@ test("calendar empty day creation, optional ending, review category, editing and
   await day.getByRole("button",{name:/Editar Gravação externa/}).click();
 
   await expect(form).toBeVisible();
-  await form.getByLabel("Término do compromisso").fill("10:00");
+  await form.getByRole("textbox",{name:"Término do compromisso"}).fill("10:00");
   await form.getByRole("button",{name:"Cancelar"}).click();
   await selected.click();
   await expect(day).toContainText("Sem término");
   await day.getByRole("button",{name:/Editar Gravação externa/}).click();
-  await form.getByLabel("Término do compromisso").fill("10:00");
-  await expect(form.getByLabel("Término do compromisso")).toHaveValue("10:00");
+  await form.getByRole("textbox",{name:"Término do compromisso"}).fill("10:00");
+  await expect(form.getByRole("textbox",{name:"Término do compromisso"})).toHaveValue("10:00");
   await form.getByRole("button",{name:"Salvar compromisso"}).click();
   await expect(form).toHaveCount(0);
   await selected.click();
