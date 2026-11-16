@@ -333,19 +333,27 @@ export function FirebaseWorkspace() {
     window.addEventListener("beforeunload",warn);
     return ()=>window.removeEventListener("beforeunload",warn);
   },[saving]);
+  // Resolve the outcome for each queued write only after Firestore confirms it.
+  // Errors still stop later writes to prevent accidental duplication, but the
+  // caller receives false instead of a false-positive success notification.
   const enqueue=useCallback((operation:()=>Promise<unknown>,{blocksInteraction=true}={})=>{
+    let resolveOutcome:(saved:boolean)=>void=()=>undefined;
+    const outcome=new Promise<boolean>(resolve=>{resolveOutcome=resolve;});
     pending.current++;
     if(blocksInteraction){pendingBlocking.current++;setBlockingWrites(true);}
     setSaving(true);
     queue.current=queue.current.then(async()=>{
-      if (failed.current) return;
+      if(failed.current){resolveOutcome(false);return;}
       await operation();
+      resolveOutcome(true);
     }).catch(reason=>{
       failed.current=true;setFailedWrite(true);setError(dataErrorMessage(reason));
+      resolveOutcome(false);
     }).finally(()=>{
       pending.current--;if(!pending.current)setSaving(false);
       if(blocksInteraction){pendingBlocking.current--;if(!pendingBlocking.current)setBlockingWrites(false);}
     });
+    return outcome;
   },[]);
   // Theme changes share the write queue and error handling, but must not make
   // the focused account menu inert while the preference is being persisted.
@@ -373,7 +381,6 @@ export function FirebaseWorkspace() {
   }),[repository,enqueue,financePeriod,financeBars]);
   if (!user) return null;
   return <>
-    {blockingWrites && <div className="cloud-operation" role="status">Salvando alterações…</div>}
     {authError && <p className="cloud-banner" role="alert">{authError}</p>}
     {remoteChanges && !error && <section className="cloud-recovery" role="status">
       <h2>Há alterações em outro dispositivo</h2>
