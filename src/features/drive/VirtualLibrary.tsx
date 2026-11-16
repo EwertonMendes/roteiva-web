@@ -182,7 +182,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
   }}finally{if(revision===loadRevision.current){setLoadingPage(false);setRefreshing(false);}}
  },[base,user?.uid,call,parent,trash,pageScope,term,searchAll,onSelectProject]);
  useEffect(()=>transfers.subscribe((_file,destination)=>{
-  if(destination.projectId===selectedProjectId&&destination.linkedFolderId===parent&&!mutation.current){if(user?.uid&&selectedProjectId)invalidateLibraryFolders(user.uid,selectedProjectId);notifyFileCount();void load();}
+  if(destination.projectId===selectedProjectId){if(user?.uid&&selectedProjectId)invalidateLibraryFolders(user.uid,selectedProjectId);notifyFileCount();if(destination.linkedFolderId===parent&&!mutation.current)void load();}
  }),[transfers.subscribe,selectedProjectId,parent,load]);
  async function upload(files:File[]){
   if(!files.length||!selectedProjectId||busy)return;
@@ -300,7 +300,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
  if(!edit||!base||busy||(edit.action==='move'&&!destinationId))return;const operation=edit,scope=generation.current,controller=new AbortController();mutation.current=controller;setBusy(true);setError('');
  try{await call(base+(operation.node?'/'+operation.node.id:''),'POST',operation.node?
  {action:operation.action,name,parentId:operation.action==='move'?destinationId:parent,revision:operation.node.revision}:{name,parentId:parent},controller.signal);
- if(scope===generation.current){setEdit(null);if(user?.uid&&selectedProjectId)invalidateLibraryFolders(user.uid,selectedProjectId);await load();}
+ if(scope===generation.current){setEdit(null);if(user?.uid&&selectedProjectId)invalidateLibraryFolders(user.uid,selectedProjectId);notifyFileCount();await load();}
  }catch(e){if(!controller.signal.aborted&&scope===generation.current)setError(e instanceof Error?e.message:'Não foi possível salvar.');}
  finally{if(mutation.current===controller)mutation.current=null;if(scope===generation.current)setBusy(false);}
  }
@@ -444,7 +444,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
  </div></div>}
  {dropboxPicker&&dropbox&&<DropboxLibraryPicker key={dropbox.id+':'+dropboxStructure} connectionId={dropbox.id} includeFolders={dropboxStructure} onClose={()=>setDropboxPicker(false)} onSelect={(ids,names,folderIds)=>void addDropbox(ids,names,folderIds)}/>}
  {preview&&selectedProjectId&&<LibraryAssetPreview key={preview.id} projectId={selectedProjectId} node={preview} onClose={()=>setPreview(null)}/>}
- {structure&&selectedProjectId&&<LibraryStructureDialog key={selectedProjectId+':'+parent} projectId={selectedProjectId} parentId={parent} onClose={()=>setStructure(false)} onApplied={()=>{setStructure(false);void load();}}/>}
- {assisted&&selectedProjectId&&<AssistedLibraryImport key={selectedProjectId+':'+assisted.parentId} projectId={selectedProjectId} parentId={assisted.parentId} sources={assisted.sources} unavailable={assisted.failed} recursive={assisted.recursive} onExploreFolder={folder=>void addDriveFolderContents(folder)} onClose={()=>{setAssisted(null);void load();}} onApplied={()=>{setAssisted(null);setSearch('');setTerm('');void load();}}/>}
+ {structure&&selectedProjectId&&<LibraryStructureDialog key={selectedProjectId+':'+parent} projectId={selectedProjectId} parentId={parent} onClose={()=>setStructure(false)} onApplied={()=>{setStructure(false);notifyFileCount();void load();}}/>}
+ {assisted&&selectedProjectId&&<AssistedLibraryImport key={selectedProjectId+':'+assisted.parentId} projectId={selectedProjectId} parentId={assisted.parentId} sources={assisted.sources} unavailable={assisted.failed} recursive={assisted.recursive} onExploreFolder={folder=>void addDriveFolderContents(folder)} onClose={()=>{setAssisted(null);void load();}} onApplied={()=>{setAssisted(null);setSearch('');setTerm('');notifyFileCount();void load();}}/>}
  </section>;
 }
