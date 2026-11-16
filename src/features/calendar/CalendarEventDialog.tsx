@@ -32,6 +32,7 @@ export function CalendarEventDialog({editing,date,projects,clients,events,prefer
   const [client,setClient]=useState(editing?.client==="Interno"?"":editing?.client||initialProject?.client||"");
   const [projectId,setProjectId]=useState(initialProjectId?String(initialProjectId):"");
   const [error,setError]=useState("");
+  const [validationAttempted,setValidationAttempted]=useState(false);
   const locked=!!editing?.autoDeadline;
   useEffect(()=>{
     const node=dialog.current;
@@ -52,6 +53,7 @@ export function CalendarEventDialog({editing,date,projects,clients,events,prefer
   },[editing?.id,eventDate,time,endTime,events]);
   function save(event:FormEvent<HTMLFormElement>){
     event.preventDefault();
+    setValidationAttempted(true);
     const cleanTitle=title.trim();
     if(!cleanTitle){setError("Informe o título do compromisso.");return;}
     if(!isValidCivilDate(eventDate)){setError("Selecione uma data válida.");return;}
@@ -85,30 +87,34 @@ export function CalendarEventDialog({editing,date,projects,clients,events,prefer
         <AppButton className="calendar-dialog-close" aria-label="Fechar cadastro" type="button" onClick={onCancel}><X size={21}/></AppButton>
       </div>
       <div className="calendar-form-section calendar-form-basic">
-        <label htmlFor="calendar-title">Título do compromisso</label>
-        <AppInput id="calendar-title" ref={input} maxLength={200} value={title} onChange={event=>{setTitle(event.target.value);setError("");}}
-          placeholder="Ex.: Gravação externa — campanha verão" required/>
-        <label htmlFor="calendar-type">Tipo de compromisso</label>
-        <div className="calendar-field-with-icon"><Video size={19} aria-hidden="true"/>
-          <AppSelect id="calendar-type" aria-label="Tipo de compromisso" value={type} onValueChange={value=>setType(value as CalendarEvent["type"])} disabled={locked}>
-            {typeOptions.map(option=><option key={option} value={option}>{option}</option>)}
-          </AppSelect>
-        </div>
+        <label className="calendar-basic-field">Título do compromisso
+          <AppInput id="calendar-title" ref={input} maxLength={200} value={title} onChange={event=>{setTitle(event.target.value);setError("");}}
+            placeholder="Ex.: Gravação externa — campanha verão" required/>
+        </label>
+        <label className="calendar-basic-field">Tipo de compromisso
+          <div className="calendar-field-with-icon"><Video size={19} aria-hidden="true"/>
+            <AppSelect id="calendar-type" aria-label="Tipo de compromisso" value={type} onValueChange={value=>setType(value as CalendarEvent["type"])} disabled={locked}>
+              {typeOptions.map(option=><option key={option} value={option}>{option}</option>)}
+            </AppSelect>
+          </div>
+        </label>
       </div>
       <div className="calendar-form-section">
         <h3><CalendarDays size={19} aria-hidden="true"/>Data e horário</h3>
         <div className="calendar-date-fields">
           <div className="calendar-datetime-field">
             <span className="calendar-field-caption">Data</span>
-            <CalendarDateField value={eventDate} onChange={value=>{setEventDate(value);setError("");}}/>
+            <CalendarDateField value={eventDate} showValidation={validationAttempted} onChange={value=>{setEventDate(value);setError("");}}/>
           </div>
           <div className="calendar-datetime-field">
             <span className="calendar-field-caption">Início</span>
-            <CalendarTimeField label="Início do compromisso" value={time} onChange={value=>{setTime(value);setError("");}}/>
+            <CalendarTimeField label="Início do compromisso" value={time} showValidation={validationAttempted} onChange={value=>{setTime(value);setError("");}}/>
           </div>
           <div className="calendar-datetime-field">
             <span className="calendar-field-caption">Término <em>(opcional)</em></span>
-            <CalendarTimeField label="Término do compromisso" optional value={endTime} onChange={value=>{setEndTime(value);setError("");}}/>
+            <CalendarTimeField label="Término do compromisso" optional value={endTime} showValidation={validationAttempted}
+              rangeError={endTime&&Number.isFinite(timeMinutes(time))&&Number.isFinite(timeMinutes(endTime))&&!validTimeRange(time,endTime)?"O término precisa ser após o início.":""}
+              onChange={value=>{setEndTime(value);setError("");}}/>
           </div>
         </div>
         {!endTime&&<p className="calendar-form-hint"><Info size={16}/>Sem término definido, apenas o início será registrado.</p>}
