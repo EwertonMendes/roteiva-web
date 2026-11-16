@@ -53,8 +53,15 @@ test("calendar empty day creation, optional ending, review category, editing and
   await expect(day).toContainText("Sem término");
   await day.getByRole("button",{name:/Editar Gravação externa/}).click();
   await form.getByLabel("Término do compromisso").fill("10:00");
+  await expect(form.getByLabel("Término do compromisso")).toHaveValue("10:00");
   await form.getByRole("button",{name:"Salvar compromisso"}).click();
   await expect(form).toHaveCount(0);
+  await selected.click();
+  await expect(day).toContainText("09:00 – 10:00");
+  await day.getByRole("button",{name:"Fechar"}).click();
+  // Wait for the cloud command queue; a render update is not a durable write.
+  await expect(page.locator(".app-shell")).toHaveAttribute("aria-busy","false");
+  await expect(page.locator(".cloud-operation")).toBeHidden();
 
   await page.reload();
   await expect(page.locator(".roteiva-calendar")).toBeVisible();
