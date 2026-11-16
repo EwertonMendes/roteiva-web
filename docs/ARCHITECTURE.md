@@ -1,5 +1,15 @@
 # Arquitetura do Roteiva — MVP SaaS
 
+## Contrato do calendário 09 (16/11/2026 — branch em validação)
+- A agenda permanece em users/{uid}/events, com comandos tipados por documento, id numérico, data civil YYYY-MM-DD, hora local HH:mm e endTime opcional representado por string vazia na persistência. Nenhuma migração destrutiva nem novos serviços.
+- Enum de tipos ampliado aditivamente com Revisão; a whitelist em firestore.rules deve estar publicada antes de validar essa categoria em DEV. Excluir e editar eventos continuam autorizados apenas pelo owner e acesso ativo.
+- A rota de calendário carrega clientes/projetos para seletores válidos e a janela de eventos atual (+ vizinhos), com até quatro eventos subsequentes; a UI nunca usa o recorte mensal para executar exclusão de domínios.
+- autoDeadline=true é propriedade de prazo originado pelo projeto: a UI mantém tipo/projeto fixos, aplica atualização de data ao documento de projeto e impede exclusão direta pelo calendário. A remoção da data do projeto continua sendo o caminho de exclusão.
+- CalendarView e CalendarEventDialog em src/features/calendar isolam estados efêmeros e apresentação. Um modal nativo por vez usa a top-layer para foco/Escape sem listeners globais. ISO civil é construído no calendário local para evitar deslocamento de data.
+- O vínculo cliente permanece no campo string histórico (não foi introduzido clientId no evento), enquanto projectId mantém referencial validado no Firestore. Contas com registros antigos são preservadas.
+
+
+
 > **Registro histórico (15/11/2026):** os estados de consoles e pendências abaixo foram observados nessa data. PR #125 e PR #129 foram mergeados posteriormente; DEV já contém essas alterações. A implantação em PROD depende de workflows protegidos; este documento não comprova a publicação nem a aprovação do Dropbox.
 
 ## OAuth multiconta e separação — auditoria de 15/11/2026
