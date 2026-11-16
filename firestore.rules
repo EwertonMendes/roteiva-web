@@ -136,7 +136,7 @@ service cloud.firestore {
         clock(d.time) &&
         (d.endTime=='' || (clock(d.endTime) && d.endTime>d.time)) &&
         d.autoDeadline is bool &&
-        d.type in ["Produção","Entrega","Reunião","Aprovação"] &&
+        d.type in ["Produção","Entrega","Reunião","Aprovação","Revisão"] &&
         text(d.client,0,500);
     }
     function valid_financeEntries(d,uid,id) {
