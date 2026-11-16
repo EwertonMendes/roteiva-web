@@ -9,7 +9,7 @@ import {ApiError} from './types.ts';
 const FIRST_BYTES=1024*1024;
 const NEXT_BYTES=8*1024*1024;
 const MAX_SLICE_RETRIES=2;
-export const MAX_STITCHED_VIDEO=256*1024*1024;
+export const MAX_STITCHED_VIDEO=2*1024*1024*1024;
 type ReadSlice=(range:string,signal:AbortSignal)=>Promise<Response>;
 
 async function openSlice(
@@ -49,6 +49,9 @@ export async function stitchedVideoResponse(
  const start=Number(match[1]),end=Number(match[2]);
  if(!Number.isSafeInteger(start)||!Number.isSafeInteger(end)||start>end||end>=total)
   throw new ApiError(416,'media_invalid_range');
+ // Limit upstream calls even for large videos on Workers Free (50 subrequests).
+ // The slices are streamed, so their size is not an in-memory allocation.
+ const nextBytes=Math.max(NEXT_BYTES,Math.ceil((end-start+1)/26));
  const abort=new AbortController();
  const onAbort=()=>abort.abort();
  if(requestSignal?.aborted)abort.abort();
@@ -66,8 +69,7 @@ export async function stitchedVideoResponse(
     if(cursor>end){cleanup();controller.close();return;}
     try{
      if(!reader){
-      sliceEnd=Math.min(end,cursor+NEXT_BYTES-1);
-      failures=0;
+      if(failures===0)sliceEnd=Math.min(end,cursor+nextBytes-1);
       reader=await openSlice(read,cursor,sliceEnd,total,abort.signal);
      }
      let part:ReadableStreamReadResult<Uint8Array>;
