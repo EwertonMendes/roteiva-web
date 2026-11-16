@@ -23,11 +23,9 @@ export async function libraryContent(request:Request,env:Env,uid:string,projectI
  ]);
  if(node.kind!=='asset')throw new ApiError(404,'source_unavailable');
  if(!asset)throw new ApiError(404,'source_unavailable');
- // A recently verified image observation is reusable for the first image
- // request, not just for Range requests. The provider remains authoritative
- // for its bytes and revocation; an old observation is never authoritative.
- const recentImage=!request.headers.has('Range')&&request.method==='GET'&&asset.mime_type.startsWith('image/');
- const reuse=(!!request.headers.get('Range')||recentImage)&&asset.state==='available'&&
+ // Unranged images still recheck provider metadata for permission revocation.
+ // Only adjacent native Range requests reuse previously verified observations.
+ const reuse=!!request.headers.get('Range')&&asset.state==='available'&&
   typeof asset.size==='string'&&asset.size.length>0&&typeof asset.source_name==='string'&&
   Number.isFinite(asset.observed_at)&&observationStarted>=asset.observed_at&&
   observationStarted-asset.observed_at<MEDIA_METADATA_FRESH_MS;
