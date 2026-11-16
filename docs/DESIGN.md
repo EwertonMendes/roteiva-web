@@ -1,5 +1,10 @@
 # Identidade visual e experiência — Roteiva
 
+## Calendário 09 — refinamento visual e seletores (16/11/2026, DEV)
+- O título/subtítulo, mês, rótulos de dias, agenda lateral, estados vazios e botão Novo compromisso seguem a hierarquia/contraste do mockup. A cor de destaque é reservada à data selecionada e à ação de adicionar na agenda.
+- O formulário padroniza a linha Data, Início, Término (opcional): mesmo alinhamento de rótulo, altura e bordas. Campos usam digitação direta (DD/MM/AAAA e HH:mm) e popovers com navegação acessível, em vez do calendário/relógio nativos específicos de cada sistema operacional.
+- Em telas desktop com altura utilizável (>=720px, largura >1150px), a página se ajusta à viewport e evita a rolagem externa; Próximos compromissos tem região rolável independente. Em viewport pequeno, zoom elevado ou mobile, prevalece rolagem natural para evitar ocultação de dados.
+
 ## Calendário 09 — atualização de UX (16/11/2026, em validação DEV)
 - O mockup 09 governa a grade mensal com 4/5/6 semanas, célula selecionada azul, contagem por dia, agenda lateral e dois diálogos acessíveis. Clicar em dia vazio abre o cadastro com data; dia ocupado abre a lista ordenada, com edição e adicionar outro. A seleção mantém o mês e não confunde datas civis com instantes UTC.
 - O formulário usa os controles compartilhados do Roteiva: título, tipo, data, início obrigatório, término opcional, cliente cadastrado e projeto opcional. Clientes antigos em texto livre não são sobrescritos por navegação; os vínculos de projetos continuam por ID.
