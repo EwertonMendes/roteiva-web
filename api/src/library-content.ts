@@ -6,7 +6,6 @@ import {accessCredential} from './google.ts';
 import {dropboxConnection,dropboxAccess} from './dropbox.ts';
 import {sourceRange,playbackRange} from './library-source.ts';
 import {streamHeaders} from './media-fetch.ts';
-import {stitchedVideoResponse,MAX_STITCHED_VIDEO} from './media-range-chunks.ts';
 import {driveResourceHeaders,storedDriveResourceKey} from './drive-resource-keys.ts';
 type Asset={id:string;provider:'google_drive'|'dropbox';connection_id:string;file_id:string;mime_type:string;source_name:string;size:string|null;source_revision:string|null;observed_at:number;state:string};
 // The original provider remains authoritative for bytes and revocation. Reuse
@@ -53,26 +52,17 @@ export async function libraryContent(request:Request,env:Env,uid:string,projectI
  readRange=(requested,signal)=>streamHeaders(fetcher,'https://content.dropboxapi.com/2/files/download',{
  method:'POST',headers:{Authorization:'Bearer '+credential,'Dropbox-API-Arg':JSON.stringify({path:asset.file_id}),Range:requested},redirect:'manual',signal});
  }
- // DEV-only: one browser response is stitched from short upstream reads. Avoid
- // the original long-lived provider connection, which can stop after ~40s.
- // Limit the total size to bound subrequests on a Worker Free account.
- const requested=/^bytes=(\d+)-(\d+)$/.exec(range);
- const canStitch=env.ENVIRONMENT==='dev'&&request.method==='GET'&&source.mimeType.startsWith('video/')&&
-  Number(source.size)<=MAX_STITCHED_VIDEO&&requested&&Number(requested[2])-Number(requested[1])+1>8*1024*1024;
- if(canStitch){
-  const response=await stitchedVideoResponse(range,source.size,source.mimeType,
-   (slice,signal)=>readRange(slice,signal),request.signal);
-  if(!reuse)await env.DB.prepare("UPDATE library_assets SET source_name=?,mime_type=?,size=?,source_revision=?,state='available',observed_at=? WHERE library_id=? AND id=? AND observed_at<=?")
-   .bind(source.name,source.mimeType,source.size,source.revision,observationStarted,lib.id,asset.id,observationStarted).run();
-  return response;
- }
+ // A single provider range is handed to the runtime as an opaque stream.
+ // NEVER read, re-chunk or transform native media bytes in JavaScript:
+ // the free-tier CPU budget is cumulative over the entire streaming response.
  const upstream=await readRange(range,request.signal);
  if(!upstream.ok){await upstream.body?.cancel();throw new ApiError(upstream.status===429?429:502,upstream.status===429?'provider_rate_limited':'source_unavailable');}
  const originMs=Math.round(performance.now()-startOrigin);
  if(metadataMs+originMs>750)console.info(JSON.stringify({event:'media_origin_timing',kind:'library',provider:asset.provider,
   metadataMs,originMs,reusedMetadata:reuse}));
  const match=/^bytes (\d+)-(\d+)\/(\d+)$/.exec(upstream.headers.get('Content-Range')||'');
- const matchingPartial=upstream.status===206&&!!match&&'bytes='+match[1]+'-'+match[2]===range&&match[3]===source.size;
+ const matchingPartial=upstream.status===206&&!!match&&'bytes='+match[1]+'-'+match[2]===range&&match[3]===source.size&&
+   (!upstream.headers.has('Content-Length')||upstream.headers.get('Content-Length')===String(Number(match[2])-Number(match[1])+1));
  // Some providers answer a complete download with 200 despite our
  // upstream bytes=0-EOF request. Accept it only if no Range was requested
  // by the browser and the source's expected total size is verified.
@@ -86,10 +76,24 @@ export async function libraryContent(request:Request,env:Env,uid:string,projectI
  .bind(source.name,source.mimeType,source.size,source.revision,observationStarted,lib.id,asset.id,observationStarted).run();
  const headers=new Headers({'Content-Type':source.mimeType,'Accept-Ranges':'bytes',
  'Content-Length':String(matchingFull?Number(source.size):Number(match![2])-Number(match![1])+1),'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer',
- 'Access-Control-Expose-Headers':'Content-Length, Content-Range, Accept-Ranges'});
+ 'Access-Control-Expose-Headers':'Content-Length, Content-Range, Accept-Ranges, X-Roteiva-Media-Transport'});
  if(!full&&!matchingFull)headers.set('Content-Range',upstream.headers.get('Content-Range')!);
  if(source.mimeType==='image/svg+xml')headers.set('Content-Security-Policy',"sandbox; default-src 'none'");
  if(request.method==='HEAD'){await upstream.body?.cancel();return new Response(null,{status:full||matchingFull?200:206,headers});}
+ if(/^(video|audio)\//.test(source.mimeType)){
+  // The browser's Range/seek determines the upstream response extent. Pass
+  // through its ReadableStream untouched: no arrayBuffer, clone, transform,
+  // interval stitching or per-byte CPU work. An aborted stream is surfaced
+  // to Chrome as an I/O failure rather than silently manufacturing more bytes.
+  headers.set('X-Roteiva-Media-Transport','origin-pass-through');
+  if(env.ENVIRONMENT==='dev')console.info(JSON.stringify({
+   event:'media_proxy_headers',provider:asset.provider,kind:source.mimeType.startsWith('video/')?'video':'audio',
+   status:matchingFull?200:206,metadataMs,originMs,
+   bytes:Number(headers.get('Content-Length')),mode:'pass_through'
+  }));
+  return new Response(upstream.body,{status:matchingFull?200:206,headers});
+ }
+ // Bounded images/PDF retain the pre-existing body length verification.
  const expected=matchingFull?Number(source.size):Number(match![2])-Number(match![1])+1;let received=0;
  const body=upstream.body?.pipeThrough(new TransformStream<Uint8Array,Uint8Array>({
  transform(chunk,controller){received+=chunk.byteLength;if(received>expected){controller.error(new Error('source_size_changed'));return;}controller.enqueue(chunk);},
