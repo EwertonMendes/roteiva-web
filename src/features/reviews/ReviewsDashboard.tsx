@@ -326,8 +326,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
     await run(async()=>{
       if(action==="publish")await completePublication("/reviews/"+opened.review.id+"/publish");
       else await call("/reviews/"+opened.review.id+"/"+action,"POST");
-      if(action==="close")setOpened(null);
-      else await openDetail(opened.review.id);
+      await openDetail(opened.review.id);
     });
   };
   async function closeReviewConfirmed(){
