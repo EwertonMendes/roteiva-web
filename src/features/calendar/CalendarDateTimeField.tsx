@@ -97,13 +97,13 @@ export function CalendarDateField({value,onChange,showValidation=false}:{value:s
     </div>}
   </div>;
 }
-export function CalendarTimeField({value,onChange,optional=false,label,showValidation=false}:{
-  value:string;onChange:(value:string)=>void;optional?:boolean;label:string;showValidation?:boolean;
+export function CalendarTimeField({value,onChange,optional=false,label,showValidation=false,rangeError=""}:{
+  value:string;onChange:(value:string)=>void;optional?:boolean;label:string;showValidation?:boolean;rangeError?:string;
 }){
   const [open,setOpen]=useState(false);
   const [touched,setTouched]=useState(false);
   const helpId=useId();
-  const fieldError=(touched||showValidation)?timeInputError(value,optional):"";
+  const fieldError=(touched||showValidation)?(timeInputError(value,optional)||rangeError):"";
   const root=useRef<HTMLDivElement>(null);
   const trigger=useRef<HTMLButtonElement>(null);
   const popupId=useId();
