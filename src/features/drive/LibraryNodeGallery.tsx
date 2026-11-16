@@ -66,7 +66,7 @@ export function LibraryNodeGallery<T extends LibraryGalleryNode>({
     <h3>Arquivos</h3><ul className="vl-explorer-items vl-explorer-items--grid vl-explorer-assets">{nodes.filter(n=>n.kind==='asset').map(renderNode)}</ul>
    </section>}
   </div>:<>
-   <div className="vl-list-header" aria-hidden="true"><span>Nome</span><span>Ações</span></div>
+   <div className="vl-list-header" aria-hidden="true"><span>Nome</span>{renderActions&&<span>Ações</span>}</div>
    <ul className="vl-explorer-items vl-explorer-items--list" aria-label={listLabel}>{nodes.map(renderNode)}</ul>
   </>}
  </>;
