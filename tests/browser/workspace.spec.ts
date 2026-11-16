@@ -109,23 +109,35 @@ test("Google emulator session, CRUD, restoration, themes and separate users",asy
   await page.getByRole("button",{name:"Mostrar valores financeiros"}).click();
   await expect(page.locator(".flow-finance-amount")).toContainText("R$ 100,01");
   await navigate(page,"Calendário");
-  const emptyDay=page.locator(".calendar-grid > button:not(.outside):not(:has(.event-chip))").first();
+  const calendar=page.locator(".roteiva-calendar");
+  const eventDialog=page.locator("dialog.roteiva-calendar-form");
+  // The redesigned grid uses a numeric counter and the date field displays DD/MM/YYYY.
+  const emptyDay=calendar.locator(".calendar-grid > button:not(.outside):not(.has-events)").first();
   const day=Number(await emptyDay.locator("b").first().innerText());
   await emptyDay.click();
-  await expect(page.locator("form.calendar-event-modal")).toBeVisible();
-  await expect(page.getByLabel("Data do trabalho",{exact:true})).toHaveValue(today.slice(0,7)+"-"+String(day).padStart(2,"0"));
-  await page.getByRole("button",{name:"Cancelar",exact:true}).click();
-  await page.getByRole("button",{name:"Novo compromisso",exact:true}).click();
-  await page.getByLabel("Título",{exact:true}).fill("Gravação Aurora");
-  await page.getByLabel("Data do trabalho",{exact:true}).fill(today);
-  await page.getByLabel("Horário de término",{exact:true}).fill("10:00");
-  await page.getByRole("button",{name:"Salvar compromisso"}).click();await settled(page);
-  const busyDay=page.locator(".calendar-grid > button:has(.event-chip)").filter({hasText:"Gravação Aurora"}).first();
+  await expect(eventDialog).toBeVisible();
+  await expect(eventDialog.getByRole("textbox",{name:"Data do compromisso"}))
+    .toHaveValue(String(day).padStart(2,"0")+"/"+today.slice(5,7)+"/"+today.slice(0,4));
+  await eventDialog.getByRole("button",{name:"Cancelar"}).click();
+  await page.locator(".heading-actions").getByRole("button",{name:"Novo compromisso",exact:true}).click();
+  await eventDialog.getByRole("textbox",{name:"Título do compromisso"}).fill("Gravação Aurora");
+  await eventDialog.getByRole("textbox",{name:"Data do compromisso"})
+    .fill(today.slice(8,10)+"/"+today.slice(5,7)+"/"+today.slice(0,4));
+  await eventDialog.getByRole("textbox",{name:"Término do compromisso"}).fill("10:00");
+  await eventDialog.getByRole("button",{name:"Salvar compromisso"}).click();await settled(page);
+  await expect(eventDialog).toHaveCount(0);
+  const busyDay=calendar.locator(".calendar-grid > button.selected");
+  await expect(busyDay.locator(".calendar-event-counter")).toHaveText("1");
   await busyDay.click();
-  await expect(page.getByRole("button",{name:"Adicionar outro compromisso"})).toBeVisible();
-  await page.getByRole("button",{name:"Adicionar outro compromisso"}).click();
-  await expect(page.getByLabel("Data do trabalho",{exact:true})).toHaveValue(today);
-  await page.getByRole("button",{name:"Cancelar",exact:true}).click();
+  const dayDialog=page.locator("dialog.day-events-dialog");
+  await expect(dayDialog.getByText("Gravação Aurora",{exact:true})).toBeVisible();
+  await dayDialog.getByRole("button",{name:"Novo compromisso"}).click();
+  await expect(eventDialog.getByRole("textbox",{name:"Data do compromisso"}))
+    .toHaveValue(today.slice(8,10)+"/"+today.slice(5,7)+"/"+today.slice(0,4));
+  await eventDialog.getByRole("button",{name:"Cancelar"}).click();
+  // A child dialog now closes independently; explicitly close the preserved day dialog.
+  await expect(dayDialog).toBeVisible();
+  await dayDialog.getByRole("button",{name:"Fechar compromissos do dia"}).click();
   if(info.project.name==="mobile")await page.getByRole("button",{name:"Abrir menu",exact:true}).click();
   await page.getByRole("button",{name:"Opções da conta",exact:true}).click();
   await page.getByRole("button",{name:"Ativar modo escuro",exact:true}).click();await settled(page);
@@ -142,7 +154,7 @@ test("Google emulator session, CRUD, restoration, themes and separate users",asy
   await navigate(page,"Financeiro");
   await expect(page.locator(".finance-table")).toContainText("100,01");
   await navigate(page,"Calendário");
-  await expect(page.locator(".day-agenda").getByText("Gravação Aurora",{exact:true})).toBeVisible();
+  await expect(page.locator(".calendar-agenda-events").getByText("Gravação Aurora",{exact:true})).toBeVisible();
   await navigate(page,"Projetos");
   await expect(page.getByText("Filme Aurora",{exact:true})).toBeVisible();
   await page.getByRole("button",{name:"Filme Aurora",exact:true}).click();
