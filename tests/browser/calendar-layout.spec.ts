@@ -22,6 +22,10 @@ async function enterCalendar(page:Page,email:string){
   if(await open.isVisible())await open.click();
   await page.locator(".sidebar nav").getByRole("button",{name:/^Calendário/}).click();
   await expect(page.locator(".roteiva-calendar")).toBeVisible();
+  // Route transitions temporarily mount a 100vh loading screen alongside
+  // the inert workspace. Measure only after that transition is complete.
+  await expect(page.locator(".studio-loading")).toHaveCount(0);
+  await expect(page.locator("[inert]")).toHaveCount(0);
 }
 
 test("calendar empty day creation, optional ending, review category, editing and reload",async({page},info)=>{
