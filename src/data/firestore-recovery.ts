@@ -34,3 +34,30 @@ export async function retryFirestoreRead<T>(
   }
   throw Error("Leitura esgotada.");
 }
+
+/**
+ * A newly restored Firebase tab can briefly get a permission-denied SDK read
+ * while its cross-tab credential provider is still synchronizing. This is NOT
+ * a blanket retry: first confirm the current user's entitlement and profile
+ * with fresh authenticated server-only reads. The actual Firestore Rules must
+ * allow the retried business query; a second denial is final.
+ *
+ * Never use this for writes. Writes may have committed before an error.
+ */
+export async function retryVerifiedInitialRead<T>(
+  read:()=>Promise<T>,
+  confirmServerEntitlement:()=>Promise<boolean>,
+  options:{isCurrent?:()=>boolean}={},
+):Promise<T>{
+  try{
+    return await retryFirestoreRead(read,{isCurrent:options.isCurrent});
+  }catch(original){
+    if(firestoreCode(original)!=='permission-denied')throw original;
+    if(options.isCurrent&&!options.isCurrent())throw new Error('Leitura cancelada.');
+    // A failure to confirm access must deny, never authorize the retry.
+    const verified=await confirmServerEntitlement();
+    if(!verified)throw original;
+    if(options.isCurrent&&!options.isCurrent())throw new Error('Leitura cancelada.');
+    return retryFirestoreRead(read,{attempts:1,isCurrent:options.isCurrent});
+  }
+}
