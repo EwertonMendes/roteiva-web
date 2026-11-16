@@ -1,6 +1,6 @@
 import {useEffect,useRef,useState} from 'react';
 import {AlertCircle,Expand,FileAudio,LoaderCircle,Minimize,RefreshCcw,Volume2,X} from 'lucide-react';
-import {API_BASE_URL,appEnvironment} from '../../lib/environment';
+import {API_BASE_URL} from '../../lib/environment';
 import {useAuth} from '../auth/AuthProvider';
 import {AppButton} from '../ui/AppButton';
 import {useOverlayFocus} from './DriveLibraryUI';
@@ -11,13 +11,6 @@ import {ReviewPdfViewer} from '../reviews/ReviewPdfViewer';
 import {ReviewImageViewer} from '../reviews/ReviewImageViewer';
 
 const imageLimit=24*1024*1024;
-const mimeIsVideo=(mime?:string)=>Boolean(mime?.startsWith('video/'));
-function validStreamEmbed(value:unknown):value is string{
- if(typeof value!=='string')return false;
- try{const u=new URL(value);return u.protocol==='https:'&&/^customer-[a-z0-9-]+\.cloudflarestream\.com$/.test(u.hostname)&&u.pathname.endsWith('/iframe');}catch{return false;}
-}
-
-
 /** Image previews reuse tab-memory bytes. PDFs and video/audio stream over the
  * existing authenticated same-origin media transport, without a full PDF blob
  * download or a public provider URL.
@@ -27,12 +20,6 @@ export function LibraryAssetPreview({projectId,node,onClose}:{projectId:number;n
  const [expanded,setExpanded]=useState(false),[muted,setMuted]=useState(true);
  const videoRef=useRef<HTMLVideoElement>(null);
  const resumeVideoTime=useRef(0);
- // Optional DEV-only adaptive preview: no background transcoding or extra cost.
- const [optimized,setOptimized]=useState<{state:'absent'|'processing'|'ready'|'failed'|'unavailable';embedUrl?:string}>({state:'absent'});
- const [streamStart,setStreamStart]=useState(0);
- const [nativeFailed,setNativeFailed]=useState(false);
- const eligible=appEnvironment.appEnv==='dev'&&mimeIsVideo(node.mime_type);
-
  const networkRetryCount=useRef(0);
  const networkRetryTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
 
@@ -49,7 +36,7 @@ export function LibraryAssetPreview({projectId,node,onClose}:{projectId:number;n
  useEffect(()=>{
   let alive=true,release:(()=>void)|undefined;
   const controller=new AbortController();
-  setURL('');setError('');setLoading(true);setMuted(true);setNativeFailed(false);setStreamStart(0);resumeVideoTime.current=0;
+  setURL('');setError('');setLoading(true);setMuted(true);resumeVideoTime.current=0;
   if(!user){setLoading(false);setError('Entre novamente no Roteiva para abrir este arquivo.');return()=>controller.abort();}
   if(!image&&!stream){setLoading(false);return()=>controller.abort();}
   libraryPreviewCache.scope(user.uid);
@@ -96,49 +83,7 @@ export function LibraryAssetPreview({projectId,node,onClose}:{projectId:number;n
   networkRetryCount.current=0;
   return()=>{if(networkRetryTimer.current)clearTimeout(networkRetryTimer.current);networkRetryTimer.current=null;};
  },[url]);
- // Only opening a video can start the DEV optimization. The read-only GET is
- // cheap and reuses an already encoded revision; an absent revision is ingested
- // automatically once on the backend, never from a folder listing or prefetch.
- useEffect(()=>{
-  if(!eligible||!user)return;
-  let cancelled=false,timer:ReturnType<typeof setTimeout>|undefined;
-  const began=Date.now();
-  const endpoint=API_BASE_URL+'/library/projects/'+projectId+'/nodes/'+node.id+'/stream';
-  setOptimized({state:'absent'});
-  async function request(method:'GET'|'POST'){
-   const response=await fetch(endpoint,{method,headers:{Authorization:'Bearer '+await user!.getIdToken()},cache:'no-store'});
-   if(!response.ok)throw new Error('stream_unavailable');
-   return response.json() as Promise<{state:string;embedUrl?:string}>;
-  }
-  async function check(){
-   try{
-    let data=await request('GET');
-    if(cancelled)return;
-    if(data.state==='absent')data=await request('POST');
-    if(cancelled)return;
-    if(data.state==='ready'&&validStreamEmbed(data.embedUrl)){
-     const video=videoRef.current;
-     setStreamStart(Math.floor(video&&Number.isFinite(video.currentTime)?video.currentTime:resumeVideoTime.current));
-     setOptimized({state:'ready',embedUrl:data.embedUrl});return;
-    }
-    if(data.state==='processing'&&Date.now()-began<10*60*1000){
-     setOptimized({state:'processing'});timer=setTimeout(check,5000);return;
-    }
-    setOptimized({state:'unavailable'});
-   }catch{if(!cancelled)setOptimized({state:'unavailable'});}
-  }
-  void check();
-  return()=>{cancelled=true;if(timer)clearTimeout(timer);};
- },[eligible,user,projectId,node.id,node.source_revision]);
- useEffect(()=>{
-  if(nativeFailed&&optimized.state==='unavailable'){
-   setError('Não foi possível reproduzir o vídeo. Tente novamente.');
-  }
- },[nativeFailed,optimized.state]);
- const fail=()=>{
-  if(eligible&&optimized.state==='processing'){setNativeFailed(true);return;}
-  setURL('');setError('O navegador não conseguiu reproduzir o arquivo. Tente novamente.');
- };
+ const fail=()=>{setURL('');setError('O navegador não conseguiu reproduzir o arquivo. Tente novamente.');};
  const recoverVideo=(video:HTMLVideoElement)=>{
   // Network interruptions (MEDIA_ERR_NETWORK) can occur after the first frame.
   // Retry just once on the same authenticated URL; completed ranges remain
@@ -169,24 +114,20 @@ export function LibraryAssetPreview({projectId,node,onClose}:{projectId:number;n
     </div>
    </header>
    <div className="vl-preview-body">
-    {loading&&optimized.state!=='ready'?<div className="vl-preview-state" role="status"><LoaderCircle className="vl-loading" size={27}/><span>Carregando arquivo…</span></div>:
-     error&&optimized.state!=='ready'?<div className="vl-preview-state vl-preview-failed" role="alert">
+    {loading?<div className="vl-preview-state" role="status"><LoaderCircle className="vl-loading" size={27}/><span>Carregando arquivo…</span></div>:
+     error?<div className="vl-preview-state vl-preview-failed" role="alert">
       <AlertCircle size={27} aria-hidden="true"/><p>{error}</p>
       <AppButton className="vl-preview-retry" type="button" onClick={()=>setRetry(n=>n+1)}><RefreshCcw size={16}/>Tentar novamente</AppButton>
      </div>:
-     !url&&optimized.state!=='ready'?<div className="vl-preview-state"><p>Não há prévia integrada para este formato de arquivo.</p></div>:
+     !url?<div className="vl-preview-state"><p>Não há prévia integrada para este formato de arquivo.</p></div>:
      pdf?<div className="vl-preview-document"><ReviewPdfViewer src={url} name={node.name}/></div>:
      image?<ReviewImageViewer src={url} name={node.name} onError={fail}/>:
      mime.startsWith('video/')?<div className="vl-preview-media-stage">
-      {optimized.state==='ready'&&optimized.embedUrl?
-       <iframe className="vl-preview-stream-frame" src={optimized.embedUrl+(streamStart>1?'&startTime='+streamStart:'')} title={'Reprodução otimizada de '+node.name}
-         allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowFullScreen referrerPolicy="strict-origin-when-cross-origin"/>:
-       nativeFailed?<div className="vl-preview-state" role="status"><LoaderCircle className="vl-loading" size={27}/><span>Preparando reprodução contínua…</span></div>:
-       <video ref={videoRef} className="vl-preview-video" src={url} controls autoPlay muted={muted}
+      <video ref={videoRef} className="vl-preview-video" src={url} controls autoPlay muted={muted}
         onTimeUpdate={event=>{resumeVideoTime.current=event.currentTarget.currentTime;}}
         playsInline preload="auto" onLoadedData={event=>{if(event.currentTarget.paused)void event.currentTarget.play().catch(()=>{});}}
-        onVolumeChange={event=>setMuted(event.currentTarget.muted)} onError={event=>recoverVideo(event.currentTarget)}/>}
-      {optimized.state!=='ready'&&muted&&<AppButton className="vl-preview-unmute" type="button" onClick={()=>{
+        onVolumeChange={event=>setMuted(event.currentTarget.muted)} onError={event=>recoverVideo(event.currentTarget)}/>
+      {muted&&<AppButton className="vl-preview-unmute" type="button" onClick={()=>{
        if(!videoRef.current)return;videoRef.current.muted=false;setMuted(false);
        if(videoRef.current.paused)void videoRef.current.play().catch(()=>{});
       }}><Volume2 size={17} aria-hidden="true"/>Ativar som</AppButton>}
