@@ -1,5 +1,5 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
-import {FolderOpen,FolderPlus,FolderTree,RefreshCw,Trash2,RotateCcw,ArrowLeft,Search,CloudUpload,FilePlus2,FolderInput,Pencil,MoveRight,AlertCircle,Plus,LayoutGrid,List,MoreVertical,ChevronRight,X,HardDrive} from 'lucide-react';
+import {FolderOpen,FolderPlus,FolderTree,RefreshCw,Trash2,RotateCcw,ArrowLeft,Search,CloudUpload,FilePlus2,FolderInput,Pencil,MoveRight,AlertCircle,Plus,MoreVertical,ChevronRight,X,HardDrive} from 'lucide-react';
 import type {Project} from '../../domain/workspace';
 import {useAuth} from '../auth/AuthProvider';
 import {useDriveApi} from './drive-api';
@@ -27,7 +27,7 @@ import {LibraryConnections} from './LibraryConnections';
 import {LibraryStructureDialog} from './LibraryStructureDialog';
 import {MoveDestinationDialog} from './MoveDestinationDialog';
 import {LibraryLoadingRows} from './LibraryLoadingRows';
-import {LibraryThumbnail} from './LibraryThumbnail';
+import {LibraryNodeGallery,LibraryLayoutControl,useLibraryLayout} from './LibraryNodeGallery';
 import {AssistedLibraryImport} from './AssistedLibraryImport';
 import {expandDropboxTree} from './expand-dropbox-tree';
 import googleDriveMark from '../../assets/brand/google-drive.svg';
@@ -52,7 +52,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
  const [manualOAuth,setManualOAuth]=useState<{provider:StorageOAuthProvider;url:string}|null>(null);
  const oauthController=useRef<AbortController|null>(null),oauthWindow=useRef<StorageOAuthWindow|null>(null);
  const [loadingPage,setLoadingPage]=useState(false),[refreshing,setRefreshing]=useState(false),[searchAll,setSearchAll]=useState(true);
- const [layout,setLayout]=useState<'list'|'grid'>(()=>{try{return localStorage.getItem('roteiva-library-layout')==='grid'?'grid':'list';}catch{return 'list';}});
+ const [layout,setLayout]=useLibraryLayout();
  const [addOpen,setAddOpen]=useState(false),[settingsOpen,setSettingsOpen]=useState(false),[menuNode,setMenuNode]=useState<Node|null>(null);
  const [spaceMenu,setSpaceMenu]=useState<{x:number;y:number}|null>(null);
  const nameInput=useRef<HTMLInputElement>(null),previousFolder=useRef('root');
@@ -72,6 +72,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
   return()=>cancelAnimationFrame(frame);
  },[edit?.action,edit?.node?.id]);
  const base=selectedProjectId?'/library/projects/'+selectedProjectId+'/nodes':'';
+ const notifyFileCount=()=>{if(selectedProjectId)window.dispatchEvent(new CustomEvent('roteiva:library-changed',{detail:{projectId:selectedProjectId}}));};
  const oauthReturned=new URLSearchParams(window.location.search).has('drive')||new URLSearchParams(window.location.search).has('dropbox');
  const pageScope=libraryFolderKey(user?.uid||'anonymous',selectedProjectId||0,parent,trash,term,searchAll);
  const page=loadedPage?.scope===pageScope?loadedPage:getLibraryFolder<Node>(pageScope)?.data||null;
@@ -181,7 +182,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
   }}finally{if(revision===loadRevision.current){setLoadingPage(false);setRefreshing(false);}}
  },[base,user?.uid,call,parent,trash,pageScope,term,searchAll,onSelectProject]);
  useEffect(()=>transfers.subscribe((_file,destination)=>{
-  if(destination.projectId===selectedProjectId&&destination.linkedFolderId===parent&&!mutation.current){if(user?.uid&&selectedProjectId)invalidateLibraryFolders(user.uid,selectedProjectId);void load();}
+  if(destination.projectId===selectedProjectId){if(user?.uid&&selectedProjectId)invalidateLibraryFolders(user.uid,selectedProjectId);notifyFileCount();if(destination.linkedFolderId===parent&&!mutation.current)void load();}
  }),[transfers.subscribe,selectedProjectId,parent,load]);
  async function upload(files:File[]){
   if(!files.length||!selectedProjectId||busy)return;
@@ -213,7 +214,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
  async function performImport(items:LibraryImport[],target:string,controller:AbortController,scope:number){
   const failed=await importLibraryBatch(call,base.replace('/nodes','/imports'),target,items,controller.signal,(done,total)=>setProgress('Adicionando '+done+' de '+total+' arquivos…'));
   if(scope!==generation.current||controller.signal.aborted)return;
-  setFailedImports(failed.length?{parentId:target,items:failed}:null);if(user?.uid&&selectedProjectId)invalidateLibraryFolders(user.uid,selectedProjectId);await load();
+  setFailedImports(failed.length?{parentId:target,items:failed}:null);if(user?.uid&&selectedProjectId)invalidateLibraryFolders(user.uid,selectedProjectId);notifyFileCount();await load();
  }
  async function inspectSelection(items:LibraryImport[],target:string,controller:AbortController,scope:number,folderIds?:ReadonlySet<string>){
   const sources:InspectedLibrarySource[]=[],failed:{name:string;code:string}[]=[];
@@ -299,7 +300,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
  if(!edit||!base||busy||(edit.action==='move'&&!destinationId))return;const operation=edit,scope=generation.current,controller=new AbortController();mutation.current=controller;setBusy(true);setError('');
  try{await call(base+(operation.node?'/'+operation.node.id:''),'POST',operation.node?
  {action:operation.action,name,parentId:operation.action==='move'?destinationId:parent,revision:operation.node.revision}:{name,parentId:parent},controller.signal);
- if(scope===generation.current){setEdit(null);if(user?.uid&&selectedProjectId)invalidateLibraryFolders(user.uid,selectedProjectId);await load();}
+ if(scope===generation.current){setEdit(null);if(user?.uid&&selectedProjectId)invalidateLibraryFolders(user.uid,selectedProjectId);notifyFileCount();await load();}
  }catch(e){if(!controller.signal.aborted&&scope===generation.current)setError(e instanceof Error?e.message:'Não foi possível salvar.');}
  finally{if(mutation.current===controller)mutation.current=null;if(scope===generation.current)setBusy(false);}
  }
@@ -314,26 +315,18 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
   else if(action==='drive-file'||action==='drive-tree')void addDrive(action==='drive-tree');
   else{setDropboxStructure(action==='dropbox-tree');setDropboxPicker(true);}
  };
- const renderNode=(n:Node)=><li key={n.id} className="vl-explorer-item" data-kind={n.kind} data-menu-open={menuNode?.id===n.id} onContextMenu={e=>{e.preventDefault();e.stopPropagation();setSpaceMenu(null);setMenuNode(n);setAddOpen(false);}}>
-      <AppButton className="vl-explorer-file" disabled={trash||busy} aria-label={n.name} title={n.name}
-       onClick={()=>{setMenuNode(null);if(n.kind==='folder'){setParent(n.id);setSearch('');setTerm('');}else setPreview(n);}}>
-       <span className="vl-file-emblem">{n.kind==='folder'?<FolderOpen size={24}/>:
-         <LibraryThumbnail node={n} uid={user?.uid||''}/>}</span>
-       <span className="vl-file-meta"><strong>{n.name}</strong><small>{term&&searchAll?n.parent_name||'Arquivos':n.kind==='folder'?'Pasta':n.provider==='google_drive'?'Google Drive':n.provider==='dropbox'?'Dropbox':'Arquivo'}</small></span>
-      </AppButton>
-      <div className="vl-menu-shell">
-       <AppButton className="vl-menu-trigger" aria-label={'Ações de '+n.name} aria-expanded={menuNode?.id===n.id} onClick={()=>setMenuNode(old=>old?.id===n.id?null:n)}><MoreVertical size={19}/></AppButton>
-       {menuNode?.id===n.id&&<div className="vl-context-menu" role="group" aria-label={'Ações de '+n.name}>
-        {trash?<AppButton onClick={()=>openEditor('restore',n)}><RotateCcw size={17}/> Restaurar</AppButton>:<>
-         {n.kind==='asset'&&<AppButton onClick={()=>{setMenuNode(null);setPreview(n);}}><FolderOpen size={17}/> Visualizar</AppButton>}
-         <AppButton onClick={()=>openEditor('rename',n)}><Pencil size={17}/> Renomear</AppButton>
-         <AppButton onClick={()=>openEditor('move',n)}><MoveRight size={17}/> Mover</AppButton>
-         <div className="vl-menu-divider"/>
-         <AppButton onClick={()=>openEditor('trash',n)}><Trash2 size={17}/> Remover da Biblioteca</AppButton>
-        </>}
-       </div>}
-      </div>
-     </li>;
+ const renderNodeActions=(n:Node)=><>
+  <AppButton className="vl-menu-trigger" aria-label={'Ações de '+n.name} aria-expanded={menuNode?.id===n.id} onClick={()=>setMenuNode(old=>old?.id===n.id?null:n)}><MoreVertical size={19}/></AppButton>
+  {menuNode?.id===n.id&&<div className="vl-context-menu" role="group" aria-label={'Ações de '+n.name}>
+   {trash?<AppButton onClick={()=>openEditor('restore',n)}><RotateCcw size={17}/> Restaurar</AppButton>:<>
+    {n.kind==='asset'&&<AppButton onClick={()=>{setMenuNode(null);setPreview(n);}}><FolderOpen size={17}/> Visualizar</AppButton>}
+    <AppButton onClick={()=>openEditor('rename',n)}><Pencil size={17}/> Renomear</AppButton>
+    <AppButton onClick={()=>openEditor('move',n)}><MoveRight size={17}/> Mover</AppButton>
+    <div className="vl-menu-divider"/>
+    <AppButton onClick={()=>openEditor('trash',n)}><Trash2 size={17}/> Remover da Biblioteca</AppButton>
+   </>}
+  </div>}
+ </>;
  return <section className="panel virtual-library vl-explorer" aria-label="Explorador da Biblioteca">
   <header className="vl-explorer-head">
    <LibraryProjectPicker projects={projects} value={selectedProjectId} onChange={onSelectProject}/>
@@ -394,10 +387,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
        setMenuNode(null);setSpaceMenu(null);
       }}>{trash?<ArrowLeft size={19}/>:<Trash2 size={18}/>}<span>{trash?'Voltar aos arquivos':'Lixeira'}</span></AppButton>
      <AppButton className="vl-small-tool" disabled={busy||trash} onClick={()=>setStructure(true)} aria-label="Estrutura de pastas"><FolderTree size={17}/><span>Pastas</span></AppButton>
-     <div className="vl-layout-control" role="group" aria-label="Visualização dos arquivos">
-      <AppButton aria-label="Exibir lista" aria-pressed={layout==='list'} onClick={()=>setLayout('list')}><List size={18}/></AppButton>
-      <AppButton aria-label="Exibir grade" aria-pressed={layout==='grid'} onClick={()=>setLayout('grid')}><LayoutGrid size={18}/></AppButton>
-     </div>
+     <LibraryLayoutControl layout={layout} onChange={setLayout}/>
     </div>
    </div>
    {trash&&<div className="vl-trash-heading" role="status"><span className="vl-trash-heading-icon"><Trash2 size={23}/></span><span><strong>Lixeira</strong><small>Itens removidos da Biblioteca. Os arquivos originais continuam no Google Drive ou Dropbox.</small></span></div>}
@@ -416,18 +406,13 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
     }}>
    {loadingPage&&!page?<LibraryLoadingRows label="Carregando arquivos…" count={4}/>:error&&!page?
     <div role="alert" className="vl-explorer-empty"><AlertCircle size={26}/><h3>Não foi possível abrir esta pasta</h3><p>{error}</p><AppButton className="vl-retry-action" onClick={()=>void load()}>Tentar novamente</AppButton></div>:<>
-    {page?.nodes.length?<><div className="vl-explorer-count" role="status">{page.nodes.length}{page.nextPage?'+':''} {page.nodes.length===1?'item':'itens'}</div>
-     {layout==='grid'?<div className="vl-drive-groups">
-       {page.nodes.some(n=>n.kind==='folder')&&<section aria-label="Pastas" className="vl-drive-group vl-drive-folders">
-        <h3>Pastas</h3><ul className="vl-explorer-items vl-explorer-items--grid vl-explorer-folders">{page.nodes.filter(n=>n.kind==='folder').map(renderNode)}</ul>
-       </section>}
-       {page.nodes.some(n=>n.kind==='asset')&&<section aria-label="Arquivos" className="vl-drive-group vl-drive-assets">
-        <h3>Arquivos</h3><ul className="vl-explorer-items vl-explorer-items--grid vl-explorer-assets">{page.nodes.filter(n=>n.kind==='asset').map(renderNode)}</ul>
-       </section>}
-      </div>:<>
-       <div className="vl-list-header" aria-hidden="true"><span>Nome</span><span>Ações</span></div>
-       <ul className="vl-explorer-items vl-explorer-items--list" aria-label={trash?'Itens na lixeira':'Arquivos e pastas'}>{page.nodes.map(renderNode)}</ul>
-      </>}</>:<div className="vl-explorer-empty vl-explorer-empty--folder"><FolderOpen size={32}/><h3>{term?'Nenhum resultado':trash?'Lixeira vazia':'Esta pasta está vazia'}</h3><p>{term?'Experimente outro nome ou escopo.':trash?'Itens removidos aparecem aqui.':'Use Adicionar para criar pastas e incluir arquivos.'}</p></div>}
+    {page?.nodes.length?<LibraryNodeGallery nodes={page.nodes} layout={layout} uid={user?.uid||''}
+     countLabel={page.nodes.length+(page.nextPage?'+':'')+' '+(page.nodes.length===1?'item':'itens')}
+     listLabel={trash?'Itens na lixeira':'Arquivos e pastas'} disabled={trash||busy}
+     activeMenuId={menuNode?.id} searchAll={Boolean(term&&searchAll)}
+     onOpen={n=>{setMenuNode(null);if(n.kind==='folder'){setParent(n.id);setSearch('');setTerm('');}else setPreview(n);}}
+     onContextMenu={(n,e)=>{e.preventDefault();e.stopPropagation();setSpaceMenu(null);setMenuNode(n);setAddOpen(false);}}
+     renderActions={renderNodeActions}/>:<div className="vl-explorer-empty vl-explorer-empty--folder"><FolderOpen size={32}/><h3>{term?'Nenhum resultado':trash?'Lixeira vazia':'Esta pasta está vazia'}</h3><p>{term?'Experimente outro nome ou escopo.':trash?'Itens removidos aparecem aqui.':'Use Adicionar para criar pastas e incluir arquivos.'}</p></div>}
     {page?.nextPage&&<div className="vl-loadmore"><AppButton disabled={loadingPage} onClick={()=>void load(page.nextPage!,true)}>Carregar mais</AppButton></div>}
    </>}
    {spaceMenu&&<div className="vl-space-context-menu" role="group" aria-label="Ações da pasta atual" style={{left:spaceMenu.x,top:spaceMenu.y}}>
@@ -459,7 +444,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
  </div></div>}
  {dropboxPicker&&dropbox&&<DropboxLibraryPicker key={dropbox.id+':'+dropboxStructure} connectionId={dropbox.id} includeFolders={dropboxStructure} onClose={()=>setDropboxPicker(false)} onSelect={(ids,names,folderIds)=>void addDropbox(ids,names,folderIds)}/>}
  {preview&&selectedProjectId&&<LibraryAssetPreview key={preview.id} projectId={selectedProjectId} node={preview} onClose={()=>setPreview(null)}/>}
- {structure&&selectedProjectId&&<LibraryStructureDialog key={selectedProjectId+':'+parent} projectId={selectedProjectId} parentId={parent} onClose={()=>setStructure(false)} onApplied={()=>{setStructure(false);void load();}}/>}
- {assisted&&selectedProjectId&&<AssistedLibraryImport key={selectedProjectId+':'+assisted.parentId} projectId={selectedProjectId} parentId={assisted.parentId} sources={assisted.sources} unavailable={assisted.failed} recursive={assisted.recursive} onExploreFolder={folder=>void addDriveFolderContents(folder)} onClose={()=>{setAssisted(null);void load();}} onApplied={()=>{setAssisted(null);setSearch('');setTerm('');void load();}}/>}
+ {structure&&selectedProjectId&&<LibraryStructureDialog key={selectedProjectId+':'+parent} projectId={selectedProjectId} parentId={parent} onClose={()=>setStructure(false)} onApplied={()=>{setStructure(false);notifyFileCount();void load();}}/>}
+ {assisted&&selectedProjectId&&<AssistedLibraryImport key={selectedProjectId+':'+assisted.parentId} projectId={selectedProjectId} parentId={assisted.parentId} sources={assisted.sources} unavailable={assisted.failed} recursive={assisted.recursive} onExploreFolder={folder=>void addDriveFolderContents(folder)} onClose={()=>{setAssisted(null);void load();}} onApplied={()=>{setAssisted(null);setSearch('');setTerm('');notifyFileCount();void load();}}/>}
  </section>;
 }

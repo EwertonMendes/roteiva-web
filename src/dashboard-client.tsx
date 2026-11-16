@@ -7,6 +7,7 @@ import { MoneyInput } from "./features/ui/MoneyInput";
 import {ProjectDetail} from './features/projects/ProjectDetail';
 import {SidebarAccountMenu} from "./features/ui/SidebarAccountMenu";
 import {ProjectsView} from "./features/projects/ProjectsView";
+import {useProjectFileCount} from "./features/projects/useProjectFileCount";
 import {ClientDirectory} from "./features/clients/ClientDirectory";
 import {ClientFormDialog} from "./features/clients/ClientFormDialog";
 import {phoneDigits,validBrazilPhone} from "./lib/brazil-phone";
@@ -715,8 +716,11 @@ function Overview({ projects, setView, onOpenProject }: { projects: Project[]; s
 }
 
 function ProjectRow({ project, onOpen }: { project: Project; onOpen: () => void }) {
+  const virtual= !isDemo && import.meta.env.VITE_VIRTUAL_LIBRARY === "true";
+  const actualCount=useProjectFileCount(project.id,virtual);
+  const files=virtual?actualCount:project.files;
   return <AppButton className="project-row" onClick={onOpen}>
-    <BrandAvatar initials={project.initials} color={project.color} /><div className="project-name"><b>{project.name}</b><small>{project.client} · {project.files} arquivos</small></div>
+    <BrandAvatar initials={project.initials} color={project.color} /><div className="project-name"><b>{project.name}</b><small>{project.client} · {files??"…"} {files===1?"arquivo":"arquivos"}</small></div>
     <StatusBadge status={project.status} /><div className="progress-cell"><span><i style={{ width: `${project.progress}%` }} /></span><small>{project.progress}%</small></div>
     <div className="due-cell"><small>Prazo</small><b>{project.due}</b></div><ChevronRight size={16} />
   </AppButton>;

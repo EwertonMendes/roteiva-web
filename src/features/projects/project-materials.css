@@ -1,0 +1,33 @@
+/* Shared Library explorer embedded in Project Detail. The same gallery styles
+   handle thumbnails, file-type artwork and responsive grid/list cards. */
+.project-detail .pd-linked-library{
+ margin-top:16px;border:1px solid var(--line);border-radius:14px;
+ background:var(--card);overflow:visible;min-width:0;
+}
+.project-detail .pd-linked-toolbar{
+ display:flex;align-items:center;justify-content:space-between;gap:10px;
+ flex-wrap:wrap;padding:11px 15px;border-bottom:1px solid var(--line);
+}
+.project-detail .pd-linked-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.project-detail .pd-linked-actions .vl-small-tool{min-height:39px}
+.project-detail .pd-linked-library .vl-query{padding:12px 15px}
+.project-detail .pd-linked-library .vl-file-area{min-height:110px;padding:0 0 5px}
+.project-detail .pd-linked-library .vl-drive-groups{padding:7px 14px 16px;gap:16px}
+.project-detail .pd-linked-library .vl-explorer-items--list{padding:3px 12px 12px}
+.project-detail .pd-linked-library .vl-explorer-items--list .vl-explorer-file{min-width:0}
+.project-detail .pd-linked-library .vl-explorer-items--grid .vl-explorer-item{min-width:0}
+.project-detail .pd-linked-state{
+ display:flex;flex-direction:column;align-items:center;justify-content:center;
+ gap:12px;min-height:130px;padding:22px;color:var(--muted);text-align:center;
+ font-size:var(--type-support);
+}
+.project-detail .pd-linked-state p{margin:0;max-width:60ch;overflow-wrap:anywhere}
+.project-detail .pd-linked-load-error{padding:10px 15px;color:var(--ink);font-size:var(--type-support)}
+@media(max-width:680px){
+ .project-detail .pd-linked-toolbar{align-items:stretch;padding:10px}
+ .project-detail .pd-linked-toolbar .vl-explorer-breadcrumb{width:100%}
+ .project-detail .pd-linked-actions{width:100%;justify-content:space-between}
+ .project-detail .pd-linked-actions .vl-small-tool{font-size:11px}
+ .project-detail .pd-linked-library .vl-query{padding:10px}
+ .project-detail .pd-linked-library .vl-drive-groups{padding:5px 10px 12px}
+}

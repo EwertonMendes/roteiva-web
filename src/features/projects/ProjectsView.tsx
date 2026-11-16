@@ -1,12 +1,13 @@
 import {AppButton} from "../ui/AppButton";
 import {useEffect,useRef,useState} from 'react';
-import {CalendarDays,ChevronDown,ChevronRight,Film,FolderOpen,LayoutGrid,ImagePlus,Pencil,LoaderCircle} from 'lucide-react';
+import {CalendarDays,ChevronDown,ChevronRight,Files,FolderOpen,LayoutGrid,ImagePlus,Pencil,LoaderCircle} from 'lucide-react';
 import type {Project,ProjectCover,Status} from '../../domain/workspace';
 import {PROJECT_STATUS_ICONS} from '../ui/project-status';
 import {isDemo} from '../../lib/firebase';
 import {DriveCoversProvider,useCoverImage,useDriveCovers} from './DriveCoversProvider';
 import {CoverEditor} from './CoverEditor';
 import {CoverFrame} from './CoverFrame';
+import {useProjectFileCount} from './useProjectFileCount';
 import './projects.css';
 const colors:Record<Status,string>={'Em produção':'#349af4','Em aprovação':'#f6bd4f','Ajustes':'#ae77f1','Aprovado':'#38cc74'};
 function StatusIcon({status}:{status:Status}){const Icon=PROJECT_STATUS_ICONS[status];return <Icon size={18} style={{color:colors[status]}} aria-hidden="true"/>;}
@@ -14,8 +15,11 @@ function ProjectCard({project,onOpen,onEdit,eager=false}:{project:Project;onOpen
  const context=useDriveCovers();const box=useRef<HTMLElement>(null);const [visible,setVisible]=useState(eager);
  useEffect(()=>{if(eager||visible)return;const observer=new IntersectionObserver(([entry])=>{if(entry.isIntersecting){setVisible(true);observer.disconnect();}},{rootMargin:'320px'});if(box.current)observer.observe(box.current);return ()=>observer.disconnect();},[eager,visible]);
  const {src,error,loading}=useCoverImage(project.cover,eager||visible,true,true);
+ const virtual=!isDemo&&import.meta.env.VITE_VIRTUAL_LIBRARY==='true';
+ const liveCount=useProjectFileCount(project.id,visible&&virtual);
  const canEdit=!!context; // Keep 'Adicionar capa' discoverable before a provider is connected.
  const hasCover=!!project.cover;
+ const files=virtual?liveCount:project.files;
  return <article className="pc-card" ref={box}>
   <div className={"pc-photo"+(hasCover?"":" pc-photo--empty")} data-cover-state={!hasCover?"empty":src?"loaded":error?"unavailable":loading?"loading":"pending"}>
    {hasCover?(src?<CoverFrame src={src} cover={project.cover!}/>:error?
@@ -23,7 +27,7 @@ function ProjectCard({project,onOpen,onEdit,eager=false}:{project:Project;onOpen
     <div className="pc-image-unavailable pc-cover-loading" role="status"><LoaderCircle size={24} className="pc-spin"/><span>Carregando capa…</span></div>):
     <div className="pc-image-unavailable pc-image-empty"><ImagePlus size={26}/><span>Projeto sem capa</span>{canEdit&&<AppButton type="button" className="pc-add-cover" onClick={onEdit}>Adicionar capa</AppButton>}</div>}
    {hasCover&&<AppButton type="button" className="pc-edit-overlay" onClick={onEdit} disabled={!canEdit}><Pencil size={16}/>Editar capa</AppButton>}
-   <span className="pc-files-overlay"><Film size={17}/>{project.files} {project.files===1?'arquivo':'arquivos'}</span>
+   <span className="pc-files-overlay" aria-label={files!==null?`${files} arquivos vinculados`:'Consultando quantidade de arquivos'}><Files size={17}/>{files??'…'} {files===1?'arquivo':'arquivos'}</span>
    <AppButton className="pc-open-overlay" type="button" aria-label={'Abrir projeto '+project.name} onClick={onOpen}><ChevronRight size={23}/></AppButton>
   </div>
   <div className="pc-card-body">
