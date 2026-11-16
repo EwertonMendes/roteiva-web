@@ -53,14 +53,14 @@ test("calendar empty day creation, optional ending, review category, editing and
   await expect(form).toBeVisible();
   await form.getByRole("textbox",{name:"Término do compromisso"}).fill("10:00");
   await form.getByRole("button",{name:"Cancelar"}).click();
-  await selected.click();
+  await expect(day).toBeVisible();
   await expect(day).toContainText("Sem término");
   await day.getByRole("button",{name:/Editar Gravação externa/}).click();
   await form.getByRole("textbox",{name:"Término do compromisso"}).fill("10:00");
   await expect(form.getByRole("textbox",{name:"Término do compromisso"})).toHaveValue("10:00");
   await form.getByRole("button",{name:"Salvar compromisso"}).click();
   await expect(form).toHaveCount(0);
-  await selected.click();
+  await expect(day).toBeVisible();
   await expect(day).toContainText("09:00 – 10:00");
   await day.getByRole("button",{name:"Fechar",exact:true}).click();
   // Wait for the cloud command queue; a render update is not a durable write.
@@ -323,7 +323,11 @@ test("nested day/editor/confirmation dialogs keep the underlying day and lock ba
 test("legacy overlays and native AppDialog share the global scroll lock",async({page},info)=>{
   await enterCalendar(page,"global-modal-scroll-"+info.project.name+"@example.com");
   const sidebar=page.locator(".sidebar nav");
-  await sidebar.getByRole("button",{name:/^Projetos/}).click();
+  async function navigateTo(name:RegExp){
+    if(info.project.name==="mobile")await page.getByRole("button",{name:"Abrir menu",exact:true}).click();
+    await sidebar.getByRole("button",{name}).click();
+  }
+  await navigateTo(/^Projetos/);
   await page.getByRole("button",{name:"Criar projeto"}).first().click();
   await expect(page.locator(".modal-backdrop")).toBeVisible();
   await expect(page.locator("html")).toHaveCSS("overflow-y","hidden");
@@ -332,7 +336,7 @@ test("legacy overlays and native AppDialog share the global scroll lock",async({
   await expect(page.locator(".modal-backdrop")).toHaveCount(0);
   await expect(page.locator("html")).not.toHaveCSS("overflow-y","hidden");
 
-  await sidebar.getByRole("button",{name:/^Clientes/}).click();
+  await navigateTo(/^Clientes/);
   await page.getByRole("button",{name:"Novo cliente"}).first().click();
   const dialog=page.locator("dialog.cd-form-dialog");
   await expect(dialog).toBeVisible();
