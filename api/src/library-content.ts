@@ -14,11 +14,20 @@ const MEDIA_METADATA_FRESH_MS=90000;
 /** Identity/project are verified by the router; the reference and origin are checked on every read. */
 export async function libraryContent(request:Request,env:Env,uid:string,projectId:number,nodeId:string,fetcher:typeof fetch=fetch){
  const observationStarted=Date.now();
- const lib=await libraryFor(env,uid,projectId),node=await libraryNode(env,lib,nodeId);
+ const lib=await libraryFor(env,uid,projectId);
+ // Two independent D1 reads may resolve together. Neither may bypass the
+ // existing ancestor/state authorization before bytes are returned.
+ const [node,asset]=await Promise.all([
+  libraryNode(env,lib,nodeId),
+  env.DB.prepare('SELECT a.* FROM library_entries e JOIN library_assets a ON a.library_id=e.library_id AND a.id=e.asset_id WHERE e.library_id=? AND e.node_id=?').bind(lib.id,nodeId).first<Asset>()
+ ]);
  if(node.kind!=='asset')throw new ApiError(404,'source_unavailable');
- const asset=await env.DB.prepare('SELECT a.* FROM library_entries e JOIN library_assets a ON a.library_id=e.library_id AND a.id=e.asset_id WHERE e.library_id=? AND e.node_id=?').bind(lib.id,node.id).first<Asset>();
  if(!asset)throw new ApiError(404,'source_unavailable');
- const reuse=!!request.headers.get('Range')&&asset.state==='available'&&
+ // A recently verified image observation is reusable for the first image
+ // request, not just for Range requests. The provider remains authoritative
+ // for its bytes and revocation; an old observation is never authoritative.
+ const recentImage=!request.headers.has('Range')&&request.method==='GET'&&asset.mime_type.startsWith('image/');
+ const reuse=(!!request.headers.get('Range')||recentImage)&&asset.state==='available'&&
   typeof asset.size==='string'&&asset.size.length>0&&typeof asset.source_name==='string'&&
   Number.isFinite(asset.observed_at)&&observationStarted>=asset.observed_at&&
   observationStarted-asset.observed_at<MEDIA_METADATA_FRESH_MS;
@@ -76,18 +85,24 @@ export async function libraryContent(request:Request,env:Env,uid:string,projectI
  .bind(source.name,source.mimeType,source.size,source.revision,observationStarted,lib.id,asset.id,observationStarted).run();
  const headers=new Headers({'Content-Type':source.mimeType,'Accept-Ranges':'bytes',
  'Content-Length':String(matchingFull?Number(source.size):Number(match![2])-Number(match![1])+1),'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer',
- 'Access-Control-Expose-Headers':'Content-Length, Content-Range, Accept-Ranges, X-Roteiva-Media-Transport'});
+ 'Access-Control-Expose-Headers':'Content-Length, Content-Range, Accept-Ranges, X-Roteiva-Media-Transport, X-Roteiva-Metadata-Ms, X-Roteiva-Origin-Headers-Ms'});
  if(!full&&!matchingFull)headers.set('Content-Range',upstream.headers.get('Content-Range')!);
  if(source.mimeType==='image/svg+xml')headers.set('Content-Security-Policy',"sandbox; default-src 'none'");
+ if(env.ENVIRONMENT==='dev'){
+  headers.set('X-Roteiva-Metadata-Ms',String(metadataMs));
+  headers.set('X-Roteiva-Origin-Headers-Ms',String(originMs));
+ }
  if(request.method==='HEAD'){await upstream.body?.cancel();return new Response(null,{status:full||matchingFull?200:206,headers});}
- if(/^(video|audio)\//.test(source.mimeType)){
-  // The browser's Range/seek determines the upstream response extent. Pass
-  // through its ReadableStream untouched: no arrayBuffer, clone, transform,
-  // interval stitching or per-byte CPU work. An aborted stream is surfaced
-  // to Chrome as an I/O failure rather than silently manufacturing more bytes.
+ const trustedImageLength=source.mimeType.startsWith('image/')&&upstream.headers.has('Content-Length')&&
+  upstream.headers.get('Content-Length')===headers.get('Content-Length');
+ if(/^(video|audio)\//.test(source.mimeType)||trustedImageLength){
+  // Forward verified origin streams as-is. Video remains unchanged. Small
+  // full-image responses with a matching declared length can progressively
+  // decode in <img> without exhausting the free-tier CPU budget per chunk.
   headers.set('X-Roteiva-Media-Transport','origin-pass-through');
   if(env.ENVIRONMENT==='dev')console.info(JSON.stringify({
-   event:'media_proxy_headers',provider:asset.provider,kind:source.mimeType.startsWith('video/')?'video':'audio',
+   event:'media_proxy_headers',provider:asset.provider,
+   kind:source.mimeType.startsWith('video/')?'video':source.mimeType.startsWith('audio/')?'audio':'image',
    status:matchingFull?200:206,metadataMs,originMs,
    bytes:Number(headers.get('Content-Length')),mode:'pass_through'
   }));
