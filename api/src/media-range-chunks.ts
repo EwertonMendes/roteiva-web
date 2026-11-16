@@ -1,48 +1,39 @@
 import {ApiError} from './types.ts';
 
 /**
- * A single open-ended native video response is assembled from bounded,
- * individually verified provider reads. The player sees one continuous range,
- * but Google/Dropbox never have to keep one huge upstream body alive for minutes.
- * This is a DEV fallback while adaptive Stream encoding is unavailable.
+ * Authenticated progressive video relay. One HTTP 206 is streamed to the native
+ * player continuously, while upstream reads use bounded ranges to avoid a long
+ * provider connection. Never buffer an entire slice before releasing its bytes:
+ * doing so introduced a periodic 8 MiB playback starvation in the former relay.
  */
 const FIRST_BYTES=1024*1024;
 const NEXT_BYTES=8*1024*1024;
+const MAX_SLICE_RETRIES=2;
 export const MAX_STITCHED_VIDEO=256*1024*1024;
 type ReadSlice=(range:string,signal:AbortSignal)=>Promise<Response>;
 
-async function verifiedSlice(
+async function openSlice(
  read:ReadSlice,start:number,end:number,total:number,signal:AbortSignal,
-):Promise<Uint8Array>{
- const requested='bytes='+start+'-'+end;
- for(let attempt=0;attempt<2;attempt++){
-  if(signal.aborted)throw new ApiError(499,'media_cancelled');
+):Promise<ReadableStreamDefaultReader<Uint8Array>> {
+ const expected='bytes '+start+'-'+end+'/'+total;
+ for(let attempt=0;attempt<=MAX_SLICE_RETRIES;attempt++){
+  if(signal.aborted)throw new ApiError(503,'media_cancelled');
   let response:Response|undefined;
   try{
-   response=await read(requested,signal);
-   if(!response.ok){
-    const status=response.status;
-    await response.body?.cancel();
-    if(status===429)throw new ApiError(429,'provider_rate_limited');
-    if(status>=500&&attempt===0)continue;
-    throw new ApiError(502,'source_unavailable');
-   }
-   const range=response.headers.get('Content-Range');
-   const expected='bytes '+start+'-'+end+'/'+total;
-   if(response.status!==206||range!==expected||
-      (response.headers.has('Content-Length')&&response.headers.get('Content-Length')!==String(end-start+1))){
-    await response.body?.cancel();
-    throw new ApiError(502,'media_range_unsupported');
-   }
-   const bytes=new Uint8Array(await response.arrayBuffer());
-   if(bytes.byteLength!==end-start+1)throw new Error('incomplete_provider_chunk');
-   return bytes;
+   response=await read('bytes='+start+'-'+end,signal);
   }catch(error){
-   if(signal.aborted)throw error;
-   if(attempt===1||error instanceof ApiError)throw error;
-   // A failed short upstream can be retried without ever exposing a partial
-   // chunk to the native media player.
+   if(!signal.aborted&&attempt<MAX_SLICE_RETRIES)continue;
+   throw error;
   }
+  if(response.status===429){await response.body?.cancel();throw new ApiError(429,'provider_rate_limited');}
+  if(response.status>=500&&attempt<MAX_SLICE_RETRIES){await response.body?.cancel();continue;}
+  if(response.status!==206||response.headers.get('Content-Range')!==expected||
+    (response.headers.has('Content-Length')&&response.headers.get('Content-Length')!==String(end-start+1))||
+    !response.body){
+   await response.body?.cancel();
+   throw new ApiError(502,'media_range_unsupported');
+  }
+  return response.body.getReader();
  }
  throw new ApiError(502,'source_unavailable');
 }
@@ -62,24 +53,56 @@ export async function stitchedVideoResponse(
  const onAbort=()=>abort.abort();
  if(requestSignal?.aborted)abort.abort();
  else requestSignal?.addEventListener('abort',onAbort,{once:true});
+ const cleanup=()=>requestSignal?.removeEventListener('abort',onAbort);
+ let cursor=start;
+ let sliceEnd=Math.min(end,cursor+FIRST_BYTES-1);
+ let failures=0;
+ let reader:ReadableStreamDefaultReader<Uint8Array>|null=null;
  try{
-  const firstEnd=Math.min(start+FIRST_BYTES-1,end);
-  const first=await verifiedSlice(read,start,firstEnd,total,abort.signal);
-  let cursor=firstEnd+1;
+  reader=await openSlice(read,cursor,sliceEnd,total,abort.signal);
   const body=new ReadableStream<Uint8Array>({
-   start(controller){controller.enqueue(first);},
    async pull(controller){
-    if(abort.signal.aborted){controller.error(new Error('media_cancelled'));return;}
-    if(cursor>end){requestSignal?.removeEventListener('abort',onAbort);controller.close();return;}
-    const nextEnd=Math.min(cursor+NEXT_BYTES-1,end);
+    if(abort.signal.aborted){cleanup();controller.error(new Error('media_cancelled'));return;}
+    if(cursor>end){cleanup();controller.close();return;}
     try{
-     const bytes=await verifiedSlice(read,cursor,nextEnd,total,abort.signal);
-     if(abort.signal.aborted){controller.error(new Error('media_cancelled'));return;}
-     cursor=nextEnd+1;
-     controller.enqueue(bytes);
-    }catch(error){abort.abort();controller.error(error);}
+     if(!reader){
+      sliceEnd=Math.min(end,cursor+NEXT_BYTES-1);
+      failures=0;
+      reader=await openSlice(read,cursor,sliceEnd,total,abort.signal);
+     }
+     let part:ReadableStreamReadResult<Uint8Array>;
+     try{part=await reader.read();}
+     catch(error){
+      try{await reader.cancel();}catch{/* reader was interrupted */}
+      reader=null;
+      if(!abort.signal.aborted&&++failures<=MAX_SLICE_RETRIES)return;
+      throw error;
+     }
+     if(part.done){
+      reader.releaseLock();reader=null;
+      if(cursor<=sliceEnd){
+       if(++failures<=MAX_SLICE_RETRIES)return;
+       throw new Error('incomplete_provider_chunk');
+      }
+      return;
+     }
+     if(part.value.byteLength===0)return;
+     if(part.value.byteLength>sliceEnd-cursor+1)throw new Error('provider_range_overflow');
+     cursor+=part.value.byteLength;
+     failures=0;
+     controller.enqueue(part.value);
+     if(cursor>sliceEnd){
+      const completed=reader;reader=null;
+      // Exact range consumed, release any transport resources immediately.
+      await completed.cancel().catch(()=>{});
+     }
+    }catch(error){
+     abort.abort();cleanup();
+     if(reader){await reader.cancel().catch(()=>{});reader=null;}
+     controller.error(error);
+    }
    },
-   cancel(){abort.abort();requestSignal?.removeEventListener('abort',onAbort);},
+   cancel(){abort.abort();cleanup();if(reader)void reader.cancel().catch(()=>{});reader=null;},
   });
   return new Response(body,{status:206,headers:{
    'Content-Type':mimeType,'Accept-Ranges':'bytes',
@@ -88,5 +111,5 @@ export async function stitchedVideoResponse(
    'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer',
    'Access-Control-Expose-Headers':'Content-Length, Content-Range, Accept-Ranges',
   }});
- }catch(error){abort.abort();requestSignal?.removeEventListener('abort',onAbort);throw error;}
+ }catch(error){abort.abort();cleanup();throw error;}
 }
