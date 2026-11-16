@@ -37,7 +37,7 @@
 .pc-image-unavailable { height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:7px; color:var(--muted); font-size:var(--type-support); }
 .pc-more { display:flex; justify-content:center; padding:0 24px 24px; }
 .pc-connection-notice { font-size:var(--type-support); color:var(--muted); }
-.pc-dialog { position:fixed; inset:0; margin:auto; width:min(820px,calc(100vw - 32px)); height:min(760px,calc(100dvh - 40px)); max-height:calc(100dvh - 40px); border:1px solid var(--line); border-radius:24px; color:var(--ink); background:var(--paper); padding:0; box-shadow:0 30px 100px #0005; overflow:hidden; }
+.pc-dialog { position:fixed; inset:0; margin:auto; width:min(820px,calc(100vw - 32px)); height:min(760px,calc(100dvh - 40px)); max-height:calc(100dvh - 40px); border:1px solid var(--line); border-radius:24px; color:var(--ink); background:var(--modal-surface); padding:0; box-shadow:0 30px 100px #0005; overflow:hidden; }
 .pc-dialog[open] { display:grid; grid-template-rows:auto minmax(0,1fr) auto; }
 .pc-dialog::backdrop { background:#0009; backdrop-filter:blur(6px); }
 .pc-dialog > header { display:flex; align-items:start; justify-content:space-between; gap:16px; padding:24px; border-bottom:1px solid var(--line); }
@@ -45,7 +45,7 @@
 .pc-dialog header p { margin:0; color:var(--muted); overflow-wrap:anywhere; }
 .pc-dialog .icon-button { flex-shrink:0; }
 .pc-editor-body { display:flex; flex-direction:column; padding:22px 24px; min-height:0; overflow-y:auto; overscroll-behavior:contain; }
-.pc-dialog > footer { position:relative; display:flex; gap:10px; align-items:center; border-top:1px solid var(--line); padding:16px 24px; background:var(--paper); z-index:2; }
+.pc-dialog > footer { position:relative; display:flex; gap:10px; align-items:center; border-top:1px solid var(--line); padding:16px 24px; background:var(--modal-surface); z-index:2; }
 .pc-dialog > footer > div { flex:1; }
 .pc-picker-tools { display:flex; flex-wrap:wrap; gap:16px; }
 .pc-picker-tools > label { display:flex; flex-direction:column; gap:8px; min-width:0; flex:1 1 220px; font-size:var(--type-support); color:var(--muted); }
