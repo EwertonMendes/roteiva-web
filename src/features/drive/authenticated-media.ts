@@ -3,7 +3,7 @@ import {API_BASE_URL} from '../../lib/environment';
 const WORKER_PATH='/roteiva-media-sw.js';
 // The query is a transport-protocol version, not a per-request cache buster.
 // A version change replaces an older worker under the same '/' registration.
-const WORKER_URL=WORKER_PATH+'?mediaProtocol=4';
+const WORKER_URL=WORKER_PATH+'?mediaProtocol=5';
 const PUBLIC_MEDIA_ERROR='Não foi possível abrir este arquivo agora. Tente novamente.';
 const providers=new Map<string,{getToken:()=>Promise<string>;getReviewSession?:()=>string;url:string;scope:string}>();
 let setup:Promise<void>|undefined;
@@ -13,7 +13,7 @@ function isExpectedWorker(worker:ServiceWorker|null):boolean{
  if(!worker)return false;
  try{
   const script=new URL(worker.scriptURL);
-  return script.origin===location.origin&&script.pathname===WORKER_PATH&&script.searchParams.get('mediaProtocol')==='4';
+  return script.origin===location.origin&&script.pathname===WORKER_PATH&&script.searchParams.get('mediaProtocol')==='5';
  }catch{return false;}
 }
 function controllerIsReady():boolean{
