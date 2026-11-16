@@ -1,4 +1,4 @@
-import {test,expect,type Page} from './fixtures';
+import {test,expect,type Page,fulfillEmulatorAccessEnsure} from './fixtures';
 import {initializeTestEnvironment} from '@firebase/rules-unit-testing';
 import {collection,doc,getDoc,getDocs,query,updateDoc,setDoc,deleteDoc,where,Timestamp} from 'firebase/firestore';
 
@@ -81,13 +81,12 @@ test('session survives reload and OAuth return URLs for every registered identit
 });
 
 test('a second tab restores the same account and can reload without manual recovery',async({page},info)=>{
-  await signup(page,'access-new-tab-'+info.project.name+'@example.com');
-  // The first tab has already provisioned this isolated account. Share only the
-  // API transport mock; Firestore and persistent Auth stay real emulator SDKs.
-  await page.context().route('http://127.0.0.1:8787/access/ensure',async route=>{
-    const headers={'Access-Control-Allow-Origin':cloud,'Access-Control-Allow-Methods':'POST, OPTIONS','Access-Control-Allow-Headers':'Authorization, Content-Type'};
-    await route.fulfill({status:route.request().method()==='OPTIONS'?204:200,headers,body:route.request().method()==='OPTIONS'?'':'{}'});
-  });
+  // Repeat iterations need distinct emulator identities: reusing the same
+  // e-mail silently skips registration and makes later repetitions invalid.
+  await signup(page,'access-new-tab-'+info.project.name+'-'+info.repeatEachIndex+'@example.com');
+  // Context routes also apply to newly opened pages. They must perform the
+  // SAME server-side entitlement provisioning as the original page fixture.
+  await page.context().route('http://127.0.0.1:8787/access/ensure',fulfillEmulatorAccessEnsure);
   const restored=await page.context().newPage();
   try{
     await restored.goto(cloud+'/biblioteca?drive=connected');
