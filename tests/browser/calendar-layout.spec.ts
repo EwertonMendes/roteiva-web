@@ -250,3 +250,94 @@ test("masked times, invalid dates, inline validation and label spacing on deskto
   await form.getByRole("button",{name:"Salvar compromisso"}).click();
   await expect(form).toHaveCount(0);
 });
+
+
+test("nested day/editor/confirmation dialogs keep the underlying day and lock background",async({page},info)=>{
+  await enterCalendar(page,"calendar-modal-stack-"+info.project.name+"@example.com");
+  const selected=page.locator(".roteiva-calendar .calendar-grid>button.selected");
+  await selected.click();
+  const editor=page.locator("dialog.roteiva-calendar-form");
+  await expect(editor).toBeVisible();
+  await editor.getByLabel("Título do compromisso").fill("Teste pilha modal");
+  await editor.getByRole("button",{name:"Salvar compromisso"}).click();
+  await expect(editor).toHaveCount(0);
+  await expect(selected.locator(".calendar-event-counter")).toHaveText("1");
+
+  await selected.click();
+  const day=page.locator("dialog.day-events-dialog");
+  await expect(day).toBeVisible();
+  async function expectBackgroundLocked(){
+    const state=await page.evaluate(()=>{
+      const root=getComputedStyle(document.documentElement);
+      const body=getComputedStyle(document.body);
+      const main=document.querySelector(".app-shell > .main");
+      return {html:root.overflowY,body:body.overflowY,main:main?getComputedStyle(main).overflowY:"missing"};
+    });
+    expect(state.html).toBe("hidden");
+    expect(state.body).toBe("hidden");
+    expect(state.main).toBe("hidden");
+  }
+  await expectBackgroundLocked();
+
+  // Day is NEVER unmounted when a form is opened on top.
+  await day.getByRole("button",{name:"Novo compromisso"}).click();
+  await expect(editor).toBeVisible();
+  await expect(day).toBeVisible();
+  await expectBackgroundLocked();
+  await page.keyboard.press("Escape");
+  await expect(editor).toHaveCount(0);
+  await expect(day).toBeVisible();
+  await expectBackgroundLocked();
+
+  await day.getByRole("button",{name:"Editar Teste pilha modal"}).click();
+  await expect(editor).toBeVisible();
+  await editor.getByRole("button",{name:"Cancelar"}).click();
+  await expect(day).toBeVisible();
+  await expect(editor).toHaveCount(0);
+
+  await day.getByRole("button",{name:"Excluir Teste pilha modal"}).click();
+  const confirm=page.locator("dialog.rt-confirm-dialog");
+  await expect(confirm).toBeVisible();
+  await expect(confirm).toContainText("Excluir compromisso?");
+  await expect(day).toBeVisible();
+  await expectBackgroundLocked();
+  await page.keyboard.press("Escape");
+  await expect(confirm).toHaveCount(0);
+  await expect(day).toBeVisible();
+  await expect(day.locator(".calendar-day-record")).toHaveCount(1);
+  await day.getByRole("button",{name:"Excluir Teste pilha modal"}).click();
+  await confirm.getByRole("button",{name:"Manter compromisso"}).click();
+  await expect(day.locator(".calendar-day-record")).toHaveCount(1);
+  await day.getByRole("button",{name:"Excluir Teste pilha modal"}).click();
+  await confirm.getByRole("button",{name:"Excluir compromisso",exact:true}).click();
+  await expect(confirm).toHaveCount(0);
+  await expect(day).toBeVisible();
+  await expect(day.locator(".calendar-day-record")).toHaveCount(0);
+  await expectBackgroundLocked();
+  await page.keyboard.press("Escape");
+  await expect(day).toHaveCount(0);
+  await expect(page.locator("dialog[open]")).toHaveCount(0);
+  await expect(page.locator("html")).not.toHaveCSS("overflow-y","hidden");
+});
+
+test("legacy overlays and native AppDialog share the global scroll lock",async({page},info)=>{
+  await enterCalendar(page,"global-modal-scroll-"+info.project.name+"@example.com");
+  const sidebar=page.locator(".sidebar nav");
+  await sidebar.getByRole("button",{name:/^Projetos/}).click();
+  await page.getByRole("button",{name:"Criar projeto"}).first().click();
+  await expect(page.locator(".modal-backdrop")).toBeVisible();
+  await expect(page.locator("html")).toHaveCSS("overflow-y","hidden");
+  await expect(page.locator("body")).toHaveCSS("overflow-y","hidden");
+  await page.locator(".project-modal").getByRole("button",{name:"Cancelar"}).click();
+  await expect(page.locator(".modal-backdrop")).toHaveCount(0);
+  await expect(page.locator("html")).not.toHaveCSS("overflow-y","hidden");
+
+  await sidebar.getByRole("button",{name:/^Clientes/}).click();
+  await page.getByRole("button",{name:"Novo cliente"}).first().click();
+  const dialog=page.locator("dialog.cd-form-dialog");
+  await expect(dialog).toBeVisible();
+  await expect(page.locator("html")).toHaveCSS("overflow-y","hidden");
+  await dialog.getByRole("button",{name:/Fechar|Cancelar/}).first().click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.locator("html")).not.toHaveCSS("overflow-y","hidden");
+});
