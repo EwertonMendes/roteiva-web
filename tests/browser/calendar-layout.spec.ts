@@ -22,6 +22,10 @@ async function enterCalendar(page:Page,email:string){
   if(await open.isVisible())await open.click();
   await page.locator(".sidebar nav").getByRole("button",{name:/^Calendário/}).click();
   await expect(page.locator(".roteiva-calendar")).toBeVisible();
+  // Route transitions temporarily mount a 100vh loading screen alongside
+  // the inert workspace. Measure only after that transition is complete.
+  await expect(page.locator(".studio-loading")).toHaveCount(0);
+  await expect(page.locator("[inert]")).toHaveCount(0);
 }
 
 test("calendar empty day creation, optional ending, review category, editing and reload",async({page},info)=>{
@@ -31,7 +35,7 @@ test("calendar empty day creation, optional ending, review category, editing and
   const form=page.locator("dialog.roteiva-calendar-form");
   await expect(form).toBeVisible();
   await form.getByLabel("Título do compromisso").fill("Gravação externa — campanha verão");
-  await expect(form.getByLabel("Término do compromisso")).toHaveValue("");
+  await expect(form.getByRole("textbox",{name:"Término do compromisso"})).toHaveValue("");
   await form.getByRole("combobox",{name:"Tipo de compromisso"}).click();
   await page.getByRole("option",{name:"Revisão"}).click();
   await form.getByRole("button",{name:"Salvar compromisso"}).click();
@@ -47,13 +51,13 @@ test("calendar empty day creation, optional ending, review category, editing and
   await day.getByRole("button",{name:/Editar Gravação externa/}).click();
 
   await expect(form).toBeVisible();
-  await form.getByLabel("Término do compromisso").fill("10:00");
+  await form.getByRole("textbox",{name:"Término do compromisso"}).fill("10:00");
   await form.getByRole("button",{name:"Cancelar"}).click();
   await selected.click();
   await expect(day).toContainText("Sem término");
   await day.getByRole("button",{name:/Editar Gravação externa/}).click();
-  await form.getByLabel("Término do compromisso").fill("10:00");
-  await expect(form.getByLabel("Término do compromisso")).toHaveValue("10:00");
+  await form.getByRole("textbox",{name:"Término do compromisso"}).fill("10:00");
+  await expect(form.getByRole("textbox",{name:"Término do compromisso"})).toHaveValue("10:00");
   await form.getByRole("button",{name:"Salvar compromisso"}).click();
   await expect(form).toHaveCount(0);
   await selected.click();
@@ -92,4 +96,74 @@ test("calendar grid never overflows and adapts to mobile in both themes",async({
     }
   }
   await expect(page.getByRole("button",{name:"Exportar cópia"})).toHaveCount(0);
+});
+
+
+test("date/time controls use Roteiva popovers, align fields and preserve keyboard editing",async({page},info)=>{
+  await enterCalendar(page,"calendar-pickers-"+info.project.name+"@example.com");
+  await page.getByRole("button",{name:"Novo compromisso",exact:true}).first().click();
+  const form=page.locator("dialog.roteiva-calendar-form");
+  await expect(form).toBeVisible();
+  const date=form.getByRole("textbox",{name:"Data do compromisso"});
+  const start=form.getByRole("textbox",{name:"Início do compromisso"});
+  const end=form.getByRole("textbox",{name:"Término do compromisso"});
+  await expect(date).toHaveAttribute("type","text");
+  await expect(start).toHaveAttribute("type","text");
+  await expect(end).toHaveAttribute("type","text");
+  await form.getByRole("button",{name:"Abrir calendário de data"}).click();
+  const datePicker=form.getByRole("dialog",{name:"Escolher data"});
+  await expect(datePicker).toBeVisible();
+  await datePicker.locator("button.today").first().click();
+  await expect(date).toHaveValue(/^\d{2}\/\d{2}\/\d{4}$/);
+  await date.fill("20/11/2026");
+  await expect(date).toHaveValue("20/11/2026");
+  await form.getByRole("button",{name:"Escolher início do compromisso"}).click();
+  const startPicker=form.getByRole("dialog",{name:"Selecionar início do compromisso"});
+  await expect(startPicker).toBeVisible();
+  await startPicker.getByRole("group",{name:"Horas"}).getByRole("button",{name:"11",exact:true}).click();
+  await startPicker.getByRole("group",{name:"Minutos"}).getByRole("button",{name:"30",exact:true}).click();
+  await startPicker.getByRole("button",{name:"Concluir"}).click();
+  await expect(start).toHaveValue("11:30");
+  await form.getByRole("button",{name:"Escolher término do compromisso"}).click();
+  const endPicker=form.getByRole("dialog",{name:"Selecionar término do compromisso"});
+  await expect(endPicker).toBeVisible();
+  await endPicker.getByRole("group",{name:"Horas"}).getByRole("button",{name:"12",exact:true}).click();
+  await endPicker.getByRole("group",{name:"Minutos"}).getByRole("button",{name:"00",exact:true}).click();
+  await endPicker.getByRole("button",{name:"Concluir"}).click();
+  await expect(end).toHaveValue("12:00");
+  const fields=await form.locator(".calendar-datetime-field").evaluateAll(els=>els.map(el=>{
+    const caption=el.querySelector(".calendar-field-caption")!.getBoundingClientRect();
+    const control=el.querySelector(".calendar-picker-control")!.getBoundingClientRect();
+    return {labelY:caption.y,labelHeight:caption.height,y:control.y,height:control.height};
+  }));
+  expect(fields).toHaveLength(3);
+  expect(Math.abs(fields[1].y-fields[2].y)).toBeLessThan(2);
+  expect(Math.abs(fields[0].height-fields[2].height)).toBeLessThan(2);
+  if(info.project.name==="desktop")expect(Math.abs(fields[0].y-fields[1].y)).toBeLessThan(2);
+  await form.getByRole("button",{name:"Cancelar"}).click();
+  await expect(form).toHaveCount(0);
+});
+
+test("desktop calendar fits the viewport and scrolls only upcoming events",async({page},info)=>{
+  if(info.project.name==="mobile")return;
+  await enterCalendar(page,"calendar-height-"+info.project.name+"@example.com");
+  for(const [width,height] of [[1700,900],[1440,800],[1280,760]]){
+    await page.setViewportSize({width,height});
+    const measured=await page.evaluate(()=>{
+      const main=document.querySelector(".app-view-calendar .main")!.getBoundingClientRect();
+      const grid=document.querySelector(".roteiva-calendar .calendar-grid")!.getBoundingClientRect();
+      const upcoming=document.querySelector(".roteiva-calendar .upcoming-scroll")!;
+      const cells=[...document.querySelectorAll(".roteiva-calendar .calendar-grid>button")].map(el=>el.getBoundingClientRect());
+      return {
+        viewport:innerHeight,scrollHeight:document.documentElement.scrollHeight,
+        mainBottom:main.bottom,gridBottom:grid.bottom,lastCellBottom:cells.at(-1)!.bottom,
+        upcomingOverflow:getComputedStyle(upcoming).overflowY,
+      };
+    });
+    expect(measured.scrollHeight,"no document scroll at "+width+"x"+height).toBeLessThanOrEqual(height+2);
+    expect(measured.mainBottom).toBeLessThanOrEqual(height+2);
+    expect(measured.gridBottom).toBeLessThanOrEqual(height+2);
+    expect(measured.lastCellBottom).toBeLessThanOrEqual(measured.gridBottom+1);
+    expect(measured.upcomingOverflow).toBe("auto");
+  }
 });
