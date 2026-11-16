@@ -42,6 +42,24 @@ export async function libraryRouter(request:Request,env:Env,uid:string,url:URL,f
  if(!appId||!/^\d+$/.test(appId)||!env.GOOGLE_PICKER_API_KEY)throw new ApiError(503,'picker_not_configured');
  return Response.json({authorized:false,clientId:env.GOOGLE_CLIENT_ID,appId,developerKey:env.GOOGLE_PICKER_API_KEY,accountId:row.google_account_id});
  }
+ const count=/^\/library\/projects\/([1-9][0-9]{0,14})\/count$/.exec(url.pathname);
+ if(count&&request.method==='GET'){
+  const projectId=Number(count[1]);
+  await authorizeLibraryProject(request,env,uid,projectId,fetcher);
+  const lib=await libraryFor(env,uid,projectId);
+  // Count all reachable active assets (including subfolders) without pagination.
+  const row=await env.DB.prepare(`WITH RECURSIVE visible(id,depth) AS (
+    SELECT id,0 FROM library_nodes WHERE library_id=? AND id='root' AND state='active'
+    UNION ALL
+    SELECT child.id,visible.depth+1 FROM library_nodes child
+    JOIN visible ON child.parent_id=visible.id
+    WHERE child.library_id=? AND child.state='active' AND visible.depth<16
+   )
+   SELECT COUNT(*) AS count FROM visible
+   JOIN library_nodes node ON node.library_id=? AND node.id=visible.id
+   WHERE node.kind='asset'`).bind(lib.id,lib.id,lib.id).first<{count:number}>();
+  return Response.json({count:row?.count||0},{headers:{'Cache-Control':'private, no-store'}});
+ }
  const match=/^\/library\/projects\/([1-9][0-9]{0,14})\/(nodes|imports)(?:\/([0-9a-f-]{36}|root))?$/.exec(url.pathname);
  if(!match)throw new ApiError(404,'not_found');
  await authorizeLibraryProject(request,env,uid,Number(match[1]),fetcher);
