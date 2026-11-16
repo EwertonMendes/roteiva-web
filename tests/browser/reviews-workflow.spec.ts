@@ -341,9 +341,19 @@ test('profissional cria, cliente comenta/pede ajustes, V2 aprovada e encerrament
   await approvedDetail.getByText('Histórico das versões anteriores').click();
   await expect(approvedDetail.getByText('Ajustar encerramento',{exact:true})).toBeVisible();
   await expect(approvedDetail.getByText('Aumentar legenda',{exact:true})).toBeVisible();
-  page.once('dialog',dialog=>dialog.accept());
-  await page.getByRole('button',{name:'Encerrar revisão',exact:true}).click();
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  // Native window.confirm was replaced by a reusable, accessible stacked dialog.
+  await approvedDetail.getByRole('button',{name:'Encerrar revisão',exact:true}).click();
+  const confirmation=page.locator('dialog.rt-confirm-dialog');
+  await expect(confirmation).toBeVisible();
+  await expect(confirmation).toContainText('Encerrar esta aprovação?');
+  await expect(approvedDetail).toBeVisible();
+  await confirmation.getByRole('button',{name:'Manter aprovação'}).click();
+  await expect(confirmation).toHaveCount(0);
+  expect(closeCalls).toBe(0);
+  await approvedDetail.getByRole('button',{name:'Encerrar revisão',exact:true}).click();
+  await confirmation.getByRole('button',{name:'Encerrar aprovação',exact:true}).click();
+  await expect(confirmation).toHaveCount(0);
+  await expect(approvedDetail).toHaveCount(0);
   await guest.reload();await expect(guest.getByRole('heading',{name:'Material indisponível'})).toBeVisible();
   expect(thumbCalls).toBeGreaterThan(0);
   expect({createCalls,publishCalls,revisionCalls,closeCalls}).toEqual({createCalls:1,publishCalls:1,revisionCalls:1,closeCalls:1});
