@@ -60,3 +60,21 @@ test('image previews accept exactly sized complete 200 responses but reject part
  state.total='5';
  await assert.rejects(libraryContent(new Request('https://api.example/content'),env,'alice',17,id,fetcher),e=>e.code==='media_range_unsupported');
 });
+
+test('full images keep fresh provider authorization but forward verified image streams without JS buffering',async t=>{
+ const {env,id,fetcher,state}=await fixture(t);
+ state.fullStatus=200;
+ const priorMetadata=state.metadataReads;
+ const response=await libraryContent(new Request('https://api.example/content'),env,'alice',17,id,fetcher);
+ assert.equal(response.status,200);
+ assert.equal(response.headers.get('X-Roteiva-Media-Transport'),'origin-pass-through');
+ assert.equal(response.headers.get('Content-Type'),'image/jpeg');
+ assert.equal(response.headers.get('Content-Length'),'4');
+ assert.ok(Number.isFinite(Number(response.headers.get('X-Roteiva-Metadata-Ms'))));
+ assert.ok(Number.isFinite(Number(response.headers.get('X-Roteiva-Origin-Headers-Ms'))));
+ assert.equal(await response.text(),'test');
+ assert.equal(state.metadataReads,priorMetadata+1,'full image must check permissions again');
+ const second=await libraryContent(new Request('https://api.example/content'),env,'alice',17,id,fetcher);
+ await second.body?.cancel();
+ assert.equal(state.metadataReads,priorMetadata+2,'memory cache must not weaken API authorization on misses');
+});
