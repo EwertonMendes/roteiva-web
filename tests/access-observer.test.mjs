@@ -60,10 +60,38 @@ test('REST recovery requires exact project/path, owner and validated entitlement
  }
 });
 
-test('a terminated listener refreshes from the server and restarts once, retaining revocation monitoring',async()=>{
+test('multiple listener terminations recheck the server and restore monitoring without losing the session',async()=>{
  let next,fail,subscriptions=0,reads=0;const values=[],errors=[];
  const stop=observeAccess((n,e)=>{next=n;fail=e;subscriptions++;return()=>{};},async()=>{reads++;return active;},v=>values.push(v),e=>errors.push(e));
- fail();await settle();assert.equal(subscriptions,2);assert.equal(reads,1);assert.deepEqual(values,[active]);
- next({fromCache:false,value:{...active,suspended:true}});assert.equal(values.at(-1).suspended,true);
- fail();await settle();assert.equal(subscriptions,2);assert.equal(reads,1);assert.equal(errors.length,1);stop();
+ fail();await settle();assert.equal(subscriptions,2);assert.equal(reads,1);
+ fail();await settle();assert.equal(subscriptions,3);assert.equal(reads,2);
+ // Consecutive failures back off, but never count as evidence of revocation.
+ fail();await new Promise(resolve=>setTimeout(resolve,150));
+ assert.equal(subscriptions,4);assert.equal(reads,3);assert.deepEqual(errors,[]);
+ assert.equal(values.length,3);
+ next({fromCache:false,value:{...active,suspended:true}});
+ assert.equal(values.at(-1).suspended,true);
+ // A healthy authoritative snapshot resets the bounded restart budget.
+ fail();await settle();assert.equal(subscriptions,5);assert.equal(reads,4);
+ assert.deepEqual(errors,[]);stop();
 });
+test('a failed access verification during repeated termination fails closed',async()=>{
+ let next,fail,reads=0;const values=[],errors=[];
+ const stop=observeAccess((n,e)=>{next=n;fail=e;return()=>{};},
+   async()=>{reads++;return reads===1?active:null;},v=>values.push(v),e=>errors.push(e));
+ fail();await settle();assert.equal(values.length,1);
+ fail();await settle();assert.equal(reads,2);assert.equal(errors.length,1);
+ assert.match(errors[0].message,/confirmar seu acesso/);
+ stop();
+});
+test('closing a tab cancels a pending listener-restart timer',async()=>{
+ let fail,subscriptions=0,reads=0;const errors=[];
+ const stop=observeAccess((_n,e)=>{fail=e;subscriptions++;return()=>{};},
+   async()=>{reads++;return active;},()=>{},e=>errors.push(e));
+ fail();await settle();fail();await settle();fail();await settle();
+ assert.equal(reads,3);assert.equal(subscriptions,3);
+ stop();
+ await new Promise(resolve=>setTimeout(resolve,170));
+ assert.equal(subscriptions,3);assert.deepEqual(errors,[]);
+});
+
