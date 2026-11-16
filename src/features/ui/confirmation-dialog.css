@@ -1,0 +1,68 @@
+/* Shared Roteiva confirmation: project/finance/reviews/calendar may reuse it. */
+.rt-confirm-dialog {
+  position:fixed;
+  inset:0;
+  box-sizing:border-box;
+  width:min(430px,calc(100vw - 28px));
+  max-width:calc(100vw - 28px);
+  max-height:calc(100dvh - 28px);
+  overflow:auto;
+  margin:auto;
+  padding:28px;
+  border-radius:20px;
+  background:var(--card);
+  color:var(--ink);
+  border:1px solid var(--line);
+  box-shadow:0 30px 95px #0008;
+  overscroll-behavior:contain;
+}
+.rt-confirm-dialog::backdrop {background:#050507bd;backdrop-filter:blur(6px)}
+.rt-confirm-dialog .rt-confirm-symbol {
+  display:grid;
+  place-items:center;
+  width:48px;
+  height:48px;
+  border-radius:14px;
+  border:1px solid var(--line);
+  background:var(--subtle);
+  color:var(--ink);
+  margin-bottom:20px;
+}
+.rt-confirm-dialog .rt-confirm-symbol--danger {
+  border-color:#d65c5c47;
+  background:#cc474715;
+  color:#e17e7e;
+}
+.rt-confirm-dialog .rt-confirm-close {
+  position:absolute;
+  top:21px;
+  right:21px;
+  width:38px;
+  height:38px;
+  display:grid;
+  place-items:center;
+  background:var(--subtle);
+  color:var(--muted);
+  border:1px solid var(--line);
+  border-radius:10px;
+}
+.rt-confirm-dialog h2 {font-size:1.35rem;line-height:1.25;letter-spacing:-.025em;font-weight:750;margin:0 28px 10px 0;color:var(--ink)}
+.rt-confirm-dialog p {font-size:var(--type-support);line-height:1.6;color:var(--muted);margin:0;overflow-wrap:anywhere}
+.rt-confirm-dialog .rt-confirm-error {color:#e17e7e;margin-top:12px}
+.rt-confirm-dialog .rt-confirm-actions {display:flex;justify-content:flex-end;gap:10px;margin-top:26px}
+.rt-confirm-dialog .rt-confirm-actions button {
+  display:inline-flex;justify-content:center;align-items:center;
+  min-height:44px;padding:0 16px;border-radius:10px;
+  font:inherit;font-size:.91rem;font-weight:720;
+}
+.rt-confirm-dialog .rt-confirm-cancel {background:var(--subtle);color:var(--ink);border:1px solid var(--line)}
+.rt-confirm-dialog .rt-confirm-submit {background:#f2f2f4;color:#171719;border:1px solid #eeeeef}
+.rt-confirm-dialog .rt-confirm-submit--danger {background:#b53e46;color:#fff;border-color:#b53e46}
+.rt-confirm-dialog .rt-confirm-submit--danger:hover {background:#a5343c}
+.rt-confirm-dialog .rt-confirm-actions button:disabled {cursor:wait;opacity:.6}
+@media(max-width:480px) {
+  .rt-confirm-dialog {padding:23px 20px;border-radius:16px}
+  .rt-confirm-dialog h2 {font-size:1.2rem}
+  .rt-confirm-dialog .rt-confirm-actions {gap:8px}
+  .rt-confirm-dialog .rt-confirm-actions button {flex:1;min-width:0;padding:0 10px}
+}
