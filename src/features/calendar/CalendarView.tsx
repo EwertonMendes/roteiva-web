@@ -118,7 +118,7 @@ export function CalendarView({events,projects,onAdd,onEdit,onDelete,onMonthChang
         const now=new Date();setCursor(new Date(now.getFullYear(),now.getMonth(),1,12));setSelectedDate(dateKey(now.getFullYear(),now.getMonth(),now.getDate()));
       }}>Hoje</AppButton></div>
       <div className="calendar-week">{weekdays.map(name=><span key={name}>{name}</span>)}</div>
-      <div className="calendar-grid">{cells.map(cell=>{
+      <div className="calendar-grid" style={{gridTemplateRows:"repeat("+(cells.length/7)+",minmax(0,1fr))"}}>{cells.map(cell=>{
         const items=perDate.get(cell.key)||[];
         const cellDate=localDate(cell.key);
         const label=cell.day+" de "+months[cellDate.getMonth()].toLowerCase()+" de "+cellDate.getFullYear()+", "+items.length+" "+(items.length===1?"compromisso":"compromissos");
@@ -135,7 +135,7 @@ export function CalendarView({events,projects,onAdd,onEdit,onDelete,onMonthChang
       <div className="calendar-agenda-body">
         {selectedEvents.length>0
           ? <div className="calendar-agenda-events">
-              {selectedEvents.slice(0,4).map(item=><AppButton key={item.id} className="calendar-agenda-row" onClick={()=>setOpenedDay(selectedDate)}>
+              {selectedEvents.slice(0,2).map(item=><AppButton key={item.id} className="calendar-agenda-row" onClick={()=>setOpenedDay(selectedDate)}>
                 <b>{item.time}</b><span>{item.title}</span><small>{item.type}</small>
               </AppButton>)}
               <AppButton className="calendar-agenda-all" onClick={()=>setOpenedDay(selectedDate)}>Ver agenda completa do dia{selectedEvents.length>4?" ("+selectedEvents.length+")":""}</AppButton>
@@ -144,10 +144,12 @@ export function CalendarView({events,projects,onAdd,onEdit,onDelete,onMonthChang
               <AppButton onClick={()=>onAdd(selectedDate)}>Adicionar compromisso</AppButton></div>}
       </div>
       <div className="upcoming-list"><span>PRÓXIMOS COMPROMISSOS</span>
-        {upcoming.map(item=><article key={item.id}>
-          <div><b>{localDate(item.date).getDate()}</b><small>{months[localDate(item.date).getMonth()].slice(0,3)}</small></div>
-          <p><b>{item.title}</b><small>{eventRange(item)} · {item.client||"Sem cliente vinculado"}</small></p>
-        </article>)}
+        <div className="upcoming-scroll" tabIndex={upcoming.length>3?0:undefined} aria-label="Lista de próximos compromissos">
+          {upcoming.map(item=><article key={item.id}>
+            <div><b>{localDate(item.date).getDate()}</b><small>{months[localDate(item.date).getMonth()].slice(0,3)}</small></div>
+            <p><b>{item.title}</b><small>{eventRange(item)} · {item.client||"Sem cliente vinculado"}</small></p>
+          </article>)}
+        </div>
       </div>
     </aside>
     {openedDay&&<DayEventsDialog key={openedDay} date={openedDay} events={perDate.get(openedDay)||[]} projects={projects}
