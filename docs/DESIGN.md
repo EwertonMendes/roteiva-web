@@ -1,5 +1,12 @@
 # Identidade visual e experiência — Roteiva
 
+## Calendário 09 — atualização de UX (16/11/2026, em validação DEV)
+- O mockup 09 governa a grade mensal com 4/5/6 semanas, célula selecionada azul, contagem por dia, agenda lateral e dois diálogos acessíveis. Clicar em dia vazio abre o cadastro com data; dia ocupado abre a lista ordenada, com edição e adicionar outro. A seleção mantém o mês e não confunde datas civis com instantes UTC.
+- O formulário usa os controles compartilhados do Roteiva: título, tipo, data, início obrigatório, término opcional, cliente cadastrado e projeto opcional. Clientes antigos em texto livre não são sobrescritos por navegação; os vínculos de projetos continuam por ID.
+- Prazo automático de projeto mantém tipo e projeto bloqueados no editor; editar data sincroniza o prazo do projeto. Excluir prazo automático exige alterar o projeto, evitando reintrodução ou inconsistência.
+- Os modais nativos têm foco contido e Escape, são responsivos, e as cores/espacamentos permanecem isolados em src/features/calendar/calendar.css. O botão Exportar cópia continua removido mesmo se aparecer em referências antigas.
+- A adição de Revisão ao enum de eventos requer regras Firestore compatíveis antes de homologação; outros campos persistidos não mudam.
+
 ## Revisão editorial de produto — 13/11/2026 (PR #125, em homologação)
 Referência visual vinculante: `Roteiva-revisao-editorial-16x9.pdf`, páginas 2–9, especialmente os mockups 4 e 9. A revisão preserva as telas já aprovadas de Clientes, Aprovações, Biblioteca e Configurações.
 

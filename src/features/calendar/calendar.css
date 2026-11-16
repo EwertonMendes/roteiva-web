@@ -1,0 +1,316 @@
+/* Calendário 09 — componentes isolados dos estilos legados e dos outros modais. */
+.roteiva-calendar {
+  grid-template-columns:minmax(0,2.08fr) minmax(290px,1fr);
+  align-items:stretch;
+  gap:20px;
+}
+.roteiva-calendar .calendar-panel,
+.roteiva-calendar .agenda-panel {
+  min-width:0;
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:20px;
+  box-shadow:0 13px 36px rgba(0,0,0,.05);
+}
+.roteiva-calendar .calendar-toolbar {
+  min-height:94px;
+  padding:0 25px;
+  border-color:var(--line);
+}
+.roteiva-calendar .calendar-toolbar h2 {
+  font-size:var(--type-card);
+  font-weight:700;
+  letter-spacing:-.025em;
+}
+.roteiva-calendar .calendar-toolbar h2 span {color:var(--muted);font-weight:500}
+.roteiva-calendar .calendar-toolbar>div {display:flex;gap:10px}
+.roteiva-calendar .calendar-toolbar>div button,
+.roteiva-calendar .calendar-toolbar>button {
+  background:var(--subtle);color:var(--ink);border:1px solid var(--line);
+  width:44px;height:44px;min-height:44px;border-radius:12px;
+}
+.roteiva-calendar .calendar-toolbar>button{width:auto;padding:0 19px;font-weight:650}
+.roteiva-calendar .calendar-week {
+  min-height:55px;
+  margin:0 14px;
+  padding:0;
+  background:transparent;
+  font-size:var(--type-support);
+  font-weight:750;
+  color:var(--muted);
+  letter-spacing:.045em;
+}
+.roteiva-calendar .calendar-grid {
+  padding:0 14px 14px;
+  gap:0;
+  border-radius:15px;
+}
+.roteiva-calendar .calendar-grid>button {
+  position:relative;
+  display:flex;
+  flex-direction:column;
+  justify-content:flex-start;
+  align-items:flex-start;
+  min-height:clamp(90px,7vw,124px);
+  width:100%;
+  padding:18px 14px;
+  border:0;
+  border-top:1px solid var(--line);
+  border-right:1px solid var(--line);
+  background:transparent;
+  color:var(--ink);
+  border-radius:0;
+  box-shadow:none;
+  text-align:left;
+  transition:background-color .15s ease;
+  overflow:hidden;
+}
+.roteiva-calendar .calendar-grid>button:nth-child(7n) {border-right:0}
+.roteiva-calendar .calendar-grid>button b {
+  display:block;
+  font-size:var(--type-support);
+  line-height:1.25;
+  font-weight:720;
+  margin:0;
+  color:inherit;
+}
+.roteiva-calendar .calendar-grid>button.outside {
+  background:transparent;
+  color:var(--muted);
+  opacity:.5;
+}
+.roteiva-calendar .calendar-grid>button:hover {background:var(--subtle)}
+.roteiva-calendar .calendar-grid>button.selected {
+  background:color-mix(in srgb,#1c62db 26%,var(--card));
+  color:#f5f9ff;
+  border-radius:12px;
+  outline:2px solid #398bff;
+  outline-offset:-2px;
+  box-shadow:inset 0 0 0 1px #398bff,0 5px 22px #1d62c31a;
+  z-index:1;
+}
+:root:not([data-theme="dark"]) .roteiva-calendar .calendar-grid>button.selected {
+  background:#e9f2ff;color:#183e84;
+}
+.roteiva-calendar .calendar-grid .calendar-event-counter {
+  display:grid;
+  place-items:center;
+  min-width:29px;
+  height:29px;
+  padding:0 7px;
+  border-radius:999px;
+  background:var(--subtle);
+  border:1px solid var(--line);
+  color:var(--ink);
+  font-size:var(--type-support);
+  font-weight:750;
+  margin-top:auto;
+}
+.roteiva-calendar .calendar-grid>button.selected .calendar-event-counter {
+  border-color:#4c8bff;
+  color:inherit;
+  background:#3779f530;
+}
+.roteiva-calendar .agenda-panel {display:flex;flex-direction:column;min-height:0}
+.roteiva-calendar .agenda-panel .panel-head {min-height:116px;height:auto;padding:20px 24px}
+.roteiva-calendar .agenda-panel .panel-head span {font-size:var(--type-support)}
+.roteiva-calendar .agenda-panel .panel-head h2 {font-size:var(--type-card);font-weight:720;line-height:1.25}
+.roteiva-calendar .agenda-panel .panel-head button {
+  width:42px;height:42px;display:grid;place-items:center;
+  background:transparent;border:0;color:var(--ink);
+}
+.roteiva-calendar .calendar-agenda-body {
+  min-height:250px;
+  display:flex;flex-direction:column;
+}
+.roteiva-calendar .agenda-empty {
+  display:flex;
+  min-height:250px;
+  flex:1;
+  padding:25px;
+  justify-content:center;
+  align-items:center;
+  gap:11px;
+}
+.roteiva-calendar .agenda-empty>b {font-size:var(--type-body);margin:3px 0 0}
+.roteiva-calendar .agenda-empty>span {font-size:var(--type-support);margin:0}
+.roteiva-calendar .agenda-empty>button {
+  padding:4px 8px;
+  font-size:var(--type-support);
+  color:var(--accent);
+  font-weight:750;
+}
+.roteiva-calendar .calendar-agenda-events {display:grid;gap:0;padding:14px 20px}
+.roteiva-calendar .calendar-agenda-row {
+  display:grid;grid-template-columns:54px minmax(0,1fr);
+  align-items:center;column-gap:12px;row-gap:3px;
+  background:transparent;border:0;border-bottom:1px solid var(--line);
+  color:var(--ink);text-align:left;padding:13px 0;width:100%;
+}
+.roteiva-calendar .calendar-agenda-row b {font-size:var(--type-support);grid-row:span 2}
+.roteiva-calendar .calendar-agenda-row span {font-size:var(--type-support);font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.roteiva-calendar .calendar-agenda-row small {font-size:var(--type-caption);color:var(--muted)}
+.roteiva-calendar .calendar-agenda-all {padding:12px 0;background:transparent;border:0;color:var(--accent);text-align:left;font-weight:700}
+.roteiva-calendar .upcoming-list {padding:21px 23px;flex:1;border-color:var(--line)}
+.roteiva-calendar .upcoming-list>span {font-size:var(--type-support);color:var(--muted)}
+.roteiva-calendar .upcoming-list article {padding:17px 0;align-items:flex-start;border-color:var(--line)}
+.roteiva-calendar .upcoming-list article>div {
+  width:56px;min-width:56px;height:61px;
+  background:var(--subtle);color:var(--ink);
+  border:1px solid var(--line);border-radius:12px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+}
+.roteiva-calendar .upcoming-list article>div b {font-size:var(--type-card)}
+.roteiva-calendar .upcoming-list article>div small {font-size:var(--type-support)}
+.roteiva-calendar .upcoming-list p {min-width:0;padding-top:3px}
+.roteiva-calendar .upcoming-list p b {font-size:var(--type-body);font-weight:700;overflow-wrap:anywhere}
+.roteiva-calendar .upcoming-list p small {font-size:var(--type-support);line-height:1.55;color:var(--muted)}
+/* Native dialog ensures top-layer, focus containment and Escape support. */
+.roteiva-calendar-dialog {
+  position:fixed;
+  inset:0;
+  width:min(930px,calc(100vw - 36px));
+  max-width:calc(100vw - 36px);
+  max-height:calc(100dvh - 36px);
+  margin:auto;
+  overflow:auto;
+  padding:28px 32px 23px;
+  border:1px solid var(--line);
+  border-radius:22px;
+  background:var(--card);
+  color:var(--ink);
+  box-shadow:0 30px 110px #0008;
+}
+.roteiva-calendar-dialog::backdrop {background:#080809bb;backdrop-filter:blur(7px)}
+.roteiva-calendar-dialog .calendar-dialog-head {display:flex;align-items:center;gap:14px}
+.roteiva-calendar-dialog .calendar-dialog-heading {display:flex;align-items:center;gap:13px;font-size:var(--type-body);font-weight:700}
+.roteiva-calendar-dialog .calendar-dialog-close {
+  margin-left:auto;display:grid;place-items:center;
+  width:42px;height:42px;flex:0 0 42px;
+  background:var(--subtle);border:1px solid var(--line);
+  border-radius:12px;color:var(--muted);
+}
+.roteiva-calendar-dialog .calendar-day-heading {
+  display:flex;align-items:center;justify-content:space-between;
+  gap:20px;padding:12px 0 24px;border-bottom:1px solid var(--line);
+}
+.roteiva-calendar-dialog h2,.roteiva-calendar-dialog h3 {color:var(--ink);letter-spacing:-.025em}
+.roteiva-calendar-dialog .calendar-day-heading h2 {font-size:var(--type-card);font-weight:760;margin:0}
+.roteiva-calendar-dialog .calendar-day-actions {display:flex;gap:15px;align-items:center;color:var(--muted);font-size:var(--type-support)}
+.roteiva-calendar-dialog .primary-button {background:#f6f6f6;color:#111;border:1px solid #ececec}
+.roteiva-calendar-dialog .primary-button:hover {background:#e6e6e6}
+.roteiva-calendar-dialog .secondary-button {background:var(--subtle);color:var(--ink);border:1px solid var(--line)}
+.roteiva-calendar-dialog .calendar-day-records {display:grid}
+.roteiva-calendar-dialog .calendar-day-record {
+  display:grid;grid-template-columns:minmax(145px,.85fr) minmax(0,2.5fr) auto;
+  gap:25px;align-items:center;padding:19px 0;border-bottom:1px solid var(--line);
+}
+.roteiva-calendar-dialog .calendar-record-time {border-right:1px solid var(--line);align-self:stretch;display:flex;flex-direction:column;justify-content:center;gap:5px}
+.roteiva-calendar-dialog .calendar-record-time b {font-size:var(--type-body);font-weight:760;white-space:nowrap}
+.roteiva-calendar-dialog .calendar-record-time small {font-size:var(--type-support);color:var(--muted)}
+.roteiva-calendar-dialog .calendar-record-info {min-width:0;display:grid;gap:9px}
+.roteiva-calendar-dialog .calendar-record-info>b {font-size:var(--type-body);overflow-wrap:anywhere}
+.roteiva-calendar-dialog .calendar-record-info>div {display:flex;gap:12px;align-items:center;flex-wrap:wrap;color:var(--muted);font-size:var(--type-support)}
+.roteiva-calendar-dialog .calendar-event-kind {border:1px solid var(--line);border-radius:999px;padding:4px 10px;color:var(--ink);background:var(--subtle)}
+.roteiva-calendar-dialog .calendar-record-actions {display:flex;align-items:center;gap:6px}
+.roteiva-calendar-dialog .calendar-record-actions .secondary-button {white-space:nowrap}
+.roteiva-calendar-dialog .calendar-record-delete,
+.roteiva-calendar-dialog .calendar-delete-action {background:transparent;border:0;color:var(--muted);padding:8px;border-radius:10px}
+.roteiva-calendar-dialog .calendar-record-delete:hover,
+.roteiva-calendar-dialog .calendar-delete-action:hover {color:#dc6565;background:#e73e3e12}
+.roteiva-calendar-dialog .calendar-day-footer {display:flex;align-items:center;justify-content:space-between;gap:14px;color:var(--muted);font-size:var(--type-support);padding-top:20px}
+/* Event form */
+.roteiva-calendar-form {width:min(800px,calc(100vw - 36px));padding:30px 34px 24px}
+.roteiva-calendar-form .calendar-form-title {align-items:flex-start;gap:19px}
+.roteiva-calendar-form .calendar-form-title>svg {margin-top:5px;flex-shrink:0}
+.roteiva-calendar-form .calendar-form-title>div {flex:1}
+.roteiva-calendar-form .calendar-form-title h2 {font-size:clamp(26px,2.6vw,36px);margin:0;font-weight:760;line-height:1.1}
+.roteiva-calendar-form .calendar-form-title p {margin:10px 0 0;font-size:var(--type-body);color:var(--muted);line-height:1.5}
+.roteiva-calendar-form .calendar-form-section {padding:24px 0 26px;border-bottom:1px solid var(--line)}
+.roteiva-calendar-form .calendar-form-basic {border-top:0}
+.roteiva-calendar-form .calendar-form-section>label,
+.roteiva-calendar-form .calendar-date-fields>label,
+.roteiva-calendar-form .calendar-link-fields>label {
+  display:grid;gap:10px;font-size:var(--type-body);font-weight:700;color:var(--ink)
+}
+.roteiva-calendar-form .calendar-form-basic>label+input {margin:0 0 22px}
+.roteiva-calendar-form .calendar-form-section h3 {
+  display:flex;align-items:center;gap:12px;margin:0 0 18px;font-size:var(--type-body);font-weight:760
+}
+.roteiva-calendar-form .calendar-form-section h3 span,
+.roteiva-calendar-form .calendar-date-fields label span {color:var(--muted);font-weight:500}
+.roteiva-calendar-form input:not([type="hidden"]),
+.roteiva-calendar-form .rt-select-trigger {
+  width:100%;min-width:0;min-height:52px;height:52px;
+  background:var(--subtle);color:var(--ink);
+  border:1px solid var(--line);border-radius:11px;padding:0 14px;
+  font-size:var(--type-body);font-weight:500;
+}
+.roteiva-calendar-form .calendar-form-basic>input {background:var(--card);border-color:var(--muted)}
+.roteiva-calendar-form .calendar-form-basic>label:not(:first-child) {margin-top:0}
+.roteiva-calendar-form .calendar-field-with-icon {position:relative;min-width:0;display:flex;align-items:center}
+.roteiva-calendar-form .calendar-field-with-icon>svg {position:absolute;z-index:1;left:17px;pointer-events:none}
+.roteiva-calendar-form .calendar-field-with-icon .rt-select {width:100%;min-width:0}
+.roteiva-calendar-form .calendar-field-with-icon .rt-select-trigger {padding-left:52px;text-align:left}
+.roteiva-calendar-form .calendar-date-fields {display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+.roteiva-calendar-form .calendar-date-fields input {color-scheme:inherit}
+.roteiva-calendar-form .calendar-optional-end {position:relative;min-width:0}
+.roteiva-calendar-form .calendar-optional-end button {position:absolute;right:37px;top:50%;transform:translateY(-50%);background:var(--card);border:0;color:var(--muted);padding:4px;border-radius:5px}
+.roteiva-calendar-form .calendar-form-hint {display:flex;align-items:center;gap:10px;margin:14px 0 0;font-size:var(--type-support);line-height:1.5;color:var(--muted)}
+.roteiva-calendar-form .calendar-form-hint svg {flex-shrink:0}
+.roteiva-calendar-form .calendar-link-fields {display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.roteiva-calendar-form .calendar-save-error {margin:14px 0 0;padding:12px;border:1px solid #e2585840;border-radius:9px}
+.roteiva-calendar-form .event-availability {margin:14px 0 0}
+.roteiva-calendar-form .calendar-form-actions {display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:24px}
+.roteiva-calendar-form .calendar-form-action-right {display:flex;gap:10px;margin-left:auto}
+.roteiva-calendar-form .calendar-form-actions button {min-height:47px}
+.roteiva-calendar-form .calendar-delete-action {display:flex;align-items:center;gap:6px}
+/* The layout can scroll naturally on smaller screens, without hiding cells. */
+@media(max-width:1150px){
+  .roteiva-calendar {grid-template-columns:minmax(0,1fr)}
+  .roteiva-calendar .agenda-panel {min-height:0}
+  .roteiva-calendar .calendar-agenda-body {min-height:170px}
+  .roteiva-calendar .agenda-empty {min-height:180px}
+}
+@media(max-width:700px){
+  .roteiva-calendar {gap:14px}
+  .roteiva-calendar .calendar-panel,.roteiva-calendar .agenda-panel {border-radius:15px}
+  .roteiva-calendar .calendar-toolbar {min-height:70px;padding:0 12px}
+  .roteiva-calendar .calendar-toolbar h2 {font-size:var(--type-body)}
+  .roteiva-calendar .calendar-toolbar>div {gap:4px}
+  .roteiva-calendar .calendar-toolbar>div button,.roteiva-calendar .calendar-toolbar>button {width:35px;min-height:38px;height:38px;border-radius:9px}
+  .roteiva-calendar .calendar-toolbar>button {width:auto;padding:0 11px}
+  .roteiva-calendar .calendar-week {min-height:38px;margin:0 5px;font-size:var(--type-caption)}
+  .roteiva-calendar .calendar-grid {padding:0 5px 6px}
+  .roteiva-calendar .calendar-grid>button {min-height:64px;padding:9px 5px}
+  .roteiva-calendar .calendar-grid>button b {font-size:var(--type-support)}
+  .roteiva-calendar .calendar-grid .calendar-event-counter {min-width:22px;height:22px;padding:0 4px;font-size:var(--type-caption)}
+  .roteiva-calendar .agenda-panel .panel-head {min-height:86px;padding:15px 18px}
+  .roteiva-calendar .upcoming-list {padding:18px}
+  .roteiva-calendar-dialog {width:calc(100vw - 18px);max-width:calc(100vw - 18px);max-height:calc(100dvh - 18px);padding:20px 18px;border-radius:16px}
+  .roteiva-calendar-dialog .calendar-day-heading {align-items:flex-start;flex-direction:column;gap:16px}
+  .roteiva-calendar-dialog .calendar-day-heading h2 {font-size:var(--type-body)}
+  .roteiva-calendar-dialog .calendar-day-actions {width:100%;justify-content:space-between}
+  .roteiva-calendar-dialog .calendar-day-record {grid-template-columns:1fr auto;gap:8px;padding:18px 0}
+  .roteiva-calendar-dialog .calendar-record-time {grid-column:1/-1;border-right:0}
+  .roteiva-calendar-dialog .calendar-record-info {grid-column:1}
+  .roteiva-calendar-dialog .calendar-record-actions {grid-column:2;grid-row:2;flex-direction:column;align-self:center}
+  .roteiva-calendar-dialog .calendar-day-footer {align-items:stretch;flex-direction:column}
+  .roteiva-calendar-form .calendar-form-title {gap:12px}
+  .roteiva-calendar-form .calendar-form-title h2 {font-size:26px}
+  .roteiva-calendar-form .calendar-form-title p {font-size:var(--type-support)}
+  .roteiva-calendar-form .calendar-form-section {padding:19px 0}
+  .roteiva-calendar-form .calendar-date-fields {grid-template-columns:1fr 1fr;gap:13px}
+  .roteiva-calendar-form .calendar-date-fields>label:first-child {grid-column:1/-1}
+  .roteiva-calendar-form .calendar-link-fields {grid-template-columns:1fr;gap:13px}
+  .roteiva-calendar-form .calendar-form-actions {flex-wrap:wrap}
+  .roteiva-calendar-form .calendar-form-action-right {width:100%;justify-content:flex-end}
+}
+@media(max-width:380px){
+  .roteiva-calendar .calendar-grid>button {min-height:55px;padding:6px 4px}
+  .roteiva-calendar-form .calendar-form-action-right {flex-direction:column-reverse}
+  .roteiva-calendar-form .calendar-form-action-right button {width:100%}
+}
+@media(prefers-reduced-motion:reduce){
+  .roteiva-calendar .calendar-grid>button {transition:none}
+}

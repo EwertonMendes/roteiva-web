@@ -302,6 +302,9 @@ O runner Node usa `--test-force-exit` após todos os testes e hooks de cleanup: 
 
 **Limite da evidência:** emuladores não comprovam OAuth do Google em produção, duas contas Google reais, Safari/iOS ou cotas reais. Ver status/evidências no roadmap. Artefatos de QA são mantidos por sete dias no Actions. Não marcar testes planejados como executados.
 
+## QA do Calendário 09 (16/11/2026)
+Executar pnpm test:calendar, pnpm typecheck, pnpm build e pnpm test:rules. O fluxo de navegador está em tests/browser/calendar-layout.spec.ts, com cadastro sem término, categoria Revisão, consulta/edição por dia, cancelamento, persistência após reload e geometria em light/dark desktop/mobile. O workflow qa-regression.yml aceita workflow_dispatch com suite=calendar; suite=full também o executa. Rodar no emulador antes do merge e revisar visualmente no DEV real. A alteração de firestore.rules exige confirmar publicação do workflow firebase-infra.yml em DEV além do frontend.yml; PROD não deve receber essas regras até promoção autorizada.
+
 ## CI/CD por responsabilidade — revisão de 18/10/2026
 
 O Roteiva **não publica mais GitHub Pages**. O ambiente DEV segue no Firebase Hosting (frontend) e Cloudflare Worker/D1 (API). Os deploys não dependem de um workflow principal nem de uma suite Playwright de vários minutos.

@@ -156,6 +156,8 @@ test("invalid money, civil dates, time ranges and references are rejected",async
   for(const date of ["2026-02-29","2026-04-31","2026-13-01","16/10/2026"]) await assertFails(setDoc(doc(db,pathFor("alice","events")),{...fixtures.events,date,...meta("alice")}));
   for(const [time,endTime] of [["25:00",""],["09:00","08:00"],["09:00","09:00"]]) await assertFails(setDoc(doc(db,pathFor("alice","events")),{...fixtures.events,time,endTime,...meta("alice")}));
   await assertSucceeds(setDoc(doc(db,pathFor("alice","events")),{...fixtures.events,date:"2028-02-29",...meta("alice")}));
+  await assertSucceeds(setDoc(doc(db,"users/alice/events/11"),{...fixtures.events,id:11,endTime:"",type:"Revisão",...meta("alice")}));
+  await assertFails(setDoc(doc(db,pathFor("alice","events")),{...fixtures.events,type:"Outro",...meta("alice")}));
   for(const name of ["tasks","events","financeEntries"]) await assertFails(setDoc(doc(db,pathFor("alice",name)),{...fixtures[name],projectId:999,...meta("alice")}));
   await assertFails(setDoc(doc(db,pathFor("alice","projects")),{...project,clientId:999,...meta("alice")}));
   await assertFails(setDoc(doc(db,"users/alice/clients/99"),{...client,...meta("alice")}));

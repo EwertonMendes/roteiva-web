@@ -289,7 +289,7 @@ export function FirebaseWorkspace() {
     try {
       await queue.current;
       if(failed.current)throw Error("Conflito: há uma gravação não confirmada.");
-      await repository.load(["projects","activities"]);
+      await repository.load(["clients","projects","activities"]);
       const workspace=await repository.calendarWindow(year,month);
       if(request===scopeRequest.current){
         setInitial(current=>current?{...current,workspace}:current);

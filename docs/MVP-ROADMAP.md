@@ -28,6 +28,13 @@ Evidências visuais e logs sanitizados permanecem locais: `qa-evidence/*2026-11-
 - [ ] **DEPENDÊNCIA EXTERNA:** Google Drive DEV permanece em modo OAuth Testing. Para autorizar qualquer conta Google, o proprietário deve publicar/verificar o cliente no Google Auth Platform conforme escopos aplicáveis; contas fora de Test users serão bloqueadas pelo Google até essa mudança. Não alegar liberação universal antes de verificar configuração e consentimento real.
 - [ ] Homologação de contas reais Google/Dropbox e merge PR somente após aprovação; PROD intocado.
 
+## Calendário 09 — implementação em branch para DEV (16/11/2026)
+- [x] **IMPLEMENTADO EM BRANCH:** mês adaptativo, seleção azul, contador por dia, clique em dia vazio/ocupado, modal de consulta ordenada, editor em três seções, seletor de cliente/projeto, horário final opcional e tipo Revisão.
+- [x] **IMPLEMENTADO EM BRANCH:** preservar comandos Firestore por documento, prazo automático vinculado ao projeto, dados antigos e modo demo; formatação de data civil local e agenda lateral.
+- [ ] **VALIDAR CI:** calendário unitário, TypeScript, build, regras Firestore (incluindo Revisão e término vazio), fluxo Playwright light/dark desktop/mobile, check de segurança.
+- [ ] **VALIDAR DEV:** deploy frontend e regras aprovados, cadastro, edição, exclusão manual, prazo automático e reload da sessão em navegador real. PROD permanece intocado.
+- [ ] **VALIDAR VISUALMENTE:** comparar mockups 09 em 1600/1280/1100/390/320 px, light/dark e overflow; incluir casos com vários compromissos.
+
 ## Liberação de PROD solicitada — 14/11/2026
 - [x] Integração na master do ciclo editorial e revisão de UX: SHA base `a7d66160` já aprovado em DEV.
 - [x] Ativação explícita da Biblioteca virtual no Worker de PROD e no build do frontend de PROD.
