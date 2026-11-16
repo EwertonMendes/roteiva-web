@@ -468,7 +468,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
       id:editingEvent?.id||newId(),autoDeadline:!!editingEvent?.autoDeadline&&type==="Entrega",
       title:title.trim(),date,time,endTime,type,client,projectId,
     };
-    commitCommands([{kind:"saveEvent",event:entry}]);
+    const commands:WorkspaceCommand[]=[{kind:"saveEvent",event:entry}];
     setCalendarEvents(current=>(editingEvent?current.map(item=>item.id===entry.id?entry:item):[...current,entry])
       .sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time)));
     if(entry.autoDeadline&&entry.projectId) {
@@ -477,9 +477,10 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
         const modified:Project={...linked,dueDate:date,
           due:new Date(date+"T12:00:00").toLocaleDateString("pt-BR",{day:"2-digit",month:"short"})};
         setProjects(current=>current.map(p=>p.id===modified.id?modified:p));
-        commitCommands([{kind:"saveProject",project:modified}]);
+        commands.push({kind:"saveProject",project:modified});
       }
     }
+    commitCommands(commands); // Event and linked deadline update share one Firestore transaction.
     logActivity("Compromisso salvo: "+entry.title);
     setEditingEvent(null);setEventModalOpen(false);
     setCalendarFocus(previous=>({date,revision:(previous?.revision||0)+1}));
