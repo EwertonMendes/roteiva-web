@@ -4,7 +4,8 @@ const media=new Map();
 // Never writes private bytes to CacheStorage, disk, IndexedDB or CDN. Closing
 // a preview preserves a recent chunk; logout/account switch clears everything.
 const chunks=new Map();
-const CHUNK_TTL=3*60*1000,MAX_CHUNK=8*1024*1024,MAX_CACHED=48*1024*1024;
+const CHUNK_TTL=3*60*1000,MAX_CHUNK=8*1024*1024,MAX_IMAGE=8*1024*1024,MAX_CACHED=48*1024*1024;
+const SAFE_IMAGE=/^image\/(?:jpeg|png|webp|avif|gif|bmp|tiff)(?:$|;)/i;
 let cachedBytes=0;
 const MEDIA_CACHE='roteiva-private-media-v2';
 const DISK_MAX_ENTRIES=6,DISK_TTL=10*60*1000;
@@ -62,19 +63,22 @@ function getChunk(key){
 }
 function saveChunk(key,response,writeDisk){
  const length=Number(response.headers.get('Content-Length')||0);
- if(response.status!==206||!Number.isSafeInteger(length)||length<1||length>MAX_CHUNK||
-    !/^bytes \d+-\d+\/\d+$/.test(response.headers.get('Content-Range')||''))return Promise.resolve();
+ const rangeOK=response.status===206&&/^bytes \d+-\d+\/\d+$/.test(response.headers.get('Content-Range')||'');
+ // A private full-size image may be decoded by <img> while its bounded
+ // response is copied to tab-local memory. Never persist original images to disk.
+ const imageOK=response.status===200&&SAFE_IMAGE.test(response.headers.get('Content-Type')||'')&&length<=MAX_IMAGE;
+ if(!Number.isSafeInteger(length)||length<1||length>MAX_CHUNK||(!rangeOK&&!imageOK))return Promise.resolve();
  const generation=cacheGeneration;
  return response.arrayBuffer().then(async data=>{
   if(data.byteLength!==length||generation!==cacheGeneration)return;
   const headers=Array.from(response.headers.entries());
   forget(key);
-  chunks.set(key,{data,headers,expires:Date.now()+CHUNK_TTL});
+  chunks.set(key,{data,headers,status:response.status,expires:Date.now()+CHUNK_TTL});
   cachedBytes+=length;
   while(cachedBytes>MAX_CACHED){
    const old=chunks.keys().next().value;if(!old)break;forget(old);
   }
-  if(writeDisk)await persistChunk(key,data,headers,generation);
+  if(writeDisk&&rangeOK)await persistChunk(key,data,headers,generation);
  }).catch(()=>{});
 }
 
@@ -143,7 +147,7 @@ self.addEventListener('fetch',event=>{
   forget(key);chunks.set(key,{...hit,expires:Date.now()+CHUNK_TTL});cachedBytes+=hit.data.byteLength;
   while(cachedBytes>MAX_CACHED){const old=chunks.keys().next().value;if(!old)break;forget(old);}
  }}
- if(hit)return new Response(hit.data.slice(0),{status:206,headers:new Headers(hit.headers)});
+ if(hit)return new Response(hit.data.slice(0),{status:hit.status||206,headers:new Headers(hit.headers)});
  try{
  const controller=new AbortController();
  const timer=setTimeout(()=>controller.abort(),20000);
@@ -162,11 +166,12 @@ self.addEventListener('fetch',event=>{
  // valid partial response that the cache is actually going to consume.
  const length=Number(upstream.headers.get('Content-Length')||0);
  const contentRange=upstream.headers.get('Content-Range')||'';
- const canCache=key&&upstream.status===206&&Number.isSafeInteger(length)&&
-  length>0&&length<=MAX_CHUNK&&/^bytes \d+-\d+\/\d+$/.test(contentRange);
+ const partialCache=upstream.status===206&&/^bytes \d+-\d+\/\d+$/.test(contentRange);
+ const imageCache=!range&&upstream.status===200&&SAFE_IMAGE.test(upstream.headers.get('Content-Type')||'')&&length<=MAX_IMAGE;
+ const canCache=key&&Number.isSafeInteger(length)&&length>0&&length<=MAX_CHUNK&&(partialCache||imageCache);
  if(canCache){
   const snapshot=upstream.clone();
-  const task=saveChunk(key,snapshot,diskEligible(range));
+  const task=saveChunk(key,snapshot,partialCache&&diskEligible(range));
   event.waitUntil?.(task);
  }
  return new Response(upstream.body,{status:upstream.status,headers:responseHeaders});
