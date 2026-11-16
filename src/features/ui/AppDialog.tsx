@@ -15,10 +15,9 @@ export const AppDialog=forwardRef<HTMLDialogElement,Props>(function AppDialog({
     const element=localRef.current;
     if(!element)return;
     if(!element.open)element.showModal();
-    // Native dialog already traps focus; only lock background scrolling.
-    const previous=document.body.style.overflow;
-    document.body.style.overflow="hidden";
-    return()=>{document.body.style.overflow=previous;if(element.open)element.close();};
+    // The global modal layer stylesheet locks background scroll for any open
+    // native or ARIA dialog; per-dialog imperative restoration breaks nesting.
+    return()=>{if(element.open)element.close();};
   },[]);
   return <dialog {...props} ref={element=>{
     localRef.current=element;
