@@ -168,3 +168,12 @@
 }
 .vl-preview-modal .vl-stream-actions button{max-width:100%;white-space:normal;}
 @media(max-width:650px){.vl-preview-modal .vl-stream-actions{bottom:42px;left:6px;padding:6px;font-size:11px}}
+
+
+/* Private image bytes render as they arrive; keep a small, non-blocking
+   progress label until native decoding finishes. No full-blob gate. */
+.vl-preview-modal .vl-preview-image-stage{position:relative;width:100%;height:100%;min-width:0;min-height:0}
+.vl-preview-modal .vl-preview-image-stage .review-private-viewer{width:100%;height:100%}
+.vl-preview-modal .vl-preview-image-loading{position:absolute;z-index:2;top:12px;left:12px;pointer-events:none;
+ padding:7px 11px;border-radius:999px;background:var(--subtle);border:1px solid var(--line);
+ color:var(--ink);font-size:12px;font-weight:500}
