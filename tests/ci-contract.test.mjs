@@ -93,3 +93,27 @@ test("review video uses only native fullscreen controls", () => {
     assert.equal(css.includes(orphan), false, `Obsolete fullscreen style: ${orphan}`);
   }
 });
+
+test("PROD promotion runs full regression in parallel without weakening authorization", () => {
+  const prod = read(".github/workflows/production.yml");
+  assert.match(prod, /jobs:\s*\n  authorize:/);
+  assert.match(prod, /test "\$GITHUB_ACTOR" = "\$GITHUB_REPOSITORY_OWNER"/);
+  assert.match(prod, /test "\$APPROVED_SHA" = "\$GITHUB_SHA"/);
+  assert.match(prod, /git ls-remote origin refs\/heads\/master/);
+  assert.match(prod, /merged_at != null and \.base\.ref == "master"/);
+  assert.match(prod, /needs: \[authorize, checks, browser\]/);
+  assert.match(prod, /shard: \[1, 2, 3\]/);
+  assert.match(prod, /playwright test --shard=/);
+  assert.match(prod, /pnpm test:rules/);
+  assert.match(prod, /npm run migrate:local --prefix api/);
+  assert.match(prod, /environment: cloudflare-production/);
+  assert.match(prod, /environment: firebase-production/);
+  assert.match(prod, /guard-environment\.mjs prod --before-migrations/);
+  assert.match(prod, /guard-secrets\.mjs prod/);
+  assert.match(prod, /scripts\/smoke-environment\.mjs prod/);
+  const browser=prod.split("  browser:\n")[1].split("  worker:\n")[0];
+  assert.match(browser, /fail-fast: false/);
+  assert.match(browser, /ffmpeg/);
+  assert.match(browser, /firebase emulators:exec --project demo-roteiva --only auth,firestore/);
+  assert.doesNotMatch(browser, /--grep|--project=desktop|--project=mobile/, "Every browser project/test must run on one shard");
+});

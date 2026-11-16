@@ -16,16 +16,15 @@ concurrency:
   group: roteiva-production
   cancel-in-progress: false
 jobs:
-  validate:
-    # Explicit owner-confirmed manual promotion is authorized even if the
-    # optional PRODUCTION_ENABLED switch is off. A full exact SHA, current
-    # master, merged PR and protected production environments are still required.
+  authorize:
+    # Reject stale, unmerged, or unapproved promotions before scheduling the
+    # expensive tests. The protected deployment environments remain mandatory.
     if: >-
       github.ref == 'refs/heads/master' &&
       (vars.PRODUCTION_ENABLED == 'true' ||
        (github.event_name == 'workflow_dispatch' && inputs.confirmation == 'DEPLOY ROTEIVA PROD'))
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 2
     steps:
       - uses: actions/checkout@v4
       - name: Require owner promotion of current approved master
@@ -42,9 +41,19 @@ jobs:
           test "$(git ls-remote origin refs/heads/master | cut -f1)" = "$APPROVED_SHA"
           gh api "repos/$GITHUB_REPOSITORY/commits/$APPROVED_SHA/pulls" |
             jq -e 'any(.[]; .merged_at != null and .base.ref == "master")' >/dev/null
+
+  checks:
+    # Fast application, Worker/D1 and Firestore isolation checks on one runner.
+    # The full browser regression runs independently in three isolated shards.
+    needs: authorize
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         with:
           version: 11.25.0
+          run_install: false
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -55,10 +64,49 @@ jobs:
           java-version: '21'
       - run: pnpm install --frozen-lockfile
       - run: npm ci --prefix api --ignore-scripts --no-audit --no-fund
-      # Same system dependency as qa-isolated-e2e.yml. Without this the
-      # real long-video browser test fails with spawnSync ffmpeg ENOENT,
-      # even though every application/Worker check passed in DEV.
-      - name: Prepare long-video regression fixture encoder
+      - name: Unit, TypeScript, Worker, D1 and Firestore rules
+        run: |
+          set -euo pipefail
+          pnpm test
+          pnpm typecheck
+          npm run typecheck --prefix api
+          npm test --prefix api
+          npm run migrate:local --prefix api
+          pnpm test:rules
+
+  browser:
+    # Playwright's file-based sharding retains every desktop and mobile test,
+    # but avoids serializing ~13 minutes of E2E on a single GitHub runner.
+    needs: authorize
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: pnpm install --frozen-lockfile
+      - name: Cache browser and Firebase emulator binaries
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/ms-playwright
+            ~/.cache/firebase/emulators
+          key: ${{ runner.os }}-prod-e2e-${{ hashFiles('pnpm-lock.yaml') }}
+      - name: Prepare real-video regression encoder
         run: |
           if ! command -v ffmpeg >/dev/null 2>&1; then
             sudo apt-get update -qq
@@ -66,19 +114,29 @@ jobs:
           fi
           command -v ffmpeg
           ffmpeg -version | head -1
-      - name: Test application, backend, D1 and user isolation
+      - name: Build isolated emulator and demo frontends
         run: |
-          pnpm test
-          pnpm typecheck
-          npm run typecheck --prefix api
-          npm test --prefix api
-          npm run migrate:local --prefix api
           pnpm build:demo
           pnpm build:emulator
           pnpm exec playwright install --with-deps chromium
-          pnpm test:firebase
+      - name: Full desktop/mobile Playwright regression (shard ${{ matrix.shard }}/3)
+        env:
+          CI: 'true'
+        run: |
+          pnpm exec firebase emulators:exec --project demo-roteiva --only auth,firestore \
+            "pnpm exec playwright test --shard=${{ matrix.shard }}/3 --reporter=list"
+      - name: Archive failed browser traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prod-browser-shard-${{ matrix.shard }}-failure
+          path: |
+            test-results/
+            playwright-report/
+          if-no-files-found: ignore
+          retention-days: 7
   worker:
-    needs: validate
+    needs: [authorize, checks, browser]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: cloudflare-production
