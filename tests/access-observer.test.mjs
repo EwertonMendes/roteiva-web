@@ -60,10 +60,58 @@ test('REST recovery requires exact project/path, owner and validated entitlement
  }
 });
 
-test('a terminated listener refreshes from the server and restarts once, retaining revocation monitoring',async()=>{
+const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+
+test('a transient listener failure refreshes entitlement and retries until a live snapshot',async()=>{
  let next,fail,subscriptions=0,reads=0;const values=[],errors=[];
- const stop=observeAccess((n,e)=>{next=n;fail=e;subscriptions++;return()=>{};},async()=>{reads++;return active;},v=>values.push(v),e=>errors.push(e));
- fail();await settle();assert.equal(subscriptions,2);assert.equal(reads,1);assert.deepEqual(values,[active]);
- next({fromCache:false,value:{...active,suspended:true}});assert.equal(values.at(-1).suspended,true);
- fail();await settle();assert.equal(subscriptions,2);assert.equal(reads,1);assert.equal(errors.length,1);stop();
+ const stop=observeAccess((n,e)=>{next=n;fail=e;subscriptions++;return()=>{};},
+  async()=>{reads++;return active;},v=>values.push(v),e=>errors.push(e));
+ fail();await settle();
+ assert.equal(subscriptions,2);assert.equal(reads,1);assert.deepEqual(values,[active]);
+ // The next terminal notification also requires a fresh authorized server
+ // read; it is not treated as a permanent denial.
+ fail();await settle();assert.equal(reads,2);assert.deepEqual(errors,[]);
+ await sleep(240);assert.equal(subscriptions,3);
+ next({fromCache:false,value:{...active,suspended:true}});
+ assert.equal(values.at(-1).suspended,true);
+ fail();await settle();
+ assert.equal(reads,3);assert.equal(subscriptions,4);
+ assert.deepEqual(errors,[]);
+ stop();
+});
+
+test('repeated listener terminations eventually block access instead of retrying forever',async()=>{
+ let fail,subscriptions=0,reads=0;const errors=[];
+ const stop=observeAccess((_,e)=>{fail=e;subscriptions++;return()=>{};},
+   async()=>{reads++;return active;},()=>{},e=>errors.push(e));
+ const delays=[0,200,500,1000];
+ for(let i=0;i<delays.length;i++){
+   fail();await settle();
+   if(delays[i])await sleep(delays[i]+50);
+ }
+ assert.equal(subscriptions,5);
+ assert.equal(reads,4);
+ fail();await settle();
+ assert.equal(subscriptions,5);assert.equal(reads,4);
+ assert.match(errors[0]?.message||'',/acompanhar o estado/);
+ assert.equal(errors.length,1);
+ stop();
+});
+
+test('recovery denial fails closed without restarting a listener',async()=>{
+ let fail,subscriptions=0;const values=[],errors=[];
+ const stop=observeAccess((_,e)=>{fail=e;subscriptions++;return()=>{};},
+  async()=>{throw new Error('HTTP 403');},v=>values.push(v),e=>errors.push(e));
+ fail();await settle();
+ assert.equal(subscriptions,1);assert.deepEqual(values,[]);
+ assert.equal(errors.length,1);stop();
+});
+
+test('logging out cancels a scheduled access-listener restart',async()=>{
+ let fail,subscriptions=0;
+ const stop=observeAccess((_,e)=>{fail=e;subscriptions++;return()=>{};},
+  async()=>active,()=>{},()=>{});
+ fail();await settle();assert.equal(subscriptions,2);
+ fail();await settle();stop();
+ await sleep(250);assert.equal(subscriptions,2);
 });
