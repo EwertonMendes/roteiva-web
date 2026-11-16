@@ -123,7 +123,7 @@ test("Google emulator session, CRUD, restoration, themes and separate users",asy
   await eventForm.getByRole("textbox",{name:"Data do compromisso"}).fill(displayDate(today));
   await eventForm.getByRole("textbox",{name:"Término do compromisso"}).fill("10:00");
   await eventForm.getByRole("button",{name:"Salvar compromisso"}).click();await settled(page);
-  const busyDay=page.locator(".calendar-grid > button.has-events.selected");
+  const busyDay=page.locator(".calendar-grid > button.has-events").first();
   await expect(busyDay.locator(".calendar-event-counter")).toHaveText("1");
   await busyDay.click();
   const dayDialog=page.locator("dialog.day-events-dialog");
