@@ -62,3 +62,66 @@ test('request cancellation prevents any more upstream reads',async()=>{
  await assert.rejects(response.arrayBuffer());
  assert.equal(requests.length,countAtCancellation);
 });
+
+test('first video bytes reach the browser before a 1 MiB provider range finishes downloading',async()=>{
+ const size=12*MB;
+ let releaseRest;
+ const waitRest=new Promise(resolve=>{releaseRest=resolve;});
+ let firstBody=true;
+ const read=async(range)=>{
+  const m=/^bytes=(\d+)-(\d+)$/.exec(range);
+  const start=Number(m[1]),end=Number(m[2]),length=end-start+1;
+  if(!firstBody){
+   return new Response(new Uint8Array(length),{status:206,headers:{
+    'Content-Range':'bytes '+start+'-'+end+'/'+size,'Content-Length':String(length),
+   }});
+  }
+  firstBody=false;
+  let sent=false;
+  const body=new ReadableStream({
+   async pull(controller){
+    if(!sent){
+     sent=true;controller.enqueue(new Uint8Array(64*1024));return;
+    }
+    await waitRest;
+    controller.enqueue(new Uint8Array(length-64*1024));controller.close();
+   }
+  });
+  return new Response(body,{status:206,headers:{
+   'Content-Range':'bytes '+start+'-'+end+'/'+size,'Content-Length':String(length),
+  }});
+ };
+ const response=await stitchedVideoResponse('bytes=0-'+(size-1),String(size),'video/mp4',read);
+ const reader=response.body.getReader();
+ try{
+  const first=await Promise.race([
+   reader.read(),
+   new Promise((_,reject)=>setTimeout(()=>reject(new Error('progressive bytes delayed until full upstream range')),500)),
+  ]);
+  assert.equal(first.value.byteLength,64*1024);
+ }finally{releaseRest();await reader.cancel();}
+});
+
+test('provider stream ending midway is resumed at the exact byte offset',async()=>{
+ const size=2*MB,seen=[];
+ const read=async range=>{
+  seen.push(range);
+  const m=/^bytes=(\d+)-(\d+)$/.exec(range);
+  const start=Number(m[1]),end=Number(m[2]),requested=end-start+1;
+  const partial=start===0?128*1024:requested;
+  const body=new Uint8Array(partial).fill(start%251);
+  // Simulate a connection that closes early while claiming the full range.
+  return new Response(new ReadableStream({
+   start(controller){controller.enqueue(body);controller.close();}
+  }),{status:206,headers:{
+   'Content-Range':'bytes '+start+'-'+end+'/'+size,
+   'Content-Length':String(requested),
+  }});
+ };
+ const response=await stitchedVideoResponse('bytes=0-'+(size-1),String(size),'video/mp4',read);
+ const bytes=new Uint8Array(await response.arrayBuffer());
+ assert.equal(bytes.byteLength,size);
+ assert.ok(seen.includes('bytes='+(128*1024)+'-'+(MB-1)),'must retry only unreceived bytes');
+ assert.equal(bytes[0],0);
+ assert.equal(bytes[128*1024],(128*1024)%251);
+});
