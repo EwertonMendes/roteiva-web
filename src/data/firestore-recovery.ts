@@ -36,28 +36,38 @@ export async function retryFirestoreRead<T>(
 }
 
 /**
- * A newly restored Firebase tab can briefly get a permission-denied SDK read
- * while its cross-tab credential provider is still synchronizing. This is NOT
- * a blanket retry: first confirm the current user's entitlement and profile
- * with fresh authenticated server-only reads. The actual Firestore Rules must
- * allow the retried business query; a second denial is final.
- *
- * Never use this for writes. Writes may have committed before an error.
+ * When one browser tab reloads while another owns the persistent Firestore
+ * connection, the SDK can transiently deny reads until its Auth credentials
+ * and tab ownership converge. A retry is allowed ONLY after fresh server
+ * verification of this user's current access and registered profile. Every
+ * subsequent protected Firestore query still enforces Rules independently.
+ * A genuine access revocation, server denial, different identity or exhausted
+ * retry budget must fail closed. Never retry writes.
  */
 export async function retryVerifiedInitialRead<T>(
   read:()=>Promise<T>,
   confirmServerEntitlement:()=>Promise<boolean>,
-  options:{isCurrent?:()=>boolean}={},
+  options:{isCurrent?:()=>boolean;delaysMs?:readonly number[]}={},
 ):Promise<T>{
   try{
     return await retryFirestoreRead(read,{isCurrent:options.isCurrent});
   }catch(original){
     if(firestoreCode(original)!=='permission-denied')throw original;
-    if(options.isCurrent&&!options.isCurrent())throw new Error('Leitura cancelada.');
-    // A failure to confirm access must deny, never authorize the retry.
-    const verified=await confirmServerEntitlement();
-    if(!verified)throw original;
-    if(options.isCurrent&&!options.isCurrent())throw new Error('Leitura cancelada.');
-    return retryFirestoreRead(read,{attempts:1,isCurrent:options.isCurrent});
+    const delays=options.delaysMs??[150,450,1000];
+    let lastError:unknown=original;
+    for(const delay of delays){
+      if(options.isCurrent&&!options.isCurrent())throw new Error('Leitura cancelada.');
+      // Fail closed for absent/suspended/expired access, or failed fresh auth.
+      if(!(await confirmServerEntitlement()))throw original;
+      if(options.isCurrent&&!options.isCurrent())throw new Error('Leitura cancelada.');
+      if(delay>0)await new Promise<void>(resolve=>setTimeout(resolve,delay));
+      if(options.isCurrent&&!options.isCurrent())throw new Error('Leitura cancelada.');
+      try{return await retryFirestoreRead(read,{attempts:1,isCurrent:options.isCurrent});}
+      catch(error){
+        if(firestoreCode(error)!=='permission-denied')throw error;
+        lastError=error;
+      }
+    }
+    throw lastError;
   }
 }
