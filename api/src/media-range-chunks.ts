@@ -65,38 +65,42 @@ export async function stitchedVideoResponse(
   reader=await openSlice(read,cursor,sliceEnd,total,abort.signal);
   const body=new ReadableStream<Uint8Array>({
    async pull(controller){
-    if(abort.signal.aborted){cleanup();controller.error(new Error('media_cancelled'));return;}
-    if(cursor>end){cleanup();controller.close();return;}
     try{
-     if(!reader){
-      if(failures===0)sliceEnd=Math.min(end,cursor+nextBytes-1);
-      reader=await openSlice(read,cursor,sliceEnd,total,abort.signal);
-     }
-     let part:ReadableStreamReadResult<Uint8Array>;
-     try{part=await reader.read();}
-     catch(error){
-      try{await reader.cancel();}catch{/* reader was interrupted */}
-      reader=null;
-      if(!abort.signal.aborted&&++failures<=MAX_SLICE_RETRIES)return;
-      throw error;
-     }
-     if(part.done){
-      reader.releaseLock();reader=null;
-      if(cursor<=sliceEnd){
-       if(++failures<=MAX_SLICE_RETRIES)return;
-       throw new Error('incomplete_provider_chunk');
+     // Do not return from pull without enqueueing or closing: a ReadableStream
+     // consumer can otherwise remain pending forever after a short upstream.
+     for(;;){
+      if(abort.signal.aborted)throw new Error('media_cancelled');
+      if(cursor>end){cleanup();controller.close();return;}
+      if(!reader){
+       if(failures===0)sliceEnd=Math.min(end,cursor+nextBytes-1);
+       reader=await openSlice(read,cursor,sliceEnd,total,abort.signal);
+      }
+      let part:ReadableStreamReadResult<Uint8Array>;
+      try{part=await reader.read();}
+      catch(error){
+       try{await reader.cancel();}catch{/* interrupted reader */}
+       reader=null;
+       if(!abort.signal.aborted&&++failures<=MAX_SLICE_RETRIES)continue;
+       throw error;
+      }
+      if(part.done){
+       reader.releaseLock();reader=null;
+       if(cursor<=sliceEnd){
+        if(++failures<=MAX_SLICE_RETRIES)continue;
+        throw new Error('incomplete_provider_chunk');
+       }
+       continue;
+      }
+      if(part.value.byteLength===0)continue;
+      if(part.value.byteLength>sliceEnd-cursor+1)throw new Error('provider_range_overflow');
+      cursor+=part.value.byteLength;
+      failures=0;
+      controller.enqueue(part.value);
+      if(cursor>sliceEnd){
+       const completed=reader;reader=null;
+       await completed.cancel().catch(()=>{});
       }
       return;
-     }
-     if(part.value.byteLength===0)return;
-     if(part.value.byteLength>sliceEnd-cursor+1)throw new Error('provider_range_overflow');
-     cursor+=part.value.byteLength;
-     failures=0;
-     controller.enqueue(part.value);
-     if(cursor>sliceEnd){
-      const completed=reader;reader=null;
-      // Exact range consumed, release any transport resources immediately.
-      await completed.cancel().catch(()=>{});
      }
     }catch(error){
      abort.abort();cleanup();
