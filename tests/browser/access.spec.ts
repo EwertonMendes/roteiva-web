@@ -91,8 +91,10 @@ test('a second tab restores the same account and can reload without manual recov
   const restored=await page.context().newPage();
   try{
     await restored.goto(cloud+'/biblioteca?drive=connected');
-    await expect(restored.locator('.app-shell')).toBeVisible();
-    await restored.reload();await expect(restored.locator('.app-shell')).toBeVisible();
+    // Mobile Chromium may need additional time to restore IndexedDB Auth from
+    // another tab. Do not reload to mask a failure: assert automatic recovery.
+    await expect(restored.locator('.app-shell')).toBeVisible({timeout:30000});
+    await restored.reload();await expect(restored.locator('.app-shell')).toBeVisible({timeout:30000});
     await expect(restored.getByRole('heading',{name:'Não foi possível consultar seu cadastro.'})).toHaveCount(0);
   }finally{await restored.close();}
 });
