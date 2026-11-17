@@ -141,6 +141,11 @@ dialog.rt-parity-modal.rt-modal--full{width:min(1160px,calc(100vw - 36px))}
 .rt-parity-modal .rt-modal__body .field-hint{color:var(--muted);font-size:var(--type-support);font-weight:400}
 .rt-parity-modal .rt-modal__body .rt-modal__section > p{color:var(--muted);font-size:var(--type-support);line-height:1.5}
 .rt-parity-modal .rt-modal__body label > .rt-input-frame{height:52px}
+/* The canonical AppInput explicitly supports sm/md/lg. Do not stretch a
+   compact adorned search control to the 52px height of standard form fields. */
+.rt-parity-modal .rt-modal__body label > .rt-input-frame[data-control-size="sm"]{
+  height:44px;min-height:44px;
+}
 .rt-parity-modal .rt-modal__body label > .rt-input-frame > .rt-input{border:0;background:transparent;box-shadow:none}
 .rt-parity-modal .rt-modal__body label > .rt-input-frame:focus-within{border-color:var(--field-focus-border);box-shadow:0 0 0 3px var(--field-focus-ring)}
 /* Feature containers preserve media and scroll UX but never override shell title. */
