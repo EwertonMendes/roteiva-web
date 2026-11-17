@@ -1,3 +1,4 @@
+import {CloudDownload as ModalCloudDownload} from "lucide-react";
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {ChevronRight,Folder,Search} from 'lucide-react';
 import {AppButton} from '../ui/AppButton';
@@ -75,7 +76,7 @@ export function DropboxLibraryPicker({connectionId,onClose,onSelect,includeFolde
  return <AppModal size="wide" className="lib-dialog lib-dialog--dropbox"
    onCloseRequest={onClose} aria-labelledby="dropbox-library-title" aria-describedby="dropbox-library-description">
    <div className="rt-modal__layout">
-    <AppModalHeader title={includeFolders?'Importar do Dropbox':'Adicionar do Dropbox'} titleId="dropbox-library-title"
+    <AppModalHeader icon={<ModalCloudDownload size={26}/>} title={includeFolders?'Importar do Dropbox':'Adicionar do Dropbox'} titleId="dropbox-library-title"
       descriptionId="dropbox-library-description" closeLabel="Fechar seletor Dropbox"
       description={<>{includeFolders?'Selecione pastas ou arquivos. As subpastas serão conferidas antes da importação.':'Escolha arquivos para adicionar à Biblioteca.'} Os originais não serão alterados.</>}
       onClose={onClose}/>
