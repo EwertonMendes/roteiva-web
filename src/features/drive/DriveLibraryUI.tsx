@@ -314,7 +314,7 @@ export function DriveUnlinkConfirm({name,onCancel,onConfirm,busy}:{name:string;o
   return <AppModal size="compact" className="rl-confirm" aria-label="Desvincular pasta"
     onCloseRequest={()=>{if(!busy)onCancel();}}>
     <div className="rt-modal__layout">
-      <AppModalHeader icon={<ModalUnlink size={26}/>} title={<>Desvincular “{name}”?</>} onClose={onCancel} closeDisabled={busy}/>
+      <AppModalHeader icon={<ModalUnlink size={26}/>} description="Este projeto deixará de exibir a pasta, sem apagar os arquivos." title={<>Desvincular “{name}”?</>} onClose={onCancel} closeDisabled={busy}/>
       <AppModalBody><p>A pasta deixará de aparecer neste projeto. Nenhum arquivo será apagado do seu Google Drive.</p></AppModalBody>
       <AppModalFooter>
         <AppButton variant="secondary" type="button" disabled={busy} onClick={onCancel}>Manter pasta</AppButton>
