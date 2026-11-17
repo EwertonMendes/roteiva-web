@@ -665,7 +665,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
       {modalOpen && (
         <AppModal size="medium" className="rt-project-dialog" onCloseRequest={() => setModalOpen(false)}
           aria-labelledby="project-new-title" aria-describedby="project-new-description">
-          <form className="rt-modal__layout" onSubmit={addProject}>
+          <form className="rt-modal__layout project-modal" onSubmit={addProject}>
             <AppModalHeader title="Comece uma nova produção" titleId="project-new-title"
               eyebrow="NOVO PROJETO" descriptionId="project-new-description"
               description="Defina o essencial agora. A equipe completa os detalhes depois."
@@ -684,7 +684,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
       {financeModalOpen && (
         <AppModal size="medium" className="rt-finance-dialog" onCloseRequest={closeFinanceModal}
           aria-labelledby="finance-modal-title" aria-describedby="finance-modal-description">
-          <form key={editingFinanceEntry?.id || "new-revenue"} className="rt-modal__layout" onSubmit={addFinanceEntry}>
+          <form key={editingFinanceEntry?.id || "new-revenue"} className="rt-modal__layout project-modal finance-modal" onSubmit={addFinanceEntry}>
             <AppModalHeader title={editingFinanceEntry ? "Atualize o lançamento" : "Registre uma entrada ou custo"} titleId="finance-modal-title"
               eyebrow={editingFinanceEntry ? "EDITAR LANÇAMENTO" : "NOVO LANÇAMENTO"} descriptionId="finance-modal-description"
               description={editingFinanceEntry ? "Revise os dados e salve para atualizar os indicadores financeiros." : "Escolha a data para registrar a entrada ou o custo no mês correspondente."}
