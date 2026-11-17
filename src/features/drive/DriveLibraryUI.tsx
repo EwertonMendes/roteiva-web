@@ -1,5 +1,6 @@
 import {AppInput} from "../ui/AppInput";
 import {AppButton} from "../ui/AppButton";
+import {AppModal,AppModalHeader,AppModalBody,AppModalFooter} from "../ui/AppModal";
 import {CollectionState} from "../ui/CollectionState";
 import { AppSelect } from "../ui/AppSelect";
 import { useEffect, useRef, useState } from "react";
@@ -113,7 +114,6 @@ export function StorageFolderPicker({provider='google_drive',projects,projectId,
   const [chosen,setChosen]=useState<Record<string,DriveItem>>({});
   const [filter,setFilter]=useState("");
   const [submitting,setSubmitting]=useState(false);
-  const ref=useOverlayFocus(()=>{if(!working&&!submitting)onClose();});
   useEffect(()=>{setChosen({});setFilter("");},[projectId]);
   const selected=Object.values(chosen).filter(f=>!linkedIds.has(f.id));
   const currentFolder=path.at(-1);
@@ -130,10 +130,10 @@ export function StorageFolderPicker({provider='google_drive',projects,projectId,
     try{if(await onLinkCurrent({...currentFolder,mimeType:DROPBOX_FOLDER}))onClose();}
     finally{setSubmitting(false);}
   }
-  return <div className="rl-overlay" onMouseDown={event=>{if(event.target===event.currentTarget && !working && !submitting)onClose();}}>
-    <div className="rl-picker" ref={ref} role="dialog" aria-modal="true" aria-label={"Selecionar pastas do "+providerName} tabIndex={-1}>
-      <header className="rl-picker-head"><div><h2>Vincular pastas</h2><p>Escolha as pastas que deseja organizar no projeto. Os arquivos continuam no {providerName}.</p></div>
-        <AppButton className="rl-icon-button" type="button" onClick={onClose} aria-label="Fechar seletor" disabled={working||submitting}><X size={18}/></AppButton></header>
+  return <AppModal size="wide" className="rl-picker" onCloseRequest={()=>{if(!working&&!submitting)onClose();}}
+    aria-label={"Selecionar pastas do "+providerName}>
+      <AppModalHeader title="Vincular pastas" onClose={onClose} closeDisabled={working||submitting}
+        closeLabel="Fechar seletor" description={<>Escolha as pastas que deseja organizar no projeto. Os arquivos continuam no {providerName}.</>}/>
       <div className="rl-picker-context">
         <label htmlFor="rl-picker-project">Projeto de destino</label>
         <AppSelect id="rl-picker-project" aria-label="Projeto para vincular pastas" value={projectId??""} onValueChange={value=>onProjectChange(value)} disabled={working||submitting}>
@@ -174,14 +174,13 @@ export function StorageFolderPicker({provider='google_drive',projects,projectId,
         <p className="rl-picker-note">A seleção permanece ao navegar entre pastas. O filtro considera apenas os resultados carregados.</p>
       </>}
       {error&&<div role="alert" className="rl-error rl-picker-error"><span>{error}</span>{onRetry&&<AppButton type="button" className="secondary-button" onClick={onRetry} disabled={loading||working||submitting}>Tentar novamente</AppButton>}</div>}
-      <footer className="rl-picker-footer"><span>{selected.length} {selected.length===1?"pasta selecionada":"pastas selecionadas"}</span>
-        <div><AppButton type="button" className="secondary-button" onClick={onClose} disabled={working||submitting}>Cancelar</AppButton>
-           {canLinkCurrent&&<AppButton type="button" className="secondary-button" onClick={()=>void linkCurrent()} disabled={loading||working||submitting}>Vincular pasta atual</AppButton>}
-          <AppButton type="button" className="primary-button" onClick={()=>void commit()} disabled={!projectId||!selected.length||!canRead||working||submitting||loading}>{submitting?"Vinculando…":selected.length?`Vincular ${selected.length} ${selected.length===1?"pasta":"pastas"}`:"Vincular pastas"}</AppButton>
+      <AppModalFooter className="rl-picker-footer"><span>{selected.length} {selected.length===1?"pasta selecionada":"pastas selecionadas"}</span>
+        <div><AppButton type="button" variant="secondary" onClick={onClose} disabled={working||submitting}>Cancelar</AppButton>
+           {canLinkCurrent&&<AppButton type="button" variant="secondary" onClick={()=>void linkCurrent()} disabled={loading||working||submitting}>Vincular pasta atual</AppButton>}
+          <AppButton type="button" variant="primary" onClick={()=>void commit()} disabled={!projectId||!selected.length||!canRead||working||submitting||loading}>{submitting?"Vinculando…":selected.length?`Vincular ${selected.length} ${selected.length===1?"pasta":"pastas"}`:"Vincular pastas"}</AppButton>
         </div>
-      </footer>
-    </div>
-  </div>;
+      </AppModalFooter>
+  </AppModal>;
 }
 
 type ExplorerProps={
@@ -283,7 +282,6 @@ export function DriveFileExplorer({folderName,path,files,loading,hasMore,thumbna
 }
 
 export function DrivePreview({item,onClose,onPrevious,onNext,position,total}:{item:DriveItem;onClose:()=>void;onPrevious?:()=>void;onNext?:()=>void;position?:number;total?:number}){
-  const ref=useOverlayFocus(onClose);
   useEffect(()=>{
     const onKey=(event:KeyboardEvent)=>{
       if(event.altKey||event.ctrlKey||event.metaKey)return;
@@ -295,24 +293,32 @@ export function DrivePreview({item,onClose,onPrevious,onNext,position,total}:{it
     document.addEventListener("keydown",onKey);
     return ()=>document.removeEventListener("keydown",onKey);
   },[onPrevious,onNext]);
-  return <div className="rl-overlay rl-preview-overlay" onMouseDown={e=>{if(e.target===e.currentTarget)onClose();}}>
-    <div className="rl-preview" ref={ref} role="dialog" aria-modal="true" aria-label={"Prévia de "+item.name} tabIndex={-1}>
-      <header><div className="rl-preview-title"><strong title={item.name}>{item.name}</strong><small>{readableFileType(item.mimeType)}{position&&total?" · "+position+" de "+total:""}</small></div>
-        <div><a className="secondary-button" href={driveFileUrl(item)} target="_blank" rel="noreferrer"><ExternalLink size={15}/> Abrir no Drive</a><AppButton type="button" className="rl-icon-button" onClick={onClose} aria-label="Fechar prévia"><X size={18}/></AppButton></div></header>
+  return <AppModal size="full" className="rl-preview" aria-label={"Prévia de "+item.name}
+    onCloseRequest={onClose}>
+      <AppModalHeader title={item.name}
+        description={readableFileType(item.mimeType)+(position&&total?" · "+position+" de "+total:"")}
+        onClose={onClose} closeLabel="Fechar prévia"
+        actions={<a className="secondary-button" href={driveFileUrl(item)} target="_blank" rel="noreferrer">
+          <ExternalLink size={15}/> Abrir no Drive</a>}/>
       <div className="rl-preview-body">
         {onPrevious&&<AppButton type="button" className="rl-preview-nav rl-preview-nav-prev" onClick={onPrevious} aria-label="Visualizar arquivo anterior"><ChevronLeft size={21}/></AppButton>}
         <iframe key={item.id} title={"Prévia de "+item.name} referrerPolicy="no-referrer" allow="fullscreen" src={"https://drive.google.com/file/d/"+encodeURIComponent(item.id)+"/preview"}/>
         {onNext&&<AppButton type="button" className="rl-preview-nav rl-preview-nav-next" onClick={onNext} aria-label="Visualizar próximo arquivo"><ChevronRight size={21}/></AppButton>}
       </div>
       <p>A prévia depende das permissões do Google Drive. Se não carregar, use “Abrir no Drive”.</p>
-    </div>
-  </div>;
+  </AppModal>;
 }
 
 export function DriveUnlinkConfirm({name,onCancel,onConfirm,busy}:{name:string;onCancel:()=>void;onConfirm:()=>void;busy:boolean}){
-  const ref=useOverlayFocus(onCancel);
-  return <div className="rl-overlay"><div className="rl-confirm" role="dialog" aria-modal="true" aria-label="Desvincular pasta" ref={ref} tabIndex={-1}>
-    <h2>Desvincular “{name}”?</h2><p>A pasta deixará de aparecer neste projeto. Nenhum arquivo será apagado do seu Google Drive.</p>
-    <footer><AppButton className="secondary-button" type="button" disabled={busy} onClick={onCancel}>Manter pasta</AppButton><AppButton className="primary-button" type="button" disabled={busy} onClick={onConfirm}>{busy?"Desvinculando…":"Desvincular"}</AppButton></footer>
-  </div></div>;
+  return <AppModal size="compact" className="rl-confirm" aria-label="Desvincular pasta"
+    onCloseRequest={()=>{if(!busy)onCancel();}}>
+    <div className="rt-modal__layout">
+      <AppModalHeader title={<>Desvincular “{name}”?</>} onClose={onCancel} closeDisabled={busy}/>
+      <AppModalBody><p>A pasta deixará de aparecer neste projeto. Nenhum arquivo será apagado do seu Google Drive.</p></AppModalBody>
+      <AppModalFooter>
+        <AppButton variant="secondary" type="button" disabled={busy} onClick={onCancel}>Manter pasta</AppButton>
+        <AppButton variant="primary" type="button" disabled={busy} onClick={onConfirm}>{busy?"Desvinculando…":"Desvincular"}</AppButton>
+      </AppModalFooter>
+    </div>
+  </AppModal>;
 }
