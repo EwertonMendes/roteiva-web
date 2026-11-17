@@ -83,3 +83,41 @@
   .rt-modal__body .form-grid{grid-template-columns:1fr;gap:15px}
   .rt-modal__footer > :first-child{margin-left:0}
 }
+
+/* Specialized media keeps its viewport, transport and keyboard shortcuts.
+   Only the dialog chrome is shared. */
+.rt-modal.vl-preview-modal{
+ width:min(1060px,calc(100vw - 32px));max-width:calc(100vw - 32px);
+ height:min(84dvh,720px);min-height:min(350px,calc(100dvh - 32px));
+ max-height:calc(100dvh - 32px);display:flex;flex-direction:column;
+}
+.rt-modal.vl-preview-modal .rt-modal__header{padding:16px 22px 13px;min-height:48px}
+.rt-modal.vl-preview-modal .rt-modal__heading h2{
+ font-size:var(--type-card);white-space:nowrap;text-overflow:ellipsis;overflow:hidden;
+}
+.rt-modal.vl-preview-modal .rt-modal__body.vl-preview-body{
+ flex:1;min-height:0;margin:0 22px 20px;padding:0;overflow:hidden;
+ display:flex;align-items:center;justify-content:center;border-radius:12px;
+ background:var(--subtle);
+}
+.rt-modal.vl-preview-modal.is-expanded{
+ width:calc(100vw - 8px);max-width:calc(100vw - 8px);
+ height:calc(100dvh - 8px);max-height:calc(100dvh - 8px);
+}
+.rt-modal.rt-confirm-dialog .rt-modal__icon .rt-confirm-symbol{margin:0;flex:0 0 48px}
+.rt-modal.rt-confirm-dialog .rt-modal__body{padding-block:0;flex:0 1 auto}
+.rt-modal.review-dialog{max-width:calc(100vw - 32px);display:flex;flex-direction:column}
+.rt-modal.review-dialog > .rt-modal__header{padding:26px 30px 20px}
+.rt-modal.review-dialog > .rt-modal__header .rt-modal__heading h2{
+ font-size:clamp(25px,2.4vw,34px);font-weight:760;
+}
+.rt-modal.review-dialog > .review-dialog-body{min-height:0}
+.rt-modal.review-dialog > .rt-modal__footer{background:var(--modal-surface)}
+.rt-modal .rt-modal__body > p{line-height:1.6;color:var(--muted)}
+.rt-modal .rt-modal__heading h2{overflow-wrap:anywhere}
+@media(max-width:600px){
+ .rt-modal.vl-preview-modal{height:calc(100dvh - 16px);max-height:calc(100dvh - 16px)}
+ .rt-modal.vl-preview-modal .rt-modal__header{padding:13px 16px}
+ .rt-modal.vl-preview-modal .rt-modal__body.vl-preview-body{margin:0 8px 10px}
+ .rt-modal.review-dialog > .rt-modal__header{padding:18px}
+}
