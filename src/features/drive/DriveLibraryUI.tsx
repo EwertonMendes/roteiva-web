@@ -1,3 +1,4 @@
+import {FolderOpen as ModalFolderOpen, FileImage as ModalFileImage, Unlink as ModalUnlink} from "lucide-react";
 import {AppInput} from "../ui/AppInput";
 import {AppButton} from "../ui/AppButton";
 import {AppModal,AppModalHeader,AppModalBody,AppModalFooter} from "../ui/AppModal";
@@ -132,7 +133,7 @@ export function StorageFolderPicker({provider='google_drive',projects,projectId,
   }
   return <AppModal size="wide" className="rl-picker" onCloseRequest={()=>{if(!working&&!submitting)onClose();}}
     aria-label={"Selecionar pastas do "+providerName}>
-      <AppModalHeader title="Vincular pastas" onClose={onClose} closeDisabled={working||submitting}
+      <AppModalHeader icon={<ModalFolderOpen size={26}/>} title="Vincular pastas" onClose={onClose} closeDisabled={working||submitting}
         closeLabel="Fechar seletor" description={<>Escolha as pastas que deseja organizar no projeto. Os arquivos continuam no {providerName}.</>}/>
       <div className="rl-picker-context">
         <label htmlFor="rl-picker-project">Projeto de destino</label>
@@ -295,7 +296,7 @@ export function DrivePreview({item,onClose,onPrevious,onNext,position,total}:{it
   },[onPrevious,onNext]);
   return <AppModal size="full" className="rl-preview" aria-label={"Prévia de "+item.name}
     onCloseRequest={onClose}>
-      <AppModalHeader title={item.name}
+      <AppModalHeader icon={<ModalFileImage size={26}/>} title={item.name}
         description={readableFileType(item.mimeType)+(position&&total?" · "+position+" de "+total:"")}
         onClose={onClose} closeLabel="Fechar prévia"
         actions={<a className="secondary-button" href={driveFileUrl(item)} target="_blank" rel="noreferrer">
@@ -313,7 +314,7 @@ export function DriveUnlinkConfirm({name,onCancel,onConfirm,busy}:{name:string;o
   return <AppModal size="compact" className="rl-confirm" aria-label="Desvincular pasta"
     onCloseRequest={()=>{if(!busy)onCancel();}}>
     <div className="rt-modal__layout">
-      <AppModalHeader title={<>Desvincular “{name}”?</>} onClose={onCancel} closeDisabled={busy}/>
+      <AppModalHeader icon={<ModalUnlink size={26}/>} title={<>Desvincular “{name}”?</>} onClose={onCancel} closeDisabled={busy}/>
       <AppModalBody><p>A pasta deixará de aparecer neste projeto. Nenhum arquivo será apagado do seu Google Drive.</p></AppModalBody>
       <AppModalFooter>
         <AppButton variant="secondary" type="button" disabled={busy} onClick={onCancel}>Manter pasta</AppButton>
