@@ -61,8 +61,8 @@ function classifyCloudflare(error:unknown,id:string):FeedbackDeliveryFailure{
 }
 function toBase64(bytes:Uint8Array):string{
   const parts:string[]=[];
-  for(let i=0;i<bytes.byteLength;i+=8192){
-    const data=bytes.subarray(i,i+8192);
+  for(let i=0;i<bytes.byteLength;i+=8190){
+    const data=bytes.subarray(i,i+8190);
     let chunk='';
     for(const byte of data)chunk+=String.fromCharCode(byte);
     parts.push(btoa(chunk));

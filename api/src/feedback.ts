@@ -1,4 +1,5 @@
 import {ApiError,type Env} from './types.ts';
+import {feedbackEnabled,sendFeedbackEmail,FeedbackDeliveryFailure,type FeedbackAttachment} from './feedback-delivery.ts';
 
 export const MAX_FEEDBACK_IMAGES=5;
 export const MAX_FEEDBACK_FILE_BYTES=1024*1024;
@@ -7,7 +8,7 @@ const DAILY_LIMIT=3;
 const DAY_MS=24*60*60*1000;
 type Kind='bug'|'idea'|'praise'|'other';
 const kinds:Record<Kind,string>={bug:'Problema',idea:'Sugestão',praise:'Elogio',other:'Outro assunto'};
-type ImageAttachment={content:Uint8Array;filename:string;type:string;disposition:'attachment'};
+
 
 function one(form:FormData,name:string):string{
   const values=form.getAll(name);
@@ -61,7 +62,7 @@ export async function parseFeedback(request:Request){
       throw new ApiError(400,'feedback_invalid_form');
   }
   const kind=one(form,'kind');
-  if(!(kind in kinds))throw new ApiError(400,'feedback_invalid_form');
+  if(!Object.hasOwn(kinds,kind))throw new ApiError(400,'feedback_invalid_form');
   const title=text(one(form,'title'),5,120);
   const description=text(one(form,'description'),15,4000);
   const screen=one(form,'screen');
@@ -71,7 +72,7 @@ export async function parseFeedback(request:Request){
     throw new ApiError(400,'feedback_invalid_form');
   const files=form.getAll('images');
   if(files.length>MAX_FEEDBACK_IMAGES)throw new ApiError(400,'feedback_too_many_images');
-  const attachments:ImageAttachment[]=[];
+  const attachments:FeedbackAttachment[]=[];
   for(let i=0;i<files.length;i++){
     const file=files[i];
     if(!(file instanceof File)||file.size<12||file.size>MAX_FEEDBACK_FILE_BYTES)
@@ -88,58 +89,66 @@ export async function feedbackRouter(request:Request,env:Env,uid:string,email:st
   if(request.method==='GET'){
     const rows=await env.DB.prepare('SELECT id,kind,title,screen,status,attachment_count,created_at FROM feedback_reports WHERE owner_uid=? ORDER BY created_at DESC LIMIT 15')
       .bind(uid).all();
-    return Response.json({items:rows.results,available:!!env.FEEDBACK_EMAIL});
+    return Response.json({items:rows.results,available:feedbackEnabled(env)});
   }
   if(request.method!=='POST')throw new ApiError(405,'method_not_allowed');
   // Fail closed when Cloudflare Email Routing or its verified recipient is not configured.
-  if(!env.FEEDBACK_EMAIL)throw new ApiError(503,'feedback_unavailable');
+  if(!feedbackEnabled(env))throw new ApiError(503,'feedback_unavailable');
   const feedback=await parseFeedback(request);
-  const now=Date.now(),id=crypto.randomUUID();
+  const now=Date.now();
+  let id=crypto.randomUUID();
   // One atomic conditional write: concurrent tabs cannot bypass the daily quota,
   // and replays of the same request key cannot send two emails.
   const created=await env.DB.prepare(
     "INSERT INTO feedback_reports (id,owner_uid,request_key,kind,title,description,screen,status,attachment_count,created_at) "+
     "SELECT ?,?,?,?,?,?,?,'sending',?,? WHERE "+
-    "(SELECT COUNT(*) FROM feedback_reports WHERE owner_uid=? AND created_at>=?)<? "+
+    "(SELECT COUNT(*) FROM feedback_reports WHERE owner_uid=? AND created_at>=? AND status IN ('sending','sent'))<? "+
     "ON CONFLICT(owner_uid,request_key) DO NOTHING RETURNING id"
   ).bind(id,uid,feedback.requestKey,feedback.kind,feedback.title,feedback.description,
     feedback.screen,feedback.attachments.length,now,uid,now-DAY_MS,DAILY_LIMIT).first<{id:string}>();
   if(!created){
-    const previous=await env.DB.prepare('SELECT id,status FROM feedback_reports WHERE owner_uid=? AND request_key=?')
-      .bind(uid,feedback.requestKey).first<{id:string;status:string}>();
+    const previous=await env.DB.prepare('SELECT id,status,retry_safe FROM feedback_reports WHERE owner_uid=? AND request_key=?')
+      .bind(uid,feedback.requestKey).first<{id:string;status:string;retry_safe:number}>();
     if(previous?.status==='sent')return Response.json({id:previous.id,status:'received',duplicate:true});
-    if(previous)throw new ApiError(409,'feedback_already_attempted');
-    throw new ApiError(429,'feedback_daily_limit');
+    if(previous?.status==='failed'&&previous.retry_safe===1){
+      // A provider's definitive rejection permits an atomic retry of exactly this key.
+      // Other rows (including old failures/ambiguous sends) must never be replayed.
+      const renewed=await env.DB.prepare(
+        "UPDATE feedback_reports SET status='sending',retry_safe=0,kind=?,title=?,description=?,screen=?,attachment_count=? "+
+        "WHERE owner_uid=? AND request_key=? AND status='failed' AND retry_safe=1 AND "+
+        "(SELECT COUNT(*) FROM feedback_reports WHERE owner_uid=? AND created_at>=? AND status IN ('sending','sent'))<? RETURNING id"
+      ).bind(feedback.kind,feedback.title,feedback.description,feedback.screen,feedback.attachments.length,
+        uid,feedback.requestKey,uid,now-DAY_MS,DAILY_LIMIT).first<{id:string}>();
+      if(!renewed)throw new ApiError(409,'feedback_already_attempted');
+      id=renewed.id;
+    }else if(previous)throw new ApiError(409,'feedback_already_attempted');
+    else throw new ApiError(429,'feedback_daily_limit');
+  }
+  let messageId:string;
+  try{
+    const receipt=await sendFeedbackEmail(env,{
+      id,email,kindLabel:kinds[feedback.kind],title:feedback.title,description:feedback.description,
+      screen:feedback.screen,attachments:feedback.attachments
+    });
+    messageId=receipt.messageId;
+  }catch(error){
+    const failure=error instanceof FeedbackDeliveryFailure?error:
+      new FeedbackDeliveryFailure('feedback_delivery_unconfirmed',false);
+    // A definitive provider rejection can be retried without using the daily quota.
+    // Unknown outcomes stay 'sending' to avoid silently resending possibly accepted mail.
+    if(failure.safeToRetry){
+      await env.DB.prepare("UPDATE feedback_reports SET status='failed',retry_safe=1 WHERE id=? AND owner_uid=? AND status='sending'")
+        .bind(id,uid).run().catch(()=>undefined);
+    }
+    throw new ApiError(failure.status,failure.code);
   }
   try{
-    const sent=await env.FEEDBACK_EMAIL.send({
-      to:'suporte.roteiva@gmail.com',
-      from:'suporte@roteiva.com',
-      replyTo:email,
-      subject:'[Roteiva] '+kinds[feedback.kind]+' #'+id.slice(0,8),
-      text:[
-        'Novo feedback do Roteiva',
-        'Protocolo: '+id,
-        'Categoria: '+kinds[feedback.kind],
-        'Assunto: '+feedback.title,
-        'Usuário: '+uid,
-        'E-mail verificado: '+email,
-        'Ambiente: '+env.ENVIRONMENT,
-        'Tela: '+feedback.screen,
-        'Capturas anexadas: '+feedback.attachments.length,
-        '',
-        feedback.description
-      ].join('\n'),
-      attachments:feedback.attachments
-    });
-    await env.DB.prepare("UPDATE feedback_reports SET status='sent',message_id=?,sent_at=? WHERE id=? AND owner_uid=? AND status='sending'")
-      .bind(sent.messageId,Date.now(),id,uid).run();
-  }catch(error){
-    // No bodies, addresses or provider exceptions in logs. A send may have
-    // succeeded even if the confirmation write failed; never auto-retry it.
-    await env.DB.prepare("UPDATE feedback_reports SET status='failed' WHERE id=? AND owner_uid=? AND status='sending'")
-      .bind(id,uid).run().catch(()=>undefined);
-    console.error(JSON.stringify({event:'feedback_delivery_failed',reportId:id}));
+    const result=await env.DB.prepare("UPDATE feedback_reports SET status='sent',message_id=?,sent_at=? WHERE id=? AND owner_uid=? AND status='sending'")
+      .bind(messageId,Date.now(),id,uid).run();
+    if(result.meta.changes!==1)throw new Error('status_not_persisted');
+  }catch{
+    // Provider accepted the message: never trigger another send as a fallback.
+    console.error(JSON.stringify({event:'feedback_delivery_record_not_confirmed',reportId:id}));
     throw new ApiError(503,'feedback_delivery_unconfirmed');
   }
   return Response.json({id,status:'received'},{status:201});
