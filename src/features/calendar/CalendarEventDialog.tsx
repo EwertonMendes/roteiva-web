@@ -1,6 +1,7 @@
-import {useEffect,useMemo,useRef,useState,type FormEvent} from "react";
-import {CalendarDays,Check,Clock3,Folder,Info,Trash2,UserRound,Video,X} from "lucide-react";
+import {useMemo,useRef,useState,type FormEvent} from "react";
+import {CalendarDays,Check,Clock3,Folder,Info,Trash2,UserRound,Video} from "lucide-react";
 import {AppButton} from "../ui/AppButton";
+import {AppModal,AppModalHeader,AppModalBody,AppModalFooter} from "../ui/AppModal";
 import {AppInput} from "../ui/AppInput";
 import {AppSelect} from "../ui/AppSelect";
 import type {CalendarEvent,Client,Project} from "../../domain/workspace";
@@ -20,7 +21,6 @@ type Props={
 const typeOptions:CalendarEvent["type"][]=["Produção","Entrega","Reunião","Aprovação","Revisão"];
 
 export function CalendarEventDialog({editing,date,projects,clients,events,preferredProjectId,onSave,onCancel,onDelete}:Props){
-  const dialog=useRef<HTMLDialogElement>(null);
   const input=useRef<HTMLInputElement>(null);
   const initialProjectId=editing?.projectId||preferredProjectId||0;
   const initialProject=projects.find(p=>p.id===initialProjectId);
@@ -34,12 +34,7 @@ export function CalendarEventDialog({editing,date,projects,clients,events,prefer
   const [error,setError]=useState("");
   const [validationAttempted,setValidationAttempted]=useState(false);
   const locked=!!editing?.autoDeadline;
-  useEffect(()=>{
-    const node=dialog.current;
-    node?.showModal();
-    input.current?.focus();
-    return ()=>{if(node?.open)node.close();};
-  },[]);
+  // AppModal provides the native dialog focus and Escape contract.
   const sortedClients=useMemo(()=>[...clients].sort((a,b)=>a.name.localeCompare(b.name,"pt-BR")),[clients]);
   const clientMatches=sortedClients.some(c=>c.name===client);
   const matchingClient=sortedClients.find(c=>c.name===client);
@@ -77,15 +72,13 @@ export function CalendarEventDialog({editing,date,projects,clients,events,prefer
     const linked=projects.find(p=>String(p.id)===value);
     if(linked&&linked.client&&linked.client!=="Interno")setClient(linked.client);
   }
-  return <dialog ref={dialog} className="roteiva-calendar-dialog roteiva-calendar-form" aria-labelledby="calendar-event-title"
-    onClose={onCancel} onMouseDown={event=>{if(event.target===event.currentTarget)event.currentTarget.close();}}>
-    <form onSubmit={save} noValidate>
-      <div className="calendar-dialog-head calendar-form-title">
-        <CalendarDays size={26} aria-hidden="true"/>
-        <div><h2 id="calendar-event-title">{editing?"Editar compromisso":"Novo compromisso"}</h2>
-          <p>Organize sua agenda e reserve o tempo de cada trabalho.</p></div>
-        <AppButton className="calendar-dialog-close" aria-label="Fechar cadastro" type="button" onClick={onCancel}><X size={21}/></AppButton>
-      </div>
+  return <AppModal size="wide" className="roteiva-calendar-dialog roteiva-calendar-form"
+    aria-labelledby="calendar-event-title" onCloseRequest={onCancel}>
+    <form className="rt-modal__layout" onSubmit={save} noValidate>
+      <AppModalHeader title={editing?"Editar compromisso":"Novo compromisso"} titleId="calendar-event-title"
+        description="Organize sua agenda e reserve o tempo de cada trabalho."
+        icon={<CalendarDays size={26}/>} onClose={onCancel} closeLabel="Fechar cadastro"/>
+      <AppModalBody className="calendar-form-body">
       <div className="calendar-form-section calendar-form-basic">
         <label className="calendar-basic-field">Título do compromisso
           <AppInput id="calendar-title" ref={input} maxLength={200} value={title} onChange={event=>{setTitle(event.target.value);setError("");}}
@@ -145,13 +138,14 @@ export function CalendarEventDialog({editing,date,projects,clients,events,prefer
           :"Associe este compromisso a um cliente ou projeto cadastrado."}</p>
       </div>
       {error&&<p className="event-form-error calendar-save-error" role="alert">{error}</p>}
-      <div className="calendar-form-actions">
+      </AppModalBody>
+      <AppModalFooter className="calendar-form-actions">
         {editing&&!locked&&onDelete&&<AppButton className="calendar-delete-action" type="button" onClick={()=>onDelete(editing)}><Trash2 size={17}/> Excluir</AppButton>}
         <div className="calendar-form-action-right">
           <AppButton className="secondary-button" type="button" onClick={onCancel}>Cancelar</AppButton>
           <AppButton className="primary-button" type="submit"><Check size={20}/> Salvar compromisso</AppButton>
         </div>
-      </div>
+      </AppModalFooter>
     </form>
-  </dialog>;
+  </AppModal>;
 }
