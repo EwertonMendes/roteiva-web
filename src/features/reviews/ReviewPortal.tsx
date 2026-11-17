@@ -2,12 +2,12 @@ import { API_BASE_URL } from "../../lib/environment.ts";
 import {AppInput} from "../ui/AppInput";
 import {AppTextarea} from "../ui/AppTextarea";
 import {AppButton} from "../ui/AppButton";
+import {AppModal,AppModalHeader,AppModalBody,AppModalFooter} from "../ui/AppModal";
 import {useCallback,useEffect,useRef,useState} from "react";
 import {Check,CheckCircle2,Clock3,ExternalLink,FileAudio,FileImage,FileText,FileVideo,
-  LoaderCircle,MessageSquare,Moon,Pause,Play,Send,ShieldCheck,Sun,Video,X} from "lucide-react";
+  LoaderCircle,MessageSquare,Moon,Pause,Play,Send,ShieldCheck,Sun,Video} from "lucide-react";
 import {useAuth} from "../auth/AuthProvider";
 import {authenticatedReviewMedia,warmAuthenticatedMedia} from '../drive/authenticated-media';
-import {useOverlayFocus} from "../drive/DriveLibraryUI";
 import {ReviewImageViewer} from "./ReviewImageViewer";
 import {ReviewPdfViewer} from "./ReviewPdfViewer";
 import {useReviewBrowserGuards} from "./useReviewBrowserGuards";
@@ -95,7 +95,6 @@ export function ReviewPortal({token}:{token:string}){
   const [playhead,setPlayhead]=useState(0),[duration,setDuration]=useState<number|null>(null);
   const loadedVersion=useRef(0),videoRef=useRef<HTMLVideoElement>(null),commentRef=useRef<HTMLTextAreaElement>(null);
   const playbackResume=useRef({at:0,playing:false});
-  const dialogRef=useOverlayFocus(()=>{if(!busy)setDecision(null);},!!decision);
   const request=useCallback(async<T,>(path:string,method:"GET"|"POST"="GET",payload?:unknown):Promise<T>=>{
     const epoch=sessionEpoch.current;
     const unchanged=()=>{if(epoch!==sessionEpoch.current||sessionOwner.current!==(user?.uid||''))throw Object.assign(new Error('A conta mudou. Atualize a revisão.'),{code:'invalid_identity',status:401});};
@@ -445,21 +444,25 @@ export function ReviewPortal({token}:{token:string}){
       </>}
     </div>
     <footer className="review-portal-footer"><ShieldCheck size={13}/> Revisão realizada através do <strong>Roteiva</strong></footer>
-    {decision&&<div className="review-modal-backdrop" ref={dialogRef} tabIndex={-1}>
-      <section className="review-portal-confirm" role="dialog" aria-modal="true" aria-label="Confirmar decisão">
-        <AppButton className="review-icon" aria-label="Fechar" disabled={busy} onClick={()=>setDecision(null)}><X size={19}/></AppButton>
-        {decision==="approved"?<><CheckCircle2 size={31}/><h2>Confirmar aprovação?</h2>
+    {decision&&<AppModal size="medium" className="rt-review-confirm" aria-label="Confirmar decisão"
+      onCloseRequest={()=>{if(!busy)setDecision(null);}}>
+      <div className="rt-modal__layout">
+       <AppModalHeader title={decision==="approved"?"Confirmar aprovação?":"Quais ajustes são necessários?"}
+         onClose={()=>setDecision(null)} closeDisabled={busy}
+         eyebrow="APROVAÇÕES / CONFIRMAÇÃO"/>
+       <AppModalBody>
+        {decision==="approved"?<><CheckCircle2 size={31}/>
           <p>Você confirma que revisou os materiais da versão {data?.review.version} e que estão aprovados?</p></>:
-          <><MessageSquare size={31}/><h2>Quais ajustes são necessários?</h2>
+          <><MessageSquare size={31}/>
             <p>Explique as mudanças para que o profissional possa preparar a próxima versão.</p>
             <AppTextarea rows={4} maxLength={1500} value={decisionText} onChange={e=>setDecisionText(e.target.value)}
               placeholder="Descreva os ajustes desejados…"/></>}
         <label>Seu nome<AppInput value={name} maxLength={100} onChange={e=>setName(e.target.value)} placeholder="Seu nome"/></label>
-        <div className="review-portal-buttons"><AppButton className="review-action-secondary" onClick={()=>setDecision(null)} disabled={busy}>Cancelar</AppButton>
-          <AppButton className="review-action-primary" disabled={busy||!name.trim()||(decision==="changes"&&!decisionText.trim())}
-            onClick={()=>void action("decide",decision)}>{busy?"Registrando…":"Confirmar decisão"}</AppButton></div>
+        </AppModalBody><AppModalFooter><AppButton variant="secondary" onClick={()=>setDecision(null)} disabled={busy}>Cancelar</AppButton>
+          <AppButton variant="primary" disabled={busy||!name.trim()||(decision==="changes"&&!decisionText.trim())}
+            onClick={()=>void action("decide",decision)}>{busy?"Registrando…":"Confirmar decisão"}</AppButton></AppModalFooter>
         {notice&&<p role="alert">{notice}</p>}
-      </section>
-    </div>}
+      </div>
+    </AppModal>}
   </main>;
 }
