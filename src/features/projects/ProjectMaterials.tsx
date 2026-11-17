@@ -12,10 +12,11 @@ import '../drive/virtual-library.css';
 import './project-materials.css';
 type StorageLink=(DriveFolderLink&{provider:'google_drive'})|DropboxFolderLink;
 /** Read existing folder associations; management and uploads live in the Library. */
-export function ProjectMaterials({projectId,onManage}:{projectId:number;onManage:()=>void}){
- return import.meta.env.VITE_VIRTUAL_LIBRARY==='true'?<VirtualProjectMaterials projectId={projectId} onManage={onManage}/>:<LegacyProjectMaterials projectId={projectId} onManage={onManage}/>;
+type Props={projectId:number;onManage:(folderId?:string)=>void;onFolderChange?:(folderId:string)=>void};
+export function ProjectMaterials(props:Props){
+ return import.meta.env.VITE_VIRTUAL_LIBRARY==='true'?<VirtualProjectMaterials {...props}/>:<LegacyProjectMaterials {...props}/>;
 }
-function LegacyProjectMaterials({projectId,onManage}:{projectId:number;onManage:()=>void}){
+function LegacyProjectMaterials({projectId,onManage}:Props){
  const {user}=useAuth();
  const [state,setState]=useState<{links:StorageLink[];loading:boolean;error:boolean}>({links:[],loading:true,error:false});
  const [attempt,setAttempt]=useState(0);
@@ -39,12 +40,12 @@ function LegacyProjectMaterials({projectId,onManage}:{projectId:number;onManage:
     <a href={link.provider==='dropbox'?'https://www.dropbox.com/home':
      'https://drive.google.com/drive/folders/'+encodeURIComponent(link.folderId)}
      target="_blank" rel="noreferrer">Abrir {link.provider==='dropbox'?'Dropbox':'link'}<ExternalLink size={15} aria-hidden="true"/></a>
-   </div><AppButton className="secondary-button" onClick={onManage} aria-label={'Gerenciar material '+link.folderName}>
+   </div><AppButton className="secondary-button" onClick={()=>onManage()} aria-label={'Gerenciar material '+link.folderName}>
      <Pencil size={16} aria-hidden="true"/>Gerenciar</AppButton>
   </article>)}{!state.links.length&&<div className="pd-material-empty">
    <FolderOpen size={23} aria-hidden="true"/>
    <p>Vincule pastas do Google Drive ou Dropbox na Biblioteca deste projeto.</p>
-   <AppButton className="secondary-button" onClick={onManage}>Abrir Biblioteca<ExternalLink size={16} aria-hidden="true"/></AppButton>
+   <AppButton className="secondary-button" onClick={()=>onManage()}>Abrir Biblioteca<ExternalLink size={16} aria-hidden="true"/></AppButton>
   </div>}</>;
 }
 type Node={id:string;kind:'folder'|'asset';name:string;revision:number;mime_type?:string;provider?:string;connection_id?:string;file_id?:string;source_revision?:string;parent_name?:string};
@@ -52,7 +53,7 @@ type Page={nodes:Node[];trail:{id:string;name:string}[];nextPage:string|null};
 
 /** Embedded explorer uses the same cards and private thumbnails as the Library,
  * but navigates only the current project's authorized virtual registry. */
-function VirtualProjectMaterials({projectId,onManage}:{projectId:number;onManage:()=>void}){
+function VirtualProjectMaterials({projectId,onManage,onFolderChange}:Props){
  const {user}=useAuth(),call=useDriveApi();
  const [layout,setLayout]=useLibraryLayout();
  const [folder,setFolder]=useState('root'),[query,setQuery]=useState(''),[term,setTerm]=useState('');
@@ -61,7 +62,7 @@ function VirtualProjectMaterials({projectId,onManage}:{projectId:number;onManage
  const [error,setError]=useState(''),[attempt,setAttempt]=useState(0);
  const [preview,setPreview]=useState<Node|null>(null);
  const scope=useRef('');
- useEffect(()=>{setFolder('root');setQuery('');setTerm('');setPreview(null);},[projectId]);
+ useEffect(()=>{setFolder('root');onFolderChange?.('root');setQuery('');setTerm('');setPreview(null);},[projectId,onFolderChange]);
  useEffect(()=>{const timer=setTimeout(()=>setTerm(query.trim().length>=2?query.trim():''),280);return()=>clearTimeout(timer);},[query]);
  useEffect(()=>{
   const controller=new AbortController();
@@ -86,9 +87,15 @@ function VirtualProjectMaterials({projectId,onManage}:{projectId:number;onManage
   }catch(e){if(scope.current===key)setError(e instanceof Error?e.message:'Não foi possível carregar mais arquivos.');}
   finally{if(scope.current===key)setMoreBusy(false);}
  }
+ function changeFolder(folderId:string){
+  setFolder(folderId);
+  onFolderChange?.(folderId);
+  setQuery('');
+  setTerm('');
+ }
  function openNode(node:Node){
   if(node.kind==='asset')setPreview(node);
-  else{setFolder(node.id);setQuery('');setTerm('');}
+  else changeFolder(node.id);
  }
  return <div className="virtual-library vl-explorer pd-linked-library" aria-label="Arquivos vinculados ao projeto">
   <div className="pd-linked-toolbar">
@@ -96,14 +103,14 @@ function VirtualProjectMaterials({projectId,onManage}:{projectId:number;onManage
     {(page?.trail||[{id:'root',name:'Arquivos'}]).map((crumb,index)=><span className="vl-path-part" key={crumb.id}>
      {index>0&&<ChevronRight size={15}/>}
      <AppButton type="button" disabled={busy} aria-current={crumb.id===folder?'location':undefined}
-      onClick={()=>{setFolder(crumb.id);setQuery('');setTerm('');}}>{crumb.name}</AppButton>
+      onClick={()=>changeFolder(crumb.id)}>{crumb.name}</AppButton>
     </span>)}
    </nav>
    <div className="pd-linked-actions">
     <AppButton type="button" className="vl-small-tool" onClick={()=>setAttempt(n=>n+1)}
      disabled={busy} aria-label="Atualizar arquivos" title="Atualizar arquivos"><RefreshCw size={17}/></AppButton>
     <LibraryLayoutControl layout={layout} onChange={setLayout}/>
-    <AppButton type="button" className="vl-small-tool" onClick={onManage}>Gerenciar na Biblioteca<ExternalLink size={15}/></AppButton>
+    <AppButton type="button" className="vl-small-tool" onClick={()=>onManage(folder)}>Gerenciar na Biblioteca<ExternalLink size={15}/></AppButton>
    </div>
   </div>
   <div className="vl-query">

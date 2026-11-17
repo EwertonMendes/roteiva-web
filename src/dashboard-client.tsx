@@ -140,6 +140,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
   const [calendarFocus,setCalendarFocus]=useState<{date:string;revision:number}|null>(null);
   const [demoStorageWarning, setDemoStorageWarning] = useState(false);
   const [libraryProject, setLibraryProject] = useState("");
+  const [libraryTarget,setLibraryTarget]=useState<{projectId:number;folderId:string}|null>(null);
   const [uploading, setUploading] = useState(false);
   const storageKey = "roteiva-pages-demo-workspace-v1";
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -185,7 +186,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     const previousTasks=new Map((old?.tasks||[]).map(t=>[t.id,t]));
     for(const task of updated.tasks||[]){
       const was=previousTasks.get(task.id);
-      if(!was || was.title!==task.title || was.done!==task.done)
+      if(!was || was.title!==task.title || was.done!==task.done || was.order!==task.order)
         commands.push({kind:"saveTask",projectId:updated.id,task});
       previousTasks.delete(task.id);
     }
@@ -525,6 +526,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
 
   function startProject(){if(!isDemo&&view!=="projects")changeView("projects");setModalOpen(true);}
   function changeView(next:View) {
+    if(next==="library")setLibraryTarget(null);
     setActivityOpen(false);
     navigateRoute({view:next});
     if(next==="projects"&&query.trim())onSearchProjects?.();
@@ -624,7 +626,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
           {((view === "projects" && !selectedProject) || (view === "clients" && !selectedClient && (clientPage?.total??clientList.length)>=5 || view === "clients" && !selectedClient && !!query.trim())) && <label className="page-search"><Search size={17}/><AppInput aria-label={view === "projects" ? "Buscar projetos" : "Buscar clientes"} value={query} onChange={e => { const value=e.target.value; setQuery(value); if(value.trim()){ if(view === "projects")onSearchProjects?.(); else onSearchClients?.(); } }} placeholder={view === "projects" ? "Buscar projetos" : "Buscar clientes"}/></label>}
           {view === "settings" && <SettingsPage profile={profile} email={email} photoURL={photoURL} theme={theme} toggleTheme={toggleTheme} onSaveProfile={onSaveProfile} />}
           {view === "overview" && <TodayStudio clients={clientList} projects={projects} entries={financeEntries} events={calendarEvents} activities={activities} onView={changeView} onOpenActivity={() => setActivityOpen(true)} overviewMetrics={overviewMetrics} />}
-          {view === "projects" && (selectedProject && projects.some(p => p.id === selectedProject) ? <ProjectDetail key={selectedProject} project={projects.find(p => p.id === selectedProject)!} clients={clientList} entries={financeEntries} assets={libraryAssets} events={calendarEvents} onSave={updateProject} onBack={() => changeView("projects")} onRevenue={addLinkedRevenue} onEditRevenue={openFinanceModal} onMaterials={()=>{setLibraryProject(String(selectedProject));changeView("library");}} onEditEvent={(event)=>openEvent(event)} onEvent={(p) => { openEvent(null, p.dueDate); }} onReview={()=>{setReviewStart({clientId:projects.find(p=>p.id===selectedProject)?.clientId,projectId:selectedProject||undefined});changeView("reviews");}} /> : <ProjectsView projects={filtered.map(p => ({...p, files: libraryAssets.filter(a => a.projectId === p.id).length}))}
+          {view === "projects" && (selectedProject && projects.some(p => p.id === selectedProject) ? <ProjectDetail key={selectedProject} project={projects.find(p => p.id === selectedProject)!} clients={clientList} entries={financeEntries} assets={libraryAssets} events={calendarEvents} onSave={updateProject} onBack={() => changeView("projects")} onRevenue={addLinkedRevenue} onEditRevenue={openFinanceModal} onMaterials={(folderId)=>{setLibraryTarget({projectId:selectedProject!,folderId:folderId||"root"});setLibraryProject(String(selectedProject));navigateRoute({view:"library"});}} onEditEvent={(event)=>openEvent(event)} onEvent={(p) => { openEvent(null, p.dueDate); }} onReview={()=>{setReviewStart({clientId:projects.find(p=>p.id===selectedProject)?.clientId,projectId:selectedProject||undefined});changeView("reviews");}} /> : <ProjectsView projects={filtered.map(p => ({...p, files: libraryAssets.filter(a => a.projectId === p.id).length}))}
                   onSaveCover={(id,cover)=>{const project=projects.find(p=>p.id===id);if(project)updateProject({...project,cover});}} statusFilter={statusFilter} setStatusFilter={(status)=>{
                     setStatusFilter(status);
                     onProjectStatus?.(status);
@@ -643,7 +645,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
             onMonthChange={onCalendarMonthChange} onAdd={date=>openEvent(null,date)}
             onEdit={openEvent} onDelete={deleteCalendarEvent}/>}
 
-          {view === "library" && <LibraryView assets={libraryAssets} query={query} onUpload={(files) => uploadAssets(files, Number(libraryProject) || undefined)} projects={projects} selectedProjectId={Number(libraryProject)||undefined} onSelectProject={setLibraryProject} />}
+          {view === "library" && <LibraryView assets={libraryAssets} query={query} onUpload={(files) => uploadAssets(files, Number(libraryProject) || undefined)} projects={projects} selectedProjectId={Number(libraryProject)||undefined} onSelectProject={setLibraryProject} initialFolder={libraryTarget} />}
         </section>
       </main>
 
@@ -734,7 +736,7 @@ function assetIcon(kind: AssetKind) {
   return kind === "Vídeo" ? FileVideo : kind === "Imagem" ? ImageIcon : kind === "Áudio" ? FileAudio : FileText;
 }
 
-function LibraryView({ assets, query, onUpload, projects, selectedProjectId, onSelectProject }: { assets: LibraryAsset[]; query: string; onUpload: (files: FileList | null) => void; projects: readonly Project[]; selectedProjectId?:number; onSelectProject:(id:string)=>void }) {
+function LibraryView({ assets, query, onUpload, projects, selectedProjectId, onSelectProject, initialFolder }: { assets: LibraryAsset[]; query: string; onUpload: (files: FileList | null) => void; projects: readonly Project[]; selectedProjectId?:number; onSelectProject:(id:string)=>void; initialFolder?:{projectId:number;folderId:string}|null }) {
   const dropboxEnabled=import.meta.env.VITE_DROPBOX_ENABLED==='true';
   const [provider,setProvider]=useState<'google_drive'|'dropbox'>(()=>dropboxEnabled&&
     new URLSearchParams(window.location.search).has('dropbox')?'dropbox':'google_drive');
@@ -746,7 +748,7 @@ function LibraryView({ assets, query, onUpload, projects, selectedProjectId, onS
   const kinds: (AssetKind | "Todos")[] = ["Todos", "Vídeo", "Imagem", "Áudio", "Documento"];
 
   if (isDemo && import.meta.env.VITE_LIBRARY_REVIEW === "true") return <LibraryReviewDemo />;
-  if (!isDemo && import.meta.env.VITE_VIRTUAL_LIBRARY === 'true') return <VirtualLibrary projects={projects} selectedProjectId={selectedProjectId} onSelectProject={onSelectProject}/>;
+  if (!isDemo && import.meta.env.VITE_VIRTUAL_LIBRARY === 'true') return <VirtualLibrary projects={projects} selectedProjectId={selectedProjectId} onSelectProject={onSelectProject} initialFolder={initialFolder}/>;
   return <div className="library-layout">
     {!isDemo && (!useEmulators || (import.meta.env.MODE === "emulator" && new URLSearchParams(window.location.search).get("driveE2E") === "1")) && <>
       {dropboxEnabled&&<nav className="storage-providers" aria-label="Provedor de armazenamento" role="tablist">

@@ -9,12 +9,7 @@
 .app-shell .project-detail .studio-form input { min-height:48px; border-radius:12px; }
 .app-shell .project-detail .studio-form textarea { min-height:116px; border-radius:12px; }
 .project-detail .pd-stage { position:relative; }
-
-.project-detail .pd-stage i { position:absolute; top:50%; left:17px; transform:translateY(-50%); width:12px; height:12px; border-radius:50%; background:#4f95ed; pointer-events:none; }
-.project-detail .pd-stage[data-stage="Em aprovação"] i { background:#a98af4; }
-.project-detail .pd-stage[data-stage="Ajustes"] i { background:var(--pd-warning); }
-.project-detail .pd-stage[data-stage="Aprovado"] i { background:var(--pd-success); }
-.project-detail .pd-columns { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:20px; align-items:start; }
+.project-detail .pd-columns { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:20px; align-items:stretch; }
 .project-detail .pd-section-head { display:flex; justify-content:space-between; align-items:center; gap:18px; margin-bottom:18px; flex-wrap:wrap; }
 .app-shell .project-detail .pd-section-head h2 { margin:0; }
 .project-detail .pd-progress { min-width:160px; max-width:100%; font-size:var(--type-support); color:var(--muted); }
@@ -101,3 +96,37 @@
   .project-detail .pd-entry button span { display:none; }
 }
 @media (forced-colors:active) { .project-detail .pd-check { forced-color-adjust:none; border-color:ButtonText; } .project-detail .pd-task[data-done="true"] .pd-check { background:Highlight; color:HighlightText; border-color:Highlight; } }
+
+
+/* The desktop panels form a single equal-height row. Only the task list grows
+   up to six standard-height entries; more tasks scroll inside their card. */
+.project-detail .pd-checklist{display:flex;flex-direction:column;min-height:0}
+.project-detail .pd-checklist>.pd-section-head{flex-shrink:0}
+.project-detail .pd-tasks{
+ flex:0 1 auto;min-height:0;max-height:324px;
+ overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;
+ scrollbar-color:var(--muted) transparent;
+}
+.project-detail .pd-task{min-width:0}
+.project-detail .pd-task .pd-drag-handle{
+ flex:0 0 30px;width:30px;min-width:30px;min-height:42px;
+ display:grid;place-items:center;border:0;border-radius:8px;
+ padding:0;background:transparent;color:var(--muted);cursor:grab;
+ touch-action:none;user-select:none;
+}
+.project-detail .pd-task .pd-drag-handle:active{cursor:grabbing}
+.project-detail .pd-task .pd-drag-handle:hover{color:var(--ink);background:var(--subtle)}
+.project-detail .pd-task .pd-drag-handle:focus-visible{outline:2px solid var(--focus-outline);outline-offset:-2px}
+.project-detail .pd-task[data-dragging="true"]{background:var(--subtle);opacity:.68}
+.project-detail .pd-task[data-drop-target="true"]{box-shadow:inset 0 2px var(--ink)}
+.project-detail .pd-task label{gap:12px;overflow:hidden}
+.project-detail .pd-task label>span:last-child{min-width:0;overflow-wrap:anywhere}
+.project-detail .pd-add-task{margin-top:auto;flex-shrink:0}
+.project-detail .pd-task-announcement{
+ position:absolute;width:1px;height:1px;padding:0;margin:-1px;
+ overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;
+}
+@media(max-width:800px){
+ .project-detail .pd-columns{align-items:start}
+ .project-detail .pd-checklist{height:auto}
+}

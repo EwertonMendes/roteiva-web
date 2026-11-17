@@ -33,13 +33,48 @@ test('project detail: tasks, drafts, finance, agenda, materials and responsive t
   await detail.locator('.pd-task label').filter({hasText:'Captar evento'}).click();
   await expect(detail.getByRole('progressbar')).toHaveAttribute('value','40');
   await expect(page.getByRole('textbox',{name:'Briefing',exact:true})).toHaveValue('Rascunho preservado durante o checklist.');
+  const taskList=detail.locator('.pd-tasks');
+  const drag=page.getByRole('button',{name:/Reordenar tarefa Captar evento/});
+  await drag.focus();
+  await drag.press('ArrowUp');
+  await expect(taskList.locator('.pd-task').first()).toContainText('Captar evento');
+  // Pointer movement uses the same accessible handle on desktop and touch devices.
+  if((page.viewportSize()?.width||0)>800){
+    const from=await drag.boundingBox();
+    const to=await taskList.locator('.pd-task').filter({hasText:'Conferir equipamentos'}).boundingBox();
+    expect(from&&to).toBeTruthy();
+    await page.mouse.move(from!.x+from!.width/2,from!.y+from!.height/2);
+    await page.mouse.down();
+    await page.mouse.move(to!.x+to!.width/2,to!.y+to!.height/2,{steps:6});
+    await page.mouse.up();
+    await expect(taskList.locator('.pd-task').first()).toContainText('Conferir equipamentos');
+    const boxes=await Promise.all([detail.locator('.pd-checklist').boundingBox(),detail.locator('.pd-finance').boundingBox()]);
+    expect(Math.abs(boxes[0]!.height-boxes[1]!.height)).toBeLessThanOrEqual(2);
+  }
   await page.getByLabel('Nova tarefa',{exact:true}).fill('Revisar áudio');
   await page.getByLabel('Nova tarefa',{exact:true}).press('Enter');
   await expect(page.getByRole('checkbox',{name:'Revisar áudio',exact:true})).toBeVisible();
+  await expect(page.getByLabel('Nova tarefa',{exact:true})).toBeFocused();
+  await page.getByLabel('Nova tarefa',{exact:true}).fill('Tarefa adicional');
+  await page.getByRole('button',{name:'Adicionar tarefa',exact:true}).click();
+  await expect(page.getByLabel('Nova tarefa',{exact:true})).toBeFocused();
+  await expect(taskList.locator('.pd-task')).toHaveCount(7);
+  expect(await taskList.evaluate(element=>element.scrollHeight>element.clientHeight)).toBe(true);
+  await expect.poll(()=>taskList.evaluate(element=>Math.abs(element.scrollHeight-element.clientHeight-element.scrollTop))).toBeLessThanOrEqual(2);
+  if((page.viewportSize()?.width||0)>800){
+    const boxes=await Promise.all([detail.locator('.pd-checklist').boundingBox(),detail.locator('.pd-finance').boundingBox()]);
+    expect(Math.abs(boxes[0]!.height-boxes[1]!.height)).toBeLessThanOrEqual(2);
+  }
+  await page.getByRole('button',{name:'Remover tarefa Tarefa adicional',exact:true}).click();
   await page.getByRole('button',{name:'Remover tarefa Revisar áudio',exact:true}).click();
   await expect(page.getByRole('checkbox',{name:'Revisar áudio',exact:true})).toHaveCount(0);
   await page.getByLabel('Nome do projeto',{exact:true}).fill('Projeto atualizado');
-  await chooseAppSelect(page, page.getByRole('combobox',{name:'Etapa',exact:true}), 'Ajustes');
+  const stage=page.getByRole('combobox',{name:'Etapa',exact:true});
+  await stage.click();
+  await expect(page.locator('.rt-select-menu .rt-select-leading svg')).toHaveCount(4);
+  await stage.press('Escape');
+  await chooseAppSelect(page, stage, 'Ajustes');
+  await expect(stage.locator('.rt-select-leading svg')).toHaveCount(1);
   await page.getByRole('button',{name:'Salvar projeto',exact:true}).click();
   await page.reload();
   await expect(page.getByLabel('Nome do projeto',{exact:true})).toHaveValue('Projeto atualizado');

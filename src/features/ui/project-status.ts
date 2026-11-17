@@ -15,3 +15,11 @@ export const PROJECT_STATUS_LABELS = {
   Ajustes: "Ajustes pedidos",
   Aprovado: "Aprovado",
 } satisfies Record<Status, string>;
+
+/** Shared colors for status filters, cards and dropdown options. */
+export const PROJECT_STATUS_COLORS = {
+  "Em produção":"#349af4",
+  "Em aprovação":"#f6bd4f",
+  Ajustes:"#ae77f1",
+  Aprovado:"#38cc74",
+} satisfies Record<Status,string>;

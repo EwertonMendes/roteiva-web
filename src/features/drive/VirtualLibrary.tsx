@@ -35,7 +35,7 @@ import dropboxMark from '../../assets/brand/dropbox.svg';
 import type {InspectedLibrarySource,LibraryInspection} from '../../../shared/library-selection';
 type Node={id:string;parent_id:string|null;kind:'folder'|'asset';name:string;revision:number;provider?:string;connection_id?:string;file_id?:string;source_revision?:string;source_state?:string;mime_type?:string;parent_name?:string};
 type Page={nodes:Node[];trail:{id:string;name:string}[];nextPage:string|null};
-export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{projects:readonly Project[];selectedProjectId?:number;onSelectProject:(id:string)=>void}){
+export function VirtualLibrary({projects,selectedProjectId,onSelectProject,initialFolder}:{projects:readonly Project[];selectedProjectId?:number;onSelectProject:(id:string)=>void;initialFolder?:{projectId:number;folderId:string}|null}){
  const {user}=useAuth(),call=useDriveApi();
  useEffect(()=>{if(user)warmAuthenticatedMedia();},[user]);
  const storage=useStorageConnections();
@@ -46,7 +46,9 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
  const dropboxAccounts=storage.connections.filter(x=>x.provider==='dropbox'&&x.status==='connected');
  const [dropboxId,setDropboxId]=useState(''),[dropboxPicker,setDropboxPicker]=useState(false);
  const dropbox=dropboxAccounts.find(x=>x.id===dropboxId)||dropboxAccounts[0];
- const [parent,setParent]=useState('root'),[loadedPage,setPage]=useState<(Page&{scope:string})|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ const entryFolder=initialFolder&&selectedProjectId===initialFolder.projectId&&/^(root|[0-9a-f-]{36})$/.test(initialFolder.folderId)?initialFolder.folderId:'root';
+ const firstSelection=useRef(true);
+ const [parent,setParent]=useState(entryFolder),[loadedPage,setPage]=useState<(Page&{scope:string})|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const [returnNotice,setReturnNotice]=useState('');
  const [connectingProvider,setConnectingProvider]=useState<StorageOAuthProvider|null>(null),[connectionError,setConnectionError]=useState('');
  const [manualOAuth,setManualOAuth]=useState<{provider:StorageOAuthProvider;url:string}|null>(null);
@@ -198,7 +200,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject}:{pro
   }catch(e){if(scope===generation.current&&!controller.signal.aborted)setError(e instanceof Error?e.message:'Não foi possível preparar o envio.');}
   finally{if(mutation.current===controller){mutation.current=null;setProgress('');}if(scope===generation.current)setBusy(false);}
  }
- useEffect(()=>{setParent('root');setSpaceMenu(null);setTrash(false);previousFolder.current='root';setPage(null);setEdit(null);setPreview(null);setStructure(false);setAssisted(null);setDropboxPicker(false);setFailedImports(null);mutation.current?.abort();++generation.current;},[selectedProjectId,user?.uid]);
+ useEffect(()=>{const target=firstSelection.current?entryFolder:'root';if(user?.uid)firstSelection.current=false;setParent(target);setSpaceMenu(null);setTrash(false);previousFolder.current=target;setPage(null);setEdit(null);setPreview(null);setStructure(false);setAssisted(null);setDropboxPicker(false);setFailedImports(null);mutation.current?.abort();++generation.current;},[selectedProjectId,user?.uid]);
  // OAuth reloads React; restore only a short-lived hint for the same UID.
  // The API revalidates project ownership and the selected folder ancestors.
  useEffect(()=>{

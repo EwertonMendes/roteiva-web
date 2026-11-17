@@ -679,3 +679,23 @@ test('private client photos validate provider, crop, complete metadata and owner
  const gone={...Object.fromEntries(Object.keys(dropbox).map(key=>[key,deleteField()])),photoModifiedTime:deleteField()};
  await assertSucceeds(updateDoc(ref,{...gone,revision:3,updatedAt:serverTimestamp()}));
 });
+
+
+test("task positions are validated, sortable and backward compatible",async()=>{
+ const db=dbFor("alice");
+ const ref=id=>doc(db,"users","alice","tasks",String(id));
+ for(const [id,title,order] of [[50,"Terceira",2],[51,"Primeira",0],[52,"Segunda",1]]){
+  await assertSucceeds(setDoc(ref(id),{id,projectId:2,title,done:false,order,...meta("alice")}));
+ }
+ await assertSucceeds(setDoc(ref(53),{id:53,projectId:2,title:"Legada",done:false,...meta("alice")}));
+ await assertFails(setDoc(ref(54),{id:54,projectId:2,title:"Inválida",done:false,order:-1,...meta("alice")}));
+ await assertFails(setDoc(ref(55),{id:55,projectId:2,title:"Inválida",done:false,order:"primeiro",...meta("alice")}));
+ const repo=new FirestoreWorkspace(db,"alice");
+ const workspace=await repo.load(["projects","tasks"]);
+ const titles=workspace.projects.find(p=>p.id===2).tasks.map(t=>t.title);
+ assert.deepEqual(titles,["Primeira","Segunda","Terceira","Legada"]);
+ await assertSucceeds(updateDoc(ref(53),{order:3,revision:2,updatedAt:serverTimestamp()}));
+ const refreshed=new FirestoreWorkspace(db,"alice");
+ const after=await refreshed.load(["projects","tasks"]);
+ assert.deepEqual(after.projects.find(p=>p.id===2).tasks.map(t=>t.order),[0,1,2,3]);
+});

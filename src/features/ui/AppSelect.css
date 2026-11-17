@@ -35,14 +35,17 @@
   cursor: not-allowed;
   opacity: .55;
 }
-.rt-select .rt-select-value {
-  display: block;
+ .rt-select .rt-select-value {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   min-width: 0;
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+ .rt-select .rt-select-value-label { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .rt-select .rt-select-placeholder { color: var(--muted); }
 .rt-select .rt-select-chevron {
   flex: 0 0 auto;
@@ -85,7 +88,10 @@
 .rt-select-option[data-selected] { font-weight: 600; }
 .rt-select-option[aria-disabled="true"] { opacity: .42; cursor: not-allowed; }
 .rt-select-option[aria-disabled="true"][data-active] { background: transparent; }
-.rt-select-option-label { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+ .rt-select-option-label { display:flex;align-items:center;gap:10px;min-width:0;flex:1;overflow:hidden; }
+.rt-select-option-text { min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.rt-select-leading { display:inline-grid;place-items:center;flex:0 0 19px;width:19px;height:19px; }
+.rt-select-leading svg {display:block;flex:0 0 auto;}
 @keyframes rt-select-appear {
   from { opacity: 0; transform: translateY(-3px) scale(.99); }
   to { opacity: 1; transform: translateY(0) scale(1); }
@@ -98,7 +104,6 @@
 .reviews-toolbar > .rt-select { width: auto; min-width: 190px; }
 .settings-field .rt-select-trigger { min-height: 49px; }
 .rl-picker-context .rt-select-trigger { min-height: 42px; }
-.project-detail .pd-stage .rt-select-trigger { padding-left: 43px; }
 .rl-account-panel .rt-select-trigger { min-height: 39px; }
 /* A filter beside a search field must not consume all available flex width. */
 .rowner-gallery-filters > .rt-select { flex: 0 0 150px; width: 150px; max-width: 48%; }

@@ -196,6 +196,16 @@ test('virtual navigation preserves folder commands and a partial Dropbox batch r
  await expect(page.getByRole('button',{name:'Aprovados',exact:true})).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1)).toBe(true);
  await page.screenshot({path:info.outputPath('library-ready.png'),fullPage:true});
+ // Handoff from the project detail must open exactly the folder being viewed.
+ await page.goto(web+'/projetos');
+ await page.getByRole('button',{name:'Projeto Biblioteca QA',exact:true}).click();
+ const detail=page.locator('.project-detail');
+ await expect(detail).toBeVisible();
+ await detail.locator('.pd-linked-library').getByRole('button',{name:'Vídeos',exact:true}).click();
+ await expect(detail.getByRole('navigation',{name:'Caminho dos materiais'})).toContainText('Vídeos');
+ await detail.getByRole('button',{name:'Adicionar material',exact:true}).click();
+ await expect(page).toHaveURL(/\/biblioteca$/);
+ await expect(page.getByRole('navigation',{name:'Caminho da pasta'})).toContainText('Vídeos');
 });
 test('minimum-scope cover selection releases the native dialog for Google Picker and saves an authorized image',async({page,context},info)=>{
  const headers={'Access-Control-Allow-Origin':web,'Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Allow-Methods':'GET, POST, OPTIONS'};
