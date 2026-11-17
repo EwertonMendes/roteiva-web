@@ -128,3 +128,49 @@ test('an empty listener snapshot is reconciled by an authenticated server read',
     });
   }finally{await env.cleanup();}
 });
+
+test('new signup recovers when deletion-status read is temporarily unavailable',async({page},info)=>{
+  let reads=0;
+  const headers={'Access-Control-Allow-Origin':cloud,
+    'Access-Control-Allow-Methods':'GET, OPTIONS','Access-Control-Allow-Headers':'Authorization, Content-Type'};
+  await page.route('http://127.0.0.1:8787/account/deletion/status',async route=>{
+    if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
+    reads++;
+    await route.fulfill(reads===1?{status:503,headers,body:'{}'}:{
+      status:200,headers,contentType:'application/json',body:JSON.stringify({available:true,operation:null})
+    });
+  });
+  await signup(page,'reviewer-transient-'+info.project.name+'@example.com');
+  expect(reads).toBeGreaterThanOrEqual(2);
+  await page.reload();
+  await expect(page.locator('.app-shell')).toBeVisible();
+});
+
+test('new identity cannot bypass an unavailable deletion-status guard',async({page},info)=>{
+  let available=false;
+  const headers={'Access-Control-Allow-Origin':cloud,
+    'Access-Control-Allow-Methods':'GET, OPTIONS','Access-Control-Allow-Headers':'Authorization, Content-Type'};
+  await page.route('http://127.0.0.1:8787/account/deletion/status',async route=>{
+    if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
+    return route.fulfill(available?{status:200,headers,contentType:'application/json',
+      body:JSON.stringify({available:true,operation:null})}:{status:503,headers,body:'{}'});
+  });
+  await page.goto(cloud);
+  await page.getByRole('button',{name:'Criar conta',exact:true}).click();
+  const opening=page.waitForEvent('popup');
+  await page.getByRole('button',{name:'Cadastrar com Google',exact:true}).click();
+  const popup=await opening;await popup.waitForLoadState('load');
+  await popup.getByRole('button',{name:'Add new account',exact:true}).click();
+  await popup.locator('#email-input').fill('reviewer-guard-'+info.project.name+'@example.com');
+  await popup.locator('#display-name-input').fill('Avaliação Dropbox');
+  await popup.locator('#sign-in').click();
+  await expect(page.getByRole('heading',{name:'Não foi possível consultar seu cadastro.'})).toBeVisible({timeout:30000});
+  await expect(page.getByRole('button',{name:'Criar meu espaço de trabalho'})).toHaveCount(0);
+  await expect(page.locator('.app-shell')).toHaveCount(0);
+  available=true;
+  await page.getByRole('button',{name:/Tentar novamente/}).click();
+  await page.getByLabel('Como podemos chamar você?').fill('Avaliação Dropbox');
+  await page.getByLabel('Concordo com o uso dos meus dados').check();
+  await page.getByRole('button',{name:'Criar meu espaço de trabalho'}).click();
+  await expect(page.locator('.app-shell')).toBeVisible();
+});
