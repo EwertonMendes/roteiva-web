@@ -82,7 +82,7 @@ test('library counter callback is retired and collection states are reused',()=>
 
 test('all date inputs use the branded shared calendar picker, never browser-native date controls',()=>{
   for(const path of walk(root)){
-    const file=relative(root,path).replaceAll('\','/');
+    const file=relative(root,path).replaceAll('\\','/');
     const source=readFileSync(path,'utf8');
     assert.doesNotMatch(source,/type\s*=\s*["'](?:date|datetime-local|month|week)["']/i,file+' must use the shared calendar date picker');
   }
