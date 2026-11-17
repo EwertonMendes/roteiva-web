@@ -2,15 +2,14 @@ import {AppButton} from "../ui/AppButton";
 import {useEffect,useRef,useState} from 'react';
 import {CalendarDays,ChevronDown,ChevronRight,Files,FolderOpen,LayoutGrid,ImagePlus,Pencil,LoaderCircle} from 'lucide-react';
 import type {Project,ProjectCover,Status} from '../../domain/workspace';
-import {PROJECT_STATUS_ICONS} from '../ui/project-status';
+import {PROJECT_STATUS_ICONS,PROJECT_STATUS_COLORS} from '../ui/project-status';
 import {isDemo} from '../../lib/firebase';
 import {DriveCoversProvider,useCoverImage,useDriveCovers} from './DriveCoversProvider';
 import {CoverEditor} from './CoverEditor';
 import {CoverFrame} from './CoverFrame';
 import {useProjectFileCount} from './useProjectFileCount';
 import './projects.css';
-const colors:Record<Status,string>={'Em produção':'#349af4','Em aprovação':'#f6bd4f','Ajustes':'#ae77f1','Aprovado':'#38cc74'};
-function StatusIcon({status}:{status:Status}){const Icon=PROJECT_STATUS_ICONS[status];return <Icon size={18} style={{color:colors[status]}} aria-hidden="true"/>;}
+function StatusIcon({status}:{status:Status}){const Icon=PROJECT_STATUS_ICONS[status];return <Icon size={18} style={{color:PROJECT_STATUS_COLORS[status]}} aria-hidden="true"/>;}
 function ProjectCard({project,onOpen,onEdit,eager=false}:{project:Project;onOpen:()=>void;onEdit:()=>void;eager?:boolean}){
  const context=useDriveCovers();const box=useRef<HTMLElement>(null);const [visible,setVisible]=useState(eager);
  useEffect(()=>{if(eager||visible)return;const observer=new IntersectionObserver(([entry])=>{if(entry.isIntersecting){setVisible(true);observer.disconnect();}},{rootMargin:'320px'});if(box.current)observer.observe(box.current);return ()=>observer.disconnect();},[eager,visible]);
