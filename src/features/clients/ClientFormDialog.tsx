@@ -36,8 +36,8 @@ export function ClientFormDialog({client,onClose,onSubmit}:Props){
           <label>Valor mensal combinado<MoneyInput name="monthlyFee" defaultValue={client?.monthlyFee}/></label></div>
        </div>}
      </AppModalBody>
-     <AppModalFooter className="cd-form-actions"><AppButton type="button" className="secondary-button" onClick={onClose}>Cancelar</AppButton>
-       <AppButton type="submit" className="primary-button">Salvar cliente <ChevronRight size={18}/></AppButton>
+     <AppModalFooter className="cd-form-actions"><AppButton type="button" variant="secondary" onClick={onClose}>Cancelar</AppButton>
+       <AppButton type="submit" variant="primary">Salvar cliente <ChevronRight size={18}/></AppButton>
      </AppModalFooter>
    </form>
  </AppModal>;
