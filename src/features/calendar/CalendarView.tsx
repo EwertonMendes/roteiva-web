@@ -1,6 +1,7 @@
 import {useEffect,useMemo,useRef,useState} from "react";
 import {CalendarDays,ChevronLeft,ChevronRight,Plus,Pencil,Trash2,X} from "lucide-react";
 import {AppButton} from "../ui/AppButton";
+import {AppModal,AppModalHeader,AppModalBody} from "../ui/AppModal";
 import type {CalendarEvent,Project} from "../../domain/workspace";
 import {eventRange} from "../../studio-calendar";
 import {calendarCells,dateKey,localDate,todayKey} from "./calendar-dates";
@@ -23,21 +24,15 @@ function DayEventsDialog({date,events,projects,onClose,onAdd,onEdit,onDelete}:{
   date:string;events:CalendarEvent[];projects:Project[];
   onClose:()=>void;onAdd:()=>void;onEdit:(item:CalendarEvent)=>void;onDelete:(item:CalendarEvent)=>void;
 }) {
-  const dialog=useRef<HTMLDialogElement>(null);
-  useEffect(()=>{
-    const node=dialog.current;
-    node?.showModal();
-    return ()=>{if(node?.open)node.close();};
-  },[]);
   const formatted=localDate(date).toLocaleDateString("pt-BR",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
-  return <dialog ref={dialog} onClose={onClose} className="roteiva-calendar-dialog day-events-dialog"
-    aria-labelledby="day-events-title" onMouseDown={event=>{if(event.target===event.currentTarget)event.currentTarget.close();}}>
-    <div className="calendar-dialog-head">
-      <div className="calendar-dialog-heading"><CalendarDays size={21} aria-hidden="true"/><span>Compromissos do dia</span></div>
-      <AppButton type="button" className="calendar-dialog-close" aria-label="Fechar compromissos do dia" onClick={onClose}><X size={21}/></AppButton>
-    </div>
+  return <AppModal size="wide" className="roteiva-calendar-dialog day-events-dialog"
+    onCloseRequest={onClose} aria-labelledby="day-events-title">
+    <div className="rt-modal__layout">
+      <AppModalHeader title="Compromissos do dia" titleId="day-events-title"
+        icon={<CalendarDays size={22}/>} onClose={onClose} closeLabel="Fechar compromissos do dia"/>
+      <AppModalBody>
     <div className="calendar-day-heading">
-      <h2 id="day-events-title">{formatted.slice(0,1).toUpperCase()+formatted.slice(1)}</h2>
+      <h2>{formatted.slice(0,1).toUpperCase()+formatted.slice(1)}</h2>
       <div className="calendar-day-actions"><span>{events.length} {events.length===1?"compromisso":"compromissos"}</span>
         <AppButton className="primary-button" onClick={onAdd}><Plus size={18}/> Novo compromisso</AppButton>
       </div>
@@ -58,7 +53,9 @@ function DayEventsDialog({date,events,projects,onClose,onAdd,onEdit,onDelete}:{
         </article>;
       })}
     </div>
-  </dialog>;
+      </AppModalBody>
+    </div>
+  </AppModal>;
 }
 
 export function CalendarView({events,projects,onAdd,onEdit,onDelete,onMonthChange,focusDate}:Props) {
