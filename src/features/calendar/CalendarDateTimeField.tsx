@@ -23,11 +23,17 @@ function displayDate(iso:string){
   const [year,month,day]=iso.split("-");
   return day+"/"+month+"/"+year;
 }
-export function CalendarDateField({value,onChange,showValidation=false}:{value:string;onChange:(value:string)=>void;showValidation?:boolean}){
+export function CalendarDateField({value,onChange,showValidation=false,optional=false,label="Data do compromisso",onDraftChange,maxYear=2199}:{
+  value:string;onChange:(value:string)=>void;showValidation?:boolean;optional?:boolean;
+  label?:string;onDraftChange?:(draft:string)=>void;maxYear?:number;
+}){
   const [draft,setDraft]=useState(()=>displayDate(value));
   const [touched,setTouched]=useState(false);
   const helpId=useId();
-  const fieldError=(touched||showValidation)?dateInputError(draft):"";
+  const fieldError=(touched||showValidation)
+    ?(optional&&!draft?"":dateInputError(draft)||(
+      Number(draft.slice(-4))>maxYear?`O ano deve ser até ${maxYear}.`:""))
+    :"";
   const [open,setOpen]=useState(false);
   const [cursor,setCursor]=useState(()=>localDate(isValidCivilDate(value)?value:todayKey()));
   const root=useRef<HTMLDivElement>(null);
@@ -41,7 +47,10 @@ export function CalendarDateField({value,onChange,showValidation=false}:{value:s
   const selected=isValidCivilDate(value)?value:todayKey();
   const [focused,setFocused]=useState(selected);
   function select(key:string){
-    setDraft(displayDate(key));onChange(key);setTouched(true);setFocused(key);setOpen(false);trigger.current?.focus();
+    if(Number(key.slice(0,4))>maxYear)return;
+    const displayed=displayDate(key);
+    setDraft(displayed);onChange(key);onDraftChange?.(displayed);
+    setTouched(true);setFocused(key);setOpen(false);trigger.current?.focus();
   }
   function reveal(){
     const origin=isValidCivilDate(value)?localDate(value):localDate(todayKey());
@@ -63,12 +72,14 @@ export function CalendarDateField({value,onChange,showValidation=false}:{value:s
   }
   return <div className="calendar-picker" ref={root} onKeyDown={event=>{if(open&&event.key==="Escape"){event.preventDefault();event.stopPropagation();setOpen(false);trigger.current?.focus();}}}>
     <div className="calendar-picker-control">
-      <AppInput type="text" ref={input} aria-label="Data do compromisso" inputMode="numeric" autoComplete="off"
+      <AppInput type="text" ref={input} aria-label={label} inputMode="numeric" autoComplete="off"
         placeholder="dd/mm/aaaa" maxLength={10} value={draft} invalid={!!fieldError}
         aria-describedby={fieldError?helpId:undefined}
         onChange={event=>{
           const next=maskDateText(event.target.value);
-          setDraft(next);onChange(parseDateText(next));
+          setDraft(next);onDraftChange?.(next);
+          const parsed=parseDateText(next);
+          onChange(parsed&&Number(parsed.slice(0,4))<=maxYear?parsed:"");
         }}
         onBlur={()=>setTouched(true)}
         onKeyDown={event=>{if(event.key==="Escape"&&open){event.stopPropagation();setOpen(false);}}}/>
@@ -87,6 +98,7 @@ export function CalendarDateField({value,onChange,showValidation=false}:{value:s
       <div className="calendar-picker-days" onKeyDown={onGridKeyDown}>
         {calendarCells(year,month).map(cell=><AppButton key={cell.key} data-date-key={cell.key} type="button"
           aria-label={localDate(cell.key).toLocaleDateString("pt-BR",{day:"numeric",month:"long",year:"numeric"})}
+          disabled={Number(cell.key.slice(0,4))>maxYear}
           aria-pressed={value===cell.key}
           tabIndex={focused===cell.key?0:-1}
           className={(cell.current?"":"outside")+(value===cell.key?" selected":"")+(cell.key===todayKey()?" today":"")}
