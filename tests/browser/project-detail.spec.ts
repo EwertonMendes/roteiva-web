@@ -75,8 +75,27 @@ test('project detail: tasks, drafts, finance, agenda, materials and responsive t
   // The shared Roteiva calendar picker replaces the browser-native date input.
   const due=page.getByRole('textbox',{name:'Prazo do projeto'});
   await expect(due).toHaveValue('17/11/2026');
-  await detail.getByRole('button',{name:'Abrir calendário de data'}).click();
+  // Clicking the text portion must both focus the editable input and reveal
+  // the calendar; a click elsewhere must dismiss it.
+  await due.click();
+  await expect(due).toBeFocused();
   const projectPicker=detail.getByRole('dialog',{name:'Escolher data'});
+  await expect(projectPicker).toBeVisible();
+  if((page.viewportSize()?.width||0)>800){
+    expect(await projectPicker.evaluate(el=>el.scrollHeight-el.clientHeight)).toBeLessThanOrEqual(2);
+  }
+  await detail.getByRole('textbox',{name:'Briefing',exact:true}).click();
+  await expect(projectPicker).toHaveCount(0);
+  await detail.getByRole('button',{name:'Abrir calendário de data'}).click();
+  await expect(due).toBeFocused();
+  const inset=await detail.locator('.pd-date-field .calendar-picker-control').evaluate(el=>{
+    const frame=el.getBoundingClientRect();
+    const icon=el.querySelector<HTMLButtonElement>('.calendar-picker-toggle')!.getBoundingClientRect();
+    return {right:frame.right-icon.right,top:icon.top-frame.top,bottom:frame.bottom-icon.bottom};
+  });
+  expect(inset.right).toBeGreaterThanOrEqual(4);
+  expect(inset.top).toBeGreaterThanOrEqual(3);
+  expect(inset.bottom).toBeGreaterThanOrEqual(3);
   await expect(projectPicker).toBeVisible();
   await expect(projectPicker).toHaveAttribute('popover','manual');
   await expect(projectPicker).toHaveCSS('position','fixed');
@@ -185,8 +204,13 @@ test('project detail: tasks and recurring month picker use Roteiva calendar',asy
   const month=page.getByRole('textbox',{name:'Mês do pacote'});
   await expect(month).toBeVisible();
   await expect(page.locator('input[type="month"]')).toHaveCount(0);
-  await page.getByRole('button',{name:'Escolher mês do pacote'}).click();
+  await month.click();
+  await expect(month).toBeFocused();
   const chooser=page.getByRole('dialog',{name:'Escolher mês'});
+  await expect(chooser).toBeVisible();
+  await page.getByRole('heading',{name:'Clientes',exact:true}).click();
+  await expect(chooser).toHaveCount(0);
+  await page.getByRole('button',{name:'Escolher mês do pacote'}).click();
   await expect(chooser).toBeVisible();
   await expect(chooser).toHaveAttribute('popover','manual');
   await expect(chooser).toHaveCSS('position','fixed');
