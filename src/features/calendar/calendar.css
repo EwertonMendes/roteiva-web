@@ -447,6 +447,8 @@
   color:var(--ink);
   border:1px solid var(--line);
   border-radius:11px;
+  padding:4px 7px; /* Keep the icon and its focus ring inset from the outer edge. */
+  cursor:text;
   transition:border-color .15s,box-shadow .15s;
 }
 :is(.roteiva-calendar-form,.project-detail,.project-modal,.studio-section) .calendar-picker-control:focus-within {
@@ -467,7 +469,7 @@
   font-size:1rem;
   font-weight:550;
   font-variant-numeric:tabular-nums;
-  padding:0 4px 0 15px;
+  padding:0 4px 0 8px;
   color:var(--ink);
 }
 :is(.roteiva-calendar-form,.project-detail,.project-modal,.studio-section) .calendar-picker-control input.rt-input:focus {
@@ -497,14 +499,13 @@
   background:var(--subtle);
   color:var(--ink);
 }
-:is(.roteiva-calendar-form,.project-detail,.project-modal,.studio-section) .calendar-picker-control .calendar-picker-toggle {min-width:42px}
+:is(.roteiva-calendar-form,.project-detail,.project-modal,.studio-section) .calendar-picker-control .calendar-picker-toggle {min-width:38px;height:38px;cursor:pointer}
 :is(.roteiva-calendar-form,.project-detail,.project-modal,.studio-section) .calendar-picker-control .calendar-picker-clear {min-width:25px;padding:0 3px}
 :is(.roteiva-calendar-form,.project-detail,.project-modal,.studio-section) .calendar-picker-popover {
   position:fixed;
   inset:auto;
   margin:0;
-  overflow-y:auto;
-  overscroll-behavior:contain;
+  overflow:visible;
   top:calc(100% + 9px);
   left:0;
   z-index:50;
@@ -723,7 +724,7 @@
 }
 @media (max-width:365px) {
   :is(.roteiva-calendar-form,.project-detail,.project-modal,.studio-section) .calendar-picker-control input.rt-input:not([type="hidden"]) {font-size:.88rem;padding-left:8px}
-  :is(.roteiva-calendar-form,.project-detail,.project-modal,.studio-section) .calendar-picker-control .calendar-picker-toggle {min-width:32px;padding:0 4px}
+  :is(.roteiva-calendar-form,.project-detail,.project-modal,.studio-section) .calendar-picker-control .calendar-picker-toggle {min-width:36px;height:36px;padding:0 5px}
   .roteiva-calendar-form .calendar-field-caption {font-size:.89rem}
   .roteiva-calendar-form .calendar-field-caption em {font-size:.78rem}
 }
@@ -780,8 +781,10 @@
 .project-modal .rt-date-form-field .calendar-field-feedback {min-height:0;margin:0}
 .project-modal .rt-date-form-field .calendar-field-feedback:not(:empty) {padding-top:5px}
 :is(.roteiva-calendar-form,.project-detail,.project-modal,.studio-section) .calendar-picker-popover[popover] {
-  position:fixed;inset:auto;margin:0;max-height:calc(100dvh - 16px);
-  overflow-y:auto;overscroll-behavior:contain;
+  position:fixed;inset:auto;margin:0;
+  max-height:none;overflow:visible;
+  /* The positioning hook only enables internal scroll if the entire panel
+     physically cannot fit in the visual viewport (e.g. mobile keyboard). */
 }
 
 /* Branded month variant shares the same floating calendar and focus contract. */
