@@ -1,3 +1,4 @@
+import {ShieldCheck as ModalShieldCheck} from "lucide-react";
 import { API_BASE_URL } from "../../lib/environment.ts";
 import {AppInput} from "../ui/AppInput";
 import {AppTextarea} from "../ui/AppTextarea";
@@ -447,7 +448,7 @@ export function ReviewPortal({token}:{token:string}){
     {decision&&<AppModal size="medium" className="rt-review-confirm" aria-label="Confirmar decisão"
       onCloseRequest={()=>{if(!busy)setDecision(null);}}>
       <div className="rt-modal__layout">
-       <AppModalHeader title={decision==="approved"?"Confirmar aprovação?":"Quais ajustes são necessários?"}
+       <AppModalHeader icon={<ModalShieldCheck size={26}/>} title={decision==="approved"?"Confirmar aprovação?":"Quais ajustes são necessários?"}
          onClose={()=>setDecision(null)} closeDisabled={busy}
          eyebrow="APROVAÇÕES / CONFIRMAÇÃO"/>
        <AppModalBody>
