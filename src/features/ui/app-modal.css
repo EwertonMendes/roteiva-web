@@ -145,3 +145,28 @@
  --field-focus-border:var(--r-accent);
  background:var(--modal-surface);color:var(--ink);
 }
+
+/* Shared field states win over legacy feature-level border definitions. */
+:root .rt-modal .rt-modal__body .rt-input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):focus,
+:root .rt-modal .rt-modal__body .rt-textarea:focus,
+:root .rt-modal .rt-modal__body .rt-select-trigger:focus-visible,
+:root .rt-modal .rt-modal__body .rt-select[data-open] .rt-select-trigger{
+ border-color:var(--field-focus-border);
+ box-shadow:0 0 0 3px var(--field-focus-ring);
+ outline:none;
+}
+/* An input with an adornment has a single focus surface on the frame. */
+:root .rt-modal .rt-input-frame:focus-within{
+ border-color:var(--field-focus-border);
+ box-shadow:0 0 0 3px var(--field-focus-ring);
+}
+:root .rt-modal .rt-input-frame > .rt-input:focus{
+ border:0;outline:0;box-shadow:none;
+}
+/* Explicit compact size is owned by the UI primitive, not by a feature. */
+:root .rt-modal .rt-input-frame[data-control-size="sm"]{
+ height:48px;min-height:48px;
+}
+:root .rt-modal .rt-input-frame[data-control-size="sm"] > .rt-input{
+ height:100%;min-height:0;
+}
