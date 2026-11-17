@@ -46,7 +46,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject,initi
  const dropboxAccounts=storage.connections.filter(x=>x.provider==='dropbox'&&x.status==='connected');
  const [dropboxId,setDropboxId]=useState(''),[dropboxPicker,setDropboxPicker]=useState(false);
  const dropbox=dropboxAccounts.find(x=>x.id===dropboxId)||dropboxAccounts[0];
- const entryFolder=selectedProjectId===initialFolder?.projectId&&/^(root|[0-9a-f-]{36})$/.test(initialFolder.folderId)?initialFolder.folderId:'root';
+ const entryFolder=initialFolder&&selectedProjectId===initialFolder.projectId&&/^(root|[0-9a-f-]{36})$/.test(initialFolder.folderId)?initialFolder.folderId:'root';
  const firstSelection=useRef(true);
  const [parent,setParent]=useState(entryFolder),[loadedPage,setPage]=useState<(Page&{scope:string})|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const [returnNotice,setReturnNotice]=useState('');
