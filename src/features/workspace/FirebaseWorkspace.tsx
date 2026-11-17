@@ -387,7 +387,12 @@ export function FirebaseWorkspace() {
       const bars=await repository.financeYearBars(year,clientId,months);
       setFinanceBars({key:year+"-"+(clientId||""),bars});
     }
-  }),[repository,enqueue,financePeriod,financeBars]);
+  },{blocksInteraction:!(
+    // Checklist commands can be queued while the user types the next task.
+    // Project edits (without task changes) remain blocking as before.
+    commands.some(c=>c.kind==="saveTask"||c.kind==="deleteTask")&&
+    commands.every(c=>["saveProject","saveTask","deleteTask","appendActivity","deleteActivity"].includes(c.kind))
+  )}),[repository,enqueue,financePeriod,financeBars]);
   if (!user) return null;
   return <>
     {authError && <p className="cloud-banner" role="alert">{authError}</p>}
