@@ -103,9 +103,9 @@ export async function feedbackRouter(request:Request,env:Env,uid:string,email:st
     "INSERT INTO feedback_reports (id,owner_uid,request_key,kind,title,description,screen,status,attachment_count,created_at) "+
     "SELECT ?,?,?,?,?,?,?,'sending',?,? WHERE "+
     "(SELECT COUNT(*) FROM feedback_reports WHERE owner_uid=? AND created_at>=? AND status IN ('sending','sent'))<? "+
-    "ON CONFLICT(owner_uid,request_key) DO NOTHING RETURNING id"
+    "AND (SELECT COUNT(*) FROM feedback_reports WHERE owner_uid=? AND created_at>=?)<10 ON CONFLICT(owner_uid,request_key) DO NOTHING RETURNING id"
   ).bind(id,uid,feedback.requestKey,feedback.kind,feedback.title,feedback.description,
-    feedback.screen,feedback.attachments.length,now,uid,now-DAY_MS,DAILY_LIMIT).first<{id:string}>();
+    feedback.screen,feedback.attachments.length,now,uid,now-DAY_MS,DAILY_LIMIT,uid,now-DAY_MS).first<{id:string}>();
   if(!created){
     const previous=await env.DB.prepare('SELECT id,status,retry_safe FROM feedback_reports WHERE owner_uid=? AND request_key=?')
       .bind(uid,feedback.requestKey).first<{id:string;status:string;retry_safe:number}>();
@@ -114,12 +114,12 @@ export async function feedbackRouter(request:Request,env:Env,uid:string,email:st
       // A provider's definitive rejection permits an atomic retry of exactly this key.
       // Other rows (including old failures/ambiguous sends) must never be replayed.
       const renewed=await env.DB.prepare(
-        "UPDATE feedback_reports SET status='sending',retry_safe=0,kind=?,title=?,description=?,screen=?,attachment_count=? "+
-        "WHERE owner_uid=? AND request_key=? AND status='failed' AND retry_safe=1 AND "+
-        "(SELECT COUNT(*) FROM feedback_reports WHERE owner_uid=? AND created_at>=? AND status IN ('sending','sent'))<? RETURNING id"
-      ).bind(feedback.kind,feedback.title,feedback.description,feedback.screen,feedback.attachments.length,
-        uid,feedback.requestKey,uid,now-DAY_MS,DAILY_LIMIT).first<{id:string}>();
-      if(!renewed)throw new ApiError(409,'feedback_already_attempted');
+        "UPDATE feedback_reports SET status='sending',retry_safe=0,created_at=?,attempt_count=attempt_count+1,kind=?,title=?,description=?,screen=?,attachment_count=? "+
+        "WHERE owner_uid=? AND request_key=? AND status='failed' AND retry_safe=1 AND attempt_count<3 AND "+
+        "(SELECT COUNT(*) FROM feedback_reports WHERE owner_uid=? AND created_at>=? AND status IN ('sending','sent'))<? AND (SELECT COUNT(*) FROM feedback_reports WHERE owner_uid=? AND created_at>=?)<10 RETURNING id"
+      ).bind(now,feedback.kind,feedback.title,feedback.description,feedback.screen,feedback.attachments.length,
+        uid,feedback.requestKey,uid,now-DAY_MS,DAILY_LIMIT,uid,now-DAY_MS).first<{id:string}>();
+      if(!renewed)throw new ApiError(429,'feedback_daily_limit');
       id=renewed.id;
     }else if(previous)throw new ApiError(409,'feedback_already_attempted');
     else throw new ApiError(429,'feedback_daily_limit');
