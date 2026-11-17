@@ -5,7 +5,7 @@ import {createHash} from "node:crypto";
 
 const read=path=>readFileSync(new URL("../src/"+path,import.meta.url),"utf8");
 const gitBlob=contents=>createHash("sha1")
-  .update("blob "+Buffer.byteLength(contents)+"\\0").update(contents).digest("hex");
+  .update("blob "+Buffer.byteLength(contents)).update(Buffer.from([0])).update(contents).digest("hex");
 
 /** PROD master (4a4dfb6): the calendar is the immutable visual reference.
  * Never "standardize" it or its date/time primitives as part of this PR. */
