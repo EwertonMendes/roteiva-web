@@ -204,8 +204,15 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
       if(deadline)commands.push({kind:"saveEvent",event:deadline});
       else if(existing)commands.push({kind:"deleteEvent",id:existing.id});
     }
+    // Keep task writes and their activity in one non-blocking batch. A separate
+    // blocking activity write would briefly make the entire app inert and steal
+    // focus from the checklist input after each addition.
+    const activity:Activity={id:crypto.randomUUID(),text:`Projeto atualizado: ${updated.name}`,when:new Date().toISOString()};
+    setActivities(current=>[activity,...current].slice(0,150));
+    commands.push({kind:"appendActivity",activity});
+    if(activities.length>=150&&activities[149]?.id)
+      commands.push({kind:"deleteActivity",id:activities[149].id!});
     commitCommands(commands,"Projeto atualizado.");
-    logActivity(`Projeto atualizado: ${updated.name}`);
   }
   function saveClientPackage(client: Client) {
     setClientList(current => current.map(c => c.id === client.id ? client : c));
