@@ -142,8 +142,8 @@ export function CalendarEventDialog({editing,date,projects,clients,events,prefer
       <AppModalFooter className="calendar-form-actions">
         {editing&&!locked&&onDelete&&<AppButton className="calendar-delete-action" type="button" onClick={()=>onDelete(editing)}><Trash2 size={17}/> Excluir</AppButton>}
         <div className="calendar-form-action-right">
-          <AppButton className="secondary-button" type="button" onClick={onCancel}>Cancelar</AppButton>
-          <AppButton className="primary-button" type="submit"><Check size={20}/> Salvar compromisso</AppButton>
+          <AppButton variant="secondary" type="button" onClick={onCancel}>Cancelar</AppButton>
+          <AppButton variant="primary" type="submit"><Check size={20}/> Salvar compromisso</AppButton>
         </div>
       </AppModalFooter>
     </form>
