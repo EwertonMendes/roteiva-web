@@ -14,7 +14,7 @@ function reorder(tasks:Tasks,sourceId:number,targetId:number):Tasks{
  const reordered=[...tasks];
  const [moved]=reordered.splice(source,1);
  reordered.splice(destination,0,moved);
- return reordered;
+ return reordered.map((task,index)=>({...task,order:index}));
 }
 
 /** Pointer Events work with mouse, pen and touch. Keyboard arrows on the
@@ -45,7 +45,8 @@ export function ProjectChecklist({tasks,onChange}:{tasks:Tasks;onChange:(next:Ta
   if(!title)return;
   const id=newId();
   pendingAdded.current=id;
-  onChange([...tasks,{id,title,done:false}]);
+  onChange([...tasks,{id,title,done:false}].map((task,index)=>({...task,order:index})));
+
   setDraft('');
   inputRef.current?.focus({preventScroll:true});
  }
