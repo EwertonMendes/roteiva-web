@@ -22,6 +22,8 @@ export type AppSelectProps = {
   required?: boolean;
   className?: string;
   placeholder?: string;
+  /** Optional visual adornment for each option and the selected value. */
+  renderLeading?: (value: string) => ReactNode;
   "aria-label"?: string;
   "aria-labelledby"?: string;
   "aria-describedby"?: string;
@@ -45,7 +47,7 @@ function readOptions(children: ReactNode): SelectOption[] {
 
 export function AppSelect({
   children, value, defaultValue, onValueChange, name, id, disabled = false,
-  required, className = "", placeholder = "Selecione uma opção",
+  required, className = "", placeholder = "Selecione uma opção", renderLeading,
   "aria-label": ariaLabel, "aria-labelledby": labelledBy,
   "aria-describedby": describedBy, "aria-invalid": invalid,
 }: AppSelectProps) {
@@ -202,7 +204,8 @@ export function AppSelect({
       onKeyDown={onKeyDown}
     >
       <span className={`rt-select-value ${selected ? "" : "rt-select-placeholder"}`} title={selected?.text}>
-        {selected?.label ?? placeholder}
+        {selected && renderLeading && <span className="rt-select-leading" aria-hidden="true">{renderLeading(selected.value)}</span>}
+        <span className="rt-select-value-label">{selected?.label ?? placeholder}</span>
       </span>
       <ChevronDown className="rt-select-chevron" aria-hidden="true" size={16} />
     </AppButton>
@@ -221,7 +224,10 @@ export function AppSelect({
         onPointerMove={event => { if (event.pointerType === "mouse" && !option.disabled) setActive(index); }}
         onMouseDown={event => event.preventDefault()}
         onClick={() => commit(index)}
-      ><span className="rt-select-option-label">{option.label}</span>{option.value === current && <Check size={16} aria-hidden="true" className="rt-select-check"/>}</div>)}
+      ><span className="rt-select-option-label">
+        {renderLeading && <span className="rt-select-leading" aria-hidden="true">{renderLeading(option.value)}</span>}
+        <span className="rt-select-option-text">{option.label}</span>
+       </span>{option.value === current && <Check size={16} aria-hidden="true" className="rt-select-check"/>}</div>)}
     </div>, triggerRef.current?.closest("dialog[open]") ?? document.body)}
   </div>;
 }
