@@ -45,7 +45,7 @@ function LegacyProjectMaterials({projectId,onManage}:Props){
   </article>)}{!state.links.length&&<div className="pd-material-empty">
    <FolderOpen size={23} aria-hidden="true"/>
    <p>Vincule pastas do Google Drive ou Dropbox na Biblioteca deste projeto.</p>
-   <AppButton className="secondary-button" onClick={onManage}>Abrir Biblioteca<ExternalLink size={16} aria-hidden="true"/></AppButton>
+   <AppButton className="secondary-button" onClick={()=>onManage()}>Abrir Biblioteca<ExternalLink size={16} aria-hidden="true"/></AppButton>
   </div>}</>;
 }
 type Node={id:string;kind:'folder'|'asset';name:string;revision:number;mime_type?:string;provider?:string;connection_id?:string;file_id?:string;source_revision?:string;parent_name?:string};
@@ -110,7 +110,7 @@ function VirtualProjectMaterials({projectId,onManage,onFolderChange}:Props){
     <AppButton type="button" className="vl-small-tool" onClick={()=>setAttempt(n=>n+1)}
      disabled={busy} aria-label="Atualizar arquivos" title="Atualizar arquivos"><RefreshCw size={17}/></AppButton>
     <LibraryLayoutControl layout={layout} onChange={setLayout}/>
-    <AppButton type="button" className="vl-small-tool" onClick={onManage}>Gerenciar na Biblioteca<ExternalLink size={15}/></AppButton>
+    <AppButton type="button" className="vl-small-tool" onClick={()=>onManage(folder)}>Gerenciar na Biblioteca<ExternalLink size={15}/></AppButton>
    </div>
   </div>
   <div className="vl-query">
