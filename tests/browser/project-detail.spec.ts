@@ -168,3 +168,28 @@ test('project detail: tasks and new-project calendar control',async({page})=>{
 });
 
 
+
+
+test('project detail: tasks and recurring month picker use Roteiva calendar',async({page})=>{
+  await page.addInitScript(()=>{
+    localStorage.setItem('roteiva-theme','dark');
+    localStorage.setItem('roteiva-pages-demo-workspace-v1',JSON.stringify({
+      projects:[],
+      clients:[{id:21,name:'Cliente mensal',contact:'Contato',color:'blue',initials:'CM',
+        type:'Recorrente',since:'2026',projects:0,active:0,
+        monthlyDeliverables:2,monthlyFee:1000,deliveries:[]}],
+      financeEntries:[],calendarEvents:[],libraryAssets:[],comments:[],activities:[],
+    }));
+  });
+  await page.goto(base+'/#/clientes/21');
+  const month=page.getByRole('textbox',{name:'Mês do pacote'});
+  await expect(month).toBeVisible();
+  await expect(page.locator('input[type="month"]')).toHaveCount(0);
+  await page.getByRole('button',{name:'Escolher mês do pacote'}).click();
+  const chooser=page.getByRole('dialog',{name:'Escolher mês'});
+  await expect(chooser).toBeVisible();
+  await expect(chooser).toHaveAttribute('popover','manual');
+  await expect(chooser).toHaveCSS('position','fixed');
+  await chooser.getByRole('button',{name:'Fevereiro'}).click();
+  await expect(month).toHaveValue(/Fevereiro de \d{4}/);
+});
