@@ -184,3 +184,13 @@ O gerenciamento de Google Drive e Dropbox abre um diálogo responsivo pelo coman
 
 ### Autorização independente da conta principal (15/11/2026)
 **Adicionar conta** abre um login Google/Dropbox em janela separada; a Biblioteca e o projeto em uso não recarregam. O Dropbox exige novo login ao adicionar uma conta com conexão anterior (opção oficial `force_reauthentication`). Sucesso/cancelamento retornam ao mesmo gerenciador e atualizam apenas a lista de conexões e a seleção do provedor. Uma rejeição do Google permanece na janela externa; o usuário pode cancelar sem perder o workspace. Navegação na aba principal só ocorre como fallback quando o navegador bloquear a janela. O erro `access_denied` de contas não cadastradas como testadoras do OAuth DEV é configuração externa, não efeito da conta usada para entrar no Roteiva.
+
+## Sistema de modais unificado — 17/11/2026 (PR #157, DEV)
+
+- `src/features/ui/AppModal.tsx` fornece o shell nativo e acessível, com `AppModalHeader`, `AppModalBody`, `AppModalFooter` e `AppModalSection`. Lógica de negócio e chamadas a serviços permanecem no componente proprietário do fluxo.
+- `app-modal.css` centraliza superfícies opacas, hierarquia tipográfica, close button, espaçamento, limites de viewport, rodapé fixo e dimensões de campos. O modal de Novo compromisso define a referência visual.
+- Tamanhos semânticos (`compact`, `medium`, `wide`, `full`) são variantes explícitas, não alturas improvisadas em cada tela. Área de mídia preserva o viewport próprio, sem reutilizar diretamente o layout de formulário.
+- Fluxos de agenda, clientes, projeto, financeiro, aprovações, conta, importação e gestão da biblioteca devem usar o shell compartilhado. Dropdowns, popovers e visualização ampliada não são formulários modais e mantêm semântica de interação apropriada.
+- `AppButton` possui variantes e tamanhos explícitos. `AppInput`, `AppSelect`, `AppTextarea`, `MoneyInput` e adaptadores de datas são a interface pública reutilizável. Evitar elementos HTML básicos isolados fora da camada de UI e novos overrides de cor/foco/altura em CSS de features.
+- Contrato regressivo: `tests/modal-design-system.test.mjs`, `tests/ui-controls.test.mjs`, testes browser de calendário, clientes, financeiro, aprovações, biblioteca e editor de capas.
+- Esta mudança é **somente frontend DEV**. Nenhuma mudança de permissões, escopos Drive/Dropbox, persistência, scripts de Worker ou configuração de PROD.
