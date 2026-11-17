@@ -1,7 +1,7 @@
 /* Design tokens are owned by the shared control layer. Feature layouts should
  * change spacing through variables rather than redefine input focus/borders. */
 :root {
-  --rt-control-height:44px;
+  --rt-control-height:48px;
   --rt-control-radius:10px;
   --rt-control-padding:12px;
 }
@@ -34,13 +34,13 @@
 .rt-input-frame>.rt-input:focus{border:0;outline:0;box-shadow:none;}
 .rt-input-frame[data-disabled]{opacity:.55;}
 .rt-button{display:inline-flex;align-items:center;justify-content:center;gap:8px;
-  border-radius:10px;border:1px solid var(--line);font:inherit;font-weight:600;min-height:42px;
+  border-radius:10px;border:1px solid var(--line);font:inherit;font-weight:600;min-height:46px;
   cursor:pointer;transition:background-color .15s,border-color .15s,opacity .15s;}
 .rt-button--primary{background:var(--accent);color:var(--on-accent);border-color:transparent;padding:0 16px;}
 .rt-button--secondary{background:var(--subtle);color:var(--ink);padding:0 16px;}
 .rt-button--ghost{background:transparent;color:var(--ink);border-color:transparent;padding:0 12px;}
 .rt-button--danger{background:var(--field-error-border,#bc4d4d);color:white;border-color:transparent;padding:0 16px;}
 .rt-button:disabled{opacity:.55;cursor:not-allowed;}
-.rt-button[data-control-size="sm"]{min-height:34px;}
-.rt-button[data-control-size="lg"]{min-height:49px;}
+.rt-button[data-control-size="sm"]{min-height:38px;}
+.rt-button[data-control-size="lg"]{min-height:52px;}
 @media(prefers-reduced-motion:reduce){.rt-button{transition:none;}}
