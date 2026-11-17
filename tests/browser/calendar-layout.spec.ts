@@ -325,7 +325,7 @@ test("nested day/editor/confirmation dialogs keep the underlying day and lock ba
   await expect(page.locator("html")).not.toHaveCSS("overflow-y","hidden");
 });
 
-test("legacy overlays and native AppDialog share the global scroll lock",async({page},info)=>{
+test("native project and client dialogs share the global scroll lock",async({page},info)=>{
   await enterCalendar(page,"global-modal-scroll-"+info.project.name+"@example.com");
   const sidebar=page.locator(".sidebar nav");
   async function navigateTo(name:RegExp){
@@ -334,11 +334,11 @@ test("legacy overlays and native AppDialog share the global scroll lock",async({
   }
   await navigateTo(/^Projetos/);
   await page.getByRole("button",{name:"Criar projeto"}).first().click();
-  await expect(page.locator(".modal-backdrop")).toBeVisible();
+  await expect(page.locator("dialog.rt-project-dialog")).toBeVisible();
   await expect(page.locator("html")).toHaveCSS("overflow-y","hidden");
   await expect(page.locator("body")).toHaveCSS("overflow-y","hidden");
   await page.locator(".project-modal").getByRole("button",{name:"Cancelar"}).click();
-  await expect(page.locator(".modal-backdrop")).toHaveCount(0);
+  await expect(page.locator("dialog.rt-project-dialog")).toHaveCount(0);
   await expect(page.locator("html")).not.toHaveCSS("overflow-y","hidden");
 
   await navigateTo(/^Clientes/);
