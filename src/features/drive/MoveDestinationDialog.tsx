@@ -1,3 +1,4 @@
+import {FolderInput as ModalFolderInput} from "lucide-react";
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {ChevronRight,Folder as FolderIcon,FolderOpen,LoaderCircle,MoveRight} from 'lucide-react';
 import {AppButton} from '../ui/AppButton';
@@ -41,7 +42,7 @@ export function MoveDestinationDialog({base,source,busy,error:saveError,onClose,
  return <AppModal size="medium" className="lib-dialog lib-dialog--move"
    onCloseRequest={()=>{if(!busy)onClose();}} aria-labelledby="library-move-title" aria-describedby="library-move-description">
    <div className="rt-modal__layout">
-    <AppModalHeader title="Mover para" titleId="library-move-title" descriptionId="library-move-description"
+    <AppModalHeader icon={<ModalFolderInput size={26}/>} title="Mover para titleId="library-move-title" descriptionId="library-move-description"
       description={<>Escolha o destino para “{source.name}”.</>} onClose={onClose} closeDisabled={busy}/>
     <AppModalBody className="lib-dialog-content">
     <nav aria-label="Pasta de destino" className="lib-breadcrumb">
