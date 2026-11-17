@@ -23,15 +23,26 @@
 6. O Gmail precisa estar verificado **na mesma conta do Worker PROD** e roteiva.com deve pertencer a ela. Somente depois promover o código por pipeline protegida.
 7. Validar em PROD com usuário de teste: envio sem imagens, envio com 5 imagens, anexos e cabeçalhos From/Reply-To no Gmail, não duplicação e histórico de cada proprietário.
 
-## DEV/PROD
+## DEV/PROD: entregas isoladas no mesmo Gmail
 
-O Worker DEV usa outra conta Cloudflare. Não pode enviar como suporte@roteiva.com se a zona roteiva.com só existe na conta PROD. O binding é por isso exclusivo da configuração PROD. Em DEV, GET do histórico funciona e o envio informa explicitamente "indisponível", sem sucesso simulado. Os testes unitários substituem o binding por um stub.
+- **PROD:** permanece no Cloudflare Email Service com o binding `FEEDBACK_EMAIL`, remetente fixo `suporte@roteiva.com` e destinatário `suporte.roteiva@gmail.com`. É necessário ativar o **Email Sending** para a zona `roteiva.com` na conta PROD; ter apenas o Gmail marcado `Verified` em Email Routing não comprova essa ativação. Erros de domínio/remetente são registrados com **código do provedor, sem conteúdo do feedback**, e mostrados como falha de configuração (não como suposta confirmação de envio). Verificar `Email Service > Email Sending` e `Activity Log` na conta Cloudflare PROD. Não alterar registros DNS existentes automaticamente.
+- **DEV:** usa **Resend API** via HTTPS, sem Email Routing, e envia diretamente para **`suporte.roteiva@gmail.com`**. Não usa o domínio remetente PROD, token PROD nem conta Cloudflare PROD. Para testes, o remetente é `Roteiva DEV <onboarding@resend.dev>` (sandbox Resend), permitido **somente quando o e-mail da conta Resend for o destinatário**, neste caso `suporte.roteiva@gmail.com`. Resend tem quotas gratuitas; acompanhe o painel da conta.
+- Para habilitar DEV, criar conta em https://resend.com com **`suporte.roteiva@gmail.com`**, criar API Key com somente permissão de envio e gravar como **secret do Worker DEV** `RESEND_API_KEY` na conta Cloudflare DEV (por painel ou `npx wrangler secret put RESEND_API_KEY --env dev` com credenciais DEV). Não adicionar a chave em `wrangler.jsonc`, `vars`, código, GitHub ou frontend. O próximo deploy do Worker preserva secrets já configurados.
+- Enquanto esse secret não for configurado, DEV mostra **indisponível**, sem falsas confirmações nem chamadas externas. No PROD o fluxo não usa Resend.
+- Se futuramente for necessário enviar DEV de outro remetente, configurar um domínio verificado na Resend e revisar explicitamente a política de origem, sem compartilhar a identidade de PROD.
 
-Para envio real em DEV, é necessária decisão separada: subdomínio delegado/remetente próprio, ou serviço/proxy de e-mail com chave restrita. Não reutilizar segredos PROD no DEV.
+## Tentativas, idempotência e diagnóstico
+
+- O backend mantém o limite de **3 mensagens aceitas/em processamento por usuário em 24 horas**, e também **até 10 registros iniciados em 24 horas**, inclusive erros. Cada tentativa é reservada atomicamente no D1.
+- Provedor que respondeu com erro **definitivo e não aceitou** o e-mail: status `failed`, `retry_safe=1`. O usuário pode tentar novamente, até 3 vezes no mesmo protocolo, preservando o controle de limite diário.
+- Resultado **incerto** (timeout, falha de rede, resposta sem confirmação, falha após aceitação): fica em `sending`, não é reenviado automaticamente; o frontend cria uma nova chave apenas quando o usuário **clica novamente**, avisando sobre possível duplicação.
+- Linhas antigas marcadas `failed` não ganham automaticamente permissão de retry; poderiam ter sido efetivamente entregues. A migração 0033 é aditiva.
+- Resend DEV envia `Idempotency-Key` do protocolo na API para proteger duplicatas dentro da janela documentada de 24 horas.
+- Para verificar falhas Cloudflare, filtrar logs estruturados pelo evento `feedback_email_send_rejected`, com `providerCode` e `reportId`; não registra e-mail, JWT, corpo nem anexos.
 
 ## Rollout, segurança e privacidade
 
-- PR com testes frontend e Worker -> revisão -> deploy DEV sem envio externo.
+- PR com testes frontend e Worker -> revisão -> deploy DEV; envio direto em DEV só depois de configurar o secret Resend.
 - Verificar Email Service/Gmail na conta PROD -> promoção protegida -> teste real da caixa de entrada.
 - Nenhum segredo adicionado ao código/GitHub. Nunca enviar arquivos, tokens ou conteúdo de feedback aos logs.
 - Dados D1 são apagados pelo fluxo de exclusão da conta. O e-mail recebido no Gmail NÃO é apagado automaticamente; definir retenção e tratar pedidos de exclusão nessa caixa.
