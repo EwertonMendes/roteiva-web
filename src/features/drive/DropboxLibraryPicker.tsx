@@ -22,7 +22,7 @@ function mimeByName(name:string){
 }
 /** Provider metadata stays cached by owner and connection; selected items survive folder navigation. */
 export function DropboxLibraryPicker({connectionId,onClose,onSelect,includeFolders=false}:{connectionId:string;onClose:()=>void;onSelect:(ids:string[],names:Map<string,string>,folders:Set<string>)=>void;includeFolders?:boolean}){
- const call=useDriveApi(),dialog=useOverlayFocus(onClose),{user}=useAuth();
+ const call=useDriveApi(),{user}=useAuth();
  const getThumbnail=useStorageThumbnailFetch('dropbox');
  const [trail,setTrail]=useState([{id:'root',name:'Meu Dropbox'}]),[loaded,setPage]=useState<(Page&{scope:string})|null>(null);
  const [selected,setSelected]=useState<Map<string,string>>(new Map()),[loading,setLoading]=useState(true),[paging,setPaging]=useState(false);
