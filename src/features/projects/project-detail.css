@@ -103,7 +103,7 @@
 .project-detail .pd-checklist{display:flex;flex-direction:column;min-height:0}
 .project-detail .pd-checklist>.pd-section-head{flex-shrink:0}
 .project-detail .pd-tasks{
- flex:0 1 auto;min-height:0;max-height:calc(6 * 54px);
+ flex:0 1 auto;min-height:0;max-height:324px;
  overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;
  scrollbar-color:var(--muted) transparent;
 }
