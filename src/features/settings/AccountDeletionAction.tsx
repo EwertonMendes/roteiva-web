@@ -105,7 +105,7 @@ export function AccountDeletionAction(){
     {opened&&<AppModal size="medium" className="account-delete-dialog" onCloseRequest={dismiss}
       aria-labelledby="delete-title" aria-describedby="delete-desc">
       <div className="rt-modal__layout">
-        <AppModalHeader icon={<ModalShieldAlert size={26}/>} title="Excluir sua conta?" titleId="delete-title"
+        <AppModalHeader icon={<ModalShieldAlert size={26}/>} title="Excluir sua conta?" titleId="delete-title" description="Confira os dados antes de confirmar esta ação permanente."
           eyebrow="CONFIRMAÇÃO DE SEGURANÇA" onClose={dismiss} closeDisabled={busy}/>
         <AppModalBody>
         <p id="delete-desc">Esta ação é <strong>permanente</strong>. Seu perfil, projetos, clientes, agenda, financeiro e demais informações no Roteiva serão eliminados. Não será possível recuperá-los. Um marcador pseudonimizado da identidade utilizada no teste gratuito será preservado para evitar novas concessões gratuitas.</p>
