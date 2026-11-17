@@ -1,3 +1,4 @@
+import {ShieldCheck as ModalShieldCheck} from "lucide-react";
 import { API_BASE_URL } from "../../lib/environment.ts";
 import {AppInput} from "../ui/AppInput";
 import {AppButton} from "../ui/AppButton";
@@ -174,7 +175,7 @@ export function ReviewOwnerWorkspace({detail,working,error,onClose,onRevise,onPu
     mediaRef.current?.scrollIntoView({behavior:"smooth",block:"nearest"});
   }
   return <>
-    <AppModalHeader title={review.title}
+    <AppModalHeader icon={<ModalShieldCheck size={26}/>} title={review.title}
       eyebrow={"APROVAÇÕES / "+review.clientName+" / V"+review.version}
       description={<>{review.projectName} <span aria-hidden="true">·</span> {review.clientName}</>}
       onClose={onClose} closeDisabled={working}/>
