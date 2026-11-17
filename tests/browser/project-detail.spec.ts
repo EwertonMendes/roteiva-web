@@ -136,7 +136,9 @@ test('project detail: tasks, drafts, finance, agenda, materials and responsive t
   await page.getByRole('button',{name:'Abrir Biblioteca',exact:true}).click();
   await expect(page).toHaveURL(/#\/biblioteca$/);
   await page.goto(base+'/#/projetos');
-  await page.getByRole('button',{name:'Criar projeto'}).click();
+  await page.reload();
+  await expect(page.locator('.project-detail')).toHaveCount(0);
+  await page.locator('.heading-actions').getByRole('button',{name:'Criar projeto',exact:true}).click();
   const create=page.locator('.project-modal').filter({hasText:'Comece uma nova produção'});
   await expect(create).toBeVisible();
   await expect(create.locator('input[type="date"]')).toHaveCount(0);
