@@ -111,7 +111,7 @@ export function LibraryReviewDemo() {
       onMore={()=>{}} onLink={linkMultiple} onConnect={()=>{}}/>}
     {removeId&&<AppModal size="compact" aria-label="Desvincular pasta" onCloseRequest={()=>setRemoveId(null)}>
       <div className="rt-modal__layout">
-       <AppModalHeader icon={<ModalUnlink size={26}/>} title={<>Desvincular “{folders.find(f=>f.id===removeId)?.name}”?</>}
+       <AppModalHeader icon={<ModalUnlink size={26}/>} description="O vínculo será removido sem excluir arquivos originais." title={<>Desvincular “{folders.find(f=>f.id===removeId)?.name}”?</>}
          onClose={()=>setRemoveId(null)}/>
        <AppModalBody><p>A pasta não ficará mais vinculada neste exemplo. Nenhum arquivo é apagado.</p></AppModalBody>
        <AppModalFooter><AppButton type="button" variant="secondary" onClick={()=>setRemoveId(null)}>Manter pasta</AppButton>
