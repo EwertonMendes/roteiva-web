@@ -7,7 +7,7 @@ on:
         type: choice
         required: true
         default: full
-        options: [full, library, overview, sidebar, drive, pointer, review, money, finance, calendar, controls, workspace, prod-blockers]
+        options: [full, library, overview, sidebar, drive, pointer, review, money, finance, calendar, controls, covers, workspace, prod-blockers]
   schedule:
     - cron: '20 7 * * *'
 permissions:
@@ -84,6 +84,9 @@ jobs:
       - name: Validate shared inputs, selects and dialogs (desktop and mobile)
         if: github.event_name == 'workflow_dispatch' && inputs.suite == 'controls'
         run: pnpm exec firebase emulators:exec --project demo-roteiva --only auth,firestore "pnpm exec playwright test tests/browser/ui-controls.spec.ts tests/browser/settings-layout.spec.ts tests/browser/money-input.spec.ts tests/browser/semantic-icons.spec.ts"
+      - name: Validate shared cover editor search and persistence (desktop/mobile)
+        if: github.event_name == 'workflow_dispatch' && inputs.suite == 'covers'
+        run: pnpm exec firebase emulators:exec --project demo-roteiva --only auth,firestore "pnpm exec playwright test tests/browser/project-covers.spec.ts"
       - name: Validate workspace navigation and retired JSON export in desktop/mobile
         if: github.event_name == 'workflow_dispatch' && inputs.suite == 'workspace'
         run: pnpm exec firebase emulators:exec --project demo-roteiva --only auth,firestore "pnpm exec playwright test tests/browser/workspace.spec.ts"
@@ -97,7 +100,7 @@ jobs:
           pnpm exec firebase emulators:exec --project demo-roteiva --only auth,firestore \
             'pnpm exec playwright test tests/browser/access.spec.ts tests/browser/project-detail.spec.ts tests/browser/reviews-workflow.spec.ts tests/browser/workspace.spec.ts --grep "a second tab restores|project detail: tasks|profissional cria, cliente comenta|Google emulator session, CRUD" --reporter=line'
       - name: Backend saga with isolated D1 and Firebase emulators
-        if: github.event_name != 'workflow_dispatch' || !contains(fromJSON('["library","overview","sidebar","pointer","review","money","finance","calendar","controls","workspace","prod-blockers"]'), inputs.suite)
+        if: github.event_name != 'workflow_dispatch' || !contains(fromJSON('["library","overview","sidebar","pointer","review","money","finance","calendar","controls","covers","workspace","prod-blockers"]'), inputs.suite)
         run: pnpm test:trial:e2e
       - name: Archive failure context
         if: failure()
