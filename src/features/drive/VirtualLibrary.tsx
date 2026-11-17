@@ -354,7 +354,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject,initi
    <div className="rt-modal__layout">
      <AppModalHeader title="Contas de armazenamento" titleId="vl-accounts-title" descriptionId="vl-accounts-description"
        description="Gerencie o acesso aos seus arquivos em um só lugar."
-       onClose={()=>setSettingsOpen(false)} actions={
+       onClose={()=>setSettingsOpen(false)} closeLabel="Fechar contas" actions={
          <AppButton type="button" variant="secondary" controlSize="sm" aria-label="Atualizar contas"
            title="Atualizar contas" disabled={storage.loading} onClick={()=>void storage.refresh(true)}>
            <RefreshCw size={18} className={storage.loading?'vl-loading':''} aria-hidden="true"/>
