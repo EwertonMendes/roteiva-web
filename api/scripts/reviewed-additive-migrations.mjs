@@ -14,6 +14,7 @@ export const reviewedAdditiveMigrations=Object.freeze({
   '0028_drive_resource_keys.sql':'e9c6e772d62e215db892ee2baf7446e8ab92a04c',
   '0029_review_source_checks.sql':'461f8ba9cb23afd010a35f6c10691980db2f61d3',
   '0030_review_source_checksum.sql':'09cc99c00692dde60dd8b766b8ac97ba5326a9b3',
+  '0033_feedback_retry_safety.sql':'eb4cd1b8e65c77ce2f95042ab6d0e1a31d7bde05',
 });
 
 export function gitBlobSha(content){
