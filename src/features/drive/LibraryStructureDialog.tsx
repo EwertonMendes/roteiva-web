@@ -1,3 +1,4 @@
+import {FolderTree as ModalFolderTree} from "lucide-react";
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {AppButton} from '../ui/AppButton';
 import {AppTextarea} from '../ui/AppTextarea';
@@ -21,7 +22,7 @@ export function LibraryStructureDialog({projectId,parentId,onClose,onApplied}:{p
  return <AppModal size="medium" onCloseRequest={()=>{if(!busy)onClose();}}
    aria-labelledby="library-structure-title" className="virtual-library-editor">
   <div className="rt-modal__layout">
-  <AppModalHeader title="Criar uma estrutura de pastas" titleId="library-structure-title"
+  <AppModalHeader icon={<ModalFolderTree size={26}/>} title="Criar uma estrutura de pastas" titleId="library-structure-title"
     description="As pastas serão criadas dentro da pasta atual do Roteiva. Os originais no Drive e Dropbox permanecem no mesmo lugar."
     onClose={onClose} closeDisabled={busy}/>
   <AppModalBody>
