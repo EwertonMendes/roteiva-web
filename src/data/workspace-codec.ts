@@ -49,10 +49,14 @@ export function decodeWorkspace(records: Records): WorkspaceData {
     if (collection === "activities") workspace.activities.push(d as WorkspaceData["activities"][number]);
   }
   for (const [path,d] of records) {
-    if (path.startsWith("tasks/")) workspace.projects.find(p=>p.id===d.projectId)?.tasks?.push({id:Number(d.id),title:String(d.title),done:!!d.done});
+    if (path.startsWith("tasks/")) workspace.projects.find(p=>p.id===d.projectId)?.tasks?.push({id:Number(d.id),title:String(d.title),done:!!d.done,...(typeof d.order==='number'&&Number.isSafeInteger(d.order)&&d.order>=0?{order:d.order}:{})});
     if (path.startsWith("deliveries/")) workspace.clients.find(c=>c.id===d.clientId)?.deliveries?.push({id:Number(d.id),title:String(d.title),month:String(d.month),done:!!d.done});
   }
-  for (const p of workspace.projects) p.progress = p.tasks?.length ? Math.round(p.tasks.filter(t=>t.done).length/p.tasks.length*100) : 0;
+  for (const p of workspace.projects){
+    // Old documents without a position retain their existing stable relative order.
+    p.tasks?.sort((a,b)=>(a.order??Number.MAX_SAFE_INTEGER)-(b.order??Number.MAX_SAFE_INTEGER));
+    p.progress=p.tasks?.length?Math.round(p.tasks.filter(t=>t.done).length/p.tasks.length*100):0;
+  }
   workspace.activities.sort((a,b)=>b.when.localeCompare(a.when));
   return workspace;
 }
