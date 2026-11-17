@@ -1,7 +1,7 @@
 import {useId,useRef,useState} from "react";
 import {createPortal} from "react-dom";
-import {AlertTriangle,Check,X} from "lucide-react";
-import {AppDialog} from "./AppDialog";
+import {AlertTriangle,Check} from "lucide-react";
+import {AppModal,AppModalHeader,AppModalBody,AppModalFooter} from "./AppModal";
 import {AppButton} from "./AppButton";
 
 export type ConfirmationDialogProps={
@@ -32,21 +32,23 @@ export function ConfirmationDialog({
       setError(cause instanceof Error?cause.message:"Não foi possível concluir. Tente novamente.");
     }finally{pending.current=false;setBusy(false);}
   }
-  return createPortal(<AppDialog className="rt-confirm-dialog"
+  return createPortal(<AppModal size="compact" className="rt-confirm-dialog"
     aria-labelledby={titleId} aria-describedby={descriptionId}
     onCloseRequest={()=>{if(!pending.current)onCancel();}}>
-    <div className={"rt-confirm-symbol"+(tone==="danger"?" rt-confirm-symbol--danger":"")} aria-hidden="true">
-      {tone==="danger"?<AlertTriangle size={23}/>:<Check size={23}/>}
+    <div className="rt-modal__layout">
+      <AppModalHeader title={title} titleId={titleId} description={description} descriptionId={descriptionId}
+        onClose={onCancel} closeDisabled={busy} closeLabel="Fechar confirmação"
+        icon={<span className={"rt-confirm-symbol"+(tone==="danger"?" rt-confirm-symbol--danger":"")}>
+          {tone==="danger"?<AlertTriangle size={23}/>:<Check size={23}/>}
+        </span>}/>
+      <AppModalBody>
+        {error&&<p className="rt-confirm-error" role="alert">{error}</p>}
+      </AppModalBody>
+      <AppModalFooter>
+        <AppButton type="button" variant="secondary" disabled={busy} onClick={onCancel}>{cancelLabel}</AppButton>
+        <AppButton type="button" variant={tone==="danger"?"danger":"primary"} loading={busy}
+          onClick={()=>void confirm()}>{busy?"Processando…":confirmLabel}</AppButton>
+      </AppModalFooter>
     </div>
-    <AppButton type="button" className="rt-confirm-close" aria-label="Fechar confirmação"
-      disabled={busy} onClick={onCancel}><X size={19}/></AppButton>
-    <h2 id={titleId}>{title}</h2>
-    <p id={descriptionId}>{description}</p>
-    {error&&<p className="rt-confirm-error" role="alert">{error}</p>}
-    <div className="rt-confirm-actions">
-      <AppButton type="button" className="rt-confirm-cancel" disabled={busy} onClick={onCancel}>{cancelLabel}</AppButton>
-      <AppButton type="button" className={"rt-confirm-submit"+(tone==="danger"?" rt-confirm-submit--danger":"")} loading={busy}
-        onClick={()=>void confirm()}>{busy?"Processando…":confirmLabel}</AppButton>
-    </div>
-  </AppDialog>,document.body);
+  </AppModal>,document.body);
 }
