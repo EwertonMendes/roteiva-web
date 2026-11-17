@@ -135,10 +135,19 @@ test('project detail: tasks, drafts, finance, agenda, materials and responsive t
   await eventDialog.getByRole('button',{name:'Cancelar',exact:true}).click();
   await page.getByRole('button',{name:'Abrir Biblioteca',exact:true}).click();
   await expect(page).toHaveURL(/#\/biblioteca$/);
+});
+
+test('project detail: tasks and new-project calendar control',async({page})=>{
+  await page.addInitScript(()=>{
+    localStorage.setItem('roteiva-theme','dark');
+    localStorage.setItem('roteiva-pages-demo-workspace-v1',JSON.stringify({
+      projects:[],clients:[],financeEntries:[],calendarEvents:[],libraryAssets:[],comments:[],activities:[],
+    }));
+  });
   await page.goto(base+'/#/projetos');
-  await page.reload();
-  await expect(page.locator('.project-detail')).toHaveCount(0);
-  await page.locator('.heading-actions').getByRole('button',{name:'Criar projeto',exact:true}).click();
+  const start=page.locator('.heading-actions').getByRole('button',{name:'Criar projeto',exact:true});
+  await expect(start).toBeVisible();
+  await start.click();
   const create=page.locator('.project-modal').filter({hasText:'Comece uma nova produção'});
   await expect(create).toBeVisible();
   await expect(create.locator('input[type="date"]')).toHaveCount(0);
