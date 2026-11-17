@@ -186,7 +186,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     const previousTasks=new Map((old?.tasks||[]).map(t=>[t.id,t]));
     for(const task of updated.tasks||[]){
       const was=previousTasks.get(task.id);
-      if(!was || was.title!==task.title || was.done!==task.done)
+      if(!was || was.title!==task.title || was.done!==task.done || was.order!==task.order)
         commands.push({kind:"saveTask",projectId:updated.id,task});
       previousTasks.delete(task.id);
     }
