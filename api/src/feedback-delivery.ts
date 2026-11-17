@@ -7,8 +7,14 @@ export type FeedbackMail={
 };
 
 export class FeedbackDeliveryFailure extends Error{
-  constructor(public code:string,public safeToRetry:boolean,public status=503){
+  code:string;
+  safeToRetry:boolean;
+  status:number;
+  constructor(code:string,safeToRetry:boolean,status=503){
     super(code);
+    this.code=code;
+    this.safeToRetry=safeToRetry;
+    this.status=status;
   }
 }
 const DESTINATION='suporte.roteiva@gmail.com';
