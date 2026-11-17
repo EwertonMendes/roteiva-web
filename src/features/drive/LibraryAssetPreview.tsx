@@ -1,3 +1,4 @@
+import {FileImage as ModalFileImage} from "lucide-react";
 import {useEffect,useRef,useState} from 'react';
 import {AlertCircle,Expand,FileAudio,LoaderCircle,Minimize,RefreshCcw,Volume2} from 'lucide-react';
 import {useAuth} from '../auth/AuthProvider';
@@ -104,7 +105,7 @@ export function LibraryAssetPreview({projectId,node,onClose}:{projectId:number;n
  };
  return <AppModal size="full" onCloseRequest={requestClose} aria-label={'Prévia de '+node.name}
    className={'virtual-library-editor virtual-library-preview vl-preview-modal'+(expanded?' is-expanded':'')}>
-   <AppModalHeader title={node.name} onClose={onClose} closeLabel="Fechar prévia"
+   <AppModalHeader icon={<ModalFileImage size={26}/>} title={node.name} onClose={onClose} closeLabel="Fechar prévia"
      actions={!image&&<AppButton variant="secondary" controlSize="sm" type="button"
        aria-label={expanded?'Sair da tela cheia':'Visualizar em tela cheia'} aria-pressed={expanded}
        title={expanded?'Sair da tela cheia':'Visualizar em tela cheia'}
