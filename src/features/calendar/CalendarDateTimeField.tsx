@@ -1,4 +1,4 @@
-import {useEffect,useId,useRef,useState,type KeyboardEvent} from "react";
+import {useEffect,useId,useLayoutEffect,useRef,useState,type KeyboardEvent} from "react";
 import {CalendarDays,ChevronLeft,ChevronRight,Check,Clock3,X} from "lucide-react";
 import {AppButton} from "../ui/AppButton";
 import {AppInput} from "../ui/AppInput";
@@ -8,15 +8,46 @@ import {dateInputError,maskDateText,maskTimeText,normalizeTimeText,parseDateText
 const MONTHS=["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 const WEEKDAYS=["D","S","T","Q","Q","S","S"];
 
-function useOutsideDismiss(ref:React.RefObject<HTMLDivElement|null>,open:boolean,close:()=>void){
-  useEffect(()=>{
-    if(!open)return;
-    function onPointer(event:PointerEvent){
-      if(event.target instanceof Node&&!ref.current?.contains(event.target))close();
-    }
-    document.addEventListener("pointerdown",onPointer);
-    return ()=>document.removeEventListener("pointerdown",onPointer);
-  },[ref,open,close]);
+/** Native popovers live in the browser top layer, above clipped cards
+ * and scrolling modals, while keeping the same Roteiva visual component. */
+function useCalendarPopover(root:React.RefObject<HTMLDivElement|null>,popup:React.RefObject<HTMLDivElement|null>,open:boolean,close:()=>void){
+ const dismiss=useRef(close);dismiss.current=close;
+ useLayoutEffect(()=>{
+  const anchor=root.current,layer=popup.current;
+  if(!open||!anchor||!layer)return;
+  if(!layer.matches(':popover-open'))layer.showPopover();
+  const position=()=>{
+   if(!layer.matches(':popover-open'))return;
+   const rect=anchor.getBoundingClientRect(),width=layer.getBoundingClientRect().width||286,height=layer.scrollHeight;
+   const below=Math.max(0,innerHeight-rect.bottom-12),aboveRoom=Math.max(0,rect.top-12);
+   const above=height>below&&aboveRoom>below;
+   const maxHeight=Math.max(100,Math.min(height,above?aboveRoom:below,innerHeight-20));
+   const top=above?rect.top-maxHeight-8:rect.bottom+8;
+   layer.style.left=Math.max(8,Math.min(rect.left,innerWidth-width-8))+'px';
+   layer.style.top=Math.max(8,Math.min(top,innerHeight-maxHeight-8))+'px';
+   layer.style.maxHeight=maxHeight+'px';
+  };
+  position();
+  const outside=(event:globalThis.PointerEvent)=>{
+   if(event.target instanceof Node&&!anchor.contains(event.target)&&!layer.contains(event.target))dismiss.current();
+  };
+  const escape=(event:globalThis.KeyboardEvent)=>{
+   if(event.key!=='Escape')return;
+   event.preventDefault();event.stopPropagation();dismiss.current();
+   (anchor.querySelector('.calendar-picker-toggle') as HTMLButtonElement|null)?.focus();
+  };
+  document.addEventListener('pointerdown',outside);
+  document.addEventListener('keydown',escape,true);
+  window.addEventListener('resize',position);
+  window.addEventListener('scroll',position,true);
+  return ()=>{
+   document.removeEventListener('pointerdown',outside);
+   document.removeEventListener('keydown',escape,true);
+   window.removeEventListener('resize',position);
+   window.removeEventListener('scroll',position,true);
+   if(layer.matches(':popover-open'))layer.hidePopover();
+  };
+ },[open,root,popup]);
 }
 function displayDate(iso:string){
   if(!isValidCivilDate(iso))return "";
@@ -40,9 +71,11 @@ export function CalendarDateField({value,onChange,showValidation=false,optional=
   const input=useRef<HTMLInputElement>(null);
   const trigger=useRef<HTMLButtonElement>(null);
   const popupId=useId();
+  const popup=useRef<HTMLDivElement>(null);
+  useCalendarPopover(root,popup,open,()=>setOpen(false));
   // A partial date keeps its text while the parent receives an invalid (empty) value.
   useEffect(()=>{if(value&&isValidCivilDate(value))setDraft(displayDate(value));},[value]);
-  useOutsideDismiss(root,open,()=>setOpen(false));
+
   const year=cursor.getFullYear(),month=cursor.getMonth();
   const selected=isValidCivilDate(value)?value:todayKey();
   const [focused,setFocused]=useState(selected);
@@ -88,7 +121,7 @@ export function CalendarDateField({value,onChange,showValidation=false,optional=
         onClick={reveal}><CalendarDays size={20}/></AppButton>
     </div>
     <span className="calendar-field-feedback" id={helpId} aria-live="polite">{fieldError}</span>
-    {open&&<div id={popupId} role="dialog" aria-label="Escolher data" className="calendar-picker-popover calendar-date-popover">
+    {open&&<div id={popupId} ref={popup} popover="manual" role="dialog" aria-label="Escolher data" className="calendar-picker-popover calendar-date-popover">
       <div className="calendar-picker-top">
         <strong>{MONTHS[month]} {year}</strong>
         <div><AppButton type="button" aria-label="Mês anterior" onClick={()=>setCursor(new Date(year,month-1,1,12))}><ChevronLeft size={17}/></AppButton>
@@ -119,7 +152,9 @@ export function CalendarTimeField({value,onChange,optional=false,label,showValid
   const root=useRef<HTMLDivElement>(null);
   const trigger=useRef<HTMLButtonElement>(null);
   const popupId=useId();
-  useOutsideDismiss(root,open,()=>setOpen(false));
+  const popup=useRef<HTMLDivElement>(null);
+  useCalendarPopover(root,popup,open,()=>setOpen(false));
+
   const valid=/^([01]\d|2[0-3]):[0-5]\d$/.test(value);
   const hour=valid?Number(value.slice(0,2)):9;
   const minute=valid?Number(value.slice(3,5)):0;
@@ -140,7 +175,7 @@ export function CalendarTimeField({value,onChange,optional=false,label,showValid
         onClick={()=>setOpen(v=>!v)}><Clock3 size={20}/></AppButton>
     </div>
     <span className="calendar-field-feedback" id={helpId} aria-live="polite">{fieldError}</span>
-    {open&&<div id={popupId} role="dialog" className="calendar-picker-popover calendar-time-popover" aria-label={"Selecionar "+label.toLowerCase()}>
+    {open&&<div id={popupId} ref={popup} popover="manual" role="dialog" className="calendar-picker-popover calendar-time-popover" aria-label={"Selecionar "+label.toLowerCase()}>
       <div className="calendar-time-title"><Clock3 size={17}/><strong>Escolher horário</strong></div>
       <div className="calendar-time-columns">
         <div><span>Hora</span><div className="calendar-time-options" role="group" aria-label="Horas">{Array.from({length:24},(_,i)=><AppButton key={i} type="button"
