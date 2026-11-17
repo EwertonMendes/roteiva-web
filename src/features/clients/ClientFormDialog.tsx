@@ -1,3 +1,4 @@
+import {UsersRound as ModalUsersRound} from "lucide-react";
 import {AppInput} from "../ui/AppInput";
 import {AppButton} from "../ui/AppButton";
 import {useState,type FormEvent} from "react";
@@ -13,7 +14,7 @@ export function ClientFormDialog({client,onClose,onSubmit}:Props){
  return <AppModal size="wide" className="cd-form-dialog" onCloseRequest={onClose}
   aria-labelledby="cd-form-title" aria-describedby="cd-form-description">
    <form className="rt-modal__layout cd-form" onSubmit={onSubmit}>
-     <AppModalHeader title={client?"Atualize os dados do cliente":"Cadastre um novo cliente"}
+     <AppModalHeader icon={<ModalUsersRound size={26}/>} title={client?"Atualize os dados do cliente":"Cadastre um novo cliente"}
        titleId="cd-form-title" descriptionId="cd-form-description"
        eyebrow={client?"EDITAR CLIENTE":"NOVO CLIENTE"}
        description="Defina o perfil para acompanhar recorrência e histórico de trabalhos."
