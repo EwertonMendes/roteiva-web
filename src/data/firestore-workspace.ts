@@ -45,7 +45,10 @@ export function dataErrorMessage(error: unknown): string {
   if (code.includes("unauthenticated")) return "Sua sessão expirou. Saia e entre novamente.";
   if (code.includes("unavailable") || code.includes("deadline-exceeded")) return "Sem conexão com o serviço. As alterações não foram confirmadas. Reconecte e recarregue os dados.";
   if (code.includes("resource-exhausted")) return "O Roteiva está temporariamente indisponível. Tente novamente mais tarde.";
-  return error instanceof Error && error.message.startsWith("Conflito") ? error.message : "Não foi possível salvar ou carregar os dados. Recarregue para recuperar a versão salva.";
+  if (code.includes("failed-precondition") || code.includes("unimplemented"))
+    return "O armazenamento local do navegador não pôde ser iniciado. Tente novamente em uma aba normal ou outro navegador.";
+  if (code.includes("invalid-argument")) return "A resposta do serviço foi inesperada. Tente novamente ou entre em contato com o suporte.";
+  return error instanceof Error && error.message.startsWith("Conflito") ? error.message : "Não foi possível concluir a operação. Tente novamente; se persistir, contate o suporte.";
 }
 export class FirestoreWorkspace {
   private stored = new Map<string, Stored>();
