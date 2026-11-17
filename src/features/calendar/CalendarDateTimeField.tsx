@@ -191,3 +191,50 @@ export function CalendarTimeField({value,onChange,optional=false,label,showValid
     </div>}
   </div>;
 }
+
+/** Month-only variant of the shared calendar control for recurring client work. */
+export function CalendarMonthField({value,onChange,label="Mês do pacote"}:{
+ value:string;onChange:(value:string)=>void;label?:string;
+}){
+ const date=new Date();
+ const initialYear=/^(19|20)\d{2}-(0[1-9]|1[0-2])$/.test(value)?Number(value.slice(0,4)):date.getFullYear();
+ const [cursorYear,setCursorYear]=useState(initialYear),[open,setOpen]=useState(false);
+ const root=useRef<HTMLDivElement>(null),popup=useRef<HTMLDivElement>(null),trigger=useRef<HTMLButtonElement>(null);
+ const id=useId();
+ useCalendarPopover(root,popup,open,()=>setOpen(false));
+ const month=Number(value.slice(5,7));
+ const display=month>=1&&month<=12?MONTHS[month-1]+' de '+value.slice(0,4):'Selecione um mês';
+ function selectMonth(year:number,monthIndex:number){
+  onChange(String(year)+'-'+String(monthIndex+1).padStart(2,'0'));
+  setOpen(false);trigger.current?.focus();
+ }
+ return <div className="calendar-picker calendar-month-picker" ref={root}>
+  <div className="calendar-picker-control">
+   <AppInput type="text" aria-label={label} readOnly value={display} aria-haspopup="dialog"
+    onClick={()=>setOpen(current=>!current)}
+    onKeyDown={event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();setOpen(true);}}}/>
+   <AppButton ref={trigger} type="button" className="calendar-picker-toggle"
+    aria-label="Escolher mês do pacote" aria-expanded={open} aria-controls={open?id:undefined}
+    onClick={()=>setOpen(current=>!current)}><CalendarDays size={20}/></AppButton>
+  </div>
+  {open&&<div ref={popup} id={id} popover="manual" role="dialog" aria-label="Escolher mês"
+    className="calendar-picker-popover calendar-month-popover">
+   <div className="calendar-picker-top"><strong>{cursorYear}</strong>
+    <div><AppButton type="button" aria-label="Ano anterior" disabled={cursorYear<=1900}
+      onClick={()=>setCursorYear(y=>Math.max(1900,y-1))}><ChevronLeft size={17}/></AppButton>
+     <AppButton type="button" aria-label="Próximo ano" disabled={cursorYear>=2099}
+      onClick={()=>setCursorYear(y=>Math.min(2099,y+1))}><ChevronRight size={17}/></AppButton></div>
+   </div>
+   <div className="calendar-month-options">
+    {MONTHS.map((name,index)=><AppButton type="button" key={name}
+      aria-pressed={cursorYear===Number(value.slice(0,4))&&index+1===month}
+      className={cursorYear===Number(value.slice(0,4))&&index+1===month?'selected':''}
+      onClick={()=>selectMonth(cursorYear,index)}>{name}</AppButton>)}
+   </div>
+   <div className="calendar-picker-footer">
+    <AppButton type="button" onClick={()=>selectMonth(date.getFullYear(),date.getMonth())}>Este mês</AppButton>
+    <AppButton type="button" onClick={()=>{setOpen(false);trigger.current?.focus();}}>Fechar</AppButton>
+   </div>
+  </div>}
+ </div>;
+}
