@@ -15,7 +15,7 @@
   gap: 10px;
   width: 100%;
   min-width: 0;
-  min-height: 43px;
+  min-height: var(--rt-control-height, 48px);
   padding: 10px 12px 10px 14px;
   border: 1px solid var(--line);
   border-radius: 11px;
@@ -102,20 +102,14 @@
 .heading-actions > .rt-select { width: min(190px, 55vw); flex: 0 1 190px; }
 .library-toolbar .rt-select, .rl-review-project .rt-select { width: min(240px, 100%); }
 .reviews-toolbar > .rt-select { width: auto; min-width: 190px; }
-.settings-field .rt-select-trigger { min-height: 49px; }
-.rl-picker-context .rt-select-trigger { min-height: 42px; }
-.rl-account-panel .rt-select-trigger { min-height: 39px; }
 /* A filter beside a search field must not consume all available flex width. */
 .rowner-gallery-filters > .rt-select { flex: 0 0 150px; width: 150px; max-width: 48%; }
 .rowner-gallery-filters .rowner-gallery-search { flex: 1 1 0; min-width: 120px; }
-.project-detail .studio-form .rt-select-trigger { min-height: 48px; }
 @media (max-width: 700px) {
   .rowner-gallery-filters > .rt-select { flex: 1 1 100%; max-width: 100%; width: 100%; }
   .rowner-gallery-filters .rowner-gallery-search { flex: 1 1 100%; }
 }
 @media (max-width: 820px) {
-  .rt-select .rt-select-trigger { min-height: 44px; }
-  .project-modal .rt-select-trigger { min-height: 46px; }
   .rt-select-option { min-height: 44px; }
   .finance-filters .rt-select { width: 100%; }
   .reviews-toolbar > .rt-select { width: 100%; min-width: 0; }
