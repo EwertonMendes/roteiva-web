@@ -170,3 +170,12 @@
 :root .rt-modal .rt-input-frame[data-control-size="sm"] > .rt-input{
  height:100%;min-height:0;
 }
+
+/* MoneyInput is a composite: the outside frame owns focus, never its inner input. */
+:root .rt-modal .rt-modal__body .money-input > input.rt-input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):focus{
+ border:0;outline:0;box-shadow:none;background:transparent;
+}
+:root .rt-modal .rt-modal__body .money-input:focus-within{
+ border-color:var(--field-focus-border);
+ box-shadow:0 0 0 3px var(--field-focus-ring);
+}
