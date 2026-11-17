@@ -1,3 +1,4 @@
+import {FileImage as ModalFileImage} from "lucide-react";
 import { API_BASE_URL } from "../../lib/environment.ts";
 import {AppButton} from "../ui/AppButton";
 import {AppModal,AppModalHeader} from "../ui/AppModal";
@@ -51,7 +52,7 @@ function DropboxPreview({file,link,onClose,onNext,onPrevious}:{file:DriveItem;li
  const kind=state.ticket?.mimeType||file.mimeType;
  return <AppModal size="full" className="rl-preview db-preview" aria-label={'Prévia de '+file.name}
     onCloseRequest={()=>{if(!document.querySelector('.review-private-viewer.is-expanded'))onClose();}}>
-   <AppModalHeader title={file.name} description="Dropbox · Prévia protegida pelo Roteiva"
+   <AppModalHeader icon={<ModalFileImage size={26}/>} title={file.name} description="Dropbox · Prévia protegida pelo Roteiva"
      onClose={onClose} closeLabel="Fechar prévia"
      actions={<a href={dropboxWebUrl(file)} target="_blank" rel="noreferrer" className="secondary-button">
        <ExternalLink size={15}/> Abrir Dropbox</a>}/>
