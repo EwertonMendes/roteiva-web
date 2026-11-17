@@ -110,12 +110,13 @@ service cloud.firestore {
         text(d.initials,0,80) && valid_projectCover(d);
     }
     function valid_tasks(d,uid,id) {
-      return d.keys().hasAll(["ownerUid","schemaVersion","revision","createdAt","updatedAt","id","projectId","title","done"]) && d.keys().hasOnly(["ownerUid","schemaVersion","revision","createdAt","updatedAt","id","projectId","title","done"]) &&
+      return d.keys().hasAll(["ownerUid","schemaVersion","revision","createdAt","updatedAt","id","projectId","title","done"]) && d.keys().hasOnly(["ownerUid","schemaVersion","revision","createdAt","updatedAt","id","projectId","title","done","order"]) &&
         metadata(d,uid) &&
         d.id is int && d.id>0 && d.id<=9007199254740991 && string(d.id)==id &&
         d.projectId is int && d.projectId>0 && linked(uid,'projects',d.projectId) &&
         text(d.title,1,200) &&
-        d.done is bool;
+        d.done is bool &&
+        (!d.keys().hasAny(['order']) || (d.order is int && d.order>=0 && d.order<=1000000));
     }
     function valid_deliveries(d,uid,id) {
       return d.keys().hasAll(["ownerUid","schemaVersion","revision","createdAt","updatedAt","id","clientId","title","month","done"]) && d.keys().hasOnly(["ownerUid","schemaVersion","revision","createdAt","updatedAt","id","clientId","title","month","done"]) &&
