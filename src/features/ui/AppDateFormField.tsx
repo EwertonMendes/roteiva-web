@@ -1,4 +1,5 @@
 import {useState} from 'react';
+import {AppInput} from './AppInput';
 import {CalendarDateField} from '../calendar/CalendarDateTimeField';
 import {isValidCivilDate} from '../calendar/calendar-dates';
 import {parseDateText} from '../calendar/calendar-input';
@@ -22,8 +23,8 @@ export function AppDateFormField({
     <span className="rt-date-form-label">{label}</span>
     <CalendarDateField label={label} value={value} onChange={setValue}
       onDraftChange={setDraft} maxYear={maxYear} optional={optional}/>
-    <input type="hidden" name={name} value={value} readOnly/>
-    <input type="hidden" name={name+'Draft'} value={draft} readOnly/>
+    <AppInput type="hidden" name={name} value={value} readOnly/>
+    <AppInput type="hidden" name={name+'Draft'} value={draft} readOnly/>
   </div>;
 }
 
