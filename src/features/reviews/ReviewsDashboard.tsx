@@ -1,3 +1,4 @@
+import {Send as ModalSend} from "lucide-react";
 import { API_BASE_URL } from "../../lib/environment.ts";
 import {AppInput} from "../ui/AppInput";
 import {AppTextarea} from "../ui/AppTextarea";
@@ -429,7 +430,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
 
     {composer&&<AppModal size="wide" className="review-dialog review-composer-dialog" aria-label="Enviar materiais para aprovação"
       onCloseRequest={()=>{if(!working)resetComposer();}}>
-        <AppModalHeader eyebrow={"APROVAÇÕES / "+(replacement?"NOVA VERSÃO":"NOVA SOLICITAÇÃO")}
+        <AppModalHeader icon={<ModalSend size={26}/>} eyebrow={"APROVAÇÕES / "+(replacement?"NOVA VERSÃO":"NOVA SOLICITAÇÃO")}
           title={replacement?"Selecione os novos arquivos":"Enviar para aprovação"}
           description={replacement?"Escolha os arquivos da nova versão.":"Configure o acesso e selecione os materiais, sem perder o contexto."}
           onClose={resetComposer} closeDisabled={working}/>
