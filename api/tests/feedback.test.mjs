@@ -14,7 +14,7 @@ function request(overrides={}){
 }
 function configured(db){
   const sent=[];
-  const env={DB:db.DB,ENVIRONMENT:'dev',FEEDBACK_EMAIL:{async send(message){
+  const env={DB:db.DB,ENVIRONMENT:'prod',FEEDBACK_EMAIL:{async send(message){
     sent.push(message);
     return {messageId:'mail-'+sent.length};
   }}};
@@ -87,7 +87,7 @@ test('failed provider never reports success and a repeated key does not resend',
   const db=database();t.after(db.close);
   const key=crypto.randomUUID();
   let calls=0;
-  const env={DB:db.DB,ENVIRONMENT:'dev',FEEDBACK_EMAIL:{async send(){calls++;throw Error('provider unavailable secret details');}}};
+  const env={DB:db.DB,ENVIRONMENT:'prod',FEEDBACK_EMAIL:{async send(){calls++;throw Error('provider unavailable secret details');}}};
   await assert.rejects(()=>feedbackRouter(request({key}),env,'A','a@gmail.com'),error=>error.code==='feedback_delivery_unconfirmed');
   await assert.rejects(()=>feedbackRouter(request({key}),env,'A','a@gmail.com'),error=>error.code==='feedback_already_attempted');
   assert.equal(calls,1);
