@@ -87,7 +87,7 @@ test("financial entries, export, edit and month selection survive the new layout
   await enterFinance(page,"finance-actions-"+info.project.name+"@example.com");
   await page.getByRole("button",{name:"Nova receita"}).click();
   await page.getByLabel("Valor do trabalho").fill("30000");
-  await page.getByLabel("Previsão de recebimento").fill(await page.evaluate(()=>new Date().toLocaleDateString("en-CA")));
+  await page.getByLabel("Previsão de recebimento").fill(await page.evaluate(()=>new Date().toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric"})));
   await page.locator("form.finance-modal").getByRole("button",{name:"Adicionar lançamento"}).click();
   await expect(page.locator(".finance-table")).toContainText("300,00");
   await expect(page.locator(".finance-metrics .featured")).toContainText("300,00");
@@ -149,7 +149,7 @@ test("recurring revenue at 100% renders a continuous solid donut without a seam"
   await page.locator('form.finance-modal .rt-select:has(input[name="clientId"]) .rt-select-trigger').click();
   await page.getByRole("option",{name:"Recorrente do financeiro"}).click();
   await page.getByLabel("Valor do trabalho").fill("30000");
-  await page.getByLabel("Previsão de recebimento").fill(await page.evaluate(()=>new Date().toLocaleDateString("en-CA")));
+  await page.getByLabel("Previsão de recebimento").fill(await page.evaluate(()=>new Date().toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric"})));
   await page.locator("form.finance-modal").getByRole("button",{name:"Adicionar lançamento"}).click();
   await expect(page.locator(".donut b")).toHaveText("100%");
   for(const theme of ["light","dark"] as const){
