@@ -135,6 +135,33 @@ dialog.rt-parity-modal.rt-modal--full{width:min(1160px,calc(100vw - 36px))}
 .rt-parity-modal .rt-modal__body .cd-form-grid > label{
   display:flex;flex-direction:column;gap:10px;min-width:0;
 }
+/* Unified grid row contract: labels and date adapters start on the same
+   baseline. Legacy .project-modal .form-grid label sets margin-top:12px,
+   which must not apply inside the shared modal shell. */
+.rt-parity-modal .rt-modal__body .form-grid > :is(label,.rt-date-form-field){
+  display:flex;
+  flex-direction:column;
+  align-items:stretch;
+  justify-content:flex-start;
+  gap:10px;
+  min-width:0;
+  margin:0;
+}
+/* Text nodes inside <label> and the date adapter's caption share
+   the same line box; otherwise their controls drift by a few pixels. */
+.rt-parity-modal .rt-modal__body .form-grid > label,
+.rt-parity-modal .rt-modal__body .form-grid > .rt-date-form-field > .rt-date-form-label{
+  line-height:1.35;
+}
+/* The date adapter uses the same 52px field size as AppSelect/AppInput;
+   this supersedes the obsolete 48px project-only picker override, but
+   deliberately leaves the calendar widget internals and popover untouched. */
+.rt-parity-modal .rt-modal__body .form-grid > .rt-date-form-field .calendar-picker-control{
+  box-sizing:border-box;
+  height:52px;
+  min-height:52px;
+}
+
 .rt-parity-modal .rt-modal__body .cd-form-recurring{display:flex;flex-direction:column;gap:20px}
 .rt-parity-modal .rt-modal__body .cd-form-recurring > label{display:flex;flex-direction:column;gap:10px}
 .rt-parity-modal .rt-modal__body .cd-form-types{margin:0 0 20px}

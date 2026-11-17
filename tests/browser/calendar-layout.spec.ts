@@ -460,6 +460,28 @@ test("project, client and finance modals match PROD calendar heading and single-
   await page.getByRole("button",{name:"Criar projeto",exact:true}).first().click();
   await compare("dialog.rt-project-dialog");
   const project=page.locator("dialog.rt-project-dialog");
+  // A paired select/date row must share one label baseline and one field height.
+  // On mobile the grid stacks, but both controls still retain the 52px contract.
+  const alignment=await project.locator(".rt-modal__section .form-grid").first().evaluate(row=>{
+    const client=row.querySelector<HTMLElement>(":scope > label")!;
+    const due=row.querySelector<HTMLElement>(":scope > .rt-date-form-field")!;
+    const dateLabel=due.querySelector<HTMLElement>(".rt-date-form-label")!;
+    const clientControl=client.querySelector<HTMLElement>(".rt-select-trigger")!;
+    const dateControl=due.querySelector<HTMLElement>(".calendar-picker-control")!;
+    const a=client.getBoundingClientRect(),b=dateLabel.getBoundingClientRect();
+    const c=clientControl.getBoundingClientRect(),d=dateControl.getBoundingClientRect();
+    return {stacked:window.matchMedia("(max-width:700px)").matches,
+      labelTopDifference:Math.abs(a.top-b.top),
+      controlTopDifference:Math.abs(c.top-d.top),
+      clientHeight:c.height,dateHeight:d.height};
+  });
+  expect(Math.abs(alignment.clientHeight-alignment.dateHeight)).toBeLessThan(1);
+  expect(alignment.clientHeight).toBe(52);
+  expect(alignment.dateHeight).toBe(52);
+  if(!alignment.stacked){
+    expect(alignment.labelTopDifference).toBeLessThan(2);
+    expect(alignment.controlTopDifference).toBeLessThan(2);
+  }
   const date=project.locator(".calendar-picker-control").first();
   await project.getByRole("button",{name:"Abrir calendário de data"}).click();
   await expect(page.getByRole("dialog",{name:"Escolher data"})).toBeVisible();
