@@ -84,7 +84,7 @@ test('project detail: tasks, drafts, finance, agenda, materials and responsive t
   if((page.viewportSize()?.width||0)>800){
     expect(await projectPicker.evaluate(el=>el.scrollHeight-el.clientHeight)).toBeLessThanOrEqual(2);
   }
-  await detail.getByRole('textbox',{name:'Briefing',exact:true}).click();
+  await detail.getByRole('textbox',{name:'Nome do projeto',exact:true}).click();
   await expect(projectPicker).toHaveCount(0);
   await detail.getByRole('button',{name:'Abrir calendário de data'}).click();
   await expect(due).toBeFocused();
