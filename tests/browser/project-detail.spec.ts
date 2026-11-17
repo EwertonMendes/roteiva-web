@@ -76,8 +76,16 @@ test('project detail: tasks, drafts, finance, agenda, materials and responsive t
   const due=page.getByRole('textbox',{name:'Prazo do projeto'});
   await expect(due).toHaveValue('17/11/2026');
   await detail.getByRole('button',{name:'Abrir calendário de data'}).click();
-  await expect(detail.getByRole('dialog',{name:'Escolher data'})).toBeVisible();
-  await detail.getByRole('dialog',{name:'Escolher data'}).getByRole('button',{name:'Fechar'}).click();
+  const projectPicker=detail.getByRole('dialog',{name:'Escolher data'});
+  await expect(projectPicker).toBeVisible();
+  await expect(projectPicker).toHaveAttribute('popover','manual');
+  await expect(projectPicker).toHaveCSS('position','fixed');
+  await expect.poll(()=>projectPicker.evaluate(el=>{
+    const rect=el.getBoundingClientRect();
+    const hit=document.elementFromPoint(rect.left+rect.width/2,rect.top+Math.min(20,rect.height/2));
+    return !!hit&&(el===hit||el.contains(hit));
+  })).toBe(true);
+  await projectPicker.getByRole('button',{name:'Fechar'}).click();
   await due.fill('31/02/2028');
   await detail.getByRole('button',{name:'Salvar projeto'}).click();
   await expect(detail.getByRole('alert')).toContainText('Corrija a data do prazo');
@@ -100,6 +108,17 @@ test('project detail: tasks, drafts, finance, agenda, materials and responsive t
   await expect(page.getByRole('textbox',{name:'Briefing',exact:true})).toHaveValue('Rascunho preservado durante o checklist.');
   await expect(page.getByRole('combobox',{name:'Etapa',exact:true})).toContainText('Ajustes');
   await page.getByRole('button',{name:'Editar lançamento Transporte',exact:true}).click();
+  const financeModal=page.locator('.finance-modal');
+  await expect(financeModal.locator('input[type="date"]')).toHaveCount(0);
+  const financialDue=financeModal.getByRole('textbox',{name:'Vencimento do pagamento'});
+  await expect(financialDue).toHaveValue('17/11/2026');
+  await financialDue.fill('31/02/2028');
+  await financeModal.getByRole('button',{name:'Salvar alterações'}).click();
+  await expect(financeModal).toBeVisible();
+  await financialDue.fill('17/11/2026');
+  await financeModal.getByRole('button',{name:'Abrir calendário de data'}).click();
+  await expect(financeModal.getByRole('dialog',{name:'Escolher data'})).toBeVisible();
+  await financeModal.getByRole('dialog',{name:'Escolher data'}).getByRole('button',{name:'Fechar'}).click();
   await page.getByLabel('Valor do trabalho').fill('75,00');
   await page.getByRole('button',{name:'Salvar alterações',exact:true}).click();
   await expect(detail.locator('.pd-totals')).toContainText('225,00');
@@ -116,6 +135,25 @@ test('project detail: tasks, drafts, finance, agenda, materials and responsive t
   await eventDialog.getByRole('button',{name:'Cancelar',exact:true}).click();
   await page.getByRole('button',{name:'Abrir Biblioteca',exact:true}).click();
   await expect(page).toHaveURL(/#\/biblioteca$/);
+  await page.goto(base+'/#/projetos');
+  await page.getByRole('button',{name:'Criar projeto'}).click();
+  const create=page.locator('.project-modal').filter({hasText:'Comece uma nova produção'});
+  await expect(create).toBeVisible();
+  await expect(create.locator('input[type="date"]')).toHaveCount(0);
+  await create.getByRole('textbox',{name:'Nome do projeto'}).fill('Projeto de teste do datepicker');
+  const createDue=create.getByRole('textbox',{name:'Prazo'});
+  await create.getByRole('button',{name:'Abrir calendário de data'}).click();
+  const popup=create.getByRole('dialog',{name:'Escolher data'});
+  await expect(popup).toHaveAttribute('popover','manual');
+  await expect(popup).toBeVisible();
+  await expect(popup).toHaveCSS('position','fixed');
+  await popup.getByRole('button',{name:'Fechar'}).click();
+  await createDue.fill('31/02/2028');
+  await create.getByRole('button',{name:/Criar projeto/}).click();
+  await expect(create).toBeVisible();
+  await createDue.fill('22/02/2028');
+  await create.getByRole('button',{name:/Criar projeto/}).click();
+  await expect(create).toHaveCount(0);
 });
 
 
