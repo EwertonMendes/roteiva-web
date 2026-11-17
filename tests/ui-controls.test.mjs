@@ -79,3 +79,16 @@ test('library counter callback is retired and collection states are reused',()=>
     assert.match(readFileSync(new URL(path,base),'utf8'),/<CollectionState[\s>]/,path);
   }
 });
+
+test('all date inputs use the branded shared calendar picker, never browser-native date controls',()=>{
+  for(const path of walk(root)){
+    const file=relative(root,path).replaceAll('\','/');
+    const source=readFileSync(path,'utf8');
+    assert.doesNotMatch(source,/type\s*=\s*["'](?:date|datetime-local|month|week)["']/i,file+' must use the shared calendar date picker');
+  }
+  const dashboard=readFileSync(new URL('../src/dashboard-client.tsx',import.meta.url),'utf8');
+  const detail=readFileSync(new URL('../src/features/projects/ProjectDetail.tsx',import.meta.url),'utf8');
+  assert.match(dashboard,/<AppDateFormField name="due"/);
+  assert.match(dashboard,/<AppDateFormField key=\{editingFinanceEntry/);
+  assert.match(detail,/<CalendarDateField label="Prazo do projeto"/);
+});
