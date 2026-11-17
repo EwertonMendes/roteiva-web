@@ -18,8 +18,14 @@ async function api<T>(path:string,method:"GET"|"POST",body?:unknown):Promise<T>{
   const {auth}=firebaseServices();
   if(!auth.currentUser)throw new Error("Sua sessão expirou. Entre novamente.");
   const token=await auth.currentUser.getIdToken(method==="POST");
-  const r=await fetch(BASE+path,{method,headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},
-    ...(body?{body:JSON.stringify(body)}:{}),cache:"no-store"});
+  let r:Response;
+  try{
+    r=await fetch(BASE+path,{method,headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},
+      ...(body?{body:JSON.stringify(body)}:{}),cache:"no-store"});
+  }catch{
+    if(method==="GET")throw new DeletionApiError("unavailable","Não foi possível consultar o estado da conta.");
+    throw new Error("Não foi possível enviar a solicitação com segurança. Tente novamente.");
+  }
   if(!r.ok){
     const data=await r.json().catch(()=>({})) as {error?:{code?:string}};
     const code=data.error?.code||"";
