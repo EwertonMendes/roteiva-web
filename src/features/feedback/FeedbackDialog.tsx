@@ -18,9 +18,14 @@ const kinds:{value:Kind;label:string}[]=[
 ];
 const messages:Record<string,string>={
   feedback_unavailable:'O envio está sendo configurado neste ambiente.',
-  feedback_delivery_unconfirmed:'Não foi possível confirmar o envio. Guarde o protocolo e evite reenviar imediatamente.',
+  feedback_delivery_unconfirmed:'Não foi possível confirmar a entrega. O envio anterior pode ter sido recebido. Confira o histórico antes de tentar novamente.',
+  feedback_email_sender_setup:'O e-mail de suporte ainda precisa de uma configuração do remetente. Tente novamente depois que o serviço for habilitado.',
+  feedback_email_recipient_setup:'A caixa de suporte ainda precisa de verificação no serviço de e-mail.',
+  feedback_dev_email_setup:'O serviço de e-mail de DEV ainda precisa ser configurado ou autorizado.',
+  feedback_email_provider_rejected:'O serviço de e-mail rejeitou o envio. Nossa equipe precisa verificar a configuração.',
+  feedback_delivery_busy:'O serviço de e-mail está temporariamente ocupado. Tente novamente mais tarde.',
   feedback_daily_limit:'O limite de três feedbacks em 24 horas foi atingido.',
-  feedback_already_attempted:'Essa tentativa já foi processada. Confira o histórico antes de criar outra.',
+  feedback_already_attempted:'Esta tentativa anterior não pode ser reutilizada. Você já pode clicar novamente para fazer um novo envio.',
   feedback_invalid_form:'Confira o assunto, a descrição e os campos do formulário.',
   feedback_invalid_image:'Uma das imagens não é válida. Use PNG, JPEG ou WebP.',
   feedback_too_large:'O total de imagens excedeu o limite permitido.',
@@ -69,7 +74,8 @@ export function FeedbackDialog({getToken,onClose}:{getToken:()=>Promise<string>;
   const [available,setAvailable]=useState<boolean|null>(null);
   const [history,setHistory]=useState<Report[]>([]);
   const [showHistory,setShowHistory]=useState(false);
-  const [requestKey]=useState(()=>crypto.randomUUID());
+  const [requestKey,setRequestKey]=useState(()=>crypto.randomUUID());
+  const [retrying,setRetrying]=useState(false);
   const fileInput=useRef<HTMLInputElement>(null);
   const imagesRef=useRef<Preview[]>([]);
   const pending=processing||preparing;
@@ -131,7 +137,7 @@ export function FeedbackDialog({getToken,onClose}:{getToken:()=>Promise<string>;
       setError('Informe um assunto de pelo menos 5 caracteres e uma descrição com pelo menos 15.');
       return;
     }
-    setProcessing(true);setError('');
+    setProcessing(true);setError('');setRetrying(false);
     try{
       const form=new FormData();
       form.set('kind',kind);form.set('title',title.trim());form.set('description',description.trim());
@@ -146,7 +152,18 @@ export function FeedbackDialog({getToken,onClose}:{getToken:()=>Promise<string>;
       setSentId(payload.id||'');
       if(payload.id)setHistory(old=>[{id:payload.id!,kind,title,status:'sent' as const,created_at:Date.now()},...old].slice(0,15));
     }catch(reason){
+      // A new click is a deliberate new attempt. Never auto-resend after an uncertain outcome.
+      // The former key remains recorded by D1, so subsequent clicks cannot get trapped in 409.
+      setRequestKey(crypto.randomUUID());
+      setRetrying(true);
       setError(reason instanceof Error?reason.message:'Não foi possível confirmar o envio.');
+      try{
+        const token=await getToken();
+        const historyResponse=await fetch(API_BASE_URL+'/feedback',{
+          headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(10000)
+        });
+        if(historyResponse.ok){const info=await responsePayload(historyResponse);setHistory(info.items||[]);}
+      }catch{ /* An unavailable history endpoint must not erase the original error. */ }
     }finally{setProcessing(false);}
   }
   function close(){if(!pending)onClose();}
@@ -215,7 +232,7 @@ export function FeedbackDialog({getToken,onClose}:{getToken:()=>Promise<string>;
       <AppModalFooter>
         <AppButton type="button" variant="secondary" disabled={pending} onClick={close}>{sentId?'Fechar':'Cancelar'}</AppButton>
         {!sentId&&<AppButton type="submit" variant="primary" loading={pending} disabled={pending||available!==true||title.trim().length<5||description.trim().length<15}>
-          {preparing?'Preparando imagens…':processing?'Enviando…':'Enviar feedback'}
+          {preparing?'Preparando imagens…':processing?'Enviando…':retrying?'Tentar novamente':'Enviar feedback'}
         </AppButton>}
       </AppModalFooter>
     </form>
