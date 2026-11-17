@@ -80,3 +80,10 @@ test("main business dialogs use shared date, input, select, textarea and money p
   }
   assert.match(read("features/clients/ClientFormDialog.tsx"),/BrazilPhoneInput/);
 });
+
+test("compact adorned AppInput keeps its 44px frame instead of 52px modal form sizing",()=>{
+  const css=read("features/ui/app-modal.css");
+  assert.match(css,/\.rt-modal__body label > \.rt-input-frame\[data-control-size="sm"\]/);
+  assert.match(css,/height:44px;min-height:44px/);
+  assert.match(read("features/projects/CoverEditor.tsx"),/controlSize="sm" leading=\{<Search size=\{18\}\/?>\}/);
+});
