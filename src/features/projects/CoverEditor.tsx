@@ -1,3 +1,4 @@
+import {ImagePlus as ModalImagePlus} from "lucide-react";
 import { API_BASE_URL } from "../../lib/environment.ts";
 import {AppInput} from "../ui/AppInput";
 import {AppButton} from "../ui/AppButton";
@@ -153,7 +154,7 @@ export function CoverEditor({project,client,onClose,onSave}:{project?:Project;cl
  };
  return <AppModal ref={dialog} size="wide" className="pc-dialog" aria-labelledby="pc-editor-title"
    onCloseRequest={onClose}>
-  <AppModalHeader title={choosing?'Escolha uma imagem':'Encontre o melhor enquadramento'} titleId="pc-editor-title"
+  <AppModalHeader icon={<ModalImagePlus size={26}/>} title={choosing?'Escolha uma imagem':'Encontre o melhor enquadramento'} titleId="pc-editor-title"
     eyebrow={client?'FOTO DO CLIENTE':'CAPA DO PROJETO'} description={subject.name}
     onClose={onClose} closeLabel="Fechar editor de capa"/>
   <AppModalBody className={"pc-editor-body "+(choosing?"pc-editor-body--picker":"pc-editor-body--crop")}>
