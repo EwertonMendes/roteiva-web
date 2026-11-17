@@ -436,7 +436,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject,initi
  {edit&&edit.action!=='move'&&<AppModal size="compact" className="virtual-library-editor" aria-labelledby="virtual-library-title"
   onCloseRequest={()=>{if(!busy){setError('');setEdit(null);}}}>
   <form className="rt-modal__layout" onSubmit={e=>{e.preventDefault();void save();}}>
-   <AppModalHeader icon={<ModalFolderPlus size={26}/>} title={{create:'Nova pasta',rename:'Renomear',restore:'Restaurar',trash:'Remover do Roteiva'}[edit.action]}
+   <AppModalHeader icon={<ModalFolderPlus size={26}/>} description={{create:"Escolha um nome para organizar seus arquivos.",rename:"Defina o novo nome da pasta ou arquivo.",restore:"Devolva o item à sua organização.",trash:"O arquivo original permanece na conta conectada."}[edit.action]} title={{create:'Nova pasta',rename:'Renomear',restore:'Restaurar',trash:'Remover do Roteiva'}[edit.action]}
      titleId="virtual-library-title" onClose={()=>{setError('');setEdit(null);}} closeDisabled={busy}/>
    <AppModalBody>
     {error&&<div role="alert" className="virtual-library-error">{error}</div>}
