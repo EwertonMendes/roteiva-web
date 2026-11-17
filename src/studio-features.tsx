@@ -1,4 +1,5 @@
 import {AppInput} from "./features/ui/AppInput";
+import {CalendarMonthField} from "./features/calendar/CalendarDateTimeField";
 import {AppButton} from "./features/ui/AppButton";
 import {formatPhoneDisplay} from "./lib/brazil-phone";
 import {useState,type ReactNode} from "react";
@@ -10,7 +11,6 @@ import type {Project, Client, FinanceEntry} from "./dashboard-client";
 
 export const money = (v: number) => new Intl.NumberFormat("pt-BR", {style: "currency", currency: "BRL"}).format(v);
 export const isoDate = toISO;
-const today = () => new Date().toLocaleDateString("en-CA");
 const sum = sumMoney;
 export const projectTemplates: Record<string, string[]> = {
   "Livre": [],
@@ -24,7 +24,10 @@ function Back({onClick}: {onClick: () => void}) { return <AppButton className="s
 export function ClientDetail({client, projects, entries, onBack, onEdit, onProject, onSave, onReview}: {onReview?:()=>void;onSave: (client:Client) => void; client: Client; projects: Project[]; entries: FinanceEntry[]; onBack: () => void; onEdit: (c: Client) => void; onProject: (id:number) => void}) {
   const linked = projects.filter(p => p.clientId === client.id || (!p.clientId && p.client === client.name));
   const finances = entries.filter(e => e.clientId === client.id && e.kind !== "expense");
-  const [month,setMonth] = useState(today().slice(0,7));
+  const [month,setMonth] = useState(()=>{
+    const now=new Date();
+    return now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  });
   const deliveries = (client.deliveries || []).filter(d => d.month === month);
   const completed = deliveries.filter(d => d.done).length;
   function prepareDeliveries() {
@@ -34,7 +37,7 @@ export function ClientDetail({client, projects, entries, onBack, onEdit, onProje
     onSave({...client,deliveries:[...existing,...Array.from({length:needed},(_,i)=>({id:newId()+i,title:`Entrega ${deliveries.length+i+1}`,month,done:false}))]});
   }
   return <div className="studio-detail"><div className="studio-toolbar"><Back onClick={onBack}/>{onReview&&<AppButton className="secondary-button" onClick={onReview}>Enviar para aprovação</AppButton>}<AppButton className="primary-button" onClick={() => onEdit(client)}>Editar cliente</AppButton></div><section className="panel studio-section"><span className="eyebrow">FICHA DO CLIENTE · {client.type}</span><h2>{client.name}</h2><p>{client.contact}</p><div className="contact-links">{client.phone && <a href={`tel:${client.phone.replace(/[^+\d]/g,"")}`}><IconLabel icon={Phone}>{formatPhoneDisplay(client.phone)}</IconLabel></a>}{client.email && <a href={`mailto:${client.email}`}><IconLabel icon={Mail}>{client.email}</IconLabel></a>}</div><div className="studio-stats"><div><small>Projetos</small><b>{linked.length}</b></div><div><small>Receitas registradas</small><b>{money(sum(finances))}</b></div><div><small>A receber</small><b>{money(sum(finances.filter(e => e.status === "A receber")))}</b></div></div></section>
-  {client.type === "Recorrente" && <section className="panel studio-section"><span className="eyebrow">PACOTE RECORRENTE</span><h2>{client.packageTitle || "Defina seu pacote mensal"}</h2><p>{money(client.monthlyFee || 0)} / mês · {client.monthlyDeliverables || 0} entregas previstas</p><progress value={completed} max={Math.max(client.monthlyDeliverables || 1, completed)}/><p>{completed} de {client.monthlyDeliverables || 0} entregas concluídas. O valor combinado não gera uma receita automaticamente.</p><label>Mês do pacote<AppInput aria-label="Mês do pacote" type="month" value={month} onChange={e=>setMonth(e.target.value)}/></label>{deliveries.map(d=><label className="task-row" key={d.id}><AppInput type="checkbox" checked={d.done} onChange={()=>onSave({...client,deliveries:(client.deliveries || []).map(item=>item.id===d.id?{...item,done:!item.done}:item)})}/><span>{d.title}</span></label>)}{deliveries.length<(client.monthlyDeliverables||0)&&<AppButton className="secondary-button" onClick={prepareDeliveries}>Preparar entregas deste mês</AppButton>}</section>}
+  {client.type === "Recorrente" && <section className="panel studio-section"><span className="eyebrow">PACOTE RECORRENTE</span><h2>{client.packageTitle || "Defina seu pacote mensal"}</h2><p>{money(client.monthlyFee || 0)} / mês · {client.monthlyDeliverables || 0} entregas previstas</p><progress value={completed} max={Math.max(client.monthlyDeliverables || 1, completed)}/><p>{completed} de {client.monthlyDeliverables || 0} entregas concluídas. O valor combinado não gera uma receita automaticamente.</p><div className="client-package-month"><span>Mês do pacote</span><CalendarMonthField value={month} onChange={setMonth}/></div>{deliveries.map(d=><label className="task-row" key={d.id}><AppInput type="checkbox" checked={d.done} onChange={()=>onSave({...client,deliveries:(client.deliveries || []).map(item=>item.id===d.id?{...item,done:!item.done}:item)})}/><span>{d.title}</span></label>)}{deliveries.length<(client.monthlyDeliverables||0)&&<AppButton className="secondary-button" onClick={prepareDeliveries}>Preparar entregas deste mês</AppButton>}</section>}
   <section className="panel studio-section"><h2><IconLabel icon={FolderKanban} size={20}>Projetos do cliente</IconLabel></h2>{linked.length ? linked.map(p => <AppButton className="studio-row" key={p.id} onClick={() => onProject(p.id)}><b>{p.name}</b><span>{p.status}</span><span>{p.due}</span></AppButton>) : <Empty>Nenhum projeto vinculado ainda.</Empty>}</section><section className="panel studio-section"><h2><IconLabel icon={Receipt} size={20}>Histórico financeiro</IconLabel></h2>{finances.map(e => <div className="studio-row" key={e.id}><b>{e.project}</b><span>{e.date} · {e.status}</span><strong>{money(e.amount)}</strong></div>)}{!finances.length && <Empty>Nenhuma receita vinculada.</Empty>}</section></div>;
 }
 export function StudioReviews() {

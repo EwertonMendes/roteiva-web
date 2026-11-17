@@ -76,8 +76,16 @@ test('project detail: tasks, drafts, finance, agenda, materials and responsive t
   const due=page.getByRole('textbox',{name:'Prazo do projeto'});
   await expect(due).toHaveValue('17/11/2026');
   await detail.getByRole('button',{name:'Abrir calendário de data'}).click();
-  await expect(detail.getByRole('dialog',{name:'Escolher data'})).toBeVisible();
-  await detail.getByRole('dialog',{name:'Escolher data'}).getByRole('button',{name:'Fechar'}).click();
+  const projectPicker=detail.getByRole('dialog',{name:'Escolher data'});
+  await expect(projectPicker).toBeVisible();
+  await expect(projectPicker).toHaveAttribute('popover','manual');
+  await expect(projectPicker).toHaveCSS('position','fixed');
+  await expect.poll(()=>projectPicker.evaluate(el=>{
+    const rect=el.getBoundingClientRect();
+    const hit=document.elementFromPoint(rect.left+rect.width/2,rect.top+Math.min(20,rect.height/2));
+    return !!hit&&(el===hit||el.contains(hit));
+  })).toBe(true);
+  await projectPicker.getByRole('button',{name:'Fechar'}).click();
   await due.fill('31/02/2028');
   await detail.getByRole('button',{name:'Salvar projeto'}).click();
   await expect(detail.getByRole('alert')).toContainText('Corrija a data do prazo');
@@ -100,6 +108,17 @@ test('project detail: tasks, drafts, finance, agenda, materials and responsive t
   await expect(page.getByRole('textbox',{name:'Briefing',exact:true})).toHaveValue('Rascunho preservado durante o checklist.');
   await expect(page.getByRole('combobox',{name:'Etapa',exact:true})).toContainText('Ajustes');
   await page.getByRole('button',{name:'Editar lançamento Transporte',exact:true}).click();
+  const financeModal=page.locator('.finance-modal');
+  await expect(financeModal.locator('input[type="date"]')).toHaveCount(0);
+  const financialDue=financeModal.getByRole('textbox',{name:'Vencimento do pagamento'});
+  await expect(financialDue).toHaveValue('17/11/2026');
+  await financialDue.fill('31/02/2028');
+  await financeModal.getByRole('button',{name:'Salvar alterações'}).click();
+  await expect(financeModal).toBeVisible();
+  await financialDue.fill('17/11/2026');
+  await financeModal.getByRole('button',{name:'Abrir calendário de data'}).click();
+  await expect(financeModal.getByRole('dialog',{name:'Escolher data'})).toBeVisible();
+  await financeModal.getByRole('dialog',{name:'Escolher data'}).getByRole('button',{name:'Fechar'}).click();
   await page.getByLabel('Valor do trabalho').fill('75,00');
   await page.getByRole('button',{name:'Salvar alterações',exact:true}).click();
   await expect(detail.locator('.pd-totals')).toContainText('225,00');
@@ -118,4 +137,59 @@ test('project detail: tasks, drafts, finance, agenda, materials and responsive t
   await expect(page).toHaveURL(/#\/biblioteca$/);
 });
 
+test('project detail: tasks and new-project calendar control',async({page})=>{
+  await page.addInitScript(()=>{
+    localStorage.setItem('roteiva-theme','dark');
+    localStorage.setItem('roteiva-pages-demo-workspace-v1',JSON.stringify({
+      projects:[],clients:[],financeEntries:[],calendarEvents:[],libraryAssets:[],comments:[],activities:[],
+    }));
+  });
+  await page.goto(base+'/#/projetos');
+  const start=page.locator('.heading-actions').getByRole('button',{name:'Criar projeto',exact:true});
+  await expect(start).toBeVisible();
+  await start.click();
+  const create=page.locator('.project-modal').filter({hasText:'Comece uma nova produção'});
+  await expect(create).toBeVisible();
+  await expect(create.locator('input[type="date"]')).toHaveCount(0);
+  await create.getByRole('textbox',{name:'Nome do projeto'}).fill('Projeto de teste do datepicker');
+  const createDue=create.getByRole('textbox',{name:'Prazo'});
+  await create.getByRole('button',{name:'Abrir calendário de data'}).click();
+  const popup=create.getByRole('dialog',{name:'Escolher data'});
+  await expect(popup).toHaveAttribute('popover','manual');
+  await expect(popup).toBeVisible();
+  await expect(popup).toHaveCSS('position','fixed');
+  await popup.getByRole('button',{name:'Fechar'}).click();
+  await createDue.fill('31/02/2028');
+  await create.getByRole('button',{name:/Criar projeto/}).click();
+  await expect(create).toBeVisible();
+  await createDue.fill('22/02/2028');
+  await create.getByRole('button',{name:/Criar projeto/}).click();
+  await expect(create).toHaveCount(0);
+});
 
+
+
+
+test('project detail: tasks and recurring month picker use Roteiva calendar',async({page})=>{
+  await page.addInitScript(()=>{
+    localStorage.setItem('roteiva-theme','dark');
+    localStorage.setItem('roteiva-pages-demo-workspace-v1',JSON.stringify({
+      projects:[],
+      clients:[{id:21,name:'Cliente mensal',contact:'Contato',color:'blue',initials:'CM',
+        type:'Recorrente',since:'2026',projects:0,active:0,
+        monthlyDeliverables:2,monthlyFee:1000,deliveries:[]}],
+      financeEntries:[],calendarEvents:[],libraryAssets:[],comments:[],activities:[],
+    }));
+  });
+  await page.goto(base+'/#/clientes/21');
+  const month=page.getByRole('textbox',{name:'Mês do pacote'});
+  await expect(month).toBeVisible();
+  await expect(page.locator('input[type="month"]')).toHaveCount(0);
+  await page.getByRole('button',{name:'Escolher mês do pacote'}).click();
+  const chooser=page.getByRole('dialog',{name:'Escolher mês'});
+  await expect(chooser).toBeVisible();
+  await expect(chooser).toHaveAttribute('popover','manual');
+  await expect(chooser).toHaveCSS('position','fixed');
+  await chooser.getByRole('button',{name:'Fevereiro'}).click();
+  await expect(month).toHaveValue(/Fevereiro de \d{4}/);
+});

@@ -83,7 +83,7 @@ test("Google emulator session, CRUD, restoration, themes and separate users",asy
   await expect(page.locator(".toast")).toHaveCount(1);
   await expect(page.locator("form.finance-modal")).toBeVisible();
   await page.getByLabel("Valor do trabalho").fill("100,01");
-  await page.getByLabel("Previsão de recebimento",{exact:true}).fill(today);
+  await page.getByLabel("Previsão de recebimento",{exact:true}).fill(today.split('-').reverse().join('/'));
   await page.locator("form.finance-modal").getByRole("button",{name:"Adicionar lançamento"}).click();await settled(page);
   await expect(page.locator(".rt-toast--success")).toContainText("Receita registrada.");
   await expect(page.locator(".toast")).toHaveCount(1);
