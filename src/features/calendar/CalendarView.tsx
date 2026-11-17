@@ -34,7 +34,7 @@ function DayEventsDialog({date,events,projects,onClose,onAdd,onEdit,onDelete}:{
     <div className="calendar-day-heading">
       <h2>{formatted.slice(0,1).toUpperCase()+formatted.slice(1)}</h2>
       <div className="calendar-day-actions"><span>{events.length} {events.length===1?"compromisso":"compromissos"}</span>
-        <AppButton className="primary-button" onClick={onAdd}><Plus size={18}/> Novo compromisso</AppButton>
+        <AppButton variant="primary" onClick={onAdd}><Plus size={18}/> Novo compromisso</AppButton>
       </div>
     </div>
     <div className="calendar-day-records">
