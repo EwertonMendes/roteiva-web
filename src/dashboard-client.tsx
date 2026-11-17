@@ -4,6 +4,7 @@ import {AppButton} from "./features/ui/AppButton";
 import {useToast} from "./features/ui/ToastProvider";
 import { AppSelect } from "./features/ui/AppSelect";
 import { MoneyInput } from "./features/ui/MoneyInput";
+import {AppDateFormField,readFormDate} from "./features/ui/AppDateFormField";
 import {ProjectDetail} from './features/projects/ProjectDetail';
 import {SidebarAccountMenu} from "./features/ui/SidebarAccountMenu";
 import {ProjectsView} from "./features/projects/ProjectsView";
@@ -343,7 +344,9 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     const name = String(form.get("name") || "Novo projeto");
     const clientId = Number(form.get("clientId")) || undefined;
     const client = clientList.find(c => c.id === clientId)?.name || "Sem cliente vinculado";
-    const dueValue = String(form.get("due") || "");
+    const selectedDue=readFormDate(form,"due");
+    if(!selectedDue.valid){notify("Informe um prazo válido (DD/MM/AAAA) antes de criar o projeto.","error");return;}
+    const dueValue=selectedDue.value;
     const due = dueValue ? new Date(`${dueValue}T12:00:00`).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }).replace(".", "") : "Sem prazo";
     const template = String(form.get("template") || "Livre");
     const description = String(form.get("description") || "");
@@ -422,7 +425,9 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     const amountRaw = String(form.get("amount") || "0").trim();
     const amount = parseMoney(amountRaw);
     const status = String(form.get("status") || "A receber") as FinanceEntry["status"];
-    const dateValue = String(form.get("date") || "");
+    const selectedDate=readFormDate(form,"date");
+    if(!selectedDate.valid){notify("Informe uma data válida (DD/MM/AAAA) para o lançamento.","error");return;}
+    const dateValue=selectedDate.value;
     const entryDate = dateValue ? new Date(`${dateValue}T12:00:00`) : new Date();
     if (!Number.isFinite(entryDate.getTime()) || !Number.isFinite(amount) || amount <= 0) return notify("Informe um valor válido.","error");
     const projectId = Number(form.get("projectId")) || undefined;
@@ -661,7 +666,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
           <form className="project-modal" onSubmit={addProject} onMouseDown={(event) => event.stopPropagation()}>
             <div className="modal-head"><div><span>NOVO PROJETO</span><h2>Comece uma nova produção</h2><p>Defina o essencial agora. A equipe completa os detalhes depois.</p></div><AppButton type="button" onClick={() => setModalOpen(false)}><X size={19} /></AppButton></div>
             <label>Nome do projeto<AppInput name="name" required autoFocus placeholder="Ex.: Campanha Primavera 2027" /></label>
-            <div className="form-grid"><label>Cliente cadastrado<AppSelect aria-label="Cliente cadastrado" name="clientId"><option value="">Sem cliente vinculado</option>{[...clientList].sort((a,b) => a.name.localeCompare(b.name, "pt-BR")).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</AppSelect></label><label>Prazo<AppInput name="due" type="date" /></label></div>
+            <div className="form-grid"><label>Cliente cadastrado<AppSelect aria-label="Cliente cadastrado" name="clientId"><option value="">Sem cliente vinculado</option>{[...clientList].sort((a,b) => a.name.localeCompare(b.name, "pt-BR")).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</AppSelect></label><AppDateFormField name="due" label="Prazo"/></div>
             <label>Modelo de produção<AppSelect aria-label="Modelo de produção" name="template">{Object.keys(projectTemplates).map(t => <option key={t}>{t}</option>)}</AppSelect></label><label>Descrição<AppTextarea name="description" placeholder="Objetivo, formatos e contexto da produção…" /></label>
             <div className="modal-actions"><AppButton type="button" className="secondary-button" onClick={() => setModalOpen(false)}>Cancelar</AppButton><AppButton className="primary-button" type="submit">Criar projeto <ChevronRight size={16} /></AppButton></div>
           </form>
@@ -675,7 +680,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
             <div className="modal-head"><div><span>{editingFinanceEntry ? "EDITAR LANÇAMENTO" : "NOVO LANÇAMENTO"}</span><h2>{editingFinanceEntry ? "Atualize o lançamento" : "Registre uma entrada ou custo"}</h2><p>{editingFinanceEntry ? "Revise os dados e salve para atualizar os indicadores financeiros." : "Escolha a data para registrar a entrada ou o custo no mês correspondente."}</p></div><AppButton type="button" onClick={closeFinanceModal}><X size={19} /></AppButton></div>
             <label>Tipo de lançamento<AppSelect aria-label="Tipo de lançamento" name="kind" value={financeKind} onValueChange={value=> setFinanceKind(value as "income" | "expense")}><option value="income">Receita</option><option value="expense">Despesa / custo de produção</option></AppSelect></label><label>Projeto vinculado<AppSelect aria-label="Projeto vinculado" name="projectId" defaultValue={editingFinanceEntry?.projectId || selectedProject || ""}><option value="">Sem projeto vinculado</option>{projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</AppSelect></label><label>Trabalho ou projeto <small className="field-hint">Opcional</small><AppInput name="project" autoFocus defaultValue={editingFinanceEntry?.project === "Receita avulsa" ? "" : editingFinanceEntry?.project || ""} placeholder="Ex.: Filme institucional — Corte final" /></label>
             <div className="form-grid"><label>Cliente cadastrado<AppSelect aria-label="Cliente cadastrado" name="clientId" defaultValue={editingFinanceEntry?.clientId || projects.find(p => p.id === selectedProject)?.clientId || ""}><option value="">Sem cliente vinculado</option>{[...clientList].sort((a, b) => a.name.localeCompare(b.name, "pt-BR")).map((client) => <option key={client.id} value={client.id}>{client.name} · {client.type}</option>)}</AppSelect><small className="field-hint">{clientList.length ? `${clientList.length} ${clientList.length === 1 ? "cliente disponível" : "clientes disponíveis"}` : "Cadastre clientes para vinculá-los às receitas"}</small></label><label>Valor do trabalho<MoneyInput name="amount" required defaultValue={editingFinanceEntry?.amount} /></label></div>
-            <div className="form-grid"><label>{financeKind === "expense" ? "Vencimento do pagamento" : "Previsão de recebimento"}<AppInput name="date" type="date" defaultValue={editingFinanceEntry ? editingFinanceEntry.date.split("/").reverse().join("-") : ""} /></label><label>Situação<AppSelect aria-label="Situação" name="status" defaultValue={editingFinanceEntry?.status || "A receber"}><option value="Recebido">{financeKind === "expense" ? "Pago" : "Recebido"}</option><option value="A receber">{financeKind === "expense" ? "A pagar" : "A receber"}</option></AppSelect></label></div>
+            <div className="form-grid"><AppDateFormField key={editingFinanceEntry?.id||"new"} name="date" label={financeKind==="expense"?"Vencimento do pagamento":"Previsão de recebimento"} initialValue={editingFinanceEntry?editingFinanceEntry.date.split("/").reverse().join("-"):""}/><label>Situação<AppSelect aria-label="Situação" name="status" defaultValue={editingFinanceEntry?.status || "A receber"}><option value="Recebido">{financeKind === "expense" ? "Pago" : "Recebido"}</option><option value="A receber">{financeKind === "expense" ? "A pagar" : "A receber"}</option></AppSelect></label></div>
             <label>Parcelamento<AppSelect aria-label="Parcelamento" name="installments" defaultValue="1" disabled={!!editingFinanceEntry}>{[1,2,3,4,5,6,10,12,24].map(n => <option key={n} value={n}>{n === 1 ? "Pagamento único" : `${n} parcelas mensais (dividir o valor total)`}</option>)}</AppSelect><small className="field-hint">Ao parcelar, o valor informado é dividido entre os meses. Cada parcela pode ser editada depois.</small></label><div className="modal-actions"><AppButton type="button" className="secondary-button" onClick={closeFinanceModal}>Cancelar</AppButton><AppButton className="primary-button" type="submit">{editingFinanceEntry ? "Salvar alterações" : "Adicionar lançamento"} <ArrowUpRight size={16} /></AppButton></div>
           </form>
         </div>
