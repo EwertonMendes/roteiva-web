@@ -190,7 +190,7 @@ export function FeedbackDialog({getToken,onClose}:{getToken:()=>Promise<string>;
               <span>Até cinco imagens, otimizadas antes do envio</span>
               <AppButton type="button" variant="secondary" disabled={pending||images.length>=5}
                 onClick={()=>fileInput.current?.click()}>Selecionar imagens</AppButton>
-              <input ref={fileInput} className="feedback-file-input" type="file" accept="image/png,image/jpeg,image/webp" multiple
+              <AppInput ref={fileInput} className="feedback-file-input" type="file" accept="image/png,image/jpeg,image/webp" multiple
                 aria-label="Selecionar capturas de tela" disabled={pending} onChange={event=>{
                   void addFiles(Array.from(event.target.files||[]));event.target.value='';
                 }}/>
