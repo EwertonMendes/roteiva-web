@@ -1,10 +1,11 @@
 import { API_BASE_URL } from "../../lib/environment.ts";
 import {AppInput} from "../ui/AppInput";
 import {AppButton} from "../ui/AppButton";
+import {AppModalHeader} from "../ui/AppModal";
 import { AppSelect } from "../ui/AppSelect";
 import {useCallback,useEffect,useMemo,useRef,useState} from "react";
 import {CheckCircle2,ChevronRight,Clock3,Copy,ExternalLink,FileAudio,FileImage,FileText,
-  FileVideo,FolderOpen,Grid2X2,History,Link2,List,LoaderCircle,MessageSquare,RotateCcw,Search,Send,ShieldCheck,X} from "lucide-react";
+  FileVideo,FolderOpen,Grid2X2,History,Link2,List,LoaderCircle,MessageSquare,RotateCcw,Search,Send,ShieldCheck} from "lucide-react";
 import {formatReviewTime} from "./review-timecode";
 import {useDriveApi} from "../drive/drive-api";
 import {ReviewImageViewer} from "./ReviewImageViewer";
@@ -173,14 +174,10 @@ export function ReviewOwnerWorkspace({detail,working,error,onClose,onRevise,onPu
     mediaRef.current?.scrollIntoView({behavior:"smooth",block:"nearest"});
   }
   return <>
-    <header className="rowner-header">
-      <div className="rowner-heading">
-        <span className="eyebrow">APROVAÇÕES / {review.clientName} / V{review.version}</span>
-        <h2>{review.title}</h2>
-        <p>{review.projectName} <span aria-hidden="true">·</span> {review.clientName}</p>
-      </div>
-      <AppButton type="button" className="review-icon" disabled={working} aria-label="Fechar" onClick={onClose}><X size={20}/></AppButton>
-    </header>
+    <AppModalHeader title={review.title}
+      eyebrow={"APROVAÇÕES / "+review.clientName+" / V"+review.version}
+      description={<>{review.projectName} <span aria-hidden="true">·</span> {review.clientName}</>}
+      onClose={onClose} closeDisabled={working}/>
     <div className="review-dialog-body rowner-body">
       {error&&<div className="reviews-warning" role="alert">{error}</div>}
       {["pending","changes","approved"].includes(review.status)&&<ShareArea detail={detail}/>}
@@ -355,7 +352,7 @@ export function ReviewOwnerWorkspace({detail,working,error,onClose,onRevise,onPu
         </div>
       </details>}
     </div>
-    <footer className="rowner-footer">
+    <footer className="rowner-footer rt-modal__footer">
       <span className="rowner-footer-state">{working?<LoaderCircle size={15} className="rl-spin"/>:<ShieldCheck size={15}/>}
         {working?"Atualizando…":statusText[review.status]}</span>
       <div className="rowner-footer-actions">

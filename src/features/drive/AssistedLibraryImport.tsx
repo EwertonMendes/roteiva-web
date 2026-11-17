@@ -3,7 +3,7 @@ import {AppButton} from '../ui/AppButton';
 import {AppInput} from '../ui/AppInput';
 import {AppSelect} from '../ui/AppSelect';
 import {useDriveApi,messages} from './drive-api';
-import {useOverlayFocus} from './DriveLibraryUI';
+import {AppModal,AppModalHeader,AppModalBody,AppModalFooter} from '../ui/AppModal';
 import {assistedLibraryPlan,type AssistedFile} from './assisted-library-plan';
 import {importLibraryBatch} from './library-import';
 import type {InspectedLibrarySource} from '../../../shared/library-selection';
@@ -13,7 +13,7 @@ export function AssistedLibraryImport({projectId,parentId,sources,unavailable,on
  const [mapping,setMapping]=useState<Record<string,string>|null>(null),[started,setStarted]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[progress,setProgress]=useState('');
  const [failures,setFailures]=useState<Record<string,string>>({});
  const [visibleFolders,setVisibleFolders]=useState(12),[visibleFiles,setVisibleFiles]=useState(15);
- const call=useDriveApi(),attempt=useRef(crypto.randomUUID()),operation=useRef<AbortController|null>(null),dialog=useOverlayFocus(()=>{if(!busy)onClose();});
+ const call=useDriveApi(),attempt=useRef(crypto.randomUUID()),operation=useRef<AbortController|null>(null);
  useEffect(()=>()=>operation.current?.abort(),[]);
  const fileKey=(x:AssistedFile)=>x.provider+':'+x.connectionId+':'+x.fileId;
  const folderPath=(key:string):string=>{const node=folders.find(x=>x.key===key);return node?(node.parentKey?folderPath(node.parentKey)+' / ':'')+node.name:'Pasta atual';};
@@ -40,8 +40,12 @@ export function AssistedLibraryImport({projectId,parentId,sources,unavailable,on
   }catch(e){if(!controller.signal.aborted){setError(e instanceof Error?e.message:'Não foi possível confirmar a importação. Repita para conferir sem duplicar pastas ou arquivos.');if(!mapping&&['invalid_library_structure','invalid_library_name','library_depth_exceeded','library_parent_denied','library_structure_ambiguous','library_structure_mismatch'].includes((e as {code?:string}).code||'')){setStarted(false);attempt.current=crypto.randomUUID();}}}
   finally{if(!controller.signal.aborted){setBusy(false);setProgress('');}}
  }
- return <div className="virtual-library-backdrop"><div ref={dialog} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="assisted-library-title" className="virtual-library-editor virtual-library-preview">
-  <h3 id="assisted-library-title">Revisar organização selecionada</h3><p>{recursive?'As subpastas e os arquivos encontrados dentro das pastas selecionadas no Dropbox foram incluídos nesta prévia. Confirme antes de importar.':'O Google Drive compartilha os arquivos individualmente: selecionar uma pasta não libera automaticamente seu conteúdo. Abra cada pasta abaixo e selecione os arquivos e as subpastas para incluí-los na estrutura.'} Os originais permanecem no provedor.</p>
+ return <AppModal size="wide" className="virtual-library-editor virtual-library-preview"
+   onCloseRequest={()=>{if(!busy)onClose();}} aria-labelledby="assisted-library-title">
+   <div className="rt-modal__layout">
+   <AppModalHeader title="Revisar organização selecionada" titleId="assisted-library-title"
+     onClose={onClose} closeDisabled={busy}/>
+   <AppModalBody><p>{recursive?'As subpastas e os arquivos encontrados dentro das pastas selecionadas no Dropbox foram incluídos nesta prévia. Confirme antes de importar.':'O Google Drive compartilha os arquivos individualmente: selecionar uma pasta não libera automaticamente seu conteúdo. Abra cada pasta abaixo e selecione os arquivos e as subpastas para incluí-los na estrutura.'} Os originais permanecem no provedor.</p>
   <p>Pastas virtuais com o mesmo nome no destino serão reutilizadas quando houver uma única correspondência. Arquivos sem pasta pai selecionada ficam na pasta atual; ajuste os destinos abaixo.</p>
    <div className="vl-import-summary" role="status"><strong>{folders.length} {folders.length===1?'pasta':'pastas'}</strong><strong>{files.length} {files.length===1?'arquivo':'arquivos'}</strong></div>
    {!recursive&&onExploreFolder&&folders.length>0&&<p className="vl-import-explore-note">Para preservar a segurança, selecione o conteúdo de cada pasta no Google Picker. Só os itens realmente selecionados entrarão na Biblioteca.</p>}
@@ -58,6 +62,8 @@ export function AssistedLibraryImport({projectId,parentId,sources,unavailable,on
   {(initial.error||error)&&<p role="alert" className="virtual-library-error">{initial.error||error}</p>}{progress&&<p role="status">{progress}</p>}
   {!folders.length&&!files.length&&<p>Nenhum item disponível nesta seleção.</p>}
    {folders.length>0&&!files.length&&!recursive&&onExploreFolder&&<p role="status" className="vl-import-empty-warning">Nenhum arquivo foi selecionado até agora. A conclusão criará somente as pastas exibidas; use “Selecionar conteúdo desta pasta” para trazer os arquivos.</p>}
-  <div className="virtual-library-toolbar"><AppButton disabled={busy||Boolean(initial.error)||!folders.length&&!files.length} onClick={()=>void apply()}>{mapping?files.length?'Repetir somente os arquivos pendentes':'Concluir importação':started?'Conferir e concluir':files.length?'Criar estrutura e adicionar '+files.length+' arquivo(s)':'Criar somente as pastas'}</AppButton><AppButton disabled={busy} onClick={onClose}>Fechar</AppButton></div>
- </div></div>;
+  </AppModalBody>
+  <AppModalFooter><AppButton variant="primary" disabled={busy||Boolean(initial.error)||!folders.length&&!files.length} onClick={()=>void apply()}>{mapping?files.length?'Repetir somente os arquivos pendentes':'Concluir importação':started?'Conferir e concluir':files.length?'Criar estrutura e adicionar '+files.length+' arquivo(s)':'Criar somente as pastas'}</AppButton><AppButton variant="secondary" disabled={busy} onClick={onClose}>Fechar</AppButton></AppModalFooter>
+  </div>
+ </AppModal>;
 }

@@ -18,15 +18,15 @@ test('approval shortcut is consumed and never reopens after leaving the list',as
  };
  await nav('Clientes');await page.getByText('Cliente Revisão',{exact:true}).click();
  await page.getByRole('button',{name:/aprovação/i}).click();
- await expect(page.locator('.review-modal-backdrop')).toBeVisible();
+ await expect(page.locator('dialog.review-composer-dialog')).toBeVisible();
  await page.getByRole('button',{name:'Fechar',exact:true}).click();
  await nav('Projetos');await nav('Aprovações');
- await expect(page.locator('.review-modal-backdrop')).toHaveCount(0);
+ await expect(page.locator('dialog.review-composer-dialog')).toHaveCount(0);
  await page.getByRole('button',{name:'Nova aprovação',exact:true}).click();
- await expect(page.locator('.review-modal-backdrop')).toBeVisible();
+ await expect(page.locator('dialog.review-composer-dialog')).toBeVisible();
  await page.getByRole('button',{name:'Fechar',exact:true}).click();
  await nav('Projetos');await nav('Aprovações');
- await expect(page.locator('.review-modal-backdrop')).toHaveCount(0);
+ await expect(page.locator('dialog.review-composer-dialog')).toHaveCount(0);
 });
 
 async function prepare(page:Page,email:string){
