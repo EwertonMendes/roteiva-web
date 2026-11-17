@@ -14,10 +14,17 @@ export const AppDialog=forwardRef<HTMLDialogElement,Props>(function AppDialog({
   useEffect(()=>{
     const element=localRef.current;
     if(!element)return;
+    const opener=document.activeElement instanceof HTMLElement?document.activeElement:null;
     if(!element.open)element.showModal();
-    // The global modal layer stylesheet locks background scroll for any open
-    // native or ARIA dialog; per-dialog imperative restoration breaks nesting.
-    return()=>{if(element.open)element.close();};
+    // Focus restoration must work after React unmount, including Escape and
+    // stacked native dialogs. Do not steal focus from a different active layer.
+    return()=>{
+      if(element.open)element.close();
+      const activeDialog=document.querySelector<HTMLDialogElement>("dialog:modal");
+      if(opener?.isConnected && (!activeDialog||activeDialog.contains(opener))){
+        opener.focus({preventScroll:true});
+      }
+    };
   },[]);
   return <dialog {...props} ref={element=>{
     localRef.current=element;
