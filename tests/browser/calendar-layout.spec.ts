@@ -429,7 +429,7 @@ test("project, client and finance modals match PROD calendar heading and single-
     const field=dialog.querySelector<HTMLInputElement>(".calendar-basic-field > input")!;
     const h=getComputedStyle(h2),p=getComputedStyle(sub),i=icon.getBoundingClientRect(),f=field.getBoundingClientRect();
     return {size:h.fontSize,weight:h.fontWeight,line:h.lineHeight,subtitle:p.fontSize,iconWidth:i.width,
-      inputHeight:f.height,headerPadding:header.getBoundingClientRect().left-dialog.getBoundingClientRect().left};
+      inputHeight:f.height,headerPadding:i.left-dialog.getBoundingClientRect().left};
   });
   await canonical.getByRole("button",{name:"Cancelar"}).click();
   const compare=async(selector:string,hasInput=true)=>{
@@ -444,7 +444,7 @@ test("project, client and finance modals match PROD calendar heading and single-
       const h=getComputedStyle(h2),p=getComputedStyle(sub),i=icon.getBoundingClientRect();
       return {size:h.fontSize,weight:h.fontWeight,line:h.lineHeight,subtitle:p.fontSize,
         iconWidth:i.width,inputHeight:hasInput?field.getBoundingClientRect().height:0,
-        headerPadding:header.getBoundingClientRect().left-dialog.getBoundingClientRect().left};
+        headerPadding:i.left-dialog.getBoundingClientRect().left};
     },hasInput);
     expect(current.size).toBe(ref.size);
     expect(current.weight).toBe(ref.weight);
