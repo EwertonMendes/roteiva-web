@@ -8,6 +8,7 @@ import { MoneyInput } from "./features/ui/MoneyInput";
 import {AppDateFormField,readFormDate} from "./features/ui/AppDateFormField";
 import {ProjectDetail} from './features/projects/ProjectDetail';
 import {SidebarAccountMenu} from "./features/ui/SidebarAccountMenu";
+import {FeedbackDialog} from "./features/feedback/FeedbackDialog";
 import {ProjectsView} from "./features/projects/ProjectsView";
 import {useProjectFileCount} from "./features/projects/useProjectFileCount";
 import {ClientDirectory} from "./features/clients/ClientDirectory";
@@ -22,7 +23,7 @@ import {
   ArrowUpRight, Building2, UserRound,
   Pencil, Plus, ReceiptText, Search, Trash2,
   UserRoundPlus, Users, WalletCards, X, Upload, Image as ImageIcon,
-  FileVideo, FileAudio, FileText, HardDrive, ChevronLeft, Settings2,
+  FileVideo, FileAudio, FileText, HardDrive, ChevronLeft, Settings2, MessageCircleHeart,
   type LucideIcon,
 } from "lucide-react";
 import { ClientDetail, StudioReviews, projectTemplates } from "./studio-features";
@@ -90,6 +91,7 @@ function BrandAvatar({ initials, color, large = false }: { initials: string; col
 type DashboardProps = {
   firstName: string; email: string; photoURL?: string; profile?:RoteivaProfile|null;
   onSaveProfile?:(changes:ProfileChanges)=>Promise<void>;
+  getFeedbackToken?:()=>Promise<string>;
   initialWorkspace?: WorkspaceData; initialTheme?: "light"|"dark";
   onThemeChange?:(theme:"light"|"dark")=>void;
   onRouteChange?:(route:WorkspaceRoute)=>void;
@@ -101,7 +103,7 @@ type DashboardProps = {
   financeBars?:{key:string;bars:number[]};eventCount?:number;usage?:Readonly<FirestoreUsage>;onCalendarMonthChange?:(year:number,month:number)=>void;
   onMoreClients?:()=>void;onSearchClients?:()=>void;onClientCreated?:(client:Client)=>void;canValidateProjectLink?:boolean;canValidateClientLink?:boolean; saving?:boolean; onLogout?:()=>void;
 };
-export default function DashboardClient({ firstName, email, photoURL, profile, onSaveProfile, initialWorkspace, initialTheme, onThemeChange, onRouteChange, onCommands, overviewMetrics, projectPage, onMoreProjects, onProjectStatus, onSearchProjects, clientPage, onMoreClients, onSearchClients, onClientCreated, onFinancePeriodChange, financeBars, eventCount, usage, onCalendarMonthChange, canValidateProjectLink, canValidateClientLink, saving, onLogout }: DashboardProps) {
+export default function DashboardClient({ firstName, email, photoURL, profile, onSaveProfile, getFeedbackToken, initialWorkspace, initialTheme, onThemeChange, onRouteChange, onCommands, overviewMetrics, projectPage, onMoreProjects, onProjectStatus, onSearchProjects, clientPage, onMoreClients, onSearchClients, onClientCreated, onFinancePeriodChange, financeBars, eventCount, usage, onCalendarMonthChange, canValidateProjectLink, canValidateClientLink, saving, onLogout }: DashboardProps) {
   const routeEnvironment={base:import.meta.env.BASE_URL,useHash:isDemo};
   const initialRoute=()=>routeFromLocation(window.location,routeEnvironment);
   const [initialBrowserRoute]=useState<WorkspaceRoute>(initialRoute);
@@ -118,6 +120,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
   const [statusFilter, setStatusFilter] = useState<Status | "Todos">("Todos");
   const [modalOpen, setModalOpen] = useState(false);
   const [clientModalOpen, setClientModalOpen] = useState(false);
+  const [feedbackOpen,setFeedbackOpen]=useState(false);
   const [financeModalOpen, setFinanceModalOpen] = useState(false);
   const [financeKind, setFinanceKind] = useState<"income" | "expense">("income");
   const [editingFinanceEntry, setEditingFinanceEntry] = useState<FinanceEntry | null>(null);
@@ -615,6 +618,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
           <AppButton className={view === "settings" ? "active" : ""} onClick={() => changeView("settings")}><AnimatedNavIcon icon={Settings2} hoverIcon={UserRound} kind="settings" /><span>Configurações</span></AppButton>
         </nav>
 
+        {getFeedbackToken&&<AppButton type="button" className="sidebar-feedback-button" onClick={()=>{setMobileOpen(false);setFeedbackOpen(true);}}><MessageCircleHeart size={19} aria-hidden="true"/><span>Enviar feedback</span></AppButton>}
         <div className="sidebar-profile">
           {photoURL ? <img className="profile-photo" src={photoURL} alt="Foto do usuário" referrerPolicy="no-referrer" /> : <span>{firstName.slice(0, 2).toUpperCase()}</span>}<div><b>{firstName}</b><small>{email}</small></div><SidebarAccountMenu key={view} theme={theme} onToggleTheme={toggleTheme} onLogout={onLogout?signOut:undefined}/>
         </div>
@@ -710,6 +714,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
           </form>
         </AppModal>
       )}
+      {feedbackOpen&&getFeedbackToken&&<FeedbackDialog getToken={getFeedbackToken} onClose={()=>setFeedbackOpen(false)} />}
       {deletingFinanceEntry && <ConfirmationDialog
         title="Remover este lançamento?"
         description={deletingFinanceEntry.project+", no valor de "+formatCurrency(deletingFinanceEntry.amount)+", será removido do financeiro e dos indicadores do mês."}
