@@ -136,3 +136,12 @@
 :root .rt-modal form.project-modal .rt-modal__body .rt-textarea{
  border:1px solid var(--line);background:var(--subtle);font-weight:400;
 }
+
+/* Guest approval has its own theme independent from the workspace root. */
+.review-portal[data-theme] .rt-modal{
+ --modal-surface:var(--r-card);--paper:var(--r-card);--ink:var(--r-ink);
+ --muted:var(--r-muted);--line:var(--r-border);--subtle:var(--r-field);
+ --accent:var(--r-cta);--on-accent:var(--r-cta-text);
+ --field-focus-border:var(--r-accent);
+ background:var(--modal-surface);color:var(--ink);
+}
