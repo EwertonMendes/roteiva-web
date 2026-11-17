@@ -1,3 +1,4 @@
+import {HardDrive as ModalHardDrive, FolderPlus as ModalFolderPlus} from "lucide-react";
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {FolderOpen,FolderPlus,FolderTree,RefreshCw,Trash2,RotateCcw,ArrowLeft,Search,CloudUpload,FilePlus2,FolderInput,Pencil,MoveRight,AlertCircle,Plus,MoreVertical,ChevronRight,X,HardDrive} from 'lucide-react';
 import type {Project} from '../../domain/workspace';
@@ -352,7 +353,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject,initi
   {settingsOpen&&<AppModal size="wide" className="vl-accounts-dialog" onCloseRequest={()=>setSettingsOpen(false)}
    aria-labelledby="vl-accounts-title" aria-describedby="vl-accounts-description">
    <div className="rt-modal__layout">
-     <AppModalHeader title="Contas de armazenamento" titleId="vl-accounts-title" descriptionId="vl-accounts-description"
+     <AppModalHeader icon={<ModalHardDrive size={26}/>} title="Contas de armazenamento" titleId="vl-accounts-title" descriptionId="vl-accounts-description"
        description="Gerencie o acesso aos seus arquivos em um só lugar."
        onClose={()=>setSettingsOpen(false)} closeLabel="Fechar contas" actions={
          <AppButton type="button" variant="secondary" controlSize="sm" aria-label="Atualizar contas"
@@ -435,7 +436,7 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject,initi
  {edit&&edit.action!=='move'&&<AppModal size="compact" className="virtual-library-editor" aria-labelledby="virtual-library-title"
   onCloseRequest={()=>{if(!busy){setError('');setEdit(null);}}}>
   <form className="rt-modal__layout" onSubmit={e=>{e.preventDefault();void save();}}>
-   <AppModalHeader title={{create:'Nova pasta',rename:'Renomear',restore:'Restaurar',trash:'Remover do Roteiva'}[edit.action]}
+   <AppModalHeader icon={<ModalFolderPlus size={26}/>} title={{create:'Nova pasta',rename:'Renomear',restore:'Restaurar',trash:'Remover do Roteiva'}[edit.action]}
      titleId="virtual-library-title" onClose={()=>{setError('');setEdit(null);}} closeDisabled={busy}/>
    <AppModalBody>
     {error&&<div role="alert" className="virtual-library-error">{error}</div>}
