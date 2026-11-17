@@ -55,8 +55,12 @@ test('project detail: tasks, drafts, finance, agenda, materials and responsive t
   await page.getByLabel('Nova tarefa',{exact:true}).press('Enter');
   await expect(page.getByRole('checkbox',{name:'Revisar áudio',exact:true})).toBeVisible();
   await expect(page.getByLabel('Nova tarefa',{exact:true})).toBeFocused();
+  await page.waitForTimeout(100);
+  await expect(page.getByLabel('Nova tarefa',{exact:true})).toBeFocused();
   await page.getByLabel('Nova tarefa',{exact:true}).fill('Tarefa adicional');
   await page.getByRole('button',{name:'Adicionar tarefa',exact:true}).click();
+  await expect(page.getByLabel('Nova tarefa',{exact:true})).toBeFocused();
+  await page.waitForTimeout(100);
   await expect(page.getByLabel('Nova tarefa',{exact:true})).toBeFocused();
   await expect(taskList.locator('.pd-task')).toHaveCount(7);
   expect(await taskList.evaluate(element=>element.scrollHeight>element.clientHeight)).toBe(true);
@@ -68,6 +72,20 @@ test('project detail: tasks, drafts, finance, agenda, materials and responsive t
   await page.getByRole('button',{name:'Remover tarefa Tarefa adicional',exact:true}).click();
   await page.getByRole('button',{name:'Remover tarefa Revisar áudio',exact:true}).click();
   await expect(page.getByRole('checkbox',{name:'Revisar áudio',exact:true})).toHaveCount(0);
+  // The shared Roteiva calendar picker replaces the browser-native date input.
+  const due=page.getByRole('textbox',{name:'Prazo do projeto'});
+  await expect(due).toHaveValue('17/11/2026');
+  await detail.getByRole('button',{name:'Abrir calendário de data'}).click();
+  await expect(detail.getByRole('dialog',{name:'Escolher data'})).toBeVisible();
+  await detail.getByRole('dialog',{name:'Escolher data'}).getByRole('button',{name:'Fechar'}).click();
+  await due.fill('31/02/2028');
+  await detail.getByRole('button',{name:'Salvar projeto'}).click();
+  await expect(detail.getByRole('alert')).toContainText('Corrija a data do prazo');
+  await due.fill('22/02/2222');
+  await detail.getByRole('button',{name:'Salvar projeto'}).click();
+  await expect(detail.getByRole('alert')).toContainText('Corrija a data do prazo');
+  await due.fill('22/02/2028');
+  await expect(detail.getByRole('alert')).toHaveCount(0);
   await page.getByLabel('Nome do projeto',{exact:true}).fill('Projeto atualizado');
   const stage=page.getByRole('combobox',{name:'Etapa',exact:true});
   await stage.click();
@@ -78,6 +96,7 @@ test('project detail: tasks, drafts, finance, agenda, materials and responsive t
   await page.getByRole('button',{name:'Salvar projeto',exact:true}).click();
   await page.reload();
   await expect(page.getByLabel('Nome do projeto',{exact:true})).toHaveValue('Projeto atualizado');
+  await expect(page.getByRole('textbox',{name:'Prazo do projeto'})).toHaveValue('22/02/2028');
   await expect(page.getByRole('textbox',{name:'Briefing',exact:true})).toHaveValue('Rascunho preservado durante o checklist.');
   await expect(page.getByRole('combobox',{name:'Etapa',exact:true})).toContainText('Ajustes');
   await page.getByRole('button',{name:'Editar lançamento Transporte',exact:true}).click();

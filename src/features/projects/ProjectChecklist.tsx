@@ -34,9 +34,16 @@ export function ProjectChecklist({tasks,onChange}:{tasks:Tasks;onChange:(next:Ta
  useLayoutEffect(()=>{
   const id=pendingAdded.current;
   if(id===null||!tasks.some(task=>task.id===id))return;
-  pendingAdded.current=null;
   if(listRef.current)listRef.current.scrollTop=listRef.current.scrollHeight;
+  // Clicking + disables the submit button during the next render. Restore
+  // focus after that DOM commit as well as before the next paint.
   inputRef.current?.focus({preventScroll:true});
+  const frame=requestAnimationFrame(()=>{
+   if(pendingAdded.current!==id)return;
+   inputRef.current?.focus({preventScroll:true});
+   if(document.activeElement===inputRef.current)pendingAdded.current=null;
+  });
+  return ()=>cancelAnimationFrame(frame);
  },[tasks]);
 
  function addTask(event:FormEvent<HTMLFormElement>){

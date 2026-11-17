@@ -3,6 +3,9 @@ import {AppTextarea} from "../ui/AppTextarea";
 import {AppButton} from "../ui/AppButton";
 import { AppSelect } from "../ui/AppSelect";
 import {useState, type FormEvent} from 'react';
+import {CalendarDateField} from '../calendar/CalendarDateTimeField';
+import {isValidCivilDate} from '../calendar/calendar-dates';
+import {dateInputError} from '../calendar/calendar-input';
 import {ArrowLeft, ArrowUpRight, ArrowDownRight, CalendarDays, ExternalLink, FolderOpen, Link2, Pencil, Plus} from 'lucide-react';
 import type {Project, Client, FinanceEntry, CalendarEvent, LibraryAsset, Status} from '../../domain/workspace';
 import {eventRange} from '../../studio-calendar';
@@ -30,6 +33,15 @@ function stageIcon(value:string){
 export function ProjectDetail({project,clients,entries,assets,events,onSave,onBack,onRevenue,onEditRevenue,onMaterials,onEvent,onEditEvent,onReview}:Props){
   const [materialFolder,setMaterialFolder]=useState('root');
   const [status,setStatus]=useState(project.status);
+  const [dueDate,setDueDate]=useState(project.dueDate&&isValidCivilDate(project.dueDate)?project.dueDate:'');
+  const [dueDateDraft,setDueDateDraft]=useState(()=>{
+    if(!project.dueDate||!isValidCivilDate(project.dueDate))return '';
+    const [year,month,day]=project.dueDate.split('-');
+    return day+'/'+month+'/'+year;
+  });
+  const [validationAttempted,setValidationAttempted]=useState(false);
+  const [formError,setFormError]=useState('');
+
   const tasks=project.tasks||[];
   const linked=entries.filter(entry=>entry.projectId===project.id);
   const income=sumMoney(linked.filter(entry=>entry.kind!=='expense'));
@@ -42,9 +54,23 @@ export function ProjectDetail({project,clients,entries,assets,events,onSave,onBa
     const input=event.currentTarget.elements.namedItem('name') as HTMLInputElement;
     const name=input.value.trim();
     if(!name){input.setCustomValidity('Informe o nome do projeto.');input.reportValidity();return;}
-    const clientId=Number(form.get('clientId'))||undefined;
-    const dueDate=String(form.get('dueDate')||'');
-    onSave({...project,name,status,clientId,client:clients.find(client=>client.id===clientId)?.name||'Sem cliente vinculado',description:String(form.get('description')||''),dueDate,due:dueDate?new Date(dueDate+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}):'Sem prazo'});
+    setValidationAttempted(true);
+    const clientValue=String(form.get('clientId')||'');
+    const clientId=clientValue?Number(clientValue):undefined;
+    const description=String(form.get('description')||'');
+    if(name.length>200||description.length>10000||!statuses.includes(status)||
+      (clientValue&&(!Number.isSafeInteger(clientId)||!clients.some(client=>client.id===clientId)))){
+      setFormError('Revise os dados do projeto antes de salvar.');
+      return;
+    }
+    // A partial or impossible DD/MM/AAAA must never be silently saved as "Sem prazo".
+    if(dueDateDraft&&(dateInputError(dueDateDraft)||!isValidCivilDate(dueDate)||
+      Number(dueDate.slice(0,4))>2099)){
+      setFormError('Corrija a data do prazo antes de salvar o projeto.');
+      return;
+    }
+    setFormError('');
+    onSave({...project,name,status,clientId,client:clients.find(client=>client.id===clientId)?.name||'Sem cliente vinculado',description,dueDate,due:dueDate?new Date(dueDate+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}):'Sem prazo'});
   }
   function updateTasks(updated:NonNullable<Project['tasks']>){
     onSave({...project,tasks:updated,progress:updated.length?Math.round(updated.filter(task=>task.done).length/updated.length*100):0});
@@ -56,8 +82,15 @@ export function ProjectDetail({project,clients,entries,assets,events,onSave,onBa
       <form className="studio-form" onSubmit={save}>
         <div className="form-grid"><label>Nome do projeto<AppInput name="name" required maxLength={200} defaultValue={project.name} onInput={event=>event.currentTarget.setCustomValidity('')}/></label>
           <label>Etapa<div className="pd-stage"><AppSelect aria-label="Etapa" name="status" value={status} renderLeading={stageIcon} onValueChange={value=>setStatus(value as Status)}>{statuses.map(status=><option key={status} value={status}>{status}</option>)}</AppSelect></div></label></div>
-        <div className="form-grid"><label>Cliente<AppSelect aria-label="Cliente" name="clientId" defaultValue={project.clientId||''}><option value="">Sem cliente</option>{clients.map(client=><option key={client.id} value={client.id}>{client.name}</option>)}</AppSelect></label><label>Prazo<AppInput type="date" name="dueDate" defaultValue={project.dueDate}/></label></div>
+        <div className="form-grid"><label>Cliente<AppSelect aria-label="Cliente" name="clientId" defaultValue={project.clientId||''}><option value="">Sem cliente</option>{clients.map(client=><option key={client.id} value={client.id}>{client.name}</option>)}</AppSelect></label><div className="pd-date-field">
+          <span className="pd-date-caption">Prazo</span>
+          <CalendarDateField label="Prazo do projeto" value={dueDate} optional maxYear={2099}
+            showValidation={validationAttempted}
+            onDraftChange={draft=>{setDueDateDraft(draft);setFormError('');}}
+            onChange={value=>{setDueDate(value);setFormError('');}}/>
+        </div></div>
         <label>Briefing<AppTextarea name="description" rows={4} maxLength={10000} defaultValue={project.description} placeholder="Objetivo, referências, formatos e orientações…"/></label>
+        {formError&&<p className="pd-form-error" role="alert">{formError}</p>}
         <AppButton className="primary-button" type="submit">Salvar projeto</AppButton>
       </form>
     </section>
