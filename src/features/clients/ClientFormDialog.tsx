@@ -1,8 +1,8 @@
 import {AppInput} from "../ui/AppInput";
 import {AppButton} from "../ui/AppButton";
 import {useState,type FormEvent} from "react";
-import {AppDialog} from "../ui/AppDialog";
-import {Building2,ChevronRight,ReceiptText,X} from "lucide-react";
+import {AppModal,AppModalHeader,AppModalBody,AppModalFooter} from "../ui/AppModal";
+import {Building2,ChevronRight,ReceiptText} from "lucide-react";
 import type {Client,ClientType} from "../../domain/workspace";
 import {BrazilPhoneInput} from "../ui/BrazilPhoneInput";
 import {MoneyInput} from "../ui/MoneyInput";
@@ -10,16 +10,16 @@ import {MoneyInput} from "../ui/MoneyInput";
 type Props={client:Client|null;onClose:()=>void;onSubmit:(event:FormEvent<HTMLFormElement>)=>void};
 export function ClientFormDialog({client,onClose,onSubmit}:Props){
  const [type,setType]=useState<ClientType>(client?.type||"Recorrente");
- return <AppDialog className="cd-form-dialog" onCloseRequest={onClose}
+ return <AppModal size="wide" className="cd-form-dialog" onCloseRequest={onClose}
   aria-labelledby="cd-form-title" aria-describedby="cd-form-description">
-   <form className="cd-form" onSubmit={onSubmit}>
-     <header className="cd-form-header"><div>
-       <span className="eyebrow">{client?"EDITAR CLIENTE":"NOVO CLIENTE"}</span>
-       <h2 id="cd-form-title">{client?"Atualize os dados do cliente":"Cadastre um novo cliente"}</h2>
-       <p id="cd-form-description">Defina o perfil para acompanhar recorrência e histórico de trabalhos.</p>
-      </div><AppButton className="cd-form-close" type="button" aria-label="Fechar cadastro" onClick={onClose}><X size={22}/></AppButton>
-     </header>
-     <div className="cd-form-fields">
+   <form className="rt-modal__layout cd-form" onSubmit={onSubmit}>
+     <AppModalHeader title={client?"Atualize os dados do cliente":"Cadastre um novo cliente"}
+       titleId="cd-form-title" descriptionId="cd-form-description"
+       eyebrow={client?"EDITAR CLIENTE":"NOVO CLIENTE"}
+       description="Defina o perfil para acompanhar recorrência e histórico de trabalhos."
+       onClose={onClose} closeLabel="Fechar cadastro"/>
+     <AppModalBody className="cd-form-fields">
+
       <label>Nome do cliente<AppInput name="name" maxLength={200} required autoFocus defaultValue={client?.name} placeholder="Ex.: Estúdio Aurora"/></label>
       <div className="cd-form-grid"><label>Contato principal<AppInput name="contact" maxLength={500} defaultValue={client?.contact} placeholder="Nome do contato"/></label>
         <label>Telefone<BrazilPhoneInput name="phone" defaultValue={client?.phone} placeholder="(11) 99999-9999" /></label></div>
@@ -35,10 +35,10 @@ export function ClientFormDialog({client,onClose,onSubmit}:Props){
         <div className="cd-form-grid"><label>Entregas por mês<AppInput name="monthlyDeliverables" type="number" min="0" max="100" step="1" defaultValue={client?.monthlyDeliverables||""} placeholder="0"/></label>
           <label>Valor mensal combinado<MoneyInput name="monthlyFee" defaultValue={client?.monthlyFee}/></label></div>
        </div>}
-     </div>
-     <footer className="cd-form-actions"><AppButton type="button" className="secondary-button" onClick={onClose}>Cancelar</AppButton>
+     </AppModalBody>
+     <AppModalFooter className="cd-form-actions"><AppButton type="button" className="secondary-button" onClick={onClose}>Cancelar</AppButton>
        <AppButton type="submit" className="primary-button">Salvar cliente <ChevronRight size={18}/></AppButton>
-     </footer>
+     </AppModalFooter>
    </form>
- </AppDialog>;
+ </AppModal>;
 }
