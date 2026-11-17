@@ -144,7 +144,7 @@ export function FeedbackDialog({getToken,onClose}:{getToken:()=>Promise<string>;
       const payload=await responsePayload(response);
       if(!response.ok)throw Error(messages[payload.error?.code||'']||'Não foi possível confirmar o envio. Verifique o histórico antes de tentar novamente.');
       setSentId(payload.id||'');
-      if(payload.id)setHistory(old=>[{id:payload.id!,kind,title,status:'sent',created_at:Date.now()},...old].slice(0,15));
+      if(payload.id)setHistory(old=>[{id:payload.id!,kind,title,status:'sent' as const,created_at:Date.now()},...old].slice(0,15));
     }catch(reason){
       setError(reason instanceof Error?reason.message:'Não foi possível confirmar o envio.');
     }finally{setProcessing(false);}
