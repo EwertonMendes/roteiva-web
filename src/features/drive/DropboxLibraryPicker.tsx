@@ -1,9 +1,10 @@
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
-import {ChevronRight,Folder,Search,X} from 'lucide-react';
+import {ChevronRight,Folder,Search} from 'lucide-react';
 import {AppButton} from '../ui/AppButton';
 import {AppInput} from '../ui/AppInput';
 import {useDriveApi} from './drive-api';
-import {useOverlayFocus,type DriveItem} from './DriveLibraryUI';
+import {type DriveItem} from './DriveLibraryUI';
+import {AppModal,AppModalHeader,AppModalBody,AppModalFooter} from '../ui/AppModal';
 import {useAuth} from '../auth/AuthProvider';
 import {cacheKey,getCachedFolder,setCachedFolder,onceFolderRequest} from './storage-folder-cache';
 import {DriveThumbnail} from './DriveThumbnail';
@@ -71,14 +72,14 @@ export function DropboxLibraryPicker({connectionId,onClose,onSelect,includeFolde
   });
  }
  function chooseFolder(id:string,name:string){setFilter('');setTerm('');setTrail(old=>[...old,{id,name}]);}
- return <div className="lib-dialog-backdrop">
-  <div ref={dialog} tabIndex={-1} className="lib-dialog lib-dialog--dropbox" role="dialog" aria-modal="true" aria-labelledby="dropbox-library-title" aria-describedby="dropbox-library-description">
-   <header className="lib-dialog-header">
-    <div><h3 id="dropbox-library-title">{includeFolders?'Importar do Dropbox':'Adicionar do Dropbox'}</h3>
-     <p id="dropbox-library-description">{includeFolders?'Selecione pastas ou arquivos. As subpastas serão conferidas antes da importação.':'Escolha arquivos para adicionar à Biblioteca.'} Os originais não serão alterados.</p></div>
-    <AppButton type="button" aria-label="Fechar seletor Dropbox" className="lib-icon-button" onClick={onClose}><X size={18}/></AppButton>
-   </header>
-   <div className="lib-dialog-content">
+ return <AppModal size="wide" className="lib-dialog lib-dialog--dropbox"
+   onCloseRequest={onClose} aria-labelledby="dropbox-library-title" aria-describedby="dropbox-library-description">
+   <div className="rt-modal__layout">
+    <AppModalHeader title={includeFolders?'Importar do Dropbox':'Adicionar do Dropbox'} titleId="dropbox-library-title"
+      descriptionId="dropbox-library-description" closeLabel="Fechar seletor Dropbox"
+      description={<>{includeFolders?'Selecione pastas ou arquivos. As subpastas serão conferidas antes da importação.':'Escolha arquivos para adicionar à Biblioteca.'} Os originais não serão alterados.</>}
+      onClose={onClose}/>
+    <AppModalBody className="lib-dialog-content">
     <nav aria-label="Pastas do Dropbox" className="lib-breadcrumb">
      {trail.map((item,i)=><span className="lib-crumb" key={item.id}>{i>0&&<ChevronRight size={15} aria-hidden="true"/>}
       <AppButton type="button" aria-current={i===trail.length-1?'location':undefined} onClick={()=>{setFilter('');setTerm('');setTrail(items=>items.slice(0,i+1));}}>{item.name}</AppButton></span>)}
@@ -123,11 +124,11 @@ export function DropboxLibraryPicker({connectionId,onClose,onSelect,includeFolde
     </div>
     {error&&page&&<div role="alert" className="lib-picker-error">{error} <AppButton type="button" onClick={()=>void load()}>Tentar novamente</AppButton></div>}
     {loading&&page&&<p role="status" className="lib-picker-note">Atualizando pasta…</p>}
-   </div>
-   <footer className="lib-dialog-footer"><span role="status" className="lib-picker-count"><strong>{selected.size}</strong> de {MAX_SELECTED} selecionados</span>
-    <AppButton type="button" className="lib-secondary-button" onClick={onClose}>Cancelar</AppButton>
-    <AppButton type="button" className="lib-primary-button" disabled={!selected.size} onClick={()=>onSelect([...selected.keys()],selected,new Set(selectedFolders.current))}>Adicionar selecionados</AppButton>
-   </footer>
+   </AppModalBody>
+   <AppModalFooter className="lib-dialog-footer"><span role="status" className="lib-picker-count"><strong>{selected.size}</strong> de {MAX_SELECTED} selecionados</span>
+    <AppButton type="button" variant="secondary" onClick={onClose}>Cancelar</AppButton>
+    <AppButton type="button" variant="primary" disabled={!selected.size} onClick={()=>onSelect([...selected.keys()],selected,new Set(selectedFolders.current))}>Adicionar selecionados</AppButton>
+   </AppModalFooter>
   </div>
- </div>;
+ </AppModal>;
 }
