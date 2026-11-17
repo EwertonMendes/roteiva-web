@@ -1,0 +1,63 @@
+/* Modal design system: follows the Calendar "Novo compromisso" surface and rhythm.
+ * Feature CSS may style content but must not own dialog chrome or control dimensions. */
+.rt-modal{
+  box-sizing:border-box;position:fixed;inset:0;margin:auto;
+  width:min(760px,calc(100vw - 32px));max-width:calc(100vw - 32px);
+  max-height:calc(100dvh - 32px);padding:0;overflow:hidden;
+  border:1px solid var(--line);border-radius:22px;
+  background:var(--modal-surface);color:var(--ink);
+  box-shadow:0 30px 110px rgba(0,0,0,.48);
+  --rt-control-height:52px;
+}
+.rt-modal::backdrop{background:rgba(8,8,9,.72);backdrop-filter:blur(7px)}
+.rt-modal--compact{width:min(460px,calc(100vw - 32px))}
+.rt-modal--medium{width:min(640px,calc(100vw - 32px))}
+.rt-modal--wide{width:min(850px,calc(100vw - 32px))}
+.rt-modal--full{width:min(1160px,calc(100vw - 32px))}
+.rt-modal__layout{display:flex;flex-direction:column;min-height:0;max-height:calc(100dvh - 34px)}
+.rt-modal__header{
+  padding:28px 30px 20px;display:flex;align-items:flex-start;gap:16px;flex-shrink:0;
+  background:var(--modal-surface);
+}
+.rt-modal__icon{display:grid;place-items:center;flex:0 0 auto;margin-top:4px;color:var(--ink)}
+.rt-modal__heading{min-width:0;flex:1}
+.rt-modal__eyebrow{display:block;margin-bottom:10px;font-size:var(--type-caption);
+  letter-spacing:.13em;font-weight:700;color:var(--muted);text-transform:uppercase}
+.rt-modal__heading h2{margin:0;font-size:clamp(25px,2.45vw,34px);
+  font-weight:760;line-height:1.15;letter-spacing:-.03em;color:var(--ink)}
+.rt-modal__heading p{font-size:var(--type-support);font-weight:400;
+  color:var(--muted);line-height:1.5;margin:9px 0 0}
+.rt-modal .rt-modal__close{flex:0 0 42px;width:42px;height:42px;min-height:42px;
+  padding:0;display:grid;place-items:center;border-radius:12px;background:var(--subtle);
+  color:var(--muted);border:1px solid var(--line)}
+.rt-modal__body{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;
+  padding:12px 30px 26px;scrollbar-width:thin}
+.rt-modal__section{padding:23px 0;border-top:1px solid var(--line)}
+.rt-modal__section:first-child{border-top:0;padding-top:0}
+.rt-modal__section-title{display:flex;align-items:center;gap:10px;margin:0 0 18px;
+  font-size:var(--type-body);font-weight:740;color:var(--ink)}
+.rt-modal__footer{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;
+  flex-shrink:0;gap:10px;padding:17px 30px 20px;border-top:1px solid var(--line);
+  background:var(--modal-surface)}
+.rt-modal__footer .rt-button{min-height:47px}
+.rt-modal :is(.rt-modal__body,.rt-modal__layout) label:not(.rt-choice):not(.review-sharing-option){
+  min-width:0;color:var(--ink);font-size:var(--type-support);font-weight:650}
+.rt-modal .rt-input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="file"]),
+.rt-modal .rt-select-trigger{min-height:var(--rt-control-height);height:var(--rt-control-height);
+  border-radius:11px;background:var(--subtle);color:var(--ink);border-color:var(--line)}
+.rt-modal .rt-input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="file"]){padding-inline:14px}
+.rt-modal .money-input{--money-field-height:var(--rt-control-height);border-radius:11px}
+.rt-modal .rt-textarea{min-height:80px;background:var(--subtle);border-color:var(--line);border-radius:11px}
+.rt-modal :is(.rt-input,.rt-textarea,.rt-select-trigger):focus{border-color:var(--field-focus-border);box-shadow:0 0 0 3px var(--field-focus-ring)}
+.rt-modal .rt-select[data-open] .rt-select-trigger{border-color:var(--field-focus-border)}
+@media(max-width:600px){
+  .rt-modal{width:calc(100vw - 16px);max-width:calc(100vw - 16px);max-height:calc(100dvh - 16px);border-radius:17px}
+  .rt-modal__layout{max-height:calc(100dvh - 18px)}
+  .rt-modal__header{padding:20px 18px 16px;gap:11px}
+  .rt-modal__heading h2{font-size:25px}
+  .rt-modal .rt-modal__close{width:40px;height:40px;min-height:40px;flex-basis:40px}
+  .rt-modal__body{padding:8px 18px 20px}
+  .rt-modal__footer{padding:14px 18px max(14px,env(safe-area-inset-bottom))}
+  .rt-modal__footer .rt-button{flex:1;min-width:0}
+}
+@media(prefers-reduced-motion:reduce){.rt-modal *{scroll-behavior:auto}}
