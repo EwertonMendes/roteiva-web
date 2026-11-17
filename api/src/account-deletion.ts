@@ -100,6 +100,8 @@ async function revokeConnections(env:Env,uid:string):Promise<boolean>{
   await env.DB.prepare('DELETE FROM dropbox_upload_attempts WHERE owner_uid=?').bind(uid).run();
   await env.DB.prepare('DELETE FROM dropbox_oauth_transactions WHERE owner_uid=?').bind(uid).run();
   await env.DB.prepare('DELETE FROM oauth_transactions WHERE owner_uid=?').bind(uid).run();
+  // Report metadata is owner-scoped; email attachments live in the support mailbox.
+  await env.DB.prepare('DELETE FROM feedback_reports WHERE owner_uid=?').bind(uid).run();
   return true;
 }
 async function runPhase(env:Env,job:Job,lease:string):Promise<void>{

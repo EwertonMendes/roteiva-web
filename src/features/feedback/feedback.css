@@ -1,0 +1,44 @@
+.sidebar-feedback-button{
+  display:flex;align-items:center;gap:11px;min-height:44px;width:100%;
+  flex:0 0 auto;margin: auto 0 10px;padding:0 12px;
+  color:#c7cdc0;background:#242720;border:1px solid #343a2d;border-radius:11px;
+  text-align:left;font-size:var(--type-support);font-weight:600;
+}
+.sidebar-feedback-button:hover{color:#d9fc82;background:#2b3022;border-color:#657a35}
+.sidebar-feedback-button+.sidebar-profile{margin-top:0}
+.rt-feedback-dialog .feedback-form .rt-modal__section{padding:18px 0}
+.rt-feedback-dialog .feedback-field{display:flex;flex-direction:column;gap:9px;margin-bottom:18px;min-width:0}
+.rt-feedback-dialog .feedback-field:last-child{margin-bottom:0}
+.rt-feedback-dialog .feedback-label{font-weight:700}
+.rt-feedback-dialog .feedback-kinds{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.rt-feedback-dialog .feedback-kind{padding:10px 6px;min-height:43px;color:var(--ink);background:var(--subtle);border:1px solid var(--line);border-radius:10px;font-size:var(--type-support)}
+.rt-feedback-dialog .feedback-kind.selected{border-color:var(--field-focus-border);background:var(--field-focus-ring);font-weight:700}
+.rt-feedback-dialog .feedback-upload{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;min-height:149px;padding:18px;border:1px dashed var(--line);border-radius:12px;background:var(--subtle);text-align:center}
+.rt-feedback-dialog .feedback-upload>p{margin:0;font-weight:600;font-size:var(--type-support)}
+.rt-feedback-dialog .feedback-upload>span{color:var(--muted);font-size:var(--type-caption)}
+.rt-feedback-dialog .feedback-upload>.rt-button{min-height:36px;margin-top:5px;font-size:var(--type-support)}
+.rt-feedback-dialog .feedback-file-input{display:none}
+.rt-feedback-dialog .feedback-previews{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-top:12px}
+.rt-feedback-dialog .feedback-preview{position:relative;aspect-ratio:1.2;overflow:hidden;border:1px solid var(--line);border-radius:9px;background:var(--subtle)}
+.rt-feedback-dialog .feedback-preview img{width:100%;height:100%;object-fit:cover}
+.rt-feedback-dialog .feedback-preview button{position:absolute;top:4px;right:4px;display:grid;place-items:center;width:30px;height:30px;border:1px solid var(--line);border-radius:8px;color:var(--ink);background:var(--modal-surface)}
+.rt-feedback-dialog .feedback-alert{padding:12px 15px;margin:14px 0;border-radius:9px;background:var(--subtle);color:var(--ink);font-size:var(--type-support)}
+.rt-feedback-dialog .feedback-privacy{color:var(--muted);font-size:var(--type-caption);line-height:1.5;margin:13px 0}
+.rt-feedback-dialog .feedback-history{margin:0 0 16px;border-top:1px solid var(--line);padding-top:13px}
+.rt-feedback-dialog .feedback-history-toggle{padding:0;border:0;background:transparent;color:var(--ink);font-size:var(--type-support);font-weight:700}
+.rt-feedback-dialog .feedback-history ul{display:flex;flex-direction:column;gap:7px;padding:0;margin:12px 0;list-style:none}
+.rt-feedback-dialog .feedback-history li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 12px;background:var(--subtle);border-radius:8px;font-size:var(--type-support)}
+.rt-feedback-dialog .feedback-history li span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rt-feedback-dialog .feedback-history li small{white-space:nowrap;color:var(--muted)}
+.rt-feedback-dialog .feedback-history>p{color:var(--muted);font-size:var(--type-support)}
+.rt-feedback-dialog .feedback-success{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;padding:30px 10px;color:var(--ink)}
+.rt-feedback-dialog .feedback-success svg{color:var(--field-focus-border)}
+.rt-feedback-dialog .feedback-success h3{margin:0;font-size:1.2rem}
+.rt-feedback-dialog .feedback-success p{margin:0;color:var(--muted)}
+.rt-feedback-dialog .feedback-success span{font-size:var(--type-caption);overflow-wrap:anywhere}
+@media(max-width:620px){
+ .rt-feedback-dialog .feedback-kinds{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .rt-feedback-dialog .feedback-previews{grid-template-columns:repeat(3,minmax(0,1fr))}
+ .rt-feedback-dialog .feedback-history li{align-items:flex-start;flex-direction:column}
+ .rt-feedback-dialog .feedback-history li small{white-space:normal}
+}
