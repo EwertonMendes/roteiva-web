@@ -1,3 +1,4 @@
+import {FolderTree as ModalFolderTree} from "lucide-react";
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {AppButton} from '../ui/AppButton';
 import {AppInput} from '../ui/AppInput';
@@ -43,7 +44,7 @@ export function AssistedLibraryImport({projectId,parentId,sources,unavailable,on
  return <AppModal size="wide" className="virtual-library-editor virtual-library-preview"
    onCloseRequest={()=>{if(!busy)onClose();}} aria-labelledby="assisted-library-title">
    <div className="rt-modal__layout">
-   <AppModalHeader title="Revisar organização selecionada" titleId="assisted-library-title"
+   <AppModalHeader icon={<ModalFolderTree size={26}/>} title="Revisar organização selecionada" titleId="assisted-library-title"
      onClose={onClose} closeDisabled={busy}/>
    <AppModalBody><p>{recursive?'As subpastas e os arquivos encontrados dentro das pastas selecionadas no Dropbox foram incluídos nesta prévia. Confirme antes de importar.':'O Google Drive compartilha os arquivos individualmente: selecionar uma pasta não libera automaticamente seu conteúdo. Abra cada pasta abaixo e selecione os arquivos e as subpastas para incluí-los na estrutura.'} Os originais permanecem no provedor.</p>
   <p>Pastas virtuais com o mesmo nome no destino serão reutilizadas quando houver uma única correspondência. Arquivos sem pasta pai selecionada ficam na pasta atual; ajuste os destinos abaixo.</p>
