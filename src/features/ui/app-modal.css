@@ -121,3 +121,18 @@
  .rt-modal.vl-preview-modal .rt-modal__body.vl-preview-body{margin:0 8px 10px}
  .rt-modal.review-dialog > .rt-modal__header{padding:18px}
 }
+
+/* Keep stable form test hooks without reactivating pre-system dialog surfaces. */
+.rt-modal > form.project-modal.rt-modal__layout{
+ width:100%;max-width:none;min-width:0;height:auto;max-height:calc(100dvh - 34px);
+ margin:0;padding:0;border:0;border-radius:0;
+ background:transparent;box-shadow:none;backdrop-filter:none;display:flex;flex-direction:column;
+}
+:root .rt-modal form.project-modal .rt-modal__body .rt-input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+:root .rt-modal form.project-modal .rt-modal__body .rt-select-trigger{
+ min-height:var(--rt-control-height);height:var(--rt-control-height);background:var(--subtle);
+ border-color:var(--line);border-radius:11px;color:var(--ink);font-size:var(--type-body);
+}
+:root .rt-modal form.project-modal .rt-modal__body .rt-textarea{
+ border:1px solid var(--line);background:var(--subtle);font-weight:400;
+}
