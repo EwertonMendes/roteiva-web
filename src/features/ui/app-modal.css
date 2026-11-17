@@ -1,0 +1,234 @@
+/*
+ * Modal parity with the stable PROD "Novo compromisso".
+ * The calendar, date/time popovers, shared focus contract and global controls
+ * are intentionally UNTOUCHED. Every selector below is modal-scoped.
+ */
+dialog.rt-parity-modal {
+  box-sizing:border-box;position:fixed;inset:0;margin:auto;
+  width:min(800px,calc(100vw - 36px));max-width:calc(100vw - 36px);
+  max-height:calc(100dvh - 36px);padding:0;overflow:hidden;
+  border:1px solid var(--line);border-radius:22px;
+  background:var(--modal-surface);color:var(--ink);
+  box-shadow:0 30px 110px #0008;
+  overscroll-behavior:contain;
+}
+dialog.rt-parity-modal[open]{display:flex;flex-direction:column;}
+dialog.rt-parity-modal::backdrop{background:#080809bb;backdrop-filter:blur(7px)}
+dialog.rt-parity-modal.rt-modal--compact{width:min(460px,calc(100vw - 36px))}
+dialog.rt-parity-modal.rt-modal--medium{width:min(800px,calc(100vw - 36px))}
+dialog.rt-parity-modal.rt-modal--wide{width:min(850px,calc(100vw - 36px))}
+dialog.rt-parity-modal.rt-modal--full{width:min(1160px,calc(100vw - 36px))}
+.rt-parity-modal > .rt-modal__layout,
+.rt-parity-modal > form.rt-modal__layout{
+  display:flex;flex:1;min-width:0;min-height:0;flex-direction:column;
+  width:100%;max-width:100%;max-height:calc(100dvh - 38px);
+  padding:0;margin:0;border:0;background:transparent;box-shadow:none;
+}
+.rt-parity-modal .rt-modal__header{
+  display:flex;align-items:flex-start;gap:18px;flex:0 0 auto;
+  padding:30px 34px 0;background:var(--modal-surface);color:var(--ink);
+  border:0;margin:0;min-width:0;
+}
+.rt-parity-modal .rt-modal__icon{
+  display:grid;place-items:center;flex:0 0 26px;
+  width:26px;height:30px;margin-top:2px;color:var(--ink);
+}
+.rt-parity-modal .rt-modal__icon svg{display:block;width:26px;height:26px;stroke-width:2}
+.rt-parity-modal .rt-modal__heading{flex:1;min-width:0}
+.rt-parity-modal .rt-modal__heading h2{
+  color:var(--ink);margin:0;
+  font-size:clamp(26px,2.6vw,36px);font-weight:760;line-height:1.1;
+  letter-spacing:-.025em;overflow-wrap:anywhere;
+}
+.rt-parity-modal .rt-modal__heading p{
+  color:var(--muted);margin:10px 0 0;
+  font-size:var(--type-body);font-weight:400;line-height:1.5;
+  overflow-wrap:anywhere;
+}
+.rt-parity-modal .rt-modal__header-actions{display:flex;align-items:center;gap:8px;flex:0 0 auto}
+.rt-parity-modal .rt-modal__close{
+  margin-left:auto;display:grid;place-items:center;flex:0 0 42px;
+  width:42px;height:42px;min-width:42px;min-height:42px;padding:0;
+  border:1px solid var(--line);border-radius:12px;
+  background:var(--subtle);color:var(--muted);
+}
+.rt-parity-modal .rt-modal__body{
+  display:block;flex:1 1 auto;min-height:0;min-width:0;
+  overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;
+  scrollbar-width:thin;padding:0 34px;
+  color:var(--ink);
+}
+.rt-parity-modal .rt-modal__section{
+  display:block;min-width:0;margin:0;padding:28px 0;
+  border:0;border-bottom:1px solid var(--line);
+}
+.rt-parity-modal .rt-modal__section-title{
+  display:flex;align-items:center;gap:13px;margin:0 0 21px;
+  font-size:1.08rem;font-weight:760;line-height:1.35;color:var(--ink);
+}
+.rt-parity-modal .rt-modal__section-title svg{width:19px;height:19px;stroke-width:2;flex:none}
+.rt-parity-modal .rt-modal__footer{
+  display:flex;align-items:center;justify-content:flex-end;flex:0 0 auto;
+  gap:10px;min-height:82px;margin:0;padding:19px 34px 24px;
+  border:0;border-top:1px solid var(--line);background:var(--modal-surface);
+}
+.rt-parity-modal .rt-modal__footer .rt-button{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  min-height:47px;padding:0 17px;border-radius:10px;
+  font:inherit;font-weight:650;white-space:nowrap;
+}
+.rt-parity-modal .rt-modal__footer .rt-button--primary{
+  background:#f6f6f6;color:#111;border:1px solid #ececec;
+}
+.rt-parity-modal .rt-modal__footer .rt-button--primary:hover{background:#e6e6e6}
+.rt-parity-modal .rt-modal__footer .rt-button--secondary{
+  background:var(--subtle);color:var(--ink);border:1px solid var(--line);
+}
+/* Only stand-alone fields: never style nested date picker, time picker,
+   a masked currency input or the inside of an adorned composite input. */
+.rt-parity-modal .rt-modal__body label:not(.cd-form-types label):not(.review-sharing-option){
+  color:var(--ink);font-size:var(--type-body);font-weight:700;
+}
+.rt-parity-modal .rt-modal__body label > .rt-input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]):not([type="file"]),
+.rt-parity-modal .rt-modal__body label > .rt-select .rt-select-trigger{
+  box-sizing:border-box;width:100%;min-width:0;min-height:52px;height:52px;
+  background:var(--subtle);color:var(--ink);
+  border:1px solid var(--line);border-radius:11px;
+  font-size:var(--type-body);font-weight:500;
+}
+.rt-parity-modal .rt-modal__body label > .rt-input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]):not([type="file"]){padding:0 14px}
+.rt-parity-modal .rt-modal__body label > .rt-textarea{
+  display:block;width:100%;min-width:0;min-height:80px;padding:12px 14px;
+  background:var(--subtle);color:var(--ink);border:1px solid var(--line);
+  border-radius:11px;font-size:var(--type-body);font-weight:500;
+}
+.rt-parity-modal .rt-modal__body label > .rt-input:focus,
+.rt-parity-modal .rt-modal__body label > .rt-textarea:focus,
+.rt-parity-modal .rt-modal__body label > .rt-select .rt-select-trigger:focus-visible{
+  border-color:var(--field-focus-border);
+  box-shadow:0 0 0 3px var(--field-focus-ring);
+  outline:none;
+}
+.rt-parity-modal .rt-modal__body .form-grid,
+.rt-parity-modal .rt-modal__body .cd-form-grid{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;
+}
+.rt-parity-modal .rt-modal__body .rt-date-form-field{
+  display:flex;flex-direction:column;gap:10px;min-width:0;
+}
+.rt-parity-modal .rt-modal__body .rt-date-form-label{
+  color:var(--ink);font-size:var(--type-body);font-weight:700;
+}
+.rt-parity-modal .rt-modal__body .money-input{--money-field-height:52px;border-radius:11px}
+.rt-parity-modal .rt-modal__body .cd-form-types label{font-weight:600}
+.rt-parity-modal .rt-modal__body .cd-form-fields,
+.rt-parity-modal .rt-modal__body.cd-form-fields{display:block;min-width:0;overflow-y:auto}
+.rt-parity-modal .rt-modal__body .rt-modal__section > label,
+.rt-parity-modal .rt-modal__body .rt-modal__section > .form-grid,
+.rt-parity-modal .rt-modal__body .rt-modal__section > .cd-form-grid{
+  display:grid;gap:10px;min-width:0;margin-bottom:20px;
+}
+.rt-parity-modal .rt-modal__body .rt-modal__section > label:last-child,
+.rt-parity-modal .rt-modal__body .rt-modal__section > .form-grid:last-child,
+.rt-parity-modal .rt-modal__body .rt-modal__section > .cd-form-grid:last-child{margin-bottom:0}
+.rt-parity-modal .rt-modal__body .form-grid > label,
+.rt-parity-modal .rt-modal__body .cd-form-grid > label{
+  display:flex;flex-direction:column;gap:10px;min-width:0;
+}
+.rt-parity-modal .rt-modal__body .cd-form-recurring{display:flex;flex-direction:column;gap:20px}
+.rt-parity-modal .rt-modal__body .cd-form-recurring > label{display:flex;flex-direction:column;gap:10px}
+.rt-parity-modal .rt-modal__body .cd-form-types{margin:0 0 20px}
+.rt-parity-modal .rt-modal__body .field-hint{color:var(--muted);font-size:var(--type-support);font-weight:400}
+.rt-parity-modal .rt-modal__body .rt-modal__section > p{color:var(--muted);font-size:var(--type-support);line-height:1.5}
+.rt-parity-modal .rt-modal__body label > .rt-input-frame{height:52px}
+.rt-parity-modal .rt-modal__body label > .rt-input-frame > .rt-input{border:0;background:transparent;box-shadow:none}
+.rt-parity-modal .rt-modal__body label > .rt-input-frame:focus-within{border-color:var(--field-focus-border);box-shadow:0 0 0 3px var(--field-focus-ring)}
+/* Feature containers preserve media and scroll UX but never override shell title. */
+.rt-parity-modal.vl-preview-modal{height:min(84dvh,720px);max-height:calc(100dvh - 36px)}
+.rt-parity-modal.vl-preview-modal .rt-modal__body.vl-preview-body{
+  display:flex;align-items:center;justify-content:center;
+  margin:16px 22px 20px;padding:0;min-height:0;overflow:hidden;
+  border-radius:12px;background:var(--subtle);
+}
+.rt-parity-modal.vl-preview-modal.is-expanded{
+  width:calc(100vw - 8px);max-width:calc(100vw - 8px);
+  height:calc(100dvh - 8px);max-height:calc(100dvh - 8px);
+}
+.rt-parity-modal.review-dialog > .review-dialog-body{min-height:0;overflow:auto}
+.rt-parity-modal.pc-dialog .rt-modal__body.pc-editor-body{display:flex;flex:1;min-height:0;overflow:auto}
+.rt-parity-modal.pc-dialog .rt-modal__footer > div{flex:1}
+.rt-parity-modal.rt-confirm-dialog .rt-modal__body{flex:0 1 auto}
+.rt-parity-modal.rt-confirm-dialog .rt-modal__icon .rt-confirm-symbol{margin:0;width:26px;height:26px;border:0;background:none}
+.rt-parity-modal.rt-confirm-dialog .rt-modal__icon .rt-confirm-symbol svg{width:23px;height:23px}
+/* Non-destructive overlay behavior: hide the queue without cancelling uploads. */
+:root:has(dialog.rt-parity-modal.vl-preview-modal[open]) .rl-upload-queue{visibility:hidden}
+@media(max-width:700px){
+ dialog.rt-parity-modal{width:calc(100vw - 18px);max-width:calc(100vw - 18px);
+  max-height:calc(100dvh - 18px);border-radius:16px}
+ dialog.rt-parity-modal.rt-modal--compact,
+ dialog.rt-parity-modal.rt-modal--medium,
+ dialog.rt-parity-modal.rt-modal--wide,
+ dialog.rt-parity-modal.rt-modal--full{width:calc(100vw - 18px);max-width:calc(100vw - 18px)}
+ .rt-parity-modal .rt-modal__header{padding:20px 18px 0;gap:12px}
+ .rt-parity-modal .rt-modal__icon{flex-basis:26px;width:26px}
+ .rt-parity-modal .rt-modal__icon svg{width:26px;height:26px}
+ .rt-parity-modal .rt-modal__heading h2{font-size:26px}
+ .rt-parity-modal .rt-modal__heading p{font-size:var(--type-support)}
+ .rt-parity-modal .rt-modal__body{padding:0 18px}
+ .rt-parity-modal .rt-modal__section{padding:19px 0}
+ .rt-parity-modal .rt-modal__footer{padding:14px 18px max(16px,env(safe-area-inset-bottom));gap:9px}
+ .rt-parity-modal .rt-modal__body .form-grid,
+ .rt-parity-modal .rt-modal__body .cd-form-grid{grid-template-columns:1fr;gap:16px}
+ .rt-parity-modal .rt-modal__body .cd-form-types{grid-template-columns:1fr}
+ .rt-parity-modal .rt-modal__footer .rt-button{min-width:0}
+}
+@media(max-width:380px){
+ .rt-parity-modal .rt-modal__footer{flex-wrap:wrap}
+ .rt-parity-modal .rt-modal__footer .rt-button{flex:1}
+}
+
+/* Inherited legacy project-modal styles must never turn the new form into a
+ * second translucent card. These selectors only affect converted dialogs. */
+:root .rt-parity-modal > form.rt-modal__layout.project-modal,
+:root[data-theme="dark"] .rt-parity-modal > form.rt-modal__layout.project-modal{
+  display:flex;flex-direction:column;flex:1;align-items:stretch;
+  width:100%;max-width:100%;height:auto;max-height:calc(100dvh - 38px);
+  min-height:0;overflow:hidden;
+  padding:0;margin:0;border:0;border-radius:0;
+  background:transparent;box-shadow:none;backdrop-filter:none;
+}
+:root .rt-parity-modal .rt-modal__body .rt-modal__section label,
+:root[data-theme="dark"] .rt-parity-modal .rt-modal__body .rt-modal__section label{
+  color:var(--ink);font-weight:700;
+}
+:root .rt-parity-modal .rt-modal__body .rt-modal__section label > .rt-input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]):not([type="file"]),
+:root .rt-parity-modal .rt-modal__body .rt-modal__section label > .rt-select .rt-select-trigger{
+  min-height:52px;height:52px;background:var(--subtle);
+  border:1px solid var(--line);border-radius:11px;color:var(--ink);
+  font-family:inherit;font-size:var(--type-body);font-weight:500;
+}
+:root .rt-parity-modal .rt-modal__body .rt-modal__section label > .rt-textarea{
+  border:1px solid var(--line);background:var(--subtle);box-shadow:none;
+  color:var(--ink);font-weight:500;
+}
+:root .rt-parity-modal .rt-modal__body .rt-modal__section label > .rt-input:focus,
+:root .rt-parity-modal .rt-modal__body .rt-modal__section label > .rt-textarea:focus{
+  border-color:var(--field-focus-border);
+  box-shadow:0 0 0 3px var(--field-focus-ring);outline:none;
+}
+:root .rt-parity-modal .rt-modal__body .money-input > input.rt-input,
+:root .rt-parity-modal .rt-modal__body .money-input > input.rt-input:focus{
+  height:100%;min-height:0;padding:0 12px;border:0;border-radius:0;
+  background:transparent;box-shadow:none;outline:none;
+}
+/* The canonical date/time control keeps exactly one focus ring on its
+ * container. No rule in this stylesheet targets its inner inputs or buttons. */
+
+/* Final specificity tier: a focused single AppInput must never inherit the
+ * neutral border from older project/client CSS. Composite fields are excluded. */
+:root .rt-parity-modal .rt-modal__body .rt-modal__section label > .rt-input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]):not([type="file"]):focus,
+:root .rt-parity-modal .rt-modal__body .rt-modal__section label > .rt-textarea:focus{
+  border-color:var(--field-focus-border);
+  box-shadow:0 0 0 3px var(--field-focus-ring);
+  outline:none;
+}

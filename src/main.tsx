@@ -38,6 +38,7 @@ import "./features/finance/finance.css";
 import "./features/calendar/calendar.css";
 import "./features/ui/confirmation-dialog.css";
 import "./features/ui/modal-scroll.css";
+import "./features/ui/app-modal.css";
 import "./features/ui/toast.css";
 
 class AppErrorBoundary extends Component<{children:ReactNode},{error:string}> {

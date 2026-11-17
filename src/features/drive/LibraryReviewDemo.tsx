@@ -1,4 +1,6 @@
+import {Unlink as ModalUnlink} from "lucide-react";
 import {AppButton} from "../ui/AppButton";
+import {AppModal,AppModalHeader,AppModalBody,AppModalFooter} from "../ui/AppModal";
 import { AppSelect } from "../ui/AppSelect";
 import { useState } from "react";
 import { Check, ChevronDown, FolderOpen, MoreHorizontal, Plus, ShieldCheck } from "lucide-react";
@@ -107,9 +109,14 @@ export function LibraryReviewDemo() {
       loading={false} working={false} canRead={true} hasMore={false} error=""
       linkedIds={new Set(activeLinks)} onClose={()=>setPicker(false)} onNavigate={(_,next)=>setPickerPath(next)}
       onMore={()=>{}} onLink={linkMultiple} onConnect={()=>{}}/>}
-    {removeId&&<div className="rl-overlay"><div className="rl-confirm" role="dialog" aria-modal="true" aria-label="Desvincular pasta">
-      <h2>Desvincular “{folders.find(f=>f.id===removeId)?.name}”?</h2><p>A pasta não ficará mais vinculada neste exemplo. Nenhum arquivo é apagado.</p>
-      <footer><AppButton type="button" className="secondary-button" onClick={()=>setRemoveId(null)}>Manter pasta</AppButton><AppButton type="button" className="primary-button" onClick={()=>unlink(removeId)}>Desvincular</AppButton></footer>
-    </div></div>}
+    {removeId&&<AppModal size="compact" aria-label="Desvincular pasta" onCloseRequest={()=>setRemoveId(null)}>
+      <div className="rt-modal__layout">
+       <AppModalHeader icon={<ModalUnlink size={26}/>} description="O vínculo será removido sem excluir arquivos originais." title={<>Desvincular “{folders.find(f=>f.id===removeId)?.name}”?</>}
+         onClose={()=>setRemoveId(null)}/>
+       <AppModalBody><p>A pasta não ficará mais vinculada neste exemplo. Nenhum arquivo é apagado.</p></AppModalBody>
+       <AppModalFooter><AppButton type="button" variant="secondary" onClick={()=>setRemoveId(null)}>Manter pasta</AppButton>
+         <AppButton type="button" variant="primary" onClick={()=>unlink(removeId)}>Desvincular</AppButton></AppModalFooter>
+      </div>
+    </AppModal>}
   </section>;
 }

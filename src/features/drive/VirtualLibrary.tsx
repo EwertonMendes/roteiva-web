@@ -1,3 +1,4 @@
+import {HardDrive as ModalHardDrive, FolderPlus as ModalFolderPlus} from "lucide-react";
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {FolderOpen,FolderPlus,FolderTree,RefreshCw,Trash2,RotateCcw,ArrowLeft,Search,CloudUpload,FilePlus2,FolderInput,Pencil,MoveRight,AlertCircle,Plus,MoreVertical,ChevronRight,X,HardDrive} from 'lucide-react';
 import type {Project} from '../../domain/workspace';
@@ -11,7 +12,7 @@ import './virtual-library.css';
 import './library-explorer.css';
 import {LibraryProjectPicker} from './LibraryProjectPicker';
 import {libraryFolderKey,getLibraryFolder,setLibraryFolder,libraryFolderFlight,invalidateLibraryFolders,clearLibraryFolders} from './library-folder-cache';
-import {useOverlayFocus} from './DriveLibraryUI';
+import {AppModal,AppModalHeader,AppModalBody,AppModalFooter} from '../ui/AppModal';
 import {useStorageConnections} from './StorageConnectionsProvider';
 import {preparePicker,pickLibraryFiles,type PickerConfig} from './google-picker';
 import {DropboxLibraryPicker} from './DropboxLibraryPicker';
@@ -66,8 +67,6 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject,initi
  const [search,setSearch]=useState(''),[term,setTerm]=useState('');
  const [failedImports,setFailedImports]=useState<{parentId:string;items:FailedLibraryImport[]}|null>(null);
  const generation=useRef(0),loadRevision=useRef(0),mutation=useRef<AbortController|null>(null);
- const dialogRef=useOverlayFocus(()=>{if(!busy)setEdit(null);},Boolean(edit&&edit.action!=='move'),edit?.action+':'+edit?.node?.id);
- const accountsDialogRef=useOverlayFocus(()=>setSettingsOpen(false),settingsOpen);
  useEffect(()=>{
   if(edit?.action!=='create'&&edit?.action!=='rename')return;
   const frame=requestAnimationFrame(()=>{nameInput.current?.focus();if(edit.action==='rename')nameInput.current?.select();});
@@ -351,15 +350,17 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject,initi
     </div>}
    </div>
   </header>
-  {settingsOpen&&<div className="vl-accounts-backdrop" onPointerDown={event=>{if(event.target===event.currentTarget)setSettingsOpen(false);}}>
-   <div ref={accountsDialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="vl-accounts-title" aria-describedby="vl-accounts-description" className="vl-accounts-dialog">
-    <header className="vl-accounts-header">
-     <div className="vl-accounts-heading"><h2 id="vl-accounts-title">Contas de armazenamento</h2><p id="vl-accounts-description">Gerencie o acesso aos seus arquivos em um só lugar.</p></div>
-     <div className="vl-accounts-header-actions">
-      <AppButton type="button" aria-label="Atualizar contas" title="Atualizar contas" disabled={storage.loading} onClick={()=>void storage.refresh(true)}><RefreshCw size={18} className={storage.loading?'vl-loading':''} aria-hidden="true"/></AppButton>
-      <AppButton type="button" aria-label="Fechar contas" title="Fechar" onClick={()=>setSettingsOpen(false)}><X size={18} aria-hidden="true"/></AppButton>
-     </div>
-    </header>
+  {settingsOpen&&<AppModal size="wide" className="vl-accounts-dialog" onCloseRequest={()=>setSettingsOpen(false)}
+   aria-labelledby="vl-accounts-title" aria-describedby="vl-accounts-description">
+   <div className="rt-modal__layout">
+     <AppModalHeader icon={<ModalHardDrive size={26}/>} title="Contas de armazenamento" titleId="vl-accounts-title" descriptionId="vl-accounts-description"
+       description="Gerencie o acesso aos seus arquivos em um só lugar."
+       onClose={()=>setSettingsOpen(false)} closeLabel="Fechar contas" actions={
+         <AppButton type="button" variant="secondary" controlSize="sm" aria-label="Atualizar contas"
+           title="Atualizar contas" disabled={storage.loading} onClick={()=>void storage.refresh(true)}>
+           <RefreshCw size={18} className={storage.loading?'vl-loading':''} aria-hidden="true"/>
+         </AppButton>}/>
+     <AppModalBody className="vl-accounts-content">
     {storage.error&&<div role="alert" className="vl-accounts-provider-error">Não foi possível atualizar {storage.error}. Tente novamente.</div>}
     {connectionError&&<div role="alert" className="vl-accounts-provider-error">{connectionError}</div>}
     {manualOAuth&&<div className="vl-oauth-pending" role="status">
@@ -368,8 +369,9 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject,initi
      <AppButton type="button" onClick={()=>{void storage.refresh(true).then(()=>setManualOAuth(null));}}>Atualizar contas</AppButton>
     </div>}
     <LibraryConnections busy={busy||Boolean(connectingProvider)} pendingProvider={connectingProvider} onCancelConnect={cancelConnection} selectedDriveId={account?.id} selectedDropboxId={dropbox?.id} onSelectDrive={setAccountId} onSelectDropbox={setDropboxId} onConnect={(provider,accountId)=>void connect(provider,accountId)}/>
+    </AppModalBody>
    </div>
-  </div>}
+  </AppModal>}
   {storage.error&&<div role="alert" className="vl-compact-alert"><AlertCircle size={17}/><span>Falha ao verificar {storage.error}.</span><AppButton onClick={()=>void storage.refresh(true)}>Tentar novamente</AppButton></div>}
   {returnNotice&&<div role="status" className="vl-compact-alert"><AlertCircle size={17}/><span>{returnNotice}</span><AppButton onClick={()=>setReturnNotice('')}>Dispensar</AppButton></div>}
   {error&&<div role="alert" className="vl-compact-alert"><AlertCircle size={17}/><span>{error}</span><AppButton onClick={()=>setError('')} aria-label="Dispensar erro"><X size={16}/></AppButton></div>}
@@ -431,19 +433,23 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject,initi
   {base&&<AppInput ref={fileInput} type="file" multiple hidden onChange={e=>{const files=Array.from(e.target.files||[]);e.target.value='';void upload(files);}}/>}
  {edit?.action==='move'&&edit.node&&<MoveDestinationDialog key={edit.node.id} base={base} source={edit.node}
   busy={busy} error={error} onClose={()=>{setError('');setEdit(null);}} onConfirm={dest=>void save(dest)}/>}
- {edit&&edit.action!=='move'&&<div className="virtual-library-backdrop"><div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="virtual-library-title" className="virtual-library-editor">
-  <h3 id="virtual-library-title">{{create:'Nova pasta',rename:'Renomear',restore:'Restaurar',trash:'Remover do Roteiva'}[edit.action]}</h3>
-  {error&&<div role="alert" className="virtual-library-error">{error}</div>}
-  <form onSubmit={e=>{e.preventDefault();void save();}}>
+ {edit&&edit.action!=='move'&&<AppModal size="compact" className="virtual-library-editor" aria-labelledby="virtual-library-title"
+  onCloseRequest={()=>{if(!busy){setError('');setEdit(null);}}}>
+  <form className="rt-modal__layout" onSubmit={e=>{e.preventDefault();void save();}}>
+   <AppModalHeader icon={<ModalFolderPlus size={26}/>} description={{create:"Escolha um nome para organizar seus arquivos.",rename:"Defina o novo nome da pasta ou arquivo.",restore:"Devolva o item à sua organização.",trash:"O arquivo original permanece na conta conectada."}[edit.action]} title={{create:'Nova pasta',rename:'Renomear',restore:'Restaurar',trash:'Remover do Roteiva'}[edit.action]}
+     titleId="virtual-library-title" onClose={()=>{setError('');setEdit(null);}} closeDisabled={busy}/>
+   <AppModalBody>
+    {error&&<div role="alert" className="virtual-library-error">{error}</div>}
    {(edit.action==='create'||edit.action==='rename')&&<label>Nome<AppInput ref={nameInput} aria-label="Nome" required maxLength={120} value={name} onChange={e=>setName(e.target.value)}/></label>}
    {edit.action==='trash'&&<p>Remover este item da Biblioteca? Os arquivos originais permanecem no Google Drive ou Dropbox.</p>}
    {edit.action==='restore'&&<p>Restaurar este item. Caso a pasta original também esteja na lixeira, restaure primeiro a pasta.</p>}
-   <div className="virtual-library-toolbar">
-    <AppButton type="submit" disabled={busy||((edit.action==='create'||edit.action==='rename')&&!name.trim())}>{busy?'Salvando…':edit.action==='trash'?'Remover da Biblioteca':edit.action==='restore'?'Restaurar':'Confirmar'}</AppButton>
-    <AppButton type="button" disabled={busy} onClick={()=>{setError('');setEdit(null);}}>Cancelar</AppButton>
-   </div>
+   </AppModalBody>
+   <AppModalFooter>
+    <AppButton variant="primary" type="submit" disabled={busy||((edit.action==='create'||edit.action==='rename')&&!name.trim())}>{busy?'Salvando…':edit.action==='trash'?'Remover da Biblioteca':edit.action==='restore'?'Restaurar':'Confirmar'}</AppButton>
+    <AppButton variant="secondary" type="button" disabled={busy} onClick={()=>{setError('');setEdit(null);}}>Cancelar</AppButton>
+   </AppModalFooter>
   </form>
- </div></div>}
+ </AppModal>}
  {dropboxPicker&&dropbox&&<DropboxLibraryPicker key={dropbox.id+':'+dropboxStructure} connectionId={dropbox.id} includeFolders={dropboxStructure} onClose={()=>setDropboxPicker(false)} onSelect={(ids,names,folderIds)=>void addDropbox(ids,names,folderIds)}/>}
  {preview&&selectedProjectId&&<LibraryAssetPreview key={preview.id} projectId={selectedProjectId} node={preview} onClose={()=>setPreview(null)}/>}
  {structure&&selectedProjectId&&<LibraryStructureDialog key={selectedProjectId+':'+parent} projectId={selectedProjectId} parentId={parent} onClose={()=>setStructure(false)} onApplied={()=>{setStructure(false);notifyFileCount();void load();}}/>}

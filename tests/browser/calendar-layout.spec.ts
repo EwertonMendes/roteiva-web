@@ -325,7 +325,7 @@ test("nested day/editor/confirmation dialogs keep the underlying day and lock ba
   await expect(page.locator("html")).not.toHaveCSS("overflow-y","hidden");
 });
 
-test("legacy overlays and native AppDialog share the global scroll lock",async({page},info)=>{
+test("native project and client dialogs share the global scroll lock",async({page},info)=>{
   await enterCalendar(page,"global-modal-scroll-"+info.project.name+"@example.com");
   const sidebar=page.locator(".sidebar nav");
   async function navigateTo(name:RegExp){
@@ -334,11 +334,11 @@ test("legacy overlays and native AppDialog share the global scroll lock",async({
   }
   await navigateTo(/^Projetos/);
   await page.getByRole("button",{name:"Criar projeto"}).first().click();
-  await expect(page.locator(".modal-backdrop")).toBeVisible();
+  await expect(page.locator("dialog.rt-project-dialog")).toBeVisible();
   await expect(page.locator("html")).toHaveCSS("overflow-y","hidden");
   await expect(page.locator("body")).toHaveCSS("overflow-y","hidden");
   await page.locator(".project-modal").getByRole("button",{name:"Cancelar"}).click();
-  await expect(page.locator(".modal-backdrop")).toHaveCount(0);
+  await expect(page.locator("dialog.rt-project-dialog")).toHaveCount(0);
   await expect(page.locator("html")).not.toHaveCSS("overflow-y","hidden");
 
   await navigateTo(/^Clientes/);
@@ -407,4 +407,79 @@ test("modal surfaces are opaque and identical across calendar, confirmations and
     await expect(page.locator(".roteiva-calendar")).toBeVisible();
     await expect(selected.locator(".calendar-event-counter")).toHaveText("1");
   }
+});
+
+
+test("project, client and finance modals match PROD calendar heading and single-ring date field",async({page},info)=>{
+  await enterCalendar(page,"modal-parity-"+info.project.name+"@example.com");
+  const nav=async(name:string)=>{
+    const opener=page.getByRole("button",{name:"Abrir menu",exact:true});
+    if(await opener.isVisible())await opener.click();
+    await page.locator(".sidebar nav").getByRole("button",{name:new RegExp("^"+name)}).click();
+    await expect(page.locator("[inert]")).toHaveCount(0);
+  };
+  await page.getByRole("button",{name:"Novo compromisso",exact:true}).first().click();
+  const canonical=page.locator("dialog.roteiva-calendar-form");
+  await expect(canonical).toBeVisible();
+  const ref=await canonical.evaluate(dialog=>{
+    const header=dialog.querySelector<HTMLElement>(".calendar-form-title")!;
+    const h2=header.querySelector("h2")!;
+    const sub=header.querySelector("p")!;
+    const icon=header.querySelector(":scope > svg")!;
+    const field=dialog.querySelector<HTMLInputElement>(".calendar-basic-field > input")!;
+    const h=getComputedStyle(h2),p=getComputedStyle(sub),i=icon.getBoundingClientRect(),f=field.getBoundingClientRect();
+    return {size:h.fontSize,weight:h.fontWeight,line:h.lineHeight,subtitle:p.fontSize,iconWidth:i.width,
+      inputHeight:f.height,headerPadding:i.left-dialog.getBoundingClientRect().left};
+  });
+  await canonical.getByRole("button",{name:"Cancelar"}).click();
+  const compare=async(selector:string,hasInput=true)=>{
+    const modal=page.locator(selector);
+    await expect(modal).toBeVisible();
+    const current=await modal.evaluate((dialog,hasInput)=>{
+      const header=dialog.querySelector<HTMLElement>(".rt-modal__header")!;
+      const h2=header.querySelector("h2")!;
+      const sub=header.querySelector("p")!;
+      const icon=header.querySelector(".rt-modal__icon svg")!;
+      const field=dialog.querySelector<HTMLInputElement>(".rt-modal__section > label > input.rt-input")!;
+      const h=getComputedStyle(h2),p=getComputedStyle(sub),i=icon.getBoundingClientRect();
+      return {size:h.fontSize,weight:h.fontWeight,line:h.lineHeight,subtitle:p.fontSize,
+        iconWidth:i.width,inputHeight:hasInput?field.getBoundingClientRect().height:0,
+        headerPadding:i.left-dialog.getBoundingClientRect().left};
+    },hasInput);
+    expect(current.size).toBe(ref.size);
+    expect(current.weight).toBe(ref.weight);
+    expect(current.line).toBe(ref.line);
+    expect(current.subtitle).toBe(ref.subtitle);
+    expect(Math.abs(current.iconWidth-ref.iconWidth)).toBeLessThan(1);
+    expect(Math.abs(current.headerPadding-ref.headerPadding)).toBeLessThan(2);
+    if(hasInput)expect(Math.abs(current.inputHeight-ref.inputHeight)).toBeLessThan(1);
+    await expect(modal.locator(".rt-modal__icon svg")).toBeVisible();
+    await expect(modal.locator(".rt-modal__heading p")).toBeVisible();
+  };
+  await nav("Projetos");
+  await page.getByRole("button",{name:"Criar projeto",exact:true}).first().click();
+  await compare("dialog.rt-project-dialog");
+  const project=page.locator("dialog.rt-project-dialog");
+  const date=project.locator(".calendar-picker-control").first();
+  await project.getByRole("button",{name:"Abrir calendário de data"}).click();
+  await expect(page.getByRole("dialog",{name:"Escolher data"})).toBeVisible();
+  const focus=await date.evaluate(el=>{
+    const inner=el.querySelector<HTMLInputElement>("input.rt-input")!;
+    const outer=getComputedStyle(el),input=getComputedStyle(inner);
+    return {border:outer.borderTopColor,shadow:outer.boxShadow,inputBorder:input.borderTopWidth,inputShadow:input.boxShadow};
+  });
+  expect(focus.shadow).not.toBe("none");
+  expect(focus.inputBorder).toBe("0px");
+  expect(focus.inputShadow).toBe("none");
+  await page.keyboard.press("Escape");
+  await project.getByRole("button",{name:"Cancelar"}).click();
+  await nav("Clientes");
+  await page.getByRole("button",{name:"Novo cliente",exact:true}).first().click();
+  await compare("dialog.cd-form-dialog");
+  await page.locator("dialog.cd-form-dialog").getByRole("button",{name:"Cancelar"}).click();
+  await nav("Financeiro");
+  await page.getByRole("button",{name:"Nova receita"}).click();
+  await compare("dialog.rt-finance-dialog",false);
+  await expect(page.locator("dialog.rt-finance-dialog .rt-date-form-field .calendar-picker-control")).toBeVisible();
+  await page.locator("dialog.rt-finance-dialog").getByRole("button",{name:"Cancelar"}).click();
 });
