@@ -179,3 +179,9 @@
  border-color:var(--field-focus-border);
  box-shadow:0 0 0 3px var(--field-focus-ring);
 }
+
+/* Private media preview owns the visual foreground; the floating transfer
+   queue stays mounted (and retains transfers) but must not overlap the viewer. */
+:root:has(dialog.vl-preview-modal[open]) .rl-upload-queue{
+ visibility:hidden;
+}
