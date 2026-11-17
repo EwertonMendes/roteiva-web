@@ -92,3 +92,12 @@ test('all date inputs use the branded shared calendar picker, never browser-nati
   assert.match(dashboard,/<AppDateFormField key=\{editingFinanceEntry/);
   assert.match(detail,/<CalendarDateField label="Prazo do projeto"/);
 });
+
+test('client directory has one photo edit action without a duplicate pencil overlay',()=>{
+  const source=readFileSync(new URL('../src/features/clients/ClientDirectory.tsx',import.meta.url),'utf8');
+  const styles=readFileSync(new URL('../src/features/clients/clients.css',import.meta.url),'utf8');
+  assert.doesNotMatch(source,/cd-avatar-edit|<Pencil/);
+  assert.doesNotMatch(styles,/\.cd-avatar-edit/);
+  assert.match(source,/cd-change-photo/);
+  assert.match(source,/Alterar foto/);
+});
