@@ -5,6 +5,8 @@ import { ApiError, type Env } from './types.ts';
 import { reviewRouter,cleanupExpiredReviews } from './reviews.ts';
 import {DRIVE_SCOPE} from './google.ts';
 import { identity,verifiedTrialPrincipal } from './auth.ts';
+import { feedbackRouter } from './feedback.ts';
+import { assertNotDeleting } from './account-deletion.ts';
 import { callback, start, launch, enabled } from './oauth.ts';
 import { metadata, disconnect, about } from './drive.ts';
 import { listFolders, listFolderItems } from './folders.ts';
@@ -39,6 +41,7 @@ function mediaRoute(path:string){return path.endsWith('/thumbnail')||path.endsWi
 function libraryBatchRoute(path:string){return /^\/library\/projects\/[0-9]+\/(imports|inspect|structure|uploads\/destination)$/.test(path);}
 function operationName(path:string):string{
   if(mediaRoute(path))return 'thumbnail_or_media';
+  if(path==='/feedback')return 'feedback';
   if(path.startsWith('/reviews'))return 'reviews';
   if(path.includes('/uploads/'))return 'drive_upload';
   if(path.startsWith('/integrations/drive'))return 'drive_metadata';
@@ -96,6 +99,11 @@ export async function handle(request: Request, env: Env): Promise<Response> {
       const principal=await verifiedTrialPrincipal(request,env);
       if(!(await env.API_RATE_LIMIT.limit({key:env.ENVIRONMENT+':access:'+principal.uid})).success)throw new ApiError(429,'rate_limited');
       response=await ensureAccess(env,principal.uid,undefined,principal);
+    } else if (url.pathname==='/feedback' && (request.method==='POST'||request.method==='GET')) {
+      if(request.method==='POST'&&!allowedFrontend(env,origin))throw new ApiError(403,'origin_required');
+      const principal=await verifiedTrialPrincipal(request,env);
+      await assertNotDeleting(env,principal.uid);
+      response=await feedbackRouter(request,env,principal.uid,principal.verifiedEmail);
     } else if (/^\/stream\/ingest\/[-_A-Za-z0-9.]+$/.test(url.pathname)) {
       // Signed ingest requests come from the Stream transcoder, not a browser.
       // Do not require a Firebase token for this narrowly scoped temporary URL.
