@@ -1,9 +1,10 @@
 import { API_BASE_URL } from "../../lib/environment.ts";
 import {AppInput} from "../ui/AppInput";
 import {AppButton} from "../ui/AppButton";
+import {AppModal,AppModalHeader,AppModalBody,AppModalFooter} from "../ui/AppModal";
 import { AppSelect } from "../ui/AppSelect";
 import {useCallback,useEffect,useRef,useState} from 'react';
-import {ArrowLeft,Check,LoaderCircle,ChevronDown,Search,Trash2,X,Image as ImageIcon} from 'lucide-react';
+import {ArrowLeft,Check,LoaderCircle,ChevronDown,Search,Trash2,Image as ImageIcon} from 'lucide-react';
 import type {Project,ProjectCover,Client} from '../../domain/workspace';
 import {useDriveApi} from '../drive/drive-api';
 import type {DriveItem} from '../drive/DriveLibraryUI';
@@ -68,7 +69,6 @@ export function CoverEditor({project,client,onClose,onSave}:{project?:Project;cl
    const blob=await response.blob();
    return blob.type.startsWith('image/')&&blob.size<=1024*1024?blob:null;
  },[getDriveThumbnail,provider,account,user]);
- useEffect(()=>{const el=dialog.current!;el.showModal();return ()=>{if(el.open)el.close();};},[]);
  useEffect(()=>{if(search.trim()===term)return;const timer=setTimeout(()=>{setPage({files:[],nextPageToken:null});setMoreToken('');setTerm(search.trim());},300);return ()=>clearTimeout(timer);},[search,term]);
  useEffect(()=>{
   if(!choosing||!account||!canRead||virtual&&provider==='google_drive'){setBusy(false);return;}
@@ -151,9 +151,12 @@ export function CoverEditor({project,client,onClose,onSave}:{project?:Project;cl
    }).catch(e=>{if(!controller.signal.aborted)setError(e instanceof Error?e.message:'Não foi possível selecionar a imagem.');})
    .finally(()=>{if(!controller.signal.aborted){setBusy(false);const modal=dialog.current;if(modal?.isConnected&&!modal.open)modal.showModal();}});
  };
- return <dialog ref={dialog} className="pc-dialog" aria-labelledby="pc-editor-title" onCancel={e=>{e.preventDefault();onClose();}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
-  <header><div><span className="eyebrow">{client?'FOTO DO CLIENTE':'CAPA DO PROJETO'}</span><h2 id="pc-editor-title">{choosing?'Escolha uma imagem':'Encontre o melhor enquadramento'}</h2><p>{subject.name}</p></div><AppButton className="icon-button" type="button" onClick={onClose} aria-label="Fechar editor de capa"><X size={20}/></AppButton></header>
-  <div className={"pc-editor-body "+(choosing?"pc-editor-body--picker":"pc-editor-body--crop")}>
+ return <AppModal ref={dialog} size="wide" className="pc-dialog" aria-labelledby="pc-editor-title"
+   onCloseRequest={onClose}>
+  <AppModalHeader title={choosing?'Escolha uma imagem':'Encontre o melhor enquadramento'} titleId="pc-editor-title"
+    eyebrow={client?'FOTO DO CLIENTE':'CAPA DO PROJETO'} description={subject.name}
+    onClose={onClose} closeLabel="Fechar editor de capa"/>
+  <AppModalBody className={"pc-editor-body "+(choosing?"pc-editor-body--picker":"pc-editor-body--crop")}>
    {choosing?<>
     {context.loadingConnections&&<p className="pc-connection-status" role="status">Verificando Google Drive e Dropbox conectados…</p>}
     {context.error&&<div className="pc-connection-status pc-connection-status--warning" role="alert"><span>{context.error}</span><AppButton type="button" className="secondary-button" disabled={context.loadingConnections} onClick={context.retryConnections}>Atualizar conexões</AppButton></div>}
@@ -177,7 +180,7 @@ export function CoverEditor({project,client,onClose,onSave}:{project?:Project;cl
     <div className="pc-crop-content"><div className={'pc-editor-preview'+(client?' pc-editor-preview--portrait':'')} aria-busy={!src&&!imageError}>{src?<CoverFrame src={src} cover={cover} onChange={setCover}/>:!storedConnectionAvailable?<p className="pc-preview-error" role="status">A conexão dessa imagem não está mais disponível. Escolha outra imagem ou reconecte sua conta na Biblioteca.</p>:imageError?<div className="pc-preview-error" role="alert"><p>{imageError}</p>{(cover?.provider||"google_drive")==="google_drive"&&<AppButton type="button" className="secondary-button" onClick={()=>setChoosing(true)}>Reautorizar imagem pelo Drive</AppButton>}</div>:<CoverLoading>Carregando imagem…</CoverLoading>}</div>
     <p id="pc-gesture-help" className="pc-helper pc-gesture-help">Arraste para reposicionar. Use a roda do mouse ou faça pinça para ajustar o zoom.<span> No teclado, use as setas para mover, + e − para ampliar e Home para redefinir.</span></p></div>
    </>:null}
-  </div>
-  <footer><div>{stored&&<AppButton type="button" className="pc-text-button" onClick={()=>{onSave(undefined);onClose();}}><Trash2 size={16}/>{client?'Remover foto':'Remover capa'}</AppButton>}</div><AppButton type="button" className="secondary-button" onClick={onClose}>Cancelar</AppButton><AppButton type="button" className="primary-button" disabled={choosing||!cover||!src||!!imageError} onClick={()=>{if(cover){onSave(cover);onClose();}}}><Check size={17}/>{client?'Salvar foto':'Salvar capa'}</AppButton></footer>
- </dialog>;
+  </AppModalBody>
+  <AppModalFooter><div>{stored&&<AppButton type="button" className="pc-text-button" onClick={()=>{onSave(undefined);onClose();}}><Trash2 size={16}/>{client?'Remover foto':'Remover capa'}</AppButton>}</div><AppButton type="button" className="secondary-button" onClick={onClose}>Cancelar</AppButton><AppButton type="button" className="primary-button" disabled={choosing||!cover||!src||!!imageError} onClick={()=>{if(cover){onSave(cover);onClose();}}}><Check size={17}/>{client?'Salvar foto':'Salvar capa'}</AppButton></AppModalFooter>
+ </AppModal>;
 }
