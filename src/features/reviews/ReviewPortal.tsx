@@ -448,7 +448,7 @@ export function ReviewPortal({token}:{token:string}){
     {decision&&<AppModal size="medium" className="rt-review-confirm" aria-label="Confirmar decisão"
       onCloseRequest={()=>{if(!busy)setDecision(null);}}>
       <div className="rt-modal__layout">
-       <AppModalHeader icon={<ModalShieldCheck size={26}/>} title={decision==="approved"?"Confirmar aprovação?":"Quais ajustes são necessários?"}
+       <AppModalHeader icon={<ModalShieldCheck size={26}/>} title={decision==="approved"?"Confirmar aprovação?":"Quais ajustes são necessários?"} description={decision==="approved"?"Revise os dados antes de concluir.":"Explique o que precisa mudar para seguir com a aprovação."}
          onClose={()=>setDecision(null)} closeDisabled={busy}
          eyebrow="APROVAÇÕES / CONFIRMAÇÃO"/>
        <AppModalBody>
