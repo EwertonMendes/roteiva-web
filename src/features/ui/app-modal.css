@@ -170,8 +170,8 @@ dialog.rt-parity-modal.rt-modal--full{width:min(1160px,calc(100vw - 36px))}
  dialog.rt-parity-modal.rt-modal--wide,
  dialog.rt-parity-modal.rt-modal--full{width:calc(100vw - 18px);max-width:calc(100vw - 18px)}
  .rt-parity-modal .rt-modal__header{padding:20px 18px 0;gap:12px}
- .rt-parity-modal .rt-modal__icon{flex-basis:24px;width:24px}
- .rt-parity-modal .rt-modal__icon svg{width:24px;height:24px}
+ .rt-parity-modal .rt-modal__icon{flex-basis:26px;width:26px}
+ .rt-parity-modal .rt-modal__icon svg{width:26px;height:26px}
  .rt-parity-modal .rt-modal__heading h2{font-size:26px}
  .rt-parity-modal .rt-modal__heading p{font-size:var(--type-support)}
  .rt-parity-modal .rt-modal__body{padding:0 18px}
@@ -223,3 +223,12 @@ dialog.rt-parity-modal.rt-modal--full{width:min(1160px,calc(100vw - 36px))}
 }
 /* The canonical date/time control keeps exactly one focus ring on its
  * container. No rule in this stylesheet targets its inner inputs or buttons. */
+
+/* Final specificity tier: a focused single AppInput must never inherit the
+ * neutral border from older project/client CSS. Composite fields are excluded. */
+:root .rt-parity-modal .rt-modal__body .rt-modal__section label > .rt-input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]):not([type="file"]):focus,
+:root .rt-parity-modal .rt-modal__body .rt-modal__section label > .rt-textarea:focus{
+  border-color:var(--field-focus-border);
+  box-shadow:0 0 0 3px var(--field-focus-ring);
+  outline:none;
+}
