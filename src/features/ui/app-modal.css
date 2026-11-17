@@ -186,3 +186,40 @@ dialog.rt-parity-modal.rt-modal--full{width:min(1160px,calc(100vw - 36px))}
  .rt-parity-modal .rt-modal__footer{flex-wrap:wrap}
  .rt-parity-modal .rt-modal__footer .rt-button{flex:1}
 }
+
+/* Inherited legacy project-modal styles must never turn the new form into a
+ * second translucent card. These selectors only affect converted dialogs. */
+:root .rt-parity-modal > form.rt-modal__layout.project-modal,
+:root[data-theme="dark"] .rt-parity-modal > form.rt-modal__layout.project-modal{
+  display:flex;flex-direction:column;flex:1;align-items:stretch;
+  width:100%;max-width:100%;height:auto;max-height:calc(100dvh - 38px);
+  min-height:0;overflow:hidden;
+  padding:0;margin:0;border:0;border-radius:0;
+  background:transparent;box-shadow:none;backdrop-filter:none;
+}
+:root .rt-parity-modal .rt-modal__body .rt-modal__section label,
+:root[data-theme="dark"] .rt-parity-modal .rt-modal__body .rt-modal__section label{
+  color:var(--ink);font-weight:700;
+}
+:root .rt-parity-modal .rt-modal__body .rt-modal__section label > .rt-input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]):not([type="file"]),
+:root .rt-parity-modal .rt-modal__body .rt-modal__section label > .rt-select .rt-select-trigger{
+  min-height:52px;height:52px;background:var(--subtle);
+  border:1px solid var(--line);border-radius:11px;color:var(--ink);
+  font-family:inherit;font-size:var(--type-body);font-weight:500;
+}
+:root .rt-parity-modal .rt-modal__body .rt-modal__section label > .rt-textarea{
+  border:1px solid var(--line);background:var(--subtle);box-shadow:none;
+  color:var(--ink);font-weight:500;
+}
+:root .rt-parity-modal .rt-modal__body .rt-modal__section label > .rt-input:focus,
+:root .rt-parity-modal .rt-modal__body .rt-modal__section label > .rt-textarea:focus{
+  border-color:var(--field-focus-border);
+  box-shadow:0 0 0 3px var(--field-focus-ring);outline:none;
+}
+:root .rt-parity-modal .rt-modal__body .money-input > input.rt-input,
+:root .rt-parity-modal .rt-modal__body .money-input > input.rt-input:focus{
+  height:100%;min-height:0;padding:0 12px;border:0;border-radius:0;
+  background:transparent;box-shadow:none;outline:none;
+}
+/* The canonical date/time control keeps exactly one focus ring on its
+ * container. No rule in this stylesheet targets its inner inputs or buttons. */
