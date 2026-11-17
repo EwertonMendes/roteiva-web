@@ -3,6 +3,12 @@ export interface Env {
   API_RATE_LIMIT: RateLimit;
   API_THUMB_LIMIT: RateLimit;
   API_UPLOAD_LIMIT: RateLimit;
+  FEEDBACK_EMAIL?: {
+    send(message:{to:string;from:string;subject:string;text:string;replyTo?:string;attachments:Array<{
+      content:Uint8Array;filename:string;type:string;disposition:'attachment';
+    }>}):Promise<{messageId:string}>;
+  };
+  RESEND_API_KEY?: string;
   ENVIRONMENT: string;
   FIREBASE_PROJECT_ID: string;
   FRONTEND_ORIGIN: string;

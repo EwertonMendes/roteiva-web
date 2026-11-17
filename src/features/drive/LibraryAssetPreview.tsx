@@ -1,8 +1,9 @@
+import {FileImage as ModalFileImage} from "lucide-react";
 import {useEffect,useRef,useState} from 'react';
-import {AlertCircle,Expand,FileAudio,LoaderCircle,Minimize,RefreshCcw,Volume2,X} from 'lucide-react';
+import {AlertCircle,Expand,FileAudio,LoaderCircle,Minimize,RefreshCcw,Volume2} from 'lucide-react';
 import {useAuth} from '../auth/AuthProvider';
 import {AppButton} from '../ui/AppButton';
-import {useOverlayFocus} from './DriveLibraryUI';
+import {AppModal,AppModalHeader,AppModalBody} from '../ui/AppModal';
 import {authenticatedMedia} from './authenticated-media';
 import {ReviewPdfViewer} from '../reviews/ReviewPdfViewer';
 import {ReviewImageViewer} from '../reviews/ReviewImageViewer';
@@ -20,12 +21,12 @@ export function LibraryAssetPreview({projectId,node,onClose}:{projectId:number;n
  const networkRetryCount=useRef(0);
  const networkRetryTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
 
- const dialog=useOverlayFocus(()=>{
-  // The shared image viewer handles its own fullscreen Escape first.
+ const requestClose=()=>{
+  // Expanded images manage Escape first. Keep playback state unchanged when collapsing.
   if(document.querySelector('.review-private-viewer.is-expanded'))return;
   if(expanded){setExpanded(false);return;}
   onClose();
- });
+ };
  const clearPlaybackDiagnostic=()=>{
   if(playbackDiagnosticTimer.current!==null){clearTimeout(playbackDiagnosticTimer.current);playbackDiagnosticTimer.current=null;}
  };
@@ -102,19 +103,16 @@ export function LibraryAssetPreview({projectId,node,onClose}:{projectId:number;n
    video.load();
   },350);
  };
- return <div className="virtual-library-backdrop">
-  <div ref={dialog} tabIndex={-1} role="dialog" aria-modal="true" aria-label={'Prévia de '+node.name}
+ return <AppModal size="full" onCloseRequest={requestClose} aria-label={'Prévia de '+node.name}
    className={'virtual-library-editor virtual-library-preview vl-preview-modal'+(expanded?' is-expanded':'')}>
-   <header className="vl-preview-head">
-    <h3 title={node.name}>{node.name}</h3>
-    <div className="vl-preview-header-actions">
-     {!image&&<AppButton className="vl-icon-action" type="button" aria-label={expanded?'Sair da tela cheia':'Visualizar em tela cheia'}
-       title={expanded?'Sair da tela cheia':'Visualizar em tela cheia'} aria-pressed={expanded}
-       onClick={()=>setExpanded(v=>!v)}>{expanded?<Minimize size={18} aria-hidden="true"/>:<Expand size={18} aria-hidden="true"/>}</AppButton>}
-     <AppButton className="vl-icon-action" type="button" aria-label="Fechar prévia" title="Fechar prévia" onClick={onClose}><X size={19} aria-hidden="true"/></AppButton>
-    </div>
-   </header>
-   <div className="vl-preview-body">
+   <AppModalHeader icon={<ModalFileImage size={26}/>} title={node.name} onClose={onClose} closeLabel="Fechar prévia"
+     actions={!image&&<AppButton variant="secondary" controlSize="sm" type="button"
+       aria-label={expanded?'Sair da tela cheia':'Visualizar em tela cheia'} aria-pressed={expanded}
+       title={expanded?'Sair da tela cheia':'Visualizar em tela cheia'}
+       onClick={()=>setExpanded(v=>!v)}>
+       {expanded?<Minimize size={18} aria-hidden="true"/>:<Expand size={18} aria-hidden="true"/>}
+     </AppButton>}/>
+   <AppModalBody className="vl-preview-body">
     {loading?<div className="vl-preview-state" role="status"><LoaderCircle className="vl-loading" size={27}/><span>Carregando arquivo…</span></div>:
      error?<div className="vl-preview-state vl-preview-failed" role="alert">
       <AlertCircle size={27} aria-hidden="true"/><p>{error}</p>
@@ -145,7 +143,6 @@ export function LibraryAssetPreview({projectId,node,onClose}:{projectId:number;n
       <span>{node.name}</span>
       <audio className="vl-preview-audio" src={url} controls preload="metadata" onError={fail}/>
      </div>}
-   </div>
-  </div>
- </div>;
+   </AppModalBody>
+ </AppModal>;
 }

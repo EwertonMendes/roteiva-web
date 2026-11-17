@@ -1,8 +1,10 @@
+import {ShieldAlert as ModalShieldAlert} from "lucide-react";
 import { API_BASE_URL } from "../../lib/environment.ts";
 import {AppInput} from "../ui/AppInput";
 import {AppButton} from "../ui/AppButton";
-import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, CheckCircle2, LoaderCircle, ShieldAlert, Trash2, X } from "lucide-react";
+import {AppModal,AppModalHeader,AppModalBody,AppModalFooter} from "../ui/AppModal";
+import { useEffect, useState } from "react";
+import { CheckCircle2, LoaderCircle, ShieldAlert, Trash2 } from "lucide-react";
 import { GoogleAuthProvider, reauthenticateWithPopup, signOut } from "firebase/auth";
 import { useAuth } from "../auth/AuthProvider";
 import { firebaseServices, persistentCacheEnabled, purgePrivateCache } from "../../lib/firebase";
@@ -53,7 +55,6 @@ export function AccountDeletionAction(){
   const [busy,setBusy]=useState(false);
   const [needsIdentityConfirmation,setNeedsIdentityConfirmation]=useState(false);
   const [error,setError]=useState("");
-  const dialogRef=useRef<HTMLDivElement>(null);
   const canConfirm=text===CONFIRM&&checked&&!busy;
   useEffect(()=>{
     let active=true;
@@ -63,26 +64,6 @@ export function AccountDeletionAction(){
       .finally(()=>{if(active)setReady(true);});
     return ()=>{active=false;};
   },[user?.uid]);
-  useEffect(()=>{
-    if(!opened)return;
-    const old=document.body.style.overflow,previous=document.activeElement instanceof HTMLElement?document.activeElement:null;
-    document.body.style.overflow="hidden";
-    dialogRef.current?.focus();
-    function keydown(event:KeyboardEvent){
-      if(event.key==="Escape"&&!busy){event.preventDefault();setOpened(false);return;}
-      if(event.key!=="Tab")return;
-      const dialog=dialogRef.current;
-      const focusable=dialog?[...dialog.querySelectorAll<HTMLElement>('input:not([disabled]),button:not([disabled])')]:[];
-      if(!focusable.length)return;
-      if(event.shiftKey&&(document.activeElement===dialog||document.activeElement===focusable[0])){
-        event.preventDefault();focusable.at(-1)?.focus();
-      }else if(!event.shiftKey&&document.activeElement===focusable.at(-1)){
-        event.preventDefault();focusable[0].focus();
-      }
-    }
-    document.addEventListener("keydown",keydown);
-    return ()=>{document.body.style.overflow=old;previous?.focus();document.removeEventListener("keydown",keydown);};
-  },[opened,busy]);
   function dismiss(){if(busy)return;setOpened(false);setError("");setText("");setChecked(false);}
   async function request(){
     if(!canConfirm||!user)return;
@@ -131,9 +112,12 @@ export function AccountDeletionAction(){
     {progress&&<div role="status" className="account-delete-state"><ShieldAlert size={17}/>
       {progress.status==="manual_review"?"A exclusão está demorando mais que o esperado. Não é necessário repetir o pedido."
         :progress.status==="completed"?"Sua conta foi excluída.":"Recebemos seu pedido de exclusão. Você pode fechar esta página."}</div>}
-    {opened&&<div className="account-delete-overlay" onMouseDown={e=>{if(e.target===e.currentTarget)dismiss();}}>
-      <div className="account-delete-dialog" ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="delete-title" aria-describedby="delete-desc" tabIndex={-1}>
-        <header><div><AlertTriangle size={22}/><h2 id="delete-title">Excluir sua conta?</h2></div><AppButton type="button" disabled={busy} onClick={dismiss} aria-label="Fechar"><X size={19}/></AppButton></header>
+    {opened&&<AppModal size="medium" className="account-delete-dialog" onCloseRequest={dismiss}
+      aria-labelledby="delete-title" aria-describedby="delete-desc">
+      <div className="rt-modal__layout">
+        <AppModalHeader icon={<ModalShieldAlert size={26}/>} title="Excluir sua conta?" titleId="delete-title" description="Confira os dados antes de confirmar esta ação permanente."
+          eyebrow="CONFIRMAÇÃO DE SEGURANÇA" onClose={dismiss} closeDisabled={busy}/>
+        <AppModalBody>
         <p id="delete-desc">Esta ação é <strong>permanente</strong>. Seu perfil, projetos, clientes, agenda, financeiro e demais informações no Roteiva serão eliminados. Não será possível recuperá-los. Um marcador pseudonimizado da identidade utilizada no teste gratuito será preservado para evitar novas concessões gratuitas.</p>
         {user?.email&&<p>Você está excluindo a conta <strong>{user.email}</strong>.</p>}
         <div className="account-delete-preserve"><CheckCircle2 size={17}/><span>Os arquivos originais do seu Google Drive não serão apagados.</span></div>
@@ -144,11 +128,12 @@ export function AccountDeletionAction(){
           <span>Entendo que esta exclusão é irreversível.</span>
         </label>
         {error&&<p className="account-delete-error" role="alert">{error}</p>}
-        <footer><AppButton type="button" className="secondary-button" disabled={busy} onClick={dismiss}>Cancelar</AppButton>
-          <AppButton type="button" className="account-delete-danger" disabled={!canConfirm} onClick={()=>void request()}>
+        </AppModalBody>
+        <AppModalFooter><AppButton type="button" variant="secondary" disabled={busy} onClick={dismiss}>Cancelar</AppButton>
+          <AppButton type="button" variant="danger" disabled={!canConfirm} onClick={()=>void request()}>
             {busy?<><LoaderCircle size={16} className="account-delete-spin"/> Confirmando…</>:<><Trash2 size={16}/> {needsIdentityConfirmation?'Confirmar com Google':'Excluir definitivamente'}</>}
-          </AppButton></footer>
+          </AppButton></AppModalFooter>
       </div>
-    </div>}
+    </AppModal>}
   </div>;
 }

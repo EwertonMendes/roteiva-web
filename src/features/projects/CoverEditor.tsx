@@ -1,9 +1,11 @@
+import {ImagePlus as ModalImagePlus} from "lucide-react";
 import { API_BASE_URL } from "../../lib/environment.ts";
 import {AppInput} from "../ui/AppInput";
 import {AppButton} from "../ui/AppButton";
+import {AppModal,AppModalHeader,AppModalBody,AppModalFooter} from "../ui/AppModal";
 import { AppSelect } from "../ui/AppSelect";
 import {useCallback,useEffect,useRef,useState} from 'react';
-import {ArrowLeft,Check,LoaderCircle,ChevronDown,Search,Trash2,X,Image as ImageIcon} from 'lucide-react';
+import {ArrowLeft,Check,LoaderCircle,ChevronDown,Search,Trash2,Image as ImageIcon} from 'lucide-react';
 import type {Project,ProjectCover,Client} from '../../domain/workspace';
 import {useDriveApi} from '../drive/drive-api';
 import type {DriveItem} from '../drive/DriveLibraryUI';
@@ -68,7 +70,6 @@ export function CoverEditor({project,client,onClose,onSave}:{project?:Project;cl
    const blob=await response.blob();
    return blob.type.startsWith('image/')&&blob.size<=1024*1024?blob:null;
  },[getDriveThumbnail,provider,account,user]);
- useEffect(()=>{const el=dialog.current!;el.showModal();return ()=>{if(el.open)el.close();};},[]);
  useEffect(()=>{if(search.trim()===term)return;const timer=setTimeout(()=>{setPage({files:[],nextPageToken:null});setMoreToken('');setTerm(search.trim());},300);return ()=>clearTimeout(timer);},[search,term]);
  useEffect(()=>{
   if(!choosing||!account||!canRead||virtual&&provider==='google_drive'){setBusy(false);return;}
@@ -151,14 +152,17 @@ export function CoverEditor({project,client,onClose,onSave}:{project?:Project;cl
    }).catch(e=>{if(!controller.signal.aborted)setError(e instanceof Error?e.message:'Não foi possível selecionar a imagem.');})
    .finally(()=>{if(!controller.signal.aborted){setBusy(false);const modal=dialog.current;if(modal?.isConnected&&!modal.open)modal.showModal();}});
  };
- return <dialog ref={dialog} className="pc-dialog" aria-labelledby="pc-editor-title" onCancel={e=>{e.preventDefault();onClose();}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
-  <header><div><span className="eyebrow">{client?'FOTO DO CLIENTE':'CAPA DO PROJETO'}</span><h2 id="pc-editor-title">{choosing?'Escolha uma imagem':'Encontre o melhor enquadramento'}</h2><p>{subject.name}</p></div><AppButton className="icon-button" type="button" onClick={onClose} aria-label="Fechar editor de capa"><X size={20}/></AppButton></header>
-  <div className={"pc-editor-body "+(choosing?"pc-editor-body--picker":"pc-editor-body--crop")}>
+ return <AppModal ref={dialog} size="wide" className="pc-dialog" aria-labelledby="pc-editor-title"
+   onCloseRequest={onClose}>
+  <AppModalHeader icon={<ModalImagePlus size={26}/>} title={choosing?'Escolha uma imagem':'Encontre o melhor enquadramento'} titleId="pc-editor-title"
+    eyebrow={client?'FOTO DO CLIENTE':'CAPA DO PROJETO'} description={subject.name}
+    onClose={onClose} closeLabel="Fechar editor de capa"/>
+  <AppModalBody className={"pc-editor-body "+(choosing?"pc-editor-body--picker":"pc-editor-body--crop")}>
    {choosing?<>
     {context.loadingConnections&&<p className="pc-connection-status" role="status">Verificando Google Drive e Dropbox conectados…</p>}
     {context.error&&<div className="pc-connection-status pc-connection-status--warning" role="alert"><span>{context.error}</span><AppButton type="button" className="secondary-button" disabled={context.loadingConnections} onClick={context.retryConnections}>Atualizar conexões</AppButton></div>}
     {!context.loadingConnections&&!choices.length&&!context.error&&<p className="pc-connection-status" role="status">Nenhuma conta com acesso ativo. Conecte o Google Drive ou Dropbox na <a href="/biblioteca">Biblioteca</a>.</p>}
-    {choices.length>0&&<div className="pc-picker-tools"><label>Armazenamento<AppSelect aria-label="Conta de armazenamento" value={account} onValueChange={value=>{setAccount(value);setFolderTrail([]);setPage({files:[],nextPageToken:null});setMoreToken('');}}>{choices.map(c=><option key={c.id} value={c.id}>{c.provider==='dropbox'?'Dropbox · ':'Drive · '}{c.google_email}</option>)}</AppSelect></label>{!(virtual&&provider==='google_drive')&&<label className="pc-search-label" htmlFor="pc-image-query"><span>Buscar imagens {provider==='dropbox'?'no Dropbox':'no Drive'}</span><AppInput id="pc-image-query" leading={<Search size={18}/>} value={search} onChange={e=>setSearch(e.target.value)} placeholder="Nome da imagem" maxLength={100}/></label>}</div>}
+    {choices.length>0&&<div className="pc-picker-tools"><label>Armazenamento<AppSelect aria-label="Conta de armazenamento" value={account} onValueChange={value=>{setAccount(value);setFolderTrail([]);setPage({files:[],nextPageToken:null});setMoreToken('');}}>{choices.map(c=><option key={c.id} value={c.id}>{c.provider==='dropbox'?'Dropbox · ':'Drive · '}{c.google_email}</option>)}</AppSelect></label>{!(virtual&&provider==='google_drive')&&<label className="pc-search-label" htmlFor="pc-image-query"><span>Buscar imagens {provider==='dropbox'?'no Dropbox':'no Drive'}</span><AppInput id="pc-image-query" controlSize="sm" leading={<Search size={18}/>} value={search} onChange={e=>setSearch(e.target.value)} placeholder="Nome da imagem" maxLength={100}/></label>}</div>}
     <p className="pc-helper pc-picker-guidance">{virtual&&provider==='google_drive'?'Selecione uma imagem pelo Google Picker.':'Escolha uma pasta ou uma imagem.'} JPG, PNG, WebP{provider==='google_drive'?' ou AVIF':''}, até 8 MB. Seus arquivos permanecem privados.</p>
     {folderTrail.length>0&&<nav className="pc-folder-trail" aria-label="Pasta de imagens"><AppButton type="button" onClick={()=>{setFolderTrail([]);setPage({files:[],nextPageToken:null});setMoreToken('');}}>Meu {provider==='dropbox'?'Dropbox':'Drive'}</AppButton>{folderTrail.map((folder,i)=><span key={folder.id}><ChevronRight size={14}/><AppButton type="button" onClick={()=>{setFolderTrail(current=>current.slice(0,i+1));setPage({files:[],nextPageToken:null});setMoreToken('');}}>{folder.name}</AppButton></span>)}</nav>}
     {!currentAccount?null:!canRead?<p role="status">Esta conexão do Google Drive não possui permissão de leitura de imagens. Reconecte a conta na <a href="/biblioteca">Biblioteca</a> e autorize o acesso de leitura.</p>:<>
@@ -177,7 +181,7 @@ export function CoverEditor({project,client,onClose,onSave}:{project?:Project;cl
     <div className="pc-crop-content"><div className={'pc-editor-preview'+(client?' pc-editor-preview--portrait':'')} aria-busy={!src&&!imageError}>{src?<CoverFrame src={src} cover={cover} onChange={setCover}/>:!storedConnectionAvailable?<p className="pc-preview-error" role="status">A conexão dessa imagem não está mais disponível. Escolha outra imagem ou reconecte sua conta na Biblioteca.</p>:imageError?<div className="pc-preview-error" role="alert"><p>{imageError}</p>{(cover?.provider||"google_drive")==="google_drive"&&<AppButton type="button" className="secondary-button" onClick={()=>setChoosing(true)}>Reautorizar imagem pelo Drive</AppButton>}</div>:<CoverLoading>Carregando imagem…</CoverLoading>}</div>
     <p id="pc-gesture-help" className="pc-helper pc-gesture-help">Arraste para reposicionar. Use a roda do mouse ou faça pinça para ajustar o zoom.<span> No teclado, use as setas para mover, + e − para ampliar e Home para redefinir.</span></p></div>
    </>:null}
-  </div>
-  <footer><div>{stored&&<AppButton type="button" className="pc-text-button" onClick={()=>{onSave(undefined);onClose();}}><Trash2 size={16}/>{client?'Remover foto':'Remover capa'}</AppButton>}</div><AppButton type="button" className="secondary-button" onClick={onClose}>Cancelar</AppButton><AppButton type="button" className="primary-button" disabled={choosing||!cover||!src||!!imageError} onClick={()=>{if(cover){onSave(cover);onClose();}}}><Check size={17}/>{client?'Salvar foto':'Salvar capa'}</AppButton></footer>
- </dialog>;
+  </AppModalBody>
+  <AppModalFooter><div>{stored&&<AppButton type="button" className="pc-text-button" onClick={()=>{onSave(undefined);onClose();}}><Trash2 size={16}/>{client?'Remover foto':'Remover capa'}</AppButton>}</div><AppButton type="button" className="secondary-button" onClick={onClose}>Cancelar</AppButton><AppButton type="button" className="primary-button" disabled={choosing||!cover||!src||!!imageError} onClick={()=>{if(cover){onSave(cover);onClose();}}}><Check size={17}/>{client?'Salvar foto':'Salvar capa'}</AppButton></AppModalFooter>
+ </AppModal>;
 }

@@ -1,5 +1,11 @@
 # Arquitetura do Roteiva — MVP SaaS
 
+## Decisão — recuperação de primeiro acesso (PR #156, 17/11/2026)
+
+**IMPLEMENTADO; homologação externa pendente.** O bootstrap de perfil ausente inclui a consulta somente de leitura do estado de exclusão no D1. Retentativas são limitadas e canceláveis; falhas persistentes bloqueiam o cadastro. A recuperação REST usa o token Firebase do proprietário e as mesmas Firestore Rules. Uma falha nunca equivale a perfil ausente nem concede acesso.
+
+Cadastro com resultado incerto é confirmado por leitura do perfil autoritativo, sem repetir gravações. Autenticação, provisionamento e assinatura continuam sendo controles independentes. Logs limitam-se a etapa e código; não registram identidade, token ou corpo de resposta. Evidências e limites: [handoff Dropbox](DROPBOX-PRODUCTION-REVIEW-HANDOFF.md).
+
 ## Contrato do calendário 09 (16/11/2026 — branch em validação)
 - A agenda permanece em users/{uid}/events, com comandos tipados por documento, id numérico, data civil YYYY-MM-DD, hora local HH:mm e endTime opcional representado por string vazia na persistência. Nenhuma migração destrutiva nem novos serviços.
 - Enum de tipos ampliado aditivamente com Revisão; a whitelist em firestore.rules deve estar publicada antes de validar essa categoria em DEV. Excluir e editar eventos continuam autorizados apenas pelo owner e acesso ativo.

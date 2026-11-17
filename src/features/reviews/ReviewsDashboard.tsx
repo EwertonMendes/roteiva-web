@@ -1,3 +1,4 @@
+import {Send as ModalSend} from "lucide-react";
 import { API_BASE_URL } from "../../lib/environment.ts";
 import {AppInput} from "../ui/AppInput";
 import {AppTextarea} from "../ui/AppTextarea";
@@ -6,7 +7,7 @@ import {ConfirmationDialog} from "../ui/ConfirmationDialog";
 import {CollectionState} from "../ui/CollectionState";
 import { AppSelect } from "../ui/AppSelect";
 import {useCallback,useEffect,useMemo,useRef,useState} from "react";
-import {createPortal} from "react-dom";
+import {AppModal,AppModalHeader} from "../ui/AppModal";
 import {AlertTriangle,Check,ChevronLeft,ChevronRight,ExternalLink,Folder,Plus,Search,Send,ShieldCheck,X} from "lucide-react";
 import type {Client,Project} from "../../domain/workspace";
 import {useAuth} from "../auth/AuthProvider";
@@ -14,7 +15,7 @@ import {useDriveApi} from "../drive/drive-api";
 import {readDriveLinks,type DriveFolderLink} from "../../data/drive-folder-links";
 import {readDropboxLinks,type DropboxFolderLink} from "../../data/dropbox-folder-links";
 import {dropboxWebUrl} from '../dropbox/dropbox-web-url';
-import {driveFileUrl,isStorageFolder,readableFileType,type DriveItem,useOverlayFocus} from "../drive/DriveLibraryUI";
+import {driveFileUrl,isStorageFolder,readableFileType,type DriveItem} from "../drive/DriveLibraryUI";
 import {DriveThumbnail} from "../drive/DriveThumbnail";
 import {useDriveThumbnailFetch} from "../drive/useDriveThumbnailFetch";
 import {cacheKey,getCachedFolder,setCachedFolder} from "../drive/storage-folder-cache";
@@ -77,7 +78,6 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
   const [searchBusy,setSearchBusy]=useState(false);
   const searchSequence=useRef(0);
   const browseSequence=useRef(0),listSequence=useRef(0);
-  const dialogRef=useOverlayFocus(()=>{if(!working){if(composer)resetComposer();else setOpened(null);}},composer||!!opened,composer?'compose':'detail');
   const pendingUploads=transfers.uploads.filter(entry=>entry.destination.projectId===projectId&&
     !["completed","cancelled"].includes(entry.status));
   useEffect(()=>{
@@ -413,8 +413,8 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
       confirmLabel="Encerrar aprovação" cancelLabel="Manter aprovação"
       onCancel={()=>setConfirmClosingReview(false)}
       onConfirm={closeReviewConfirmed}/>}
-    {opened&&!composer&&createPortal(<div className="review-modal-backdrop" ref={dialogRef} tabIndex={-1} onMouseDown={e=>{if(e.target===e.currentTarget&&!working)setOpened(null);}}>
-      <section role="dialog" aria-modal="true" aria-label="Detalhes da revisão" className="review-dialog rowner-dialog">
+    {opened&&!composer&&<AppModal size="full" className="review-dialog rowner-dialog" aria-label="Detalhes da revisão"
+      onCloseRequest={()=>{if(!working)setOpened(null);}}>
         <ReviewOwnerWorkspace key={opened.review.id} detail={opened} working={working} error={error}
           onClose={()=>setOpened(null)} onRevise={beginRevision} onPublish={()=>void mutate("publish")}
           onRotate={()=>void mutate("rotate")} onEnd={()=>void mutate("close")}
@@ -426,15 +426,14 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
               setOpened(result);
             });
           }}/>
-      </section>
-    </div>,document.body)}
+    </AppModal>}
 
-    {composer&&createPortal(<div className="review-modal-backdrop" ref={dialogRef} tabIndex={-1} onMouseDown={e=>{if(e.target===e.currentTarget)resetComposer();}}>
-      <section className="review-dialog review-composer-dialog" role="dialog" aria-modal="true" aria-label="Enviar materiais para aprovação">
-        <header><div><span className="eyebrow">APROVAÇÕES / {replacement?"NOVA VERSÃO":"NOVA SOLICITAÇÃO"}</span>
-          <h2>{replacement?"Selecione os novos arquivos":"Enviar para aprovação"}</h2>
-          <p>{replacement?"Escolha os arquivos da nova versão.":"Configure o acesso e selecione os materiais, sem perder o contexto."}</p></div>
-          <AppButton className="review-icon" disabled={working} onClick={resetComposer} aria-label="Fechar"><X size={20}/></AppButton></header>
+    {composer&&<AppModal size="wide" className="review-dialog review-composer-dialog" aria-label="Enviar materiais para aprovação"
+      onCloseRequest={()=>{if(!working)resetComposer();}}>
+        <AppModalHeader icon={<ModalSend size={26}/>} eyebrow={"APROVAÇÕES / "+(replacement?"NOVA VERSÃO":"NOVA SOLICITAÇÃO")}
+          title={replacement?"Selecione os novos arquivos":"Enviar para aprovação"}
+          description={replacement?"Escolha os arquivos da nova versão.":"Configure o acesso e selecione os materiais, sem perder o contexto."}
+          onClose={resetComposer} closeDisabled={working}/>
         {!replacement&&<div className="review-composer-steps" aria-label="Etapas da nova aprovação">
           <span className={"review-composer-step"+(composerStep==="details"?" active":" complete")}>
             <span className="review-step-number">{composerStep==="materials"?<Check size={14}/>:1}</span>
@@ -609,7 +608,7 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
           <p className="reviews-muted">Os envios usam a mesma fila segura da Biblioteca. Aguarde a confirmação do provedor antes de compartilhar.</p>
            </>}
          </div>
-        <footer className="review-composer-footer">
+        <footer className="review-composer-footer rt-modal__footer">
            <div className="review-composer-footnote" role="status">
              {replacement?
                (pendingUploads.length?"Aguarde a conclusão dos envios.":files.length?"Nova versão pronta para enviar.":"Selecione pelo menos um arquivo para esta versão."):
@@ -632,7 +631,6 @@ export function ReviewsDashboard({clients,projects,studioName,onLibrary,startPro
                  onClick={()=>void submit()}>{working?"Preparando…":replacement?"Enviar nova versão":"Gerar aprovação"} <Send size={16}/></AppButton>}
            </div>
          </footer>
-      </section>
-    </div>,document.body)}
+      </AppModal>}
   </div>;
 }

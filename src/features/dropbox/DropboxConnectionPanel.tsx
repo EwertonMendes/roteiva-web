@@ -1,15 +1,17 @@
+import {FileImage as ModalFileImage} from "lucide-react";
 import { API_BASE_URL } from "../../lib/environment.ts";
 import {AppButton} from "../ui/AppButton";
+import {AppModal,AppModalHeader} from "../ui/AppModal";
 import {CollectionState} from "../ui/CollectionState";
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
-import {Check,ChevronDown,ChevronRight,Cloud,ExternalLink,FolderOpen,LoaderCircle,Plus,RefreshCw,ShieldCheck,Unplug,X} from 'lucide-react';
+import {Check,ChevronDown,ChevronRight,Cloud,ExternalLink,FolderOpen,LoaderCircle,Plus,RefreshCw,ShieldCheck,Unplug} from 'lucide-react';
 import type {Project} from '../../domain/workspace';
 import {AppSelect} from '../ui/AppSelect';
 import {useAuth} from '../auth/AuthProvider';
 import {useDriveApi,messages} from '../drive/drive-api';
 import {useStorageConnections} from '../drive/StorageConnectionsProvider';
 import {invalidateStorageConnection} from '../drive/storage-image-cache';
-import {DriveFileExplorer,StorageFolderPicker,DriveUnlinkConfirm,isStorageFolder,useOverlayFocus,type DriveItem,type DriveTrail} from '../drive/DriveLibraryUI';
+import {DriveFileExplorer,StorageFolderPicker,DriveUnlinkConfirm,isStorageFolder,type DriveItem,type DriveTrail} from '../drive/DriveLibraryUI';
 import {FolderActionsMenu} from '../drive/FolderActionsMenu';
 import {fetchDropboxDocument,isDropboxDocument} from './DropboxDocumentPreview';
 import {ReviewImageViewer} from '../reviews/ReviewImageViewer';
@@ -29,7 +31,6 @@ const MAX_DELTA_PAGES=12;
 type PreviewTicket={url:string;mimeType:string;expiresAt:number;size:number};
 function DropboxPreview({file,link,onClose,onNext,onPrevious}:{file:DriveItem;link:DropboxFolderLink;onClose:()=>void;onNext?:()=>void;onPrevious?:()=>void}){
  const call=useDriveApi();
- const ref=useOverlayFocus(onClose);
  const [state,setState]=useState<{ticket:PreviewTicket|null;busy:boolean;error:string}>({ticket:null,busy:true,error:''});
  useEffect(()=>{
   const controller=new AbortController();let createdUrl:string|null=null;
@@ -49,11 +50,12 @@ function DropboxPreview({file,link,onClose,onNext,onPrevious}:{file:DriveItem;li
  },[call,file.id,file.name,link.connectionId,link.folderId,link.projectId]);
  const media=state.ticket?.url;
  const kind=state.ticket?.mimeType||file.mimeType;
- return <div className="rl-overlay rl-preview-overlay" onMouseDown={e=>{if(e.target===e.currentTarget)onClose()}}>
-  <section className="rl-preview db-preview" ref={ref} role="dialog" aria-modal="true" tabIndex={-1} aria-label={'Prévia de '+file.name}>
-   <header><div className="rl-preview-title"><strong title={file.name}>{file.name}</strong><small>Dropbox · Prévia protegida pelo Roteiva</small></div>
-    <div><a href={dropboxWebUrl(file)} target="_blank" rel="noreferrer" className="secondary-button"><ExternalLink size={15}/> Abrir Dropbox</a>
-     <AppButton type="button" className="rl-icon-button" aria-label="Fechar" onClick={onClose}><X size={17}/></AppButton></div></header>
+ return <AppModal size="full" className="rl-preview db-preview" aria-label={'Prévia de '+file.name}
+    onCloseRequest={()=>{if(!document.querySelector('.review-private-viewer.is-expanded'))onClose();}}>
+   <AppModalHeader icon={<ModalFileImage size={26}/>} title={file.name} description="Dropbox · Prévia protegida pelo Roteiva"
+     onClose={onClose} closeLabel="Fechar prévia"
+     actions={<a href={dropboxWebUrl(file)} target="_blank" rel="noreferrer" className="secondary-button">
+       <ExternalLink size={15}/> Abrir Dropbox</a>}/>
    <div className="rl-preview-body db-preview-body">
     {onPrevious&&<AppButton className="rl-preview-nav rl-preview-nav-prev" onClick={onPrevious} aria-label="Arquivo anterior"><ChevronRight size={19} style={{transform:'rotate(180deg)'}}/></AppButton>}
     {state.busy?<div role="status" className="rl-state"><LoaderCircle className="rl-spin" size={22}/> Preparando prévia…</div>:
@@ -66,8 +68,7 @@ function DropboxPreview({file,link,onClose,onNext,onPrevious}:{file:DriveItem;li
     {onNext&&<AppButton className="rl-preview-nav rl-preview-nav-next" onClick={onNext} aria-label="Próximo arquivo"><ChevronRight size={19}/></AppButton>}
    </div>
    <p>A visualização respeita as permissões do Roteiva. O arquivo original continua armazenado no Dropbox.</p>
-  </section>
- </div>;
+ </AppModal>;
 }
 export function DropboxConnectionPanel({projects,selectedProjectId}:{
  projects:readonly Project[];selectedProjectId?:number;onSelectProject:(id:string)=>void;
