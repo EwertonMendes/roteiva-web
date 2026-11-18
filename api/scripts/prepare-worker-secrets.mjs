@@ -13,10 +13,8 @@ for(const name of names){
  const value=process.env[name];assert.ok(value&&(['TOKEN_KEYS','FIREBASE_ADMIN_CREDENTIALS_JSON'].includes(name)||value.trim()===value)&&!/REPLACE_WITH|PLACEHOLDER/.test(value),'Missing/invalid protected secret: '+name);
  secrets[name]=value;
 }
-// Feedback is optional. Omit an absent key from the additive upload, while
-// still rejecting malformed nonempty configuration without exposing its value.
-const resend=process.env.RESEND_API_KEY;
-if(resend){assert.match(resend,/^re_[A-Za-z0-9_-]{12,}$/,'Invalid Resend API key format');secrets.RESEND_API_KEY=resend;}
+// PROD email uses a Cloudflare binding restricted to one verified inbox.
+// No Resend credentials are accepted or uploaded for PROD.
 const keys=JSON.parse(secrets.TOKEN_KEYS);assert.equal(Buffer.from(keys[config.vars.TOKEN_KEY_VERSION]||'','base64url').length,32);
 assert.equal(Buffer.from(secrets.TRIAL_IDENTITY_HMAC_KEY,'base64url').length,32);
 assert.match(secrets.GOOGLE_PICKER_API_KEY,/^AIza[A-Za-z0-9_-]{30,}$/);

@@ -18,7 +18,7 @@ function req(key=crypto.randomUUID()){
   form.set('description','O botão não respondeu como esperado.');form.set('screen','/projetos');
   return new Request('https://api.roteiva.com/feedback',{method:'POST',body:form});
 }
-test('Resend Free sends direct to same Gmail on DEV and PROD with correct image Base64 and idempotency',async t=>{
+test('Resend Free delivers only in DEV with correct image Base64 and idempotency',async t=>{
   const previous=globalThis.fetch;t.after(()=>{globalThis.fetch=previous;});
   const captured=[];
   globalThis.fetch=async(url,options)=>{
@@ -29,16 +29,16 @@ test('Resend Free sends direct to same Gmail on DEV and PROD with correct image 
     captured.push(JSON.parse(options.body));
     return Response.json({id:'resend-confirmed-id'});
   };
-  assert.equal(feedbackEnabled({ENVIRONMENT:'prod',RESEND_API_KEY:token}),true);
+  assert.equal(feedbackEnabled({ENVIRONMENT:'prod',RESEND_API_KEY:token}),false);
   assert.equal(feedbackEnabled({ENVIRONMENT:'dev',RESEND_API_KEY:token}),true);
   assert.equal(feedbackEnabled({ENVIRONMENT:'prod',RESEND_API_KEY:''}),false);
-  for(const environment of ['dev','prod']){
+  for(const environment of ['dev']){
     const receipt=await sendFeedbackEmail({ENVIRONMENT:environment,RESEND_API_KEY:token},baseMail);
     assert.equal(receipt.messageId,'resend-confirmed-id');
   }
-  assert.equal(captured.length,2);
+  assert.equal(captured.length,1);
   for(const [index,mail] of captured.entries()){
-    const env=index===0?'DEV':'PROD';
+    const env='DEV';
     assert.equal(mail.from,'Roteiva '+env+' <onboarding@resend.dev>');
     assert.deepEqual(mail.to,['suporte.roteiva@gmail.com']);
     assert.equal(mail.reply_to,'owner@example.com');
@@ -54,11 +54,11 @@ test('sender can change only to explicitly allowlisted support address after dom
     return Response.json({id:'sent'});
   };
   await assert.rejects(()=>sendFeedbackEmail({
-    ENVIRONMENT:'prod',RESEND_API_KEY:token,RESEND_FROM_EMAIL:'attacker@unknown.example'
+    ENVIRONMENT:'dev',RESEND_API_KEY:token,RESEND_FROM_EMAIL:'attacker@unknown.example'
   },baseMail),e=>e instanceof FeedbackDeliveryFailure&&e.safeToRetry&&e.code==='feedback_email_sender_setup');
   assert.equal(calls,0);
-  await sendFeedbackEmail({ENVIRONMENT:'prod',RESEND_API_KEY:token,RESEND_FROM_EMAIL:'suporte@roteiva.com'},baseMail);
-  assert.equal(from,'Roteiva PROD <suporte@roteiva.com>');
+  await sendFeedbackEmail({ENVIRONMENT:'dev',RESEND_API_KEY:token,RESEND_FROM_EMAIL:'suporte@roteiva.com'},baseMail);
+  assert.equal(from,'Roteiva DEV <suporte@roteiva.com>');
 });
 test('definite provider rejection allows bounded repeat and never reports success early',async t=>{
   const db=database();t.after(db.close);
@@ -67,7 +67,7 @@ test('definite provider rejection allows bounded repeat and never reports succes
   globalThis.fetch=async()=>{
     calls++;return calls===1?Response.json({message:'invalid sender'},{status:403}):Response.json({id:'accepted'});
   };
-  const env={ENVIRONMENT:'prod',DB:db.DB,RESEND_API_KEY:token};
+  const env={ENVIRONMENT:'dev',DB:db.DB,RESEND_API_KEY:token};
   const key=crypto.randomUUID();
   await assert.rejects(()=>feedbackRouter(req(key),env,'owner','owner@example.com'),e=>
     e.code==='feedback_email_sender_setup');
@@ -95,7 +95,7 @@ test('legacy ambiguous failed records are not upgraded to retry-safe',async t=>{
     .run(crypto.randomUUID(),'owner',key,'bug','example title','description of problem','/projetos',Date.now());
   const previous=globalThis.fetch;t.after(()=>{globalThis.fetch=previous;});
   let calls=0;globalThis.fetch=async()=>{calls++;return Response.json({id:'sent'});};
-  const env={ENVIRONMENT:'prod',DB:db.DB,RESEND_API_KEY:token};
+  const env={ENVIRONMENT:'dev',DB:db.DB,RESEND_API_KEY:token};
   await assert.rejects(()=>feedbackRouter(req(key),env,'owner','owner@example.com'),e=>e.code==='feedback_already_attempted');
   assert.equal(calls,0);
   assert.equal((await feedbackRouter(req(),env,'owner','owner@example.com')).status,201);
