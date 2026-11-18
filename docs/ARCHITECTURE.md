@@ -1,5 +1,11 @@
 # Arquitetura do Roteiva — MVP SaaS
 
+## Decisão — cortesia de avaliação operada pelo proprietário (17/11/2026)
+
+**IMPLEMENTADO EM BRANCH; aplicação remota pendente.** `api/scripts/review-courtesy.mjs` é uma operação local, sem rota no Worker, sem permissão de cliente e sem mudança na política comercial. Requer identidade interativa do proprietário (não service account de deploy), tokens administrativos somente em memória/ambiente e selo exato de Firebase/Cloudflare/D1. A identidade alvo deve existir, ter Google verificado e perfil próprio, sem exclusão/suspensão/manutenção pendente.
+
+A concessão é finita (até 90 dias), determinística por operação e UID, com motivo/operador persistidos no grant. A operação adquire fence D1 condicional, publica e verifica negação por CAS, insere apenas o grant, calcula a projeção pela função autoritativa `resolveAccess`, verifica os dois sistemas e então libera a fence. Trial imutável e registros históricos são preservados. Falha parcial mantém a fence; não existe limpeza automática que possa liberar acesso incoerente. Repetir operação concluída não renova prazos; pendências exigem investigação. Para um grant exato já registrado, a reconciliação explícita exige fingerprint do snapshot D1/Firestore e o mesmo operador/operação; qualquer mudança invalida o plano. Não há retomada automática nem liberação genérica de fence.
+
 ## Decisão — recuperação de primeiro acesso (PR #156, 17/11/2026)
 
 **IMPLEMENTADO; homologação externa pendente.** O bootstrap de perfil ausente inclui a consulta somente de leitura do estado de exclusão no D1. Retentativas são limitadas e canceláveis; falhas persistentes bloqueiam o cadastro. A recuperação REST usa o token Firebase do proprietário e as mesmas Firestore Rules. Uma falha nunca equivale a perfil ausente nem concede acesso.

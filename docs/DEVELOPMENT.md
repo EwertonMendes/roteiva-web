@@ -1,5 +1,21 @@
 # Desenvolvimento e deploy — Roteiva
 
+## Operação local de cortesia Dropbox (17/11/2026, em revisão)
+
+Não executar em Actions público nem usar identidade de deploy para documentos. A operação `api/scripts/review-courtesy.mjs` usa Node 22.13+ com `--experimental-strip-types`, um OAuth access token da sessão interativa do proprietário em `FIREBASE_OPS_ACCESS_TOKEN`, token Cloudflare em `CLOUDFLARE_API_TOKEN` e os IDs públicos esperados em `CLOUDFLARE_ACCOUNT_ID`/`CLOUDFLARE_D1_DATABASE_ID`. Tokens não devem ser digitados em argumentos, salvos no repositório ou impressos. Sem `GOOGLE_APPLICATION_CREDENTIALS`.
+
+Primeiro executar somente o plano, com ambiente explícito, e-mail da identidade dedicada, vencimento UTC finito e identificador `dropbox-review-...`:
+
+```text
+node --experimental-strip-types api/scripts/review-courtesy.mjs dev <dedicated-email> <UTC-expiry> dropbox-review-20261117
+```
+
+O plano consulta e valida apenas. Após revisar ambiente/identidade/prazo, a mesma chamada com o último argumento `APPLY-REVIEW-COURTESY` executa a operação de domínio. A identidade não pode estar suspensa/excluindo; não é permitido substituir acesso especial nem reduzir prazo existente. O retorno omite UID, e-mail e documentos; o operador e o motivo ficam no grant privado. Nunca incluir senhas ou tokens nos argumentos.
+
+Se a aplicação falhar, a saída não confirma sucesso: a fence pode permanecer ativa. Não zerar `sync_pending`, apagar grant ou editar a projeção manualmente. Investigar o ponto de falha, a operação/grant determinísticos, exclusão e versões D1/Firestore, e preparar reconciliação administrativa revisada antes de liberar. A ferramenta não retoma automaticamente uma operação parcial. Se o grant exato já estiver registrado, o plano retorna um fingerprint SHA-256 do estado inspecionado; o modo explícito `RECOVER-REVIEW-COURTESY:<fingerprint>` reconcilia apenas esse grant, rejeita qualquer mudança do snapshot, republica o estado autoritativo e verifica os dois sistemas antes de liberar a fence. Identificar primeiro a operação interrompida e sua autoria; nunca reutilizar fingerprint de outra operação.
+
+Verificação: `node --experimental-strip-types --test api/tests/review-courtesy*.test.mjs` cobre plano sem gravação, SQLite real, CAS de projeção, preservação do trial, repetição, ambiente errado, identidade estrangeira e falhas parciais. O backend completo inclui esses testes em `npm test --prefix api`.
+
 > **Registro histórico (15/11/2026):** os estados de consoles e pendências abaixo foram observados nessa data. PR #125 e PR #129 foram mergeados posteriormente; DEV já contém essas alterações. A implantação em PROD depende de workflows protegidos; este documento não comprova a publicação nem a aprovação do Dropbox.
 
 ## OAuth comercial — estado verificado em 15/11/2026

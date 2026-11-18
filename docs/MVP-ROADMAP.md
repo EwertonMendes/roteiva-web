@@ -1,5 +1,18 @@
 # Roadmap vivo — Roteiva MVP
 
+## Cortesia específica de avaliação Dropbox — 17/11/2026
+
+**PARCIAL / EM REVISÃO:** operação administrativa local, sem endpoint público, para conceder acesso finito à identidade dedicada indicada pelo proprietário. Concessão remota DEV aplicada à identidade dedicada indicada pelo proprietário. A verificação inicial detectou diferença de normalização de timestamp e reteve a fence; a reconciliação selada confirmou consistência e liberou somente após verificar ambos os sistemas. PROD pendente.
+
+- [x] Fence D1 condicional, negação Firestore com CAS antes do grant, motivo/operador privados, cálculo autoritativo, verificação e liberação após consistência.
+- [x] Trial preservado, prazo máximo de 90 dias, repetição sem extensão, nenhum atalho de autorização/assinatura/Rules.
+- [x] 13 testes específicos aprovados, incluindo transporte Firestore simulado e SQL executado em SQLite real.
+- [x] Backend CI inicial e dry-run DEV; concessão DEV aplicada/reconciliada e repetição confirmou already-applied, trial preservado e projeção verificada. Prazo UTC: 2027-01-15T23:59:59Z.
+- [ ] CI da correção de normalização de timestamps e recuperação selada, dry-run/aplicação PROD e conferência visual da identidade dedicada.
+- [ ] Em falha parcial, reconciliação revisada; não liberar fences como atalho.
+
+PR #156 já integrado em `45ab36ddd7fa35944b9fddc63ca08d04417392ea`; regressão completa [44202519564](https://github.com/EwertonMendes/roteiva-web/actions/runs/44202519564) aprovada e promoção PROD [44205001497](https://github.com/EwertonMendes/roteiva-web/actions/runs/44205001497) iniciada. Primeiro acesso real DEV, PNG/PDF/vídeo Dropbox e aprovação fictícia foram testados; esses resultados não equivalem ao aceite da versão corrigida em PROD.
+
 ## Homologação Dropbox — PR #156 (17/11/2026)
 
 **PARCIAL — correções implementadas; primeiro acesso externo e reenvio pendentes.**
