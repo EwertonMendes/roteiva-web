@@ -87,7 +87,8 @@ for (const [name,data] of Object.entries(fixtures)) {
       if(typeof data[field]==="string") await assertFails(updateDoc(ref,{[field]:"x".repeat(12000),revision:2,updatedAt:serverTimestamp()}));
     }
     await assertSucceeds(updateDoc(ref,{revision:2,updatedAt:serverTimestamp()}));
-    await assertSucceeds(deleteDoc(ref));
+    if(name==="projects")await assertFails(deleteDoc(ref));
+    else await assertSucceeds(deleteDoc(ref));
   });
 }
 test("profile PII, creation, ownership, schema and orphan denial",async()=>{
