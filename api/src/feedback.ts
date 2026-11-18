@@ -94,7 +94,6 @@ export async function feedbackRouter(request:Request,env:Env,uid:string,email:st
   if(!feedbackEnabled(env))throw new ApiError(503,'feedback_unavailable');
   const feedback=await parseFeedback(request);
   const now=Date.now();
-  let id=crypto.randomUUID();
   // Quota is evaluated in the D1 conditional write, not a separate read.
   // Existing sent requests stay idempotent even after the quota is reached.
   const isProd=env.ENVIRONMENT==='prod';
