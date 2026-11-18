@@ -26,13 +26,12 @@ function configured(db,t){
   return {env,sent};
 }
 
-test('DEV without Resend and PROD without Cloudflare binding expose unavailable feedback and never send or persist a submission',async t=>{
+test('GET feedback is disabled and missing send provider fails closed without persistence',async t=>{
   const db=database();t.after(db.close);
   t.mock.method(globalThis,'fetch',async()=>{throw Error('No provider request is allowed without a key');});
   for(const ENVIRONMENT of ['dev','prod']){
     const env={DB:db.DB,ENVIRONMENT};
-    const status=await feedbackRouter(new Request('https://api.roteiva.com/feedback'),env,'qa','qa@example.com');
-    assert.equal((await status.json()).available,false);
+    await assert.rejects(()=>feedbackRouter(new Request('https://api.roteiva.com/feedback'),env,'qa','qa@example.com'),e=>e.status===405);
     await assert.rejects(()=>feedbackRouter(request(),env,'qa','qa@example.com'),e=>e.code==='feedback_unavailable'&&e.status===503);
   }
   assert.equal(db.sql.prepare('SELECT COUNT(*) AS n FROM feedback_reports').get().n,0);
@@ -60,7 +59,7 @@ test('authenticated request sends fixed destination; metadata D1 never stores at
   assert.ok(!JSON.stringify(row).includes('private-screenshot.png'));
   assert.ok(!JSON.stringify(row).includes('137,80,78,71'));
 });
-test('idempotency, user daily quota, and per-user history remain enforced',async t=>{
+test('idempotency, per-user daily quota and no tracking endpoint remain enforced',async t=>{
   const db=database();t.after(db.close);
   const {env,sent}=configured(db,t);
   const key=crypto.randomUUID();
@@ -74,10 +73,8 @@ test('idempotency, user daily quota, and per-user history remain enforced',async
   await assert.rejects(()=>feedbackRouter(request(),env,'A','a@gmail.com'),e=>e.code==='feedback_daily_limit');
   await feedbackRouter(request(),env,'B','b@gmail.com');
   assert.equal(sent.length,4);
-  const response=await feedbackRouter(new Request('https://api.roteiva.com/feedback'),env,'A','a@gmail.com');
-  const rows=(await response.json()).items;
-  assert.equal(rows.length,3);
-  assert.ok(rows.every(r=>!('description' in r)&&!('message_id' in r)));
+  await assert.rejects(()=>feedbackRouter(new Request('https://api.roteiva.com/feedback'),env,'A','a@gmail.com'),e=>e.status===405);
+  assert.equal(db.sql.prepare("SELECT COUNT(*) AS n FROM feedback_reports WHERE owner_uid='A'").get().n,3);
 });
 test('malformed text, MIME spoofing, size limits and absent API key reject before persistence',async t=>{
   const db=database();t.after(db.close);

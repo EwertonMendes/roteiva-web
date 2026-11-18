@@ -9,7 +9,6 @@ import './feedback.css';
 
 type Kind='bug'|'idea'|'praise'|'other';
 type Preview={id:string;file:File;url:string};
-type Report={id:string;kind:Kind;title:string;status:'sending'|'sent'|'failed';created_at:number};
 const kinds:{value:Kind;label:string}[]=[
   {value:'bug',label:'Problema'},
   {value:'idea',label:'Sugestão'},
@@ -18,14 +17,15 @@ const kinds:{value:Kind;label:string}[]=[
 ];
 const messages:Record<string,string>={
   feedback_unavailable:'O envio está sendo configurado neste ambiente.',
-  feedback_delivery_unconfirmed:'Não foi possível confirmar a entrega. O envio anterior pode ter sido recebido. Confira o histórico antes de tentar novamente.',
-  feedback_email_sender_setup:'O envio gratuito de e-mail precisa ser configurado ou ter o remetente autorizado. Tente novamente mais tarde.',
+  feedback_delivery_unconfirmed:'Não foi possível confirmar a entrega. Caso tente novamente, o suporte pode receber uma cópia duplicada.',
+  feedback_email_sender_setup:'O serviço de suporte precisa de uma configuração de envio. Tente mais tarde.',
   feedback_email_recipient_setup:'A caixa de suporte ainda precisa de verificação no serviço de e-mail.',
-  feedback_dev_email_setup:'O serviço de e-mail de DEV ainda precisa ser configurado ou autorizado.',
+  feedback_dev_email_setup:'O Resend de DEV recusou o envio. Verifique se a conta Resend pertence ao Gmail do suporte e se o remetente está autorizado.',
+  feedback_dev_email_auth:'A chave de envio do Resend DEV é inválida ou não está autorizada. Verifique a configuração do Worker.',
   feedback_email_provider_rejected:'O serviço de e-mail rejeitou o envio. Nossa equipe precisa verificar a configuração.',
   feedback_delivery_busy:'O serviço de e-mail está temporariamente ocupado. Tente novamente mais tarde.',
   feedback_daily_limit:'O limite de três feedbacks em 24 horas foi atingido.',
-  feedback_already_attempted:'Esta tentativa anterior não pode ser reutilizada. Você já pode clicar novamente para fazer um novo envio.',
+  feedback_already_attempted:'Não foi possível reutilizar a tentativa. Clique em Tentar novamente para gerar um novo envio.',
   feedback_invalid_form:'Confira o assunto, a descrição e os campos do formulário.',
   feedback_invalid_image:'Uma das imagens não é válida. Use PNG, JPEG ou WebP.',
   feedback_too_large:'O total de imagens excedeu o limite permitido.',
@@ -60,7 +60,7 @@ async function compressImage(file:File):Promise<File>{
   }finally{bitmap.close();}
 }
 async function responsePayload(response:Response){
-  return await response.json().catch(()=>({})) as {id?:string;error?:{code?:string};items?:Report[];available?:boolean};
+  return await response.json().catch(()=>({})) as {id?:string;error?:{code?:string}};
 }
 export function FeedbackDialog({getToken,onClose}:{getToken:()=>Promise<string>;onClose:()=>void}){
   const [kind,setKind]=useState<Kind>('bug');
@@ -71,9 +71,6 @@ export function FeedbackDialog({getToken,onClose}:{getToken:()=>Promise<string>;
   const [preparing,setPreparing]=useState(false);
   const [error,setError]=useState('');
   const [sentId,setSentId]=useState('');
-  const [available,setAvailable]=useState<boolean|null>(null);
-  const [history,setHistory]=useState<Report[]>([]);
-  const [showHistory,setShowHistory]=useState(false);
   const [requestKey,setRequestKey]=useState(()=>crypto.randomUUID());
   const [retrying,setRetrying]=useState(false);
   const fileInput=useRef<HTMLInputElement>(null);
@@ -81,21 +78,6 @@ export function FeedbackDialog({getToken,onClose}:{getToken:()=>Promise<string>;
   const pending=processing||preparing;
   useEffect(()=>{imagesRef.current=images;},[images]);
   useEffect(()=>()=>{for(const image of imagesRef.current)URL.revokeObjectURL(image.url);},[]);
-  useEffect(()=>{
-    const controller=new AbortController();
-    void (async()=>{
-      try{
-        const token=await getToken();
-        const result=await fetch(API_BASE_URL+'/feedback',{headers:{Authorization:'Bearer '+token},signal:controller.signal});
-        if(!result.ok)throw Error('Não foi possível consultar os feedbacks.');
-        const payload=await responsePayload(result);
-        if(!controller.signal.aborted){setAvailable(payload.available===true);setHistory(payload.items||[]);}
-      }catch{
-        if(!controller.signal.aborted){setAvailable(false);setError('Não foi possível consultar o serviço de suporte.');}
-      }
-    })();
-    return()=>controller.abort();
-  },[getToken]);
   async function addFiles(files:File[]){
     if(pending||!files.length||sentId)return;
     if(imagesRef.current.length+files.length>5){setError('Você pode anexar até cinco imagens.');return;}
@@ -132,7 +114,7 @@ export function FeedbackDialog({getToken,onClose}:{getToken:()=>Promise<string>;
   }
   async function submit(event:FormEvent<HTMLFormElement>){
     event.preventDefault();
-    if(pending||sentId||available!==true)return;
+    if(pending||sentId)return;
     if(title.trim().length<5||description.trim().length<15){
       setError('Informe um assunto de pelo menos 5 caracteres e uma descrição com pelo menos 15.');
       return;
@@ -148,22 +130,14 @@ export function FeedbackDialog({getToken,onClose}:{getToken:()=>Promise<string>;
         method:'POST',headers:{Authorization:'Bearer '+token},body:form,signal:AbortSignal.timeout(30000)
       });
       const payload=await responsePayload(response);
-      if(!response.ok)throw Error(messages[payload.error?.code||'']||'Não foi possível confirmar o envio. Verifique o histórico antes de tentar novamente.');
+      if(!response.ok)throw Error(messages[payload.error?.code||'']||'Não foi possível confirmar o envio. Tente novamente mais tarde.');
       setSentId(payload.id||'');
-      if(payload.id)setHistory(old=>[{id:payload.id!,kind,title,status:'sent' as const,created_at:Date.now()},...old].slice(0,15));
     }catch(reason){
       // A new click is a deliberate new attempt. Never auto-resend after an uncertain outcome.
       // The former key remains recorded by D1, so subsequent clicks cannot get trapped in 409.
       setRequestKey(crypto.randomUUID());
       setRetrying(true);
       setError(reason instanceof Error?reason.message:'Não foi possível confirmar o envio.');
-      try{
-        const token=await getToken();
-        const historyResponse=await fetch(API_BASE_URL+'/feedback',{
-          headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(10000)
-        });
-        if(historyResponse.ok){const info=await responsePayload(historyResponse);setHistory(info.items||[]);}
-      }catch{ /* An unavailable history endpoint must not erase the original error. */ }
     }finally{setProcessing(false);}
   }
   function close(){if(!pending)onClose();}
@@ -180,7 +154,6 @@ export function FeedbackDialog({getToken,onClose}:{getToken:()=>Promise<string>;
           <p>Enviamos sua mensagem para nossa equipe de suporte.</p>
           <span>Protocolo: {sentId}</span>
         </div>:<>
-          {available===false&&<p className="feedback-alert" role="alert">O envio de mensagens ainda não está configurado neste ambiente.</p>}
           <AppModalSection>
             <div className="feedback-field">
               <span className="feedback-label">Como podemos ajudar?</span>
@@ -221,17 +194,10 @@ export function FeedbackDialog({getToken,onClose}:{getToken:()=>Promise<string>;
         </>}
         {error&&<p className="feedback-alert" role="alert">{error}</p>}
         <p className="feedback-privacy">As informações e imagens enviadas serão recebidas no e-mail de suporte. Não inclua senhas, códigos de acesso ou documentos confidenciais.</p>
-        <div className="feedback-history">
-          <AppButton type="button" className="feedback-history-toggle" aria-expanded={showHistory}
-            onClick={()=>setShowHistory(v=>!v)}>Meus feedbacks anteriores ({history.length})</AppButton>
-          {showHistory&&(history.length?<ul>{history.map(item=><li key={item.id}>
-            <span>{item.title}</span><small>{new Date(item.created_at).toLocaleDateString('pt-BR')} · {item.status==='sent'?'Recebido':item.status==='failed'?'Não confirmado':'Processando'}</small>
-          </li>)}</ul>:<p>Você ainda não possui feedbacks registrados.</p>)}
-        </div>
       </AppModalBody>
       <AppModalFooter>
         <AppButton type="button" variant="secondary" disabled={pending} onClick={close}>{sentId?'Fechar':'Cancelar'}</AppButton>
-        {!sentId&&<AppButton type="submit" variant="primary" loading={pending} disabled={pending||available!==true||title.trim().length<5||description.trim().length<15}>
+        {!sentId&&<AppButton type="submit" variant="primary" loading={pending} disabled={pending||title.trim().length<5||description.trim().length<15}>
           {preparing?'Preparando imagens…':processing?'Enviando…':retrying?'Tentar novamente':'Enviar feedback'}
         </AppButton>}
       </AppModalFooter>

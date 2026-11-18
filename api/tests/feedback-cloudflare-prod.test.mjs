@@ -46,6 +46,9 @@ test('Cloudflare PROD delivers with fixed sender, sole verified Gmail, and raw a
   const message=calls[0];
   assert.equal(message.from,'suporte@roteiva.com');
   assert.equal(message.to,'suporte.roteiva@gmail.com');
+  assert.match(message.html,/DESCRIÇÃO/);
+  assert.doesNotMatch(message.text,/Tela:/);
+  assert.doesNotMatch(message.html,/Tela:/);
   assert.equal(message.replyTo,'owner@example.com');
   assert.match(message.subject,/Roteiva PROD/);
   assert.equal(message.attachments.length,1);

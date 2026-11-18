@@ -29,3 +29,13 @@ Referências oficiais:
 - https://developers.cloudflare.com/email-service/configuration/email-routing-addresses/
 - https://developers.cloudflare.com/email-service/configuration/send-bindings/
 - https://developers.cloudflare.com/email-service/api/send-emails/workers-api/
+
+## Mensagens e fluxo do formulário (18/11/2026)
+
+- **Sem tracking para o usuário:** o modal faz apenas `POST /feedback` no clique de envio. `GET /feedback` não é mais uma rota suportada. Não há consulta na abertura nem após falhas e a seção “Meus feedbacks anteriores” foi retirada.
+- **D1 continua necessário:** exclusivamente para limites, idempotência, texto/metadados e exclusão de conta. Não há armazenamento das imagens nem uma área de histórico visível.
+- **Um único template HTML:** `api/src/feedback-email.ts` produz HTML responsivo com cores Roteiva e versão `text/plain` para acessibilidade/compatibilidade. Inclui categoria, assunto, e-mail validado, descrição rotulada, imagens e protocolo. **Não inclui tela no e-mail**. O conteúdo do usuário é escapado antes de entrar no HTML. Não usa fontes, imagens ou CSS externos.
+- **Bug de DEV corrigido:** o Worker utilizava `fetch(..., {redirect:'error'})`; o modo `error` não é implementado pelo runtime Workers e causa `TypeError` antes da requisição ao Resend. Substituído por `redirect:'manual'` para impedir redirecionamentos automáticos sem quebrar o envio ou expor o Authorization a outro host.
+- **Erro real em DEV:** resposta Resend 4xx identifica configuração inválida/chave rejeitada; 5xx ou falha de transporte continuam como resultado incerto (sem retries automáticos). Logs contêm somente código/nome seguro do provedor, HTTP status e protocolo, nunca credenciais, conteúdo ou anexos. O `onboarding@resend.dev` só entrega para a caixa que é proprietária da conta Resend.
+- **PROD:** mantém Cloudflare `FEEDBACK_EMAIL` com destino verificado `suporte.roteiva@gmail.com` e remetente `suporte@roteiva.com` — já houve comprovação de recebimento real do e-mail com anexos. Nenhum segredo Resend em PROD.
+
