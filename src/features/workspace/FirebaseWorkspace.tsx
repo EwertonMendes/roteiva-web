@@ -3,7 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import DashboardClient from "../../dashboard-client";
 import { firebaseServices } from "../../lib/firebase";
 import { FirestoreWorkspace, dataErrorMessage } from "../../data/firestore-workspace";
-import { emptyWorkspace, type WorkspaceData } from "../../domain/workspace";
+import { emptyWorkspace, type WorkspaceData, type Project } from "../../domain/workspace";
 import { routeFromLocation, type WorkspaceRoute } from "../../lib/workspace-routing";
 import { domainsForRoute } from "../../lib/workspace-scopes";
 import type { Domain } from "../../data/firestore-sync";
