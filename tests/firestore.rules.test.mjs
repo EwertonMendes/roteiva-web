@@ -718,3 +718,28 @@ test("project deletion fence denies stale client writes without touching another
   await assertSucceeds(updateDoc(doc(bob,'users/bob/projects/2'),{name:'Other owner unchanged',revision:2,updatedAt:serverTimestamp()}));
   await assertFails(deleteDoc(fence));
 });
+
+test("repository invalidation after Worker project deletion refreshes a previously fully loaded project catalogue",async()=>{
+  const alice=dbFor("alice"),a=new FirestoreWorkspace(alice,"alice");
+  const before=await a.load(["projects","tasks"]);
+  assert.equal(before.projects.some(project=>project.id===2),true);
+  assert.equal(a.hasLoaded(["projects","tasks"]),true);
+  const stateRef=doc(alice,"users/alice/sync/state");
+  const state=(await getDoc(stateRef)).data();
+  assert.ok(state);
+  await env.withSecurityRulesDisabled(async ctx=>{
+    const admin=ctx.firestore();
+    await deleteDoc(doc(admin,"users/alice/projects/2"));
+    await updateDoc(doc(admin,"users/alice/sync/state"),{
+      revision:state.revision+1,
+      "domains.projects":state.domains.projects+1,
+      "counts.projects":state.counts.projects-1,
+      updatedAt:serverTimestamp()
+    });
+  });
+  a.invalidateAfterProjectDeletion();
+  assert.equal(a.hasLoaded(["projects","tasks"]),false);
+  const refreshed=await a.projectPage({reset:true,size:24});
+  assert.equal(refreshed.total,0);
+  assert.equal(refreshed.workspace.projects.some(project=>project.id===2),false);
+});

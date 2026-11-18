@@ -41,3 +41,5 @@
 @media(prefers-reduced-motion:reduce){
   :root .rt-toast.toast {animation:none}
 }
+
+:root .rt-toast .rt-toast-message strong{font-weight:780;color:var(--ink)}

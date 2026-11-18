@@ -67,6 +67,29 @@ export class FirestoreWorkspace {
   private readonly peekKeys=new Map<string,Set<string>>();
   private readonly financeBarCache=new Map<string,{revision:number;bars:number[]}>();
   hasLoaded(domains:readonly Domain[]):boolean { return domains.every(name=>this.loadedDomains.has(name)); }
+  /**
+   * A trusted Worker can delete project records without going through this
+   * client's transaction queue. A previously fully loaded projects domain would
+   * otherwise be returned from memory by projectPage() forever, even when the
+   * backend counters advance. Invalidate the snapshot before the next read.
+   *
+   * Only call after the server confirms completion. This changes no server data
+   * and keeps all existing cache/privacy rules intact.
+   */
+  invalidateAfterProjectDeletion():void {
+    this.loadedDomains.clear();
+    this.pagedDomains.clear();
+    this.projectCursors.clear();
+    this.filteredProjectCounts.clear();
+    this.clientCursor=undefined;
+    this.recurringCount=undefined;
+    this.rangeRevisions.clear();
+    this.peekKeys.clear();
+    this.financeBarCache.clear();
+    this.stored.clear();
+    this.stamp=null;
+  }
+
   constructor(db: Firestore, uid: string) {
     if (!uid || uid.includes("/")) throw new Error("UID inválido.");
     this.db=db; this.uid=uid;

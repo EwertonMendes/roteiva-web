@@ -4,8 +4,8 @@ import {AlertCircle,CheckCircle2,Info,TriangleAlert,X} from "lucide-react";
 import {AppButton} from "./AppButton";
 
 export type ToastTone="success"|"error"|"warning"|"info";
-export type ToastNotify=(message:string,tone?:ToastTone)=>void;
-type Toast={id:number;message:string;tone:ToastTone};
+export type ToastNotify=(message:ReactNode,tone?:ToastTone)=>void;
+type Toast={id:number;message:ReactNode;tone:ToastTone};
 const ToastContext=createContext<ToastNotify|null>(null);
 const durations:Record<ToastTone,number>={success:3500,error:6500,warning:5500,info:4200};
 const symbols={success:CheckCircle2,error:AlertCircle,warning:TriangleAlert,info:Info};
@@ -21,8 +21,8 @@ export function ToastProvider({children}:{children:ReactNode}){
   const sequence=useRef(0);
   const [portalTarget,setPortalTarget]=useState<HTMLElement|null>(null);
   const notify=useCallback<ToastNotify>((message,tone="info")=>{
-    const clean=message.trim();
-    if(!clean)return;
+    const clean=typeof message==="string" ? message.trim() : message;
+    if(clean===null||clean===undefined||clean==="")return;
     setCurrent(previous=>previous?.message===clean&&previous.tone===tone
       ?previous:{id:++sequence.current,message:clean,tone});
   },[]);

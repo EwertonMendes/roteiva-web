@@ -236,20 +236,47 @@ test('project danger zone requires an explicit confirmation and preserves financ
   const dialog=page.getByRole('dialog',{name:'Excluir este projeto?'});
   await expect(dialog).toBeVisible();
   const confirm=dialog.getByRole('button',{name:'Excluir definitivamente'});
+  const nameInput=dialog.getByRole('textbox',{name:'Digite o nome exato do projeto para confirmar'});
+  await expect(nameInput).toHaveAttribute('placeholder','Projeto destrutivo');
+  const checkbox=dialog.getByRole('checkbox',{name:/Entendo que a exclusão dos dados vinculados/});
+  await expect(checkbox).toBeVisible();
+  await expect(dialog.locator('.rt-checkbox__box')).toBeVisible();
+  const inputRect=await nameInput.boundingBox(),modalRect=await dialog.boundingBox();
+  expect(inputRect&&modalRect).toBeTruthy();
+  expect(inputRect!.width).toBeGreaterThan(modalRect!.width*0.7);
+  for(const theme of ['light','dark']){
+    await page.evaluate(value=>document.documentElement.setAttribute('data-theme',value),theme);
+    await expect(dialog.locator('.pd-delete-intro')).toBeVisible();
+    const intro=await dialog.locator('.pd-delete-intro').boundingBox();
+    const preserve=await dialog.locator('.pd-delete-preserve').boundingBox();
+    const input=await nameInput.boundingBox();
+    const check=await dialog.locator('.rt-checkbox__box').boundingBox();
+    expect(intro&&preserve&&input&&check).toBeTruthy();
+    expect(preserve!.y).toBeGreaterThan(intro!.y+intro!.height);
+    expect(input!.y).toBeGreaterThan(preserve!.y+preserve!.height);
+    expect(check!.height).toBeGreaterThanOrEqual(20);
+    expect(await dialog.evaluate(el=>el.scrollWidth<=el.clientWidth)).toBe(true);
+  }
   await expect(confirm).toBeDisabled();
-  await dialog.getByLabel('Digite o nome exato do projeto para confirmar:').fill('Projeto errado');
+  await dialog.getByLabel('Digite o nome exato do projeto para confirmar').fill('Projeto errado');
   await dialog.getByRole('checkbox').check();
   await expect(confirm).toBeDisabled();
-  await dialog.getByLabel('Digite o nome exato do projeto para confirmar:').fill('Projeto destrutivo');
+  await dialog.getByLabel('Digite o nome exato do projeto para confirmar').fill('Projeto destrutivo');
   await expect(confirm).toBeEnabled();
   await dialog.getByRole('button',{name:'Cancelar'}).click();
   await expect(page.locator('.project-detail')).toBeVisible();
   await page.getByRole('button',{name:'Excluir projeto'}).click();
-  await dialog.getByLabel('Digite o nome exato do projeto para confirmar:').fill('Projeto destrutivo');
+  await dialog.getByLabel('Digite o nome exato do projeto para confirmar').fill('Projeto destrutivo');
   await dialog.getByRole('checkbox').check();
   await dialog.getByRole('button',{name:'Excluir definitivamente'}).click();
-  await expect(page).toHaveURL(/#\\/projetos$/);
-  await expect(page.getByText('Projeto destrutivo')).toHaveCount(0);
+  await expect(page).toHaveURL(new RegExp('#/projetos$'));
+  // No reload or F5: deletion must update the visible list and toast immediately.
+  await expect(page.getByRole('button',{name:'Abrir projeto Projeto destrutivo'})).toHaveCount(0);
+  const toast=page.locator('.rt-toast--success');
+  await expect(toast).toBeVisible();
+  await expect(toast.locator('.rt-toast-message strong')).toHaveText('Projeto destrutivo');
+  await expect(toast).toContainText('foi excluído com sucesso.');
+  await expect(page.getByText('Projeto destrutivo',{exact:true})).toHaveCount(1); // toast only
   await expect.poll(async()=>page.evaluate(()=>{
     const data=JSON.parse(localStorage.getItem('roteiva-pages-demo-workspace-v1')||'{}');
     return {projects:data.projects?.length,events:data.calendarEvents?.length,

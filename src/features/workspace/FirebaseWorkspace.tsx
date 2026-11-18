@@ -3,7 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import DashboardClient from "../../dashboard-client";
 import { firebaseServices } from "../../lib/firebase";
 import { FirestoreWorkspace, dataErrorMessage } from "../../data/firestore-workspace";
-import { emptyWorkspace, type WorkspaceData } from "../../domain/workspace";
+import { emptyWorkspace, type WorkspaceData, type Project } from "../../domain/workspace";
 import { routeFromLocation, type WorkspaceRoute } from "../../lib/workspace-routing";
 import { domainsForRoute } from "../../lib/workspace-scopes";
 import type { Domain } from "../../data/firestore-sync";
@@ -311,6 +311,32 @@ export function FirebaseWorkspace() {
       }}
     finally{if(request===scopeRequest.current)setLoadingBusiness(false);}
   },[repository,calendarPeriod]);
+  // The Worker performs deletion outside this tab's Firestore transaction queue.
+  // A version bump alone rehydrates the old in-memory full collection, so purge
+  // the repository snapshot first, remove the deleted row synchronously, and
+  // refresh the catalogue from the authoritative server without remounting the
+  // dashboard (which would discard its success notification).
+  const handleProjectRemoved=useCallback((project:Project)=>{
+    repository.invalidateAfterProjectDeletion();
+    setInitial(current=>current?{
+      ...current,
+      workspace:{
+        ...current.workspace,
+        projects:current.workspace.projects.filter(item=>item.id!==project.id),
+        calendarEvents:current.workspace.calendarEvents.filter(event=>event.projectId!==project.id),
+        financeEntries:current.workspace.financeEntries.map(entry=>entry.projectId===project.id?{...entry,projectId:undefined}:entry),
+        libraryAssets:current.workspace.libraryAssets.filter(asset=>asset.projectId!==project.id),
+      }
+    }:current);
+    setProjectPage(current=>current?{...current,total:Math.max(0,current.total-1)}:current);
+    setOverviewMetrics(current=>current?{
+      ...current,
+      projectCount:Math.max(0,current.projectCount-1),
+      projectStatuses:{...current.projectStatuses,
+        [project.status]:Math.max(0,current.projectStatuses[project.status]-1)}
+    }:current);
+    void fetchProjectPage("Todos",true);
+  },[repository,fetchProjectPage]);
   const onRouteChange=useCallback((route:WorkspaceRoute)=>{
     if(route.view==="overview"){
       if(!overviewMetrics)void retryFirestoreRead(()=>repository.overviewMetrics()).then(setOverviewMetrics)
@@ -416,7 +442,7 @@ export function FirebaseWorkspace() {
     {initial && (overviewMetrics || routeFromLocation(window.location,{base:import.meta.env.BASE_URL,useHash:false}).view!=="overview") && <div inert={!!error || remoteChanges || loadingBusiness} aria-busy={saving}>
       <DashboardClient key={user.uid+"-"+version} getFeedbackToken={getFeedbackToken} firstName={profileContext?.profile.displayName || user.displayName || "Profissional"} profile={profileContext?.profile || null} onSaveProfile={profileContext?.saveProfile} email={user.email || ""} photoURL={user.photoURL || undefined}
         initialWorkspace={initial.workspace} initialTheme={theme} onCommands={businessLoaded ? executeCommands : undefined}
-        onProjectRemoved={()=>setVersion(value=>value+1)} onRouteChange={onRouteChange}
+        onProjectRemoved={handleProjectRemoved} onRouteChange={onRouteChange}
         canValidateProjectLink={repository.hasLoaded(domainsForRoute({view:"projects",projectId:1}))}
         canValidateClientLink={repository.hasLoaded(domainsForRoute({view:"clients",clientId:1}))}
         projectPage={repository.hasLoaded(["projects","tasks"])?undefined:projectPage}
