@@ -15,6 +15,8 @@ export const reviewedAdditiveMigrations=Object.freeze({
   '0029_review_source_checks.sql':'461f8ba9cb23afd010a35f6c10691980db2f61d3',
   '0030_review_source_checksum.sql':'09cc99c00692dde60dd8b766b8ac97ba5326a9b3',
   '0033_feedback_retry_safety.sql':'eb4cd1b8e65c77ce2f95042ab6d0e1a31d7bde05',
+  // Schema-only tables/triggers; exact reviewed blob, no updates/deletes against existing rows.
+  '0034_project_deletions.sql':'be2f4fa9a2455511202cac91e993190d84a88a87',
 });
 
 export function gitBlobSha(content){
