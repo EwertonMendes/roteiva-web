@@ -98,7 +98,8 @@ export async function sendFeedbackEmail(env:Env,mail:FeedbackMail):Promise<{mess
   try{
     response=await fetch(RESEND_ENDPOINT,{
       method:'POST',
-      redirect:'error',
+      // Workers does not support redirect:'error'. Manual prevents credentials leaking through redirects.
+      redirect:'manual',
       headers:{
         'Authorization':'Bearer '+env.RESEND_API_KEY,
         'Content-Type':'application/json',
