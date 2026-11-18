@@ -12,7 +12,7 @@ import { metadata, disconnect, about } from './drive.ts';
 import { listFolders, listFolderItems } from './folders.ts';
 import { thumbnail } from './thumbnails.ts';
 import {libraryRouter} from './library.ts';
-import {projectDeletionStatus,requestProjectDeletion,runPendingProjectDeletions} from './project-deletion.ts';
+import {projectDeletionStatus,requestProjectDeletion,runPendingProjectDeletions,drainProjectDeletion} from './project-deletion.ts';
 import {streamIngest} from './stream-preview.ts';
 import { startUpload, completeUpload, authorizeUploadFolder, cleanupUploads } from './uploads.ts';
 import { verifyPickerToken,pickerConfiguration,pickedDriveFile } from './picker.ts';
@@ -53,7 +53,7 @@ function operationName(path:string):string{
   if(path==='/health')return 'health';
   return 'other';
 }
-export async function handle(request: Request, env: Env): Promise<Response> {
+export async function handle(request: Request, env: Env, ctx?:ExecutionContext): Promise<Response> {
   const began=performance.now();
   const id = crypto.randomUUID();
   const url = new URL(request.url);
@@ -116,9 +116,15 @@ export async function handle(request: Request, env: Env): Promise<Response> {
       const projectId=Number(url.pathname.split('/')[2]);
       if(!(await env.API_RATE_LIMIT.limit({key:env.ENVIRONMENT+':project-delete:'+uid})).success)
         throw new ApiError(429,'rate_limited');
-      response=request.method==='POST'
-        ?await requestProjectDeletion(request,env,uid,projectId)
-        :await projectDeletionStatus(env,uid,projectId);
+      if(request.method==='POST'){
+        response=await requestProjectDeletion(request,env,uid,projectId);
+        // Continue cleanup after responding to the browser. The D1 lease guards
+        // against simultaneous cron/status requests; the cron is the fallback
+        // when an isolate ends or the user navigates away.
+        ctx?.waitUntil(drainProjectDeletion(env,uid,projectId)
+          .catch(error=>console.error(JSON.stringify({event:'project_deletion_background_failure',
+            code:error instanceof ApiError?error.code:'dependency_failure'}))));
+      }else response=await projectDeletionStatus(env,uid,projectId);
     } else if (url.pathname.startsWith('/library/')) {
       if(env.VIRTUAL_LIBRARY_ENABLED!=='true')throw new ApiError(404,'not_found');
       if(request.method==='POST'&&!allowedFrontend(env,origin))throw new ApiError(403,'origin_required');
