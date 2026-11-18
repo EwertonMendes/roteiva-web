@@ -65,6 +65,11 @@ async function revokeConnections(env:Env,uid:string):Promise<boolean>{
   if(!await revokeGuard(env,uid))return false;
   if(!await closeOwnerReviews(env,uid))return false;
   if(!await eraseOwnerLibraryChunk(env,uid))return false;
+  // Account cleanup supersedes any project-scoped tombstones and pending preview candidates.
+  await env.DB.batch([
+    env.DB.prepare('DELETE FROM project_deletion_previews WHERE owner_uid=?').bind(uid),
+    env.DB.prepare('DELETE FROM project_deletions WHERE owner_uid=?').bind(uid)
+  ]);
   // A Google Drive credential is never deleted until revocation succeeds.
   // Disabled credentials are rejected by all authenticated API routes.
   const rows=await env.DB.prepare('SELECT * FROM drive_connections WHERE owner_uid=? LIMIT 1')

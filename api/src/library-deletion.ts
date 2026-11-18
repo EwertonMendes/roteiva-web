@@ -14,3 +14,20 @@ export async function eraseOwnerLibraryChunk(env:Env,uid:string):Promise<boolean
  ]);
  return false;
 }
+
+/** Project-scoped counterpart: never touch other projects or provider originals. */
+export async function eraseProjectLibraryChunk(env:Env,uid:string,id:number):Promise<boolean>{
+ const library=await env.DB.prepare('SELECT id FROM libraries WHERE owner_uid=? AND project_id=? LIMIT 1')
+  .bind(uid,id).first<{id:string}>();
+ if(!library)return true;
+ await env.DB.batch([
+  env.DB.prepare("UPDATE libraries SET state='deleting' WHERE id=? AND owner_uid=? AND project_id=?").bind(library.id,uid,id),
+  env.DB.prepare('DELETE FROM library_entries WHERE library_id=?').bind(library.id),
+  env.DB.prepare('DELETE FROM library_upload_targets WHERE library_id=?').bind(library.id),
+  env.DB.prepare('DELETE FROM library_structure_attempts WHERE library_id=?').bind(library.id),
+  env.DB.prepare('DELETE FROM library_nodes WHERE library_id=?').bind(library.id),
+  env.DB.prepare('DELETE FROM library_assets WHERE library_id=?').bind(library.id),
+  env.DB.prepare("DELETE FROM libraries WHERE id=? AND owner_uid=? AND project_id=? AND state='deleting'").bind(library.id,uid,id),
+ ]);
+ return false;
+}
