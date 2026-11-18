@@ -12,6 +12,7 @@ import {eventRange} from '../../studio-calendar';
 import {sumMoney} from '../../studio-finance';
 import {isDemo} from '../../lib/firebase';
 import {ProjectMaterials} from './ProjectMaterials';
+import {ProjectDeletionAction} from './ProjectDeletionAction';
 import {ProjectChecklist} from './ProjectChecklist';
 import {PROJECT_STATUS_ICONS,PROJECT_STATUS_COLORS} from '../ui/project-status';
 import './project-detail.css';
@@ -21,6 +22,7 @@ type Props = {
   onSave:(project:Project)=>void; onBack:()=>void; onRevenue:(project:Project)=>void;
   onEditRevenue:(entry:FinanceEntry)=>void; onMaterials:(folderId?:string)=>void;
   onEvent:(project:Project)=>void; onEditEvent:(event:CalendarEvent)=>void; onReview?:()=>void;
+  onDeleted:()=>void; onDeleteDemo?:()=>void;
 };
 const currency=(value:number)=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(value);
 const statuses:Status[]=['Em produção','Em aprovação','Ajustes','Aprovado'];
@@ -30,7 +32,7 @@ function stageIcon(value:string){
  return Icon?<Icon size={18} style={{color:PROJECT_STATUS_COLORS[status]}} aria-hidden="true"/>:null;
 }
 
-export function ProjectDetail({project,clients,entries,assets,events,onSave,onBack,onRevenue,onEditRevenue,onMaterials,onEvent,onEditEvent,onReview}:Props){
+export function ProjectDetail({project,clients,entries,assets,events,onSave,onBack,onRevenue,onEditRevenue,onMaterials,onEvent,onEditEvent,onReview,onDeleted,onDeleteDemo}:Props){
   const [materialFolder,setMaterialFolder]=useState('root');
   const [status,setStatus]=useState(project.status);
   const [dueDate,setDueDate]=useState(project.dueDate&&isValidCivilDate(project.dueDate)?project.dueDate:'');
@@ -114,5 +116,6 @@ export function ProjectDetail({project,clients,entries,assets,events,onSave,onBa
       {agenda.map(event=><div className="pd-event" key={event.id}><b>{event.title}</b><span>{event.date.split('-').reverse().join('/')} · {eventRange(event)}</span><AppButton className="pd-remove" aria-label={`Editar compromisso ${event.title}`} onClick={()=>onEditEvent(event)}><Pencil size={17} aria-hidden="true"/></AppButton></div>)}
       {!agenda.length&&<p className="pd-empty">Nenhum compromisso vinculado.</p>}
     </section>
+    <ProjectDeletionAction project={project} onDeleted={onDeleted} onDeleteDemo={onDeleteDemo}/>
   </div>;
 }

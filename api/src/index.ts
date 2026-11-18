@@ -12,6 +12,7 @@ import { metadata, disconnect, about } from './drive.ts';
 import { listFolders, listFolderItems } from './folders.ts';
 import { thumbnail } from './thumbnails.ts';
 import {libraryRouter} from './library.ts';
+import {projectDeletionStatus,requestProjectDeletion,runPendingProjectDeletions} from './project-deletion.ts';
 import {streamIngest} from './stream-preview.ts';
 import { startUpload, completeUpload, authorizeUploadFolder, cleanupUploads } from './uploads.ts';
 import { verifyPickerToken,pickerConfiguration,pickedDriveFile } from './picker.ts';
@@ -108,6 +109,16 @@ export async function handle(request: Request, env: Env): Promise<Response> {
       // Signed ingest requests come from the Stream transcoder, not a browser.
       // Do not require a Firebase token for this narrowly scoped temporary URL.
       response=await streamIngest(request,env,url.pathname.slice('/stream/ingest/'.length));
+    } else if (new RegExp('^/projects/[1-9][0-9]{0,14}/deletion$').test(url.pathname) && ['GET','POST'].includes(request.method)) {
+      if(request.method==='POST'&&!allowedFrontend(env,origin))throw new ApiError(403,'origin_required');
+      const uid=await identity(request,env);
+      await assertActiveAccess(env,uid);
+      const projectId=Number(url.pathname.split('/')[2]);
+      if(!(await env.API_RATE_LIMIT.limit({key:env.ENVIRONMENT+':project-delete:'+uid})).success)
+        throw new ApiError(429,'rate_limited');
+      response=request.method==='POST'
+        ?await requestProjectDeletion(request,env,uid,projectId)
+        :await projectDeletionStatus(env,uid,projectId);
     } else if (url.pathname.startsWith('/library/')) {
       if(env.VIRTUAL_LIBRARY_ENABLED!=='true')throw new ApiError(404,'not_found');
       if(request.method==='POST'&&!allowedFrontend(env,origin))throw new ApiError(403,'origin_required');
@@ -296,6 +307,7 @@ export default {fetch:handle, scheduled(controller:ScheduledController,env:Env,c
     await assertDatabaseEnvironment(env);
     if(controller.cron==='* * * * *'){
       await runPendingDeletions(env);
+      try{await runPendingProjectDeletions(env);}catch{console.error(JSON.stringify({event:'project_deletion_scheduler_failure'}));}
       try{await cleanupExpiredReviews(env);}catch{console.error(JSON.stringify({event:'review_revocation_retry'}));}
     }else if(controller.cron==='*/15 * * * *'){
       // D1 security backlog is observed inside the Worker; GitHub never polls it.

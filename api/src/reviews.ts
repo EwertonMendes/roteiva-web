@@ -1,4 +1,5 @@
 import {apiOrigin} from './environment.ts';
+import {assertProjectNotDeleting as assertReviewProjectNotDeleting} from './project-deletion.ts';
 import { ApiError, type Env, type Connection } from './types.ts';
 import { identity, verifiedTrialPrincipal } from './auth.ts';
 import { assertActiveAccess } from './access.ts';
@@ -824,6 +825,7 @@ async function publicReview(request:Request,env:Env,action:'view'|'comment'|'dec
   if(!session&&!/^[A-Za-z0-9_-]{43}$/.test(token))throw new ApiError(404,'review_not_found');
   const r=session?await env.DB.prepare('SELECT * FROM review_requests WHERE id=?').bind(session.review_id).first<Review>():await env.DB.prepare('SELECT * FROM review_requests WHERE token_hash=?').bind(await hash(token)).first<Review>();
   if(!r||r.status==='closed'||r.status==='closing')throw new ApiError(404,'review_not_found');
+  await assertReviewProjectNotDeleting(env,r.owner_uid,r.project_id);
   if(r.expires_at<=now())throw new ApiError(410,'review_expired');
   if(!['pending','changes','approved'].includes(r.status))throw new ApiError(409,'review_not_ready');
   let email='',subject:string|null=null,role:'reviewer'|'viewer'='reviewer';
@@ -1029,6 +1031,8 @@ export async function reviewRouter(request:Request,env:Env,url:URL):Promise<Resp
   const parts=path.split('/');
   if(parts.length!==4&&parts.length!==3)throw new ApiError(404,'not_found');
   const r=await stored(env,parts[2],uid);
+  if(!(parts.length===4&&parts[3]==='close'&&request.method==='POST'))
+    await assertReviewProjectNotDeleting(env,r.owner_uid,r.project_id);
   if(parts.length===3&&request.method==='GET')return Response.json(await detail(env,r));
   if(parts.length===4&&parts[3]==='content'&&['GET','HEAD'].includes(request.method)&&env.VIRTUAL_LIBRARY_ENABLED==='true'){
     if(!['pending','changes','approved'].includes(r.status)||r.expires_at<=now())throw new ApiError(404,'review_not_found');
@@ -1052,6 +1056,19 @@ export async function reviewRouter(request:Request,env:Env,url:URL):Promise<Resp
  * Close invitations before revoking OAuth: otherwise Drive "anyone" grants could
  * outlive the owner's Roteiva account. One review per cron tick bounds requests.
  */
+/** Close and remove only one project's invitations, including grants and sessions. */
+export async function closeProjectReviews(env:Env,uid:string,id:number):Promise<boolean>{
+  const r=await env.DB.prepare("SELECT * FROM review_requests WHERE owner_uid=? AND project_id=? AND status!='closed' ORDER BY updated_at LIMIT 1")
+    .bind(uid,id).first<Review>();
+  if(r){await close(env,r);return false;}
+  const done=await env.DB.prepare("SELECT id FROM review_requests WHERE owner_uid=? AND project_id=? LIMIT 20")
+    .bind(uid,id).all<{id:string}>();
+  if(done.results.length){
+    await env.DB.batch(done.results.map(x=>env.DB.prepare("DELETE FROM review_requests WHERE owner_uid=? AND project_id=? AND id=?").bind(uid,id,x.id)));
+    return false;
+  }
+  return true;
+}
 export async function closeOwnerReviews(env:Env,uid:string):Promise<boolean>{
   const r=await env.DB.prepare("SELECT * FROM review_requests WHERE owner_uid=? AND status!='closed' ORDER BY updated_at LIMIT 1")
     .bind(uid).first<Review>();

@@ -1,4 +1,5 @@
 import {ApiError,type Env} from './types.ts';
+import {assertProjectNotDeleting} from './project-deletion.ts';
 
 export type Library={id:string;owner_uid:string;project_id:number};
 export type LibraryNode={id:string;parent_id:string|null;kind:'folder'|'asset';name:string;state:'active'|'trashed';revision:number};
@@ -22,6 +23,7 @@ async function mediaCheckKey(request:Request,env:Env,uid:string,projectId:number
  return Array.from(new Uint8Array(hash),b=>b.toString(16).padStart(2,'0')).join('');
 }
 export async function authorizeLibraryProject(request:Request,env:Env,uid:string,projectId:number,fetcher:typeof fetch=fetch,media=false){
+ await assertProjectNotDeleting(env,uid,projectId);
  const key=media&&request.method==='GET'?await mediaCheckKey(request,env,uid,projectId):null;
  if(key){
   const until=mediaProjectChecks.get(key)||0;

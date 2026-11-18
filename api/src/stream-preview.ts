@@ -3,6 +3,7 @@ import {base64url,decode} from './crypto.ts';
 import {libraryFor,libraryNode} from './library-core.ts';
 import {libraryContent} from './library-content.ts';
 import {readLibrarySource} from './library-assets.ts';
+import {assertProjectNotDeleting} from './project-deletion.ts';
 import {apiOrigin} from './environment.ts';
 
 type Video={id:string;readyToStream:boolean;status?:{state:string};preview?:string;hlsPlaybackUrl?:string};

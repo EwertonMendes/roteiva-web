@@ -217,3 +217,42 @@ test('project detail: tasks and recurring month picker use Roteiva calendar',asy
   await chooser.getByRole('button',{name:'Fevereiro'}).click();
   await expect(month).toHaveValue(/Fevereiro de \d{4}/);
 });
+
+test('project danger zone requires an explicit confirmation and preserves financial history in demo',async({page})=>{
+  await page.addInitScript(()=>{
+    localStorage.setItem('roteiva-pages-demo-workspace-v1',JSON.stringify({
+      projects:[{id:11,name:'Projeto destrutivo',client:'Cliente A',status:'Em produção',
+        due:'Sem prazo',progress:50,files:0,color:'blue',initials:'PR',description:'',
+        tasks:[{id:12,title:'Tarefa pendente',done:false}]}],
+      clients:[],financeEntries:[{id:31,projectId:11,project:'Receita histórica',
+        client:'Sem cliente',amount:250,kind:'income',status:'Recebido',date:'17/11/2026'}],
+      calendarEvents:[{id:41,projectId:11,title:'Entrega',date:'2026-11-17',time:'18:00',
+        type:'Entrega',client:'Sem cliente',autoDeadline:true}],
+      libraryAssets:[],comments:[],activities:[],reviewState:'pending'
+    }));
+  });
+  await page.goto(base+'/#/projetos/11');
+  await page.getByRole('button',{name:'Excluir projeto'}).click();
+  const dialog=page.getByRole('dialog',{name:'Excluir este projeto?'});
+  await expect(dialog).toBeVisible();
+  const confirm=dialog.getByRole('button',{name:'Excluir definitivamente'});
+  await expect(confirm).toBeDisabled();
+  await dialog.getByLabel('Digite o nome exato do projeto para confirmar:').fill('Projeto errado');
+  await dialog.getByRole('checkbox').check();
+  await expect(confirm).toBeDisabled();
+  await dialog.getByLabel('Digite o nome exato do projeto para confirmar:').fill('Projeto destrutivo');
+  await expect(confirm).toBeEnabled();
+  await dialog.getByRole('button',{name:'Cancelar'}).click();
+  await expect(page.locator('.project-detail')).toBeVisible();
+  await page.getByRole('button',{name:'Excluir projeto'}).click();
+  await dialog.getByLabel('Digite o nome exato do projeto para confirmar:').fill('Projeto destrutivo');
+  await dialog.getByRole('checkbox').check();
+  await dialog.getByRole('button',{name:'Excluir definitivamente'}).click();
+  await expect(page).toHaveURL(/#\\/projetos$/);
+  await expect(page.getByText('Projeto destrutivo')).toHaveCount(0);
+  await expect.poll(async()=>page.evaluate(()=>{
+    const data=JSON.parse(localStorage.getItem('roteiva-pages-demo-workspace-v1')||'{}');
+    return {projects:data.projects?.length,events:data.calendarEvents?.length,
+      financeId:data.financeEntries?.[0]?.projectId,amount:data.financeEntries?.[0]?.amount};
+  })).toEqual({projects:0,events:0,financeId:undefined,amount:250});
+});

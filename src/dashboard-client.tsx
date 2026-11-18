@@ -7,6 +7,10 @@ import { AppSelect } from "./features/ui/AppSelect";
 import { MoneyInput } from "./features/ui/MoneyInput";
 import {AppDateFormField,readFormDate} from "./features/ui/AppDateFormField";
 import {ProjectDetail} from './features/projects/ProjectDetail';
+import {clearLibraryFolders} from './features/drive/library-folder-cache';
+import {libraryPreviewCache} from './features/drive/library-preview-cache';
+import {clearAuthenticatedMediaCache} from './features/drive/authenticated-media';
+import {clearStorageImageCache} from './features/drive/storage-image-cache';
 import {SidebarAccountMenu} from "./features/ui/SidebarAccountMenu";
 import {FeedbackDialog} from "./features/feedback/FeedbackDialog";
 import {ProjectsView} from "./features/projects/ProjectsView";
@@ -96,6 +100,7 @@ type DashboardProps = {
   onThemeChange?:(theme:"light"|"dark")=>void;
   onRouteChange?:(route:WorkspaceRoute)=>void;
   onCommands?:(commands:readonly WorkspaceCommand[])=>Promise<boolean>|void;
+  onProjectRemoved?:()=>void;
   overviewMetrics?:{clientCount?:number;receivableAmount?:number;cashBalance?:number;projectCount?:number;projectStatuses?:Record<Status,number>}; projectPage?:{total:number;hasMore:boolean;status:string};
   onMoreProjects?:()=>void;onProjectStatus?:(status:Status|"Todos")=>void;
   onSearchProjects?:()=>void; clientPage?:{total:number;recurring:number;hasMore:boolean};
@@ -103,7 +108,7 @@ type DashboardProps = {
   financeBars?:{key:string;bars:number[]};eventCount?:number;usage?:Readonly<FirestoreUsage>;onCalendarMonthChange?:(year:number,month:number)=>void;
   onMoreClients?:()=>void;onSearchClients?:()=>void;onClientCreated?:(client:Client)=>void;canValidateProjectLink?:boolean;canValidateClientLink?:boolean; saving?:boolean; onLogout?:()=>void;
 };
-export default function DashboardClient({ firstName, email, photoURL, profile, onSaveProfile, getFeedbackToken, initialWorkspace, initialTheme, onThemeChange, onRouteChange, onCommands, overviewMetrics, projectPage, onMoreProjects, onProjectStatus, onSearchProjects, clientPage, onMoreClients, onSearchClients, onClientCreated, onFinancePeriodChange, financeBars, eventCount, usage, onCalendarMonthChange, canValidateProjectLink, canValidateClientLink, saving, onLogout }: DashboardProps) {
+export default function DashboardClient({ firstName, email, photoURL, profile, onSaveProfile, getFeedbackToken, initialWorkspace, initialTheme, onThemeChange, onRouteChange, onCommands, onProjectRemoved, overviewMetrics, projectPage, onMoreProjects, onProjectStatus, onSearchProjects, clientPage, onMoreClients, onSearchClients, onClientCreated, onFinancePeriodChange, financeBars, eventCount, usage, onCalendarMonthChange, canValidateProjectLink, canValidateClientLink, saving, onLogout }: DashboardProps) {
   const routeEnvironment={base:import.meta.env.BASE_URL,useHash:isDemo};
   const initialRoute=()=>routeFromLocation(window.location,routeEnvironment);
   const [initialBrowserRoute]=useState<WorkspaceRoute>(initialRoute);
@@ -183,6 +188,24 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     setEditingEvent(entry);
     setEventDate(entry?.date || date || todayKey());
     setEventModalOpen(true);
+  }
+  function projectDeleted(id:number){
+    // Purge private previews and stale folder snapshots after the server confirms
+    // the deletion. Source thumbnails are shared across projects, so invalidate
+    // local cache only; never delete provider originals.
+    clearLibraryFolders();
+    libraryPreviewCache.clear();
+    clearAuthenticatedMediaCache();
+    void clearStorageImageCache();
+    // Do not update the UI until the server confirms all deletion stages.
+    setProjects(current=>current.filter(p=>p.id!==id));
+    setCalendarEvents(current=>current.filter(e=>e.projectId!==id));
+    setFinanceEntries(current=>current.map(e=>e.projectId===id?{...e,projectId:undefined}:e));
+    setLibraryAssets(current=>current.filter(asset=>asset.projectId!==id));
+    setLibraryTarget(current=>current?.projectId===id?null:current);
+    navigateRoute({view:'projects'},{replace:true});
+    notify('Projeto excluído com segurança.', 'success');
+    if(!isDemo)onProjectRemoved?.();
   }
   function updateProject(updated: Project) {
     const old = projects.find(p => p.id === updated.id);
@@ -644,7 +667,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
           {((view === "projects" && !selectedProject) || (view === "clients" && !selectedClient && (clientPage?.total??clientList.length)>=5 || view === "clients" && !selectedClient && !!query.trim())) && <label className="page-search"><Search size={17}/><AppInput aria-label={view === "projects" ? "Buscar projetos" : "Buscar clientes"} value={query} onChange={e => { const value=e.target.value; setQuery(value); if(value.trim()){ if(view === "projects")onSearchProjects?.(); else onSearchClients?.(); } }} placeholder={view === "projects" ? "Buscar projetos" : "Buscar clientes"}/></label>}
           {view === "settings" && <SettingsPage profile={profile} email={email} photoURL={photoURL} theme={theme} toggleTheme={toggleTheme} onSaveProfile={onSaveProfile} />}
           {view === "overview" && <TodayStudio clients={clientList} projects={projects} entries={financeEntries} events={calendarEvents} activities={activities} onView={changeView} onOpenActivity={() => setActivityOpen(true)} overviewMetrics={overviewMetrics} />}
-          {view === "projects" && (selectedProject && projects.some(p => p.id === selectedProject) ? <ProjectDetail key={selectedProject} project={projects.find(p => p.id === selectedProject)!} clients={clientList} entries={financeEntries} assets={libraryAssets} events={calendarEvents} onSave={updateProject} onBack={() => changeView("projects")} onRevenue={addLinkedRevenue} onEditRevenue={openFinanceModal} onMaterials={(folderId)=>{setLibraryTarget({projectId:selectedProject!,folderId:folderId||"root"});setLibraryProject(String(selectedProject));navigateRoute({view:"library"});}} onEditEvent={(event)=>openEvent(event)} onEvent={(p) => { openEvent(null, p.dueDate); }} onReview={()=>{setReviewStart({clientId:projects.find(p=>p.id===selectedProject)?.clientId,projectId:selectedProject||undefined});changeView("reviews");}} /> : <ProjectsView projects={filtered.map(p => ({...p, files: libraryAssets.filter(a => a.projectId === p.id).length}))}
+          {view === "projects" && (selectedProject && projects.some(p => p.id === selectedProject) ? <ProjectDetail key={selectedProject} project={projects.find(p => p.id === selectedProject)!} clients={clientList} entries={financeEntries} assets={libraryAssets} events={calendarEvents} onSave={updateProject} onDeleted={()=>projectDeleted(selectedProject)} onDeleteDemo={()=>projectDeleted(selectedProject)} onBack={() => changeView("projects")} onRevenue={addLinkedRevenue} onEditRevenue={openFinanceModal} onMaterials={(folderId)=>{setLibraryTarget({projectId:selectedProject!,folderId:folderId||"root"});setLibraryProject(String(selectedProject));navigateRoute({view:"library"});}} onEditEvent={(event)=>openEvent(event)} onEvent={(p) => { openEvent(null, p.dueDate); }} onReview={()=>{setReviewStart({clientId:projects.find(p=>p.id===selectedProject)?.clientId,projectId:selectedProject||undefined});changeView("reviews");}} /> : <ProjectsView projects={filtered.map(p => ({...p, files: libraryAssets.filter(a => a.projectId === p.id).length}))}
                   onSaveCover={(id,cover)=>{const project=projects.find(p=>p.id===id);if(project)updateProject({...project,cover});}} statusFilter={statusFilter} setStatusFilter={(status)=>{
                     setStatusFilter(status);
                     onProjectStatus?.(status);

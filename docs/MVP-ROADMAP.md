@@ -928,3 +928,9 @@ Evidências: api/tests/deletion-access.test.mjs (negativa para conta sem provisi
 ## Permanência do menu ao salvar tema na conta
 
 **IMPLEMENTADO:** preferências de tema salvam sem tornar a interface inert; gravações de negócio preservam o bloqueio existente. Removidos toast de tema e indicador flutuante para essa preferência. Fila, tratamento de erro e persistência continuam ativos. Regressão em `tests/browser/workspace.spec.ts` cobre três alternâncias com conta conectada, foco e painel após confirmação e tema persistido no reload; `sidebar.spec.ts` verifica ausência de toast no demo. A regressão reproduziu o fechamento da versão anterior; resultados da correção registrados na PR.
+
+## Exclusão segura e seletiva de projetos — 17/11/2026
+
+**PARCIAL — branch de implementação; CI e homologação DEV ainda pendentes.** Zona de perigo nos detalhes, confirmação pelo nome, estado persistente, limpeza do D1/Firestore e proteção de acessos. Evidências de código: `src/features/projects/ProjectDeletionAction.tsx`, `api/src/project-deletion.ts`, `api/src/project-deletion-firestore.ts`, migration `0034` e regras `firestore.rules`. Testes: `api/tests/project-deletion.test.mjs`, `tests/firestore.rules.test.mjs`, `tests/browser/project-detail.spec.ts`.
+
+**Critérios de aceite antes de VALIDADO:** suíte API, TypeScript, rules A/B e navegador demo; smoke autenticado no DEV com projeto descartável, checklist, agenda, lançamento financeiro preservado, Biblioteca real e pelo menos uma aprovação encerrada; falha simulada/retry, atualizações concorrentes e isolamento entre projetos/UID. Não promover a PROD sem executar a migration no D1 correto, conferir guardas Firestore, segurança de compartilhamentos e receber autorização explícita.

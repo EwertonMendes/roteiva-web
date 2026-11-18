@@ -1,4 +1,5 @@
 import {ApiError,type Env} from './types.ts';
+import {assertProjectNotDeleting} from './project-deletion.ts';
 import {connection} from './repository.ts';
 import {accessCredential} from './google.ts';
 import {dropboxMedia} from './dropbox.ts';
@@ -67,8 +68,9 @@ export async function streamReviewMedia(request:Request,env:Env,url:URL):Promise
   if(request.headers.get('Sec-Fetch-Mode')==='navigate'&&request.headers.get('Sec-Fetch-Dest')==='document')
     throw new ApiError(404,'review_not_found');
   const p=await verifyReviewMediaTicket(env,url.searchParams.get('ticket')||'');
-  const r=await env.DB.prepare("SELECT id,owner_uid,status,current_version,expires_at,token_hash,access_mode FROM review_requests WHERE id=?")
-    .bind(p.r).first<{id:string;owner_uid:string;status:string;current_version:number;expires_at:number;token_hash:string;access_mode:string}>();
+  const r=await env.DB.prepare("SELECT id,owner_uid,project_id,status,current_version,expires_at,token_hash,access_mode FROM review_requests WHERE id=?")
+    .bind(p.r).first<{id:string;owner_uid:string;project_id:number;status:string;current_version:number;expires_at:number;token_hash:string;access_mode:string}>();
+  if(r)await assertProjectNotDeleting(env,r.owner_uid,r.project_id);
   if(!r||r.expires_at<=Date.now()||r.current_version!==p.v||r.token_hash!==p.h||
      !['pending','changes','approved'].includes(r.status))throw new ApiError(404,'review_not_found');
   // Reject an invalid identity before starting parallel database reads.

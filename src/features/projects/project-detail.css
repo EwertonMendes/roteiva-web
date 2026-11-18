@@ -140,3 +140,37 @@
 .project-detail .pd-date-field .calendar-field-feedback {min-height:0;margin-top:0}
 .project-detail .pd-date-field .calendar-field-feedback:not(:empty) {padding-top:6px}
 .project-detail .pd-form-error {margin:0;color:var(--pd-danger);font-size:var(--type-support);font-weight:500}
+
+/* Project-scoped destructive action: same modal primitives, no global control changes. */
+.project-detail .pd-danger-zone { border:1px solid color-mix(in srgb,#bd454e 35%,var(--line)); }
+.project-detail .pd-danger-heading { display:flex;align-items:center;gap:10px;color:#e45b64;margin-bottom:20px; }
+.app-shell .project-detail .pd-danger-heading h2 { color:inherit;font-size:1rem;text-transform:uppercase;letter-spacing:.045em;margin:0; }
+.project-detail .pd-danger-content { display:flex;align-items:center;justify-content:space-between;gap:20px; }
+.project-detail .pd-danger-content > div { flex:1;min-width:0; }
+.project-detail .pd-danger-content strong { font-size:1.08rem; }
+.project-detail .pd-danger-content p { color:var(--muted);font-size:.87rem;line-height:1.5;margin:6px 0 0; }
+.project-detail .pd-danger-content > button { display:inline-flex;align-items:center;gap:9px;flex-shrink:0;min-height:46px; }
+.project-detail .pd-danger-state,.project-detail .pd-danger-error { margin:16px 0 0;display:flex;gap:9px;align-items:flex-start;line-height:1.5;font-size:.85rem; }
+.project-detail .pd-danger-state { color:var(--muted); }
+.project-detail .pd-danger-error { color:var(--pd-danger); }
+.project-detail .pd-danger-error button { text-decoration:underline; }
+.pd-delete-dialog .rt-modal__body { display:grid;gap:17px; }
+.pd-delete-dialog .rt-modal__body p { margin:0;line-height:1.55; }
+.pd-delete-dialog .rt-modal__body > label:not(.pd-danger-check) { display:block;font-weight:650; }
+.pd-delete-dialog .pd-preserve-note { display:flex;align-items:flex-start;gap:10px;color:var(--muted); }
+.pd-delete-dialog .pd-preserve-note svg { color:#29a85e;flex-shrink:0;margin-top:3px; }
+.pd-delete-dialog .pd-danger-check { display:flex;gap:12px;align-items:flex-start;cursor:pointer;line-height:1.4; }
+.pd-delete-dialog .pd-danger-check input { min-width:18px;flex-shrink:0;margin-top:3px; }
+.pd-deletion-spin { animation:pd-turn 1.2s linear infinite;flex-shrink:0; }
+@keyframes pd-turn { to { transform:rotate(360deg); } }
+@media (prefers-reduced-motion:reduce){.pd-deletion-spin{animation:none;}}
+@media (max-width:600px){
+ .project-detail .pd-danger-content { flex-direction:column;align-items:stretch; }
+ .project-detail .pd-danger-content > button { justify-content:center;width:100%; }
+}
+
+/* Match Settings destructive action without modifying global button tokens. */
+.project-detail .pd-danger-content > button.rt-button--danger {
+ border:1px solid #c84a50;background:transparent;color:#e65b64;padding:10px 17px;border-radius:11px;
+}
+.project-detail .pd-danger-content > button.rt-button--danger:hover:not(:disabled) { background:color-mix(in srgb,#bd454e 12%,transparent); }
