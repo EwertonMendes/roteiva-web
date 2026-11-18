@@ -316,7 +316,7 @@ export function FirebaseWorkspace() {
   // the repository snapshot first, remove the deleted row synchronously, and
   // refresh the catalogue from the authoritative server without remounting the
   // dashboard (which would discard its success notification).
-  const handleProjectRemoved=useCallback((project:Project)=>{
+  const handleProjectRemoved=useCallback((project:Pick<Project,'id'|'name'|'status'>)=>{
     repository.invalidateAfterProjectDeletion();
     setInitial(current=>current?{
       ...current,
