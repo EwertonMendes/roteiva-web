@@ -1,5 +1,18 @@
 # Roadmap vivo — Roteiva MVP
 
+## Homologação Dropbox — PR #156 (17/11/2026)
+
+**PARCIAL — correções implementadas; primeiro acesso externo e reenvio pendentes.**
+
+- [x] Recuperação de leitura owner-scoped, bootstrap de exclusão com retentativas limitadas, confirmação de cadastro por leitura e classificação de erros. Sem bypass de Rules, acesso ou assinatura.
+- [x] CI do SHA `0a07067969e1b9b65f24e2b12e07823b78d24ea1`: [regressão completa](https://github.com/EwertonMendes/roteiva-web/actions/runs/44102641628), [frontend](https://github.com/EwertonMendes/roteiva-web/actions/runs/44102625800), [Rules](https://github.com/EwertonMendes/roteiva-web/actions/runs/44102625720) e [E2E isolado](https://github.com/EwertonMendes/roteiva-web/actions/runs/44102625664) aprovados. Esses resultados antecedem a integração da master atual.
+- [x] Inspeção autenticada: sessões existentes abrem Dashboard DEV/PROD e painel de contas PROD lista conexões Google/Dropbox. Não comprova cadastro novo ou OAuth novo.
+- [x] Console Dropbox PROD confirma app Roteiva `ee9yahu6fciiz9t`, Development, 3/500 usuários, callback `https://api.roteiva.com/oauth/dropbox/callback` e os quatro escopos esperados. Branding aponta para `/sobre.html` e `/privacidade.html`.
+- [ ] Revalidar checks do SHA atualizado, testar primeiro cadastro real em DEV, merge e promoção protegida PROD.
+- [ ] Conta dedicada com concessão auditável válida, testes reais de arquivos desktop/mobile, instruções em inglês e reenvio com comprovante.
+
+Bloqueio observado na master `7532fd1`: deploy API DEV recusou migration 0033 pelo guard; correção independente em PR #163. Não contornar o guard. Procedimento e critérios completos: [handoff](DROPBOX-PRODUCTION-REVIEW-HANDOFF.md).
+
 > **Registro histórico (15/11/2026):** os estados de consoles e pendências abaixo foram observados nessa data. PR #125 e PR #129 foram mergeados posteriormente; DEV já contém essas alterações. A implantação em PROD depende de workflows protegidos; este documento não comprova a publicação nem a aprovação do Dropbox.
 
 ## Configuração OAuth comercial — auditoria de 15/11/2026

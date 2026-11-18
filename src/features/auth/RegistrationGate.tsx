@@ -33,17 +33,26 @@ export function RegistrationGate({children}: {children: ReactNode}) {
     let active=true;
     setStatus("checking");
     setError("");
-    // A temporary Firestore outage must not be confused with a missing profile.
-    // Retry server-only reads (never registration writes), bounded and cancellable.
-    retryFirestoreRead(()=>loadRegistrationProfile(firebaseServices().db,user!.uid,repository),{
-      attempts:4,delaysMs:[300,900,2000],isCurrent:()=>active
-    }).then(async result=>{
-        // The profile is removed before Auth. A durable job still closes the
-        // workspace while the final identity step is being retried.
-        const deleting=result?.deletionState==='deleting'||(!result&&(await fetchAccountDeletionStatus()).operation!==null);
+    // A missing profile can coexist with a durable deletion job in D1.
+    // Verify BOTH read-only dependencies before allowing a new registration.
+    // Transient failures in either dependency are retried; writes never are.
+    retryFirestoreRead(async()=>{
+      const result=await loadRegistrationProfile(firebaseServices().db,user!.uid,repository);
+      if(result?.deletionState==='deleting')return {result,deleting:true};
+      if(result)return {result,deleting:false};
+      const deletion=await fetchAccountDeletionStatus();
+      return {result,deleting:deletion.operation!==null};
+    },{attempts:4,delaysMs:[300,900,2000],isCurrent:()=>active})
+      .then(({result,deleting})=>{
         if(active){setProfile(result);setStatus(deleting?'deleting':result?'registered':'missing');}
       })
-      .catch(reason=>{if(active){setError(dataErrorMessage(reason));setStatus("error");}});
+      .catch(reason=>{
+        if(!active)return;
+        const code=(reason as {code?:unknown}|null)?.code;
+        console.warn('[Roteiva] Primeiro acesso não confirmado',{step:'registration-read',
+          code:typeof code==='string'?code.slice(0,64):'unknown'});
+        setError(dataErrorMessage(reason));setStatus("error");
+      });
     return ()=>{active=false;};
   },[repository,attempt]);
 
@@ -55,11 +64,31 @@ export function RegistrationGate({children}: {children: ReactNode}) {
         ...values,email:user.email||"",photoURL:user.photoURL||"",
         acknowledgedDataUse:true,
       });
-      const saved=await loadRegistrationProfile(firebaseServices().db,user.uid,repository);
+      const saved=await retryFirestoreRead(
+        ()=>loadRegistrationProfile(firebaseServices().db,user.uid,repository),
+        {attempts:3,delaysMs:[300,900]}
+      );
       if (!saved) throw new Error("Conflito: o perfil não foi encontrado depois do cadastro.");
       setProfile(saved);
       setStatus("registered");
     } catch (reason) {
+      // Transaction commit may succeed before its response reaches the client.
+      // Verify the authoritative profile by READ, never replay an uncertain write.
+      try{
+        const confirmed=await retryFirestoreRead(
+          ()=>loadRegistrationProfile(firebaseServices().db,user.uid,repository),
+          {attempts:2,delaysMs:[400]}
+        );
+        if(confirmed?.deletionState==='deleting'){setStatus('deleting');return;}
+        if(confirmed && confirmed.displayName===values.displayName.trim() &&
+          confirmed.studioName===values.studioName.trim() &&
+          confirmed.professionalType===values.professionalType){
+          setProfile(confirmed);setStatus('registered');return;
+        }
+      }catch{/* Failed verification must never authorize a registration. */}
+      const code=(reason as {code?:unknown}|null)?.code;
+      console.warn('[Roteiva] Cadastro não confirmado',{step:'registration-write',
+        code:typeof code==='string'?code.slice(0,64):'unknown'});
       setError(dataErrorMessage(reason));
     } finally {
       setCreating(false);

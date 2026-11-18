@@ -14,11 +14,23 @@ export async function readOwnServerDocument(db:Firestore,uid:string,child?:'acce
   if(auth.currentUser?.uid!==uid)throw new Error('Sessão alterada.');
   const name='projects/'+project+'/databases/(default)/documents/users/'+encodeURIComponent(uid)+(child?'/'+child:'');
   const origin=appEnvironment.useEmulators?'http://127.0.0.1:8080':'https://firestore.googleapis.com';
-  const response=await fetch(origin+'/v1/'+name,{headers:{Authorization:'Bearer '+token},
-    cache:'no-store',credentials:'omit',redirect:'error',signal:AbortSignal.timeout(10000)});
+  let response:Response;
+  try{
+    response=await fetch(origin+'/v1/'+name,{headers:{Authorization:'Bearer '+token},
+      cache:'no-store',credentials:'omit',redirect:'error',signal:AbortSignal.timeout(10000)});
+  }catch{
+    // Same-owner REST recovery is always an authenticated server read.
+    // Classify transport failures for read-only retries; never repeat writes.
+    throw Object.assign(new Error('Consulta ao servidor indisponível.'),{code:'unavailable'});
+  }
   if(auth.currentUser?.uid!==uid)throw new Error('Sessão alterada.');
   if(response.status===404)return null;
-  if(!response.ok)throw new Error('Leitura de dados negada ou indisponível.');
+  if(response.status===401||response.status===403)
+    throw Object.assign(new Error('Leitura negada pelo servidor.'),{code:'permission-denied'});
+  if(response.status===408||response.status===429||response.status>=500)
+    throw Object.assign(new Error('Servidor temporariamente indisponível.'),{code:'unavailable'});
+  if(!response.ok)
+    throw Object.assign(new Error('Resposta inesperada ao consultar o cadastro.'),{code:'invalid-argument'});
   const document=await response.json() as OwnServerDocument;
   if(auth.currentUser?.uid!==uid||document.name!==name||document.fields?.ownerUid?.stringValue!==uid)
     throw new Error('Documento de outra sessão ou projeto.');
