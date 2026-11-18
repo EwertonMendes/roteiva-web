@@ -193,7 +193,7 @@ export function FeedbackDialog({getToken,onClose}:{getToken:()=>Promise<string>;
           </AppModalSection>
         </>}
         {error&&<p className="feedback-alert" role="alert">{error}</p>}
-        <p className="feedback-privacy">As informações e imagens enviadas serão recebidas no e-mail de suporte. Não inclua senhas, códigos de acesso ou documentos confidenciais.</p>
+        <p className="feedback-privacy">As informações e imagens enviadas serão recebidas pela nossa equipe de suporte. Não inclua senhas, códigos de acesso ou documentos confidenciais.</p>
       </AppModalBody>
       <AppModalFooter>
         <AppButton type="button" variant="secondary" disabled={pending} onClick={close}>{sentId?'Fechar':'Cancelar'}</AppButton>
