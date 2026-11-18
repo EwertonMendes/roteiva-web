@@ -168,3 +168,9 @@
  .project-detail .pd-danger-content { flex-direction:column;align-items:stretch; }
  .project-detail .pd-danger-content > button { justify-content:center;width:100%; }
 }
+
+/* Match Settings destructive action without modifying global button tokens. */
+.project-detail .pd-danger-content > button.rt-button--danger {
+ border:1px solid #c84a50;background:transparent;color:#e65b64;padding:10px 17px;border-radius:11px;
+}
+.project-detail .pd-danger-content > button.rt-button--danger:hover:not(:disabled) { background:color-mix(in srgb,#bd454e 12%,transparent); }

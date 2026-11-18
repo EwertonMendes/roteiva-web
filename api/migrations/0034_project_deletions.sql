@@ -70,3 +70,12 @@ CREATE TRIGGER project_library_upload_target_insert_fence BEFORE INSERT ON libra
 WHEN EXISTS(SELECT 1 FROM libraries l JOIN project_deletions p
  ON p.owner_uid=l.owner_uid AND p.project_id=l.project_id WHERE l.id=NEW.library_id)
 BEGIN SELECT RAISE(ABORT,'project_deleting'); END;
+
+CREATE TRIGGER project_library_structure_update_fence BEFORE UPDATE ON library_structure_attempts
+WHEN EXISTS(SELECT 1 FROM libraries l JOIN project_deletions p
+ ON p.owner_uid=l.owner_uid AND p.project_id=l.project_id WHERE l.id=NEW.library_id)
+BEGIN SELECT RAISE(ABORT,'project_deleting'); END;
+CREATE TRIGGER project_library_upload_target_update_fence BEFORE UPDATE ON library_upload_targets
+WHEN EXISTS(SELECT 1 FROM libraries l JOIN project_deletions p
+ ON p.owner_uid=l.owner_uid AND p.project_id=l.project_id WHERE l.id=NEW.library_id)
+BEGIN SELECT RAISE(ABORT,'project_deleting'); END;

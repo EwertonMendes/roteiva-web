@@ -1,6 +1,7 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {AlertTriangle,CheckCircle2,LoaderCircle,ShieldAlert,Trash2} from 'lucide-react';
 import type {Project} from '../../domain/workspace';
+import type {User} from 'firebase/auth';
 import {AppButton} from '../ui/AppButton';
 import {AppInput} from '../ui/AppInput';
 import {AppModal,AppModalHeader,AppModalBody,AppModalFooter} from '../ui/AppModal';
@@ -44,18 +45,25 @@ async function call(uid:string,projectId:number,method:'GET'|'POST',name?:string
   return data as Result;
 }
 type Props={project:Project;onDeleted:()=>void;onDeleteDemo?:()=>void};
-export function ProjectDeletionAction({project,onDeleted,onDeleteDemo}:Props){
+export function ProjectDeletionAction(props:Props){
+  return isDemo?<ProjectDeletionPanel {...props} user={null}/>:<AuthenticatedProjectDeletionAction {...props}/>;
+}
+function AuthenticatedProjectDeletionAction(props:Props){
   const {user}=useAuth();
+  return <ProjectDeletionPanel {...props} user={user}/>;
+}
+function ProjectDeletionPanel({project,onDeleted,onDeleteDemo,user}:Props&{user:User|null}){
   const [opened,setOpened]=useState(false),[name,setName]=useState('');
   const [acknowledged,setAcknowledged]=useState(false);
-  const [status,setStatus]=useState<Status>(isDemo?'idle':'processing');
+  const [status,setStatus]=useState<Status>('idle');
   const [phase,setPhase]=useState('');
   const [busy,setBusy]=useState(false),[error,setError]=useState('');
+  const [ready,setReady]=useState(isDemo);
   const completed=useRef(false),requesting=useRef(false);
   const poll=useCallback(async()=>{
     if(isDemo||!user)return;
     const result=await call(user.uid,project.id,'GET');
-    setStatus(result.status);setPhase(result.phase||'');
+    setStatus(result.status);setPhase(result.phase||'');setError('');
     if(result.status==='completed'&&!completed.current){
       completed.current=true;onDeleted();
     }
@@ -68,11 +76,11 @@ export function ProjectDeletionAction({project,onDeleted,onDeleteDemo}:Props){
       try{
         const result=await call(user?.uid||'',project.id,'GET');
         if(!active)return;
-        setStatus(result.status);setPhase(result.phase||'');setError('');
+        setStatus(result.status);setPhase(result.phase||'');setError('');setReady(true);
         if(result.status==='completed'&&!completed.current){
           completed.current=true;onDeleted();return;
         }
-      }catch(cause){if(active)setError(cause instanceof Error?cause.message:'Não foi possível consultar a exclusão.');}
+      }catch(cause){if(active){setError(cause instanceof Error?cause.message:'Não foi possível consultar a exclusão.');setReady(false);}}
       if(active)timeout=setTimeout(check,phase==='manual_review'?12000:2500);
     };
     void check();
@@ -105,7 +113,7 @@ export function ProjectDeletionAction({project,onDeleted,onDeleteDemo}:Props){
         <p>A exclusão é permanente e remove tarefas, compromissos, Biblioteca e aprovações vinculadas. O histórico financeiro e os arquivos originais no Google Drive ou Dropbox serão preservados.</p>
       </div>
       <AppButton type="button" variant="danger" onClick={open}
-        disabled={busy||status!=='idle'}><Trash2 size={17}/> Excluir projeto</AppButton>
+        disabled={busy||!ready||status!=='idle'}><Trash2 size={17}/> Excluir projeto</AppButton>
     </div>
     {pending&&<p className="pd-danger-state" role="status"><LoaderCircle size={17} className="pd-deletion-spin"/> {statusCopy[phase]||'Exclusão em andamento. Os dados estão protegidos e o processo continuará automaticamente.'}</p>}
     {status==='manual_review'&&<p role="alert" className="pd-danger-error"><ShieldAlert size={17}/> A exclusão requer uma verificação do suporte. O projeto permanece bloqueado e os arquivos originais estão preservados.</p>}
