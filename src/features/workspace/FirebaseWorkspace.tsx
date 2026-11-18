@@ -415,7 +415,8 @@ export function FirebaseWorkspace() {
     {loadingBusiness && !error && <main className="studio-loading" role="status">Carregando os dados do seu espaço…</main>}
     {initial && (overviewMetrics || routeFromLocation(window.location,{base:import.meta.env.BASE_URL,useHash:false}).view!=="overview") && <div inert={!!error || remoteChanges || loadingBusiness} aria-busy={saving}>
       <DashboardClient key={user.uid+"-"+version} getFeedbackToken={getFeedbackToken} firstName={profileContext?.profile.displayName || user.displayName || "Profissional"} profile={profileContext?.profile || null} onSaveProfile={profileContext?.saveProfile} email={user.email || ""} photoURL={user.photoURL || undefined}
-        initialWorkspace={initial.workspace} initialTheme={theme} onCommands={businessLoaded ? executeCommands : undefined} onRouteChange={onRouteChange}
+        initialWorkspace={initial.workspace} initialTheme={theme} onCommands={businessLoaded ? executeCommands : undefined}
+        onProjectRemoved={()=>setVersion(value=>value+1)} onRouteChange={onRouteChange}
         canValidateProjectLink={repository.hasLoaded(domainsForRoute({view:"projects",projectId:1}))}
         canValidateClientLink={repository.hasLoaded(domainsForRoute({view:"clients",clientId:1}))}
         projectPage={repository.hasLoaded(["projects","tasks"])?undefined:projectPage}
