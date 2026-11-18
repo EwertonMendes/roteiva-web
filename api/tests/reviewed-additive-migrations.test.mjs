@@ -5,8 +5,9 @@ import {reviewedAdditiveMigrations,isReviewedAdditiveMigration} from '../scripts
 
 test('approved PROD virtual-library migrations are exact immutable additive blobs',()=>{
  const names=Object.keys(reviewedAdditiveMigrations);
- assert.equal(names.length,11);
+ assert.equal(names.length,12);
  assert.ok(names.includes('0033_feedback_retry_safety.sql'));
+ assert.ok(names.includes('0034_project_deletions.sql'));
 
  for(const name of names){
   const sql=readFileSync('migrations/'+name,'utf8');
