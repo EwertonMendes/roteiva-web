@@ -269,7 +269,7 @@ test('project danger zone requires an explicit confirmation and preserves financ
   await dialog.getByLabel('Digite o nome exato do projeto para confirmar').fill('Projeto destrutivo');
   await dialog.getByRole('checkbox').check();
   await dialog.getByRole('button',{name:'Excluir definitivamente'}).click();
-  await expect(page).toHaveURL(/#\\/projetos$/);
+  await expect(page).toHaveURL(new RegExp('#/projetos$'));
   // No reload or F5: deletion must update the visible list and toast immediately.
   await expect(page.getByRole('button',{name:'Abrir projeto Projeto destrutivo'})).toHaveCount(0);
   const toast=page.locator('.rt-toast--success');
