@@ -47,6 +47,7 @@ import { FormEvent, useEffect, useLayoutEffect, useMemo, useState, useCallback, 
 
 import { isDemo, useEmulators } from "./lib/firebase";
 import { hrefForWorkspaceRoute, routeFromLocation, type WorkspaceRoute } from "./lib/workspace-routing";
+import {useProjectDeletion} from './features/projects/ProjectDeletionProvider';
 import { SettingsPage } from "./features/settings/SettingsPage";
 import { IconLabel } from "./features/ui/IconLabel";
 import { PROJECT_STATUS_ICONS, PROJECT_STATUS_LABELS } from "./features/ui/project-status";
@@ -100,7 +101,7 @@ type DashboardProps = {
   onThemeChange?:(theme:"light"|"dark")=>void;
   onRouteChange?:(route:WorkspaceRoute)=>void;
   onCommands?:(commands:readonly WorkspaceCommand[])=>Promise<boolean>|void;
-  onProjectRemoved?:(project:Project)=>void;
+  onProjectRemoved?:(project:Pick<Project,'id'|'name'|'status'>)=>void;
   overviewMetrics?:{clientCount?:number;receivableAmount?:number;cashBalance?:number;projectCount?:number;projectStatuses?:Record<Status,number>}; projectPage?:{total:number;hasMore:boolean;status:string};
   onMoreProjects?:()=>void;onProjectStatus?:(status:Status|"Todos")=>void;
   onSearchProjects?:()=>void; clientPage?:{total:number;recurring:number;hasMore:boolean};
@@ -114,6 +115,9 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
   const [initialBrowserRoute]=useState<WorkspaceRoute>(initialRoute);
   const [view, setView] = useState<View>(initialBrowserRoute.view);
   const notify=useToast();
+  const projectDeletion=useProjectDeletion();
+  const finishedDeletion=projectDeletion?.completion;
+  const acknowledgeDeletion=projectDeletion?.acknowledge;
   const workspaceName=profile?.studioName.trim() || "Roteiva Studio";
   const [projects, setProjects] = useState(initialProjects);
   const [clientList, setClientList] = useState(initialClients);
@@ -191,24 +195,29 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     setEventDate(entry?.date || date || todayKey());
     setEventModalOpen(true);
   }
-  function projectDeleted(project:Project){
+  function projectDeleted(project:Pick<Project,'id'|'name'|'status'>,fromGlobal=false){
     const id=project.id;
-    // Purge private previews and stale folder snapshots after the server confirms
-    // the deletion. Source thumbnails are shared across projects, so invalidate
-    // local cache only; never delete provider originals.
+    // Invalidate local media caches only. Never delete shared provider originals.
     clearLibraryFolders();
     libraryPreviewCache.clear();
     clearAuthenticatedMediaCache();
     void clearStorageImageCache();
-    // Do not update the UI until the server confirms all deletion stages.
     setProjects(current=>current.filter(p=>p.id!==id));
     setCalendarEvents(current=>current.filter(e=>e.projectId!==id));
     setFinanceEntries(current=>current.map(e=>e.projectId===id?{...e,projectId:undefined}:e));
     setLibraryAssets(current=>current.filter(asset=>asset.projectId!==id));
     setLibraryTarget(current=>current?.projectId===id?null:current);
-    deletedProjectToast.current=project.name;
-    navigateRoute({view:'projects'},{replace:true});
+    // Refresh the authoritative catalogue before changing routes; otherwise
+    // onRouteChange can request the old in-memory snapshot and resurrect a card.
     if(!isDemo)onProjectRemoved?.(project);
+    if(!fromGlobal){
+      deletedProjectToast.current=project.name;
+      navigateRoute({view:'projects'},{replace:true});
+    }else if(view==='projects'&&selectedProject===id){
+      // A background deletion must never navigate away from an unrelated page
+      // or another project's detail page.
+      navigateRoute({view:'projects'},{replace:true});
+    }
   }
   function updateProject(updated: Project) {
     const old = projects.find(p => p.id === updated.id);
@@ -609,6 +618,14 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     deletedProjectToast.current=null;
     notify(<><strong>{name}</strong> foi excluído com sucesso.</>,"success");
   },[view,selectedProject,notify]);
+
+  // The deletion monitor is mounted above DashboardClient and survives route
+  // changes. Consume each completion once; the global provider owns the toast.
+  useEffect(()=>{
+    if(!finishedDeletion||!dataReady)return;
+    projectDeleted(finishedDeletion.project,true);
+    acknowledgeDeletion?.(finishedDeletion.sequence);
+  },[finishedDeletion?.sequence,dataReady,acknowledgeDeletion]);
 
   // Direct links must not display another user's records or leave a broken detail URL.
   useEffect(()=>{

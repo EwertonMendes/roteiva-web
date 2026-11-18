@@ -14,6 +14,17 @@ export const test=base.extend<{deletionService:void}>({
       await route.fulfill(route.request().method()==='OPTIONS'?{status:204,headers}:{status:200,headers,
         contentType:'application/json',body:JSON.stringify({available:true,operation:null})});
     });
+    // All emulator tests are isolated from the real project-deletion Worker.
+    // A route can override this mock to simulate a durable background operation.
+    await page.route(/^http:\/\/127\.0\.0\.1:8787\/projects\/[1-9][0-9]*\/deletion$/,async route=>{
+      const headers={'Access-Control-Allow-Origin':'http://127.0.0.1:4173',
+        'Access-Control-Allow-Methods':'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers':'Authorization, Content-Type'};
+      const method=route.request().method();
+      await route.fulfill(method==='OPTIONS'?{status:204,headers}:
+        {status:method==='GET'?200:503,headers,contentType:'application/json',
+          body:JSON.stringify(method==='GET'?{status:'idle'}:{error:{code:'emulator_no_real_deletion'}})});
+    });
     // Browser E2E uses only the Firebase emulator. Never contact real DEV Worker.
     await page.route('http://127.0.0.1:8787/access/ensure',async route=>{
       const headers={'Access-Control-Allow-Origin':'http://127.0.0.1:4173',

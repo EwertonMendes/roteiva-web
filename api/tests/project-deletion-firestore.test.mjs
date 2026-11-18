@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {generateKeyPair,exportPKCS8} from 'jose';
+import {database} from './helpers/database.mjs';
+import {projectDeletionStatus,drainProjectDeletion,runPendingProjectDeletions} from '../src/project-deletion.ts';
 import {fenceProject,eraseProjectFirestoreChunk} from '../src/project-deletion-firestore.ts';
 
 /** Deterministic REST emulator: checks actual Firestore document paths,
@@ -129,4 +131,42 @@ test('a transient Firestore conflict fails closed and resuming deletes no unrela
  assert.equal(await eraseProjectFirestoreChunk(env,'alice',11),false);
  assert.equal(docs.has(alice+'/tasks/1'),false);
  assert.equal(docs.has(alice+'/tasks/99'),true);
+});
+
+test('GET remains read-only; one background drain completes every Firestore batch without browser polling',async t=>{
+  const db=database();t.after(db.close);
+  const docs=initial(),remote=mockFirestore(docs);
+  const env={...await adminEnv(),DB:db.DB};
+  t.mock.method(globalThis,'fetch',remote.fetch);
+  const now=Date.now();
+  db.sql.prepare("INSERT INTO project_deletions(owner_uid,project_id,operation_id,phase,next_attempt_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?)")
+    .run('alice',11,'op-isolated','firestore',now,now,now);
+  const result=await projectDeletionStatus(env,'alice',11);
+  assert.deepEqual(await result.json(),{status:'processing',phase:'firestore',operationId:'op-isolated'});
+  assert.equal(remote.commits,0,'a status GET must not mutate Firestore');
+  assert.equal(db.sql.prepare("SELECT phase FROM project_deletions WHERE owner_uid='alice' AND project_id=11").get().phase,'firestore');
+  // This models the Worker's ctx.waitUntil() after the POST response has been
+  // sent, with no status requests from a mounted page.
+  await drainProjectDeletion(env,'alice',11,36,20000);
+  assert.equal(db.sql.prepare("SELECT phase FROM project_deletions WHERE owner_uid='alice' AND project_id=11").get().phase,'completed');
+  assert.equal(docs.has(alice+'/projects/11'),false);
+  assert.equal(docs.has(bob+'/projects/11'),true);
+  assert.equal(docs.has(alice+'/tasks/99'),true);
+  assert.equal(docs.get(alice+'/financeEntries/51').fields.projectId.integerValue,'0');
+  const sync=docs.get(alice+'/sync/state').fields;
+  assert.equal(sync.counts.mapValue.fields.projects.integerValue,'0');
+  assert.equal(sync.counts.mapValue.fields.tasks.integerValue,'1');
+  assert.equal((await (await projectDeletionStatus(env,'alice',11)).json()).status,'completed');
+});
+test('cron independently resumes a paused project deletion without a browser connection',async t=>{
+  const db=database();t.after(db.close);
+  const docs=initial(),remote=mockFirestore(docs);
+  const env={...await adminEnv(),DB:db.DB};
+  t.mock.method(globalThis,'fetch',remote.fetch);
+  const now=Date.now();
+  db.sql.prepare("INSERT INTO project_deletions(owner_uid,project_id,operation_id,phase,next_attempt_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?)")
+    .run('alice',11,'op-cron','firestore',now,now,now);
+  await runPendingProjectDeletions(env);
+  assert.equal(db.sql.prepare("SELECT phase FROM project_deletions WHERE owner_uid='alice' AND project_id=11").get().phase,'completed');
+  assert.equal(docs.has(alice+'/projects/11'),false);
 });

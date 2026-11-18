@@ -24,11 +24,8 @@ export async function assertProjectNotDeleting(env:Env,uid:string,projectId:numb
 }
 export async function projectDeletionStatus(env:Env,uid:string,id:number):Promise<Response>{
   if(!validProject(id))throw new ApiError(400,'invalid_project');
-  const job=await row(env,uid,id);
-  if(job&&job.phase!=='completed'&&job.phase!=='manual_review'){
-    // Status checks can resume a pending job when the tab remains open.
-    await advanceProjectDeletion(env,uid,id);
-  }
+  // A status read must never be responsible for completing destructive work:
+  // background jobs and the Worker cron own all progression.
   return Response.json(state(await row(env,uid,id)),{headers:{'Cache-Control':'no-store'}});
 }
 async function ownedProject(request:Request,env:Env,uid:string,id:number):Promise<string>{
@@ -166,10 +163,31 @@ export async function advanceProjectDeletion(env:Env,uid:string,id:number):Promi
       .bind(uid,id,lease).run();
   }
 }
+/**
+ * Execute a bounded sequence without depending on browser polling. The Worker
+ * keeps the durable lease/retry state in D1; the scheduled event resumes any
+ * unfinished work even if the user closes the page or disconnects.
+ */
+export async function drainProjectDeletion(env:Env,uid:string,id:number,maxSteps=36,maxDurationMs=20000):Promise<void>{
+  const deadline=Date.now()+maxDurationMs;
+  for(let step=0;step<maxSteps&&Date.now()<deadline;step++){
+    const job=await row(env,uid,id);
+    if(!job||job.phase==='completed'||job.phase==='manual_review')return;
+    const now=Date.now();
+    if(job.lease_until>now||job.next_attempt_at>now)return;
+    await advanceProjectDeletion(env,uid,id);
+  }
+}
 export async function runPendingProjectDeletions(env:Env):Promise<void>{
   const now=Date.now();
   const jobs=await env.DB.prepare(`SELECT owner_uid,project_id FROM project_deletions
     WHERE phase NOT IN ('completed','manual_review') AND lease_until<? AND next_attempt_at<=?
-    ORDER BY next_attempt_at,updated_at LIMIT ?`).bind(now,now,LIMIT>1?1:LIMIT).all<{owner_uid:string;project_id:number}>();
-  for(const job of jobs.results)await advanceProjectDeletion(env,job.owner_uid,job.project_id);
+    ORDER BY next_attempt_at,updated_at LIMIT ?`)
+    .bind(now,now,Math.min(LIMIT,5)).all<{owner_uid:string;project_id:number}>();
+  // Each job gets a bounded amount of work; one large project cannot starve
+  // other accounts, nor prevent the next cron tick from resuming.
+  for(const job of jobs.results){
+    try{await drainProjectDeletion(env,job.owner_uid,job.project_id,30,12000);}
+    catch(error){console.error(JSON.stringify({event:'project_deletion_drain_failed',code:error instanceof ApiError?error.code:'dependency_failure'}));}
+  }
 }

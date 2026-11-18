@@ -316,7 +316,7 @@ export function FirebaseWorkspace() {
   // the repository snapshot first, remove the deleted row synchronously, and
   // refresh the catalogue from the authoritative server without remounting the
   // dashboard (which would discard its success notification).
-  const handleProjectRemoved=useCallback((project:Project)=>{
+  const handleProjectRemoved=useCallback((project:Pick<Project,'id'|'name'|'status'>)=>{
     repository.invalidateAfterProjectDeletion();
     setInitial(current=>current?{
       ...current,
@@ -328,14 +328,20 @@ export function FirebaseWorkspace() {
         libraryAssets:current.workspace.libraryAssets.filter(asset=>asset.projectId!==project.id),
       }
     }:current);
-    setProjectPage(current=>current?{...current,total:Math.max(0,current.total-1)}:current);
+    // A background completion must not replace another page's workspace with
+    // a project-list snapshot. Refresh the directory when it is actually visible
+    // (or at the next navigation to Projects).
+    const route=routeFromLocation(window.location,{base:import.meta.env.BASE_URL,useHash:false});
+    if(route.view==='projects'&&!route.projectId){
+      setProjectPage(current=>current?{...current,total:Math.max(0,current.total-1)}:current);
+      void fetchProjectPage('Todos',true);
+    }else setProjectPage(undefined);
     setOverviewMetrics(current=>current?{
       ...current,
       projectCount:Math.max(0,current.projectCount-1),
       projectStatuses:{...current.projectStatuses,
         [project.status]:Math.max(0,current.projectStatuses[project.status]-1)}
     }:current);
-    void fetchProjectPage("Todos",true);
   },[repository,fetchProjectPage]);
   const onRouteChange=useCallback((route:WorkspaceRoute)=>{
     if(route.view==="overview"){

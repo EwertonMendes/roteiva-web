@@ -17,6 +17,7 @@ import { AccessGate } from "./features/access/AccessGate";
 import {DriveTransfersProvider} from "./features/drive/DriveTransfersProvider";
 import {StorageConnectionsProvider} from "./features/drive/StorageConnectionsProvider";
 import { FirebaseWorkspace } from "./features/workspace/FirebaseWorkspace";
+import {ProjectDeletionProvider} from "./features/projects/ProjectDeletionProvider";
 import "./globals.css";
 import "./responsive.css";
 import "./refined-theme.css";
@@ -59,7 +60,7 @@ else createRoot(document.getElementById("root")!).render(<React.StrictMode>
   <ToastProvider>
   <SiteExperience />
   <AppErrorBoundary>{isDemo ? review ? <ReviewUnavailable /> : <DashboardClient firstName="Visitante" email="demo@roteiva.local" /> :
-    <AuthProvider>{publicReviewRoute ? <ReviewPortal token={publicToken||''}/> : <ProtectedRoute><RegistrationGate><AccessGate>{review ? <ReviewUnavailable /> : <DriveTransfersProvider><StorageConnectionsProvider><FirebaseWorkspace /></StorageConnectionsProvider></DriveTransfersProvider>}</AccessGate></RegistrationGate></ProtectedRoute>}</AuthProvider>}
+    <AuthProvider>{publicReviewRoute ? <ReviewPortal token={publicToken||''}/> : <ProtectedRoute><RegistrationGate><AccessGate>{review ? <ReviewUnavailable /> : <DriveTransfersProvider><StorageConnectionsProvider><ProjectDeletionProvider><FirebaseWorkspace /></ProjectDeletionProvider></StorageConnectionsProvider></DriveTransfersProvider>}</AccessGate></RegistrationGate></ProtectedRoute>}</AuthProvider>}
   </AppErrorBoundary>
   </ToastProvider>
 </React.StrictMode>);
