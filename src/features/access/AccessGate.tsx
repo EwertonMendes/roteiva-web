@@ -7,6 +7,7 @@ import {firebaseServices} from "../../lib/firebase";
 import {useAuth} from "../auth/AuthProvider";
 import {AuthLayout} from "../auth/AuthLayout";
 import "./access.css";
+import {entryToken,entryRequest,entryErrorMessage} from '../../data/bootstrap-request.ts';
 
 const BASE=API_BASE_URL;
 const AccessContext=createContext<AccessInfo|null>(null);
@@ -14,13 +15,12 @@ export const useAccess=()=>useContext(AccessContext);
 export async function ensureUserAccess():Promise<void>{
   const user=firebaseServices().auth.currentUser;
   if(!user)throw new Error("Sua sessão expirou. Entre novamente.");
-  const response=await fetch(BASE+"/access/ensure",{
-    method:"POST",headers:{Authorization:"Bearer "+await user.getIdToken(),"Content-Type":"application/json"},
+  const token=await entryToken(()=>user.getIdToken());
+  if(firebaseServices().auth.currentUser?.uid!==user.uid)throw new Error('Sessão alterada. Entre novamente.');
+  await entryRequest(BASE+"/access/ensure",{
+    method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},
     cache:"no-store"
-  });
-  if(!response.ok)throw new Error(response.status===429
-    ?"Muitas tentativas. Aguarde um pouco antes de tentar novamente."
-    :"Não foi possível verificar o acesso à sua conta. Tente novamente.");
+  },'access-ensure',45000);
 }
 export function AccessGate({children}:{children:ReactNode}){
   const {user,logout,busy}=useAuth();
@@ -43,7 +43,7 @@ export function AccessGate({children}:{children:ReactNode}){
       unsubscribe=watchAccess(firebaseServices().db,user.uid,value=>{
         if(active){setAccess(value);setError("");setNow(Date.now());}
       },reason=>{if(active)setError(reason.message);});
-    }).catch(reason=>{if(active)setError(reason instanceof Error?reason.message:"Falha ao verificar acesso.");});
+    }).catch(reason=>{if(active)setError(entryErrorMessage(reason)??'Não foi possível confirmar seu acesso. Tente novamente. Referência: access-ensure/session');});
     return()=>{active=false;unsubscribe();};
   },[user?.uid,attempt]);
   if(error)return <AuthLayout section="ACESSO" title="Não conseguimos validar sua assinatura." description="Por segurança, seu espaço fica protegido até a confirmação. Nenhum dado será apagado.">

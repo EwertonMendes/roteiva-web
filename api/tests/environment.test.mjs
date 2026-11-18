@@ -17,6 +17,8 @@ test('PROD canonical and exact historical origins retain CORS while DEV and look
    const response=await handle(new Request(environments.prod.apiOrigin+'/oauth/drive/start',{method:'OPTIONS',headers:{Origin:origin}}),base);
    assert.equal(response.status,204);assert.equal(response.headers.get('Access-Control-Allow-Origin'),origin);
    assert.equal(response.headers.get('Vary'),'Origin');
+   assert.match(response.headers.get('Access-Control-Expose-Headers'),/X-Request-Id/);
+   assert.match(response.headers.get('X-Request-Id'),/^[a-f0-9-]{36}$/);
  }
  for(const origin of [null,'null','https://www.roteiva.com',environments.dev.frontendOrigin,'https://roteiva.com.evil.example','https://evil.example','http://roteiva.com']){
    assert.equal(allowedFrontend(base,origin),false);

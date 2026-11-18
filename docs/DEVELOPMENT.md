@@ -1,5 +1,11 @@
 # Desenvolvimento e deploy — Roteiva
 
+## Regressão da entrada — 18/11/2026
+
+`pnpm test` inclui `tests/bootstrap-request.test.mjs`, `profile-read.test.mjs` e `access-observer.test.mjs`: fetch/corpo pendentes, SDK silencioso, cache-only, negação real, geração de sessão e ausência de replay de POST. Após `pnpm build:emulator` e `pnpm build:demo`, executar `pnpm exec firebase emulators:exec --project demo-roteiva --only auth,firestore "pnpm exec playwright test tests/browser/access.spec.ts"` para desktop/mobile. Promoção PROD preserva testes completos e aprovações de Cloudflare/Firebase existentes.
+
+Em uma falha externa, pedir texto/referência exibida, hora com fuso, etapa, browser/versão, SO e tipo de rede. Não pedir senha, token ou HAR bruto. Logs do Worker correlacionam UUID em resposta e negação de acesso; transporte bloqueado antes do Worker pode não produzir evento. Não habilitar invocation logs globais ou alterar região/Rules como diagnóstico preventivo.
+
 ## Deploy PROD sem configuração de feedback (17/11/2026)
 
 `RESEND_API_KEY` é opcional no environment `cloudflare-production`. Sem ela, o bootstrap publica os sete segredos críticos e não inclui uma chave vazia; o guard de nomes não exige Resend. Se fornecida, a chave continua validada e injetada pelo workflow protegido. Os demais segredos e todas as aprovações/guardas de SHA, ambiente e migração continuam obrigatórios.

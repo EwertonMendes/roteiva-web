@@ -1,6 +1,7 @@
 import {getAuth} from 'firebase/auth';
 import type {Firestore} from 'firebase/firestore';
 import {appEnvironment} from '../lib/environment.ts';
+import {entryToken,entryRequest,type EntryStage} from './bootstrap-request.ts';
 
 export type ServerField={stringValue?:unknown;integerValue?:unknown;booleanValue?:unknown;timestampValue?:unknown};
 export type OwnServerDocument={name:string;fields:Record<string,ServerField>};
@@ -10,29 +11,21 @@ export async function readOwnServerDocument(db:Firestore,uid:string,child?:'acce
   if(!user||user.uid!==uid||!project||db.app.options.projectId!==project)throw new Error('Sessão inválida.');
   // A restored SDK listener can still hold old credentials. Refreshing also
   // notifies Firestore's token provider before subsequent workspace queries.
-  const token=await user.getIdToken(true);
+  const token=await entryToken(()=>user.getIdToken(true));
   if(auth.currentUser?.uid!==uid)throw new Error('Sessão alterada.');
   const name='projects/'+project+'/databases/(default)/documents/users/'+encodeURIComponent(uid)+(child?'/'+child:'');
   const origin=appEnvironment.useEmulators?'http://127.0.0.1:8080':'https://firestore.googleapis.com';
-  let response:Response;
-  try{
-    response=await fetch(origin+'/v1/'+name,{headers:{Authorization:'Bearer '+token},
-      cache:'no-store',credentials:'omit',redirect:'error',signal:AbortSignal.timeout(10000)});
-  }catch{
-    // Same-owner REST recovery is always an authenticated server read.
-    // Classify transport failures for read-only retries; never repeat writes.
-    throw Object.assign(new Error('Consulta ao servidor indisponível.'),{code:'unavailable'});
+  const stage:EntryStage=child?'access-server':'profile-server';
+  let document:OwnServerDocument;
+  try{document=await entryRequest<OwnServerDocument>(origin+'/v1/'+name,{headers:{Authorization:'Bearer '+token},
+    cache:'no-store',credentials:'omit',redirect:'error'},stage,10000);}
+  catch(error){
+    if(auth.currentUser?.uid!==uid)throw new Error('Sessão alterada.');
+    if((error as {status?:number}).status===404)return null;
+    throw error;
   }
   if(auth.currentUser?.uid!==uid)throw new Error('Sessão alterada.');
-  if(response.status===404)return null;
-  if(response.status===401||response.status===403)
-    throw Object.assign(new Error('Leitura negada pelo servidor.'),{code:'permission-denied'});
-  if(response.status===408||response.status===429||response.status>=500)
-    throw Object.assign(new Error('Servidor temporariamente indisponível.'),{code:'unavailable'});
-  if(!response.ok)
-    throw Object.assign(new Error('Resposta inesperada ao consultar o cadastro.'),{code:'invalid-argument'});
-  const document=await response.json() as OwnServerDocument;
-  if(auth.currentUser?.uid!==uid||document.name!==name||document.fields?.ownerUid?.stringValue!==uid)
+  if(auth.currentUser?.uid!==uid||document?.name!==name||document.fields?.ownerUid?.stringValue!==uid)
     throw new Error('Documento de outra sessão ou projeto.');
   return document;
 }

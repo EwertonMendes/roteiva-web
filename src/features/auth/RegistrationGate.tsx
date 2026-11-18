@@ -10,6 +10,7 @@ import { AuthLayout } from "./AuthLayout";
 import { RegistrationPage, type RegistrationValues } from "./RegistrationPage";
 import { AccountDeletionPending } from './AccountDeletionPending';
 import { fetchAccountDeletionStatus } from '../settings/AccountDeletionAction';
+import {entryDeadline} from '../../data/bootstrap-request.ts';
 
 type Status = "checking" | "registered" | "missing" | "deleting" | "error";
 type ProfileContext = {
@@ -30,23 +31,24 @@ export function RegistrationGate({children}: {children: ReactNode}) {
   const [creating,setCreating]=useState(false);
 
   useEffect(()=>{
-    let active=true;
+    let active=true,expired=false;
     setStatus("checking");
     setError("");
     // A missing profile can coexist with a durable deletion job in D1.
     // Verify BOTH read-only dependencies before allowing a new registration.
     // Transient failures in either dependency are retried; writes never are.
-    retryFirestoreRead(async()=>{
+    entryDeadline(()=>retryFirestoreRead(async()=>{
       const result=await loadRegistrationProfile(firebaseServices().db,user!.uid,repository);
       if(result?.deletionState==='deleting')return {result,deleting:true};
       if(result)return {result,deleting:false};
       const deletion=await fetchAccountDeletionStatus();
       return {result,deleting:deletion.operation!==null};
-    },{attempts:4,delaysMs:[300,900,2000],isCurrent:()=>active})
+    },{attempts:4,delaysMs:[300,900,2000],isCurrent:()=>active&&!expired}),'registration',60000)
       .then(({result,deleting})=>{
         if(active){setProfile(result);setStatus(deleting?'deleting':result?'registered':'missing');}
       })
       .catch(reason=>{
+        expired=true;
         if(!active)return;
         const code=(reason as {code?:unknown}|null)?.code;
         console.warn('[Roteiva] Primeiro acesso não confirmado',{step:'registration-read',

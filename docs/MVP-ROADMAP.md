@@ -1,5 +1,18 @@
 # Roadmap vivo — Roteiva MVP
 
+## Entrada com rede restrita — 18/11/2026
+
+**IMPLEMENTADO EM BRANCH; publicação e validação externa pendentes.** Nova resposta Dropbox relata indisponibilidade no cadastro e erro bruto de fetch com a identidade dedicada. A origem externa exata não foi demonstrada; não atribuir a região, browser ou OAuth Dropbox por suposição.
+
+- [x] Erro de entrada tipado e sanitizado distingue etapa, transporte, timeout e HTTP; preserva código seguro/requestId sem mostrar exceção bruta. API expõe UUID apenas para origens já permitidas e correlaciona negações de acesso.
+- [x] Leitura SDK de perfil limitada a 8s antes do fallback autenticado; token 8s, REST 10s, status de conta 15s, verificação de cadastro total 60s. POST ensure tem 45s e nunca é repetido automaticamente.
+- [x] Listener silencioso/cache-only aciona leitura autoritativa e reinício com orçamento existente de oito recuperações. Snapshot real reinicia orçamento; cache nunca autoriza; logout e callbacks antigos não restauram acesso.
+- [x] Testes unitários de silêncio, fetch/body pendentes, erro HTTP, privacidade, negação real e resposta tardia; teste browser desktop/mobile de transporte com retry somente por clique explícito.
+- [ ] CI, DEV real, promoção protegida de PROD e smoke real no SHA publicado; registrar evidências após execução.
+- [ ] Aceite Dropbox e compatibilidade com a rede do avaliador; solicitar horário com fuso, ambiente, passos e erro exibido após a publicação, sem prometer resolução de bloqueio externo ainda não reproduzido.
+
+Sem migrations, novas credenciais, regras de acesso mais amplas, polling permanente ou serviços pagos. Testes: `pnpm test`, `pnpm typecheck`, `npm test --prefix api`, `npm run typecheck --prefix api` e `tests/browser/access.spec.ts` com emuladores; regressão completa na promoção PROD.
+
 ## Resend opcional para publicação — 17/11/2026
 
 **IMPLEMENTADO EM BRANCH; publicação pendente.** Por solicitação explícita do proprietário, a falta de chave do Resend não bloqueia o deploy PROD. Segredos críticos e aprovações permanecem obrigatórios. Feedback sem chave fica indisponível e rejeita envio sem persistir ou chamar o provedor.

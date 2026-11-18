@@ -2,6 +2,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readConfirmedProfile} from '../src/data/profile-read.ts';
 const profile={displayName:'Synthetic',studioName:'',professionalType:'freelancer',revision:1,legacy:false};
+
+test('silent SDK falls back once to authenticated server, without waiting for SDK completion',async()=>{
+ let finish,reads=0;
+ const result=await readConfirmedProfile(()=>new Promise(resolve=>{finish=resolve}),async()=>{reads++;return profile;},{sdkTimeoutMs:5});
+ assert.equal(result,profile);assert.equal(reads,1);finish(null);
+});
+test('silent SDK plus a denied or silent server cannot open the workspace',async()=>{
+ await assert.rejects(readConfirmedProfile(()=>new Promise(()=>{}),async()=>{throw{code:'permission-denied'}},{sdkTimeoutMs:5}),e=>e.code==='permission-denied');
+ await assert.rejects(readConfirmedProfile(()=>new Promise(()=>{}),()=>new Promise(()=>{}),{sdkTimeoutMs:5,serverTimeoutMs:5}),e=>e.code==='deadline-exceeded');
+});
 test('valid initial profile does not perform recovery reads',async()=>{
  let reads=0;assert.equal(await readConfirmedProfile(async()=>profile,async()=>{reads++;return null;}),profile);assert.equal(reads,0);
 });
