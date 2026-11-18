@@ -4,6 +4,7 @@ import type {Project} from '../../domain/workspace';
 import type {User} from 'firebase/auth';
 import {AppButton} from '../ui/AppButton';
 import {AppInput} from '../ui/AppInput';
+import {AppCheckbox} from '../ui/AppCheckbox';
 import {AppModal,AppModalHeader,AppModalBody,AppModalFooter} from '../ui/AppModal';
 import {useAuth} from '../auth/AuthProvider';
 import {API_BASE_URL} from '../../lib/environment';
@@ -121,17 +122,29 @@ function ProjectDeletionPanel({project,onDeleted,onDeleteDemo,user}:Props&{user:
     {opened&&<AppModal size="medium" className="pd-delete-dialog" aria-labelledby="pd-delete-title" aria-describedby="pd-delete-desc" onCloseRequest={dismiss}>
       <div className="rt-modal__layout">
         <AppModalHeader icon={<ShieldAlert size={25}/>} title="Excluir este projeto?" titleId="pd-delete-title"
-          description="Confirme cuidadosamente esta ação permanente." onClose={dismiss} closeDisabled={busy}/>
-        <AppModalBody>
-          <p id="pd-delete-desc">Você está excluindo <strong>{project.name}</strong>. As tarefas, os compromissos, os vínculos da Biblioteca e o histórico de aprovações deste projeto serão removidos permanentemente.</p>
-          <p className="pd-preserve-note"><CheckCircle2 size={17}/> Os lançamentos financeiros serão desvinculados e preservados. Os arquivos originais no Google Drive ou Dropbox não serão apagados.</p>
-          <label htmlFor="pd-project-confirm">Digite o nome exato do projeto para confirmar:</label>
-          <AppInput id="pd-project-confirm" value={name} onChange={event=>setName(event.target.value)}
-            autoComplete="off" spellCheck={false} maxLength={200} disabled={busy}/>
-          <label className="pd-danger-check"><AppInput type="checkbox" checked={acknowledged}
-            onChange={event=>setAcknowledged(event.target.checked)} disabled={busy}/>
-            <span>Entendo que a exclusão dos dados vinculados no Roteiva não pode ser desfeita.</span>
-          </label>
+          description="Essa ação é permanente e não pode ser desfeita." onClose={dismiss} closeDisabled={busy}/>
+        <AppModalBody className="pd-delete-body">
+          <div id="pd-delete-desc" className="pd-delete-intro">
+            <p>Você está prestes a excluir <strong>{project.name}</strong>.</p>
+            <p>Serão removidos as tarefas, os compromissos, os vínculos da Biblioteca e o histórico de aprovações associados a este projeto.</p>
+          </div>
+          <div className="pd-delete-preserve">
+            <CheckCircle2 size={20} aria-hidden="true"/>
+            <p><strong>O que será preservado</strong>
+              <span>Os lançamentos financeiros continuarão no histórico, sem vínculo com este projeto. Os arquivos originais no Google Drive e Dropbox não serão apagados.</span>
+            </p>
+          </div>
+          <div className="pd-delete-confirm-field">
+            <label htmlFor="pd-project-confirm">Digite o nome exato do projeto para confirmar</label>
+            <AppInput id="pd-project-confirm" className="pd-delete-name-input" value={name}
+              onChange={event=>setName(event.target.value)} placeholder={project.name}
+              autoComplete="off" spellCheck={false} maxLength={200} disabled={busy} autoFocus/>
+            <span className="pd-delete-hint">Use o mesmo nome exibido acima, incluindo espaços e maiúsculas.</span>
+          </div>
+          <AppCheckbox className="pd-delete-acknowledge" checked={acknowledged}
+            onChange={event=>setAcknowledged(event.target.checked)} disabled={busy}>
+            Entendo que a exclusão dos dados vinculados no Roteiva não pode ser desfeita.
+          </AppCheckbox>
           {error&&<p className="pd-danger-error" role="alert">{error}</p>}
         </AppModalBody>
         <AppModalFooter>
