@@ -85,8 +85,9 @@ test('project-wide explorer search hides descendants of trashed ancestor and rej
  await assert.rejects(listLibraryExplorer(env,lib,otherFolder,item,'hidden',false),e=>e.code==='library_changed');
 });
 
-test('adjacent private media ranges reuse a successful Firestore permission check only for the same token and project',async()=>{
- const env={FIREBASE_PROJECT_ID:'media-test-project'};
+test('adjacent private media ranges reuse a successful Firestore permission check only for the same token and project',async t=>{
+ const db=database();t.after(db.close);
+ const env={DB:db.DB,FIREBASE_PROJECT_ID:'media-test-project'};
  const route=new Request('https://example.invalid/library/projects/999100/nodes/id/content',{headers:{Authorization:'Bearer unit-perf-999100'}});
  let checks=0;
  const grant=async()=>{checks++;return Response.json({fields:{ownerUid:{stringValue:'media-user-unique'}}});};

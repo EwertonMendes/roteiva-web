@@ -68,13 +68,13 @@ test('deletion revokes only project reviews and cleans up its library subtree',a
 test('each cleanup step is resumable, leased, and retains a deletion tombstone',async t=>{
   const db=database();t.after(db.close);
   const env={DB:db.DB,VIRTUAL_LIBRARY_ENABLED:'true'};
-  addJob(db,'alice',11,'uploads');
   db.sql.prepare(`INSERT INTO drive_connections
     (id,owner_uid,google_account_id,google_email,status,scopes,created_at,updated_at)
     VALUES('drive','alice','google','a@example.com','connected','drive.file',1,1)`).run();
   db.sql.prepare(`INSERT INTO drive_upload_attempts
     (id,owner_uid,connection_id,connection_revision,project_id,linked_folder_id,target_folder_id,file_id,name,mime_type,size,status,expires_at)
     VALUES('one','alice','drive',1,11,'folder','folder','file','name','image/png',1,'completed',1000)`).run();
+  addJob(db,'alice',11,'uploads');
   await advanceProjectDeletion(env,'alice',11);
   let row=db.sql.prepare("SELECT phase,lease_id FROM project_deletions WHERE owner_uid='alice' AND project_id=11").get();
   assert.equal(row.phase,'library');assert.equal(row.lease_id,null);

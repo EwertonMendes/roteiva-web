@@ -13,7 +13,7 @@ test('Google-restricted media requires actual viewer identity even with a valid 
  const e={...env(),VIRTUAL_LIBRARY_ENABLED:'true',FIREBASE_PROJECT_ID:'demo-roteiva'};
  const subject=await reviewMediaSubject(e,review,'allowed@example.com');
  const ticket=await mintReviewMediaTicket(e,review,file,1,Date.now()+60000,inviteHash,subject);
- e.DB={prepare(){return {bind(){return {async first(){return {id:review,owner_uid:'alice',status:'pending',current_version:1,expires_at:Date.now()+60000,token_hash:inviteHash,access_mode:'google'};}};}};}};
+ e.DB={prepare(sql){return {bind(){return {async first(){return sql.includes('project_deletions')?null:{id:review,owner_uid:'alice',project_id:17,status:'pending',current_version:1,expires_at:Date.now()+60000,token_hash:inviteHash,access_mode:'google'};}};}};}};
  const request=new Request('https://api.example/reviews/media?ticket='+ticket);
  await assert.rejects(streamReviewMedia(request,e,new URL(request.url)),error=>error.code==='authentication_required');
 });
@@ -40,7 +40,8 @@ test('wrong file type and a closed review cannot stream even with signed ticket'
   const DB={prepare(sql){
     return {bind(...args){
       return {async first(){
-        if(sql.includes('FROM review_requests'))return {id:review,owner_uid:'alice',status,current_version:1,expires_at:Date.now()+60000,token_hash:inviteHash,access_mode:'link'};
+        if(sql.includes('FROM project_deletions'))return null;
+        if(sql.includes('FROM review_requests'))return {id:review,owner_uid:'alice',project_id:17,status,current_version:1,expires_at:Date.now()+60000,token_hash:inviteHash,access_mode:'link'};
         if(sql.includes('FROM review_assets'))return {file_id:file,connection_id:'unused',mime_type:mime};
         return null;
       }};
