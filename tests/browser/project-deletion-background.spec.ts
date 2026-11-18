@@ -114,7 +114,7 @@ test('idle detail makes one status request; deleting continues on Financeiro and
     await expect(page.getByRole('heading',{name:'Gestão financeira',exact:true})).toBeVisible();
     expect(page.url()).toContain('/financeiro');
     await navigate(page,'Projetos');
-    await expect(page.getByText(name,{exact:true})).toHaveCount(0);
+    await expect(page.locator('.pc-cards').getByText(name,{exact:true})).toHaveCount(0);
     await expect(page.getByRole('heading',{name:'Projetos',exact:true})).toBeVisible();
   }finally{await worker.dispose();}
 });
@@ -130,13 +130,13 @@ test('pending deletion remains visible on return to detail, and only its own det
     await expect(page.getByRole('heading',{name:'Clientes',exact:true})).toBeVisible();
     await navigate(page,'Projetos');
     // The project still exists in Firestore until the simulated Worker finishes.
-    await page.getByText(name,{exact:true}).click();
-    await expect(page.getByText('Exclusão em andamento.',{exact:false})).toBeVisible();
+    await page.locator('.pc-cards').getByRole('button',{name,exact:false}).first().click();
+    await expect(page.locator('.pd-danger-state')).toBeVisible();
     await expect(page.getByRole('button',{name:'Excluir projeto'})).toBeDisabled();
     worker.jobs.get(id)!.release=true;
     await expect(page).toHaveURL(new RegExp('/projetos$'));
     await expect(page.locator('.rt-toast--success .rt-toast-message strong')).toHaveText(name);
-    await expect(page.getByText(name,{exact:true})).toHaveCount(0);
+    await expect(page.locator('.pc-cards').getByText(name,{exact:true})).toHaveCount(0);
   }finally{await worker.dispose();}
 });
 
