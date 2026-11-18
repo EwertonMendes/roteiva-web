@@ -13,9 +13,10 @@ export type FeedbackEmailBody={
   html:string;
   replyTo?:string;
 };
-const escapeHtml=(value:string):string=>value.replace(/[&<>"']/g,char=>({
+const escapedCharacters:Record<string,string>={
   '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
-})[char]||char);
+};
+const escapeHtml=(value:string):string=>value.replace(/[&<>"']/g,char=>escapedCharacters[char]||char);
 const verifiedReplyTo=(email:string):string|undefined=>
   /^[^\s<>@\r\n]{1,64}@[^\s<>@\r\n]{1,253}$/.test(email)?email:undefined;
 function infoRow(label:string,value:string):string{
