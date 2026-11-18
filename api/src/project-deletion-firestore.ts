@@ -72,7 +72,8 @@ async function commit(env:Env,uid:string,token:string,domain:Domain|null,docs:Fi
       state.sizes[domain]=iv(remaining);
     }
   }
-  const writes=docs.map(document=>{
+  const writes:Array<{delete?:string;update?:{name:string;fields:Record<string,Value>};
+    updateMask?:{fieldPaths:string[]};currentDocument:{updateTime:string}}>=docs.map(document=>{
     if(mode==='delete')return {delete:document.name,currentDocument:{updateTime:document.updateTime}};
     return {update:{name:document.name,fields:{
       projectId:iv(0),revision:iv(integer(document.fields.revision)+1),updatedAt:time()
@@ -84,7 +85,7 @@ async function commit(env:Env,uid:string,token:string,domain:Domain|null,docs:Fi
       domains:{mapValue:{fields:state.revisions}},counts:{mapValue:{fields:state.sizes}},updatedAt:time()}},
     updateMask:{fieldPaths:['revision','domains','counts','updatedAt']},
     currentDocument:{updateTime:sync.updateTime}
-  } as typeof writes[number]);
+  });
   await request(parent.replace('/users/'+encodeURIComponent(uid),'')+':commit',token,'POST',{writes});
 }
 
