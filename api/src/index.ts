@@ -312,7 +312,9 @@ export default {fetch:handle, scheduled(controller:ScheduledController,env:Env,c
     }
     await assertDatabaseEnvironment(env);
     if(controller.cron==='* * * * *'){
-      await runPendingDeletions(env);
+      // Account cleanup failures must not starve project cleanup. Each durable
+      // queue has its own lease, retry and failure isolation.
+      try{await runPendingDeletions(env);}catch{console.error(JSON.stringify({event:'account_deletion_scheduler_failure'}));}
       try{await runPendingProjectDeletions(env);}catch{console.error(JSON.stringify({event:'project_deletion_scheduler_failure'}));}
       try{await cleanupExpiredReviews(env);}catch{console.error(JSON.stringify({event:'review_revocation_retry'}));}
     }else if(controller.cron==='*/15 * * * *'){
