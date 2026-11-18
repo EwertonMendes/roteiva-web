@@ -69,7 +69,12 @@ async function request(uid:string,id:number,method:'GET'|'POST',name?:string):Pr
  * browser. A tiny account-scoped journal lets polling recover after refresh.
  */
 export function ProjectDeletionProvider({children}:{children:ReactNode}){
-  const {user}=useAuth(),uid=user?.uid||'';
+  const {user}=useAuth();
+  // A keyed monitor physically separates pending jobs and cached operation
+  // names between different authenticated accounts on the same device.
+  return <ProjectDeletionMonitor key={user?.uid||'anonymous'} uid={user?.uid||''}>{children}</ProjectDeletionMonitor>;
+}
+function ProjectDeletionMonitor({children,uid}:{children:ReactNode;uid:string}){
   const notify=useToast();
   const [jobs,setJobs]=useState<Record<number,Job>>(()=>restored(uid));
   const [completion,setCompletion]=useState<Completion|null>(null);
@@ -79,7 +84,6 @@ export function ProjectDeletionProvider({children}:{children:ReactNode}){
   const jobsRef=useRef(jobs);
   jobsRef.current=jobs;
   const sequence=useRef(0);
-  useEffect(()=>{setJobs(restored(uid));checks.current.clear();completed.current.clear();inFlight.current.clear();},[uid]);
   useEffect(()=>{
     if(!uid)return;
     try{localStorage.setItem(key(uid),JSON.stringify(Object.values(jobs).slice(0,30)));}catch{ /* Browser storage can be unavailable; in-tab completion still works. */ }
