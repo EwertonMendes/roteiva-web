@@ -92,7 +92,7 @@ export async function feedbackRouter(request:Request,env:Env,uid:string,email:st
     return Response.json({items:rows.results,available:feedbackEnabled(env)});
   }
   if(request.method!=='POST')throw new ApiError(405,'method_not_allowed');
-  // Fail closed when Cloudflare Email Routing or its verified recipient is not configured.
+  // Fail closed when a configured Free-tier transactional email API key is absent.
   if(!feedbackEnabled(env))throw new ApiError(503,'feedback_unavailable');
   const feedback=await parseFeedback(request);
   const now=Date.now();

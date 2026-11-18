@@ -7,10 +7,11 @@ try {
 assert.equal(target,'prod','Only explicit PROD bootstrap is supported');
 for(const flag of ['OAUTH_ENABLED','DROPBOX_ENABLED','ACCOUNT_DELETION_ENABLED'])assert.equal(config.vars[flag],'true','PROD feature not provisioned: '+flag);
 assert.match(config.vars.GOOGLE_CLIENT_ID,/^18860974410-[a-z0-9]+\.apps\.googleusercontent\.com$/,'PROD Google client must belong to its dedicated OAuth project');
-const names=['TOKEN_KEYS','TRIAL_IDENTITY_HMAC_KEY','GOOGLE_CLIENT_SECRET','GOOGLE_PICKER_API_KEY','DROPBOX_APP_KEY','DROPBOX_APP_SECRET','FIREBASE_ADMIN_CREDENTIALS_JSON'];
+const names=['TOKEN_KEYS','TRIAL_IDENTITY_HMAC_KEY','GOOGLE_CLIENT_SECRET','GOOGLE_PICKER_API_KEY','DROPBOX_APP_KEY','DROPBOX_APP_SECRET','FIREBASE_ADMIN_CREDENTIALS_JSON','RESEND_API_KEY'];
 const secrets={};
 for(const name of names){
  const value=process.env[name];assert.ok(value&&(['TOKEN_KEYS','FIREBASE_ADMIN_CREDENTIALS_JSON'].includes(name)||value.trim()===value)&&!/REPLACE_WITH|PLACEHOLDER/.test(value),'Missing/invalid protected secret: '+name);
+ if(name==='RESEND_API_KEY')assert.match(value,/^re_[A-Za-z0-9_-]{12,}$/,'Invalid Resend API key format');
  secrets[name]=value;
 }
 const keys=JSON.parse(secrets.TOKEN_KEYS);assert.equal(Buffer.from(keys[config.vars.TOKEN_KEY_VERSION]||'','base64url').length,32);
