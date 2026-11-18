@@ -699,3 +699,21 @@ test("task positions are validated, sortable and backward compatible",async()=>{
  const after=await refreshed.load(["projects","tasks"]);
  assert.deepEqual(after.projects.find(p=>p.id===2).tasks.map(t=>t.order),[0,1,2,3]);
 });
+
+test("project deletion fence denies stale client writes without touching another owner",async()=>{
+  const alice=dbFor("alice"),bob=dbFor("bob");
+  const fence=doc(alice,'users/alice/projectDeletionFences/2');
+  // Only trusted Worker/Admin may create or remove a tombstone.
+  await assertFails(setDoc(fence,{ownerUid:'alice',projectId:2}));
+  await env.withSecurityRulesDisabled(async ctx=>
+    setDoc(doc(ctx.firestore(),'users/alice/projectDeletionFences/2'),{ownerUid:'alice',projectId:2}));
+  await assertFails(updateDoc(doc(alice,'users/alice/projects/2'),{name:'Resurrected',revision:2,updatedAt:serverTimestamp()}));
+  await assertFails(deleteDoc(doc(alice,'users/alice/projects/2')));
+  await assertSucceeds(setDoc(doc(alice,'users/alice/projects/3'),{...project,id:3,...meta('alice'),clientId:1}));
+  for(const name of ['tasks','events','financeEntries']){
+    await assertFails(setDoc(doc(alice,'users/alice/'+name+'/10'),
+      {...fixtures[name],projectId:2,...meta('alice')}));
+  }
+  await assertSucceeds(updateDoc(doc(bob,'users/bob/projects/2'),{name:'Other owner unchanged',revision:2,updatedAt:serverTimestamp()}));
+  await assertFails(deleteDoc(fence));
+});
