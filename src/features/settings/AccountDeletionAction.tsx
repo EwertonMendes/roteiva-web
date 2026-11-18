@@ -20,11 +20,21 @@ async function api<T>(path:string,method:"GET"|"POST",body?:unknown):Promise<T>{
   const {auth}=firebaseServices();
   if(!auth.currentUser)throw new Error("Sua sessão expirou. Entre novamente.");
   const token=await auth.currentUser.getIdToken(method==="POST");
-  const r=await fetch(BASE+path,{method,headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},
-    ...(body?{body:JSON.stringify(body)}:{}),cache:"no-store"});
+  let r:Response;
+  try{
+    r=await fetch(BASE+path,{method,headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},
+      ...(body?{body:JSON.stringify(body)}:{}),cache:"no-store"});
+  }catch{
+    if(method==="GET")throw new DeletionApiError("unavailable","Não foi possível consultar o estado da conta.");
+    throw new Error("Não foi possível enviar a solicitação com segurança. Tente novamente.");
+  }
   if(!r.ok){
     const data=await r.json().catch(()=>({})) as {error?:{code?:string}};
     const code=data.error?.code||"";
+    // Also used during first registration. Retry transient status reads only;
+    // never repeat account-deletion writes with uncertain outcome.
+    if(method==="GET"&&[408,429,500,502,503,504].includes(r.status))
+      throw new DeletionApiError("unavailable","Não foi possível confirmar o estado da conta.");
     if(code==="deletion_unavailable")throw new Error("Não foi possível solicitar a exclusão agora. Tente novamente mais tarde.");
     if(r.status===401&&code==="invalid_identity")throw new DeletionApiError(code,"Para proteger sua conta, confirme sua identidade com o Google antes de continuar.");
     throw new Error("Não foi possível concluir a solicitação com segurança. Tente novamente.");

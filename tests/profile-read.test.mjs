@@ -20,3 +20,17 @@ test('real permission denial and server failure remain denied',async()=>{
 test('unrelated failures do not trigger authentication recovery or repeat writes',async()=>{
  let reads=0;await assert.rejects(readConfirmedProfile(async()=>{throw new Error('unexpected');},async()=>{reads++;return profile;}));assert.equal(reads,0);
 });
+
+test('persistent-cache and transient SDK failures recover through authenticated server read',async()=>{
+ for(const code of ['failed-precondition','firestore/unimplemented','internal','unavailable','deadline-exceeded','aborted']){
+  let reads=0;
+  assert.equal(await readConfirmedProfile(async()=>{throw {code};},async()=>{reads++;return profile;}),profile);
+  assert.equal(reads,1,code);
+ }
+});
+test('server recovery cannot convert a real denial into a profile',async()=>{
+ for(const code of ['unavailable','failed-precondition','permission-denied'])
+  await assert.rejects(readConfirmedProfile(async()=>{throw {code};},async()=>{
+    throw Object.assign(new Error('Server denied'),{code:'permission-denied'});
+  }),error=>error.code==='permission-denied');
+});
