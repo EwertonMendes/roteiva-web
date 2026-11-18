@@ -24,7 +24,7 @@ const messages:Record<string,string>={
   feedback_dev_email_auth:'A chave de envio do Resend DEV é inválida ou não está autorizada. Verifique a configuração do Worker.',
   feedback_email_provider_rejected:'O serviço de e-mail rejeitou o envio. Nossa equipe precisa verificar a configuração.',
   feedback_delivery_busy:'O serviço de e-mail está temporariamente ocupado. Tente novamente mais tarde.',
-  feedback_daily_limit:'O limite de três feedbacks em 24 horas foi atingido.',
+  feedback_hourly_limit:'Você atingiu o limite de 20 feedbacks por hora. Tente novamente mais tarde.',
   feedback_already_attempted:'Não foi possível reutilizar a tentativa. Clique em Tentar novamente para gerar um novo envio.',
   feedback_invalid_form:'Confira o assunto, a descrição e os campos do formulário.',
   feedback_invalid_image:'Uma das imagens não é válida. Use PNG, JPEG ou WebP.',
@@ -177,7 +177,7 @@ export function FeedbackDialog({getToken,onClose}:{getToken:()=>Promise<string>;
             <div className="feedback-upload" onDragOver={event=>event.preventDefault()} onDrop={onDrop}>
               <ImagePlus size={24} aria-hidden="true"/>
               <p>Arraste imagens ou cole capturas com Ctrl+V</p>
-              <span>Até cinco imagens, otimizadas antes do envio</span>
+              <span>Adicione até 5 imagens</span>
               <AppButton type="button" variant="secondary" disabled={pending||images.length>=5}
                 onClick={()=>fileInput.current?.click()}>Selecionar imagens</AppButton>
               <AppInput ref={fileInput} className="feedback-file-input" type="file" accept="image/png,image/jpeg,image/webp" multiple

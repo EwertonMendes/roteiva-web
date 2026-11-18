@@ -20,7 +20,7 @@
 - Firebase JWT validado no Worker, controle de origem, bloqueio de conta em exclusão.
 - Até 5 imagens PNG/JPEG/WebP; otimização client-side, até 1 MiB por imagem, corpo multipart limitado a 6 MiB e validação de assinatura.
 - Destinatário e remetente PROD fixos no código; binding restringe o destino. DEV usa token secreto apenas no Worker.
-- Restrições D1: 3 mensagens aceitas/em processamento e 10 tentativas por 24 horas e proprietário; chave idempotente por tentativa e no máximo 3 reenvios explicitamente seguros por protocolo.
+- Restrições D1 em PROD: 20 mensagens aceitas/em processamento por usuário em janela móvel de 60 minutos e limite adicional de 40 tentativas registradas por hora; chave idempotente por tentativa e até 3 tentativas explicitamente seguras por protocolo. DEV não aplica quota por usuário, mas mantém autenticação, validação de anexos, rate limiting global e idempotência.
 - Erros definitivos do provedor permitem nova tentativa controlada; erro ambíguo não é automaticamente reenviado para evitar duplicidades.
 - O histórico D1 contém apenas texto/metadados. E-mails e anexos ficam na caixa Gmail, sob política de retenção própria.
 
@@ -39,3 +39,10 @@ Referências oficiais:
 - **Erro real em DEV:** resposta Resend 4xx identifica configuração inválida/chave rejeitada; 5xx ou falha de transporte continuam como resultado incerto (sem retries automáticos). Logs contêm somente código/nome seguro do provedor, HTTP status e protocolo, nunca credenciais, conteúdo ou anexos. O `onboarding@resend.dev` só entrega para a caixa que é proprietária da conta Resend.
 - **PROD:** mantém Cloudflare `FEEDBACK_EMAIL` com destino verificado `suporte.roteiva@gmail.com` e remetente `suporte@roteiva.com` — já houve comprovação de recebimento real do e-mail com anexos. Nenhum segredo Resend em PROD.
 
+
+## Política de limites (18/11/2026)
+
+- **DEV:** sem quota por usuário no formulário para testes. Continua sujeito à autenticação Firebase, rate limiting geral por IP, integridade/idempotência, tamanho do payload e limites do Resend Free.
+- **PROD:** até **20 envios aceitos ou em andamento por usuário em qualquer janela de 60 minutos**, mais limite defensivo de **40 tentativas registradas por usuário na mesma janela** para impedir abuso por falhas deliberadas; computados em D1 atomicamente sem SELECT prévio. Limite independe do IP e não muda a quota do provedor.
+- O `GET /feedback` continua desativado. O frontend informa o limite ao receber `feedback_hourly_limit` (429).
+- Texto de anexos no formulário: “Adicione até 5 imagens”; processamento e sanitização permanecem transparentes.
