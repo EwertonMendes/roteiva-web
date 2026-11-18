@@ -1,8 +1,9 @@
 import type {Env} from './types.ts';
+import {composeFeedbackEmail} from './feedback-email.ts';
 
 export type FeedbackAttachment={content:Uint8Array;filename:string;type:string;disposition:'attachment'};
 export type FeedbackMail={
-  id:string;email:string;kindLabel:string;title:string;description:string;screen:string;
+  id:string;email:string;kindLabel:string;title:string;description:string;
   attachments:FeedbackAttachment[];
 };
 
@@ -31,27 +32,11 @@ export function feedbackEnabled(env:Env):boolean{
   if(env.ENVIRONMENT==='dev')return typeof env.RESEND_API_KEY==='string'&&env.RESEND_API_KEY.trim().length>0;
   return false;
 }
-function verifiedReplyTo(email:string):string|undefined{
-  return /^[^\s<>@\r\n]{1,64}@[^\s<>@\r\n]{1,253}$/.test(email)?email:undefined;
-}
 function senderAddress(env:Env):string{
   if(!env.RESEND_FROM_EMAIL)return TEST_SENDER;
   if(env.RESEND_FROM_EMAIL!==VERIFIED_SENDER)
     throw new FeedbackDeliveryFailure('feedback_email_sender_setup',true);
   return VERIFIED_SENDER;
-}
-function summary(env:Env,mail:FeedbackMail):{subject:string;text:string;replyTo?:string}{
-  return {
-    subject:'[Roteiva '+env.ENVIRONMENT.toUpperCase()+'] '+mail.kindLabel+' #'+mail.id.slice(0,8),
-    replyTo:verifiedReplyTo(mail.email),
-    text:[
-      'Novo feedback do Roteiva','Protocolo: '+mail.id,
-      'Categoria: '+mail.kindLabel,'Assunto: '+mail.title,
-      'E-mail verificado: '+mail.email,'Ambiente: '+env.ENVIRONMENT,
-      'Tela: '+mail.screen,'Capturas anexadas: '+mail.attachments.length,
-      '',mail.description
-    ].join('\n')
-  };
 }
 function toBase64(bytes:Uint8Array):string{
   // Chunk size is a multiple of 3 so independently base64-encoded chunks can
@@ -88,10 +73,10 @@ function classifyCloudflareError(error:unknown,reportId:string):FeedbackDelivery
 }
 async function sendCloudflare(env:Env,mail:FeedbackMail):Promise<{messageId:string}>{
   if(!env.FEEDBACK_EMAIL)throw new FeedbackDeliveryFailure('feedback_unavailable',true);
-  const body=summary(env,mail);
+  const body=composeFeedbackEmail(env.ENVIRONMENT,{...mail,attachmentCount:mail.attachments.length});
   try{
     const result=await env.FEEDBACK_EMAIL.send({
-      from:VERIFIED_SENDER,to:DESTINATION,subject:body.subject,text:body.text,
+      from:VERIFIED_SENDER,to:DESTINATION,subject:body.subject,text:body.text,html:body.html,
       ...(body.replyTo?{replyTo:body.replyTo}:{}),
       attachments:mail.attachments
     });
@@ -107,7 +92,7 @@ export async function sendFeedbackEmail(env:Env,mail:FeedbackMail):Promise<{mess
   if(!feedbackEnabled(env))throw new FeedbackDeliveryFailure('feedback_unavailable',true);
   if(env.ENVIRONMENT==='prod')return sendCloudflare(env,mail);
   if(env.ENVIRONMENT!=='dev')throw new FeedbackDeliveryFailure('feedback_unavailable',true);
-  const body=summary(env,mail);
+  const body=composeFeedbackEmail(env.ENVIRONMENT,{...mail,attachmentCount:mail.attachments.length});
   const from=senderAddress(env);
   let response:Response;
   try{
@@ -124,6 +109,7 @@ export async function sendFeedbackEmail(env:Env,mail:FeedbackMail):Promise<{mess
         to:[DESTINATION],
         subject:body.subject,
         text:body.text,
+        html:body.html,
         ...(body.replyTo?{reply_to:body.replyTo}:{}),
         attachments:mail.attachments.map(item=>({
           filename:item.filename,
@@ -132,24 +118,32 @@ export async function sendFeedbackEmail(env:Env,mail:FeedbackMail):Promise<{mess
       }),
       signal:AbortSignal.timeout(15000)
     });
-  }catch{
-    // A broken connection may happen after Resend accepted the message.
-    console.error(JSON.stringify({event:'feedback_delivery_uncertain',provider:'resend',reportId:mail.id}));
+  }catch(error){
+    // Transport failure may happen after provider acceptance: no automatic retry.
+    const transportError=error instanceof Error&&['TimeoutError','AbortError','TypeError'].includes(error.name)?error.name:'UNKNOWN';
+    console.error(JSON.stringify({event:'feedback_delivery_uncertain',provider:'resend',transportError,reportId:mail.id}));
     throw new FeedbackDeliveryFailure('feedback_delivery_unconfirmed',false);
   }
   if(!response.ok){
-    // Never log the provider error body, message text, personal data or API key.
-    console.error(JSON.stringify({event:'feedback_delivery_rejected',provider:'resend',status:response.status,reportId:mail.id}));
-    if([400,401,403,422].includes(response.status))
-      throw new FeedbackDeliveryFailure('feedback_email_sender_setup',true);
-    if(response.status===429)
-      throw new FeedbackDeliveryFailure('feedback_delivery_busy',true,429);
-    if(response.status>=500)
-      throw new FeedbackDeliveryFailure('feedback_delivery_unconfirmed',false);
+    // Error-name only, never provider message/body/user content; bounded read.
+    const raw=await response.text().then(body=>body.slice(0,512)).catch(()=>'');
+    let parsed:unknown;
+    try{parsed=JSON.parse(raw);}catch{parsed=null;}
+    const candidate=parsed&&typeof parsed==='object'&&'name' in parsed?parsed.name:null;
+    const providerName=typeof candidate==='string'&&/^[a-z_]{3,48}$/.test(candidate)?candidate:'UNKNOWN';
+    const status=response.status;
+    console.error(JSON.stringify({event:'feedback_delivery_rejected',provider:'resend',status,providerName,reportId:mail.id}));
+    if(status===401)throw new FeedbackDeliveryFailure('feedback_dev_email_auth',true);
+    if(status===403)throw new FeedbackDeliveryFailure('feedback_dev_email_setup',true);
+    if(status===400||status===422)throw new FeedbackDeliveryFailure('feedback_email_provider_rejected',true);
+    if(status===429)throw new FeedbackDeliveryFailure('feedback_delivery_busy',true,429);
+    if(status>=500)throw new FeedbackDeliveryFailure('feedback_delivery_unconfirmed',false);
     throw new FeedbackDeliveryFailure('feedback_email_provider_rejected',true);
   }
   const receipt=await response.json().catch(()=>null) as {id?:unknown}|null;
-  if(!receipt||typeof receipt.id!=='string'||!receipt.id)
+  if(!receipt||typeof receipt.id!=='string'||!receipt.id){
+    console.error(JSON.stringify({event:'feedback_resend_receipt_invalid',reportId:mail.id}));
     throw new FeedbackDeliveryFailure('feedback_delivery_unconfirmed',false);
+  }
   return {messageId:receipt.id};
 }
