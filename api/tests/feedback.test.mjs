@@ -22,11 +22,11 @@ function configured(db,t){
     return Response.json({id:'mail-'+sent.length});
   };
   t.after(()=>{globalThis.fetch=oldFetch;});
-  const env={DB:db.DB,ENVIRONMENT:'prod',RESEND_API_KEY:'re_mock_secure_key_123456'};
+  const env={DB:db.DB,ENVIRONMENT:'dev',RESEND_API_KEY:'re_mock_secure_key_123456'};
   return {env,sent};
 }
 
-test('DEV and PROD without Resend expose unavailable feedback and never send or persist a submission',async t=>{
+test('DEV without Resend and PROD without Cloudflare binding expose unavailable feedback and never send or persist a submission',async t=>{
   const db=database();t.after(db.close);
   t.mock.method(globalThis,'fetch',async()=>{throw Error('No provider request is allowed without a key');});
   for(const ENVIRONMENT of ['dev','prod']){
@@ -46,7 +46,7 @@ test('authenticated request sends fixed destination; metadata D1 never stores at
   assert.equal((await response.json()).status,'received');
   assert.equal(sent.length,1);
   assert.deepEqual(sent[0].to,['suporte.roteiva@gmail.com']);
-  assert.equal(sent[0].from,'Roteiva PROD <onboarding@resend.dev>');
+  assert.equal(sent[0].from,'Roteiva DEV <onboarding@resend.dev>');
   assert.equal(sent[0].reply_to,'ownerA@gmail.com');
   assert.equal(sent[0].attachments.length,1);
   assert.equal(sent[0].attachments[0].filename,'captura-01.png');
