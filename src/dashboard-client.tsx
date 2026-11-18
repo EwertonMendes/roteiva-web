@@ -100,7 +100,7 @@ type DashboardProps = {
   onThemeChange?:(theme:"light"|"dark")=>void;
   onRouteChange?:(route:WorkspaceRoute)=>void;
   onCommands?:(commands:readonly WorkspaceCommand[])=>Promise<boolean>|void;
-  onProjectRemoved?:()=>void;
+  onProjectRemoved?:(project:Project)=>void;
   overviewMetrics?:{clientCount?:number;receivableAmount?:number;cashBalance?:number;projectCount?:number;projectStatuses?:Record<Status,number>}; projectPage?:{total:number;hasMore:boolean;status:string};
   onMoreProjects?:()=>void;onProjectStatus?:(status:Status|"Todos")=>void;
   onSearchProjects?:()=>void; clientPage?:{total:number;recurring:number;hasMore:boolean};
@@ -142,6 +142,8 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
   const [comments, setComments] = useState<{ name: string; initials: string; time: string; text: string; when: string }[]>([]);
   const [dataReady, setDataReady] = useState(false);
   const [selectedProject, setSelectedProject] = useState<number | null>(initialBrowserRoute.projectId || null);
+  // Render success only after the detail dialog has left the top layer.
+  const deletedProjectToast=useRef<string|null>(null);
   const [selectedClient, setSelectedClient] = useState<number | null>(initialBrowserRoute.clientId || null);
   const consumeReviewStart=useCallback(()=>setReviewStart(null),[]);
   const [reviewStart,setReviewStart]=useState<{clientId?:number;projectId?:number}|null>(null);
@@ -189,7 +191,8 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     setEventDate(entry?.date || date || todayKey());
     setEventModalOpen(true);
   }
-  function projectDeleted(id:number){
+  function projectDeleted(project:Project){
+    const id=project.id;
     // Purge private previews and stale folder snapshots after the server confirms
     // the deletion. Source thumbnails are shared across projects, so invalidate
     // local cache only; never delete provider originals.
@@ -203,9 +206,9 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     setFinanceEntries(current=>current.map(e=>e.projectId===id?{...e,projectId:undefined}:e));
     setLibraryAssets(current=>current.filter(asset=>asset.projectId!==id));
     setLibraryTarget(current=>current?.projectId===id?null:current);
+    deletedProjectToast.current=project.name;
     navigateRoute({view:'projects'},{replace:true});
-    notify('Projeto excluído com segurança.', 'success');
-    if(!isDemo)onProjectRemoved?.();
+    if(!isDemo)onProjectRemoved?.(project);
   }
   function updateProject(updated: Project) {
     const old = projects.find(p => p.id === updated.id);
@@ -600,6 +603,13 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     };
   },[onRouteChange]);
 
+  useEffect(()=>{
+    if(view!=="projects"||selectedProject!==null||!deletedProjectToast.current)return;
+    const name=deletedProjectToast.current;
+    deletedProjectToast.current=null;
+    notify(<><strong>{name}</strong> foi excluído com sucesso.</>,"success");
+  },[view,selectedProject,notify]);
+
   // Direct links must not display another user's records or leave a broken detail URL.
   useEffect(()=>{
     if(!dataReady)return;
@@ -667,7 +677,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
           {((view === "projects" && !selectedProject) || (view === "clients" && !selectedClient && (clientPage?.total??clientList.length)>=5 || view === "clients" && !selectedClient && !!query.trim())) && <label className="page-search"><Search size={17}/><AppInput aria-label={view === "projects" ? "Buscar projetos" : "Buscar clientes"} value={query} onChange={e => { const value=e.target.value; setQuery(value); if(value.trim()){ if(view === "projects")onSearchProjects?.(); else onSearchClients?.(); } }} placeholder={view === "projects" ? "Buscar projetos" : "Buscar clientes"}/></label>}
           {view === "settings" && <SettingsPage profile={profile} email={email} photoURL={photoURL} theme={theme} toggleTheme={toggleTheme} onSaveProfile={onSaveProfile} />}
           {view === "overview" && <TodayStudio clients={clientList} projects={projects} entries={financeEntries} events={calendarEvents} activities={activities} onView={changeView} onOpenActivity={() => setActivityOpen(true)} overviewMetrics={overviewMetrics} />}
-          {view === "projects" && (selectedProject && projects.some(p => p.id === selectedProject) ? <ProjectDetail key={selectedProject} project={projects.find(p => p.id === selectedProject)!} clients={clientList} entries={financeEntries} assets={libraryAssets} events={calendarEvents} onSave={updateProject} onDeleted={()=>projectDeleted(selectedProject)} onDeleteDemo={()=>projectDeleted(selectedProject)} onBack={() => changeView("projects")} onRevenue={addLinkedRevenue} onEditRevenue={openFinanceModal} onMaterials={(folderId)=>{setLibraryTarget({projectId:selectedProject!,folderId:folderId||"root"});setLibraryProject(String(selectedProject));navigateRoute({view:"library"});}} onEditEvent={(event)=>openEvent(event)} onEvent={(p) => { openEvent(null, p.dueDate); }} onReview={()=>{setReviewStart({clientId:projects.find(p=>p.id===selectedProject)?.clientId,projectId:selectedProject||undefined});changeView("reviews");}} /> : <ProjectsView projects={filtered.map(p => ({...p, files: libraryAssets.filter(a => a.projectId === p.id).length}))}
+          {view === "projects" && (selectedProject && projects.some(p => p.id === selectedProject) ? <ProjectDetail key={selectedProject} project={projects.find(p => p.id === selectedProject)!} clients={clientList} entries={financeEntries} assets={libraryAssets} events={calendarEvents} onSave={updateProject} onDeleted={()=>{const deleted=projects.find(p=>p.id===selectedProject);if(deleted)projectDeleted(deleted);}} onDeleteDemo={()=>{const deleted=projects.find(p=>p.id===selectedProject);if(deleted)projectDeleted(deleted);}} onBack={() => changeView("projects")} onRevenue={addLinkedRevenue} onEditRevenue={openFinanceModal} onMaterials={(folderId)=>{setLibraryTarget({projectId:selectedProject!,folderId:folderId||"root"});setLibraryProject(String(selectedProject));navigateRoute({view:"library"});}} onEditEvent={(event)=>openEvent(event)} onEvent={(p) => { openEvent(null, p.dueDate); }} onReview={()=>{setReviewStart({clientId:projects.find(p=>p.id===selectedProject)?.clientId,projectId:selectedProject||undefined});changeView("reviews");}} /> : <ProjectsView projects={filtered.map(p => ({...p, files: libraryAssets.filter(a => a.projectId === p.id).length}))}
                   onSaveCover={(id,cover)=>{const project=projects.find(p=>p.id===id);if(project)updateProject({...project,cover});}} statusFilter={statusFilter} setStatusFilter={(status)=>{
                     setStatusFilter(status);
                     onProjectStatus?.(status);
