@@ -1,5 +1,11 @@
 # Arquitetura do Roteiva — MVP SaaS
 
+## Decisão — Resend opcional na publicação (17/11/2026)
+
+A chave `RESEND_API_KEY` habilita somente envio de feedback. Sua ausência não bloqueia deploy de autenticação, Dropbox, Biblioteca ou demais funcionalidades. O preparo PROD omite valor ausente/vazio do arquivo de upload aditivo; segredo não vazio continua validado. O guard preserva os sete segredos críticos e as proteções de ambiente. Não se remove chave já existente no Worker.
+
+Sem a chave efetivamente configurada no Worker, o contrato existente permanece: `GET /feedback` retorna `available:false`; `POST /feedback` retorna 503 antes de persistir ou chamar o provedor, e a UI comunica indisponibilidade. Não fingir entrega nem usar credenciais de outro ambiente. A decisão atende à autorização explícita do proprietário em 17/11/2026.
+
 ## Decisão — cortesia de avaliação operada pelo proprietário (17/11/2026)
 
 **IMPLEMENTADO EM BRANCH; aplicação remota pendente.** `api/scripts/review-courtesy.mjs` é uma operação local, sem rota no Worker, sem permissão de cliente e sem mudança na política comercial. Requer identidade interativa do proprietário (não service account de deploy), tokens administrativos somente em memória/ambiente e selo exato de Firebase/Cloudflare/D1. A identidade alvo deve existir, ter Google verificado e perfil próprio, sem exclusão/suspensão/manutenção pendente.

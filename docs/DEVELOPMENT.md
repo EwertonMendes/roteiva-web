@@ -1,5 +1,11 @@
 # Desenvolvimento e deploy — Roteiva
 
+## Deploy PROD sem configuração de feedback (17/11/2026)
+
+`RESEND_API_KEY` é opcional no environment `cloudflare-production`. Sem ela, o bootstrap publica os sete segredos críticos e não inclui uma chave vazia; o guard de nomes não exige Resend. Se fornecida, a chave continua validada e injetada pelo workflow protegido. Os demais segredos e todas as aprovações/guardas de SHA, ambiente e migração continuam obrigatórios.
+
+O envio só fica disponível se a chave existir no Worker. Ausência deve ser validada como `available:false`, POST 503 e zero envio/gravação, não como falha geral da implantação. Para ativar posteriormente, seguir [configuração do feedback](FEEDBACK-SUPPORT.md).
+
 ## Operação local de cortesia Dropbox (17/11/2026, em revisão)
 
 Não executar em Actions público nem usar identidade de deploy para documentos. A operação `api/scripts/review-courtesy.mjs` usa Node 22.13+ com `--experimental-strip-types`, um OAuth access token da sessão interativa do proprietário em `FIREBASE_OPS_ACCESS_TOKEN`, token Cloudflare em `CLOUDFLARE_API_TOKEN` e os IDs públicos esperados em `CLOUDFLARE_ACCOUNT_ID`/`CLOUDFLARE_D1_DATABASE_ID`. Tokens não devem ser digitados em argumentos, salvos no repositório ou impressos. Sem `GOOGLE_APPLICATION_CREDENTIALS`.

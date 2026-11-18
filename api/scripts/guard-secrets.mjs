@@ -8,6 +8,5 @@ assert.equal(config.vars.DROPBOX_ENABLED,'true','Dropbox must be configured befo
 assert.equal(config.vars.ACCOUNT_DELETION_ENABLED,'true','Account deletion must be configured before promotion');
 assert.match(config.vars.GOOGLE_CLIENT_ID,/^[0-9]+-[a-z0-9]+\.apps\.googleusercontent\.com$/);
 required.push('GOOGLE_CLIENT_SECRET','GOOGLE_PICKER_API_KEY','DROPBOX_APP_KEY','DROPBOX_APP_SECRET');
-if(target==='prod')required.push('RESEND_API_KEY');
 for(const name of required)assert.ok(names.has(name),'Missing Worker secret: '+name);
 console.log('Required '+target+' secret names verified. Values were not read.');

@@ -1,5 +1,13 @@
 # Roadmap vivo — Roteiva MVP
 
+## Resend opcional para publicação — 17/11/2026
+
+**IMPLEMENTADO EM BRANCH; publicação pendente.** Por solicitação explícita do proprietário, a falta de chave do Resend não bloqueia o deploy PROD. Segredos críticos e aprovações permanecem obrigatórios. Feedback sem chave fica indisponível e rejeita envio sem persistir ou chamar o provedor.
+
+- [x] Preparo aditivo aceita ausência/vazio e mantém validação de chave não vazia.
+- [x] Guard exige somente as sete credenciais críticas.
+- [ ] CI e implantação protegida da versão consolidada; verificar contrato sem chave no ambiente publicado.
+
 ## Cortesia específica de avaliação Dropbox — 17/11/2026
 
 **PARCIAL / EM REVISÃO:** operação administrativa local, sem endpoint público, para conceder acesso finito à identidade dedicada indicada pelo proprietário. Concessão remota DEV aplicada à identidade dedicada indicada pelo proprietário. A verificação inicial detectou diferença de normalização de timestamp e reteve a fence; a reconciliação selada confirmou consistência e liberou somente após verificar ambos os sistemas. PROD pendente.
