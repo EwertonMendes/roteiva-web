@@ -102,11 +102,12 @@ export function ProjectDeletionProvider({children}:{children:ReactNode}){
       return;
     }
     if(result.status==='processing'||result.status==='manual_review'){
+      const nextStatus:Job['status']=result.status;
       setJobs(previous=>{
         const before=previous[project.id];
         if(before?.status===result.status&&before.phase===(result.phase||'')&&
           before.operationId===(result.operationId||before.operationId))return previous;
-        return {...previous,[project.id]:{project,status:result.status,phase:result.phase||'',
+        return {...previous,[project.id]:{project,status:nextStatus,phase:result.phase||'',
           operationId:result.operationId||before?.operationId}};
       });
       if(result.status==='manual_review'&&current?.status!=='manual_review')
