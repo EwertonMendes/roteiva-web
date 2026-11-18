@@ -44,3 +44,40 @@
 .rt-button[data-control-size="sm"]{min-height:34px;}
 .rt-button[data-control-size="lg"]{min-height:49px;}
 @media(prefers-reduced-motion:reduce){.rt-button{transition:none;}}
+
+/* Canonical accessible checkbox: a native input for screen readers, FormData,
+ * Space keyboard toggling and required/disabled semantics. Presentation is
+ * shared between light/dark modes without changing legacy checkbox controls. */
+.rt-checkbox{
+  position:relative;display:inline-grid;grid-template-columns:22px minmax(0,1fr);
+  align-items:start;column-gap:12px;min-width:0;
+  cursor:pointer;color:var(--ink);font:inherit;
+}
+.rt-checkbox__input{
+  position:absolute;top:0;left:0;width:22px;height:22px;margin:0;
+  opacity:0;cursor:pointer;z-index:1;
+}
+.rt-checkbox__box{
+  display:grid;place-items:center;box-sizing:border-box;
+  width:22px;height:22px;border:1.5px solid var(--line);
+  border-radius:7px;color:transparent;background:var(--subtle);
+  transition:background .14s,border-color .14s,box-shadow .14s;
+}
+.rt-checkbox__box svg{display:block;opacity:0;transition:opacity .14s;}
+.rt-checkbox__input:checked + .rt-checkbox__box{
+  background:var(--field-focus-border);border-color:var(--field-focus-border);color:white;
+}
+:root[data-theme="dark"] .rt-checkbox__input:checked + .rt-checkbox__box{color:#18220a;}
+.rt-checkbox__input:checked + .rt-checkbox__box svg{opacity:1;}
+.rt-checkbox__input:focus-visible + .rt-checkbox__box{
+  outline:2px solid var(--focus-outline);outline-offset:3px;
+}
+.rt-checkbox__input:disabled + .rt-checkbox__box{opacity:.5;}
+.rt-checkbox:has(.rt-checkbox__input:disabled){opacity:.62;cursor:not-allowed;}
+.rt-checkbox__label{
+  min-width:0;display:block;font-size:var(--type-support);font-weight:500;
+  line-height:1.55;overflow-wrap:anywhere;
+}
+@media(prefers-reduced-motion:reduce){
+  .rt-checkbox__box,.rt-checkbox__box svg{transition:none;}
+}
