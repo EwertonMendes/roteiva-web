@@ -63,7 +63,7 @@ function ProjectDeletionPanel({project,onDeleted,onDeleteDemo,user}:Props&{user:
   const poll=useCallback(async()=>{
     if(isDemo||!user)return;
     const result=await call(user.uid,project.id,'GET');
-    setStatus(result.status);setPhase(result.phase||'');setError('');
+    setStatus(result.status);setPhase(result.phase||'');setError('');setReady(true);
     if(result.status==='completed'&&!completed.current){
       completed.current=true;onDeleted();
     }
@@ -81,7 +81,7 @@ function ProjectDeletionPanel({project,onDeleted,onDeleteDemo,user}:Props&{user:
           completed.current=true;onDeleted();return;
         }
       }catch(cause){if(active){setError(cause instanceof Error?cause.message:'Não foi possível consultar a exclusão.');setReady(false);}}
-      if(active)timeout=setTimeout(check,phase==='manual_review'?12000:2500);
+      if(active)timeout=setTimeout(check,2500);
     };
     void check();
     return()=>{active=false;clearTimeout(timeout);};

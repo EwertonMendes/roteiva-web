@@ -7,6 +7,10 @@ import { AppSelect } from "./features/ui/AppSelect";
 import { MoneyInput } from "./features/ui/MoneyInput";
 import {AppDateFormField,readFormDate} from "./features/ui/AppDateFormField";
 import {ProjectDetail} from './features/projects/ProjectDetail';
+import {clearLibraryFolders} from './features/drive/library-folder-cache';
+import {libraryPreviewCache} from './features/drive/library-preview-cache';
+import {clearAuthenticatedMediaCache} from './features/drive/authenticated-media';
+import {clearStorageImageCache} from './features/drive/storage-image-cache';
 import {SidebarAccountMenu} from "./features/ui/SidebarAccountMenu";
 import {FeedbackDialog} from "./features/feedback/FeedbackDialog";
 import {ProjectsView} from "./features/projects/ProjectsView";
@@ -186,6 +190,13 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     setEventModalOpen(true);
   }
   function projectDeleted(id:number){
+    // Purge private previews and stale folder snapshots after the server confirms
+    // the deletion. Source thumbnails are shared across projects, so invalidate
+    // local cache only; never delete provider originals.
+    clearLibraryFolders();
+    libraryPreviewCache.clear();
+    clearAuthenticatedMediaCache();
+    void clearStorageImageCache();
     // Do not update the UI until the server confirms all deletion stages.
     setProjects(current=>current.filter(p=>p.id!==id));
     setCalendarEvents(current=>current.filter(e=>e.projectId!==id));
