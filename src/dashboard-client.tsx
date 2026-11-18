@@ -101,7 +101,7 @@ type DashboardProps = {
   onThemeChange?:(theme:"light"|"dark")=>void;
   onRouteChange?:(route:WorkspaceRoute)=>void;
   onCommands?:(commands:readonly WorkspaceCommand[])=>Promise<boolean>|void;
-  onProjectRemoved?:(project:Project)=>void;
+  onProjectRemoved?:(project:Pick<Project,'id'|'name'|'status'>)=>void;
   overviewMetrics?:{clientCount?:number;receivableAmount?:number;cashBalance?:number;projectCount?:number;projectStatuses?:Record<Status,number>}; projectPage?:{total:number;hasMore:boolean;status:string};
   onMoreProjects?:()=>void;onProjectStatus?:(status:Status|"Todos")=>void;
   onSearchProjects?:()=>void; clientPage?:{total:number;recurring:number;hasMore:boolean};
