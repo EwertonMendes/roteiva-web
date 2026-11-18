@@ -18,16 +18,18 @@ export class FeedbackDeliveryFailure extends Error{
   }
 }
 
-// No Cloudflare Email Sending binding or paid service: both Workers use the same
-// free transactional API but keep independent, environment-scoped secret keys.
+// DEV uses the Resend secret already configured on its Worker.
+// PROD uses Cloudflare's free verified-destination email binding exclusively.
+// Neither environment can silently fall back to the other's provider.
 const DESTINATION='suporte.roteiva@gmail.com';
 const RESEND_ENDPOINT='https://api.resend.com/emails';
 const TEST_SENDER='onboarding@resend.dev';
 const VERIFIED_SENDER='suporte@roteiva.com';
 
 export function feedbackEnabled(env:Env):boolean{
-  return (env.ENVIRONMENT==='dev'||env.ENVIRONMENT==='prod')&&
-    typeof env.RESEND_API_KEY==='string'&&env.RESEND_API_KEY.trim().length>0;
+  if(env.ENVIRONMENT==='prod')return !!env.FEEDBACK_EMAIL;
+  if(env.ENVIRONMENT==='dev')return typeof env.RESEND_API_KEY==='string'&&env.RESEND_API_KEY.trim().length>0;
+  return false;
 }
 function verifiedReplyTo(email:string):string|undefined{
   return /^[^\s<>@\r\n]{1,64}@[^\s<>@\r\n]{1,253}$/.test(email)?email:undefined;
@@ -64,8 +66,47 @@ function toBase64(bytes:Uint8Array):string{
   return chunks.join('');
 }
 
+function classifyCloudflareError(error:unknown,reportId:string):FeedbackDeliveryFailure{
+  const providerCode=error&&typeof error==='object'&&'code' in error&&
+    typeof error.code==='string'&&/^E_[A-Z_]{3,65}$/.test(error.code)?error.code:'UNKNOWN';
+  console.error(JSON.stringify({event:'feedback_delivery_rejected',provider:'cloudflare',providerCode,reportId}));
+  if(error instanceof TypeError)return new FeedbackDeliveryFailure('feedback_email_provider_rejected',true);
+  if(['E_SENDER_DOMAIN_NOT_AVAILABLE','E_SENDER_DOMAIN_NOT_CONFIGURED',
+    'E_SENDER_NOT_VERIFIED','E_EMAIL_SENDING_NOT_READY'].includes(providerCode))
+    return new FeedbackDeliveryFailure('feedback_email_sender_setup',true);
+  if(['E_RECIPIENT_NOT_ALLOWED','E_RECIPIENT_PLAN_RESTRICTED','E_RECIPIENT_SUPPRESSED'].includes(providerCode))
+    return new FeedbackDeliveryFailure('feedback_email_recipient_setup',true);
+  if(['E_RATE_LIMIT_EXCEEDED','E_DAILY_LIMIT_EXCEEDED'].includes(providerCode))
+    return new FeedbackDeliveryFailure('feedback_delivery_busy',true,429);
+  if(['E_VALIDATION_ERROR','E_TOO_MANY_RECIPIENTS','E_TOO_MANY_ATTACHMENTS',
+    'E_CONTENT_TOO_LARGE','E_FIELD_MISSING','E_HEADER_NOT_ALLOWED','E_HEADER_USE_API_FIELD',
+    'E_HEADER_VALUE_INVALID','E_HEADER_VALUE_TOO_LONG','E_HEADER_NAME_INVALID',
+    'E_HEADERS_TOO_LARGE','E_HEADERS_TOO_MANY'].includes(providerCode))
+    return new FeedbackDeliveryFailure('feedback_email_provider_rejected',true);
+  // Network/service failures may have occurred after acceptance. Never auto-resend.
+  return new FeedbackDeliveryFailure('feedback_delivery_unconfirmed',false);
+}
+async function sendCloudflare(env:Env,mail:FeedbackMail):Promise<{messageId:string}>{
+  if(!env.FEEDBACK_EMAIL)throw new FeedbackDeliveryFailure('feedback_unavailable',true);
+  const body=summary(env,mail);
+  try{
+    const result=await env.FEEDBACK_EMAIL.send({
+      from:VERIFIED_SENDER,to:DESTINATION,subject:body.subject,text:body.text,
+      ...(body.replyTo?{replyTo:body.replyTo}:{}),
+      attachments:mail.attachments
+    });
+    if(!result||typeof result.messageId!=='string'||!result.messageId)
+      throw new FeedbackDeliveryFailure('feedback_delivery_unconfirmed',false);
+    return {messageId:result.messageId};
+  }catch(error){
+    if(error instanceof FeedbackDeliveryFailure)throw error;
+    throw classifyCloudflareError(error,mail.id);
+  }
+}
 export async function sendFeedbackEmail(env:Env,mail:FeedbackMail):Promise<{messageId:string}>{
   if(!feedbackEnabled(env))throw new FeedbackDeliveryFailure('feedback_unavailable',true);
+  if(env.ENVIRONMENT==='prod')return sendCloudflare(env,mail);
+  if(env.ENVIRONMENT!=='dev')throw new FeedbackDeliveryFailure('feedback_unavailable',true);
   const body=summary(env,mail);
   const from=senderAddress(env);
   let response:Response;

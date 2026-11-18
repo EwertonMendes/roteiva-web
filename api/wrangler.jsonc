@@ -106,6 +106,12 @@
           "migrations_dir": "migrations"
         }
       ],
+      "send_email": [
+        {
+          "name": "FEEDBACK_EMAIL",
+          "destination_address": "suporte.roteiva@gmail.com"
+        }
+      ],
       "observability": {
         "enabled": true,
         "head_sampling_rate": 1,

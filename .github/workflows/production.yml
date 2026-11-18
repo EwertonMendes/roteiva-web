@@ -172,7 +172,6 @@ jobs:
           DROPBOX_APP_KEY: ${{ secrets.DROPBOX_APP_KEY }}
           DROPBOX_APP_SECRET: ${{ secrets.DROPBOX_APP_SECRET }}
           FIREBASE_ADMIN_CREDENTIALS_JSON: ${{ secrets.FIREBASE_ADMIN_CREDENTIALS_JSON }}
-          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
         run: node scripts/prepare-worker-secrets.mjs prod
       - name: Apply additive schema and seal durable identity
         run: |
