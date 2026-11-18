@@ -1,5 +1,15 @@
 # Arquitetura do Roteiva — MVP SaaS
 
+## Decisão — recuperação limitada da entrada (18/11/2026)
+
+O bootstrap distingue token, perfil SDK/REST, estado de exclusão e provisionamento. `EntryError` mantém apenas etapa/categoria, HTTP, código categórico seguro e UUID; nunca causa bruta, URL, token ou identidade. `X-Request-Id` é exposto somente às origens já permitidas, preservando headers de mídia, e correlaciona as negações do Worker. Erros de transporte não são atribuídos a DNS, CORS ou região sem evidência.
+
+Perfil SDK aguarda até 8s antes da recuperação REST autenticada e sujeita às mesmas Rules. Token é limitado a 8s; REST a 10s, incluindo corpo; leitura de estado da conta a 15s. O gate de cadastro tem orçamento total de 60s e cancela logicamente respostas tardias. Provisionamento POST tem 45s para acomodar dependências encadeadas; resultado incerto não causa replay automático. Cadastro, trial, concessões, fence e exclusão não têm atalhos novos.
+
+Um listener que não confirma snapshot do servidor em 8s usa a mesma recuperação autoritativa dos erros explícitos: até oito reinícios com backoff, orçamento reiniciado apenas por snapshot real. Silêncio/cache não confirma direitos. Leituras de recuperação têm prazo de 20s; esgotamento fecha o gate. Não há polling contínuo ou serviço novo. Troca de UID/logout invalida callbacks e timers; o SDK não cancelável pode terminar depois, sem confirmar outra sessão.
+
+Hipótese em validação: a rede externa pode bloquear ou reter uma das dependências. As correções cobrem estados reproduzidos sinteticamente, sem afirmar que reproduziram o ambiente do avaliador Dropbox. Homologação real e publicação são registradas no roadmap.
+
 ## Decisão — Resend opcional na publicação (17/11/2026)
 
 A chave `RESEND_API_KEY` habilita somente envio de feedback. Sua ausência não bloqueia deploy de autenticação, Dropbox, Biblioteca ou demais funcionalidades. O preparo PROD omite valor ausente/vazio do arquivo de upload aditivo; segredo não vazio continua validado. O guard preserva os sete segredos críticos e as proteções de ambiente. Não se remove chave já existente no Worker.

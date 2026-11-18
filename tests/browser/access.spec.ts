@@ -3,6 +3,21 @@ import {initializeTestEnvironment} from '@firebase/rules-unit-testing';
 import {collection,doc,getDoc,getDocs,query,updateDoc,setDoc,deleteDoc,where,Timestamp} from 'firebase/firestore';
 
 const cloud='http://127.0.0.1:4173';
+test('entry transport failures show a safe reference and never automatically replay provisioning',async({page},info)=>{
+ await signup(page,'access-transport-'+info.project.name+'@example.com');
+ let posts=0;
+ await page.route('http://127.0.0.1:8787/access/ensure',async route=>{
+  if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers:{'Access-Control-Allow-Origin':cloud,'Access-Control-Allow-Methods':'POST, OPTIONS','Access-Control-Allow-Headers':'Authorization, Content-Type'}});
+  posts++;await route.abort('failed');
+ });
+ await page.reload();
+ await expect(page.getByRole('alert')).toContainText('access-ensure/transport');
+ await expect(page.getByRole('alert')).not.toContainText('NetworkError');
+ expect(posts).toBe(1);await expect(page.locator('.app-shell')).toHaveCount(0);
+ await page.getByRole('button',{name:'Tentar novamente',exact:true}).click();
+ await expect.poll(()=>posts).toBe(2);
+ await expect(page.getByRole('alert')).toContainText('access-ensure/transport');
+});
 async function signup(page:Page,email:string){
   await page.goto(cloud);
   await page.getByRole('button',{name:'Criar conta',exact:true}).click();

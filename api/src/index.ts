@@ -276,7 +276,7 @@ export async function handle(request: Request, env: Env, ctx?:ExecutionContext):
   } catch (error) {
     const known = error instanceof ApiError;
     if(known && (url.pathname==='/access/ensure'||error.code.startsWith('access_')||error.code.startsWith('admin_')))
-      console.error(JSON.stringify({event:'access_request_denied',code:error.code,status:error.status}));
+      console.error(JSON.stringify({event:'access_request_denied',code:error.code,status:error.status,requestId:id}));
     const status = known ? error.status : 503;
     response = Response.json({error:{
       code:known ? error.code : 'service_unavailable',
@@ -290,6 +290,8 @@ export async function handle(request: Request, env: Env, ctx?:ExecutionContext):
   result.headers.set('X-Request-Id',id);
   result.headers.set('Vary','Origin');
   if (allowedFrontend(env,origin)) {
+    const exposed=result.headers.get('Access-Control-Expose-Headers');
+    result.headers.set('Access-Control-Expose-Headers',exposed?exposed+', X-Request-Id':'X-Request-Id');
     result.headers.set('Access-Control-Allow-Origin',origin);
     result.headers.set('Access-Control-Allow-Credentials','true');
   }

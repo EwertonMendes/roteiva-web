@@ -4,6 +4,7 @@ import type { WorkspaceData, Status } from "../domain/workspace";
 import { advanceSync, bootstrapSync, emptyNumbers, parseSync, persistentCacheSelected, readManifest, readSync, recordCounts, saveManifest, syncRef, type Domain, type SyncStamp } from "./firestore-sync.ts";
 import { FirestoreQueryGate } from "./firestore-query-gate.ts";
 import { missingQueryIndex } from "./firestore-recovery.ts";
+import {entryErrorMessage} from './bootstrap-request.ts';
 import { encodeCommand,type WorkspaceCommand } from "./firestore-commands.ts";
 import { trackAggregation, trackMutation, trackPage, trackRevision, usageSnapshot } from "./firestore-usage.ts";
 
@@ -40,6 +41,8 @@ export function readProfile(data:DocumentData): RoteivaProfile {
 
 type Stored = {data: Data; revision: number};
 export function dataErrorMessage(error: unknown): string {
+  const entry=entryErrorMessage(error);
+  if(entry)return entry;
   const code = (error as {code?:string})?.code || "";
   if (code.includes("permission-denied")) return "Não foi possível acessar ou salvar seus dados. Entre novamente e tente outra vez.";
   if (code.includes("unauthenticated")) return "Sua sessão expirou. Saia e entre novamente.";

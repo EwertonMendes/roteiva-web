@@ -4,6 +4,32 @@ import {observeAccess} from '../src/data/access-observer.ts';
 import {parseAccessRest} from '../src/data/access-state.ts';
 const active={source:'trial',unlimited:false,suspended:false,accessUntil:new Date('2099-01-01'),trialEndsAt:new Date('2099-01-01')};
 const settle=()=>new Promise(resolve=>setImmediate(resolve));
+
+test('cache-only listener recovers from the server and ignores the superseded subscription',async(t)=>{
+ const callbacks=[],values=[],errors=[];let reads=0;
+ const stop=observeAccess(next=>{callbacks.push(next);return()=>{}},async()=>{reads++;return active},v=>values.push(v),e=>errors.push(e),{firstSnapshotMs:15});t.after(stop);
+ callbacks[0]({fromCache:true,value:active});
+ await new Promise(resolve=>setTimeout(resolve,22));
+ assert.equal(reads,1);assert.deepEqual(values,[active]);assert.equal(callbacks.length,2);
+ callbacks[1]({fromCache:false,value:{...active,suspended:true}});
+ callbacks[0]({fromCache:false,value:active});
+ assert.equal(values.length,2);assert.equal(values.at(-1).suspended,true);assert.deepEqual(errors,[]);
+});
+test('silent listener with a hanging server read fails closed within the read deadline',async(t)=>{
+ const values=[],errors=[];
+ const stop=observeAccess(()=>()=>{},()=>new Promise(()=>{}),v=>values.push(v),e=>errors.push(e),{firstSnapshotMs:5,serverTimeoutMs:5});t.after(stop);
+ await new Promise(resolve=>setTimeout(resolve,25));
+ assert.deepEqual(values,[]);assert.equal(errors.length,1);assert.equal(errors[0].code,'deadline-exceeded');
+});
+test('silent listener restart budget is finite and logout cancels the watchdog',async(t)=>{
+ t.mock.timers.enable({apis:['setTimeout']});let reads=0;const errors=[];
+ const stop=observeAccess(()=>()=>{},async()=>{reads++;return active},()=>{},e=>errors.push(e),{firstSnapshotMs:8});t.after(stop);
+ for(let i=0;i<20;i++){t.mock.timers.tick(2000);await settle();}
+ assert.equal(reads,8);assert.equal(errors.length,1);
+ stop();let canceledReads=0;
+ const cancel=observeAccess(()=>()=>{},async()=>{canceledReads++;return active},()=>{},()=>{}, {firstSnapshotMs:8});cancel();
+ t.mock.timers.tick(2000);await settle();assert.equal(canceledReads,0);
+});
 function harness(readServer){
  let next,fail,unsubscribed=false;
  const values=[],errors=[];
