@@ -23,7 +23,7 @@ test('Resend Free delivers only in DEV with correct image Base64 and idempotency
   const captured=[];
   globalThis.fetch=async(url,options)=>{
     assert.equal(url,'https://api.resend.com/emails');
-    assert.equal(options.redirect,'error');
+    assert.equal(options.redirect,'manual');
     assert.equal(options.headers.Authorization,'Bearer '+token);
     assert.equal(options.headers['Idempotency-Key'],'roteiva-feedback/'+baseMail.id);
     captured.push(JSON.parse(options.body));
