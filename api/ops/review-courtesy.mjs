@@ -25,9 +25,20 @@ export async function grantReviewCourtesy(adapter, request, now = Date.now()) {
     assert.equal(previous.ends_at, end);
     assert.equal(previous.reason, reason);
     assert.equal(previous.revoked_at, null);
+    if(request.recoveryFingerprint){
+      // Explicit operator reconciliation of a previously recorded grant only.
+      // A fingerprint must seal the exact fenced D1/Firestore state inspected.
+      await adapter.verifyRecoveryPermit(uid,request.recoveryFingerprint);
+      await adapter.publishFromAuthoritativeState(uid);
+      await adapter.verifyPublished(uid,end,{fenced:true});
+      assert.equal(await adapter.releaseFence(uid),1,'Recovery release not confirmed');
+      await adapter.verifyPublished(uid,end);
+      return {status:'reconciled',expiresAt:new Date(end).toISOString()};
+    }
     await adapter.verifyPublished(uid, end);
     return {status: 'already-applied', expiresAt: new Date(end).toISOString()};
   }
+  assert.ok(!request.recoveryFingerprint,'Recovery requires the exact existing grant');
   // Acquisition must be conditional. Never steal another maintenance fence.
   assert.equal(await adapter.acquireFence(uid), 1, 'Account unavailable or maintenance already pending');
   // Any subsequent failure intentionally retains the fence. Do not automatically

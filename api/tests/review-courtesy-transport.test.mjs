@@ -7,7 +7,7 @@ import {runReviewCourtesy} from '../scripts/review-courtesy.mjs';
 function setup(t, fault){
   const db=database();t.after(db.close);
   const config=JSON.parse(readFileSync(new URL('../wrangler.jsonc',import.meta.url),'utf8')).env.dev;
-  const now=Date.now(),until=new Date(now+60*86400000).toISOString();
+  const now=Math.floor(Date.now()/1000)*1000,until=new Date(now+60*86400000).toISOString();
   db.sql.prepare('INSERT INTO access_accounts(owner_uid,trial_started_at,trial_ends_at,created_at,updated_at) VALUES(?,?,?,?,?)').run('qa',now,now+604800000,now,now);
   let version=1,commits=0;
   let projection={fields:{ownerUid:{stringValue:'qa'},schemaVersion:{integerValue:'1'},source:{stringValue:'trial'},
@@ -44,7 +44,8 @@ function setup(t, fault){
       assert.deepEqual(writes[0].updateMask.fieldPaths,['ownerUid']);
       assert.equal(writes[1].currentDocument.updateTime,projection.updateTime);
       assert.equal(db.sql.prepare('SELECT sync_pending FROM access_accounts WHERE owner_uid=?').get('qa').sync_pending,1);
-      projection={fields:writes[1].update.fields,updateTime:'v'+(++version)};
+      const canonicalFields=JSON.parse(JSON.stringify(writes[1].update.fields).replaceAll('.000Z','Z'));
+      projection={fields:canonicalFields,updateTime:'v'+(++version)};
       return Response.json({});
     }
     throw Error('Unexpected transport');
@@ -61,9 +62,22 @@ test('operator plan is read-only; apply uses real SQLite constraints and preserv
   const row=s.sql.prepare('SELECT * FROM access_accounts').get();
   assert.equal(row.sync_pending,0);assert.equal(row.trial_started_at,s.now);assert.equal(row.trial_ends_at,s.now+604800000);
   assert.equal(s.projection().fields.source.stringValue,'complimentary');
-  assert.equal(s.projection().fields.accessUntil.timestampValue,s.until);
+  assert.equal(Date.parse(s.projection().fields.accessUntil.timestampValue),Date.parse(s.until));
   assert.equal((await runReviewCourtesy(apply,s.env,s.fetcher)).status,'already-applied');
   assert.equal(s.commits(),2);assert.equal(s.sql.prepare('SELECT COUNT(*) AS n FROM access_grants').get().n,1);
+});
+test('explicit recovery seals the inspected snapshot and rejects a changed account',async t=>{
+  const s=setup(t,'publish');
+  await assert.rejects(runReviewCourtesy([...s.args,'APPLY-REVIEW-COURTESY'],s.env,s.fetcher));
+  const plan=await runReviewCourtesy(s.args,s.env,s.fetcher);
+  assert.match(plan.recoveryFingerprint,/^[a-f0-9]{64}$/);
+  s.sql.prepare('UPDATE access_accounts SET updated_at=updated_at+1').run();
+  await assert.rejects(runReviewCourtesy([...s.args,'RECOVER-REVIEW-COURTESY:'+plan.recoveryFingerprint],s.env,s.fetcher));
+  assert.equal(s.sql.prepare('SELECT sync_pending FROM access_accounts').get().sync_pending,1);
+  const fresh=await runReviewCourtesy(s.args,s.env,s.fetcher);
+  assert.equal((await runReviewCourtesy([...s.args,'RECOVER-REVIEW-COURTESY:'+fresh.recoveryFingerprint],s.env,s.fetcher)).status,'reconciled');
+  assert.equal(s.sql.prepare('SELECT sync_pending FROM access_accounts').get().sync_pending,0);
+  assert.equal(s.sql.prepare('SELECT COUNT(*) AS n FROM access_grants').get().n,1);
 });
 test('wrong environment or foreign profile causes no mutation',async t=>{
   for(const fault of ['environment','foreign']){

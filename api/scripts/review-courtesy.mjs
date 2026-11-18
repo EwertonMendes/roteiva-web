@@ -2,6 +2,7 @@
 // arbitrary SQL input, generic document patch, or credential file is accepted.
 import assert from 'node:assert/strict';
 import {pathToFileURL} from 'node:url';
+import {createHash} from 'node:crypto';
 import {readFileSync} from 'node:fs';
 import {environment} from '../../shared/environments.ts';
 import {resolveAccess} from '../src/access.ts';
@@ -120,24 +121,32 @@ const adapter={
     const s=await state(),p=await projection();assert.ok(s.active&&!s.suspended&&!s.unlimited);
     assert.equal(s.source,'complimentary');assert.ok(Date.parse(s.accessUntil)>=end);
     const wanted=fields(s);delete wanted.updatedAt;
-    for(const [key,value] of Object.entries(wanted))assert.deepEqual(p.fields[key],value);
+    for(const [key,value] of Object.entries(wanted)){if("timestampValue" in value)assert.equal(Date.parse(p.fields[key]?.timestampValue||""),Date.parse(value.timestampValue));else assert.deepEqual(p.fields[key],value);}
   },
   async releaseFence(){await profile();return (await query('UPDATE access_accounts SET sync_pending=0,updated_at=? WHERE owner_uid=? AND sync_pending=1 AND NOT EXISTS(SELECT 1 FROM account_deletions WHERE owner_uid=?)',[Date.now(),uid,uid])).meta.changes;},
+  async verifyRecoveryPermit(_uid,fingerprint){assert.match(fingerprint,/^[a-f0-9]{64}$/);assert.equal((await account()).sync_pending,1);assert.equal(await recoveryFingerprint(),fingerprint,'Recovery snapshot changed');},
 };
+function canonical(value){if(Array.isArray(value))return value.map(canonical);if(value&&typeof value==='object')return Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])]));return value;}
+async function recoveryFingerprint(){return createHash('sha256').update(JSON.stringify(canonical({environment:target,
+  account:await account(),grant:await adapter.readGrant(grantId),profile:await profile(),projection:await projection()}))).digest('hex');}
 await profile();
 validateReviewRequest({uid,operation,until,operator:owner.email});
-if(!await adapter.readGrant(grantId)){
+const existingGrant=await adapter.readGrant(grantId);
+if(!existingGrant){
   const before=await state();
   assert.ok(!before.unlimited&&!before.suspended,'Existing special access cannot be overridden');
   assert.ok(Date.parse(until)>Date.parse(before.accessUntil),'Courtesy must extend current access');
   assert.equal((await account()).sync_pending,0,'Existing maintenance must be reconciled separately');
 }
-if(confirmation!=='APPLY-REVIEW-COURTESY'){
+const recovery=confirmation?.startsWith('RECOVER-REVIEW-COURTESY:')?confirmation.slice('RECOVER-REVIEW-COURTESY:'.length):undefined;
+if(confirmation!=='APPLY-REVIEW-COURTESY'&&!recovery){
   assert.equal(confirmation,undefined,'Invalid confirmation');
-  return {environment:target,operation,expiresAt:until,identityVerified:true,mode:'read-only-plan'};
+  const pending=(await account()).sync_pending===1;let coherent=false;try{await adapter.verifyPublished(uid,Date.parse(until),{fenced:pending});coherent=true;}catch{}
+  return {environment:target,operation,expiresAt:until,identityVerified:true,mode:'read-only-plan',grantPresent:!!existingGrant,maintenancePending:pending,projectionCoherent:coherent,
+    ...(pending&&existingGrant?{recoveryFingerprint:await recoveryFingerprint()}:{})};
 }else{
   // Never log the identity, credentials, remote bodies, grants or projection.
-  const result=await grantReviewCourtesy(adapter,{uid,operation,until,operator:owner.email});
+  const result=await grantReviewCourtesy(adapter,{uid,operation,until,operator:owner.email,recoveryFingerprint:recovery});
   return {environment:target,operation,...result,trialPreserved:true,projectionVerified:true};
 }
 
