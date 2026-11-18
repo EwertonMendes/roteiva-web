@@ -6,7 +6,7 @@ export interface Env {
   API_THUMB_LIMIT: RateLimit;
   API_UPLOAD_LIMIT: RateLimit;
   RESEND_API_KEY?: string;
-  FEEDBACK_EMAIL?: {send(message:{to:string;from:string;subject:string;text:string;replyTo?:string;
+  FEEDBACK_EMAIL?: {send(message:{to:string;from:string;subject:string;text:string;html?:string;replyTo?:string;
     attachments:FeedbackEmailAttachment[]}):Promise<{messageId:string}>;};
   RESEND_FROM_EMAIL?: string;
   ENVIRONMENT: string;

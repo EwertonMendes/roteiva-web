@@ -86,13 +86,8 @@ export async function parseFeedback(request:Request){
   return {kind:kind as Kind,title,description,screen,requestKey,attachments};
 }
 export async function feedbackRouter(request:Request,env:Env,uid:string,email:string):Promise<Response>{
-  if(request.method==='GET'){
-    const rows=await env.DB.prepare('SELECT id,kind,title,screen,status,attachment_count,created_at FROM feedback_reports WHERE owner_uid=? ORDER BY created_at DESC LIMIT 15')
-      .bind(uid).all();
-    return Response.json({items:rows.results,available:feedbackEnabled(env)});
-  }
   if(request.method!=='POST')throw new ApiError(405,'method_not_allowed');
-  // Fail closed when a configured Free-tier transactional email API key is absent.
+  // Fail closed when the environment-specific delivery binding/key is absent.
   if(!feedbackEnabled(env))throw new ApiError(503,'feedback_unavailable');
   const feedback=await parseFeedback(request);
   const now=Date.now();
@@ -128,7 +123,7 @@ export async function feedbackRouter(request:Request,env:Env,uid:string,email:st
   try{
     const receipt=await sendFeedbackEmail(env,{
       id,email,kindLabel:kinds[feedback.kind],title:feedback.title,description:feedback.description,
-      screen:feedback.screen,attachments:feedback.attachments
+      attachments:feedback.attachments
     });
     messageId=receipt.messageId;
   }catch(error){

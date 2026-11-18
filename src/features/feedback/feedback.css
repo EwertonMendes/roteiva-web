@@ -24,13 +24,6 @@
 .rt-feedback-dialog .feedback-preview button{position:absolute;top:4px;right:4px;display:grid;place-items:center;width:30px;height:30px;border:1px solid var(--line);border-radius:8px;color:var(--ink);background:var(--modal-surface)}
 .rt-feedback-dialog .feedback-alert{padding:12px 15px;margin:14px 0;border-radius:9px;background:var(--subtle);color:var(--ink);font-size:var(--type-support)}
 .rt-feedback-dialog .feedback-privacy{color:var(--muted);font-size:var(--type-caption);line-height:1.5;margin:13px 0}
-.rt-feedback-dialog .feedback-history{margin:0 0 16px;border-top:1px solid var(--line);padding-top:13px}
-.rt-feedback-dialog .feedback-history-toggle{padding:0;border:0;background:transparent;color:var(--ink);font-size:var(--type-support);font-weight:700}
-.rt-feedback-dialog .feedback-history ul{display:flex;flex-direction:column;gap:7px;padding:0;margin:12px 0;list-style:none}
-.rt-feedback-dialog .feedback-history li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 12px;background:var(--subtle);border-radius:8px;font-size:var(--type-support)}
-.rt-feedback-dialog .feedback-history li span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.rt-feedback-dialog .feedback-history li small{white-space:nowrap;color:var(--muted)}
-.rt-feedback-dialog .feedback-history>p{color:var(--muted);font-size:var(--type-support)}
 .rt-feedback-dialog .feedback-success{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;padding:30px 10px;color:var(--ink)}
 .rt-feedback-dialog .feedback-success svg{color:var(--field-focus-border)}
 .rt-feedback-dialog .feedback-success h3{margin:0;font-size:1.2rem}
@@ -39,6 +32,4 @@
 @media(max-width:620px){
  .rt-feedback-dialog .feedback-kinds{grid-template-columns:repeat(2,minmax(0,1fr))}
  .rt-feedback-dialog .feedback-previews{grid-template-columns:repeat(3,minmax(0,1fr))}
- .rt-feedback-dialog .feedback-history li{align-items:flex-start;flex-direction:column}
- .rt-feedback-dialog .feedback-history li small{white-space:normal}
 }
