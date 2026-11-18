@@ -2,13 +2,15 @@
 
 ## Entrada com rede restrita — 18/11/2026
 
-**IMPLEMENTADO EM BRANCH; publicação e validação externa pendentes.** Nova resposta Dropbox relata indisponibilidade no cadastro e erro bruto de fetch com a identidade dedicada. A origem externa exata não foi demonstrada; não atribuir a região, browser ou OAuth Dropbox por suposição.
+**PUBLICADO EM DEV/PROD; validação na rede externa pendente.** [PR #174](https://github.com/EwertonMendes/roteiva-web/pull/174), SHA `6571badf72256b8b79da4bcb7a0762330ce1eb8d`. Nova resposta Dropbox relata indisponibilidade no cadastro e erro bruto de fetch com a identidade dedicada. A origem externa exata não foi demonstrada; não atribuir a região, browser ou OAuth Dropbox por suposição.
 
 - [x] Erro de entrada tipado e sanitizado distingue etapa, transporte, timeout e HTTP; preserva código seguro/requestId sem mostrar exceção bruta. API expõe UUID apenas para origens já permitidas e correlaciona negações de acesso.
 - [x] Leitura SDK de perfil limitada a 8s antes do fallback autenticado; token 8s, REST 10s, status de conta 15s, verificação de cadastro total 60s. POST ensure tem 45s e nunca é repetido automaticamente.
 - [x] Listener silencioso/cache-only aciona leitura autoritativa e reinício com orçamento existente de oito recuperações. Snapshot real reinicia orçamento; cache nunca autoriza; logout e callbacks antigos não restauram acesso.
 - [x] Testes unitários de silêncio, fetch/body pendentes, erro HTTP, privacidade, negação real e resposta tardia; teste browser desktop/mobile de transporte com retry somente por clique explícito.
-- [ ] CI, DEV real, promoção protegida de PROD e smoke real no SHA publicado; registrar evidências após execução.
+- [x] 139 testes frontend, 320 API e 16 casos browser de entrada desktop/mobile locais aprovados. CI do PR, incluindo isolamento e Biblioteca/portal, aprovado.
+- [x] DEV frontend [44400558911](https://github.com/EwertonMendes/roteiva-web/actions/runs/44400558911) e API [44400559044](https://github.com/EwertonMendes/roteiva-web/actions/runs/44400559044) publicados. Sessão real restaurada após recarga, Dashboard/Biblioteca e conexões existentes preservados.
+- [x] [Promoção PROD 44401028956](https://github.com/EwertonMendes/roteiva-web/actions/runs/44401028956), aprovações do proprietário em Cloudflare/Firebase e publicação concluídas. Checks completos e 201 casos browser aprovados (23 skips previstos pela suíte); shard 2 reexecutado após preparação do encoder do runner ficar sem progresso, sem mudar cobertura/código. Manifestos DEV/PROD confirmaram o SHA; preflight público PROD aprovado. Conta dedicada restaurou sessão/Biblioteca após recarga no build publicado; imagem Dropbox 640×360 renderizada.
 - [ ] Aceite Dropbox e compatibilidade com a rede do avaliador; solicitar horário com fuso, ambiente, passos e erro exibido após a publicação, sem prometer resolução de bloqueio externo ainda não reproduzido.
 
 Sem migrations, novas credenciais, regras de acesso mais amplas, polling permanente ou serviços pagos. Testes: `pnpm test`, `pnpm typecheck`, `npm test --prefix api`, `npm run typecheck --prefix api` e `tests/browser/access.spec.ts` com emuladores; regressão completa na promoção PROD.
