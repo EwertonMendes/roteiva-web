@@ -73,7 +73,7 @@ export function ProjectDeletionProvider({children}:{children:ReactNode}){
   const notify=useToast();
   const [jobs,setJobs]=useState<Record<number,Job>>(()=>restored(uid));
   const [completion,setCompletion]=useState<Completion|null>(null);
-  const checks=useRef(new Set<number>());
+  const checks=useRef(new Map<number,Promise<DeletionResult>|DeletionResult>());
   const completed=useRef(new Set<string>());
   const inFlight=useRef(new Set<number>());
   const jobsRef=useRef(jobs);
@@ -120,10 +120,15 @@ export function ProjectDeletionProvider({children}:{children:ReactNode}){
     if(!uid||!valid(project))throw new Error('Projeto inválido.');
     const tracked=jobsRef.current[project.id];
     if(tracked&&!force)return {status:tracked.status,phase:tracked.phase,operationId:tracked.operationId};
-    if(!force&&checks.current.has(project.id))return {status:'idle'};
-    checks.current.add(project.id);
+    const previous=checks.current.get(project.id);
+    if(!force&&previous)return await previous;
+    // React StrictMode can mount effects twice: share the same promise rather
+    // than incorrectly reporting idle before the first GET finishes.
+    const task=request(uid,project.id,'GET');
+    checks.current.set(project.id,task);
     try{
-      const result=await request(uid,project.id,'GET');
+      const result=await task;
+      checks.current.set(project.id,result);
       update(project,result);
       return result;
     }catch(error){
