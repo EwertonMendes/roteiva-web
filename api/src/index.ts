@@ -109,7 +109,7 @@ export async function handle(request: Request, env: Env): Promise<Response> {
       // Signed ingest requests come from the Stream transcoder, not a browser.
       // Do not require a Firebase token for this narrowly scoped temporary URL.
       response=await streamIngest(request,env,url.pathname.slice('/stream/ingest/'.length));
-    } else if (/^\\/projects\\/[1-9][0-9]{0,14}\\/deletion$/.test(url.pathname) && ['GET','POST'].includes(request.method)) {
+    } else if (new RegExp('^/projects/[1-9][0-9]{0,14}/deletion$').test(url.pathname) && ['GET','POST'].includes(request.method)) {
       if(request.method==='POST'&&!allowedFrontend(env,origin))throw new ApiError(403,'origin_required');
       const uid=await identity(request,env);
       await assertActiveAccess(env,uid);
