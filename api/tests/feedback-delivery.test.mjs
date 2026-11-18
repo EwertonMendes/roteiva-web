@@ -72,10 +72,11 @@ test('definite provider rejection allows bounded repeat and never reports succes
   await assert.rejects(()=>feedbackRouter(req(key),env,'owner','owner@example.com'),e=>
     e.code==='feedback_email_sender_setup');
   let row=db.sql.prepare('SELECT status,retry_safe,attempt_count FROM feedback_reports').get();
-  assert.deepEqual(row,{status:'failed',retry_safe:1,attempt_count:1});
+  assert.equal(row.status,'failed');assert.equal(row.retry_safe,1);assert.equal(row.attempt_count,1);
   assert.equal((await feedbackRouter(req(key),env,'owner','owner@example.com')).status,201);
   row=db.sql.prepare('SELECT status,retry_safe,message_id,attempt_count FROM feedback_reports').get();
-  assert.deepEqual(row,{status:'sent',retry_safe:0,message_id:'accepted',attempt_count:2});
+  assert.equal(row.status,'sent');assert.equal(row.retry_safe,0);
+  assert.equal(row.message_id,'accepted');assert.equal(row.attempt_count,2);
   assert.equal((await feedbackRouter(req(key),env,'owner','owner@example.com')).status,200);
   assert.equal(calls,2);
 });
