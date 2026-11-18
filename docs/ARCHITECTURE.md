@@ -1,5 +1,11 @@
 # Arquitetura do Roteiva — MVP SaaS
 
+## Decisão — Resend opcional na publicação (17/11/2026)
+
+A chave `RESEND_API_KEY` habilita somente envio de feedback. Sua ausência não bloqueia deploy de autenticação, Dropbox, Biblioteca ou demais funcionalidades. O preparo PROD omite valor ausente/vazio do arquivo de upload aditivo; segredo não vazio continua validado. O guard preserva os sete segredos críticos e as proteções de ambiente. Não se remove chave já existente no Worker.
+
+Sem a chave efetivamente configurada no Worker, o contrato existente permanece: `GET /feedback` retorna `available:false`; `POST /feedback` retorna 503 antes de persistir ou chamar o provedor, e a UI comunica indisponibilidade. Não fingir entrega nem usar credenciais de outro ambiente. A decisão atende à autorização explícita do proprietário em 17/11/2026.
+
 ## Decisão — recuperação de primeiro acesso (PR #156, 17/11/2026)
 
 **IMPLEMENTADO; homologação externa pendente.** O bootstrap de perfil ausente inclui a consulta somente de leitura do estado de exclusão no D1. Retentativas são limitadas e canceláveis; falhas persistentes bloqueiam o cadastro. A recuperação REST usa o token Firebase do proprietário e as mesmas Firestore Rules. Uma falha nunca equivale a perfil ausente nem concede acesso.

@@ -24,7 +24,7 @@ function run(overrides={}) {
  assert.equal(resolve(dirname(dir)),resolve(tmpdir()),'Cleanup must stay inside the temporary root');
  rmSync(dir,{recursive:true,force:true});return {status:result.status,output,saved,secrets};
 }
-test('PROD atomic bootstrap validates eight independent credentials without printing them',()=>{
+test('PROD atomic bootstrap includes a valid optional Resend credential without printing it',()=>{
  const r=run();assert.equal(r.status,0);assert.deepEqual(r.saved,r.secrets);
  assert.ok(!r.output.includes('synthetic-private-marker'));assert.ok(!r.output.includes(privateKey));
 });
@@ -36,9 +36,16 @@ test('malformed protected JSON cannot leak its source through a parser error',()
  const marker='PRIVATE-MUST-NEVER-APPEAR-IN-LOGS';const r=run({TOKEN_KEYS:'{"'+marker+'"'});
  assert.notEqual(r.status,0);assert.equal(r.saved,null);assert.ok(!r.output.includes(marker));
 });
-test('invalid protected API key and missing secret are rejected without logging values',()=>{
- for(const overrides of [{GOOGLE_PICKER_API_KEY:'PRIVATE-INVALID-KEY'},{DROPBOX_APP_SECRET:''},{RESEND_API_KEY:'PRIVATE-INVALID-KEY'},{RESEND_API_KEY:''}]){
+test('invalid protected API key and missing required secret are rejected without logging values',()=>{
+ for(const overrides of [{GOOGLE_PICKER_API_KEY:'PRIVATE-INVALID-KEY'},{DROPBOX_APP_SECRET:''},{RESEND_API_KEY:'PRIVATE-INVALID-KEY'}]){
   const r=run(overrides);assert.notEqual(r.status,0);assert.equal(r.saved,null);
   assert.ok(!r.output.includes('PRIVATE-INVALID-KEY'));
+ }
+});
+test('PROD bootstrap succeeds without optional Resend and preserves all seven required secrets',()=>{
+ for(const value of ['',undefined]){
+  const r=run({RESEND_API_KEY:value});assert.equal(r.status,0);
+  const expected={...r.secrets};delete expected.RESEND_API_KEY;
+  assert.deepEqual(r.saved,expected);assert.equal(Object.keys(r.saved).length,7);
  }
 });

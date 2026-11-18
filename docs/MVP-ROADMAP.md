@@ -1,5 +1,13 @@
 # Roadmap vivo — Roteiva MVP
 
+## Resend opcional para publicação — 17/11/2026
+
+**IMPLEMENTADO EM BRANCH; publicação pendente.** Por solicitação explícita do proprietário, a falta de chave do Resend não bloqueia o deploy PROD. Segredos críticos e aprovações permanecem obrigatórios. Feedback sem chave fica indisponível e rejeita envio sem persistir ou chamar o provedor.
+
+- [x] Preparo aditivo aceita ausência/vazio e mantém validação de chave não vazia.
+- [x] Guard exige somente as sete credenciais críticas.
+- [ ] CI e implantação protegida da versão consolidada; verificar contrato sem chave no ambiente publicado.
+
 ## Homologação Dropbox — PR #156 (17/11/2026)
 
 **PARCIAL — correções implementadas; primeiro acesso externo e reenvio pendentes.**

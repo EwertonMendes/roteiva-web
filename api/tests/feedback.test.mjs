@@ -25,6 +25,18 @@ function configured(db,t){
   const env={DB:db.DB,ENVIRONMENT:'prod',RESEND_API_KEY:'re_mock_secure_key_123456'};
   return {env,sent};
 }
+
+test('DEV and PROD without Resend expose unavailable feedback and never send or persist a submission',async t=>{
+  const db=database();t.after(db.close);
+  t.mock.method(globalThis,'fetch',async()=>{throw Error('No provider request is allowed without a key');});
+  for(const ENVIRONMENT of ['dev','prod']){
+    const env={DB:db.DB,ENVIRONMENT};
+    const status=await feedbackRouter(new Request('https://api.roteiva.com/feedback'),env,'qa','qa@example.com');
+    assert.equal((await status.json()).available,false);
+    await assert.rejects(()=>feedbackRouter(request(),env,'qa','qa@example.com'),e=>e.code==='feedback_unavailable'&&e.status===503);
+  }
+  assert.equal(db.sql.prepare('SELECT COUNT(*) AS n FROM feedback_reports').get().n,0);
+});
 test('authenticated request sends fixed destination; metadata D1 never stores attachment bytes',async t=>{
   const db=database();t.after(db.close);
   const {env,sent}=configured(db,t);

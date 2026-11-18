@@ -1,5 +1,11 @@
 # Desenvolvimento e deploy — Roteiva
 
+## Deploy PROD sem configuração de feedback (17/11/2026)
+
+`RESEND_API_KEY` é opcional no environment `cloudflare-production`. Sem ela, o bootstrap publica os sete segredos críticos e não inclui uma chave vazia; o guard de nomes não exige Resend. Se fornecida, a chave continua validada e injetada pelo workflow protegido. Os demais segredos e todas as aprovações/guardas de SHA, ambiente e migração continuam obrigatórios.
+
+O envio só fica disponível se a chave existir no Worker. Ausência deve ser validada como `available:false`, POST 503 e zero envio/gravação, não como falha geral da implantação. Para ativar posteriormente, seguir [configuração do feedback](FEEDBACK-SUPPORT.md).
+
 > **Registro histórico (15/11/2026):** os estados de consoles e pendências abaixo foram observados nessa data. PR #125 e PR #129 foram mergeados posteriormente; DEV já contém essas alterações. A implantação em PROD depende de workflows protegidos; este documento não comprova a publicação nem a aprovação do Dropbox.
 
 ## OAuth comercial — estado verificado em 15/11/2026
