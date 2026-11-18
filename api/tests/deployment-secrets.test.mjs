@@ -14,7 +14,7 @@ function run(overrides={}) {
  const secrets={TOKEN_KEYS:JSON.stringify({v1:randomBytes(32).toString('base64url')}),
   TRIAL_IDENTITY_HMAC_KEY:randomBytes(32).toString('base64url'),GOOGLE_CLIENT_SECRET:'synthetic-private-marker',
   GOOGLE_PICKER_API_KEY:'AIza'+'x'.repeat(35),DROPBOX_APP_KEY:'synthetic-dropbox-app',DROPBOX_APP_SECRET:'synthetic-dropbox-secret',
-  FIREBASE_ADMIN_CREDENTIALS_JSON:JSON.stringify({type:'service_account',project_id:'roteiva-web-prod',client_email:'backend@roteiva-web-prod.iam.gserviceaccount.com',private_key:privateKey}),...overrides};
+  FIREBASE_ADMIN_CREDENTIALS_JSON:JSON.stringify({type:'service_account',project_id:'roteiva-web-prod',client_email:'backend@roteiva-web-prod.iam.gserviceaccount.com',private_key:privateKey}),RESEND_API_KEY:'re_synthetic_abcdefghijklmnop',...overrides};
  const result=spawnSync(process.execPath,[fileURLToPath(new URL('../scripts/prepare-worker-secrets.mjs',import.meta.url)),'prod'],{
   cwd:fileURLToPath(new URL('..',import.meta.url)),encoding:'utf8',env:{...process.env,...secrets,
    CLOUDFLARE_ACCOUNT_ID:config.account_id,CLOUDFLARE_D1_DATABASE_ID:config.d1_databases[0].database_id,
@@ -24,7 +24,7 @@ function run(overrides={}) {
  assert.equal(resolve(dirname(dir)),resolve(tmpdir()),'Cleanup must stay inside the temporary root');
  rmSync(dir,{recursive:true,force:true});return {status:result.status,output,saved,secrets};
 }
-test('PROD atomic bootstrap validates seven independent credentials without printing them',()=>{
+test('PROD atomic bootstrap validates eight independent credentials without printing them',()=>{
  const r=run();assert.equal(r.status,0);assert.deepEqual(r.saved,r.secrets);
  assert.ok(!r.output.includes('synthetic-private-marker'));assert.ok(!r.output.includes(privateKey));
 });
@@ -37,7 +37,7 @@ test('malformed protected JSON cannot leak its source through a parser error',()
  assert.notEqual(r.status,0);assert.equal(r.saved,null);assert.ok(!r.output.includes(marker));
 });
 test('invalid protected API key and missing secret are rejected without logging values',()=>{
- for(const overrides of [{GOOGLE_PICKER_API_KEY:'PRIVATE-INVALID-KEY'},{DROPBOX_APP_SECRET:''}]){
+ for(const overrides of [{GOOGLE_PICKER_API_KEY:'PRIVATE-INVALID-KEY'},{DROPBOX_APP_SECRET:''},{RESEND_API_KEY:'PRIVATE-INVALID-KEY'},{RESEND_API_KEY:''}]){
   const r=run(overrides);assert.notEqual(r.status,0);assert.equal(r.saved,null);
   assert.ok(!r.output.includes('PRIVATE-INVALID-KEY'));
  }
