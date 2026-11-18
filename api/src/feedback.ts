@@ -4,8 +4,11 @@ import {feedbackEnabled,sendFeedbackEmail,FeedbackDeliveryFailure,type FeedbackA
 export const MAX_FEEDBACK_IMAGES=5;
 export const MAX_FEEDBACK_FILE_BYTES=1024*1024;
 export const MAX_FEEDBACK_BODY_BYTES=6*1024*1024;
-const DAILY_LIMIT=3;
-const DAY_MS=24*60*60*1000;
+// PROD counts confirmed or in-flight sends in a rolling hour. DEV has no
+// application-level per-user quota; authentication and global API throttling stay on.
+const PROD_HOURLY_LIMIT=20;
+const PROD_HOURLY_ATTEMPT_LIMIT=40;
+const HOUR_MS=60*60*1000;
 type Kind='bug'|'idea'|'praise'|'other';
 const kinds:Record<Kind,string>={bug:'Problema',idea:'Sugestão',praise:'Elogio',other:'Outro assunto'};
 
@@ -91,33 +94,39 @@ export async function feedbackRouter(request:Request,env:Env,uid:string,email:st
   if(!feedbackEnabled(env))throw new ApiError(503,'feedback_unavailable');
   const feedback=await parseFeedback(request);
   const now=Date.now();
+  // Quota is evaluated in the D1 conditional write, not a separate read.
+  // Existing sent requests stay idempotent even after the quota is reached.
+  const isProd=env.ENVIRONMENT==='prod';
+  const quotaPredicate=isProd
+    ? "(SELECT COUNT(*) FROM feedback_reports WHERE owner_uid=? AND created_at>=? AND status IN ('sending','sent'))<? "+
+      "AND (SELECT COUNT(*) FROM feedback_reports WHERE owner_uid=? AND created_at>=?)<?"
+    : "1=1";
+  const quotaValues=isProd
+    ? [uid,now-HOUR_MS,PROD_HOURLY_LIMIT,uid,now-HOUR_MS,PROD_HOURLY_ATTEMPT_LIMIT]
+    : [];
   let id=crypto.randomUUID();
-  // One atomic conditional write: concurrent tabs cannot bypass the daily quota,
-  // and replays of the same request key cannot send two emails.
   const created=await env.DB.prepare(
     "INSERT INTO feedback_reports (id,owner_uid,request_key,kind,title,description,screen,status,attachment_count,created_at) "+
-    "SELECT ?,?,?,?,?,?,?,'sending',?,? WHERE "+
-    "(SELECT COUNT(*) FROM feedback_reports WHERE owner_uid=? AND created_at>=? AND status IN ('sending','sent'))<? "+
-    "AND (SELECT COUNT(*) FROM feedback_reports WHERE owner_uid=? AND created_at>=?)<10 ON CONFLICT(owner_uid,request_key) DO NOTHING RETURNING id"
+    "SELECT ?,?,?,?,?,?,?,'sending',?,? WHERE "+quotaPredicate+
+    " ON CONFLICT(owner_uid,request_key) DO NOTHING RETURNING id"
   ).bind(id,uid,feedback.requestKey,feedback.kind,feedback.title,feedback.description,
-    feedback.screen,feedback.attachments.length,now,uid,now-DAY_MS,DAILY_LIMIT,uid,now-DAY_MS).first<{id:string}>();
+    feedback.screen,feedback.attachments.length,now,...quotaValues).first<{id:string}>();
   if(!created){
     const previous=await env.DB.prepare('SELECT id,status,retry_safe FROM feedback_reports WHERE owner_uid=? AND request_key=?')
       .bind(uid,feedback.requestKey).first<{id:string;status:string;retry_safe:number}>();
     if(previous?.status==='sent')return Response.json({id:previous.id,status:'received',duplicate:true});
     if(previous?.status==='failed'&&previous.retry_safe===1){
-      // A provider's definitive rejection permits an atomic retry of exactly this key.
-      // Other rows (including old failures/ambiguous sends) must never be replayed.
+      // Only definitive provider rejections may retry, at most 3 tries per key.
       const renewed=await env.DB.prepare(
         "UPDATE feedback_reports SET status='sending',retry_safe=0,created_at=?,attempt_count=attempt_count+1,kind=?,title=?,description=?,screen=?,attachment_count=? "+
         "WHERE owner_uid=? AND request_key=? AND status='failed' AND retry_safe=1 AND attempt_count<3 AND "+
-        "(SELECT COUNT(*) FROM feedback_reports WHERE owner_uid=? AND created_at>=? AND status IN ('sending','sent'))<? AND (SELECT COUNT(*) FROM feedback_reports WHERE owner_uid=? AND created_at>=?)<10 RETURNING id"
+        quotaPredicate+" RETURNING id"
       ).bind(now,feedback.kind,feedback.title,feedback.description,feedback.screen,feedback.attachments.length,
-        uid,feedback.requestKey,uid,now-DAY_MS,DAILY_LIMIT,uid,now-DAY_MS).first<{id:string}>();
-      if(!renewed)throw new ApiError(429,'feedback_daily_limit');
+        uid,feedback.requestKey,...quotaValues).first<{id:string}>();
+      if(!renewed)throw new ApiError(429,isProd?'feedback_hourly_limit':'feedback_already_attempted');
       id=renewed.id;
     }else if(previous)throw new ApiError(409,'feedback_already_attempted');
-    else throw new ApiError(429,'feedback_daily_limit');
+    else throw new ApiError(429,isProd?'feedback_hourly_limit':'rate_limited');
   }
   let messageId:string;
   try{
@@ -129,7 +138,7 @@ export async function feedbackRouter(request:Request,env:Env,uid:string,email:st
   }catch(error){
     const failure=error instanceof FeedbackDeliveryFailure?error:
       new FeedbackDeliveryFailure('feedback_delivery_unconfirmed',false);
-    // A definitive provider rejection can be retried without using the daily quota.
+    // Definitive provider rejections can be retried within the environment's guards.
     // Unknown outcomes stay 'sending' to avoid silently resending possibly accepted mail.
     if(failure.safeToRetry){
       await env.DB.prepare("UPDATE feedback_reports SET status='failed',retry_safe=1 WHERE id=? AND owner_uid=? AND status='sending'")

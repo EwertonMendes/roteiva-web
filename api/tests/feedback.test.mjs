@@ -59,7 +59,7 @@ test('authenticated request sends fixed destination; metadata D1 never stores at
   assert.ok(!JSON.stringify(row).includes('private-screenshot.png'));
   assert.ok(!JSON.stringify(row).includes('137,80,78,71'));
 });
-test('idempotency, per-user daily quota and no tracking endpoint remain enforced',async t=>{
+test('DEV allows repeated testing without per-user quota while preserving idempotency and no tracking',async t=>{
   const db=database();t.after(db.close);
   const {env,sent}=configured(db,t);
   const key=crypto.randomUUID();
@@ -68,13 +68,13 @@ test('idempotency, per-user daily quota and no tracking endpoint remain enforced
   assert.equal(dup.status,200);
   assert.equal((await dup.json()).duplicate,true);
   assert.equal(sent.length,1);
-  await feedbackRouter(request(),env,'A','a@gmail.com');
-  await feedbackRouter(request(),env,'A','a@gmail.com');
-  await assert.rejects(()=>feedbackRouter(request(),env,'A','a@gmail.com'),e=>e.code==='feedback_daily_limit');
-  await feedbackRouter(request(),env,'B','b@gmail.com');
-  assert.equal(sent.length,4);
+  for(let i=0;i<29;i++)
+    assert.equal((await feedbackRouter(request(),env,'A','a@gmail.com')).status,201);
+  assert.equal(sent.length,30);
+  assert.equal((await feedbackRouter(request(),env,'B','b@gmail.com')).status,201);
+  assert.equal(sent.length,31);
   await assert.rejects(()=>feedbackRouter(new Request('https://api.roteiva.com/feedback'),env,'A','a@gmail.com'),e=>e.status===405);
-  assert.equal(db.sql.prepare("SELECT COUNT(*) AS n FROM feedback_reports WHERE owner_uid='A'").get().n,3);
+  assert.equal(db.sql.prepare("SELECT COUNT(*) AS n FROM feedback_reports WHERE owner_uid='A'").get().n,30);
 });
 test('malformed text, MIME spoofing, size limits and absent API key reject before persistence',async t=>{
   const db=database();t.after(db.close);
