@@ -101,7 +101,7 @@ test('uncertain network failures never automatically resend the same key',async 
   t.after(()=>{globalThis.fetch=oldFetch;});
   let calls=0;
   globalThis.fetch=async()=>{calls++;throw Error('network lost after submission');};
-  const env={DB:db.DB,ENVIRONMENT:'prod',RESEND_API_KEY:'re_mock_secure_key_123456'};
+  const env={DB:db.DB,ENVIRONMENT:'dev',RESEND_API_KEY:'re_mock_secure_key_123456'};
   const key=crypto.randomUUID();
   await assert.rejects(()=>feedbackRouter(request({key}),env,'A','a@gmail.com'),e=>e.code==='feedback_delivery_unconfirmed');
   await assert.rejects(()=>feedbackRouter(request({key}),env,'A','a@gmail.com'),e=>e.code==='feedback_already_attempted');
