@@ -19,7 +19,7 @@ const kinds:{value:Kind;label:string}[]=[
 const messages:Record<string,string>={
   feedback_unavailable:'O envio está sendo configurado neste ambiente.',
   feedback_delivery_unconfirmed:'Não foi possível confirmar a entrega. O envio anterior pode ter sido recebido. Confira o histórico antes de tentar novamente.',
-  feedback_email_sender_setup:'O e-mail de suporte ainda precisa de uma configuração do remetente. Tente novamente depois que o serviço for habilitado.',
+  feedback_email_sender_setup:'O envio gratuito de e-mail precisa ser configurado ou ter o remetente autorizado. Tente novamente mais tarde.',
   feedback_email_recipient_setup:'A caixa de suporte ainda precisa de verificação no serviço de e-mail.',
   feedback_dev_email_setup:'O serviço de e-mail de DEV ainda precisa ser configurado ou autorizado.',
   feedback_email_provider_rejected:'O serviço de e-mail rejeitou o envio. Nossa equipe precisa verificar a configuração.',

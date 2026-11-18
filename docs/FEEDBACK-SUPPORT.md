@@ -1,55 +1,34 @@
-# Suporte integrado — Cloudflare Email Service
+# Feedback integrado Roteiva — envio gratuito via Resend
 
-## Contrato
+## Arquitetura
 
-- Remetente técnico fixo no backend: **suporte@roteiva.com**.
-- Caixa de recebimento fixa no backend e no binding: **suporte.roteiva@gmail.com**.
-- Endpoint do Worker: GET /feedback (últimos 15 registros do proprietário) e POST /feedback autenticado.
-- Identidade e e-mail de resposta vêm do Firebase JWT verificado no Worker, nunca do formulário.
-- Apenas texto e metadados no D1. Os anexos seguem diretamente para a caixa Gmail verificada; não há R2/Storage/Firestore para imagens.
-- Browser reencoda imagens (até 1600px) para retirar EXIF, com limite de 5 imagens de 1 MiB cada.
-- Servidor limita multipart em streaming a 6 MiB, checa formato pelo conteúdo e limita a 3 envios por usuário em 24 horas. Chave UUID por tentativa bloqueia duplicação concorrente/replay.
-- E-mails têm Reply-To verificado e corpo plain text, sem permitir injeção de HTML ou cabeçalhos a partir do formulário.
-- Falhas de entrega não retornam sucesso. Falhas posteriores ao envio são ambíguas e **nunca são repetidas automaticamente**.
-- D1 armazena status sending/sent/failed, sem anexos. Gmail precisa de política de retenção separada.
+- **DEV e PROD** usam a API HTTPS do Resend Free, diretamente dos Workers Cloudflare, SEM Cloudflare Email Sending/Workers Paid, SMTP ou storage de imagens.
+- Destinatário fixo no backend: `suporte.roteiva@gmail.com`. A mesma caixa recebe feedbacks com prefixos claros `[Roteiva DEV]` e `[Roteiva PROD]`.
+- Remetente inicial de ambos: `Roteiva DEV/PROD <onboarding@resend.dev>`. O remetente de testes SOMENTE pode enviar para o e-mail cadastrado como proprietário da conta Resend. Portanto, **a conta Resend precisa pertencer a `suporte.roteiva@gmail.com`**. Não tentar enviar para outros destinatários com esse remetente.
+- Para usar **`suporte@roteiva.com`** gratuitamente no futuro, verificar o domínio `roteiva.com` no Resend Free (DKIM/SPF/return-path conforme registros exibidos no painel), sem quebrar DNS atual. Somente após a verificação, definir a variável do Worker PROD `RESEND_FROM_EMAIL=suporte@roteiva.com` (allowlist fixa). Não ativar antes da verificação.
+- O Email Routing Cloudflare (recebimento de mensagens enviadas para `suporte@roteiva.com`) pode continuar funcionando gratuitamente; não participa do envio do formulário.
 
-## Configuração externa necessária ANTES de implantar
+## Configuração externa obrigatória (não pode ser feita somente pelo GitHub)
 
-1. Criar **suporte.roteiva@gmail.com**. Confirmar acesso, 2FA e opções de recuperação.
-2. Na conta Cloudflare que possui o domínio **roteiva.com**, acessar Compute > Email Service > Email Routing > Destination Addresses. Adicionar o Gmail e concluir a verificação enviada pela Cloudflare.
-3. Conferir a ativação de **roteiva.com** no Email Service (Email Routing ou Email Sending) e a permissão para enviar como **suporte@roteiva.com**. Verificar DNS/SPF/DKIM sem sobrescrever MX/SPF existentes sem análise.
-4. Recomendado para e-mail direto: em Email Routing > Routing Rules, criar a regra de recebimento **suporte@roteiva.com -> suporte.roteiva@gmail.com**. Essa regra é separada do envio de feedback feito pelo Worker.
-5. O api/wrangler.jsonc da conta PROD fixa o binding FEEDBACK_EMAIL com destination_address=suporte.roteiva@gmail.com. **O GitHub não verifica nem cria a configuração real da conta Cloudflare**.
-6. O Gmail precisa estar verificado **na mesma conta do Worker PROD** e roteiva.com deve pertencer a ela. Somente depois promover o código por pipeline protegida.
-7. Validar em PROD com usuário de teste: envio sem imagens, envio com 5 imagens, anexos e cabeçalhos From/Reply-To no Gmail, não duplicação e histórico de cada proprietário.
+1. Criar uma conta **Resend Free** em https://resend.com/signup usando **`suporte.roteiva@gmail.com`**; confirmar que o plano está em Free e sem upgrade automático.
+2. Gerar **duas API Keys separadas**, cada uma com permissão **Sending access**: `Roteiva DEV` e `Roteiva PROD`. Nunca copiar as chaves ao chat ou ao código.
+3. **DEV:** instalar a primeira como **Secret do Cloudflare Worker `roteiva-api-dev`**, nome exato `RESEND_API_KEY`. Pode usar Cloudflare Dashboard > Workers & Pages > `roteiva-api-dev` > Settings > Variables and Secrets, tipo Secret. Não usar a chave PROD.
+4. **PROD:** GitHub > Settings > Environments > `cloudflare-production` > Environment secrets > New environment secret, nome `RESEND_API_KEY`, valor da chave PROD. A pipeline protegida valida e injeta essa chave no Worker na publicação atômica. A variável não é exposta ao frontend nem armazenada em código.
+5. Caso a conta de destino no Resend não seja exatamente `suporte.roteiva@gmail.com`, os envios com `onboarding@resend.dev` serão rejeitados. A configuração de DOMÍNIO personalizado no Resend é opcional para o caso presente, mas obrigatória antes de usar `suporte@roteiva.com` como From.
+6. Deploy DEV por pipeline normal. Deploy PROD somente pelo pipeline protegido e após o secret estar presente. **Não usar Cloudflare Email Sending**, nem comprar Workers Paid.
+7. Smoke test real com usuário autenticado nos dois ambientes: texto simples, cinco imagens, recebimento na caixa Gmail, cabeçalho Reply-To, registro no D1 e comportamento após erro definitivo. Monitorar a quota gratuita Resend.
 
-## DEV/PROD: entregas isoladas no mesmo Gmail
+## Segurança e limites
 
-- **PROD:** permanece no Cloudflare Email Service com o binding `FEEDBACK_EMAIL`, remetente fixo `suporte@roteiva.com` e destinatário `suporte.roteiva@gmail.com`. É necessário ativar o **Email Sending** para a zona `roteiva.com` na conta PROD; ter apenas o Gmail marcado `Verified` em Email Routing não comprova essa ativação. Erros de domínio/remetente são registrados com **código do provedor, sem conteúdo do feedback**, e mostrados como falha de configuração (não como suposta confirmação de envio). Verificar `Email Service > Email Sending` e `Activity Log` na conta Cloudflare PROD. Não alterar registros DNS existentes automaticamente.
-- **DEV:** usa **Resend API** via HTTPS, sem Email Routing, e envia diretamente para **`suporte.roteiva@gmail.com`**. Não usa o domínio remetente PROD, token PROD nem conta Cloudflare PROD. Para testes, o remetente é `Roteiva DEV <onboarding@resend.dev>` (sandbox Resend), permitido **somente quando o e-mail da conta Resend for o destinatário**, neste caso `suporte.roteiva@gmail.com`. Resend tem quotas gratuitas; acompanhe o painel da conta.
-- Para habilitar DEV, criar conta em https://resend.com com **`suporte.roteiva@gmail.com`**, criar API Key com somente permissão de envio e gravar como **secret do Worker DEV** `RESEND_API_KEY` na conta Cloudflare DEV (por painel ou `npx wrangler secret put RESEND_API_KEY --env dev` com credenciais DEV). Não adicionar a chave em `wrangler.jsonc`, `vars`, código, GitHub ou frontend. O próximo deploy do Worker preserva secrets já configurados.
-- Enquanto esse secret não for configurado, DEV mostra **indisponível**, sem falsas confirmações nem chamadas externas. No PROD o fluxo não usa Resend.
-- Se futuramente for necessário enviar DEV de outro remetente, configurar um domínio verificado na Resend e revisar explicitamente a política de origem, sem compartilhar a identidade de PROD.
-
-## Tentativas, idempotência e diagnóstico
-
-- O backend mantém o limite de **3 mensagens aceitas/em processamento por usuário em 24 horas**, e também **até 10 registros iniciados em 24 horas**, inclusive erros. Cada tentativa é reservada atomicamente no D1.
-- Provedor que respondeu com erro **definitivo e não aceitou** o e-mail: status `failed`, `retry_safe=1`. O usuário pode tentar novamente, até 3 vezes no mesmo protocolo, preservando o controle de limite diário.
-- Resultado **incerto** (timeout, falha de rede, resposta sem confirmação, falha após aceitação): fica em `sending`, não é reenviado automaticamente; o frontend cria uma nova chave apenas quando o usuário **clica novamente**, avisando sobre possível duplicação.
-- Linhas antigas marcadas `failed` não ganham automaticamente permissão de retry; poderiam ter sido efetivamente entregues. A migração 0033 é aditiva.
-- Resend DEV envia `Idempotency-Key` do protocolo na API para proteger duplicatas dentro da janela documentada de 24 horas.
-- Para verificar falhas Cloudflare, filtrar logs estruturados pelo evento `feedback_email_send_rejected`, com `providerCode` e `reportId`; não registra e-mail, JWT, corpo nem anexos.
-
-## Rollout, segurança e privacidade
-
-- PR com testes frontend e Worker -> revisão -> deploy DEV; envio direto em DEV só depois de configurar o secret Resend.
-- Verificar Email Service/Gmail na conta PROD -> promoção protegida -> teste real da caixa de entrada.
-- Nenhum segredo adicionado ao código/GitHub. Nunca enviar arquivos, tokens ou conteúdo de feedback aos logs.
-- Dados D1 são apagados pelo fluxo de exclusão da conta. O e-mail recebido no Gmail NÃO é apagado automaticamente; definir retenção e tratar pedidos de exclusão nessa caixa.
-- Envio para destinatário verificado é gratuito no Free, sujeito a limites e políticas oficiais do serviço.
+- O Worker valida Firebase JWT verificado, origem, tamanho do corpo (6 MiB), até cinco anexos (1 MiB cada), magic bytes de imagens e conta em exclusão.
+- D1 guarda somente texto, metadados e estado. Capturas vão diretamente à Resend via HTTPS e à caixa Gmail, sem R2, Firebase Storage ou outros buckets.
+- Limite atômico por usuário: três envios aceitos/em processamento por 24 horas; no máximo dez tentativas registradas em 24 horas, e três tentativas por protocolo. O provedor também impõe **100 e-mails/dia e 3.000/mês no plano Free** compartilhados pela conta.
+- Cada mensagem usa um `Idempotency-Key` derivado do protocolo único. Rejeições definitivas habilitam tentativas controladas; resultado ambíguo nunca é repetido automaticamente.
+- E-mail de usuário no Reply-To vem do token verificado, não do cliente. Destinatário e API URL são constantes do backend. Não registrar mensagens, imagens ou segredo nos logs.
+- Exclusão de conta remove metadados D1. A caixa de entrada Gmail requer política de retenção/remoção separada para os dados dos feedbacks.
 
 Documentação oficial:
-- https://developers.cloudflare.com/email-service/api/send-emails/workers-api/
-- https://developers.cloudflare.com/email-service/configuration/send-bindings/
-- https://developers.cloudflare.com/email-service/configuration/email-routing-addresses/
-- https://developers.cloudflare.com/email-service/platform/limits/
+- https://resend.com/pricing
+- https://resend.com/docs/send-with-workers
+- https://resend.com/docs/send-with-nodejs
+- https://resend.com/docs/knowledge-base/how-to-verify-a-domain
