@@ -70,7 +70,7 @@ test('definite provider rejection allows bounded repeat and never reports succes
   const env={ENVIRONMENT:'dev',DB:db.DB,RESEND_API_KEY:token};
   const key=crypto.randomUUID();
   await assert.rejects(()=>feedbackRouter(req(key),env,'owner','owner@example.com'),e=>
-    e.code==='feedback_email_sender_setup');
+    e.code==='feedback_dev_email_setup');
   let row=db.sql.prepare('SELECT status,retry_safe,attempt_count FROM feedback_reports').get();
   assert.equal(row.status,'failed');assert.equal(row.retry_safe,1);assert.equal(row.attempt_count,1);
   assert.equal((await feedbackRouter(req(key),env,'owner','owner@example.com')).status,201);
