@@ -1,5 +1,12 @@
 # Arquitetura do Roteiva — MVP SaaS
 
+## Decisão — avisos financeiros sem efeitos colaterais (20/11/2026)
+
+`api/src/billing-notices.ts` é uma função pura para traduzir o direito efetivo de acesso já calculado em `activeState()` e o resumo de contrato em um único `notice` de interface. O endpoint autenticado `GET /billing/status` devolve `notice.code`, `severity` e `daysRemaining`, sem criar cobrança, sem escrever no D1/Firestore, sem cron e sem expor identificadores externos. A prioridade é **suspensão > cortesia vitalícia > direito primário atual > contrato**: inadimplência de uma assinatura não deve se sobrepor à cortesia independente ainda válida; cancelamento mantém acesso até a data paga. O marcador de renovação a 3 dias é informativo, não indica que cartão falhou.
+
+Eventos Asaas continuam exigindo reconciliação independente e não liberam acesso pelo callback. **Atenção para conta de pessoa física e Pix:** a própria documentação Asaas avisa que `CONFIRMED` pode ser temporário durante bloqueio cautelar até 72 horas, tornando inadequado usar evento `PAYMENT_CONFIRMED` isoladamente como prova de liquidação definitiva. Enquanto não houver homologação, nenhum processador de eventos pago está ativo. Fontes: https://docs.asaas.com/reference/criar-nova-cobranca ; https://docs.asaas.com/docs/webhook-para-cobrancas
+
+
 ## Decisão — contrato de checkout seguro e status de assinatura (20/11/2026)
 
 A fundação acrescenta `api/src/billing-checkout-contract.ts`: função pura para montagem de `POST /v3/checkouts` conforme documentação oficial Asaas (cartão recorrente, catálogo versionado, `externalReference` opaco por UUID, `minutesToExpire` fixo, callback somente ao domínio do ambiente, vencimento em data/hora local validada). **Não existe rota pública de criação de checkout:** a data inicial será calculada por lógica confiável no backend após homologação de trial/cortesia, e eventos de callback nunca autorizam acesso.

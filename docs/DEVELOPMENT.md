@@ -1,5 +1,10 @@
 # Desenvolvimento e deploy — Roteiva
 
+## Avisos de vigência da assinatura, apenas leitura (20/11/2026)
+
+A partir de `api/src/billing-notices.ts`, `GET /billing/status` inclui um `notice` que classifica trial, cortesia, acesso pago, cancelamento agendado, tolerância `past_due`, suspensão e expiração, com `daysRemaining` derivado de um instante único de leitura. Não agenda e-mail/SMS, não envia notificações pagas, não altera acesso ou contratos e não requisita Asaas. Testes unitários `api/tests/billing-notices.test.mjs` incluem D-3/D-1, expiração exata e priorização de cortesia. A interface existente não consome os novos campos ainda; o checkout permanece indisponível.
+
+
 ## Pré-integração de checkout e status de assinatura (20/11/2026)
 
 Checkout de cartão recorrente: `buildRecurringCardCheckout()` é **apenas um gerador puro de requisição**, sem endpoint nem chamada à API; os três preços vêm do catálogo e a URL de retorno é do próprio ambiente. `planBillingEvent()` nunca aplica uma concessão, exigindo confirmação independente no provedor. Ledger `0037` é aditivo e vazio. `GET /billing/status` exige JWT Firebase válido e responde com acesso efetivo e assinatura D1 (ou nulo), inclusive quando o trial expirou. Não há escrita nessa consulta, nem chave Asaas necessária. Testar com `npm run typecheck && npm test && npm run migrate:local && npm run build` dentro de `api/` e pela CI PR; o smoke de deploy preserva o checkout indisponível. A rota é destinada às futuras telas de contratação e cobrança, não afirma que os pagamentos estão funcionais.
