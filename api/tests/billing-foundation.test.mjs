@@ -30,6 +30,12 @@ test('missing or partial configuration fails closed before any external request'
   },{
     ENVIRONMENT:'dev',BILLING_ENABLED:'false',ASAAS_API_KEY:'key'.repeat(10),ASAAS_WEBHOOK_TOKEN:'a'.repeat(32)
   },{
+    ENVIRONMENT:'dev',BILLING_ENABLED:'true',ASAAS_API_KEY:'k'.repeat(48),
+    ASAAS_WEBHOOK_TOKEN:'k'.repeat(48)
+  },{
+    ENVIRONMENT:'dev',BILLING_ENABLED:'true',ASAAS_API_KEY:'k'.repeat(48),
+    ASAAS_WEBHOOK_TOKEN:'token with forbidden spaces'.repeat(2)
+  },{
     ENVIRONMENT:'staging',BILLING_ENABLED:'true',ASAAS_API_KEY:'key'.repeat(10),ASAAS_WEBHOOK_TOKEN:'a'.repeat(32)
   }]){
     assert.equal(asaasConfigured(env),false);

@@ -9,7 +9,10 @@ export function asaasConfigured(env:Env):boolean{
   return env.BILLING_ENABLED==='true' &&
     (env.ENVIRONMENT==='dev'||env.ENVIRONMENT==='prod') &&
     typeof env.ASAAS_API_KEY==='string' && env.ASAAS_API_KEY.length>=16 &&
-    typeof env.ASAAS_WEBHOOK_TOKEN==='string' && env.ASAAS_WEBHOOK_TOKEN.length>=32;
+    typeof env.ASAAS_WEBHOOK_TOKEN==='string' &&
+    env.ASAAS_WEBHOOK_TOKEN.length>=32 && env.ASAAS_WEBHOOK_TOKEN.length<=255 &&
+    !/\s/.test(env.ASAAS_WEBHOOK_TOKEN) &&
+    env.ASAAS_WEBHOOK_TOKEN!==env.ASAAS_API_KEY;
 }
 function baseUrl(env:Env):string{
   if(env.ENVIRONMENT==='dev')return 'https://api-sandbox.asaas.com/v3';
