@@ -88,12 +88,12 @@ Fluxo: React + Firebase Auth → Cloudflare Worker existente → adaptador Asaas
 - [x] [PR #181](https://github.com/EwertonMendes/roteiva-web/pull/181) mergeada no SHA `5ae228baf4f759589f76af974fea25aa4bcec855`; CI [API #44673673506](https://github.com/EwertonMendes/roteiva-web/actions/runs/44673673506), [E2E #44673673525](https://github.com/EwertonMendes/roteiva-web/actions/runs/44673673525) e [deploy DEV #44674072841](https://github.com/EwertonMendes/roteiva-web/actions/runs/44674072841) aprovados. Migração `0037` aplicada, Worker DEV publicado e smoke de saúde/autenticação aprovado. Nenhum pagamento ou alteração PROD.
 - [ ] Aguardando Sandbox: definir data segura da primeira cobrança, criar checkout real e associar intent, tokenização, confirmação de pagamento, reconciliação e projeção Firestore.
 
-### Fase 1.7 — Avisos de ciclo de vida sem gateway **EM PR**
+### Fase 1.7 — Avisos de ciclo de vida sem gateway **PUBLICADO E VALIDADO EM DEV**
 
 - [x] Motor puro de avisos de leitura: trial e cortesia em D-3/D-1, assinatura em renovação, cancelamento no fim de período pago, `past_due` com tolerância e suspensão administrativa.
 - [x] `GET /billing/status` devolve `notice` calculado do direito efetivo, respeitando cortesia/vitalício e sem duplicar gravações ou disparar SMS/e-mail.
 - [x] Testes de bordas temporais, prioridades de entitlement e ausência de escrita/efeito financeiro.
-- [ ] CI e deploy DEV com evidências de validação no GitHub; frontend de faturamento continua bloqueado até o checkout homologado.
+- [x] [PR #183](https://github.com/EwertonMendes/roteiva-web/pull/183), merge SHA `c246ebd03b0d01fbf8aae2164b34728b9cd3c28b`, CI API [#44675122616](https://github.com/EwertonMendes/roteiva-web/actions/runs/44675122616) e deploy DEV [#44675298640](https://github.com/EwertonMendes/roteiva-web/actions/runs/44675298640) aprovados. O checkout permanece desligado, nenhum efeito financeiro ocorreu, frontend de cobrança segue planejado e PROD não foi modificado.
 - [ ] Confirmar em Sandbox a regra efetiva de Pix PF: o Asaas documenta `CONFIRMED` temporário durante bloqueio cautelar de até 72h; não confiar apenas neste estado para liberar acesso. Fonte: https://docs.asaas.com/reference/criar-nova-cobranca
 
 ### Fase 2 — Sandbox checkout **PLANEJADO**
