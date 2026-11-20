@@ -79,13 +79,13 @@ Fluxo: React + Firebase Auth → Cloudflare Worker existente → adaptador Asaas
 - [x] [PR #179](https://github.com/EwertonMendes/roteiva-web/pull/179), merge SHA `8733635e1422bae9ad41662f1ab3f4b62eb3a22d`, [testes API #44672092578](https://github.com/EwertonMendes/roteiva-web/actions/runs/44672092578), [regressão isolada #44672092583](https://github.com/EwertonMendes/roteiva-web/actions/runs/44672092583) e [deploy DEV #44672491507](https://github.com/EwertonMendes/roteiva-web/actions/runs/44672491507) aprovados. Migração D1 aplicada, Worker publicado, smoke remoto de `/billing/webhooks/asaas` desativado (404). **Não houve cobrança, concessão ou publicação PROD.**
 - [ ] Próximo passo após Sandbox: ativar manualmente somente DEV, configurar webhook Asaas com token próprio, executar entrega real e reconciliação. Sem autorização de PROD.
 
-### Fase 1.6 — Contratos de checkout, ledger e consulta de assinatura **EM PR**
+### Fase 1.6 — Contratos de checkout, ledger e consulta de assinatura **PUBLICADA E VALIDADA EM DEV**
 
 - [x] Função pura de geração de checkout Asaas com cartão recorrente, ciclos mensal/trimestral/anual, valor no catálogo do backend, externalReference UUID e callback restrito ao domínio do ambiente.
 - [x] Modelo conservador de eventos: pagamento confirmado/recebido, atraso, estorno, chargeback, checkout e assinatura demandam reconciliação; nenhum evento libera acesso diretamente.
 - [x] Migração aditiva `0037_billing_payment_ledger.sql` cria ledger vazio para futura conciliação; unicidade de referência e FK composta impedem vincular pagamentos a dono diferente da assinatura.
 - [x] `GET /billing/status` autenticado e somente de leitura, disponível também para conta expirada, retornando status e validade do acesso existente; **checkoutAvailable:false**, sem chamadas ao Asaas.
-- [ ] Validar CI/merge/deploy em DEV; inserir evidências de workflow/SHA ao concluir.
+- [x] [PR #181](https://github.com/EwertonMendes/roteiva-web/pull/181) mergeada no SHA `5ae228baf4f759589f76af974fea25aa4bcec855`; CI [API #44673673506](https://github.com/EwertonMendes/roteiva-web/actions/runs/44673673506), [E2E #44673673525](https://github.com/EwertonMendes/roteiva-web/actions/runs/44673673525) e [deploy DEV #44674072841](https://github.com/EwertonMendes/roteiva-web/actions/runs/44674072841) aprovados. Migração `0037` aplicada, Worker DEV publicado e smoke de saúde/autenticação aprovado. Nenhum pagamento ou alteração PROD.
 - [ ] Aguardando Sandbox: definir data segura da primeira cobrança, criar checkout real e associar intent, tokenização, confirmação de pagamento, reconciliação e projeção Firestore.
 
 ### Fase 2 — Sandbox checkout **PLANEJADO**
