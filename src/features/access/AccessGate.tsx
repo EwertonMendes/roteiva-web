@@ -2,12 +2,12 @@ import { API_BASE_URL } from "../../lib/environment.ts";
 import {AppButton} from "../ui/AppButton";
 import {createContext,useContext,useEffect,useState,type ReactNode} from "react";
 import {watchAccess,type AccessInfo} from "../../data/access-watch";
-import {ArrowRight,Crown,Gift,ShieldAlert,RefreshCw,LogOut} from "lucide-react";
+import {Crown,Gift,RefreshCw} from "lucide-react";
 import {firebaseServices} from "../../lib/firebase";
 import {useAuth} from "../auth/AuthProvider";
 import {AuthLayout} from "../auth/AuthLayout";
-import {BillingPanel,billingInThisBuild} from "./BillingPanel";
-import {AccountDeletionAction} from "../settings/AccountDeletionAction";
+import {billingInThisBuild} from "./billing-data";
+import {RestrictedAccessPage} from "./RestrictedAccessPage";
 import "./access.css";
 import {entryToken,entryRequest,entryErrorMessage} from '../../data/bootstrap-request.ts';
 
@@ -65,20 +65,7 @@ export function AccessGate({children}:{children:ReactNode}){
     </div>
   </AuthLayout>;
   if(!access)return <main className="studio-loading" role="status">Confirmando seu acesso ao Roteiva…</main>;
-  if(access.suspended||(!access.unlimited&&access.accessUntil.getTime()<=now))return <AuthLayout
-    section="ACESSO À CONTA" title={access.suspended?"Acesso temporariamente suspenso.":"Seu período de acesso terminou."}
-    description={access.suspended?"Seu espaço está protegido. Consulte o suporte do Roteiva para esclarecer a suspensão.":"O teste gratuito é concedido uma única vez por identidade. Excluir e recriar a conta não libera outro teste. Seu cadastro e seus projetos estão preservados; você poderá continuar quando um novo período de acesso for ativado."}>
-    <div className="access-locked">
-      <ShieldAlert size={26}/><div><strong>{access.suspended?"Acesso suspenso":"Acesso expirado"}</strong>
-        <span>Seu cadastro e seus projetos estão preservados.</span></div>
-    </div>
-    {!access.suspended&&<BillingPanel locked refreshKey={access.accessUntil.getTime()}/>}
-    {!access.suspended&&billingInThisBuild&&<AccountDeletionAction/>}
-    <div className="access-actions">
-      <AppButton className="auth-primary" onClick={()=>setAttempt(n=>n+1)}><RefreshCw size={16}/> Verificar acesso novamente <ArrowRight size={16}/></AppButton>
-      <AppButton className="auth-link" disabled={busy} onClick={()=>void logout()}><LogOut size={16}/> Sair da conta</AppButton>
-    </div>
-  </AuthLayout>;
+  if(!usable)return <RestrictedAccessPage access={access} busy={busy} onRetry={()=>setAttempt(n=>n+1)} onLogout={()=>void logout()}/>;
   return <AccessContext.Provider value={access}>{children}</AccessContext.Provider>;
 }
 export function AccessSummary(){

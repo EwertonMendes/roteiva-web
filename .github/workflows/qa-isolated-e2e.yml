@@ -36,6 +36,7 @@ on:
       - 'tests/browser/drive-folders.spec.ts'
       - 'tests/browser/project-covers.spec.ts'
       - 'tests/browser/access-isolated-e2e.spec.ts'
+      - 'tests/browser/access.spec.ts'
       - 'tests/browser/fixtures.ts'
       - 'src/features/access/**'
       - 'src/features/auth/**'
@@ -101,7 +102,7 @@ jobs:
         run: >
           pnpm exec firebase emulators:exec --project demo-roteiva --only auth,firestore
           "pnpm exec playwright test tests/browser/reviews.spec.ts tests/browser/reviews-workflow.spec.ts
-          tests/browser/access-isolated-e2e.spec.ts tests/browser/drive-folders.spec.ts
+          tests/browser/access-isolated-e2e.spec.ts tests/browser/access.spec.ts tests/browser/drive-folders.spec.ts
           tests/browser/project-covers.spec.ts --grep @ci-smoke --workers=2 --reporter=line"
       - name: Prepare long-video regression fixture encoder
         run: |

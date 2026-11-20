@@ -1,193 +1,188 @@
-import {useEffect,useState} from "react";
-import {API_BASE_URL,appEnvironment} from "../../lib/environment";
-import {firebaseServices} from "../../lib/firebase";
-import {useAuth} from "../auth/AuthProvider";
+
+import {useEffect,useId,useState} from "react";
+import {ArrowUpRight,CalendarDays,ChevronDown,CreditCard,RefreshCw} from "lucide-react";
+import type {AccessInfo} from "../../data/access-watch";
 import {AppButton} from "../ui/AppButton";
-import {AppInput} from "../ui/AppInput";
+import {ConfirmationDialog} from "../ui/ConfirmationDialog";
+import {useAuth} from "../auth/AuthProvider";
+import {BillingArt} from "./BillingArt";
+import {BillingHistory} from "./BillingHistory";
+import {BillingPlans,CheckoutConsent} from "./BillingPlans";
+import {billingDate,billingInThisBuild,billingRequest,cadence,money,planNames,sandboxLink,type BillingStatus,type Plan,type Subscription} from "./billing-data";
 import "./billing.css";
 
-type PlanCode="monthly"|"quarterly"|"yearly";
-type Plan={code:PlanCode;amountCents:number;version:string};
-type BillingStatus={
-  checkoutAvailable:boolean;canStart:boolean;
-  access:{active:boolean}|null;
-  notice:{code:string;daysRemaining:number|null}|null;
-  checkout:{planCode:PlanCode;status:"ready"|"pending";url:string|null}|null;
-  subscription:{planCode:PlanCode;status:string;paidUntil:string|null;nextDueOn:string|null;
-    amountCents:number|null;paymentMethod:string|null;canCancel:boolean;cancellation:"pending"|"review"|null}|null;
-  payments:{state:string;amountCents:number;dueOn:string|null;invoiceUrl:string|null}[];
+const subscriptionStates:Record<string,{label:string;tone:string}> = {
+  active:{label:"Renovação ativa",tone:"positive"},
+  past_due:{label:"Em atraso",tone:"critical"},
+  canceled:{label:"Renovação cancelada",tone:"warning"},
+  expired:{label:"Expirada",tone:"neutral"},
 };
-const plans:Record<PlanCode,string>={monthly:"Mensal",quarterly:"Trimestral",yearly:"Anual"};
-const frequency:Record<PlanCode,string>={monthly:"por mês",quarterly:"a cada 3 meses",yearly:"por ano"};
-const labels:Record<string,string>={
-  active:"Renovação ativa",past_due:"Em atraso",canceled:"Renovação cancelada",expired:"Expirada",
-  pending:"Pendente",overdue:"Vencida",confirmed:"Confirmada",received:"Recebida",refused:"Cartão recusado",
-  refunded:"Estornada",chargeback:"Contestada",review:"Em análise",
+const callbacks:Record<string,string> = {
+  return:"Estamos confirmando seu pagamento.",
+  cancelled:"O checkout foi interrompido.",
+  expired:"O prazo do checkout terminou.",
 };
-const notices:Record<string,string>={
-  trial_ending:"Seu teste gratuito está perto de terminar.",
-  complimentary_ending:"Seu acesso de cortesia está perto de terminar.",
-  subscription_renewal_soon:"Sua assinatura está perto da renovação.",
-  canceled_until:"A renovação foi cancelada. Seu acesso termina na data indicada.",
-  payment_grace:"Seu acesso está no período de tolerância. Regularize a cobrança pendente.",
-};
-const currency=new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"});
-const dateFormat=new Intl.DateTimeFormat("pt-BR",{timeZone:"America/Sao_Paulo",dateStyle:"medium"});
-const money=(cents:number)=>currency.format(cents/100);
-const dateLabel=(date:string)=>dateFormat.format(new Date(date.length===10?date+"T12:00:00-03:00":date));
-export const billingInThisBuild=appEnvironment.appEnv==="dev"||appEnvironment.appEnv==="emulator";
 
-async function call<T>(path:string,uid:string,body?:object,signal?:AbortSignal):Promise<T>{
-  const {auth}=firebaseServices();
-  const user=auth.currentUser;
-  if(user?.uid!==uid)throw Error("Entre novamente para consultar sua assinatura.");
-  const token=await user.getIdToken();
-  if(auth.currentUser?.uid!==uid)throw Error("Sua sessão mudou. Entre novamente.");
-  const response=await fetch(API_BASE_URL+path,{method:body?"POST":"GET",cache:"no-store",
-    headers:{Authorization:"Bearer "+token,...(body?{"Content-Type":"application/json"}:{})},
-    body:body?JSON.stringify(body):undefined,signal:signal??AbortSignal.timeout(18000)});
-  if(!response.ok)throw Error("A área de assinatura está temporariamente indisponível. Tente novamente.");
-  const data=await response.json() as T;
-  if(auth.currentUser?.uid!==uid)throw Error("Sua sessão mudou. Entre novamente.");
-  return data;
+export function BillingPanel({access,locked=false}:{access:AccessInfo;locked?:boolean}) {
+  const {user} = useAuth();
+  if(!user||!billingInThisBuild) return null;
+  return <BillingAccount key={user.uid} uid={user.uid} access={access} locked={locked}/>;
 }
 
-function sandboxLink(value:string|null|undefined,kind:"checkout"|"invoice"):string|undefined{
-  const url=value?URL.parse(value):null;
-  if(url?.origin!=="https://sandbox.asaas.com"||url.username||url.password||url.hash)return;
-  if(kind==="invoice"&&/^\/i\/[A-Za-z0-9_-]+$/.test(url.pathname)&&!url.search)return url.href;
-  if(kind==="checkout"&&(
-    /^(?:\/000)?\/checkoutSession\/show\/[A-Za-z0-9_-]+$/.test(url.pathname)&&!url.search||
-    url.pathname==="/checkoutSession/show"&&/^\?id=[A-Za-z0-9_-]+$/.test(url.search)
-  ))return url.href;
-}
+function BillingAccount({uid,access,locked}:{uid:string;access:AccessInfo;locked:boolean}) {
+  const heading = useId();
+  const [result,setResult] = useState<{status:BillingStatus;revision:number}|null>(null);
+  const [catalog,setCatalog] = useState<Plan[]>([]);
+  const [attempt,setAttempt] = useState(0);
+  const [selected,setSelected] = useState<Plan|null>(null);
+  const [canceling,setCanceling] = useState(false);
+  const [showPlans,setShowPlans] = useState(false);
+  const [error,setError] = useState("");
+  const [catalogError,setCatalogError] = useState(false);
+  const [message,setMessage] = useState("");
+  const [checkoutPending,setCheckoutPending] = useState(false);
+  const refreshKey = access.accessUntil.getTime();
+  const callback = locked ? new URLSearchParams(window.location.search).get("billing") : null;
+  const status = result?.status;
+  const subscription = status?.subscription;
+  const checkoutUrl = access.suspended ? undefined : sandboxLink(status?.checkout?.url,"checkout");
+  const canStart = locked && !!status?.canStart && !access.suspended;
+  const readCatalog = !access.suspended && (canStart || showPlans);
 
-export function BillingPanel({locked=false,refreshKey}:{locked?:boolean;refreshKey?:number}){
-  const {user}=useAuth();
-  const uid=user?.uid;
-  const [status,setStatus]=useState<BillingStatus|null>(null);
-  const [catalog,setCatalog]=useState<Plan[]>([]);
-  const [attempt,setAttempt]=useState(0);
-  const [selected,setSelected]=useState<Plan|null>(null);
-  const [accepted,setAccepted]=useState(false);
-  const [canceling,setCanceling]=useState(false);
-  const [working,setWorking]=useState(false);
-  const [error,setError]=useState("");
-  const [message,setMessage]=useState("");
-  const callback=new URLSearchParams(window.location.search).get("billing");
-  useEffect(()=>{
-    if(!uid||!billingInThisBuild)return;
-    const controller=new AbortController();
-    const signal=AbortSignal.any([controller.signal,AbortSignal.timeout(18000)]);
+  useEffect(() => {
+    const controller = new AbortController();
     setError("");
-    void call<BillingStatus>("/billing/status",uid,undefined,signal).then(async data=>{
-      if(signal.aborted)return;
-      setStatus(data);
-      if(data.canStart){
-        const result=await call<{plans:Plan[]}>("/billing/plans",uid,undefined,signal);
-        if(!signal.aborted)setCatalog(result.plans);
-      }
-    }).catch(()=>{if(!controller.signal.aborted)setError("Não foi possível consultar sua assinatura.");});
+    void billingRequest<BillingStatus>("/billing/status",uid,undefined,controller.signal).then(data=>{
+      if(!controller.signal.aborted) setResult(previous=>({status:data,revision:(previous?.revision??0)+1}));
+    }).catch(()=>{
+      if(!controller.signal.aborted) setError("Não foi possível consultar os dados da assinatura.");
+    });
     return ()=>controller.abort();
-  },[uid,attempt,refreshKey]);
+  },[uid,attempt,refreshKey,access.suspended]);
 
-  if(!uid||!billingInThisBuild)return null;
-  const account=uid;
-  const subscription=status?.subscription;
-  const checkoutUrl=sandboxLink(status?.checkout?.url,"checkout");
+  useEffect(() => {
+    if(!readCatalog) return;
+    const controller = new AbortController();
+    setCatalogError(false);
+    void billingRequest<{plans:Plan[]}>("/billing/plans",uid,undefined,controller.signal).then(data=>{
+      if(!controller.signal.aborted) setCatalog(data.plans);
+    }).catch(()=>{
+      if(!controller.signal.aborted) setCatalogError(true);
+    });
+    return ()=>controller.abort();
+  },[uid,attempt,readCatalog]);
 
-  async function confirmCheckout(){
-    if(!selected||!accepted||working)return;
-    setWorking(true);setError("");setMessage("");
-    try{
-      const result=await call<{url?:string;status:string}>("/billing/checkout",account,{
-        planCode:selected.code,catalogVersion:selected.version,acceptedImmediateCharge:true,
-      });
-      const url=sandboxLink(result.url,"checkout");
-      if(url){window.location.assign(url);return;}
-      setMessage("Estamos verificando a criação do checkout. Atualize a consulta antes de tentar novamente.");
-      setSelected(null);setAttempt(value=>value+1);
-    }catch(reason){setError(reason instanceof Error?reason.message:"Não foi possível abrir o checkout.");}
-    finally{setWorking(false);}
-  }
-  async function cancelRenewal(){
-    setWorking(true);setError("");setMessage("");
-    try{
-      const result=await call<{status:string}>("/billing/cancel",account,{confirmed:true});
-      if(result.status==="canceled")setMessage("Renovação cancelada. Seu período pago continua disponível até o vencimento.");
-      setCanceling(false);setAttempt(value=>value+1);
-    }catch(reason){setError(reason instanceof Error?reason.message:"Não foi possível cancelar a renovação.");}
-    finally{setWorking(false);}
+  const refresh = () => setAttempt(value=>value+1);
+
+  async function confirmCheckout(plan:Plan) {
+    if(!canStart) return;
+    const response = await billingRequest<{url?:string;status:string}>("/billing/checkout",uid,{
+      planCode:plan.code,catalogVersion:plan.version,acceptedImmediateCharge:true,
+    });
+    const url = sandboxLink(response.url,"checkout");
+    if(url){ window.location.assign(url);return; }
+    setSelected(null);
+    setCheckoutPending(true);
+    refresh();
   }
 
-  return <section className={locked?"billing-panel billing-panel--locked":"settings-editor billing-panel"} aria-labelledby="billing-title">
-    <h3 id="billing-title">Assinatura</h3>
-    {callback==="return"&&locked&&<p role="status">Estamos confirmando seu pagamento.</p>}
-    {status?.notice&&notices[status.notice.code]&&<p>{notices[status.notice.code]}</p>}
-    {callback==="cancelled"&&<p>A jornada de checkout foi interrompida. Confira a situação abaixo.</p>}
-    {callback==="expired"&&<p>O prazo do checkout terminou. Confira a situação abaixo.</p>}
-    {error&&<p role="alert">{error}</p>}
-    {message&&<p role="status">{message}</p>}
-    {!status&&!error&&<p role="status">Consultando assinatura…</p>}
-    {subscription&&<>
-      <dl className="billing-summary">
-        <div><dt>Plano</dt><dd>{plans[subscription.planCode]}</dd></div>
-        <div><dt>Situação</dt><dd>{labels[subscription.status]??"Em análise"}</dd></div>
-        {subscription.amountCents!==null&&<div><dt>Preço contratado</dt><dd>{money(subscription.amountCents)} {frequency[subscription.planCode]}</dd></div>}
-        {subscription.paymentMethod==="CREDIT_CARD"&&<div><dt>Forma de pagamento</dt><dd>Cartão de crédito</dd></div>}
-        {subscription.nextDueOn&&<div><dt>Próxima cobrança</dt><dd>{dateLabel(subscription.nextDueOn)}</dd></div>}
-        {subscription.paidUntil&&<div><dt>Acesso pago até</dt><dd>{dateLabel(subscription.paidUntil)}</dd></div>}
-      </dl>
-      {subscription.status==="past_due"&&<p>Há uma cobrança em atraso. Consulte o histórico para regularizar seu plano.</p>}
-      {subscription.cancellation==="pending"&&<p role="status">Cancelamento solicitado. Aguardamos a confirmação do Asaas.</p>}
-      {subscription.cancellation==="review"&&<p>Precisamos revisar o cancelamento. <a href="/suporte.html">Entre em contato com o suporte</a>.</p>}
-      {subscription.canCancel&&!canceling&&<AppButton variant="secondary" onClick={()=>setCanceling(true)}>Cancelar renovação</AppButton>}
-      {subscription.canCancel&&canceling&&<div className="billing-confirm">
-        <p>{subscription.paidUntil?"Você mantém o acesso pago até "+dateLabel(subscription.paidUntil)+". ":""}
-          O cancelamento interrompe futuras cobranças. Você poderá escolher outra periodicidade ao fim do acesso vigente.</p>
-        <div className="billing-actions">
-          <AppButton variant="secondary" disabled={working} onClick={()=>setCanceling(false)}>Manter assinatura</AppButton>
-          <AppButton variant="danger" disabled={working} onClick={()=>void cancelRenewal()}>Confirmar cancelamento</AppButton>
-        </div>
-      </div>}
-    </>}
-    {status?.checkout&&(checkoutUrl?
-      <a className="billing-link" href={checkoutUrl} rel="noreferrer">Retomar checkout {plans[status.checkout.planCode].toLowerCase()}</a>:
-      <p role="status">Existe uma tentativa de contratação em análise.</p>)}
-    {status?.checkoutAvailable&&!status.canStart&&!status.checkout&&!subscription&&
-      <p>A contratação fica disponível ao término do seu acesso gratuito.</p>}
-    {status&&!status.checkoutAvailable&&!subscription&&<p>Contratação online indisponível no momento.</p>}
-    {status?.canStart&&catalog.length>0&&<>
-      <p>Todos os planos incluem acesso completo, com renovação por cartão.</p>
-      <ul className="billing-plans">
-        {catalog.map(plan=><li key={plan.code}>
-          <div><strong>{plans[plan.code]}</strong><span>{money(plan.amountCents)} {frequency[plan.code]}</span></div>
-          <AppButton variant="secondary" aria-pressed={selected?.code===plan.code} disabled={working}
-            onClick={()=>{setSelected(plan);setAccepted(false);}}>Escolher {plans[plan.code].toLowerCase()}</AppButton>
-        </li>)}
-      </ul>
-    </>}
-    {selected&&status?.canStart&&<div className="billing-confirm">
-      <label>
-        <AppInput type="checkbox" checked={accepted} disabled={working} onChange={event=>setAccepted(event.target.checked)}/>
-        Aceito a cobrança de {money(selected.amountCents)} ao concluir o checkout e a renovação {frequency[selected.code]} pelo mesmo valor.
-      </label>
-      <AppButton disabled={!accepted||working} onClick={()=>void confirmCheckout()}>{working?"Abrindo checkout…":"Continuar para o Asaas Sandbox"}</AppButton>
+  async function cancelRenewal() {
+    const response = await billingRequest<{status:string}>("/billing/cancel",uid,{confirmed:true});
+    if(response.status==="canceled") setMessage("Renovação cancelada. Seu acesso pago continua até o fim do período.");
+    setCanceling(false);
+    refresh();
+  }
+
+  return <section className="billing-panel" aria-labelledby={heading}>
+    {!locked&&<h2 id={heading} className="billing-section-title">Assinatura</h2>}
+    {locked&&<h2 id={heading} className="billing-sr-only">Assinatura</h2>}
+    {!locked&&!subscription&&<TrialOrComplimentary access={access} ending={status?.notice?.code.endsWith("_ending")??false}/>}
+    {subscription&&<PlanSummary subscription={subscription} illustrated={!locked} access={access} locked={locked}
+      grace={status?.notice?.code==="payment_grace"} onCancel={()=>setCanceling(true)}/>}
+    {callback&&callbacks[callback]&&<p className="billing-notice" role="status">{callbacks[callback]}</p>}
+    {message&&<p className="billing-notice" role="status">{message}</p>}
+    {checkoutPending&&!status?.checkout&&!access.suspended&&<p className="billing-notice" role="status">Estamos verificando a criação do checkout.</p>}
+    {!status&&!error&&<p className="billing-notice" role="status">Consultando assinatura…</p>}
+    {error&&<p className="billing-inline-error" role="alert">{error}</p>}
+    {status?.checkout&&!access.suspended&&<div className="billing-notice billing-next-action">
+      <div><strong>Checkout {planNames[status.checkout.planCode].toLowerCase()}</strong>
+        <p role={checkoutUrl?undefined:"status"}>{checkoutUrl?"Conclua o pagamento no Asaas.":"Estamos verificando a tentativa de contratação."}</p>
+      </div>
+      {checkoutUrl&&<a className="billing-text-link" href={checkoutUrl} rel="noreferrer">Retomar checkout <ArrowUpRight size={17}/></a>}
     </div>}
-    {!!status?.payments.length&&<>
-      <h4>Histórico de cobranças</h4>
-      <ul className="billing-history">{status.payments.map((payment,index)=>{
-        const invoice=sandboxLink(payment.invoiceUrl,"invoice");
-        return <li key={index}>
-          <span>{payment.dueOn?dateLabel(payment.dueOn):"Data indisponível"}</span>
-          <strong>{money(payment.amountCents)}</strong>
-          <span>{labels[payment.state]??"Em análise"}</span>
-          {invoice&&<a href={invoice} target="_blank" rel="noreferrer">Abrir fatura</a>}
-        </li>;
-      })}</ul>
-    </>}
-    {(status?.checkoutAvailable||status?.subscription||error||callback)&&(
-      <AppButton variant="secondary" disabled={working} onClick={()=>setAttempt(value=>value+1)}>Atualizar assinatura</AppButton>
-    )}
+    {locked&&status&&!access.suspended&&!status.checkout&&!canStart&&!status.checkoutAvailable&&
+      <p className="billing-notice">Contratação online indisponível no momento.</p>}
+    {!locked&&status?.checkoutAvailable&&!status.checkout&&
+      <AppButton variant="secondary" className="billing-toggle-plans" aria-expanded={showPlans} onClick={()=>setShowPlans(value=>!value)}>
+        {showPlans?"Ocultar planos":"Ver planos"} <ChevronDown size={17} aria-hidden="true"/>
+      </AppButton>}
+    {readCatalog&&catalog.length>0&&<BillingPlans catalog={catalog} canStart={canStart} onSelect={setSelected}/>}
+    {readCatalog&&!catalog.length&&!catalogError&&<p className="billing-notice" role="status">Consultando os planos…</p>}
+    {catalogError&&readCatalog&&<p className="billing-inline-error" role="alert">Não foi possível carregar os planos.</p>}
+    {(error||(catalogError&&readCatalog)||subscription?.cancellation==="pending"||
+      (!access.suspended&&(callback==="return"||status?.checkout?.status==="pending"||(checkoutPending&&!status?.checkout))))&&
+      <AppButton variant="secondary" className="billing-refresh" onClick={refresh}><RefreshCw size={16} aria-hidden="true"/> Atualizar assinatura</AppButton>}
+    {status&&(!locked||status.payments.length>0)&&<BillingHistory key={result?.revision} firstPage={status} uid={uid}/>}
+    {selected&&canStart&&<CheckoutConsent plan={selected} onClose={()=>setSelected(null)} onConfirm={()=>confirmCheckout(selected)}/>}
+    {subscription?.canCancel&&canceling&&<ConfirmationDialog title="Cancelar renovação?"
+      description={`As cobranças futuras serão interrompidas.${subscription.paidUntil?` Você mantém seu acesso pago até ${billingDate(subscription.paidUntil)}.`:""}`}
+      confirmLabel="Confirmar cancelamento" cancelLabel="Manter assinatura" onCancel={()=>setCanceling(false)} onConfirm={cancelRenewal}/>}
   </section>;
+}
+
+function TrialOrComplimentary({access,ending}:{access:AccessInfo;ending:boolean}) {
+  const trial = access.source==="trial";
+  return <div className="billing-account-card billing-account-card--illustrated">
+    <div className="billing-account-copy">
+      <span className="billing-pill" data-tone={ending?"warning":"positive"}>{ending?"Termina em breve":"Acesso ativo"}</span>
+      <h3>{trial?"Período de teste gratuito":access.unlimited||access.source==="complimentary"?"Acesso de cortesia":"Seu acesso"}</h3>
+      <p className="billing-account-date"><CalendarDays size={17} aria-hidden="true"/>
+        {access.unlimited?"Sem vencimento programado":`Disponível até ${billingDate(access.accessUntil)}`}
+      </p>
+      {trial&&<p className="billing-muted">Seu teste gratuito dura 7 dias, sem cobrança automática.</p>}
+    </div>
+    <div className="billing-account-art"><BillingArt name="access"/></div>
+  </div>;
+}
+
+function PlanSummary({subscription,access,locked,illustrated,grace,onCancel}:{
+  subscription:Subscription;access:AccessInfo;locked:boolean;illustrated:boolean;grace:boolean;onCancel:()=>void;
+}) {
+  const status = subscriptionStates[subscription.status] ?? {label:"Em análise",tone:"neutral"};
+  const next = subscription.status==="active" ? subscription.nextDueOn : null;
+  const paidUntil = subscription.paidUntil;
+  const canCancel = subscription.canCancel;
+  return <div className="billing-current">
+    <div className={`billing-account-card${illustrated?" billing-account-card--illustrated":""}`}>
+      <div className="billing-account-copy">
+        <span className="billing-pill" data-tone={status.tone}>{status.label}</span>
+        <h3>Plano {planNames[subscription.planCode].toLowerCase()}</h3>
+        {subscription.amountCents!==null&&<div className="billing-price">
+          <strong>{money(subscription.amountCents)}</strong><span>{cadence[subscription.planCode]}</span>
+        </div>}
+      </div>
+      {illustrated&&<div className="billing-account-art"><BillingArt name={subscription.planCode}/></div>}
+    </div>
+    <dl className="billing-details">
+      {paidUntil&&<div><CalendarDays size={19} aria-hidden="true"/><div>
+        <dt>{locked||Date.parse(paidUntil)<=Date.now()?"Período pago até":"Acesso pago até"}</dt>
+        <dd><time dateTime={paidUntil}>{billingDate(paidUntil)}</time></dd>
+      </div></div>}
+      {next&&<div><CalendarDays size={19} aria-hidden="true"/><div><dt>Próxima cobrança</dt>
+        <dd><time dateTime={next}>{billingDate(next)}</time></dd></div></div>}
+      {subscription.paymentMethod==="CREDIT_CARD"&&<div><CreditCard size={19} aria-hidden="true"/><div>
+        <dt>Forma de pagamento</dt><dd>Cartão de crédito</dd>
+      </div></div>}
+      {!locked&&access.source!=="subscription"&&<div><CalendarDays size={19} aria-hidden="true"/><div>
+        <dt>{access.source==="trial"?"Teste gratuito":access.source==="complimentary"?"Acesso de cortesia":"Acesso atual"}</dt>
+        <dd>{access.unlimited?"Sem vencimento programado":`Até ${billingDate(access.accessUntil)}`}</dd>
+      </div></div>}
+    </dl>
+    {(subscription.status==="past_due"||subscription.cancellation||canCancel)&&<div className="billing-manage">
+      {subscription.status==="past_due"&&<p>{grace?`Seu acesso continua até ${billingDate(access.accessUntil)}. `:""}Consulte o histórico para regularizar a cobrança em atraso.</p>}
+      {subscription.cancellation==="pending"&&<p role="status">O cancelamento aguarda confirmação do Asaas.</p>}
+      {subscription.cancellation==="review"&&<p>O cancelamento precisa de revisão. <a href="/suporte.html">Fale com o suporte</a>.</p>}
+      {canCancel&&<AppButton variant="secondary" onClick={onCancel}>Cancelar renovação</AppButton>}
+    </div>}
+  </div>;
 }

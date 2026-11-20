@@ -189,3 +189,120 @@ test('new identity cannot bypass an unavailable deletion-status guard',async({pa
   await page.getByRole('button',{name:'Criar meu espaço de trabalho'}).click();
   await expect(page.locator('.app-shell')).toBeVisible();
 });
+
+
+test('billing summary, responsive history and restricted checkout use the same billing data',{tag:'@ci-smoke'},async({page},info)=>{
+  const email='billing-layout-'+info.project.name+'@example.com';
+  await signup(page,email);
+  if(info.project.name==='mobile') await page.setViewportSize({width:320,height:780});
+  const validInvoice='https://sandbox.asaas.com/i/test-fatura';
+  const first=Array.from({length:5},(_,index)=>({
+    state:index===0?'overdue':index===1?'refunded':'confirmed',amountCents:39990,
+    dueOn:`2026-11-${20-index}`,invoiceUrl:index===0?validInvoice:null,
+  }));
+  const older={state:'refused',amountCents:3990,dueOn:null,invoiceUrl:'https://untrusted.example/i/test'};
+  const headers={'Access-Control-Allow-Origin':cloud,'Access-Control-Allow-Methods':'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers':'Authorization, Content-Type'};
+  let stage:'active'|'expired'|'suspended'='active',historyRequests=0,checkoutRequests=0;
+  await page.route(/^http:\/\/127\.0\.0\.1:8787\/billing\/(status|plans|checkout)(\?.*)?$/,async route=>{
+    const request=route.request(),url=new URL(request.url());
+    if(request.method()==='OPTIONS') return route.fulfill({status:204,headers});
+    if(url.pathname.endsWith('/plans')) return route.fulfill({headers,json:{plans:[
+      {code:'monthly',amountCents:3990,version:'test'},
+      {code:'quarterly',amountCents:10990,version:'test'},
+      {code:'yearly',amountCents:39990,version:'test'},
+    ]}});
+    if(url.pathname.endsWith('/checkout')){
+      checkoutRequests++;
+      expect(request.postDataJSON()).toEqual({planCode:'yearly',catalogVersion:'test',acceptedImmediateCharge:true});
+      return route.fulfill({headers,json:{status:'pending'}});
+    }
+    if(url.searchParams.get('paymentCursor')==='previous-cycle'){
+      historyRequests++;
+      if(historyRequests===1) return route.fulfill({status:503,headers,json:{}});
+      return route.fulfill({headers,json:{payments:[older],nextPaymentCursor:null}});
+    }
+    return route.fulfill({headers,json:{
+      checkoutAvailable:true,canStart:stage==='expired'&&!checkoutRequests,checkout:null,notice:null,
+      subscription:stage==='expired'?null:{
+        planCode:'yearly',status:'canceled',paidUntil:'2027-11-20T15:00:00.000Z',nextDueOn:null,
+        amountCents:39990,paymentMethod:'CREDIT_CARD',canCancel:false,cancellation:null,
+      },
+      payments:first,nextPaymentCursor:'previous-cycle',
+    }});
+  });
+  await changeAccess(email,{source:'subscription',accessUntil:Timestamp.fromMillis(Date.now()+86400000)});
+  await page.goto(cloud+'/configuracoes');
+  const billing=page.getByRole('region',{name:'Assinatura',exact:true});
+  await expect(billing.getByRole('heading',{name:'Plano anual'})).toBeVisible();
+  await expect(billing.getByText('Renovação cancelada',{exact:true})).toBeVisible();
+  const history=billing.getByRole('region',{name:'Histórico de cobranças'});
+  await expect(history.getByRole('row')).toHaveCount(6);
+  await expect(history.getByRole('link',{name:/Abrir fatura/})).toHaveAttribute('href',validInvoice);
+  const next=history.getByRole('button',{name:'Próxima página'});
+  await next.click();
+  await expect(history.getByRole('alert')).toContainText('Não foi possível carregar');
+  await expect(history.getByRole('row')).toHaveCount(6);
+  await next.click();
+  await expect(history.getByRole('status')).toHaveText('Página 2');
+  await expect(history.getByText('Cartão recusado')).toBeVisible();
+  await expect(history.getByRole('link')).toHaveCount(0);
+  await expect(next).toHaveAttribute('aria-disabled','true');
+  await history.getByRole('button',{name:'Página anterior'}).click();
+  await expect(history.getByRole('status')).toHaveText('Página 1');
+  await next.click();
+  await expect(history.getByRole('status')).toHaveText('Página 2');
+  expect(historyRequests).toBe(2);
+  await history.getByRole('button',{name:'Página anterior'}).click();
+
+  const fitsViewport=async(selector:string)=>page.locator(selector).evaluate(node=>{
+    const viewport=document.documentElement.clientWidth;
+    return document.documentElement.scrollWidth<=viewport+1 &&
+      Array.from(node.querySelectorAll<HTMLElement>('.billing-account-card,.billing-plan,.billing-table-row,.billing-access-hero')).every(element=>{
+        const box=element.getBoundingClientRect();
+        return box.left>=-1&&box.right<=viewport+1&&element.scrollWidth<=element.clientWidth+1;
+      });
+  });
+  for(const theme of ['light','dark']){
+    await page.getByRole('button',{name:theme==='light'?'Claro':'Escuro',exact:true}).click();
+    await expect.poll(()=>fitsViewport('.billing-panel')).toBe(true);
+    if(process.env.ROTEIVA_BILLING_CAPTURE){
+      await billing.screenshot({path:info.outputPath(`assinatura-${theme}.png`)});
+    }
+  }
+  await billing.getByRole('button',{name:'Ver planos'}).click();
+  await expect(billing.getByRole('heading',{name:'Planos de assinatura'})).toBeVisible();
+  await expect(billing.getByText(/16% de economia/)).toBeVisible();
+  await expect(billing.getByRole('button',{name:/Escolher/})).toHaveCount(0);
+
+  stage='expired';
+  await changeAccess(email,{accessUntil:Timestamp.fromMillis(Date.now()-60000)});
+  await expect(page.getByRole('heading',{name:'Seu período de acesso terminou.'})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Escolha seu plano'})).toBeVisible();
+  await expect.poll(()=>page.locator('.billing-access img.billing-art').evaluateAll(images=>images.every(image=>(image as HTMLImageElement).naturalWidth>0))).toBe(true);
+  await expect.poll(()=>fitsViewport('.billing-access')).toBe(true);
+  if(process.env.ROTEIVA_BILLING_CAPTURE) await page.screenshot({path:info.outputPath('planos.png'),fullPage:true});
+  await page.getByRole('button',{name:'Escolher anual'}).click();
+  const dialog=page.getByRole('dialog',{name:'Plano anual'});
+  await expect(dialog).toBeVisible();
+  const confirm=dialog.getByRole('button',{name:'Continuar para o Asaas Sandbox'});
+  await expect(confirm).toBeDisabled();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('button',{name:'Escolher anual'})).toBeFocused();
+  await page.getByRole('button',{name:'Escolher anual'}).click();
+  await dialog.getByRole('checkbox').check();
+  await confirm.click();
+  await expect(page.getByText('Estamos verificando a criação do checkout.')).toBeVisible();
+  expect(checkoutRequests).toBe(1);
+
+  stage='suspended';
+  await changeAccess(email,{suspended:true});
+  await expect(page.getByRole('heading',{name:'Acesso temporariamente suspenso.'})).toBeVisible();
+  await expect(page.getByRole('link',{name:'Fale com o suporte'})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Plano anual'})).toBeVisible();
+  await expect(page.getByRole('button',{name:/Escolher|Excluir conta/})).toHaveCount(0);
+  await expect(page.getByText('Estamos verificando a criação do checkout.')).toHaveCount(0);
+  await expect(page.locator('.app-shell')).toHaveCount(0);
+  await expect.poll(()=>fitsViewport('.billing-access')).toBe(true);
+  if(process.env.ROTEIVA_BILLING_CAPTURE) await page.screenshot({path:info.outputPath('suspensa.png'),fullPage:true});
+});

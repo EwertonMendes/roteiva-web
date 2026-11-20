@@ -152,7 +152,7 @@ test("billing requires consent and a callback alone never restores the workspace
   await expect(submit).toBeDisabled();
   await page.getByRole("checkbox",{name:/Aceito a cobrança/}).check();
   await submit.click();
-  await expect(page.getByText("Existe uma tentativa de contratação em análise.")).toBeVisible();
+  await expect(page.getByRole("status").filter({hasText:"Estamos verificando a tentativa de contratação."})).toBeVisible();
   expect(requested).toBe(1);
   await expect(page.locator(".app-shell")).toHaveCount(0);
   await setEntitlement(uid,{source:"subscription",accessUntil:Timestamp.fromMillis(Date.now()+86400000)});
