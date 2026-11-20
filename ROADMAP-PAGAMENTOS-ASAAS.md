@@ -14,6 +14,8 @@
 
 **Decisão tomada para o primeiro ensaio.** Checkout apenas após o término de trial, cortesia ou período pago. O consentimento informa cobrança ao concluir e recorrência pelo preço do catálogo. Para trocar a cadência, cancelar a renovação e escolher o novo ciclo ao fim do acesso pago. O checkout documenta `nextDueDate`, mas o agendamento pós-trial, reativação da mesma recorrência, atualização hospedada do cartão e Pix exigem validação própria. Estornos parciais e contradições de vínculo seguem para revisão. A suspensão administrativa continua prevalecendo na autorização; a cessação de cobranças de contas suspensas exige operação de suporte e homologação.
 
+**Evidência automatizada.** [PR #191](https://github.com/EwertonMendes/roteiva-web/pull/191). Em Windows, passaram a suíte API (353), a suíte frontend (141), o Playwright de acesso desktop/mobile (24) e as Rules do Firestore no emulador (37). A migração rodou em D1 local. Conta Google descartável autenticada em DEV com acesso expirado, verificada diretamente na projeção. O teste com cartão Sandbox aguarda o deploy.
+
 **Bloqueios para ativação geral.** Confirmar pelo menos um pagamento Sandbox ponta a ponta, incluindo o formato efetivo do ID/URL do checkout e a associação da primeira cobrança a `checkoutSession`; testar os três ciclos, recusa, renovação, recuperação, cancelamento, estorno e isolamento de contas. Confirmar a capacidade de recuperar checkout sem resposta quando o evento não contém `externalReference`; o caso permanece bloqueado para revisão, com a mesma intenção. Medir latência e CPU dos crons no plano gratuito. Confirmar políticas de retenção aplicáveis antes de promover. Registre a evidência por caso, inclusive limitações do Sandbox.
 
 ## 1. Decisões de produto

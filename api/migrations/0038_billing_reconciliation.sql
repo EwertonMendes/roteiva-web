@@ -47,3 +47,9 @@ CREATE TABLE billing_access_projections (
   last_error_code TEXT
 );
 CREATE INDEX billing_access_projections_due ON billing_access_projections(next_attempt_at);
+
+-- A separate privileged access update may already own sync_pending.
+CREATE TRIGGER billing_projection_respects_existing_fence BEFORE INSERT ON billing_access_projections
+WHEN EXISTS (SELECT 1 FROM access_accounts WHERE owner_uid=NEW.owner_uid AND sync_pending=1)
+  AND NOT EXISTS (SELECT 1 FROM billing_access_projections WHERE owner_uid=NEW.owner_uid)
+BEGIN SELECT RAISE(ABORT,'access_sync_pending'); END;

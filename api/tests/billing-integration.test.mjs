@@ -143,7 +143,12 @@ test('verified payments restore projection, survive retries, renew once, and rev
 
   payment={...payment,status:'CONFIRMED'};
   outage=true;
+  s.sql.exec("UPDATE access_accounts SET sync_pending=1 WHERE owner_uid='owner'");
   await event(s.env,'PAYMENT_CONFIRMED','payment','pay_a');
+  await reconcileBilling(s.env);
+  assert.equal(s.sql.prepare('SELECT state FROM billing_payment_records').get().state,'pending');
+  assert.equal(s.sql.prepare('SELECT count(*) n FROM billing_access_projections').get().n,0);
+  s.sql.exec("UPDATE access_accounts SET sync_pending=0 WHERE owner_uid='owner'; UPDATE billing_webhook_events SET next_attempt_at=0");
   await reconcileBilling(s.env);
   assert.equal(s.sql.prepare('SELECT state FROM billing_payment_records').get().state,'confirmed');
   await assert.rejects(activeState(s.env,'owner'),{code:'access_sync_pending'});

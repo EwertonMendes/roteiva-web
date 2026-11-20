@@ -19,7 +19,7 @@ export const reviewedAdditiveMigrations=Object.freeze({
   '0034_project_deletions.sql':'be2f4fa9a2455511202cac91e993190d84a88a87',
 });
 const reviewedDevAdditiveMigrations=Object.freeze({
-  '0038_billing_reconciliation.sql':'25bc451cb3cb2fc9478b15ba3396c4ecabb74712',
+  '0038_billing_reconciliation.sql':'7ac16cd8702627ad3b21e2433cfebac31544a447',
 });
 
 export function gitBlobSha(content){
