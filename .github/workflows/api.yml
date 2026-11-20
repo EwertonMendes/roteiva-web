@@ -143,4 +143,8 @@ jobs:
           const checkout=await fetch(base+'/billing/checkout',{method:'POST',
             headers:{'Content-Type':'application/json'},body:'{}'});
           assert.equal(checkout.status,404,'Checkout creation must not exist before webhook reconciliation');
+          const webhook=await fetch(base+'/billing/webhooks/asaas',{method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({id:'evt_disabled_smoke',event:'PAYMENT_RECEIVED',payment:{id:'pay_disabled_smoke'}})});
+          assert.equal(webhook.status,404,'Incomplete or missing billing configuration must reject webhooks');
           NODE

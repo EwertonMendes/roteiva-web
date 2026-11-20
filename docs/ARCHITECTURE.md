@@ -1,5 +1,12 @@
 # Arquitetura do Roteiva — MVP SaaS
 
+## Decisão — inbox de Webhooks Asaas com opt-in explícito (20/11/2026)
+
+`api/src/billing-webhook.ts` introduz a fronteira de recepção do webhook Asaas, **somente DEV** e apenas se `BILLING_ENABLED=true`, `ASAAS_API_KEY` e `ASAAS_WEBHOOK_TOKEN` estiverem presentes. A configuração padrão atual não atende a condição: o endpoint responde 404 sem tocar em dados, nenhum secret novo é exigido por pipeline, e nenhum checkout é criado. Mesmo habilitada manualmente, a rota apenas registra os eventos; não renova trial, cortesia ou assinatura, não invoca o Asaas e não publica acesso no Firestore. PROD permanece desativado por uma verificação explícita de ambiente no código até existir reconciliação e homologação.
+
+A autenticação compara o token do cabeçalho `asaas-access-token` com o segredo de webhook independente (não API Key) por digest SHA-256 com comparação de bytes. Content-Type JSON e corpo streaming com limite de 64 KiB evitam leitura irrestrita. Envelope mantém campos `id`, `event` e identificador do recurso relacionado (payment, subscription, checkout); campos adicionais são ignorados conforme a documentação do provedor. `0036_billing_webhook_events.sql` cria inbox D1 único por `provider,event_id` e índice por status/data; não armazena o corpo original, dados de cartão ou dados de clientes. Eventos desconhecidos/sem referência entram em `review`. Duplicatas usam `INSERT OR IGNORE`; HTTP 200 só depois do commit. Falhas D1 retornam 503 para permitir reenvio. `pending` **não significa pagamento confirmado**: a futura fase de conciliação verificará vínculo financeiro/UID, eventos fora de ordem, estornos e sincronização D1/Firestore antes de conceder acesso.
+
+
 ## Decisão — fundação de assinaturas Asaas sem ativar cobrança (20/11/2026)
 
 O catálogo inicial de periodicidades é único e server-side em `api/src/billing-catalog.ts`, usando centavos BRL e versão `2026-11-v1`: mensal 3990, trimestral 10990 e anual 39990. `GET /billing/plans` é **somente leitura**, sob rate limit e guard de ambiente existentes, e explicita `checkoutAvailable:false`; não habilita UI/checkout. `api/src/billing-asaas.ts` isola URLs e credenciais por ambiente, aceita somente rotas internas permitidas, configura timeout e mantém erros categóricos. `BILLING_ENABLED`, `ASAAS_API_KEY` e `ASAAS_WEBHOOK_TOKEN` são **opcionais**: sem conjunto completo, apenas funções futuras de cobrança retornariam indisponibilidade; o restante do app não muda. Mesmo configurado, nenhum endpoint de criação de cobrança foi implementado.

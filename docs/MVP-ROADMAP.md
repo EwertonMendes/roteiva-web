@@ -2,6 +2,8 @@
 
 ## Fundação de pagamentos Asaas — 20/11/2026
 
+**Inbox de Webhooks Asaas (EM PR; validação e deploy pendentes):** rota `POST /billing/webhooks/asaas` aceita eventos somente em **DEV e com configuração Asaas completa explicitamente habilitada**. Com as configurações atuais ausentes, retorna 404. O webhook valida segredo próprio, limita o corpo a 64 KiB, salva referências mínimas em D1 por ID único e só então responde 200. **Não processa pagamentos, não cria cobranças nem altera qualquer direito de acesso.** Migração aditiva `0036_billing_webhook_events.sql`; testes SQLite e request simuladas; etapa de reconciliação ainda planejada.
+
 **PUBLICADO NO DEV; checkout NÃO disponível.** PR [#176](https://github.com/EwertonMendes/roteiva-web/pull/176), SHA `7095f679a79efcb354ae544242d9e3e95fa35636`, [pipeline API DEV 44669884336](https://github.com/EwertonMendes/roteiva-web/actions/runs/44669884336) e [regressão isolada 44669406036](https://github.com/EwertonMendes/roteiva-web/actions/runs/44669406036) aprovadas. Plano detalhado em [ROADMAP-PAGAMENTOS-ASAAS.md](../ROADMAP-PAGAMENTOS-ASAAS.md). A conta Asaas PF foi criada; aprovação documental, Sandbox e credenciais reais ainda não confirmados.
 
 - [x] Roadmap persistido na raiz com políticas de recorrência, cobrança, cancelamento, inadimplência, mudança de periodicidade, segurança e limitações de free tier.
