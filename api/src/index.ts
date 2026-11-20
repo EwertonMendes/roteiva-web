@@ -25,6 +25,7 @@ import {createCheckout} from './billing-checkout.ts';
 import {asaasConfigured,checkoutRouted} from './billing-asaas.ts';
 import {cancelRenewal,retryBillingCancellation} from './billing-management.ts';
 import {reconcileBilling} from './billing-reconciliation.ts';
+import {recoverUpgrade,requestUpgrade,upgradeRouted} from './billing-upgrade.ts';
 import { backfillAccess } from './access-backfill.ts';
 import {dropboxEnabled,dropboxStart,dropboxLaunch,dropboxCallback,dropboxConnections,dropboxList,dropboxMetadata,dropboxRevoke,dropboxThumbnail} from './dropbox.ts';
 import {startDropboxUpload,appendDropboxUpload,finishDropboxUpload,cleanupDropboxUploads} from './dropbox-uploads.ts';
@@ -110,6 +111,12 @@ export async function handle(request: Request, env: Env, ctx?:ExecutionContext):
       await assertNotDeleting(env,uid);
       if(!(await env.API_RATE_LIMIT.limit({key:env.ENVIRONMENT+':billing:'+uid})).success)throw new ApiError(429,'rate_limited');
       response=await createCheckout(request,env,uid);
+    } else if (upgradeRouted(env) && url.pathname==='/billing/upgrade' && request.method==='POST') {
+      if(!allowedFrontend(env,origin))throw new ApiError(403,'origin_required');
+      const uid=await identity(request,env);
+      await assertNotDeleting(env,uid);
+      if(!(await env.API_RATE_LIMIT.limit({key:env.ENVIRONMENT+':billing:'+uid})).success)throw new ApiError(429,'rate_limited');
+      response=await requestUpgrade(env,uid,request);
     } else if (env.ENVIRONMENT==='dev' && asaasConfigured(env) && url.pathname==='/billing/cancel' && request.method==='POST') {
       if(!allowedFrontend(env,origin))throw new ApiError(403,'origin_required');
       const uid=await identity(request,env);
@@ -348,6 +355,7 @@ export default {fetch:handle, scheduled(controller:ScheduledController,env:Env,c
       try{await cleanupExpiredReviews(env);}catch{console.error(JSON.stringify({event:'review_revocation_retry'}));}
       try{await reconcileBilling(env);}catch{console.error(JSON.stringify({event:'billing_scheduler_retry'}));}
       try{await retryBillingCancellation(env);}catch{console.error(JSON.stringify({event:'billing_cancellation_scheduler_retry'}));}
+      try{await recoverUpgrade(env);}catch{console.error(JSON.stringify({event:'billing_upgrade_scheduler_retry'}));}
     }else if(controller.cron==='*/15 * * * *'){
       // D1 security backlog is observed inside the Worker; GitHub never polls it.
       try{await monitorDeletionBacklog(env);}catch{console.error(JSON.stringify({event:'security_backlog_monitor_failed'}));}

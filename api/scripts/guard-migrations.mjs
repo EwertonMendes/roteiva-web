@@ -10,6 +10,7 @@ const devOnlyBilling = new Set([
  '0036_billing_webhook_events.sql',
  '0037_billing_payment_ledger.sql',
  '0038_billing_reconciliation.sql',
+ '0039_billing_plan_changes.sql',
 ]);
 if(target==='prod'){
  if(process.argv.includes('--domain-cutover')){

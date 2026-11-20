@@ -1,5 +1,13 @@
 # Arquitetura do Roteiva — MVP SaaS
 
+## Decisão — upgrade na mesma recorrência (DEV Sandbox)
+
+`POST /billing/upgrade` exige origem DEV, sessão Firebase, limite por titular e a conta que já está no canário de checkout. A oferta em `GET /billing/status` fica restrita a recorrências vigentes de cartão. O catálogo, a renovação e o consentimento são revalidados no Worker. A troca é sempre para um ciclo superior, na próxima renovação pelo valor integral do novo plano, sem pró-rata.
+
+A migração aditiva `0039_billing_plan_changes.sql` fixa preço, data e versão consentidos antes de qualquer alteração no Asaas. O Worker verifica titularidade, contrato e faturas existentes e atualiza a mesma recorrência. Se já houver uma fatura pendente, somente a fatura esperada pode estar nessa condição. A verificação após o PUT confirma ciclo, valor e próximo vencimento. Resposta incerta é recuperada por leitura, e uma atualização ambígua nunca é reenviada automaticamente. Referências do provedor ficam no servidor. [Atualização de assinatura no Asaas](https://docs.asaas.com/reference/atualizar-assinatura-existente).
+
+O catálogo associado a cada cobrança é determinado pelo vencimento original. O plano vigente muda quando a cobrança do novo plano for confirmada. O histórico e o período pago das cobranças antigas preservam os respectivos valores e ciclos. Uma divergência na renovação exige revisão e não concede acesso. O cancelamento preserva o bloqueio de exclusão e não disputa uma alteração em andamento.
+
 ## Decisão — checkout recorrente e conciliação no DEV (20/11/2026)
 
 O Worker oferece `POST /billing/checkout` e `POST /billing/cancel` no DEV. Ambos exigem JWT Firebase, origem DEV e limite por UID. A criação registra primeiro uma intenção única em D1 com preço e versão do catálogo. A API recebe plano, versão e consentimento. O cliente Asaas é cadastrado pelo checkout hospedado ou reutilizado quando já vinculado. O Worker libera a URL exclusiva do Sandbox após persistir a referência. O callback apresenta confirmação em andamento. Resposta ambígua mantém a intenção e aguarda verificação.
