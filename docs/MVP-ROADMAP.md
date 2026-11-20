@@ -9,7 +9,7 @@
 - [x] Adaptador HTTP Asaas isolado e inativo sem flag e dois segredos; endpoint permitido, URL por ambiente, timeout, ausência de replay e erros sanitizados. **Nenhuma chamada é executada pelo app nesta fase.**
 - [x] Migração aditiva `0035_billing_foundation.sql` cria vínculos de clientes e intenções de checkout vazias, sem modificar registros anteriores. Testes locais de catálogo, fail-closed e constraints aprovados na CI do PR.
 - [x] CI PR aprovada, merge para `master`, migração DEV aplicada e smoke real de saúde/autenticação sem credenciais Asaas. Links acima.
-- [ ] Smoke adicional de `GET /billing/plans` e bloqueio de `POST /billing/checkout` em produção DEV (pipeline da PR de CI seguinte).
+- [x] Smoke remoto dos três planos, `checkoutAvailable:false`, método POST de checkout não implementado (404), health e JWT inválido: [PR #177](https://github.com/EwertonMendes/roteiva-web/pull/177), [workflow API DEV #44670412441](https://github.com/EwertonMendes/roteiva-web/actions/runs/44670412441), SHA `2b4d9c1d18d410b96e01a0d8c0da299fc8cdcbaf`.
 - [ ] Checkouts, webhooks, cobranças, pagamentos, acesso por assinatura, Pix, UI, mudanças de plano e notificações permanecem PLANEJADOS; PROD sem alteração.
 
 
