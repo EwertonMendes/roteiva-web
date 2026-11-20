@@ -141,7 +141,8 @@ function BillingAccount({uid,access,locked}:{uid:string;access:AccessInfo;locked
       <AppButton variant="secondary" className="billing-toggle-plans" aria-expanded={showPlans} onClick={()=>setShowPlans(value=>!value)}>
         {showPlans?"Ocultar planos":"Ver planos"} <ChevronDown size={17} aria-hidden="true"/>
       </AppButton>}
-    {readCatalog&&catalog.length>0&&<BillingPlans catalog={catalog} canStart={canStart} upgrade={upgradeOffer}
+    {readCatalog&&catalog.length>0&&<BillingPlans catalog={catalog} canStart={canStart}
+      upgrade={upgradeOffer&&subscription?{...upgradeOffer,currentPlan:subscription.planCode,currentAmountCents:subscription.amountCents}:null}
       onSelect={plan=>upgradeOffer?setSelectedUpgrade({plan,effectiveOn:upgradeOffer.effectiveOn}):setSelected(plan)}/>}
     {readCatalog&&!catalog.length&&!catalogError&&<p className="billing-notice" role="status">Consultando os planos…</p>}
     {catalogError&&readCatalog&&<p className="billing-inline-error" role="alert">Não foi possível carregar os planos.</p>}
@@ -152,7 +153,7 @@ function BillingAccount({uid,access,locked}:{uid:string;access:AccessInfo;locked
     {selected&&canStart&&<CheckoutConsent plan={selected} onClose={()=>setSelected(null)} onConfirm={()=>confirmCheckout(selected)}/>}
     {selectedUpgrade&&upgradeOffer&&<ConfirmationDialog title={`Upgrade para o plano ${planNames[selectedUpgrade.plan.code].toLowerCase()}`}
       description={`Em ${billingDate(selectedUpgrade.effectiveOn)}, a renovação será de ${money(selectedUpgrade.plan.amountCents)} ${cadence[selectedUpgrade.plan.code]}, no cartão atual. Nenhum valor será cobrado agora.`}
-      tone="default" confirmLabel="Confirmar upgrade" cancelLabel="Voltar" onCancel={()=>setSelectedUpgrade(null)}
+      className="billing-upgrade-confirmation" tone="default" confirmLabel="Confirmar upgrade" cancelLabel="Voltar" onCancel={()=>setSelectedUpgrade(null)}
       onConfirm={()=>confirmUpgrade(selectedUpgrade.plan,selectedUpgrade.effectiveOn)}/>}
     {subscription?.canCancel&&canceling&&<ConfirmationDialog title="Cancelar renovação?"
       description={`As cobranças futuras serão interrompidas.${subscription.paidUntil?` Você mantém seu acesso pago até ${billingDate(subscription.paidUntil)}.`:""}`}
@@ -214,7 +215,7 @@ function PlanSummary({subscription,access,locked,illustrated,grace,onCancel,onUp
       {subscription.cancellation==="pending"&&<p role="status">O cancelamento aguarda confirmação do Asaas.</p>}
       {subscription.cancellation==="review"&&<p>O cancelamento precisa de revisão. <a href="/suporte.html">Fale com o suporte</a>.</p>}
       {canCancel&&<AppButton variant="secondary" onClick={onCancel}>Cancelar renovação</AppButton>}
-      {onUpgrade&&<AppButton variant="primary" onClick={onUpgrade} aria-expanded={showPlans}>
+      {onUpgrade&&<AppButton variant="primary" onClick={onUpgrade} aria-expanded={showPlans} aria-controls={showPlans?"billing-plan-options":undefined}>
         <TrendingUp size={17} aria-hidden="true"/>{showPlans?"Ocultar opções":"Fazer upgrade"}
       </AppButton>}
     </div>}

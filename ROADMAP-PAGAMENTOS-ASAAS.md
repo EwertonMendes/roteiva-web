@@ -24,11 +24,23 @@
 |---|---:|---|---|
 | Mensal | R$ 39,90 | Até 20/12/2026 | Cancelamento preservou a vigência. Estorno total conciliado e acesso revogado. |
 | Trimestral | R$ 109,90 | Até 20/02/2027 | Cartão de recusa manteve o workspace bloqueado. A aprovação no mesmo checkout liberou acesso. Cancelamento e estorno total conferidos. |
-| Anual | R$ 399,90 | Até 20/11/2027 | Renovação cancelada pelo Roteiva. O período pago de teste está disponível para inspeção da conta QA. |
+| Anual | R$ 399,90 | Até 20/11/2027 | Renovação cancelada pelo Roteiva, com preservação do período pago nesse ensaio. |
 
 O [PR #192](https://github.com/EwertonMendes/roteiva-web/pull/192) corrigiu o prefixo do link observado e a retomada de intenção persistida. Código financeiro publicado no SHA `b53d7108f9d9809353023a5897f9c895298d0f56`, com [deploy API DEV](https://github.com/EwertonMendes/roteiva-web/actions/runs/44801984839), [deploy Hosting DEV](https://github.com/EwertonMendes/roteiva-web/actions/runs/44801984681) e [smoke remoto navegador/API e D1](https://github.com/EwertonMendes/roteiva-web/actions/runs/44803758781) aprovados. As duas primeiras recorrências e a anual foram encerradas no Sandbox. A ativação permanece restrita por `BILLING_CHECKOUT_TEST_UID`; a conta PF do Asaas de produção ficou fora desta execução.
 
-**Pendências para ativação geral.** A renovação automática e a inadimplência de cartão ainda precisam de um ciclo futuro real ou de simulação oficial de fatura recorrente. O painel Sandbox oferece carnê somente para boleto. O processamento de renovação, atraso de três dias, regularização, reversão de cobrança antiga, chargeback e falha de projeção passou em teste isolado. Alterar cadência no fim do período segue o fluxo de cancelamento e nova contratação; o ensaio alternou os três ciclos após os estornos. Permanecem pendentes estorno parcial e chargeback reais, atualização hospedada de cartão, suspensão da recorrência para contas suspensas, atraso com renovação real, exclusão remota sob falha financeira e recuperação da criação perdida quando o Asaas omite `externalReference`. O ensaio de estorno parcial via painel manteve a cobrança anual confirmada e ficou sem confirmação de reversão. A suíte API com 354 testes cobre a parada do checkout durante exclusão e a preservação do vínculo quando o provedor fica indisponível. A elegibilidade do Pix Automático exige conta PJ, e Pix comum permanece fora da oferta. Confirmar política de retenção e orçamento de CPU sob carga antes de promover. [Limites do Sandbox](https://docs.asaas.com/docs/o-que-pode-ser-testado) · [FAQ Pix Automático](https://docs.asaas.com/docs/faq-2).
+**Pendências para ativação geral.** A renovação automática e a inadimplência de cartão ainda precisam de um ciclo futuro real ou de simulação oficial de fatura recorrente. O painel Sandbox oferece carnê somente para boleto. O processamento de renovação, atraso de três dias, regularização, reversão de cobrança antiga, chargeback e falha de projeção passou em teste isolado. Permanecem pendentes estorno parcial e chargeback reais, atualização hospedada de cartão, suspensão da recorrência para contas suspensas, atraso com renovação real, exclusão remota sob falha financeira e recuperação da criação perdida quando o Asaas omite `externalReference`. O ensaio de estorno parcial via painel manteve a cobrança anual confirmada e ficou sem confirmação de reversão. A suíte API com 354 testes cobre a parada do checkout durante exclusão e a preservação do vínculo quando o provedor fica indisponível. A elegibilidade do Pix Automático exige conta PJ, e Pix comum permanece fora da oferta. Confirmar política de retenção e orçamento de CPU sob carga antes de promover. [Limites do Sandbox](https://docs.asaas.com/docs/o-que-pode-ser-testado) · [FAQ Pix Automático](https://docs.asaas.com/docs/faq-2).
+
+### Homologação de upgrades no Sandbox
+
+Em 20/11/2026, a conta QA realizou três contratações fictícias pelo checkout com cartão de teste, seguidas de upgrades em **Configurações → Assinatura → Fazer upgrade**. O teste usou a API publicada no SHA `de8dbff` ([PR #195](https://github.com/EwertonMendes/roteiva-web/pull/195)). O preço e o ciclo mudaram na mesma assinatura do Asaas. O vencimento foi mantido, nenhuma cobrança imediata foi gerada, e o Roteiva manteve o plano pago vigente.
+
+| Troca | Próxima cobrança agendada | Vencimento conferido |
+|---|---:|---|
+| Mensal → trimestral | R$ 109,90 | 20/12/2026 |
+| Mensal → anual | R$ 399,90 | 20/12/2026 |
+| Trimestral → anual | R$ 399,90 | 20/02/2027 |
+
+As recorrências dos dois testes mensais foram canceladas e suas primeiras cobranças estornadas no Sandbox para isolar os ensaios. O plano trimestral e seu upgrade anual foram deixados agendados para conferência. As próximas faturas de cartão ainda não existiam durante o teste. O painel ofereceu a geração de carnê somente para boleto. A alteração de uma fatura já emitida e a ativação após uma renovação de cartão foram exercitadas nos testes de API com respostas simuladas. A confirmação no provedor desses dois cenários permanece pendente. [Comportamento das cobranças recorrentes](https://docs.asaas.com/docs/faq-assinaturas).
 
 ## 1. Decisões de produto
 
@@ -141,7 +153,8 @@ Fluxo: React + Firebase Auth → Cloudflare Worker existente → adaptador Asaas
 
 ### Fase 5 — Política completa de ciclo **PLANEJADO**
 - [ ] Cancelamento e reativação; cobrança recusada, tolerância D+3 e expiração; reconciliação do pagamento tardio e reembolso; histórico de contratos antigos.
-- [ ] Upgrade na próxima renovação, sem pró-rata. Implementado para o canário DEV na mesma recorrência, com testes simulados. Falta homologar uma assinatura ativa no Asaas Sandbox com fatura já gerada e verificar a primeira renovação no novo ciclo.
+- [x] Validar o agendamento mensal → trimestral, mensal → anual e trimestral → anual na mesma recorrência de cartão do canário DEV. Ver [evidências do upgrade](#homologação-de-upgrades-no-sandbox).
+- [ ] Confirmar no Asaas Sandbox o upgrade com fatura já gerada e a primeira renovação de cartão no novo ciclo.
 - [ ] Proteger preço histórico; alterações de catálogo não modificam silenciosamente assinaturas existentes.
 - [ ] Notificações financeiras gratuitas via próprio Asaas apenas quando configuradas conscientemente; e-mail próprio transacional requer projeto próprio, sem serviço pago automático.
 
