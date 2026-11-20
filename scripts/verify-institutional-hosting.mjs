@@ -9,13 +9,19 @@ const app=environment('prod').frontendOrigin;
 const send=(url)=>fetch(url,{redirect:'manual',cache:'no-store',signal:AbortSignal.timeout(15000)});
 
 await waitForHostingRelease(async()=>{
-  for(const path of ['/?billing=return','/projetos/123','/clientes/123','/review','/review/'+'a'.repeat(43)+'?source=legacy']){
+  const home=await send(target+'/');
+  assert.equal(home.status,200,'Institutional homepage');
+  const html=await home.text();
+  assert.match(html,/id="titulo">Vem novidade por aí\./);
+  assert.ok(html.includes('href="'+app+'/"'),'Missing link to the application');
+  for(const path of ['/projetos/123','/clientes/123','/review','/review/'+'a'.repeat(43)+'?source=legacy']){
     const response=await send(target+path);
     assert.equal(response.status,302,path+' must be a temporary redirect');
     assert.equal(response.headers.get('Location'),app+path,path+' changed the path or query');
   }
   for(const path of ['/sobre.html','/suporte.html','/privacidade.html','/termos.html',
-    '/googleb5008dcbf685c696.html','/legal.css','/brand/roteiva-wordmark-black.svg','/__/auth/handler']){
+    '/googleb5008dcbf685c696.html','/legal.css','/brand/roteiva-wordmark-black.svg',
+    '/fonts/ubuntu/Ubuntu-Regular.ttf','/__/auth/handler']){
     const response=await send(target+path);
     assert.equal(response.status,200,path);
     assert.doesNotMatch(await response.text(),/<div id="root">/i,path+' served the SPA');
