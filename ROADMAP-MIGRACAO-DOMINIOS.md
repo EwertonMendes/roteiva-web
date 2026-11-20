@@ -1,8 +1,8 @@
 # Migração do domínio do Roteiva
 
-## Estado observado em 20/11/2026
+## Referência anterior ao corte
 
-A aplicação responde em `https://roteiva.com` com HTTPS válido. O Firebase Hosting `roteiva-web-prod` também atende `roteiva-web-prod.web.app` e `roteiva-web-prod.firebaseapp.com`. O domínio `www.roteiva.com` está conectado ao mesmo site como redirecionamento 301 para o domínio raiz e preservou o caminho e a query da sonda pública. O projeto `roteiva-web-prod` está no plano Spark e exibe a opção de adicionar outro site. A zona Cloudflare está no plano Free. [Planos Firebase](https://firebase.google.com/pricing) · [Hosting multisite](https://firebase.google.com/docs/hosting/multisites)
+Antes do corte, a aplicação respondia em `https://roteiva.com` com HTTPS válido. O Firebase Hosting `roteiva-web-prod` também atendia `roteiva-web-prod.web.app` e `roteiva-web-prod.firebaseapp.com`. O domínio `www.roteiva.com` usava o mesmo site como redirecionamento 301 para o domínio raiz e preservou o caminho e a query da sonda pública. O projeto `roteiva-web-prod` está no plano Spark e exibe a opção de adicionar outro site. A zona Cloudflare está no plano Free. [Planos Firebase](https://firebase.google.com/pricing) · [Hosting multisite](https://firebase.google.com/docs/hosting/multisites)
 
 | Recurso | Referência anterior à migração |
 | --- | --- |
@@ -25,7 +25,7 @@ A aplicação responde em `https://roteiva.com` com HTTPS válido. O Firebase Ho
 | `https://api.roteiva.com` | Worker e D1 atuais |
 | `https://roteiva-web-dev.web.app` | Hosting, Firebase Auth, Firestore, Worker e D1 DEV atuais |
 
-A página provisória fica em `institutional/index.html` e usa o deploy independente. Reservar os arquivos legais, a verificação do Google e o namespace `/__/auth/`. Quando Astro estiver pronto, publicar sua saída estática nesse site no lugar da página provisória e conservar os redirects das rotas antigas e as URLs públicas. A raiz também encaminha retornos de checkout legados conhecidos ao app.
+A página provisória fica em `institutional/index.html`, usa modo escuro por padrão e tem deploy independente. Reservar os arquivos legais, a verificação do Google e o namespace `/__/auth/`. Quando Astro estiver pronto, publicar sua saída estática nesse site no lugar da página provisória e conservar os redirects das rotas antigas e as URLs públicas. A raiz também encaminha retornos de checkout legados conhecidos ao app.
 
 ## Inventário de contratos
 
@@ -59,7 +59,7 @@ Se links novos já tiverem sido distribuídos, depois de restaurar a SPA na raiz
 | Etapa | Estado em 20/11/2026 |
 | --- | --- |
 | Infraestrutura | `app.roteiva.com` conectado a `roteiva-web-prod`. CNAME `app → roteiva-web-prod.web.app` confirmado em DNS Only. HTTPS validado sem exceção de confiança |
-| Hosting institucional | `roteiva-site-prod` publicado no mesmo projeto Spark na versão `5e060b`, após aprovação em [44682316666](https://github.com/EwertonMendes/roteiva-web/actions/runs/44682316666). O primeiro smoke recebeu 404 durante a propagação. A repetição pública verificou 302, query, páginas legais e handler Firebase. O [PR #186](https://github.com/EwertonMendes/roteiva-web/pull/186) acrescentou tentativas limitadas |
+| Hosting institucional | `roteiva-site-prod` publicado no mesmo projeto Spark. A página estática escura do [PR #189](https://github.com/EwertonMendes/roteiva-web/pull/189) foi publicada pelo [deploy protegido 44753852925](https://github.com/EwertonMendes/roteiva-web/actions/runs/44753852925). O smoke HTTPS verificou a raiz, redirecionamentos, páginas legais e handler Firebase |
 | Firebase Auth | Autorização de `app.roteiva.com` confirmada no console. Cliente Google existente salvo com a nova origem e `https://app.roteiva.com/__/auth/handler` |
 | Drive e Picker | Cliente Web do projeto Drive PROD com a origem nova, mantendo callbacks. Chave Picker com os referrers novos e as restrições Google Drive API e Google Picker API |
 | Dropbox | Callback do código preservado. A sessão atual do console Dropbox não lista o app Roteiva. Confirmar branding e callback com a conta proprietária e validar a conexão com um usuário existente |
@@ -67,10 +67,10 @@ Se links novos já tiverem sido distribuídos, depois de restaurar a SPA na raiz
 | Promoção DEV | [PR #185](https://github.com/EwertonMendes/roteiva-web/pull/185) integrado em `ac8b3968f4ab0c0edfd88296c4578312c3e49332`. Manifesto público, saúde D1, CORS e cache de Hosting confirmados. [Frontend](https://github.com/EwertonMendes/roteiva-web/actions/runs/44682300592), [Worker](https://github.com/EwertonMendes/roteiva-web/actions/runs/44682300612) e [regressão de Biblioteca e Aprovações](https://github.com/EwertonMendes/roteiva-web/actions/runs/44682300624) verdes |
 | Testes de preparação | Builds DEV/PROD, 141 testes frontend, 348 testes API e 37 testes Firestore Rules. A regressão geral teve 201 testes aprovados e 23 skips previstos. A suíte dedicada de Biblioteca e Aprovações passou. Os 6 testes do Hosting em Chromium desktop/mobile usaram destino de loopback. D1 local e Wrangler dry-run passaram |
 | Promoção PROD | [44683625195](https://github.com/EwertonMendes/roteiva-web/actions/runs/44683625195) concluiu após as duas aprovações. SHA `cce997c4826c5877ff97bcae42d99faa0e62ad5e`. Hosting `544c6c`, Worker `560ef0e4-a23d-41e6-bcd3-ad1f0dc4af61`. Manifesto, handlers de Auth, cache da SPA, identidade e integridade D1, CORS e negação de origens indevidas confirmados. As três migrations de cobrança permanecem pendentes em PROD |
-| Compatibilidade real | Chrome preservou caminho, query e fragmento no redirect institucional para o app e em uma URL legada que passa por www. As páginas públicas e os handlers na raiz respondem. Raiz e www estão associados ao site original nesta etapa |
+| Compatibilidade real | Chrome preservou caminho, query e fragmento no redirect institucional para o app e em uma URL legada que passa por www. As páginas públicas e os handlers na raiz respondem. O manifesto do app segue em `cce997c` e `/health` da API respondeu 200 |
 | Sessão PROD | A conta de teste teve o acesso reativado por cortesia. Com a sessão Google já aberta, o Chrome restaurou o acesso em uma nova aba e após recarregar o painel |
 | Homologação autenticada | No SHA PROD `cce997c`, abriram painel, projetos, clientes, calendário, financeiro, aprovações, configurações e Biblioteca. O Google Picker e o seletor Dropbox listaram itens reais. Carregaram a prévia de um vídeo do Drive e uma imagem do Dropbox. O calendário abriu em largura móvel simulada |
 | Feedback e operações com gravação | O formulário PROD aceitou conteúdo sintético para validação local. O envio foi cancelado. Em testes isolados, passaram 92 casos focados em ambiente, OAuth, uploads, mídia, aprovações, feedback e cache. Entrega real de feedback e gravações, uploads, downloads e reconexões em PROD não foram exercitados nesta rodada |
-| Próxima fase | Transferir `roteiva.com` e `www` para o site institucional e repetir as sondas HTTPS, de páginas públicas, handlers e links legados na configuração final |
+| DNS do site institucional | O Cloudflare serve o TXT `hosting-site=roteiva-site-prod` na raiz e o CNAME `roteiva-site-prod.web.app` em www, ambos em DNS Only. Os dois servidores autoritativos confirmaram os registros e o Firebase confirmou os dois vínculos e certificados ativos. O rollback usa o TXT `hosting-site=roteiva-web-prod` e o CNAME `roteiva-web-prod.web.app` anteriores |
 
 A `master` auditada em `8ee83f9` já incluía as migrations Asaas `0035`–`0037` e rotas de cobrança validadas em DEV. A publicação do domínio usa o modo de corte sem escrita de schema. As rotas de cobrança permanecem restritas a DEV e o guard impede que o deploy normal aplique essas migrations antes do release de cobrança.
