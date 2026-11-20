@@ -59,11 +59,12 @@ Se links novos já tiverem sido distribuídos, depois de restaurar a SPA na raiz
 | Etapa | Estado em 20/11/2026 |
 | --- | --- |
 | Infraestrutura | `app.roteiva.com` associado a `roteiva-web-prod` e CNAME `app → roteiva-web-prod.web.app` publicado em DNS Only. CNAME confirmado no resolvedor público. Firebase já verificou o DNS e iniciou emissão do certificado |
-| Hosting institucional | `roteiva-site-prod` criado no mesmo projeto Spark. Aguardando publicação protegida dos arquivos públicos |
+| Hosting institucional | `roteiva-site-prod` publicado no mesmo projeto Spark após a aprovação em [44682316666](https://github.com/EwertonMendes/roteiva-web/actions/runs/44682316666). O deploy completou. O primeiro smoke recebeu 404 durante a propagação e a repetição pública verificou 302, query, páginas legais e handler Firebase |
 | Firebase Auth | Autorização de `app.roteiva.com` confirmada no console. Cliente Google existente salvo com a nova origem e `https://app.roteiva.com/__/auth/handler` |
 | Drive e Picker | Cliente Web do projeto Drive PROD com a origem nova, mantendo callbacks. Chave Picker com os referrers novos e as restrições Google Drive API e Google Picker API |
 | Dropbox | Callback do código preservado. A sessão atual do console Dropbox não lista o app Roteiva. Confirmar branding e callback com a conta proprietária e validar a conexão com um usuário existente |
 | DEV real | Chrome restaurou a sessão após recarregar, abriu a Biblioteca com contas Drive e Dropbox e abriu o formulário de feedback. A verificação foi somente de leitura |
+| Promoção DEV | [PR #185](https://github.com/EwertonMendes/roteiva-web/pull/185) integrado em `ac8b3968f4ab0c0edfd88296c4578312c3e49332`. Manifesto público, saúde D1, CORS e cache de Hosting confirmados. [Frontend](https://github.com/EwertonMendes/roteiva-web/actions/runs/44682300592), [Worker](https://github.com/EwertonMendes/roteiva-web/actions/runs/44682300612) e [regressão de Biblioteca e Aprovações](https://github.com/EwertonMendes/roteiva-web/actions/runs/44682300624) verdes |
 | Testes de preparação | Builds DEV/PROD verificados. Os testes unitários cobrem CORS, upload Drive na janela de transição, callback Asaas e guardas de produção. D1 local, dry-run Wrangler e 37 testes das regras Firestore passaram. Os 6 testes do Hosting em Chromium desktop/mobile usaram destino de loopback |
 | Produção atual | A raiz e www continuam no Hosting original. O último SHA público de referência e `/health` PROD foram conferidos. A promoção da migração, testes com conta existente e transferência da raiz permanecem pendentes |
 

@@ -6,6 +6,7 @@ on:
       - 'firebase.site.prod.json'
       - 'scripts/stage-institutional-hosting.mjs'
       - 'scripts/verify-institutional-hosting.mjs'
+      - 'scripts/wait-for-hosting-release.mjs'
       - 'playwright.hosting.config.ts'
       - 'tests/hosting/**'
       - 'public/**'

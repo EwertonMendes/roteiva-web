@@ -2,6 +2,26 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {hostingOrigin,verifyHostingCache} from '../scripts/verify-hosting-cache.mjs';
+import {waitForHostingRelease} from '../scripts/wait-for-hosting-release.mjs';
+
+test("Hosting smoke retries an edge still serving the previous release and reports persistent failures",async()=>{
+  let checks=0;
+  const pauses=[];
+  const options={delaysMs:[1000,3000],pause:async delay=>pauses.push(delay)};
+  const recovered=await waitForHostingRelease(async()=>{
+    if(++checks===1)throw new Error("Stale edge");
+    return "current release";
+  },options);
+  assert.equal(recovered,"current release");
+  assert.deepEqual(pauses,[1000]);
+
+  pauses.length=0;
+  checks=0;
+  const failure=new Error("Incorrect redirect");
+  await assert.rejects(waitForHostingRelease(async()=>{checks++;throw failure;},options),error=>error===failure);
+  assert.equal(checks,3);
+  assert.deepEqual(pauses,[1000,3000]);
+});
 
 const config=JSON.parse(readFileSync(new URL("../firebase.json",import.meta.url),"utf8"));
 const hosting=config.hosting;
