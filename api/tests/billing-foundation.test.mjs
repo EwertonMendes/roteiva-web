@@ -44,13 +44,13 @@ test('missing or partial configuration fails closed before any external request'
   assert.equal(calls,0);
 });
 test('Asaas URLs are environment-locked, authenticated and error bodies not leaked',async()=>{
-  const mk=(ENVIRONMENT)=>({ENVIRONMENT,BILLING_ENABLED:'true',ASAAS_API_KEY:'key'.repeat(10),ASAAS_WEBHOOK_TOKEN:'a'.repeat(32)});
+  const mk=(ENVIRONMENT)=>({ENVIRONMENT,BILLING_ENABLED:'true',ASAAS_API_KEY:'$aact_'+(ENVIRONMENT==='dev'?'hmlg':'prod')+'_'+'key'.repeat(10),ASAAS_WEBHOOK_TOKEN:'a'.repeat(32)});
   for(const [env,host] of [['dev','https://api-sandbox.asaas.com/v3'],['prod','https://api.asaas.com/v3']]){
     let called=0;
     const transport=async(url,options)=>{
       called++;
       assert.equal(url,host+'/checkouts');
-      assert.equal(options.headers.access_token,'key'.repeat(10));
+      assert.equal(options.headers.access_token,mk(env).ASAAS_API_KEY);
       assert.equal(options.redirect,'manual');
       assert.equal(options.method,'POST');
       return Response.json({id:'chk_123'});

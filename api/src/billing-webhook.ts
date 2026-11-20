@@ -1,7 +1,7 @@
-import {asaasConfigured} from './billing-asaas.ts';
+import {asaasConfigured,providerRef} from './billing-asaas.ts';
 import {ApiError,type Env} from './types.ts';
 
-/** DEV-only, opt-in durable inbox. Absolutely no entitlements or provider calls. */
+/** DEV-only, opt-in durable inbox. The scheduled processor owns financial effects. */
 const MAX_WEBHOOK_BYTES=64*1024;
 type ResourceType='checkout'|'subscription'|'payment'|'other';
 type EventStatus='pending'|'review';
@@ -23,7 +23,7 @@ function reference(value:unknown):string|null{
 }
 export function parseAsaasEvent(value:unknown):IncomingEvent{
   const root=record(value);
-  if(!root||typeof root.id!=='string'||! /^[\x21-\x7e]{1,240}$/.test(root.id)||
+  if(!root||typeof root.id!=='string'||! /^[A-Za-z0-9_&-]{1,240}$/.test(root.id)||
       typeof root.event!=='string'||! /^[A-Z][A-Z0-9_]{0,95}$/.test(root.event))
     throw new ApiError(400,'billing_invalid_event');
   const type:ResourceType=root.event.startsWith('CHECKOUT_')?'checkout'
@@ -51,9 +51,11 @@ async function tokenMatches(actual:string|null,expected:string):Promise<boolean>
   for(let i=0;i<x.length;i++)mismatch|=x[i]^y[i];
   return mismatch===0;
 }
-async function boundedPayload(request:Request):Promise<unknown>{
+export async function readBillingJson(request:Request,limit=MAX_WEBHOOK_BYTES):Promise<unknown>{
+  if(request.headers.get('Content-Type')?.split(';')[0].trim().toLowerCase()!=='application/json')
+    throw new ApiError(415,'billing_invalid_content_type');
   const length=request.headers.get('Content-Length');
-  if(length && (/^\d+$/.test(length)===false || Number(length)>MAX_WEBHOOK_BYTES))
+  if(length && (/^\d+$/.test(length)===false || Number(length)>limit))
     throw new ApiError(413,'billing_event_too_large');
   if(!request.body)throw new ApiError(400,'billing_invalid_event');
   const reader=request.body.getReader();
@@ -64,7 +66,7 @@ async function boundedPayload(request:Request):Promise<unknown>{
       const part=await reader.read();
       if(part.done)break;
       size+=part.value.byteLength;
-      if(size>MAX_WEBHOOK_BYTES){
+      if(size>limit){
         await reader.cancel().catch(()=>undefined);
         throw new ApiError(413,'billing_event_too_large');
       }
@@ -82,27 +84,27 @@ async function boundedPayload(request:Request):Promise<unknown>{
 }
 
 /**
- * Save before acknowledgement; duplicates are no-op. The future reconciliation
- * worker (not built yet) must verify ownership and paid periods independently.
+ * Save before acknowledgement. The cron independently verifies payments and
+ * deduplicates effects even if Asaas delivers them under different event IDs.
  */
 export async function ingestAsaasWebhook(request:Request,env:Env):Promise<Response>{
-  // Safety fence until payment confirmation and reconciliation are implemented.
-  // Never accept production webhooks through an unfinished billing backend.
+  // Only the isolated DEV worker participates in the Sandbox rollout.
   if(env.ENVIRONMENT!=='dev'||!asaasConfigured(env))throw new ApiError(404,'not_found');
   if(request.method!=='POST')throw new ApiError(405,'method_not_allowed');
   if(!(await tokenMatches(request.headers.get('asaas-access-token'),env.ASAAS_WEBHOOK_TOKEN!)))
     throw new ApiError(401,'billing_webhook_unauthorized');
-  if(request.headers.get('Content-Type')?.split(';')[0].trim().toLowerCase()!=='application/json')
-    throw new ApiError(415,'billing_invalid_content_type');
-  const event=parseAsaasEvent(await boundedPayload(request));
+  const payload=await readBillingJson(request);
+  const event=parseAsaasEvent(payload);
   const now=Date.now();
+  const envelope=record(payload);
+  const intentRef=event.resourceType==='checkout'?providerRef(record(envelope?.checkout)?.externalReference):null;
   try{
     const result=await env.DB.prepare(
       'INSERT OR IGNORE INTO billing_webhook_events '+
-      '(provider,event_id,event_type,resource_type,resource_ref,subscription_ref,status,received_at,updated_at) '+
-      'VALUES (?,?,?,?,?,?,?,?,?)'
+      '(provider,event_id,event_type,resource_type,resource_ref,subscription_ref,status,received_at,updated_at,checkout_intent_ref) '+
+      'VALUES (?,?,?,?,?,?,?,?,?,?)'
     ).bind('asaas',event.eventId,event.eventType,event.resourceType,event.resourceRef,
-      event.subscriptionRef,event.status,now,now).run();
+      event.subscriptionRef,event.status,now,now,intentRef).run();
     if(!result.success)throw new Error('persist_failed');
   }catch{throw new ApiError(503,'billing_event_persist_unavailable');}
   return new Response(null,{status:200});

@@ -56,7 +56,7 @@ test('seven-day trial status, expiry, restore and suspension react without a rel
   await expect(page.getByRole('heading',{name:'Seu período de acesso terminou.'})).toBeVisible();
   await expect(page.locator('.app-shell')).toHaveCount(0);
   await expect(page.getByText(/Excluir e recriar a conta não libera outro teste/)).toBeVisible();
-  await expect(page.getByRole('button',{name:'Excluir conta',exact:true})).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'Excluir conta',exact:true})).toBeEnabled();
   await expect(page.getByText('Excluir minha conta',{exact:true})).toHaveCount(0);
   await changeAccess(email,{accessUntil:Timestamp.fromMillis(Date.now()+86400000),unlimited:false});
   await expect(page.locator('.app-shell')).toBeVisible();

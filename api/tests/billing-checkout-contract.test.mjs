@@ -51,6 +51,6 @@ test('event routing is conservative; checkout or subscription creation can never
  assert.deepEqual(planBillingEvent('PAYMENT_REFUNDED').concern,'reversal');
  assert.deepEqual(planBillingEvent('PAYMENT_OVERDUE').concern,'overdue');
  assert.deepEqual(planBillingEvent('CHECKOUT_PAID').action,'reconcile_checkout');
- assert.deepEqual(planBillingEvent('PAYMENT_CHARGEBACK_REQUESTED').action,'manual_review');
+ assert.deepEqual(planBillingEvent('PAYMENT_CHARGEBACK_REQUESTED').action,'reconcile_payment');
  assert.deepEqual(planBillingEvent('SOME_NEW_EVENT').action,'manual_review');
 });

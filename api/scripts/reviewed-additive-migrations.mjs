@@ -18,12 +18,15 @@ export const reviewedAdditiveMigrations=Object.freeze({
   // Schema-only tables/triggers; exact reviewed blob, no updates/deletes against existing rows.
   '0034_project_deletions.sql':'be2f4fa9a2455511202cac91e993190d84a88a87',
 });
+const reviewedDevAdditiveMigrations=Object.freeze({
+  '0038_billing_reconciliation.sql':'7ac16cd8702627ad3b21e2433cfebac31544a447',
+});
 
 export function gitBlobSha(content){
  const buffer=Buffer.from(content,'utf8');
  return createHash('sha1').update(`blob ${buffer.byteLength}\0`).update(buffer).digest('hex');
 }
-export function isReviewedAdditiveMigration(name,content){
- const expected=reviewedAdditiveMigrations[name];
+export function isReviewedAdditiveMigration(name,content,environment){
+ const expected=reviewedAdditiveMigrations[name]??(environment==='dev'?reviewedDevAdditiveMigrations[name]:undefined);
  return typeof expected==='string'&&gitBlobSha(content)===expected;
 }

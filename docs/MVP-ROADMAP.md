@@ -1,5 +1,9 @@
 # Roadmap vivo — Roteiva MVP
 
+## Assinatura Asaas Sandbox DEV — 20/11/2026
+
+**IMPLEMENTADO, EM VALIDAÇÃO:** Checkout recorrente e área de assinatura por conta autenticada, conciliação de cobrança via inbox D1, projeção de acesso, histórico e cancelamento com retentativa. A migração `0038_billing_reconciliation.sql` é aditiva e restrita à entrega DEV. O Asaas Sandbox e dois segredos foram provisionados no Worker DEV; fila do webhook pausada. Homologação financeira ainda pendente. Ver [roadmap Asaas](../ROADMAP-PAGAMENTOS-ASAAS.md#integração-sandbox-dev--20112026).
+
 ## Fundação de pagamentos Asaas — 20/11/2026
 
 **Avisos de ciclo de vida — PUBLICADO/VALIDADO EM DEV (sem cobrança):** [PR #183](https://github.com/EwertonMendes/roteiva-web/pull/183), merge SHA `c246ebd03b0d01fbf8aae2164b34728b9cd3c28b`, CI [#44675122616](https://github.com/EwertonMendes/roteiva-web/actions/runs/44675122616) e deploy DEV [#44675298640](https://github.com/EwertonMendes/roteiva-web/actions/runs/44675298640) aprovados. módulo puro `api/src/billing-notices.ts` classifica acesso de trial/cortesia/assinatura, término em D-3, renovação, cancelamento programado, tolerância de inadimplência e suspensão. O endpoint de leitura `GET /billing/status` passa a fornecer `notice`, calculado sem gravações, e checkout continua desligado. Sem mensagens externas, sem novo cron, sem alteração no Firestore/Rules. Testes locais cobrem bordas de tempo e fonte de direito prioritária. Documentação de Pix PF: `PAYMENT_CONFIRMED` pode refletir análise cautelar de até 72h, não deve ser assumido como recebimento definitivo.

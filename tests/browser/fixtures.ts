@@ -14,6 +14,12 @@ export const test=base.extend<{deletionService:void}>({
       await route.fulfill(route.request().method()==='OPTIONS'?{status:204,headers}:{status:200,headers,
         contentType:'application/json',body:JSON.stringify({available:true,operation:null})});
     });
+    await page.route('http://127.0.0.1:8787/billing/status',async route=>{
+      const headers={'Access-Control-Allow-Origin':'http://127.0.0.1:4173',
+        'Access-Control-Allow-Methods':'GET, OPTIONS','Access-Control-Allow-Headers':'Authorization, Content-Type'};
+      await route.fulfill(route.request().method()==='OPTIONS'?{status:204,headers}:{headers,
+        json:{checkoutAvailable:false,canStart:false,notice:null,subscription:null,checkout:null,payments:[]}});
+    });
     // All emulator tests are isolated from the real project-deletion Worker.
     // A route can override this mock to simulate a durable background operation.
     await page.route(/^http:\/\/127\.0\.0\.1:8787\/projects\/[1-9][0-9]*\/deletion$/,async route=>{

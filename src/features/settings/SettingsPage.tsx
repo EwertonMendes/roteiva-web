@@ -6,7 +6,8 @@ import { AlertTriangle, Check, Info, LockKeyhole, Mail, Moon, Save, Settings2, S
 import type { ProfileChanges, ProfessionalType, RoteivaProfile } from "../../data/firestore-workspace";
 import { dataErrorMessage } from "../../data/firestore-workspace";
 import { AccountDeletionAction } from "./AccountDeletionAction";
-import { AccessSummary } from "../access/AccessGate";
+import { AccessSummary,useAccess } from "../access/AccessGate";
+import {BillingPanel} from "../access/BillingPanel";
 
 const occupations:{value:ProfessionalType;label:string}[]=[
   {value:"freelancer",label:"Videomaker / freelancer"},
@@ -23,6 +24,7 @@ type SettingsProps={
 };
 
 export function SettingsPage({profile,email,photoURL,theme,toggleTheme,onSaveProfile}:SettingsProps){
+  const access=useAccess();
   const [name,setName]=useState(profile?.displayName||"");
   const [studio,setStudio]=useState(profile?.studioName||"");
   const [occupation,setOccupation]=useState<ProfessionalType>(profile?.professionalType||"freelancer");
@@ -123,7 +125,7 @@ export function SettingsPage({profile,email,photoURL,theme,toggleTheme,onSavePro
       </div>
     </section>
 
-    {onSaveProfile&&<AccessSummary/>}
+    {onSaveProfile&&<><AccessSummary/><BillingPanel refreshKey={access?.accessUntil.getTime()}/></>}
 
     {onSaveProfile&&<section className="settings-editor settings-danger-zone" aria-label="Zona de perigo">
       <header className="settings-section-head">

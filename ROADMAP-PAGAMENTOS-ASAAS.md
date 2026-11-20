@@ -6,6 +6,18 @@
 >
 > **Guardrails:** não comprar serviços, não habilitar cobranças reais antes de homologar, preservar DEV/PROD separados, evitar mudanças destrutivas, novas dependências não essenciais e polling contínuo; não colocar segredos em GitHub, frontend, logs, exemplos ou chat. Falta de configuração não pode derrubar login, Drive, Dropbox, autenticação, exclusão, Firestore, testes gratuitos nem concessões existentes.
 
+## Integração Sandbox DEV — 20/11/2026
+
+**Configuração verificada no console.** O proprietário acessou a conta independente [Asaas Sandbox](https://sandbox.asaas.com/) e provisionou os segredos `ASAAS_API_KEY` e `ASAAS_WEBHOOK_TOKEN` no Worker `roteiva-api-dev`. O webhook Roteiva DEV v3, com envio não sequencial, aponta para `https://roteiva-api-dev.roteiva-dev.workers.dev/billing/webhooks/asaas`; a fila foi salva pausada.
+
+**Implementação em validação.** A migração aditiva `0038_billing_reconciliation.sql` inclui coordenação de checkout, contrato, cancelamento, inbox e publicação de acesso. O Worker implementa checkout hospedado em cartão, vínculo por intenção, conciliação autoritativa, ledger, cancelamento durável e projeção Firestore com recuperação. Usuários DEV expirados podem consultar assinatura, contratar após o fim do acesso vigente e solicitar exclusão com reautenticação. O layout reutiliza Configurações e AccessGate. Consulte [procedimento e teste Sandbox](docs/DEVELOPMENT.md#integração-asaas-sandbox-no-dev).
+
+**Decisão tomada para o primeiro ensaio.** Checkout apenas após o término de trial, cortesia ou período pago. O consentimento informa cobrança ao concluir e recorrência pelo preço do catálogo. Para trocar a cadência, cancelar a renovação e escolher o novo ciclo ao fim do acesso pago. O checkout documenta `nextDueDate`, mas o agendamento pós-trial, reativação da mesma recorrência, atualização hospedada do cartão e Pix exigem validação própria. Estornos parciais e contradições de vínculo seguem para revisão. A suspensão administrativa continua prevalecendo na autorização; a cessação de cobranças de contas suspensas exige operação de suporte e homologação.
+
+**Evidência automatizada.** [PR #191](https://github.com/EwertonMendes/roteiva-web/pull/191). Em Windows, passaram a suíte API (353), a suíte frontend (141), o Playwright de acesso desktop/mobile (24) e as Rules do Firestore no emulador (37). A migração rodou em D1 local. Conta Google descartável autenticada em DEV com acesso expirado, verificada diretamente na projeção. O teste com cartão Sandbox aguarda o deploy.
+
+**Bloqueios para ativação geral.** Confirmar pelo menos um pagamento Sandbox ponta a ponta, incluindo o formato efetivo do ID/URL do checkout e a associação da primeira cobrança a `checkoutSession`; testar os três ciclos, recusa, renovação, recuperação, cancelamento, estorno e isolamento de contas. Confirmar a capacidade de recuperar checkout sem resposta quando o evento não contém `externalReference`; o caso permanece bloqueado para revisão, com a mesma intenção. Medir latência e CPU dos crons no plano gratuito. Confirmar políticas de retenção aplicáveis antes de promover. Registre a evidência por caso, inclusive limitações do Sandbox.
+
 ## 1. Decisões de produto
 
 - **Um só nível funcional** (acesso completo) em três contratos: `monthly` R$ 39,90 (3.990 centavos, `MONTHLY`), `quarterly` R$ 109,90 (10.990 centavos, `QUARTERLY`) e `yearly` R$ 399,90 (39.990 centavos, `YEARLY`). Uma única moeda BRL.
