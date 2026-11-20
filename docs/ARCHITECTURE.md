@@ -1,5 +1,12 @@
 # Arquitetura do Roteiva — MVP SaaS
 
+## Decisão — fundação de assinaturas Asaas sem ativar cobrança (20/11/2026)
+
+O catálogo inicial de periodicidades é único e server-side em `api/src/billing-catalog.ts`, usando centavos BRL e versão `2026-11-v1`: mensal 3990, trimestral 10990 e anual 39990. `GET /billing/plans` é **somente leitura**, sob rate limit e guard de ambiente existentes, e explicita `checkoutAvailable:false`; não habilita UI/checkout. `api/src/billing-asaas.ts` isola URLs e credenciais por ambiente, aceita somente rotas internas permitidas, configura timeout e mantém erros categóricos. `BILLING_ENABLED`, `ASAAS_API_KEY` e `ASAAS_WEBHOOK_TOKEN` são **opcionais**: sem conjunto completo, apenas funções futuras de cobrança retornariam indisponibilidade; o restante do app não muda. Mesmo configurado, nenhum endpoint de criação de cobrança foi implementado.
+
+`0035_billing_foundation.sql` cria duas tabelas aditivas inicialmente vazias (`billing_customers` e `billing_checkout_intents`), com ownership por `access_accounts`, integridade, unicidade e índice por expiração. Não altera grants, trials, Rules ou a tabela de assinaturas existente. O desenho planejado é webhook autenticado → evento D1 durável/idempotente → período pago D1 → projeção Firestore via CAS/fence. Um retorno do browser ou uma assinatura meramente criada no Asaas nunca comprova pagamento. Próximas etapas, ainda não entregues, estão em [roadmap de cobrança](../ROADMAP-PAGAMENTOS-ASAAS.md). Migrations não devem ser apagadas no rollback e segredos não podem entrar nos logs nem no frontend.
+
+
 ## Decisão — recuperação limitada da entrada (18/11/2026)
 
 O bootstrap distingue token, perfil SDK/REST, estado de exclusão e provisionamento. `EntryError` mantém apenas etapa/categoria, HTTP, código categórico seguro e UUID; nunca causa bruta, URL, token ou identidade. `X-Request-Id` é exposto somente às origens já permitidas, preservando headers de mídia, e correlaciona as negações do Worker. Erros de transporte não são atribuídos a DNS, CORS ou região sem evidência.

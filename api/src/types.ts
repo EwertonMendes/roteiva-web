@@ -6,6 +6,10 @@ export interface Env {
   API_THUMB_LIMIT: RateLimit;
   API_UPLOAD_LIMIT: RateLimit;
   RESEND_API_KEY?: string;
+  /** Optional billing integration: absent means no checkout and no financial effect. */
+  BILLING_ENABLED?: string;
+  ASAAS_API_KEY?: string;
+  ASAAS_WEBHOOK_TOKEN?: string;
   FEEDBACK_EMAIL?: {send(message:{to:string;from:string;subject:string;text:string;html?:string;replyTo?:string;
     attachments:FeedbackEmailAttachment[]}):Promise<{messageId:string}>;};
   RESEND_FROM_EMAIL?: string;

@@ -1,5 +1,12 @@
 # Desenvolvimento e deploy — Roteiva
 
+## Fundação de cobrança opcional (20/11/2026)
+
+`api/src/billing-catalog.ts` exporta preços iniciais em centavos. `GET /billing/plans` devolve `checkoutAvailable:false`; sem endpoint de compra, não se gera pagamento. O adaptador Asaas existe somente para desenvolvimento futuro, e seu padrão é falhar fechado. **Não configurar** `BILLING_ENABLED=true` nem segredos no DEV/PROD durante esta entrega; nada depende deles no deploy. Se houver configuração experimental posterior, `ASAAS_API_KEY` e `ASAAS_WEBHOOK_TOKEN` serão segredos separados por ambiente, nunca em `wrangler.jsonc`, GitHub ou Vite. Endpoints aceitos: DEV `https://api-sandbox.asaas.com/v3`, PROD `https://api.asaas.com/v3`.
+
+No diretório `api/`, executar `npm run typecheck`, `npm test`, `npm run migrate:local`, `npm run build` antes da promoção. O teste `billing-foundation.test.mjs` é **local**, com SQLite real e fetch simulado, sem chamadas ao Asaas. A migração `0035` é aditiva, não altera direitos e usa o pipeline DEV existente; aplicar no ambiente remoto somente através da pipeline protegida. Após merge DEV, conferir `GET /health`, `GET /billing/plans` com `checkoutAvailable:false`, `POST /access/ensure` sem token = 401 e fluxos existentes. O roadmap completo está [na raiz](../ROADMAP-PAGAMENTOS-ASAAS.md).
+
+
 ## Regressão da entrada — 18/11/2026
 
 `pnpm test` inclui `tests/bootstrap-request.test.mjs`, `profile-read.test.mjs` e `access-observer.test.mjs`: fetch/corpo pendentes, SDK silencioso, cache-only, negação real, geração de sessão e ausência de replay de POST. Após `pnpm build:emulator` e `pnpm build:demo`, executar `pnpm exec firebase emulators:exec --project demo-roteiva --only auth,firestore "pnpm exec playwright test tests/browser/access.spec.ts"` para desktop/mobile. Promoção PROD preserva testes completos e aprovações de Cloudflare/Firebase existentes.

@@ -1,5 +1,17 @@
 # Roadmap vivo — Roteiva MVP
 
+## Fundação de pagamentos Asaas — 20/11/2026
+
+**EM PR — implementação inicial isolada; cobrança NÃO disponível.** Plano detalhado em [ROADMAP-PAGAMENTOS-ASAAS.md](../ROADMAP-PAGAMENTOS-ASAAS.md). A conta Asaas PF foi criada; aprovação documental, Sandbox e credenciais reais ainda não confirmados.
+
+- [x] Roadmap persistido na raiz com políticas de recorrência, cobrança, cancelamento, inadimplência, mudança de periodicidade, segurança e limitações de free tier.
+- [x] Catálogo no backend com valores fixos BRL em centavos e versão de preço; rota pública somente de leitura `GET /billing/plans` informa `checkoutAvailable:false`.
+- [x] Adaptador HTTP Asaas isolado e inativo sem flag e dois segredos; endpoint permitido, URL por ambiente, timeout, ausência de replay e erros sanitizados. **Nenhuma chamada é executada pelo app nesta fase.**
+- [x] Migração aditiva `0035_billing_foundation.sql` cria vínculos de clientes e intenções de checkout vazias, sem modificar registros anteriores. Testes locais de catálogo, fail-closed e constraints previstos na CI de PR.
+- [ ] Validar CI PR, merge para `master`, aplicação da migração no DEV e smoke real sem credenciais Asaas. Apenas depois registrar SHA/workflow.
+- [ ] Checkouts, webhooks, cobranças, pagamentos, acesso por assinatura, Pix, UI, mudanças de plano e notificações permanecem PLANEJADOS; PROD sem alteração.
+
+
 ## Entrada com rede restrita — 18/11/2026
 
 **PUBLICADO EM DEV/PROD; validação na rede externa pendente.** [PR #174](https://github.com/EwertonMendes/roteiva-web/pull/174), SHA `6571badf72256b8b79da4bcb7a0762330ce1eb8d`. Nova resposta Dropbox relata indisponibilidade no cadastro e erro bruto de fetch com a identidade dedicada. A origem externa exata não foi demonstrada; não atribuir a região, browser ou OAuth Dropbox por suposição.
