@@ -178,7 +178,7 @@ O merge aprovado na master acionará o workflow protegido de publicação DEV; v
 
 ## Domínio roteiva.com — 11/11/2026
 
-**APP PUBLICADO (20/11/2026).** `app.roteiva.com` é a origem do frontend e do Firebase Auth. A promoção protegida e o HTTPS passaram. A conta usada no Chrome restaurou a sessão e chegou ao aviso de acesso expirado. A homologação de integrações com conta de acesso ativo e a transferência da raiz e www seguem pendentes. Evidências, critérios e rollback no [roadmap da migração](../ROADMAP-MIGRACAO-DOMINIOS.md).
+**APP PUBLICADO (20/11/2026).** `app.roteiva.com` é a origem do frontend e do Firebase Auth. A promoção protegida e o HTTPS passaram. O Chrome com sessão ativa confirmou painel, rotas internas, listagens do Drive e Dropbox, prévias de mídia e abertura do feedback. A transferência da raiz e de www segue pendente. Evidências, limites da validação e rollback no [roadmap da migração](../ROADMAP-MIGRACAO-DOMINIOS.md).
 
 **DOMÍNIO PUBLICADO E HOMOLOGADO; NÃO EQUIVALE A LIBERAÇÃO PÚBLICA DOS PROVEDORES.** O proprietário adquiriu o domínio e autorizou configurar PROD; esta seção substitui o adiamento histórico abaixo.
 
