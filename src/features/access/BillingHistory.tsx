@@ -11,6 +11,8 @@ const outcomes:Record<string,{label:string;tone:string}> = {
   received:{label:"Recebida",tone:"positive"},
   refused:{label:"Cartão recusado",tone:"critical"},
   refunded:{label:"Estornada",tone:"neutral"},
+  partial_refund:{label:"Estorno parcial",tone:"warning"},
+  canceled_invoice:{label:"Cancelada",tone:"neutral"},
   chargeback:{label:"Contestada",tone:"critical"},
 };
 const inReview = {label:"Em análise",tone:"neutral"};
@@ -68,7 +70,10 @@ export function BillingHistory({firstPage,uid}:{firstPage:PaymentPage;uid:string
         return <div className="billing-table-row" role="row" key={row}>
           <span className="billing-table-date" role="cell">{payment.dueOn?<time dateTime={payment.dueOn}>{due}</time>:due}</span>
           <span className="billing-table-state" role="cell"><span className="billing-pill" data-tone={state.tone}>{state.label}</span></span>
-          <strong className="billing-table-amount" role="cell">{money(payment.amountCents)}</strong>
+          <span className="billing-table-amount" role="cell"><strong>{money(payment.amountCents)}</strong>
+            {payment.state==="partial_refund"&&!!payment.refundedAmountCents&&
+              <small className="billing-refunded-amount">{money(payment.refundedAmountCents)} estornados</small>}
+          </span>
           <span className="billing-table-invoice" role="cell">
             {invoice ? <a href={invoice} target="_blank" rel="noreferrer" aria-label={`Abrir fatura de ${due} no Asaas (nova aba)`}>Fatura <ArrowUpRight size={14}/></a> :
               <><span className="billing-sr-only">Fatura indisponível</span><span aria-hidden="true">—</span></>}

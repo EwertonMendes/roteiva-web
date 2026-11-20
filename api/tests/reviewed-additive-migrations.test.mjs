@@ -3,12 +3,13 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {reviewedAdditiveMigrations,isReviewedAdditiveMigration} from '../scripts/reviewed-additive-migrations.mjs';
 
-test('checkout migration is reviewed by exact blob for DEV only',()=>{
- const name='0038_billing_reconciliation.sql';
- const sql=readFileSync('migrations/'+name,'utf8');
- assert.equal(isReviewedAdditiveMigration(name,sql,'dev'),true);
- assert.equal(isReviewedAdditiveMigration(name,sql,'prod'),false);
- assert.equal(isReviewedAdditiveMigration(name,sql+'\n-- Changed','dev'),false);
+test('billing migrations are reviewed by exact blob for DEV only',()=>{
+ for(const name of ['0038_billing_reconciliation.sql','0040_billing_refund_amount.sql']){
+  const sql=readFileSync('migrations/'+name,'utf8');
+  assert.equal(isReviewedAdditiveMigration(name,sql,'dev'),true);
+  assert.equal(isReviewedAdditiveMigration(name,sql,'prod'),false);
+  assert.equal(isReviewedAdditiveMigration(name,sql+'\n-- Changed','dev'),false);
+ }
 });
 
 test('approved PROD virtual-library migrations are exact immutable additive blobs',()=>{

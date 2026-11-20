@@ -30,7 +30,7 @@ export function database(...rows) {
   sql.exec(readFileSync(new URL('../../migrations/0032_feedback_reports.sql',import.meta.url),'utf8'));
   sql.exec(readFileSync(new URL('../../migrations/0033_feedback_retry_safety.sql',import.meta.url),'utf8'));
   sql.exec(readFileSync(new URL('../../migrations/0034_project_deletions.sql',import.meta.url),'utf8'));
-  for(const migration of ['0035_billing_foundation.sql','0036_billing_webhook_events.sql','0037_billing_payment_ledger.sql','0038_billing_reconciliation.sql','0039_billing_plan_changes.sql']){
+  for(const migration of ['0035_billing_foundation.sql','0036_billing_webhook_events.sql','0037_billing_payment_ledger.sql','0038_billing_reconciliation.sql','0039_billing_plan_changes.sql','0040_billing_refund_amount.sql']){
     sql.exec(readFileSync(new URL('../../migrations/'+migration,import.meta.url),'utf8'));
   }
   sql.exec("INSERT INTO deployment_identity VALUES(1,'dev')");

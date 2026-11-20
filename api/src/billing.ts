@@ -20,7 +20,7 @@ type SubscriptionView={
   paid_until:number;next_due_on:string|null;amount_cents:number|null;can_cancel:number;cancel_after:number|null;cancel_attempts:number|null;stopped_at:number|null;
 };
 type PaymentPosition={id:string;due_on:string|null;created_at:number};
-type PaymentView=PaymentPosition&{state:string;amount_cents:number;details:string|null;invoice_path:string|null};
+type PaymentView=PaymentPosition&{state:string;amount_cents:number;refunded_amount_cents:number;details:string|null;invoice_path:string|null};
 const PAGE_SIZE=5;
 
 function paymentPosition(cursor:string):PaymentPosition{
@@ -36,7 +36,7 @@ function paymentPosition(cursor:string):PaymentPosition{
 
 async function paymentPage(env:Env,uid:string,cursor:string|null){
   const position=cursor===null?null:paymentPosition(cursor);
-  const base='SELECT id,state,amount_cents,due_on,details,invoice_path,created_at FROM billing_payment_records WHERE owner_uid=?';
+  const base='SELECT id,state,amount_cents,refunded_amount_cents,due_on,details,invoice_path,created_at FROM billing_payment_records WHERE owner_uid=?';
   const order=' ORDER BY due_on DESC,created_at DESC,id DESC LIMIT ?';
   const after=position?.due_on===null?' AND due_on IS NULL AND (created_at,id)<(?,?)':
     ' AND ((due_on,created_at,id)<(?,?,?) OR due_on IS NULL)';
@@ -47,8 +47,9 @@ async function paymentPage(env:Env,uid:string,cursor:string|null){
   return {
     nextPaymentCursor:results.length>PAGE_SIZE?JSON.stringify({id:last.id,due_on:last.due_on,created_at:last.created_at}):null,
     payments:results.slice(0,PAGE_SIZE).map(payment=>({
-      state:payment.details==='refused'&&payment.state==='pending'?'refused':payment.state,
+      state:payment.details??payment.state,
       amountCents:payment.amount_cents,dueOn:payment.due_on,
+      ...(payment.refunded_amount_cents>0?{refundedAmountCents:payment.refunded_amount_cents}:{}),
       invoiceUrl:payment.invoice_path&&['pending','overdue'].includes(payment.state)?
         'https://sandbox.asaas.com'+payment.invoice_path:null,
     })),

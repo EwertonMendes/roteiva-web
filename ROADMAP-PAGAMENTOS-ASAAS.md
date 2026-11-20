@@ -42,6 +42,8 @@ Em 20/11/2026, a conta QA realizou três contratações fictícias pelo checkout
 
 As recorrências dos dois testes mensais foram canceladas e suas primeiras cobranças estornadas no Sandbox para isolar os ensaios. O plano trimestral e seu upgrade anual foram deixados agendados para conferência. As próximas faturas de cartão ainda não existiam durante o teste. O painel ofereceu a geração de carnê somente para boleto. A alteração de uma fatura já emitida e a ativação após uma renovação de cartão foram exercitadas nos testes de API com respostas simuladas. A confirmação no provedor desses dois cenários permanece pendente. [Comportamento das cobranças recorrentes](https://docs.asaas.com/docs/faq-assinaturas).
 
+Na revalidação de 20/11/2026, o painel do Sandbox recusou estornar parcialmente R$ 10,00 da cobrança fictícia feita no mesmo dia e informou que o estorno parcial só pode ser solicitado no dia seguinte. O ensaio não alterou a assinatura de QA. A conciliação de estorno parcial e a corrida entre cancelamento, resposta perdida do upgrade e confirmação tardia passaram com respostas simuladas.
+
 ## 1. Decisões de produto
 
 - **Um só nível funcional** (acesso completo) em três contratos: `monthly` R$ 39,90 (3.990 centavos, `MONTHLY`), `quarterly` R$ 109,90 (10.990 centavos, `QUARTERLY`) e `yearly` R$ 399,90 (39.990 centavos, `YEARLY`). Uma única moeda BRL.
@@ -155,6 +157,8 @@ Fluxo: React + Firebase Auth → Cloudflare Worker existente → adaptador Asaas
 - [ ] Cancelamento e reativação; cobrança recusada, tolerância D+3 e expiração; reconciliação do pagamento tardio e reembolso; histórico de contratos antigos.
 - [x] Validar o agendamento mensal → trimestral, mensal → anual e trimestral → anual na mesma recorrência de cartão do canário DEV. Ver [evidências do upgrade](#homologação-de-upgrades-no-sandbox).
 - [ ] Confirmar no Asaas Sandbox o upgrade com fatura já gerada e a primeira renovação de cartão no novo ciclo.
+- [x] Regressões de renovação e cancelamento com fatura existente, disputa com upgrade e confirmação atrasada. O ledger deixa de mostrar faturas canceladas como pagáveis.
+- [x] Conciliar estorno parcial concluído pelo Asaas, manter a maior soma comprovada e recalcular a vigência sem a cobrança parcialmente estornada. Mesma fatura e total original preservados para análise.
 - [ ] Proteger preço histórico; alterações de catálogo não modificam silenciosamente assinaturas existentes.
 - [ ] Notificações financeiras gratuitas via próprio Asaas apenas quando configuradas conscientemente; e-mail próprio transacional requer projeto próprio, sem serviço pago automático.
 

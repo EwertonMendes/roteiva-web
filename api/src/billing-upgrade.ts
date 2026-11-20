@@ -40,13 +40,21 @@ export function currentUpgrade(env:Env,uid:string,subId:string):Promise<Change|n
     .bind(uid,subId).first<Change>();
 }
 
-export async function termsAtRenewal(env:Env,subId:string,dueOn:string):Promise<Change|null>{
+export async function termsAtRenewal(env:Env,subId:string,dueOn:string,afterRemovalAmount?:number|null):Promise<Change|null>{
   const change=await env.DB.prepare(
     "SELECT * FROM billing_plan_changes WHERE subscription_id=? AND effective_on<=? "+
-    "AND state IN ('applying','verifying','scheduled','applied') ORDER BY effective_on DESC LIMIT 1"
+    "AND (state IN ('applying','verifying','scheduled','applied') OR (?=1 AND state='review')) ORDER BY effective_on DESC LIMIT 1"
+  ).bind(subId,dueOn,afterRemovalAmount!==undefined?1:0).first<Change>();
+  if(!change||change.state==='scheduled'||change.state==='applied')return change;
+  if(afterRemovalAmount===undefined)throw new ApiError(503,'billing_upgrade_verifying');
+  // After removal there is no recurrence left to verify. A payment that
+  // already settled can match the exact amount and first date consented
+  // before the PUT. Otherwise use the last verified terms.
+  if(change.next_due_on&&change.effective_on===dueOn&&change.amount_cents===afterRemovalAmount)return change;
+  return env.DB.prepare(
+    "SELECT * FROM billing_plan_changes WHERE subscription_id=? AND effective_on<=? "+
+    "AND state IN ('scheduled','applied') ORDER BY effective_on DESC LIMIT 1"
   ).bind(subId,dueOn).first<Change>();
-  if(change&&(change.state==='applying'||change.state==='verifying'))throw new ApiError(503,'billing_upgrade_verifying');
-  return change;
 }
 
 function contractForUpgrade(env:Env,uid:string):Promise<Contract|null>{
@@ -152,10 +160,11 @@ export async function requestUpgrade(env:Env,uid:string,request:Request):Promise
     if(civilDate(remote.nextDueDate)!==before)throw new ApiError(409,'billing_upgrade_invoice_conflict');
     nextDue=invoice?followingDue(effective,plan.code):effective;
     const ready=await env.DB.prepare("UPDATE billing_plan_changes SET next_due_on=? WHERE id=? AND state='applying' "+
-      "AND EXISTS(SELECT 1 FROM billing_contracts WHERE subscription_id=? AND cancel_after IS NULL AND removed_at IS NULL AND stopped_at IS NULL) "+
+      'AND EXISTS(SELECT 1 FROM billing_contracts c JOIN access_subscriptions s ON s.id=c.subscription_id '+
+      "WHERE c.subscription_id=? AND c.cancel_after IS NULL AND c.removed_at IS NULL AND c.stopped_at IS NULL AND s.status='active' AND s.paid_until=?) "+
       'AND EXISTS(SELECT 1 FROM access_accounts WHERE owner_uid=? AND suspended_at IS NULL AND sync_pending=0) '+
       'AND NOT EXISTS(SELECT 1 FROM account_deletions WHERE owner_uid=?)')
-      .bind(nextDue,id,contract.id,uid,uid).run();
+      .bind(nextDue,id,contract.id,contract.paid_until,uid,uid).run();
     if(ready.meta.changes!==1)throw new ApiError(409,'billing_upgrade_unavailable');
   }catch(error){
     await mark(env,id,'rejected');

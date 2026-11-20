@@ -5,23 +5,29 @@ import {billingDateInstant,cents,civilDate,periodEnd} from './billing-period.ts'
 import {flushBillingProjection,queueBillingProjection} from './billing-projection.ts';
 import {requireBillingPlan} from './billing-catalog.ts';
 import {termsAtRenewal} from './billing-upgrade.ts';
+import {refundedSoFar} from './billing-refunds.ts';
 import {ApiError,type Env} from './types.ts';
 
 type InboxEvent={
   event_id:string;event_type:string;resource_ref:string|null;checkout_intent_ref:string|null;attempts:number;
 };
 type Contract=CheckoutIntent&{
-  subscription_id:string;stopped_at:number|null;provider_reference:string;provider_customer_ref:string;
+  subscription_id:string;stopped_at:number|null;removed_at:number|null;provider_reference:string;provider_customer_ref:string;
 };
 type PaymentState='pending'|'confirmed'|'received'|'overdue'|'refunded'|'chargeback'|'review';
+type VerifiedPayment={
+  owner_uid:string;subscription_id:string;state:PaymentState;due_on:string|null;amount_cents:number;
+  refunded_amount_cents:number;details:string|null;paid_at:number|null;
+};
 
-function paymentState(payment:Record<string,unknown>):PaymentState{
+function paymentState(payment:Record<string,unknown>,previous?:VerifiedPayment|null):PaymentState{
   if(payment.deleted===true)return 'review';
   switch(payment.status){
     case 'CONFIRMED':return 'confirmed';
     case 'RECEIVED':return 'received';
     case 'OVERDUE':return 'overdue';
-    case 'REFUNDED':case 'REFUND_REQUESTED':case 'REFUND_IN_PROGRESS':return 'refunded';
+    case 'REFUND_REQUESTED':case 'REFUND_IN_PROGRESS':
+      return previous?.state==='confirmed'||previous?.state==='received'?previous.state:'review';
     case 'CHARGEBACK_REQUESTED':case 'CHARGEBACK_DISPUTE':case 'AWAITING_CHARGEBACK_REVERSAL':return 'chargeback';
     case 'PENDING':case 'AWAITING_RISK_ANALYSIS':case 'AUTHORIZED':return 'pending';
     default:return 'review';
@@ -30,7 +36,7 @@ function paymentState(payment:Record<string,unknown>):PaymentState{
 
 function loadContract(env:Env,ref:string):Promise<Contract|null>{
   return env.DB.prepare(
-    'SELECT i.*,c.subscription_id,c.stopped_at,s.provider_reference,b.provider_customer_ref '+
+    'SELECT i.*,c.subscription_id,c.stopped_at,c.removed_at,s.provider_reference,b.provider_customer_ref '+
     'FROM access_subscriptions s JOIN billing_contracts c ON c.subscription_id=s.id '+
     'JOIN billing_checkout_intents i ON i.id=c.checkout_intent_id JOIN billing_customers b ON b.owner_uid=c.owner_uid '+
     "WHERE s.provider='asaas' AND s.provider_reference=?"
@@ -63,6 +69,12 @@ export async function refreshPaidWindow(env:Env,uid:string,subId:string,now:numb
   ]);
 }
 
+export function closeUnpaidInvoices(env:Env,uid:string,subId:string,now:number):D1PreparedStatement{
+  return env.DB.prepare("UPDATE billing_payment_records SET state='review',details='canceled_invoice',invoice_path=NULL,updated_at=? "+
+    "WHERE owner_uid=? AND subscription_id=? AND state IN ('pending','overdue')")
+    .bind(now,uid,subId);
+}
+
 async function reconcilePayment(env:Env,payment:Record<string,unknown>,ref:string,eventType?:string):Promise<'processed'|'ignored'|'review'>{
   if(payment.id!==ref)throw new ApiError(502,'billing_provider_invalid_response');
   const subscription=providerRef(payment.subscription);
@@ -70,8 +82,7 @@ async function reconcilePayment(env:Env,payment:Record<string,unknown>,ref:strin
   if(!subscription||!customer||payment.billingType!=='CREDIT_CARD')return 'ignored';
   const checkout=providerRef(payment.checkoutSession);
   const dueOn=civilDate(payment.originalDueDate??payment.dueDate);
-  const amount=cents(payment.value);
-  if(!dueOn||!amount)return 'review';
+  if(!dueOn)return 'review';
 
   const prior=await loadContract(env,subscription);
   const intent=prior??(checkout?await intentByCheckout(env,checkout):null);
@@ -80,8 +91,7 @@ async function reconcilePayment(env:Env,payment:Record<string,unknown>,ref:strin
     return 'ignored';
   }
   if(await accountDeleting(env,intent.owner_uid))return 'ignored';
-  const change=prior?await termsAtRenewal(env,prior.subscription_id,dueOn):null;
-  if((change?.amount_cents??intent.amount_cents)!==amount || (intent.first_due_on&&dueOn<intent.first_due_on) ||
+  if((intent.first_due_on&&dueOn<intent.first_due_on) ||
     (payment.currency!==undefined&&payment.currency!=='BRL'))return 'review';
   if(prior&&(
     customer!==prior.provider_customer_ref||
@@ -91,6 +101,21 @@ async function reconcilePayment(env:Env,payment:Record<string,unknown>,ref:strin
   const now=Date.now();
   const statements:D1PreparedStatement[]=[];
   const subId=prior?.subscription_id??intent.id;
+  const previous=await env.DB.prepare(
+    'SELECT owner_uid,subscription_id,state,due_on,amount_cents,refunded_amount_cents,details,paid_at FROM billing_payment_records WHERE provider=? AND provider_payment_ref=?'
+  ).bind('asaas',ref).first<VerifiedPayment>();
+  if(previous&&(previous.owner_uid!==intent.owner_uid||previous.subscription_id!==subId||
+    (previous.due_on&&previous.due_on!==dueOn)))return 'review';
+
+  const change=prior?await termsAtRenewal(env,prior.subscription_id,dueOn,
+    prior.removed_at!==null?cents(payment.value):undefined):null;
+  const amount=change?.amount_cents??intent.amount_cents;
+  const refund=await refundedSoFar(env,payment,ref,amount,previous?.refunded_amount_cents??0,eventType);
+  if(!refund&&payment.deleted===true&&(previous?.state==='confirmed'||previous?.state==='received'))return 'review';
+  // After a reversal the provider can report a different value. Use the original
+  // verified ledger amount (or the provider's original value for a late event).
+  if(cents(payment.value)!==amount&&
+    !(refund>0&&(previous?.amount_cents===amount||cents(payment.originalValue)===amount)))return 'review';
   if(!prior){
     if(!['pending','ready'].includes(intent.status))return 'review';
     const contract=await asaasRequest(env,'GET',`/subscriptions/${subscription}`);
@@ -115,35 +140,40 @@ async function reconcilePayment(env:Env,payment:Record<string,unknown>,ref:strin
     );
   }
 
-  const state=paymentState(payment);
-  const details=state==='pending'&&['PAYMENT_CREDIT_CARD_CAPTURE_REFUSED','PAYMENT_REPROVED_BY_RISK_ANALYSIS'].includes(eventType??'')?'refused':null;
+  const reported=paymentState(payment,previous);
+  const canceledInvoice=prior?.removed_at!=null&&(payment.deleted===true||reported==='pending'||reported==='overdue');
+  const state=refund>0?(refund===amount?'refunded':'review'):canceledInvoice?'review':reported;
+  const details=refund>0&&refund<amount?'partial_refund':canceledInvoice?'canceled_invoice':
+    state==='pending'&&['PAYMENT_CREDIT_CARD_CAPTURE_REFUSED','PAYMENT_REPROVED_BY_RISK_ANALYSIS'].includes(eventType??'')?'refused':null;
   const invoice=typeof payment.invoiceUrl==='string'?URL.parse(payment.invoiceUrl):null;
   const invoicePath=invoice?.origin==='https://sandbox.asaas.com'&&!invoice.username&&!invoice.password&&
     !invoice.search&&!invoice.hash&&/^\/i\/[A-Za-z0-9_-]{1,120}$/.test(invoice.pathname)?invoice.pathname:null;
   const paid=state==='confirmed'||state==='received';
   const paidOn=civilDate(payment.paymentDate??payment.confirmedDate);
   const end=paid?periodEnd(dueOn,change?.plan_code??intent.plan_code):null;
-  const previous=await env.DB.prepare('SELECT owner_uid,subscription_id,state,due_on,amount_cents FROM billing_payment_records WHERE provider=? AND provider_payment_ref=?')
-    .bind('asaas',ref).first<{owner_uid:string;subscription_id:string;state:PaymentState;due_on:string|null;amount_cents:number}>();
-  if(previous&&(previous.owner_uid!==intent.owner_uid||previous.subscription_id!==subId||
-    (previous.due_on&&previous.due_on!==dueOn)))return 'review';
-  if(prior&&previous?.state===state&&previous.amount_cents===amount&&!details)return 'processed';
+  if(prior&&previous?.state===state&&previous.amount_cents===amount&&
+    previous.details===details&&previous.refunded_amount_cents===refund)return 'processed';
   statements.push(env.DB.prepare(
-    "INSERT INTO billing_payment_records(id,owner_uid,subscription_id,provider,provider_payment_ref,state,amount_cents,currency,due_on,verified_at,paid_at,period_ends_at,applied_at,created_at,updated_at,details,invoice_path) "+
-    "VALUES(?,?,?,'asaas',?,?,?,'BRL',?,?,?,?,?,?,?,?,?) ON CONFLICT(provider,provider_payment_ref) DO UPDATE SET "+
-    "state=excluded.state,amount_cents=excluded.amount_cents,verified_at=excluded.verified_at,paid_at=excluded.paid_at,period_ends_at=excluded.period_ends_at,applied_at=excluded.applied_at,updated_at=excluded.updated_at,details=excluded.details,invoice_path=excluded.invoice_path "+
-    'WHERE billing_payment_records.owner_uid=excluded.owner_uid AND billing_payment_records.subscription_id=excluded.subscription_id'
-  ).bind(crypto.randomUUID(),intent.owner_uid,subId,ref,state,amount,dueOn,now,paid&&paidOn?billingDateInstant(paidOn):null,end,paid?now:null,now,now,details,invoicePath));
-  if(paid&&change?.state==='scheduled'){
+    "INSERT INTO billing_payment_records(id,owner_uid,subscription_id,provider,provider_payment_ref,state,amount_cents,currency,due_on,verified_at,paid_at,period_ends_at,applied_at,created_at,updated_at,details,invoice_path,refunded_amount_cents) "+
+    "VALUES(?,?,?,'asaas',?,?,?,'BRL',?,?,?,?,?,?,?,?,?,?) ON CONFLICT(provider,provider_payment_ref) DO UPDATE SET "+
+    "state=excluded.state,amount_cents=excluded.amount_cents,verified_at=excluded.verified_at,paid_at=excluded.paid_at,period_ends_at=excluded.period_ends_at,applied_at=excluded.applied_at,updated_at=excluded.updated_at,details=excluded.details,invoice_path=excluded.invoice_path,refunded_amount_cents=excluded.refunded_amount_cents "+
+    'WHERE billing_payment_records.owner_uid=excluded.owner_uid AND billing_payment_records.subscription_id=excluded.subscription_id '+
+    'AND billing_payment_records.refunded_amount_cents<=excluded.refunded_amount_cents'
+  ).bind(crypto.randomUUID(),intent.owner_uid,subId,ref,state,amount,dueOn,now,paid&&paidOn?billingDateInstant(paidOn):previous?.paid_at??null,
+    end,paid?now:null,now,now,details,canceledInvoice?null:invoicePath,refund));
+  if(paid&&change&&change.state!=='applied'){
+    const verified=" EXISTS(SELECT 1 FROM billing_payment_records WHERE provider='asaas' AND provider_payment_ref=? "+
+      "AND subscription_id=? AND refunded_amount_cents=0 AND state IN ('confirmed','received'))";
     statements.push(
-      env.DB.prepare("UPDATE access_subscriptions SET cadence=? WHERE id=? AND owner_uid=? AND cadence<>? AND cadence<>'yearly'")
-        .bind(change.plan_code,subId,intent.owner_uid,change.plan_code),
-      env.DB.prepare("UPDATE billing_plan_changes SET state='applied' WHERE id=? AND state='scheduled'").bind(change.id),
+      env.DB.prepare("UPDATE access_subscriptions SET cadence=? WHERE id=? AND owner_uid=? AND cadence<>? AND cadence<>'yearly' AND"+verified)
+        .bind(change.plan_code,subId,intent.owner_uid,change.plan_code,ref,subId),
+      env.DB.prepare("UPDATE billing_plan_changes SET state='applied' WHERE id=? AND state IN ('applying','verifying','scheduled','review') AND"+verified)
+        .bind(change.id,ref,subId),
     );
   }
   if(!prior&&!paid)await env.DB.batch(statements);
   else await refreshPaidWindow(env,intent.owner_uid,subId,now,statements);
-  return state==='review'?'review':'processed';
+  return state==='review'&&!details?'review':'processed';
 }
 
 async function reconcileCheckout(env:Env,event:InboxEvent,ref:string):Promise<'processed'|'ignored'|'review'>{
@@ -194,7 +224,12 @@ async function reconcileContract(env:Env,ref:string,eventType:string):Promise<'p
   const now=Date.now();
   const update=env.DB.prepare('UPDATE billing_contracts SET next_due_on=?,stopped_at=COALESCE(stopped_at,?),removed_at=COALESCE(removed_at,?) WHERE subscription_id=?')
     .bind(stopped?null:civilDate(remote.nextDueDate),stopped?now:null,remote.deleted===true?now:null,linked.subscription_id);
-  if(stopped&&linked.stopped_at===null&&!await accountDeleting(env,linked.owner_uid))await refreshPaidWindow(env,linked.owner_uid,linked.subscription_id,now,[update]);
+  const removed=remote.deleted===true&&linked.removed_at===null;
+  if((removed||stopped&&linked.stopped_at===null)&&!await accountDeleting(env,linked.owner_uid)){
+    const statements=[update];
+    if(removed)statements.push(closeUnpaidInvoices(env,linked.owner_uid,linked.subscription_id,now));
+    await refreshPaidWindow(env,linked.owner_uid,linked.subscription_id,now,statements);
+  }
   else await update.run();
   return 'processed';
 }
@@ -202,8 +237,10 @@ async function reconcileContract(env:Env,ref:string,eventType:string):Promise<'p
 async function processInbox(env:Env):Promise<boolean>{
   const now=Date.now(),lease=crypto.randomUUID();
   const event=await env.DB.prepare(
-    "UPDATE billing_webhook_events SET lease_id=?,lease_until=?,attempts=attempts+1 WHERE provider='asaas' AND event_id=("+
-    "SELECT event_id FROM billing_webhook_events WHERE provider='asaas' AND status='pending' AND next_attempt_at<=? AND lease_until<=? "+
+    "UPDATE billing_webhook_events SET status='pending',lease_id=?,lease_until=?,attempts=attempts+1 WHERE provider='asaas' AND event_id=("+
+    "SELECT event_id FROM billing_webhook_events WHERE provider='asaas' AND (status='pending' OR "+
+    "(status='review' AND event_type='PAYMENT_PARTIALLY_REFUNDED' AND attempts=1 AND processed_at IS NOT NULL AND last_error_code IS NULL)) "+
+    'AND resource_ref IS NOT NULL AND next_attempt_at<=? AND lease_until<=? '+
     "AND NOT EXISTS(SELECT 1 FROM billing_webhook_events WHERE provider='asaas' AND status='pending' AND lease_until>?) "+
     'ORDER BY next_attempt_at,received_at LIMIT 1) RETURNING event_id,event_type,resource_ref,checkout_intent_ref,attempts'
   ).bind(lease,now+90000,now,now,now).first<InboxEvent>();
@@ -213,8 +250,17 @@ async function processInbox(env:Env):Promise<boolean>{
     const action=event.event_id.startsWith('recovery:')?'reconcile_checkout':planBillingEvent(event.event_type).action;
     const ref=providerRef(event.resource_ref);
     if(ref&&action==='reconcile_payment'){
-      const payment=await asaasRequest(env,'GET',`/payments/${ref}`);
-      status=await reconcilePayment(env,payment,ref,event.event_type);
+      try{
+        const payment=await asaasRequest(env,'GET',`/payments/${ref}`);
+        status=await reconcilePayment(env,payment,ref,event.event_type);
+      }catch(error){
+        if(!(error instanceof AsaasError&&error.upstreamStatus===404&&event.event_type==='PAYMENT_DELETED'))throw error;
+        const previous=await env.DB.prepare("SELECT details FROM billing_payment_records WHERE provider='asaas' AND provider_payment_ref=?")
+          .bind(ref).first<{details:string|null}>();
+        // A deletion with no provider record cannot reverse a payment. The
+        // confirmed subscription removal closes previously unpaid invoices.
+        status=previous?.details==='canceled_invoice'?'processed':'review';
+      }
     }else if(ref&&action==='reconcile_checkout'){
       status=await reconcileCheckout(env,event,ref);
     }else if(ref&&action==='reconcile_contract'){
