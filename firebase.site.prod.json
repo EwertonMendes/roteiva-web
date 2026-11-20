@@ -8,11 +8,6 @@
     ],
     "redirects": [
       {
-        "regex": "^/$",
-        "destination": "https://app.roteiva.com/",
-        "type": 302
-      },
-      {
         "regex": "^/((?:projetos|clientes|aprovacoes|financeiro|calendario|biblioteca|configuracoes|review)(?:/.*)?|index\\.html)$",
         "destination": "https://app.roteiva.com/:1",
         "type": 302

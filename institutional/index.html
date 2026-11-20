@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Em breve, novidades do Roteiva para organizar seu trabalho audiovisual.">
+  <meta name="theme-color" content="#10110f">
+  <meta name="referrer" content="no-referrer">
+  <title>Roteiva — Em breve</title>
+  <link rel="icon" href="/brand/roteiva-symbol-black.svg" type="image/svg+xml">
+  <style>
+    @font-face {
+      font-family: Ubuntu;
+      src: url("/fonts/ubuntu/Ubuntu-Regular.ttf") format("truetype");
+      font-weight: 400;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: Ubuntu;
+      src: url("/fonts/ubuntu/Ubuntu-Bold.ttf") format("truetype");
+      font-weight: 700;
+      font-display: swap;
+    }
+    :root {
+      color-scheme: dark;
+      --paper: #10110f;
+      --ink: #f1f1eb;
+      --secondary: #b4b6aa;
+      --line: #30312c;
+      --lime: #cfff47;
+      font: 1rem/1.55 Ubuntu, system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      min-height: 100svh;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      color: var(--ink);
+      background: var(--paper);
+    }
+    a { color: inherit; }
+    a:focus-visible { outline: 3px solid #ad9cff; outline-offset: 5px; }
+    .shell { width: min(75rem, calc(100% - 5rem)); margin-inline: auto; }
+    header, footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: .75rem 1.75rem;
+    }
+    header { padding-block: 1.65rem; border-bottom: 1px solid var(--line); }
+    header img { display: block; width: clamp(6.75rem, 13vw, 9rem); height: auto; }
+    header a { font-size: .95rem; font-weight: 700; text-underline-offset: .25em; }
+    main {
+      display: grid;
+      grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+      gap: clamp(2.5rem, 7vw, 7rem);
+      align-items: center;
+      padding-block: clamp(3rem, 8vw, 7rem);
+    }
+    h1 {
+      font-size: clamp(3rem, 6.8vw, 6.75rem);
+      line-height: .98;
+      letter-spacing: -.055em;
+      text-wrap: balance;
+      margin: 0 0 1.5rem;
+    }
+    p {
+      max-width: 34ch;
+      margin: 0 0 1.75rem;
+      color: var(--secondary);
+      font-size: clamp(1.05rem, 1.6vw, 1.25rem);
+      text-wrap: pretty;
+    }
+    .cta {
+      display: inline-flex;
+      gap: 1.6rem;
+      align-items: center;
+      background: var(--lime);
+      color: #11110f;
+      border: 2px solid var(--lime);
+      padding: .8rem 1.15rem;
+      min-height: 3rem;
+      border-radius: .5rem;
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .cta:hover { background: #dcff87; border-color: #dcff87; }
+    .art {
+      display: grid;
+      place-items: center;
+      aspect-ratio: 1;
+      overflow: hidden;
+      border: 1px solid #a6c641;
+      border-radius: 1.4rem;
+      background-color: var(--lime);
+      background-image: radial-gradient(#11110f35 1px, transparent 1px);
+      background-size: 1rem 1rem;
+    }
+    .art img { display: block; width: 44%; height: auto; }
+    footer {
+      padding-block: 1.25rem;
+      border-top: 1px solid var(--line);
+      color: var(--secondary);
+      font-size: .875rem;
+    }
+    footer nav { display: flex; flex-wrap: wrap; gap: .6rem 1.25rem; }
+    footer a { text-underline-offset: .22em; }
+    @media (max-width: 48rem) {
+      .shell { width: calc(100% - 2.5rem); }
+      main { grid-template-columns: 1fr; gap: 2rem; }
+      h1 { font-size: clamp(2.65rem, 11vw, 4.5rem); }
+      .art { aspect-ratio: 2 / 1; }
+      .art img { width: min(28%, 7rem); }
+    }
+  </style>
+  <script>
+    // Preserve bookmarked checkout returns from when the application used the apex.
+    const billing = new URLSearchParams(location.search).get("billing");
+    if (["return", "cancelled", "expired"].includes(billing)) {
+      location.replace("https://app.roteiva.com/" + location.search + location.hash);
+    }
+  </script>
+</head>
+<body>
+  <header class="shell">
+    <img src="/brand/roteiva-wordmark-white.svg" alt="Roteiva">
+    <a href="/sobre.html">Sobre o Roteiva</a>
+  </header>
+  <main class="shell">
+    <section aria-labelledby="titulo">
+      <h1 id="titulo">Vem novidade por aí.</h1>
+      <p>Em breve, este será o espaço para conhecer o Roteiva e acompanhar as novidades para quem trabalha com audiovisual.</p>
+      <a class="cta" href="https://app.roteiva.com/">Acessar o aplicativo <span aria-hidden="true">↗</span></a>
+    </section>
+    <div class="art" aria-hidden="true">
+      <img src="/brand/roteiva-symbol-black.svg" alt="">
+    </div>
+  </main>
+  <footer class="shell">
+    <span>Roteiva · Gestão audiovisual</span>
+    <nav aria-label="Informações do serviço">
+      <a href="/suporte.html">Suporte</a>
+      <a href="/privacidade.html">Privacidade</a>
+      <a href="/termos.html">Termos</a>
+    </nav>
+  </footer>
+</body>
+</html>

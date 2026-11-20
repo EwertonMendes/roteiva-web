@@ -4,6 +4,7 @@ on:
     branches: [master]
     paths:
       - 'firebase.site.prod.json'
+      - 'institutional/**'
       - 'scripts/stage-institutional-hosting.mjs'
       - 'scripts/verify-institutional-hosting.mjs'
       - 'scripts/wait-for-hosting-release.mjs'

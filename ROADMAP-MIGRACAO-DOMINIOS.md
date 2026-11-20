@@ -20,12 +20,12 @@ A aplicação responde em `https://roteiva.com` com HTTPS válido. O Firebase Ho
 | Endereço | Destino após homologação |
 | --- | --- |
 | `https://app.roteiva.com` | SPA React e handler Firebase Auth no site `roteiva-web-prod` |
-| `https://roteiva.com` | Site estático `roteiva-site-prod` no mesmo projeto. Raiz e rotas de aplicativo com 302 durante a transição |
+| `https://roteiva.com` | Site estático `roteiva-site-prod` no mesmo projeto. Página de lançamento provisória na raiz e 302 nas rotas legadas do app |
 | `https://www.roteiva.com` | Alias com redirecionamento para `roteiva.com` |
 | `https://api.roteiva.com` | Worker e D1 atuais |
 | `https://roteiva-web-dev.web.app` | Hosting, Firebase Auth, Firestore, Worker e D1 DEV atuais |
 
-A edição do site institucional ocorrerá em um deploy independente. Reservar os arquivos legais, a verificação do Google e o namespace `/__/auth/`. Quando Astro estiver pronto, publicar sua saída estática nesse site, remover o 302 da raiz e conservar os redirects das rotas antigas e as URLs públicas.
+A página provisória fica em `institutional/index.html` e usa o deploy independente. Reservar os arquivos legais, a verificação do Google e o namespace `/__/auth/`. Quando Astro estiver pronto, publicar sua saída estática nesse site no lugar da página provisória e conservar os redirects das rotas antigas e as URLs públicas. A raiz também encaminha retornos de checkout legados conhecidos ao app.
 
 ## Inventário de contratos
 
