@@ -134,7 +134,9 @@ A prévia nova usa Service Worker sem cache/offline, limitado a rotas de mídia 
 
 ## Domínio próprio PROD — 11/11/2026
 
-**DECISÃO TOMADA / PUBLICADO E HOMOLOGADO NO DOMÍNIO:** domínio registrado pelo proprietário na conta Cloudflare PROD. Contrato canônico: frontend/Auth `https://roteiva.com`, API `https://api.roteiva.com`; www redireciona no Hosting à raiz. Custom domains usam o mesmo site Firebase e Worker/D1 PROD. Não migrar usuários, dados, Client IDs ou chaves para trocar hostnames. Propriedade DNS confirmada no Search Console é distinta de aprovação OAuth.
+**PUBLICADO E HOMOLOGADO:** o release de referência atende o frontend e Firebase Auth em `https://roteiva.com`, com www redirecionando para a raiz. A API permanece em `https://api.roteiva.com` com seu Worker e D1 PROD.
+
+**DECISÃO TOMADA / MIGRAÇÃO PREPARADA:** o contrato do próximo corte usa `https://app.roteiva.com` para frontend e Firebase Auth no site `roteiva-web-prod`. O site `roteiva-site-prod` no mesmo projeto Spark atenderá a raiz e www após homologação. O Worker aceita a raiz por até 24 horas apenas durante a promoção coordenada. Callbacks de armazenamento continuam na API. Caminhos públicos e handlers reservados continuam acessíveis. Sessão e caches são locais à origem. A mudança preserva o UID e as conexões armazenadas no servidor. Ver [migração e critérios de aceite](../ROADMAP-MIGRACAO-DOMINIOS.md).
 
 O contrato inclui authDomain explícito e origens históricas PROD exatas. `allowedFrontend` aceita origem canônica e os dois hosts Firebase PROD conhecidos, apenas dentro do mesmo ambiente; DEV, HTTP, null, www e imitações são recusados em PROD. CORS e frame-ancestors usam a origem autorizada da requisição, com Vary Origin, sem curinga. Redirecionamentos OAuth e links novos de revisão usam origem canônica. O frontend em modo PROD redireciona hosts históricos antes de montar a aplicação, preservando rota/query/hash. Modo não é inferido do hostname; DEV/demo/emulador não redirecionam.
 

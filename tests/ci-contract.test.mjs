@@ -95,7 +95,7 @@ test("review video uses only native fullscreen controls", () => {
 });
 
 test("PROD promotion runs full regression in parallel without weakening authorization", () => {
-  const prod = read(".github/workflows/production.yml");
+  const prod = read(".github/workflows/production.yml").replace(/\r\n/g,"\n");
   assert.match(prod, /jobs:\s*\n  authorize:/);
   assert.match(prod, /test "\$GITHUB_ACTOR" = "\$GITHUB_REPOSITORY_OWNER"/);
   assert.match(prod, /test "\$APPROVED_SHA" = "\$GITHUB_SHA"/);
@@ -110,10 +110,25 @@ test("PROD promotion runs full regression in parallel without weakening authoriz
   assert.match(prod, /environment: firebase-production/);
   assert.match(prod, /guard-environment\.mjs prod --before-migrations/);
   assert.match(prod, /guard-secrets\.mjs prod/);
+  assert.match(prod, /guard-migrations\.mjs prod --domain-cutover/);
+  assert.match(prod, /if: \$\{\{ !inputs\.domain_cutover \}\}\s+run: \|\s+npm run migrate:prod/);
+  assert.match(prod, /hosting:roteiva-web-prod --project roteiva-web-prod/);
   assert.match(prod, /scripts\/smoke-environment\.mjs prod/);
   const browser=prod.split("  browser:\n")[1].split("  worker:\n")[0];
   assert.match(browser, /fail-fast: false/);
   assert.match(browser, /ffmpeg/);
   assert.match(browser, /firebase emulators:exec --project demo-roteiva --only auth,firestore/);
   assert.doesNotMatch(browser, /--grep|--project=desktop|--project=mobile/, "Every browser project/test must run on one shard");
+});
+
+test("the institutional deployment has its own site and uses the protected PROD environment", () => {
+  const workflow = read(".github/workflows/institutional-production.yml");
+  const site = JSON.parse(read("firebase.site.prod.json"));
+  assert.equal(site.hosting.site,"roteiva-site-prod");
+  assert.equal(site.hosting.public,"dist-site");
+  assert.deepEqual(Object.keys(site).sort(),["emulators","hosting"]);
+  assert.match(workflow,/environment: firebase-production/);
+  assert.match(workflow,/test "\$APPROVED_SHA" = "\$GITHUB_SHA"/);
+  assert.match(workflow,/--only hosting:roteiva-site-prod/);
+  assert.doesNotMatch(workflow,/wrangler deploy|pnpm build:prod|firestore:rules/);
 });

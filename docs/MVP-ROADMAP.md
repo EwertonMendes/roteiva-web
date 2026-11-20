@@ -178,6 +178,8 @@ O merge aprovado na master acionará o workflow protegido de publicação DEV; v
 
 ## Domínio roteiva.com — 11/11/2026
 
+**Em migração (20/11/2026).** O contrato do próximo corte usa `app.roteiva.com` no Firebase Hosting atual e reserva `roteiva-site-prod` para a raiz e www. A troca da origem em produção e a homologação real seguem pendentes. Evidências, critérios e rollback no [roadmap da migração](../ROADMAP-MIGRACAO-DOMINIOS.md).
+
 **DOMÍNIO PUBLICADO E HOMOLOGADO; NÃO EQUIVALE A LIBERAÇÃO PÚBLICA DOS PROVEDORES.** O proprietário adquiriu o domínio e autorizou configurar PROD; esta seção substitui o adiamento histórico abaixo.
 
 - [x] Registro na conta exclusiva Cloudflare PROD confirmado; Hosting raiz/www criados no site existente, DNS A/TXT/CNAME e desafios de certificado cadastrados. www redireciona à raiz.

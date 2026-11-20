@@ -4,7 +4,7 @@ import {buildRecurringCardCheckout} from '../src/billing-checkout-contract.ts';
 import {planBillingEvent} from '../src/billing-events.ts';
 const intentId='d7d87e1c-4f28-4d01-91d4-2c488e0cb044';
 const dev={ENVIRONMENT:'dev',FRONTEND_ORIGIN:'https://roteiva-web-dev.web.app'};
-const prod={ENVIRONMENT:'prod',FRONTEND_ORIGIN:'https://roteiva.com'};
+const prod={ENVIRONMENT:'prod',FRONTEND_ORIGIN:'https://app.roteiva.com'};
 const date='2027-01-31 15:02:38';
 test('builds each recurring CREDIT_CARD payload from trusted price catalog, not UI input',()=>{
  for(const [code,cycle,value] of [['monthly','MONTHLY',39.90],['quarterly','QUARTERLY',109.90],['yearly','YEARLY',399.90]]){
@@ -23,7 +23,11 @@ test('builds each recurring CREDIT_CARD payload from trusted price catalog, not 
 });
 test('production callback cannot be redirected to another origin',()=>{
  const data={planCode:'yearly',intentId,nextDueDate:date};
- assert.equal(buildRecurringCardCheckout(prod,data).callback.successUrl,'https://roteiva.com/?billing=return');
+ assert.deepEqual(buildRecurringCardCheckout(prod,data).callback,{
+   cancelUrl:'https://app.roteiva.com/?billing=cancelled',
+   expiredUrl:'https://app.roteiva.com/?billing=expired',
+   successUrl:'https://app.roteiva.com/?billing=return',
+ });
  assert.throws(()=>buildRecurringCardCheckout({...prod,FRONTEND_ORIGIN:'https://evil.example'},data),{code:'billing_invalid_environment'});
  assert.throws(()=>buildRecurringCardCheckout({ENVIRONMENT:'staging',FRONTEND_ORIGIN:'https://evil.example'},data),{code:'billing_invalid_environment'});
 });

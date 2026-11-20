@@ -1,4 +1,5 @@
 import { ApiError, type Env } from './types.ts';
+import { allowedFrontend } from './environment.ts';
 import { connection } from './repository.ts';
 import { DRIVE_SCOPE, accessCredential } from './google.ts';
 import { driveJson } from './drive-client.ts';
@@ -178,12 +179,13 @@ export async function startUpload(env:Env,uid:string,connectionId:string,targetI
   url.searchParams.set('uploadType','resumable');
   url.searchParams.set('fields','id,name,mimeType,size,parents,webViewLink');
   url.searchParams.set('supportsAllDrives','true');
+  const origin=request.headers.get('Origin');
   let response:Response;
   try {
     response=await fetcher(url,{method:'POST',redirect:'manual',headers:{
       Authorization:'Bearer '+token.value,'Content-Type':'application/json; charset=UTF-8',
       'X-Upload-Content-Length':String(data.size),'X-Upload-Content-Type':data.mimeType!,
-      Origin:env.FRONTEND_ORIGIN,
+      Origin:allowedFrontend(env,origin)?origin:env.FRONTEND_ORIGIN,
     },body:JSON.stringify({id:fileId,name:data.name,mimeType:data.mimeType,parents:[targetId]}),
     signal:AbortSignal.timeout(12000)});
   }catch{throw new ApiError(502,'drive_upload_transport_failed');}

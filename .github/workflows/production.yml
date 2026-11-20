@@ -8,6 +8,10 @@ on:
       confirmation:
         description: Type DEPLOY ROTEIVA PROD
         required: true
+      domain_cutover:
+        description: Publish the domain cutover without D1 or Firestore changes
+        type: boolean
+        default: false
 permissions:
   contents: read
   pull-requests: read
@@ -73,6 +77,11 @@ jobs:
           npm test --prefix api
           npm run migrate:local --prefix api
           pnpm test:rules
+      - name: Validate the production build before requesting deploy approvals
+        run: |
+          pnpm build:prod
+          node scripts/verify-static-build.mjs dist /
+          node scripts/verify-environment-build.mjs prod
 
   browser:
     # Playwright's file-based sharding retains every desktop and mobile test,
@@ -125,6 +134,9 @@ jobs:
         run: |
           pnpm exec firebase emulators:exec --project demo-roteiva --only auth,firestore \
             "pnpm exec playwright test --shard=${{ matrix.shard }}/3 --reporter=list"
+      - name: Institutional Hosting redirects in desktop and mobile Chromium
+        if: matrix.shard == 1
+        run: pnpm exec playwright test --config playwright.hosting.config.ts --reporter=list
       - name: Archive failed browser traces
         if: failure()
         uses: actions/upload-artifact@v4
@@ -149,6 +161,7 @@ jobs:
       CLOUDFLARE_D1_DATABASE_ID: ${{ vars.CLOUDFLARE_D1_DATABASE_ID }}
       API_BASE_URL: ${{ vars.API_BASE_URL }}
       WRANGLER_SEND_METRICS: 'false'
+      DOMAIN_CUTOVER: ${{ inputs.domain_cutover }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -157,12 +170,20 @@ jobs:
           cache: npm
           cache-dependency-path: api/package-lock.json
       - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Verify the new domain and both Firebase handlers before cutover
+        if: inputs.domain_cutover
+        run: node ../scripts/verify-domain-app.mjs --before-deploy
       - name: Recheck SHA and exact remote destinations after environment approval
         run: |
           test "$(git ls-remote origin refs/heads/master | cut -f1)" = "$GITHUB_SHA"
           node scripts/guard-environment.mjs prod --before-migrations
           node scripts/guard-token-scope.mjs prod
-          node scripts/guard-migrations.mjs prod
+          if [ "$DOMAIN_CUTOVER" = 'true' ]; then
+            node scripts/guard-migrations.mjs prod --domain-cutover
+            node scripts/guard-environment.mjs prod
+          else
+            node scripts/guard-migrations.mjs prod
+          fi
       - name: Prepare independent Worker secrets for atomic first deployment
         env:
           TOKEN_KEYS: ${{ secrets.TOKEN_KEYS }}
@@ -174,11 +195,19 @@ jobs:
           FIREBASE_ADMIN_CREDENTIALS_JSON: ${{ secrets.FIREBASE_ADMIN_CREDENTIALS_JSON }}
         run: node scripts/prepare-worker-secrets.mjs prod
       - name: Apply additive schema and seal durable identity
+        if: ${{ !inputs.domain_cutover }}
         run: |
           npm run migrate:prod
           node scripts/guard-environment.mjs prod --seal
       - name: Publish approved Worker
-        run: npx wrangler deploy --env prod --secrets-file "$RUNNER_TEMP/roteiva-prod-secrets.json"
+        run: |
+          set -euo pipefail
+          transition=()
+          if [ "$DOMAIN_CUTOVER" = 'true' ]; then
+            expires="$(date -u -d '+24 hours' '+%Y-%m-%dT%H:%M:%SZ')"
+            transition+=(--var "LEGACY_FRONTEND_UNTIL:$expires")
+          fi
+          npx wrangler deploy --env prod --secrets-file "$RUNNER_TEMP/roteiva-prod-secrets.json" "${transition[@]}"
       - name: Verify protected Worker secret bindings
         run: node scripts/guard-secrets.mjs prod
       - name: Verify deployed environment and authorization
@@ -194,13 +223,13 @@ jobs:
       VITE_USE_EMULATORS: 'false'
       VITE_API_BASE_URL: ${{ vars.API_BASE_URL }}
       VITE_FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
-      VITE_FIREBASE_AUTH_DOMAIN: ${{ vars.VITE_FIREBASE_AUTH_DOMAIN }}
       VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY }}
       VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
       VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ vars.VITE_FIREBASE_MESSAGING_SENDER_ID }}
       VITE_FIREBASE_STORAGE_BUCKET: ${{ vars.VITE_FIREBASE_STORAGE_BUCKET }}
       VITE_DROPBOX_ENABLED: 'true'
       VITE_VIRTUAL_LIBRARY: 'true'
+      DOMAIN_CUTOVER: ${{ inputs.domain_cutover }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -217,12 +246,18 @@ jobs:
           pnpm build:prod
           node scripts/verify-static-build.mjs dist /
           node scripts/verify-environment-build.mjs prod
+          node scripts/smoke-environment.mjs prod
       - uses: google-github-actions/auth@v3
         with:
           credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
       - name: Verify deployment credential project
         run: node --input-type=module -e "import fs from 'node:fs';if(JSON.parse(fs.readFileSync(process.env.GOOGLE_APPLICATION_CREDENTIALS)).project_id!=='roteiva-web-prod')process.exit(1)"
       - name: Publish verified rules, indexes and Hosting
-        run: pnpm exec firebase deploy --config firebase.prod.json --only firestore:rules,firestore:indexes,hosting --project roteiva-web-prod --non-interactive
-      - run: node scripts/verify-hosting-cache.mjs https://roteiva.com
+        if: ${{ !inputs.domain_cutover }}
+        run: pnpm exec firebase deploy --config firebase.prod.json --only firestore:rules,firestore:indexes,hosting:roteiva-web-prod --project roteiva-web-prod --non-interactive
+      - name: Publish the app Hosting site for the domain cutover
+        if: ${{ inputs.domain_cutover }}
+        run: pnpm exec firebase deploy --config firebase.prod.json --only hosting:roteiva-web-prod --project roteiva-web-prod --non-interactive
+      - run: node scripts/verify-hosting-cache.mjs https://app.roteiva.com
+      - run: node scripts/verify-domain-app.mjs
       - run: node scripts/smoke-environment.mjs prod

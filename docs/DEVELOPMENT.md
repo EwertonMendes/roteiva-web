@@ -120,7 +120,15 @@ Branch `codex/virtual-library`. Executar em `api/`: `node --experimental-strip-t
 
 **PUBLICADO E HOMOLOGADO NO DOMÍNIO:** compra concluída pelo proprietário. Frontend/Auth canônico roteiva.com no site Firebase PROD existente; www com redirectTarget roteiva.com; API api.roteiva.com como Custom Domain do Worker PROD existente. DNS do Hosting usa os registros exigidos pela API, sem proxy Cloudflare; domínio do Worker é gerenciado pelo serviço Workers. TXT Google confirma propriedade; não remover TXT de propriedade/ACME por parecer temporário sem conferir as exigências atuais do provedor. Certificados ainda precisam de conferência externa real, sem bypass de TLS.
 
-Contrato: shared/environments.ts, authDomain em .env.production e src/lib/environment-config.ts, FRONTEND_ORIGIN/callbacks em api/wrangler.jsonc; API_BASE_URL dos dois ambientes GitHub PROD e VITE_FIREBASE_AUTH_DOMAIN em firebase-production. DNS e vínculo do Custom Domain são configurações externas; deploy Wrangler sem lista de custom domains preserva o vínculo existente. Conferir ligação e health depois de publicar; não acrescentar permissões de DNS aos tokens CI por conveniência. Site/projeto/conta/D1 e sete segredos permanecem os mesmos.
+O contrato publicado antes da migração usava `VITE_FIREBASE_AUTH_DOMAIN=roteiva.com` em `firebase-production`. O novo workflow lê o domínio de Auth da configuração pública versionada em `.env.production` e valida o valor com `shared/environments.ts`. `API_BASE_URL` e as identidades de Firebase e Cloudflare continuam protegidas nos respectivos environments. O vínculo do custom domain do Worker permanece no Cloudflare.
+
+### Corte para app.roteiva.com
+
+Siga o [roadmap da migração](../ROADMAP-MIGRACAO-DOMINIOS.md). Para testar o site reservado localmente, execute `pnpm exec playwright test --config playwright.hosting.config.ts`. O teste inicia o Hosting Emulator com o projeto fictício `demo-roteiva-site` e intercepta o destino em uma origem local.
+
+Execute a promoção protegida `production.yml` na `master` com o SHA completo aprovado, `confirmation=DEPLOY ROTEIVA PROD` e `domain_cutover=true`. O Worker lê e verifica o D1 sem aplicar migrations, a oportunidade de CORS para abas antigas vence em 24 horas e a publicação Firebase é restrita ao site do app. A fundação Asaas segue em DEV. Use a opção de corte somente com as duas aprovações de produção coordenadas e monitore o resultado até o fim.
+
+O deploy institucional usa `institutional-production.yml` na `master` com o SHA aprovado e `confirmation=DEPLOY ROTEIVA SITE`. O workflow gera `dist-site` via `node scripts/stage-institutional-hosting.mjs` e publica apenas o site `roteiva-site-prod`. Após o corte dos domínios, execute `node scripts/verify-institutional-hosting.mjs https://roteiva.com` e a navegação de teste em Chrome com fragmento sintético.
 
 Antes da promoção, cadastrar origem raiz e callbacks api.roteiva.com nos clientes Drive/Dropbox e handler https://roteiva.com/__/auth/handler no cliente Firebase. Preservar entradas antigas até o corte validado; depois revisar as entradas remanescentes e os domínios associados à verificação OAuth. Atualizar marca/privacidade/termos para as páginas públicas roteiva.com; a página sobre.html explica o serviço sem login. Não confundir marca salva com verificação aprovada.
 

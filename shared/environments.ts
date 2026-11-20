@@ -1,5 +1,7 @@
 export type AppEnvironment = 'dev' | 'prod';
 
+export const legacyProdFrontendOrigin = 'https://roteiva.com';
+
 /** Public deployment identities. Secrets never belong in this contract. */
 export const environments = {
   dev: {
@@ -13,8 +15,8 @@ export const environments = {
   },
   prod: {
     projectId: 'roteiva-web-prod',
-    authDomain: 'roteiva.com',
-    frontendOrigin: 'https://roteiva.com',
+    authDomain: 'app.roteiva.com',
+    frontendOrigin: 'https://app.roteiva.com',
     frontendAliases: ['https://roteiva-web-prod.web.app', 'https://roteiva-web-prod.firebaseapp.com'],
     apiOrigin: 'https://api.roteiva.com',
     workerName: 'roteiva-api-prod',

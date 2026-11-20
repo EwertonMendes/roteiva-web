@@ -1,4 +1,4 @@
-import { environment, isEnvironmentFrontend } from '../../shared/environments.ts';
+import { environment, isEnvironmentFrontend, legacyProdFrontendOrigin } from '../../shared/environments.ts';
 import { ApiError, type Env } from './types.ts';
 
 export function assertEnvironment(env: Env): void {
@@ -31,7 +31,15 @@ export function apiOrigin(env: Env): string {
   return environment(env.ENVIRONMENT).apiOrigin;
 }
 
+/** Only the protected cutover workflow supplies an expiry. */
+export function legacyFrontendAllowed(env:Env,now=Date.now()):boolean {
+  if(env.ENVIRONMENT!=='prod'||!env.LEGACY_FRONTEND_UNTIL)return false;
+  const until=Date.parse(env.LEGACY_FRONTEND_UNTIL);
+  return until>now&&until-now<=24*60*60*1000;
+}
+
 export function allowedFrontend(env:Env,origin:string|null):origin is string {
-  try{return origin!==null&&isEnvironmentFrontend(origin,env.ENVIRONMENT);}
+  try{return origin!==null&&(isEnvironmentFrontend(origin,env.ENVIRONMENT)||
+    (origin===legacyProdFrontendOrigin&&legacyFrontendAllowed(env)));}
   catch{return false;}
 }

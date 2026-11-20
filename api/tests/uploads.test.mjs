@@ -7,6 +7,7 @@ import {verifyPickerToken} from '../src/picker.ts';
 import {DRIVE_SCOPE,DRIVE_READ_SCOPE} from '../src/google.ts';
 import {handle} from '../src/index.ts';
 import {generateKeyPair,exportJWK,SignJWT} from 'jose';
+import {environments,legacyProdFrontendOrigin} from '../../shared/environments.ts';
 
 const account='aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa';
 const root='ROOT_FOLDER_123456789';
@@ -14,17 +15,19 @@ const child='CHILD_FOLDER_123456789';
 const fileId='FILE_UPLOAD_123456789';
 const uid='alice';
 const fname='Video final.mp4';
-function req(values) {
+function req(values,origin) {
   return new Request('https://example.com/api',{method:'POST',headers:{
-    Authorization:'Bearer fake-firebase-jwt','Content-Type':'application/json'},
+    Authorization:'Bearer fake-firebase-jwt','Content-Type':'application/json',...(origin?{Origin:origin}:{})},
     body:JSON.stringify(values)});
 }
 const upload={attemptId:'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',projectId:17,linkedFolderId:root,name:fname,size:1234567,mimeType:'video/mp4'};
 async function setup({linked=true,project=true,parent=root,grant=true,canAdd=true,appAuthorized=true,
-  tokenInfo={},googleError,location='https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&upload_id=opaque',fileParent=child,fileSize=1234567}={}){
-  const env={ENVIRONMENT:'dev',FIREBASE_PROJECT_ID:'roteiva-web-dev',TOKEN_KEY_VERSION:'v1',
+  tokenInfo={},googleError,location='https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&upload_id=opaque',
+  fileParent=child,fileSize=1234567,environment='dev',uploadOrigin}={}){
+  const config=environments[environment];
+  const env={ENVIRONMENT:environment,FIREBASE_PROJECT_ID:config.projectId,TOKEN_KEY_VERSION:'v1',
     TOKEN_KEYS:JSON.stringify({v1:base64url(crypto.getRandomValues(new Uint8Array(32)))}),
-    FRONTEND_ORIGIN:'https://roteiva-web-dev.web.app',
+    FRONTEND_ORIGIN:config.frontendOrigin,
     GOOGLE_PICKER_API_KEY:'synthetic-key',GOOGLE_CLIENT_ID:'123456789-demo.apps.googleusercontent.com',GOOGLE_CLIENT_SECRET:'demo-secret'};
   const credential=await encrypt(env,'refresh',context(env,uid,'google-alice'));
   const db=database({id:account,owner_uid:uid,google_account_id:'google-alice',status:'connected',
@@ -55,7 +58,7 @@ async function setup({linked=true,project=true,parent=root,grant=true,canAdd=tru
       assert.deepEqual(payload.parents,[child]);
       assert.equal(payload.name,fname);
       assert.equal(payload.id,fileId);
-      assert.equal(init.headers.Origin,env.FRONTEND_ORIGIN);
+      assert.equal(init.headers.Origin,uploadOrigin||env.FRONTEND_ORIGIN);
       assert.equal(init.headers['X-Upload-Content-Length'],'1234567');
       if(googleError)return Response.json({error:{errors:[{reason:googleError.reason}]}},{status:googleError.status});
       return new Response(null,{status:grant?200:403,headers:{Location:location}});
@@ -87,6 +90,13 @@ test('starts resumable upload only for a linked folder descendant; no file bytes
   assert.equal(response.headers.get('Cache-Control'),'no-store');
   assert.equal(fixture.log.filter(x=>x.method==='POST'&&x.url.includes('/upload/')).length,1);
   assert.ok(fixture.log.some(x=>x.url.includes('/driveFolders/17_')));
+});
+test('resumable upload uses the exact authorized origin of an open legacy tab',async t=>{
+  const fixture=await setup({environment:'prod',uploadOrigin:legacyProdFrontendOrigin});
+  t.after(fixture.close);
+  fixture.env.LEGACY_FRONTEND_UNTIL=new Date(Date.now()+60_000).toISOString();
+  const response=await startUpload(fixture.env,uid,account,child,req(upload,legacyProdFrontendOrigin),fixture.fetcher);
+  assert.equal(response.status,200);
 });
 test('rejects an unlinked folder, another UID and a child outside the linked root',async t=>{
   const missing=await setup({linked:false});t.after(missing.close);
