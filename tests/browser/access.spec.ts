@@ -197,7 +197,8 @@ test('billing summary, responsive history and restricted checkout use the same b
   if(info.project.name==='mobile') await page.setViewportSize({width:320,height:780});
   const validInvoice='https://sandbox.asaas.com/i/test-fatura';
   const first=Array.from({length:5},(_,index)=>({
-    state:index===0?'overdue':index===1?'refunded':'confirmed',amountCents:39990,
+    state:index===0?'overdue':index===1?'refunded':index===2?'partial_refund':'confirmed',amountCents:39990,
+    ...(index===2?{refundedAmountCents:1800}:{}),
     dueOn:`2026-11-${20-index}`,invoiceUrl:index===0?validInvoice:null,
   }));
   const older={state:'refused',amountCents:3990,dueOn:null,invoiceUrl:'https://untrusted.example/i/test'};
@@ -238,6 +239,8 @@ test('billing summary, responsive history and restricted checkout use the same b
   await expect(billing.getByText('Renovação cancelada',{exact:true})).toBeVisible();
   const history=billing.getByRole('region',{name:'Histórico de cobranças'});
   await expect(history.getByRole('row')).toHaveCount(6);
+  await expect(history.getByText('Estorno parcial',{exact:true})).toBeVisible();
+  await expect(history.getByText(/18,00 estornados/)).toBeVisible();
   await expect(history.getByRole('link',{name:/Abrir fatura/})).toHaveAttribute('href',validInvoice);
   const next=history.getByRole('button',{name:'Próxima página'});
   await next.click();

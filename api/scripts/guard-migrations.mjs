@@ -11,6 +11,7 @@ const devOnlyBilling = new Set([
  '0037_billing_payment_ledger.sql',
  '0038_billing_reconciliation.sql',
  '0039_billing_plan_changes.sql',
+ '0040_billing_refund_amount.sql',
 ]);
 if(target==='prod'){
  if(process.argv.includes('--domain-cutover')){

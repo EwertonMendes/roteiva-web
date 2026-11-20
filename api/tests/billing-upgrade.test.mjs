@@ -8,6 +8,8 @@ import {billingStatusResponse} from '../src/billing.ts';
 import {ingestAsaasWebhook} from '../src/billing-webhook.ts';
 import {reconcileBilling} from '../src/billing-reconciliation.ts';
 import {handle} from '../src/index.ts';
+import {activeState,PAYMENT_GRACE_MS} from '../src/access.ts';
+import {cancelRenewal,retryBillingCancellation} from '../src/billing-management.ts';
 
 const now=Date.now();
 const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
@@ -47,8 +49,8 @@ function submit(overrides={}){
     body:JSON.stringify({planCode:'yearly',catalogVersion:planVersion,effectiveOn:effective,confirmed:true,...overrides})});
 }
 
-function provider(t,{pending=false,loseResponse=false,extraPending=false}={}){
-  let updated=false,calls=0,renewalStatus='PENDING';
+function provider(t,{pending=false,loseResponse=false,extraPending=false,onPut}={}){
+  let updated=false,calls=0,removals=0,renewal={status:'PENDING'},refunds=[];
   const scheduled={id:'pay_next',customer:'cus_a',subscription:'sub_a',billingType:'CREDIT_CARD',
     originalDueDate:effective,dueDate:effective,value:39.9,status:'PENDING'};
   const base={id:'sub_a',customer:'cus_a',billingType:'CREDIT_CARD',status:'ACTIVE'};
@@ -61,9 +63,14 @@ function provider(t,{pending=false,loseResponse=false,extraPending=false}={}){
       calls++;
       assert.deepEqual(JSON.parse(options.body),{value:399.9,cycle:'YEARLY',
         nextDueDate:pending?after('yearly'):effective,updatePendingPayments:pending});
+      await onPut?.();
       updated=true;
       if(loseResponse)throw Error('response lost after mutation');
       return Response.json(current());
+    }
+    if(request.pathname==='/v3/subscriptions/sub_a'&&options.method==='DELETE'){
+      removals++;
+      return Response.json({id:'sub_a',deleted:true});
     }
     if(request.pathname==='/v3/subscriptions/sub_a')return Response.json(current());
     if(request.pathname==='/v3/subscriptions/sub_a/payments'){
@@ -75,12 +82,15 @@ function provider(t,{pending=false,loseResponse=false,extraPending=false}={}){
       assert.equal(request.searchParams.get('dueDate[ge]'),effective);
       return Response.json({data:pending?[{...scheduled,value:updated?399.9:39.9}]:[],hasMore:false});
     }
-    if(request.pathname==='/v3/payments/pay_next')return Response.json({...scheduled,value:updated?399.9:39.9,status:renewalStatus});
+    if(request.pathname==='/v3/payments/pay_next/refunds')return Response.json({data:refunds,hasMore:false});
+    if(request.pathname==='/v3/payments/pay_next')return Response.json({...scheduled,value:updated?399.9:39.9,
+      invoiceUrl:'https://sandbox.asaas.com/i/test-renewal',...renewal});
     if(request.pathname==='/v3/payments/pay_old')return Response.json({...scheduled,id:'pay_old',value:39.9,
       originalDueDate:today,dueDate:today,checkoutSession:'checkout_a',status:'REFUNDED'});
     throw Error('unexpected provider request');
   });
-  return {calls:()=>calls,setStatus:status=>{renewalStatus=status;}};
+  return {calls:()=>calls,removals:()=>removals,setStatus:status=>{renewal={status};},
+    setRenewal:(snapshot,returnedRefunds=[])=>{renewal=snapshot;refunds=returnedRefunds;}};
 }
 
 async function reconcile(s,kind,id){
@@ -147,4 +157,108 @@ test('a second pending invoice or a suspended account prevents any provider writ
   assert.equal(status.subscription.upgradeOffer,null);
   await assert.rejects(requestUpgrade(s.env,'owner',submit()),{code:'billing_upgrade_unavailable'});
   assert.equal(remote.calls(),0);
+});
+
+
+function simulateProjectionDelivered(s){
+  // Keep these regressions on the production SQL path with no remote Firebase service.
+  s.sql.exec("UPDATE access_accounts SET sync_pending=0; DELETE FROM billing_access_projections");
+}
+function cancelRequest(){
+  return new Request(api+'/billing/cancel',{method:'POST',headers:{Origin:origin,'content-type':'application/json'},
+    body:'{"confirmed":true}'});
+}
+
+test('scheduled upgrade and declined card never advance paid access; overdue grants only the bounded grace',async t=>{
+  const s=setup(t),remote=provider(t);
+  await requestUpgrade(s.env,'owner',submit());
+  assert.equal((await activeState(s.env,'owner',paidUntil-1)).active,true);
+  assert.equal((await activeState(s.env,'owner',paidUntil)).active,false);
+  await reconcile(s,'PAYMENT_CREDIT_CARD_CAPTURE_REFUSED','pay_next');
+  simulateProjectionDelivered(s);
+  assert.equal((await activeState(s.env,'owner',paidUntil)).active,false);
+  remote.setStatus('OVERDUE');
+  await reconcile(s,'PAYMENT_OVERDUE','pay_next');
+  simulateProjectionDelivered(s);
+  assert.equal((await activeState(s.env,'owner',paidUntil+PAYMENT_GRACE_MS-1)).active,true);
+  assert.equal((await activeState(s.env,'owner',paidUntil+PAYMENT_GRACE_MS)).active,false);
+  assert.equal(s.sql.prepare("SELECT paid_until FROM access_subscriptions WHERE id='contract'").get().paid_until,paidUntil);
+});
+
+test('cancel closes the unpaid upgrade invoice and preserves a late-arriving verified settlement',async t=>{
+  const s=setup(t),remote=provider(t,{pending:true});
+  await requestUpgrade(s.env,'owner',submit());
+  await reconcile(s,'PAYMENT_CREATED','pay_next');
+  simulateProjectionDelivered(s);
+  assert.equal((await cancelRenewal(cancelRequest(),s.env,'owner')).status,200);
+  simulateProjectionDelivered(s);
+  await reconcile(s,'PAYMENT_UPDATED','pay_next');
+  simulateProjectionDelivered(s);
+  const state=await (await billingStatusResponse(s.env,'owner',paidUntil-1)).json();
+  assert.equal(state.subscription.status,'canceled');
+  assert.equal(state.subscription.upgrade,null);
+  assert.deepEqual(state.payments[0],{state:'canceled_invoice',amountCents:39990,dueOn:effective,invoiceUrl:null});
+  assert.equal((await activeState(s.env,'owner',paidUntil)).active,false);
+
+  // The provider can already have captured the invoice before processing DELETE.
+  remote.setStatus('CONFIRMED');
+  await reconcile(s,'PAYMENT_CONFIRMED','pay_next');
+  simulateProjectionDelivered(s);
+  const settled=await (await billingStatusResponse(s.env,'owner',paidUntil+1000)).json();
+  assert.equal(settled.subscription.status,'canceled');
+  assert.equal(settled.subscription.planCode,'yearly');
+  assert.equal(settled.subscription.paidUntil,new Date(periodEnd(effective,'yearly')).toISOString());
+  assert.equal(remote.removals(),1);
+});
+
+test('cancellation requested during the provider upgrade is queued without racing the PUT',async t=>{
+  const s=setup(t);
+  const remote=provider(t,{onPut:async()=>{
+    assert.equal((await cancelRenewal(cancelRequest(),s.env,'owner')).status,202);
+    assert.equal(remote.removals(),0);
+  }});
+  await requestUpgrade(s.env,'owner',submit());
+  await retryBillingCancellation(s.env);
+  simulateProjectionDelivered(s);
+  assert.equal(remote.removals(),1);
+  assert.equal(s.sql.prepare("SELECT status FROM access_subscriptions WHERE id='contract'").get().status,'canceled');
+  assert.equal((await activeState(s.env,'owner',paidUntil)).active,false);
+});
+
+test('verified partial refund withdraws only the affected paid period and resists stale payment events',async t=>{
+  const s=setup(t),remote=provider(t);
+  await requestUpgrade(s.env,'owner',submit());
+  remote.setStatus('CONFIRMED');
+  await reconcile(s,'PAYMENT_CONFIRMED','pay_next');
+  simulateProjectionDelivered(s);
+  remote.setRenewal({status:'REFUND_IN_PROGRESS',refunds:[{status:'PENDING',value:10}]});
+  await reconcile(s,'PAYMENT_REFUND_IN_PROGRESS','pay_next');
+  simulateProjectionDelivered(s);
+  assert.equal((await activeState(s.env,'owner',paidUntil+1000)).active,true);
+
+  // A historical event originally went to manual review. It is retried once
+  // under the new reader without replaying the refund mutation.
+  remote.setRenewal({status:'CONFIRMED',value:389.9,originalValue:399.9},[
+    {status:'DONE',value:4},{status:'DONE',value:6},{status:'CANCELLED',value:3},{status:'PENDING',value:12},
+  ]);
+  s.sql.prepare("INSERT INTO billing_webhook_events(provider,event_id,event_type,resource_type,resource_ref,status,received_at,updated_at,processed_at,attempts) "+
+    "VALUES('asaas','legacy_partial','PAYMENT_PARTIALLY_REFUNDED','payment','pay_next','review',?,?,?,1)").run(now,now,now);
+  await reconcileBilling(s.env);
+  simulateProjectionDelivered(s);
+  const status=await (await billingStatusResponse(s.env,'owner',paidUntil-1)).json();
+  assert.deepEqual(status.payments[0],{state:'partial_refund',amountCents:39990,refundedAmountCents:1000,dueOn:effective,invoiceUrl:null});
+  assert.equal(status.access.active,true);
+  assert.equal(status.subscription.paidUntil,new Date(paidUntil).toISOString());
+  assert.equal((await activeState(s.env,'owner',paidUntil)).active,false);
+  assert.equal(s.sql.prepare("SELECT status FROM billing_webhook_events WHERE event_id='legacy_partial'").get().status,'processed');
+
+  remote.setStatus('CONFIRMED');
+  await reconcile(s,'PAYMENT_RECEIVED','pay_next');
+  assert.equal((await activeState(s.env,'owner',paidUntil)).active,false);
+  assert.equal(s.sql.prepare("SELECT refunded_amount_cents FROM billing_payment_records WHERE provider_payment_ref='pay_next'").get().refunded_amount_cents,1000);
+  remote.setRenewal({status:'REFUNDED',value:0,originalValue:399.9});
+  await reconcile(s,'PAYMENT_REFUNDED','pay_next');
+  simulateProjectionDelivered(s);
+  assert.equal(s.sql.prepare("SELECT refunded_amount_cents FROM billing_payment_records WHERE provider_payment_ref='pay_next'").get().refunded_amount_cents,39990);
+  assert.equal((await activeState(s.env,'owner',paidUntil-1)).active,true);
 });

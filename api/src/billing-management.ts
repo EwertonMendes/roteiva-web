@@ -1,7 +1,7 @@
 import {asaasConfigured,AsaasError,asaasRequest,providerRef} from './billing-asaas.ts';
 import {openCheckout, type CheckoutIntent} from './billing-checkout.ts';
 import {flushBillingProjection} from './billing-projection.ts';
-import {refreshPaidWindow} from './billing-reconciliation.ts';
+import {closeUnpaidInvoices,refreshPaidWindow} from './billing-reconciliation.ts';
 import {cents} from './billing-period.ts';
 import {readBillingJson} from './billing-webhook.ts';
 import {ApiError,type Env} from './types.ts';
@@ -14,8 +14,12 @@ async function removeRecurrence(env:Env,ref:string):Promise<void>{
     // Retry after a lost response. The subscription must have previously been
     // verified on this account. A definitive GET can corroborate its removal.
     if(!(error instanceof AsaasError&&error.upstreamStatus===404))throw error;
-    const remote=await asaasRequest(env,'GET',`/subscriptions/${ref}`);
-    if(remote.id!==ref||remote.deleted!==true)throw new ApiError(502,'billing_provider_invalid_response');
+    try{
+      const remote=await asaasRequest(env,'GET',`/subscriptions/${ref}`);
+      if(remote.id!==ref||remote.deleted!==true)throw new ApiError(502,'billing_provider_invalid_response');
+    }catch(lookup){
+      if(!(lookup instanceof AsaasError&&lookup.upstreamStatus===404))throw lookup;
+    }
   }
 }
 
@@ -29,7 +33,7 @@ async function stopContract(env:Env,uid:string,contract:Recurrence,deleting:bool
   const stop=env.DB.prepare('UPDATE billing_contracts SET stopped_at=COALESCE(stopped_at,?),removed_at=?,next_due_on=NULL,cancel_after=NULL WHERE owner_uid=? AND subscription_id=?')
     .bind(now,now,uid,contract.subscription_id);
   if(deleting)await stop.run();
-  else await refreshPaidWindow(env,uid,contract.subscription_id,now,[stop]);
+  else await refreshPaidWindow(env,uid,contract.subscription_id,now,[stop,closeUnpaidInvoices(env,uid,contract.subscription_id,now)]);
 }
 
 function recurringContract(env:Env,uid:string):Promise<Recurrence|null>{
@@ -42,7 +46,8 @@ async function attemptCancellation(env:Env,uid:string,contract:Recurrence):Promi
   const now=Date.now();
   const job=await env.DB.prepare(
     'UPDATE billing_contracts SET cancel_attempts=cancel_attempts+1,cancel_after=? WHERE subscription_id=? '+
-    'AND owner_uid=? AND removed_at IS NULL AND cancel_after<=? AND cancel_attempts<8 RETURNING cancel_attempts'
+    'AND owner_uid=? AND removed_at IS NULL AND cancel_after<=? AND cancel_attempts<8 '+
+    "AND NOT EXISTS(SELECT 1 FROM billing_plan_changes WHERE subscription_id=billing_contracts.subscription_id AND state='applying') RETURNING cancel_attempts"
   ).bind(now+90000,contract.subscription_id,uid,now).first<{cancel_attempts:number}>();
   if(!job)return false;
   try{
@@ -61,7 +66,9 @@ export async function retryBillingCancellation(env:Env):Promise<void>{
   const job=await env.DB.prepare(
     'SELECT c.owner_uid,c.subscription_id,s.provider_reference FROM billing_contracts c JOIN access_subscriptions s ON s.id=c.subscription_id '+
     'WHERE c.removed_at IS NULL AND c.cancel_after<=? AND c.cancel_attempts<8 '+
-    'AND NOT EXISTS(SELECT 1 FROM account_deletions d WHERE d.owner_uid=c.owner_uid) ORDER BY c.cancel_after LIMIT 1'
+    'AND NOT EXISTS(SELECT 1 FROM account_deletions d WHERE d.owner_uid=c.owner_uid) '+
+    "AND NOT EXISTS(SELECT 1 FROM billing_plan_changes u WHERE u.subscription_id=c.subscription_id AND u.state='applying') "+
+    'ORDER BY c.cancel_after LIMIT 1'
   ).bind(Date.now()).first<Recurrence&{owner_uid:string}>();
   if(job)await attemptCancellation(env,job.owner_uid,job);
 }
@@ -72,11 +79,8 @@ export async function cancelRenewal(request:Request,env:Env,uid:string):Promise<
   if(data?.confirmed!==true||Object.keys(data).length!==1)throw new ApiError(400,'billing_consent_required');
   const contract=await recurringContract(env,uid);
   if(contract){
-    await env.DB.prepare('UPDATE billing_contracts SET cancel_after=? WHERE owner_uid=? AND subscription_id=? AND cancel_after IS NULL AND removed_at IS NULL '+
-      "AND NOT EXISTS (SELECT 1 FROM billing_plan_changes WHERE subscription_id=billing_contracts.subscription_id AND state='applying')")
+    await env.DB.prepare('UPDATE billing_contracts SET cancel_after=? WHERE owner_uid=? AND subscription_id=? AND cancel_after IS NULL AND removed_at IS NULL')
       .bind(Date.now(),uid,contract.subscription_id).run();
-    if(await env.DB.prepare("SELECT 1 FROM billing_plan_changes WHERE subscription_id=? AND state='applying'")
-      .bind(contract.subscription_id).first())throw new ApiError(409,'billing_upgrade_in_progress');
     const completed=await attemptCancellation(env,uid,contract);
     if(completed){
       await flushBillingProjection(env,uid);

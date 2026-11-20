@@ -244,6 +244,7 @@
 }
 .billing-table-row { border-top: 1px solid var(--line); min-height: 2.65rem; padding-block: .35rem; font-size: .875rem; }
 .billing-table-amount { font-variant-numeric: tabular-nums; }
+.billing-refunded-amount { display: block; margin-top: .2rem; color: var(--billing-text-muted); }
 .billing-table-invoice, .billing-table-head > :last-child { text-align: end; }
 .billing-table-invoice a {
   display: inline-flex;

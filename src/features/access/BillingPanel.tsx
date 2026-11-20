@@ -156,7 +156,7 @@ function BillingAccount({uid,access,locked}:{uid:string;access:AccessInfo;locked
       className="billing-upgrade-confirmation" tone="default" confirmLabel="Confirmar upgrade" cancelLabel="Voltar" onCancel={()=>setSelectedUpgrade(null)}
       onConfirm={()=>confirmUpgrade(selectedUpgrade.plan,selectedUpgrade.effectiveOn)}/>}
     {subscription?.canCancel&&canceling&&<ConfirmationDialog title="Cancelar renovação?"
-      description={`As cobranças futuras serão interrompidas.${subscription.paidUntil?` Você mantém seu acesso pago até ${billingDate(subscription.paidUntil)}.`:""}`}
+      description={`As cobranças futuras serão interrompidas.${subscription.upgrade?" O upgrade agendado também será cancelado.":""}${subscription.paidUntil?` Você mantém seu acesso pago até ${billingDate(subscription.paidUntil)}.`:""}`}
       confirmLabel="Confirmar cancelamento" cancelLabel="Manter assinatura" onCancel={()=>setCanceling(false)} onConfirm={cancelRenewal}/>}
   </section>;
 }

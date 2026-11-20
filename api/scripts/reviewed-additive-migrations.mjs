@@ -20,6 +20,7 @@ export const reviewedAdditiveMigrations=Object.freeze({
 });
 const reviewedDevAdditiveMigrations=Object.freeze({
   '0038_billing_reconciliation.sql':'7ac16cd8702627ad3b21e2433cfebac31544a447',
+  '0040_billing_refund_amount.sql':'345d0ff8cc48e404598c5daceffaf83047d1a633',
 });
 
 export function gitBlobSha(content){

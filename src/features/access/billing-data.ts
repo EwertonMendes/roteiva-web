@@ -6,7 +6,7 @@ export type PlanCode = "monthly" | "quarterly" | "yearly";
 export type Plan = {code:PlanCode;amountCents:number;version:string};
 export type UpgradeOffer = {effectiveOn:string;plans:PlanCode[]};
 export type ScheduledUpgrade = {planCode:PlanCode;amountCents:number;effectiveOn:string;status:"pending"|"scheduled"|"review"};
-export type Payment = {state:string;amountCents:number;dueOn:string|null;invoiceUrl:string|null};
+export type Payment = {state:string;amountCents:number;refundedAmountCents?:number;dueOn:string|null;invoiceUrl:string|null};
 export type PaymentPage = {payments:Payment[];nextPaymentCursor?:string|null};
 export type Subscription = {
   planCode:PlanCode;

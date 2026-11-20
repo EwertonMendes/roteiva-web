@@ -155,6 +155,8 @@ Fluxo: React + Firebase Auth → Cloudflare Worker existente → adaptador Asaas
 - [ ] Cancelamento e reativação; cobrança recusada, tolerância D+3 e expiração; reconciliação do pagamento tardio e reembolso; histórico de contratos antigos.
 - [x] Validar o agendamento mensal → trimestral, mensal → anual e trimestral → anual na mesma recorrência de cartão do canário DEV. Ver [evidências do upgrade](#homologação-de-upgrades-no-sandbox).
 - [ ] Confirmar no Asaas Sandbox o upgrade com fatura já gerada e a primeira renovação de cartão no novo ciclo.
+- [x] Regressões de renovação e cancelamento com fatura existente, disputa com upgrade e confirmação atrasada. O ledger deixa de mostrar faturas canceladas como pagáveis.
+- [x] Conciliar estorno parcial concluído pelo Asaas, manter a maior soma comprovada e recalcular a vigência sem a cobrança parcialmente estornada. Mesma fatura e total original preservados para análise.
 - [ ] Proteger preço histórico; alterações de catálogo não modificam silenciosamente assinaturas existentes.
 - [ ] Notificações financeiras gratuitas via próprio Asaas apenas quando configuradas conscientemente; e-mail próprio transacional requer projeto próprio, sem serviço pago automático.
 

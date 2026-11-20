@@ -2,6 +2,8 @@
 
 ## Assinatura Asaas Sandbox DEV — 20/11/2026
 
+**Renovação, cancelamento e estorno — regressões implementadas:** testes de D1 verificam vigência inalterada antes da cobrança, recusa e tolerância de 72 horas, cancelamento concorrente com upgrade, fatura pendente removida e confirmação válida entregue depois do cancelamento. O estorno parcial passa a ser conciliado com a evidência atual do Asaas e deixa de sustentar a vigência automática da cobrança afetada. A primeira renovação de cartão no novo ciclo e o cancelamento com fatura de cartão já gerada ainda aguardam validação no provedor. Evidências em `api/tests/billing-upgrade.test.mjs` e `tests/browser/access.spec.ts`.
+
 **Upgrade em Configurações — agendamento validado no canário DEV:** mensal → trimestral, mensal → anual e trimestral → anual. Para cada troca, o Asaas confirmou o novo valor e ciclo no contrato existente e o Roteiva preservou a vigência atual. A comparação usa o valor contratado, e o modal foi validado até 320 px. A primeira cobrança recorrente pós-upgrade e o cenário com fatura já emitida continuam pendentes no provedor. Ver [evidências do upgrade](../ROADMAP-PAGAMENTOS-ASAAS.md#homologação-de-upgrades-no-sandbox).
 
 **Redesenho da assinatura — implementado:** Configurações reúne acesso, plano contratado e histórico paginado. A tela de acesso restrito diferencia expiração e suspensão, com comparação visual de planos onde há elegibilidade para checkout e suporte em caso de suspensão. Evidências de regressão em `tests/browser/access.spec.ts` e `api/tests/billing-status.test.mjs`. A homologação dos cenários financeiros abaixo tem escopo próprio.
