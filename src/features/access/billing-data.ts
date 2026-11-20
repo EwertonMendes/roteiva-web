@@ -4,6 +4,8 @@ import {firebaseServices} from "../../lib/firebase";
 
 export type PlanCode = "monthly" | "quarterly" | "yearly";
 export type Plan = {code:PlanCode;amountCents:number;version:string};
+export type UpgradeOffer = {effectiveOn:string;plans:PlanCode[]};
+export type ScheduledUpgrade = {planCode:PlanCode;amountCents:number;effectiveOn:string;status:"pending"|"scheduled"|"review"};
 export type Payment = {state:string;amountCents:number;dueOn:string|null;invoiceUrl:string|null};
 export type PaymentPage = {payments:Payment[];nextPaymentCursor?:string|null};
 export type Subscription = {
@@ -15,6 +17,8 @@ export type Subscription = {
   paymentMethod:string|null;
   canCancel:boolean;
   cancellation:"pending"|"review"|null;
+  upgradeOffer?:UpgradeOffer|null;
+  upgrade?:ScheduledUpgrade|null;
 };
 export type BillingStatus = PaymentPage & {
   checkoutAvailable:boolean;
@@ -34,19 +38,36 @@ export function billingDate(value:string|Date) {
   return Number.isFinite(date.getTime()) ? dateFormat.format(date) : "Data indisponível";
 }
 
+const upgradeErrors:Record<string,string> = {
+  billing_catalog_changed:"Os valores mudaram. Atualize a assinatura para comparar os planos novamente.",
+  billing_upgrade_terms_changed:"A data da renovação mudou. Atualize a assinatura para conferir a nova data.",
+  billing_upgrade_invoice_conflict:"Há uma fatura que precisa ser conferida antes da mudança. Consulte o histórico ou fale com o suporte.",
+  billing_upgrade_provider_rejected:"O Asaas não aceitou a mudança nesta recorrência. Fale com o suporte para verificar o cartão.",
+  billing_upgrade_in_progress:"Já existe uma mudança em andamento. Atualize a assinatura para acompanhar.",
+  billing_upgrade_unavailable:"A assinatura não está elegível para essa mudança. Atualize a assinatura para conferir a situação.",
+};
+
 export async function billingRequest<T>(path:string,uid:string,body?:object,signal?:AbortSignal):Promise<T> {
   const {auth} = firebaseServices();
   const user = auth.currentUser;
   if(user?.uid!==uid) throw Error("Entre novamente para consultar sua assinatura.");
   const token = await user.getIdToken();
   if(auth.currentUser?.uid!==uid) throw Error("Sua sessão mudou. Entre novamente.");
+  const timeout = AbortSignal.timeout(path==="/billing/upgrade"?60000:18000);
   const response = await fetch(API_BASE_URL+path,{
     method:body?"POST":"GET",cache:"no-store",
     headers:{Authorization:"Bearer "+token,...(body?{"Content-Type":"application/json"}:{})},
     body:body?JSON.stringify(body):undefined,
-    signal:signal?AbortSignal.any([signal,AbortSignal.timeout(18000)]):AbortSignal.timeout(18000),
+    signal:signal?AbortSignal.any([signal,timeout]):timeout,
   });
-  if(!response.ok) throw Error("A área de assinatura está temporariamente indisponível. Tente novamente.");
+  if(!response.ok) {
+    if(path==="/billing/upgrade"||path==="/billing/cancel"){
+      const failure=await response.json().catch(()=>null) as {error?:{code?:string}}|null;
+      const message=upgradeErrors[failure?.error?.code??""];
+      if(message)throw Error(message);
+    }
+    throw Error("A área de assinatura está temporariamente indisponível. Tente novamente.");
+  }
   const data = await response.json() as T;
   if(auth.currentUser?.uid!==uid) throw Error("Sua sessão mudou. Entre novamente.");
   return data;

@@ -5,18 +5,20 @@ import {AppButton} from "../ui/AppButton";
 import {AppInput} from "../ui/AppInput";
 import {AppModal,AppModalBody,AppModalFooter,AppModalHeader} from "../ui/AppModal";
 import {BillingArt} from "./BillingArt";
-import {cadence,money,planNames,type Plan,type PlanCode} from "./billing-data";
+import {billingDate,cadence,money,planNames,type Plan,type PlanCode,type UpgradeOffer} from "./billing-data";
 
 const months:Record<PlanCode,number> = {monthly:1,quarterly:3,yearly:12};
-export function BillingPlans({catalog,canStart,onSelect}:{catalog:Plan[];canStart:boolean;onSelect:(plan:Plan)=>void}) {
+export function BillingPlans({catalog,canStart,upgrade,onSelect}:{catalog:Plan[];canStart:boolean;upgrade?:UpgradeOffer|null;onSelect:(plan:Plan)=>void}) {
   const monthly = catalog.find(plan=>plan.code==="monthly")?.amountCents;
+  const displayed=upgrade?catalog.filter(plan=>upgrade.plans.includes(plan.code)):catalog;
   return <section className="billing-plan-section" aria-labelledby="billing-plans-title">
     <header className="billing-plan-head">
-      <h3 id="billing-plans-title">{canStart?"Escolha seu plano":"Planos de assinatura"}</h3>
-      <p>{canStart?"Todos incluem acesso completo ao Roteiva, com renovação por cartão.":"Valores para novas contratações, com renovação por cartão."}</p>
+      <h3 id="billing-plans-title">{upgrade?"Faça upgrade do seu plano":canStart?"Escolha seu plano":"Planos de assinatura"}</h3>
+      <p>{upgrade?`O novo plano começa na renovação de ${billingDate(upgrade.effectiveOn)}.`:
+        canStart?"Todos incluem acesso completo ao Roteiva, com renovação por cartão.":"Valores para novas contratações, com renovação por cartão."}</p>
     </header>
     <ul className="billing-plans">
-      {catalog.map(plan => {
+      {displayed.map(plan => {
         const savings = monthly ? Math.floor(100*(1-plan.amountCents/(monthly*months[plan.code]))) : 0;
         const highlighted = plan.code==="yearly" && savings>0;
         return <li className="billing-plan" data-featured={highlighted || undefined} data-plan={plan.code} key={plan.code}>
@@ -30,8 +32,8 @@ export function BillingPlans({catalog,canStart,onSelect}:{catalog:Plan[];canStar
             </div>
             <div className="billing-price"><strong>{money(plan.amountCents)}</strong><span>{cadence[plan.code]}</span></div>
           </div>
-          {canStart&&<AppButton variant={highlighted?"primary":"secondary"} className="billing-plan-action" onClick={()=>onSelect(plan)}>
-            Escolher {planNames[plan.code].toLowerCase()} <ArrowRight size={17} aria-hidden="true"/>
+          {(canStart||upgrade)&&<AppButton variant={highlighted?"primary":"secondary"} className="billing-plan-action" onClick={()=>onSelect(plan)}>
+            {upgrade?"Mudar para":"Escolher"} {planNames[plan.code].toLowerCase()} <ArrowRight size={17} aria-hidden="true"/>
           </AppButton>}
         </li>;
       })}

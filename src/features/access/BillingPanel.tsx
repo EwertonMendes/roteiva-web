@@ -1,6 +1,6 @@
 
 import {useEffect,useId,useState} from "react";
-import {ArrowUpRight,CalendarDays,ChevronDown,CreditCard,RefreshCw} from "lucide-react";
+import {ArrowUpRight,CalendarDays,ChevronDown,CreditCard,RefreshCw,TrendingUp} from "lucide-react";
 import type {AccessInfo} from "../../data/access-watch";
 import {AppButton} from "../ui/AppButton";
 import {ConfirmationDialog} from "../ui/ConfirmationDialog";
@@ -35,6 +35,7 @@ function BillingAccount({uid,access,locked}:{uid:string;access:AccessInfo;locked
   const [catalog,setCatalog] = useState<Plan[]>([]);
   const [attempt,setAttempt] = useState(0);
   const [selected,setSelected] = useState<Plan|null>(null);
+  const [selectedUpgrade,setSelectedUpgrade] = useState<{plan:Plan;effectiveOn:string}|null>(null);
   const [canceling,setCanceling] = useState(false);
   const [showPlans,setShowPlans] = useState(false);
   const [error,setError] = useState("");
@@ -47,6 +48,8 @@ function BillingAccount({uid,access,locked}:{uid:string;access:AccessInfo;locked
   const subscription = status?.subscription;
   const checkoutUrl = access.suspended ? undefined : sandboxLink(status?.checkout?.url,"checkout");
   const canStart = locked && !!status?.canStart && !access.suspended;
+  const upgradeOffer = !locked&&!access.suspended ? subscription?.upgradeOffer : null;
+  const upgrade = subscription?.upgrade;
   const readCatalog = !access.suspended && (canStart || showPlans);
 
   useEffect(() => {
@@ -93,14 +96,36 @@ function BillingAccount({uid,access,locked}:{uid:string;access:AccessInfo;locked
     refresh();
   }
 
+  async function confirmUpgrade(plan:Plan,effectiveOn:string) {
+    const response = await billingRequest<{status:"scheduled"|"pending"}>("/billing/upgrade",uid,{
+      planCode:plan.code,catalogVersion:plan.version,effectiveOn,confirmed:true,
+    });
+    setSelectedUpgrade(null);
+    setShowPlans(false);
+    setResult(previous=>{
+      if(!previous?.status.subscription)return previous;
+      return {...previous,status:{...previous.status,subscription:{
+        ...previous.status.subscription,upgradeOffer:null,
+        upgrade:{planCode:plan.code,amountCents:plan.amountCents,effectiveOn,status:response.status},
+      }}};
+    });
+    refresh();
+  }
+
   return <section className="billing-panel" aria-labelledby={heading}>
     {!locked&&<h2 id={heading} className="billing-section-title">Assinatura</h2>}
     {locked&&<h2 id={heading} className="billing-sr-only">Assinatura</h2>}
     {!locked&&!subscription&&<TrialOrComplimentary access={access} ending={status?.notice?.code.endsWith("_ending")??false}/>}
     {subscription&&<PlanSummary subscription={subscription} illustrated={!locked} access={access} locked={locked}
-      grace={status?.notice?.code==="payment_grace"} onCancel={()=>setCanceling(true)}/>}
+      grace={status?.notice?.code==="payment_grace"} onCancel={()=>setCanceling(true)}
+      onUpgrade={upgradeOffer?()=>setShowPlans(value=>!value):undefined} showPlans={showPlans}/>}
     {callback&&callbacks[callback]&&<p className="billing-notice" role="status">{callbacks[callback]}</p>}
     {message&&<p className="billing-notice" role="status">{message}</p>}
+    {upgrade&&!access.suspended&&<div className="billing-notice" role="status">
+      {upgrade.status==="scheduled"?<p><strong>Upgrade agendado.</strong> O plano {planNames[upgrade.planCode].toLowerCase()} começa em {billingDate(upgrade.effectiveOn)}. A próxima cobrança será de {money(upgrade.amountCents)}.</p>:
+        upgrade.status==="pending"?<p>O upgrade aguarda confirmação do Asaas.</p>:
+          <p>O upgrade precisa de revisão. <a className="billing-support-link" href="/suporte.html">Fale com o suporte</a>.</p>}
+    </div>}
     {checkoutPending&&!status?.checkout&&!access.suspended&&<p className="billing-notice" role="status">Estamos verificando a criação do checkout.</p>}
     {!status&&!error&&<p className="billing-notice" role="status">Consultando assinatura…</p>}
     {error&&<p className="billing-inline-error" role="alert">{error}</p>}
@@ -112,18 +137,23 @@ function BillingAccount({uid,access,locked}:{uid:string;access:AccessInfo;locked
     </div>}
     {locked&&status&&!access.suspended&&!status.checkout&&!canStart&&!status.checkoutAvailable&&
       <p className="billing-notice">Contratação online indisponível no momento.</p>}
-    {!locked&&status?.checkoutAvailable&&!status.checkout&&
+    {!locked&&!upgradeOffer&&!upgrade&&status?.checkoutAvailable&&!status.checkout&&
       <AppButton variant="secondary" className="billing-toggle-plans" aria-expanded={showPlans} onClick={()=>setShowPlans(value=>!value)}>
         {showPlans?"Ocultar planos":"Ver planos"} <ChevronDown size={17} aria-hidden="true"/>
       </AppButton>}
-    {readCatalog&&catalog.length>0&&<BillingPlans catalog={catalog} canStart={canStart} onSelect={setSelected}/>}
+    {readCatalog&&catalog.length>0&&<BillingPlans catalog={catalog} canStart={canStart} upgrade={upgradeOffer}
+      onSelect={plan=>upgradeOffer?setSelectedUpgrade({plan,effectiveOn:upgradeOffer.effectiveOn}):setSelected(plan)}/>}
     {readCatalog&&!catalog.length&&!catalogError&&<p className="billing-notice" role="status">Consultando os planos…</p>}
     {catalogError&&readCatalog&&<p className="billing-inline-error" role="alert">Não foi possível carregar os planos.</p>}
-    {(error||(catalogError&&readCatalog)||subscription?.cancellation==="pending"||
+    {(error||(catalogError&&readCatalog)||subscription?.cancellation==="pending"||(upgrade?.status==="pending"&&!access.suspended)||
       (!access.suspended&&(callback==="return"||status?.checkout?.status==="pending"||(checkoutPending&&!status?.checkout))))&&
       <AppButton variant="secondary" className="billing-refresh" onClick={refresh}><RefreshCw size={16} aria-hidden="true"/> Atualizar assinatura</AppButton>}
     {status&&(!locked||status.payments.length>0)&&<BillingHistory key={result?.revision} firstPage={status} uid={uid}/>}
     {selected&&canStart&&<CheckoutConsent plan={selected} onClose={()=>setSelected(null)} onConfirm={()=>confirmCheckout(selected)}/>}
+    {selectedUpgrade&&upgradeOffer&&<ConfirmationDialog title={`Upgrade para o plano ${planNames[selectedUpgrade.plan.code].toLowerCase()}`}
+      description={`Em ${billingDate(selectedUpgrade.effectiveOn)}, a renovação será de ${money(selectedUpgrade.plan.amountCents)} ${cadence[selectedUpgrade.plan.code]}, no cartão atual. Nenhum valor será cobrado agora.`}
+      tone="default" confirmLabel="Confirmar upgrade" cancelLabel="Voltar" onCancel={()=>setSelectedUpgrade(null)}
+      onConfirm={()=>confirmUpgrade(selectedUpgrade.plan,selectedUpgrade.effectiveOn)}/>}
     {subscription?.canCancel&&canceling&&<ConfirmationDialog title="Cancelar renovação?"
       description={`As cobranças futuras serão interrompidas.${subscription.paidUntil?` Você mantém seu acesso pago até ${billingDate(subscription.paidUntil)}.`:""}`}
       confirmLabel="Confirmar cancelamento" cancelLabel="Manter assinatura" onCancel={()=>setCanceling(false)} onConfirm={cancelRenewal}/>}
@@ -145,8 +175,9 @@ function TrialOrComplimentary({access,ending}:{access:AccessInfo;ending:boolean}
   </div>;
 }
 
-function PlanSummary({subscription,access,locked,illustrated,grace,onCancel}:{
+function PlanSummary({subscription,access,locked,illustrated,grace,onCancel,onUpgrade,showPlans}:{
   subscription:Subscription;access:AccessInfo;locked:boolean;illustrated:boolean;grace:boolean;onCancel:()=>void;
+  onUpgrade?:()=>void;showPlans:boolean;
 }) {
   const status = subscriptionStates[subscription.status] ?? {label:"Em análise",tone:"neutral"};
   const next = subscription.status==="active" ? subscription.nextDueOn : null;
@@ -178,11 +209,14 @@ function PlanSummary({subscription,access,locked,illustrated,grace,onCancel}:{
         <dd>{access.unlimited?"Sem vencimento programado":`Até ${billingDate(access.accessUntil)}`}</dd>
       </div></div>}
     </dl>
-    {(subscription.status==="past_due"||subscription.cancellation||canCancel)&&<div className="billing-manage">
+    {(subscription.status==="past_due"||subscription.cancellation||canCancel||onUpgrade)&&<div className="billing-manage">
       {subscription.status==="past_due"&&<p>{grace?`Seu acesso continua até ${billingDate(access.accessUntil)}. `:""}Consulte o histórico para regularizar a cobrança em atraso.</p>}
       {subscription.cancellation==="pending"&&<p role="status">O cancelamento aguarda confirmação do Asaas.</p>}
       {subscription.cancellation==="review"&&<p>O cancelamento precisa de revisão. <a href="/suporte.html">Fale com o suporte</a>.</p>}
       {canCancel&&<AppButton variant="secondary" onClick={onCancel}>Cancelar renovação</AppButton>}
+      {onUpgrade&&<AppButton variant="primary" onClick={onUpgrade} aria-expanded={showPlans}>
+        <TrendingUp size={17} aria-hidden="true"/>{showPlans?"Ocultar opções":"Fazer upgrade"}
+      </AppButton>}
     </div>}
   </div>;
 }

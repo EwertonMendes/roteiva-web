@@ -141,7 +141,7 @@ Fluxo: React + Firebase Auth → Cloudflare Worker existente → adaptador Asaas
 
 ### Fase 5 — Política completa de ciclo **PLANEJADO**
 - [ ] Cancelamento e reativação; cobrança recusada, tolerância D+3 e expiração; reconciliação do pagamento tardio e reembolso; histórico de contratos antigos.
-- [ ] Troca de periodicidade na próxima renovação, sem pró-rata; garantir que o método escolhido é suportado. Evitar assinatura paralela no provedor.
+- [ ] Upgrade na próxima renovação, sem pró-rata. Implementado para o canário DEV na mesma recorrência, com testes simulados. Falta homologar uma assinatura ativa no Asaas Sandbox com fatura já gerada e verificar a primeira renovação no novo ciclo.
 - [ ] Proteger preço histórico; alterações de catálogo não modificam silenciosamente assinaturas existentes.
 - [ ] Notificações financeiras gratuitas via próprio Asaas apenas quando configuradas conscientemente; e-mail próprio transacional requer projeto próprio, sem serviço pago automático.
 

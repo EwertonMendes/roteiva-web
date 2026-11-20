@@ -2,6 +2,8 @@
 
 ## Assinatura Asaas Sandbox DEV — 20/11/2026
 
+**Upgrade em Configurações — implementado para o canário DEV:** mensal permite trimestral ou anual e trimestral permite anual. A interface confirma valor e data da renovação, e a API valida a alteração no mesmo contrato antes de mostrá-la como agendada. Testes em `api/tests/billing-upgrade.test.mjs` e `tests/browser/access.spec.ts` cobrem consentimento, conflito de faturas, resposta perdida e liberação pelo pagamento. A verificação com uma recorrência ativa no Asaas Sandbox continua pendente.
+
 **Redesenho da assinatura — implementado:** Configurações reúne acesso, plano contratado e histórico paginado. A tela de acesso restrito diferencia expiração e suspensão, com comparação visual de planos onde há elegibilidade para checkout e suporte em caso de suspensão. Evidências de regressão em `tests/browser/access.spec.ts` e `api/tests/billing-status.test.mjs`. A homologação dos cenários financeiros abaixo tem escopo próprio.
 
 **PUBLICADO E VALIDADO NA CONTA QA DEV:** Primeira cobrança mensal, trimestral e anual, recusa de cartão, vinculação ao usuário, webhook Asaas com HTTP 200, conciliação D1, reabertura automática do workspace, cancelamento e estorno total. A migração `0038_billing_reconciliation.sql` foi aplicada no DEV. A versão financeira `b53d710` passou no [smoke real DEV](https://github.com/EwertonMendes/roteiva-web/actions/runs/44803758781). A oferta geral continua indisponível. O próximo ciclo automático de cartão, chargeback real e atualização de cartão permanecem pendentes. Ver [evidências e limitações](../ROADMAP-PAGAMENTOS-ASAAS.md#integração-sandbox-dev--20112026).

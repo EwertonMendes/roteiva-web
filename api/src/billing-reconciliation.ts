@@ -4,6 +4,7 @@ import {planBillingEvent} from './billing-events.ts';
 import {billingDateInstant,cents,civilDate,periodEnd} from './billing-period.ts';
 import {flushBillingProjection,queueBillingProjection} from './billing-projection.ts';
 import {requireBillingPlan} from './billing-catalog.ts';
+import {termsAtRenewal} from './billing-upgrade.ts';
 import {ApiError,type Env} from './types.ts';
 
 type InboxEvent={
@@ -79,7 +80,8 @@ async function reconcilePayment(env:Env,payment:Record<string,unknown>,ref:strin
     return 'ignored';
   }
   if(await accountDeleting(env,intent.owner_uid))return 'ignored';
-  if(intent.amount_cents!==amount || (intent.first_due_on&&dueOn<intent.first_due_on) ||
+  const change=prior?await termsAtRenewal(env,prior.subscription_id,dueOn):null;
+  if((change?.amount_cents??intent.amount_cents)!==amount || (intent.first_due_on&&dueOn<intent.first_due_on) ||
     (payment.currency!==undefined&&payment.currency!=='BRL'))return 'review';
   if(prior&&(
     customer!==prior.provider_customer_ref||
@@ -120,17 +122,25 @@ async function reconcilePayment(env:Env,payment:Record<string,unknown>,ref:strin
     !invoice.search&&!invoice.hash&&/^\/i\/[A-Za-z0-9_-]{1,120}$/.test(invoice.pathname)?invoice.pathname:null;
   const paid=state==='confirmed'||state==='received';
   const paidOn=civilDate(payment.paymentDate??payment.confirmedDate);
-  const end=paid?periodEnd(dueOn,intent.plan_code):null;
-  const previous=await env.DB.prepare('SELECT state,due_on FROM billing_payment_records WHERE provider=? AND provider_payment_ref=?')
-    .bind('asaas',ref).first<{state:PaymentState;due_on:string|null}>();
-  if(previous?.due_on&&previous.due_on!==dueOn)return 'review';
-  if(prior&&previous?.state===state&&!details)return 'processed';
+  const end=paid?periodEnd(dueOn,change?.plan_code??intent.plan_code):null;
+  const previous=await env.DB.prepare('SELECT owner_uid,subscription_id,state,due_on,amount_cents FROM billing_payment_records WHERE provider=? AND provider_payment_ref=?')
+    .bind('asaas',ref).first<{owner_uid:string;subscription_id:string;state:PaymentState;due_on:string|null;amount_cents:number}>();
+  if(previous&&(previous.owner_uid!==intent.owner_uid||previous.subscription_id!==subId||
+    (previous.due_on&&previous.due_on!==dueOn)))return 'review';
+  if(prior&&previous?.state===state&&previous.amount_cents===amount&&!details)return 'processed';
   statements.push(env.DB.prepare(
     "INSERT INTO billing_payment_records(id,owner_uid,subscription_id,provider,provider_payment_ref,state,amount_cents,currency,due_on,verified_at,paid_at,period_ends_at,applied_at,created_at,updated_at,details,invoice_path) "+
     "VALUES(?,?,?,'asaas',?,?,?,'BRL',?,?,?,?,?,?,?,?,?) ON CONFLICT(provider,provider_payment_ref) DO UPDATE SET "+
-    "state=excluded.state,verified_at=excluded.verified_at,paid_at=excluded.paid_at,period_ends_at=excluded.period_ends_at,applied_at=excluded.applied_at,updated_at=excluded.updated_at,details=excluded.details,invoice_path=excluded.invoice_path "+
+    "state=excluded.state,amount_cents=excluded.amount_cents,verified_at=excluded.verified_at,paid_at=excluded.paid_at,period_ends_at=excluded.period_ends_at,applied_at=excluded.applied_at,updated_at=excluded.updated_at,details=excluded.details,invoice_path=excluded.invoice_path "+
     'WHERE billing_payment_records.owner_uid=excluded.owner_uid AND billing_payment_records.subscription_id=excluded.subscription_id'
   ).bind(crypto.randomUUID(),intent.owner_uid,subId,ref,state,amount,dueOn,now,paid&&paidOn?billingDateInstant(paidOn):null,end,paid?now:null,now,now,details,invoicePath));
+  if(paid&&change?.state==='scheduled'){
+    statements.push(
+      env.DB.prepare("UPDATE access_subscriptions SET cadence=? WHERE id=? AND owner_uid=? AND cadence<>? AND cadence<>'yearly'")
+        .bind(change.plan_code,subId,intent.owner_uid,change.plan_code),
+      env.DB.prepare("UPDATE billing_plan_changes SET state='applied' WHERE id=? AND state='scheduled'").bind(change.id),
+    );
+  }
   if(!prior&&!paid)await env.DB.batch(statements);
   else await refreshPaidWindow(env,intent.owner_uid,subId,now,statements);
   return state==='review'?'review':'processed';

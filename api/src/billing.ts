@@ -3,6 +3,7 @@ import {activeState} from './access.ts';
 import {billingNotice} from './billing-notices.ts';
 import {asaasConfigured,checkoutEnabled} from './billing-asaas.ts';
 import {openCheckout,openCheckoutUrl} from './billing-checkout.ts';
+import {currentUpgrade,upgradeOffer} from './billing-upgrade.ts';
 import {ApiError,type Env} from './types.ts';
 
 export function billingPlansResponse(env?:Env):Response{
@@ -16,7 +17,7 @@ export function billingPlansResponse(env?:Env):Response{
 type SubscriptionView={
   id:string;cadence:BillingPlanCode;
   status:'active'|'past_due'|'canceled'|'expired';
-  paid_until:number;next_due_on:string|null;amount_cents:number|null;can_cancel:number;cancel_after:number|null;cancel_attempts:number|null;
+  paid_until:number;next_due_on:string|null;amount_cents:number|null;can_cancel:number;cancel_after:number|null;cancel_attempts:number|null;stopped_at:number|null;
 };
 type PaymentPosition={id:string;due_on:string|null;created_at:number};
 type PaymentView=PaymentPosition&{state:string;amount_cents:number;details:string|null;invoice_path:string|null};
@@ -60,7 +61,8 @@ export async function billingStatusResponse(env:Env,uid:string,now=Date.now(),cu
   const [access,subscription,checkout,history]=await Promise.all([
     activeState(env,uid,now),
     env.DB.prepare(
-      'SELECT s.id,s.cadence,s.status,s.paid_until,c.next_due_on,i.amount_cents,c.cancel_after,c.cancel_attempts,(c.subscription_id IS NOT NULL AND c.removed_at IS NULL) AS can_cancel '+
+      'SELECT s.id,s.cadence,s.status,s.paid_until,c.next_due_on,c.stopped_at,c.cancel_after,c.cancel_attempts,(c.subscription_id IS NOT NULL AND c.removed_at IS NULL) AS can_cancel '+
+      ",COALESCE((SELECT u.amount_cents FROM billing_plan_changes u WHERE u.subscription_id=s.id AND u.state='applied' ORDER BY u.effective_on DESC LIMIT 1),i.amount_cents) AS amount_cents "+
       'FROM access_subscriptions s LEFT JOIN billing_contracts c ON c.subscription_id=s.id LEFT JOIN billing_checkout_intents i ON i.id=c.checkout_intent_id '+
       "WHERE s.owner_uid=? ORDER BY CASE s.status WHEN 'active' THEN 0 WHEN 'past_due' THEN 1 WHEN 'canceled' THEN 2 ELSE 3 END,s.updated_at DESC LIMIT 1"
     ).bind(uid).first<SubscriptionView>(),
@@ -69,6 +71,8 @@ export async function billingStatusResponse(env:Env,uid:string,now=Date.now(),cu
   ]);
   const enabled=checkoutEnabled(env,uid);
   const checkoutUrl=checkout&&enabled?openCheckoutUrl(checkout,now):null;
+  const upgrade=subscription?.can_cancel&&subscription.stopped_at===null&&subscription.cancel_after===null
+    ?await currentUpgrade(env,uid,subscription.id):null;
   return Response.json({
     checkoutAvailable:enabled,
     canStart:checkoutEnabled(env,uid)&&!!access&&!access.active&&!access.suspended&&!checkout&&!subscription?.can_cancel,
@@ -83,12 +87,19 @@ export async function billingStatusResponse(env:Env,uid:string,now=Date.now(),cu
       planCode:subscription.cadence,
       status:subscription.status,
       paidUntil:subscription.paid_until>0?new Date(subscription.paid_until).toISOString():null,
-      nextDueOn:subscription.next_due_on,
+      nextDueOn:upgrade?.state==='scheduled'?upgrade.effective_on:subscription.next_due_on,
       amountCents:subscription.amount_cents,
       paymentMethod:subscription.amount_cents!==null?'CREDIT_CARD':null,
-      canCancel:!!subscription.can_cancel&&subscription.cancel_after===null&&asaasConfigured(env),
+      canCancel:!!subscription.can_cancel&&subscription.cancel_after===null&&upgrade?.state!=='applying'&&asaasConfigured(env),
       cancellation:subscription.can_cancel&&subscription.cancel_after!==null?
         (subscription.cancel_attempts??0)>=8?'review':'pending':null,
+      upgradeOffer:!upgrade&&access?.active&&!access.suspended&&subscription.status==='active'&&
+        subscription.can_cancel&&subscription.stopped_at===null&&subscription.cancel_after===null
+        ?upgradeOffer(env,uid,subscription.cadence,subscription.paid_until,now):null,
+      upgrade:upgrade?{
+        planCode:upgrade.plan_code,amountCents:upgrade.amount_cents,effectiveOn:upgrade.effective_on,
+        status:upgrade.state==='scheduled'?'scheduled':upgrade.state==='review'?'review':'pending',
+      }:null,
     }:null,
     ...history,
   });

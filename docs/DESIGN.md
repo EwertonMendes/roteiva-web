@@ -3,6 +3,7 @@
 ## Assinatura e acesso à conta no DEV
 
 - Configurações usa um cartão para identificar plano ou acesso atual, situação e valor contratado. Datas e meio de pagamento ficam juntos, e a recorrência tem ação própria com confirmação. O catálogo fica sob **Ver planos** quando a conta pode consultá-lo em Configurações.
+- Uma recorrência elegível mostra **Fazer upgrade** junto ao plano vigente. Apenas ciclos superiores são selecionáveis. A confirmação mostra valor, data e uso do cartão cadastrado. O ciclo atual fica visível até a confirmação da nova cobrança e o upgrade agendado informa o próximo valor.
 - A tela de acesso expirado mostra mensal, trimestral e anual quando o Worker autoriza o checkout. Os cards mostram o total cobrado por ciclo e calculam a economia comparando o mesmo período com o preço mensal. A confirmação da cobrança usa o modal compartilhado. Na suspensão, a ação principal é o suporte.
 - O histórico exibe até cinco linhas por página, com situação em texto e link de fatura quando disponível. Em contêiner estreito, cada linha passa a dois pares de informações e mantém o acesso por teclado, sem rolagem horizontal.
 - As ilustrações editoriais de cinema usam transparência em WebP, abaixo de `public/brand/billing/`. Tipografia Ubuntu, cores do tema e os controles compartilhados governam a interface em claro e escuro.

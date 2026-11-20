@@ -72,8 +72,11 @@ export async function cancelRenewal(request:Request,env:Env,uid:string):Promise<
   if(data?.confirmed!==true||Object.keys(data).length!==1)throw new ApiError(400,'billing_consent_required');
   const contract=await recurringContract(env,uid);
   if(contract){
-    await env.DB.prepare('UPDATE billing_contracts SET cancel_after=? WHERE owner_uid=? AND subscription_id=? AND cancel_after IS NULL AND removed_at IS NULL')
+    await env.DB.prepare('UPDATE billing_contracts SET cancel_after=? WHERE owner_uid=? AND subscription_id=? AND cancel_after IS NULL AND removed_at IS NULL '+
+      "AND NOT EXISTS (SELECT 1 FROM billing_plan_changes WHERE subscription_id=billing_contracts.subscription_id AND state='applying')")
       .bind(Date.now(),uid,contract.subscription_id).run();
+    if(await env.DB.prepare("SELECT 1 FROM billing_plan_changes WHERE subscription_id=? AND state='applying'")
+      .bind(contract.subscription_id).first())throw new ApiError(409,'billing_upgrade_in_progress');
     const completed=await attemptCancellation(env,uid,contract);
     if(completed){
       await flushBillingProjection(env,uid);
@@ -117,6 +120,8 @@ export async function stopBillingForDeletion(env:Env,uid:string):Promise<boolean
   const [intent,contract]=await Promise.all([openCheckout(env,uid),recurringContract(env,uid)]);
   if(!intent&&!contract)return true;
   if(!asaasConfigured(env))throw new ApiError(503,'billing_deletion_unavailable');
+  if(contract&&await env.DB.prepare("SELECT 1 FROM billing_plan_changes WHERE subscription_id=? AND state='applying'")
+    .bind(contract.subscription_id).first())throw new ApiError(503,'billing_upgrade_in_progress');
   if(intent)await stopOpenCheckout(env,intent);
   if(contract)await stopContract(env,uid,contract,true);
   return !await recurringContract(env,uid);

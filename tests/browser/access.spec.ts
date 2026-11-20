@@ -306,3 +306,60 @@ test('billing summary, responsive history and restricted checkout use the same b
   await expect.poll(()=>fitsViewport('.billing-access')).toBe(true);
   if(process.env.ROTEIVA_BILLING_CAPTURE) await page.screenshot({path:info.outputPath('suspensa.png'),fullPage:true});
 });
+
+
+test('settings offers only higher plans and schedules the confirmed renewal',{tag:'@ci-smoke'},async({page},info)=>{
+  const email='upgrade-layout-'+info.project.name+'@example.com';
+  await signup(page,email);
+  if(info.project.name==='mobile')await page.setViewportSize({width:320,height:780});
+  await changeAccess(email,{source:'subscription',accessUntil:Timestamp.fromMillis(Date.now()+86400000)});
+  const headers={'Access-Control-Allow-Origin':cloud,'Access-Control-Allow-Methods':'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers':'Authorization, Content-Type'};
+  let scheduled=false,topPlan=false,upgrades=0;
+  await page.route(/^http:\/\/127\.0\.0\.1:8787\/billing\/(status|plans|upgrade)$/,async route=>{
+    const request=route.request();
+    if(request.method()==='OPTIONS')return route.fulfill({status:204,headers});
+    if(request.url().endsWith('/plans'))return route.fulfill({headers,json:{plans:[
+      {code:'monthly',amountCents:3990,version:'test'},
+      {code:'quarterly',amountCents:10990,version:'test'},
+      {code:'yearly',amountCents:39990,version:'test'},
+    ]}});
+    if(request.url().endsWith('/upgrade')){
+      upgrades++;
+      expect(request.postDataJSON()).toEqual({planCode:'yearly',catalogVersion:'test',effectiveOn:'2027-04-12',confirmed:true});
+      scheduled=true;
+      return route.fulfill({headers,json:{status:'scheduled'}});
+    }
+    return route.fulfill({headers,json:{checkoutAvailable:true,canStart:false,checkout:null,notice:null,payments:[],
+      subscription:{
+        status:'active',planCode:topPlan?'yearly':'monthly',amountCents:topPlan?39990:3990,
+        paidUntil:'2027-04-12T03:00:00.000Z',nextDueOn:'2027-04-12',paymentMethod:'CREDIT_CARD',
+        canCancel:true,cancellation:null,
+        upgradeOffer:scheduled||topPlan?null:{effectiveOn:'2027-04-12',plans:['quarterly','yearly']},
+        upgrade:scheduled&&!topPlan?{planCode:'yearly',amountCents:39990,effectiveOn:'2027-04-12',status:'scheduled'}:null,
+      },
+    }});
+  });
+  await page.goto(cloud+'/configuracoes');
+  const upgrade=page.getByRole('button',{name:'Fazer upgrade'});
+  await upgrade.click();
+  await expect(page.getByRole('heading',{name:'Faça upgrade do seu plano'})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Mudar para mensal'})).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'Mudar para trimestral'})).toBeVisible();
+  await page.getByRole('button',{name:'Mudar para anual'}).click();
+  const dialog=page.getByRole('dialog',{name:'Upgrade para o plano anual'});
+  await expect(dialog.getByText(/12 de abr.*2027.*399,90.*cartão atual.*Nenhum valor/)).toBeVisible();
+  await dialog.getByRole('button',{name:'Voltar'}).click();
+  expect(upgrades).toBe(0);
+  await page.getByRole('button',{name:'Mudar para anual'}).click();
+  await dialog.getByRole('button',{name:'Confirmar upgrade'}).click();
+  await expect(page.getByRole('status').filter({hasText:'Upgrade agendado.'})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Plano mensal'})).toBeVisible();
+  await expect(upgrade).toHaveCount(0);
+  expect(upgrades).toBe(1);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  topPlan=true;
+  await page.reload();
+  await expect(page.getByRole('heading',{name:'Plano anual'})).toBeVisible();
+  await expect(upgrade).toHaveCount(0);
+});

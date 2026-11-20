@@ -119,7 +119,7 @@
   font-size: .9rem;
 }
 .billing-manage p { margin-inline-end: auto; flex: 1 1 15rem; }
-.billing-manage a, .billing-text-link { text-decoration: underline; text-underline-offset: .22em; }
+.billing-manage a, .billing-text-link, .billing-support-link { text-decoration: underline; text-underline-offset: .22em; }
 .billing-text-link { display: inline-flex; align-items: center; gap: .35rem; font-weight: 700; min-height: 2.75rem; color: var(--ink); }
 .billing-panel .rt-button, .billing-access .rt-button, .billing-consent .rt-modal__footer .rt-button { white-space: normal; }
 .billing-toggle-plans, .billing-refresh { justify-self: start; }
