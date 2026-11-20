@@ -129,4 +129,18 @@ jobs:
           assert.deepEqual(await response.json(),{status:'ok',environment:'dev'});
           const denied=await fetch(base+'/integrations/drive',{headers:{Authorization:'Bearer invalid'}});
           assert.equal(denied.status,401);
+          const catalogResponse=await fetch(base+'/billing/plans');
+          assert.equal(catalogResponse.status,200);
+          assert.equal(catalogResponse.headers.get('Cache-Control'),'no-store');
+          const catalog=await catalogResponse.json();
+          assert.equal(catalog.checkoutAvailable,false,'Never expose an unfinished checkout');
+          assert.equal(catalog.currency,'BRL');
+          assert.deepEqual(catalog.plans.map(plan=>[plan.code,plan.cycle,plan.amountCents]),[
+            ['monthly','MONTHLY',3990],
+            ['quarterly','QUARTERLY',10990],
+            ['yearly','YEARLY',39990]
+          ]);
+          const checkout=await fetch(base+'/billing/checkout',{method:'POST',
+            headers:{'Content-Type':'application/json'},body:'{}'});
+          assert.equal(checkout.status,404,'Checkout creation must not exist before webhook reconciliation');
           NODE
