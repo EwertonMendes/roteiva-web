@@ -106,7 +106,7 @@ function BillingAccount({uid,access,locked}:{uid:string;access:AccessInfo;locked
     {error&&<p className="billing-inline-error" role="alert">{error}</p>}
     {status?.checkout&&!access.suspended&&<div className="billing-notice billing-next-action">
       <div><strong>Checkout {planNames[status.checkout.planCode].toLowerCase()}</strong>
-        <p>{checkoutUrl?"Conclua o pagamento no Asaas.":"Estamos verificando a tentativa de contratação."}</p>
+        <p role={checkoutUrl?undefined:"status"}>{checkoutUrl?"Conclua o pagamento no Asaas.":"Estamos verificando a tentativa de contratação."}</p>
       </div>
       {checkoutUrl&&<a className="billing-text-link" href={checkoutUrl} rel="noreferrer">Retomar checkout <ArrowUpRight size={17}/></a>}
     </div>}

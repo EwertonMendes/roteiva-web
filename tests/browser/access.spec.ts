@@ -191,7 +191,7 @@ test('new identity cannot bypass an unavailable deletion-status guard',async({pa
 });
 
 
-test('billing summary, responsive history and restricted checkout use the same billing data',async({page},info)=>{
+test('billing summary, responsive history and restricted checkout use the same billing data',{tag:'@ci-smoke'},async({page},info)=>{
   const email='billing-layout-'+info.project.name+'@example.com';
   await signup(page,email);
   if(info.project.name==='mobile') await page.setViewportSize({width:320,height:780});
