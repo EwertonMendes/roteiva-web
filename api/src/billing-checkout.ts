@@ -25,11 +25,11 @@ export function openCheckout(env:Env,uid:string):Promise<CheckoutIntent|null>{
 
 export function checkoutLink(id:string,link?:unknown):string{
   if(!providerRef(id))throw new ApiError(502,'billing_provider_invalid_response');
-  if(link===undefined||link===null)return sandboxOrigin+'/checkoutSession/show?id='+id;
+  if(link===undefined||link===null)return sandboxOrigin+'/000/checkoutSession/show/'+id;
   if(typeof link==='string'){
     const url=URL.parse(link);
     if(url?.origin===sandboxOrigin&&!url.username&&!url.password&&!url.hash&&
-      ((url.pathname==='/checkoutSession/show/'+id&&!url.search)||
+      ((['/checkoutSession/show/'+id,'/000/checkoutSession/show/'+id].includes(url.pathname)&&!url.search)||
        (url.pathname==='/checkoutSession/show'&&url.search==='?id='+id))){
       return url.href;
     }
@@ -37,13 +37,17 @@ export function checkoutLink(id:string,link?:unknown):string{
   throw new ApiError(502,'billing_provider_invalid_response');
 }
 
+export function openCheckoutUrl(row:CheckoutIntent,now:number):string|null{
+  if(row.expires_at<=now||!row.provider_checkout_ref)return null;
+  return checkoutLink(row.provider_checkout_ref,row.checkout_path?sandboxOrigin+row.checkout_path:undefined);
+}
+
 function resume(row:CheckoutIntent,planCode:BillingPlanCode,now:number):Response{
   if(row.plan_code!==planCode)throw new ApiError(409,'billing_checkout_already_open');
-  if(row.status==='ready'&&row.expires_at>now&&row.provider_checkout_ref){
-    return Response.json({status:'ready',url:checkoutLink(row.provider_checkout_ref,
-      row.checkout_path?sandboxOrigin+row.checkout_path:undefined)});
-  }
-  return Response.json({status:'pending'},{status:202});
+  // A provider ID can be saved before the ready response. Reuse the exact
+  // existing checkout even when saving the presentation URL was interrupted.
+  const url=openCheckoutUrl(row,now);
+  return url?Response.json({status:'ready',url}):Response.json({status:'pending'},{status:202});
 }
 
 export async function createCheckout(request:Request,env:Env,uid:string,now=Date.now()):Promise<Response>{

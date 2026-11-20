@@ -57,7 +57,7 @@ function sandboxLink(value:string|null|undefined,kind:"checkout"|"invoice"):stri
   if(url?.origin!=="https://sandbox.asaas.com"||url.username||url.password||url.hash)return;
   if(kind==="invoice"&&/^\/i\/[A-Za-z0-9_-]+$/.test(url.pathname)&&!url.search)return url.href;
   if(kind==="checkout"&&(
-    /^\/checkoutSession\/show\/[A-Za-z0-9_-]+$/.test(url.pathname)&&!url.search||
+    /^(?:\/000)?\/checkoutSession\/show\/[A-Za-z0-9_-]+$/.test(url.pathname)&&!url.search||
     url.pathname==="/checkoutSession/show"&&/^\?id=[A-Za-z0-9_-]+$/.test(url.search)
   ))return url.href;
 }
