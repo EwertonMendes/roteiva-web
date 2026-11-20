@@ -62,12 +62,12 @@ Fluxo: React + Firebase Auth → Cloudflare Worker existente → adaptador Asaas
 - [ ] Confirmar documentos Asaas e elegibilidade; API real **somente após** aprovação e ensaio controlado. Registrar política fiscal, termos comerciais, cancelamento/reembolso e retenção de dados com responsável.
 - [ ] Identificar dependências atuais da pipeline, acesso e exclusão; medir baseline de custo. Não alterar PROD.
 
-### Fase 1 — Fundação independente do Asaas **EM IMPLEMENTAÇÃO**
-- [ ] Salvar este roadmap na raiz e referenciar fontes de verdade.
-- [ ] Catálogo imutável (BRL, centavos, periodicidade, preço de versão) + testes.
-- [ ] Cliente HTTP de Asaas tipado, endpoints fixos por ambiente, timeout, JSON validado, mensagens de erro sanitizadas, nunca registrar token ou corpo.
-- [ ] Status de disponibilidade opcional no Worker e sem qualquer autorização para cobrar quando ausente configuração.
-- [ ] Migrações aditivas e testes de integridade para registros mínimos, respeitando guards D1; **sem gravar dados financeiros reais**.
+### Fase 1 — Fundação independente do Asaas **IMPLEMENTADA EM BRANCH; DEPLOY DEV PENDENTE**
+- [x] Salvar este roadmap na raiz e referenciar fontes de verdade.
+- [x] Catálogo imutável (BRL, centavos, periodicidade, preço de versão) + testes.
+- [x] Cliente HTTP de Asaas tipado, endpoints fixos por ambiente, timeout, JSON validado, mensagens de erro sanitizadas, nunca registrar token ou corpo. **Isolado, não chamado pelo app**.
+- [x] Endpoint de leitura `GET /billing/plans` com `checkoutAvailable:false`, sem qualquer autorização para cobrar; flags/chaves opcionais.
+- [x] Migração `0035_billing_foundation.sql` aditiva e testes de integridade para tabelas de customer/checkout vazias; **sem gravar dados financeiros reais**.
 - [ ] CI PR verde, merge em master para deploy DEV e smoke de `/health`/acesso existente; confirmar não mudou PROD.
 
 ### Fase 2 — Sandbox checkout **PLANEJADO**

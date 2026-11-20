@@ -19,6 +19,7 @@ import { verifyPickerToken,pickerConfiguration,pickedDriveFile } from './picker.
 import { deletionStatus, requestDeletion, runPendingDeletions, runDeletionMaintenance } from './account-deletion.ts';
 import { monitorDeletionBacklog } from './deletion-monitor.ts';
 import { ensureAccess, assertActiveAccess } from './access.ts';
+import {billingPlansResponse} from './billing.ts';
 import { backfillAccess } from './access-backfill.ts';
 import {dropboxEnabled,dropboxStart,dropboxLaunch,dropboxCallback,dropboxConnections,dropboxList,dropboxMetadata,dropboxRevoke,dropboxThumbnail} from './dropbox.ts';
 import {startDropboxUpload,appendDropboxUpload,finishDropboxUpload,cleanupDropboxUploads} from './dropbox-uploads.ts';
@@ -43,6 +44,7 @@ function libraryBatchRoute(path:string){return /^\/library\/projects\/[0-9]+\/(i
 function operationName(path:string):string{
   if(mediaRoute(path))return 'thumbnail_or_media';
   if(path==='/feedback')return 'feedback';
+  if(path.startsWith('/billing/'))return 'billing';
   if(path.startsWith('/reviews'))return 'reviews';
   if(path.includes('/uploads/'))return 'drive_upload';
   if(path.startsWith('/integrations/drive'))return 'drive_metadata';
@@ -95,6 +97,8 @@ export async function handle(request: Request, env: Env, ctx?:ExecutionContext):
       const principal=await verifiedTrialPrincipal(request,env,300);
       if(!(await env.API_RATE_LIMIT.limit({key:env.ENVIRONMENT+':delete:'+principal.uid})).success)throw new ApiError(429,'rate_limited');
       response=await requestDeletion(request,env,principal.uid,principal);
+    } else if (url.pathname === '/billing/plans' && request.method === 'GET') {
+      response=billingPlansResponse();
     } else if (url.pathname === '/access/ensure' && request.method === 'POST') {
       if(!allowedFrontend(env,origin))throw new ApiError(403,'origin_required');
       const principal=await verifiedTrialPrincipal(request,env);
