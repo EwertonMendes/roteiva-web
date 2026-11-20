@@ -37,7 +37,7 @@ function purchase(planCode='monthly',overrides={}){
     body:JSON.stringify({planCode,catalogVersion:'2026-11-v1',acceptedImmediateCharge:true,...overrides})});
 }
 function checkoutResponse(id='checkout_a'){
-  return Response.json({id,link:'https://sandbox.asaas.com/checkoutSession/show/'+id});
+  return Response.json({id,link:'https://sandbox.asaas.com/000/checkoutSession/show/'+id});
 }
 function providerPayment(overrides={}){
   return {id:'pay_a',customer:'cus_a',subscription:'sub_a',checkoutSession:'checkout_a',
@@ -72,7 +72,10 @@ test('checkout authorizes an enrolled expired owner, uses catalog and sends one 
   const responses=await Promise.all([createCheckout(purchase('quarterly'),s.env,'owner'),createCheckout(purchase('quarterly'),s.env,'owner')]);
   assert.ok(responses.some(response=>response.status===201));
   assert.equal(requests,1);
-  assert.equal((await (await createCheckout(purchase('quarterly'),s.env,'owner')).json()).url,'https://sandbox.asaas.com/checkoutSession/show/checkout_a');
+  assert.equal((await (await createCheckout(purchase('quarterly'),s.env,'owner')).json()).url,'https://sandbox.asaas.com/000/checkoutSession/show/checkout_a');
+  s.sql.exec("UPDATE billing_checkout_intents SET status='pending',checkout_path=NULL WHERE owner_uid='owner'");
+  assert.equal((await (await createCheckout(purchase('quarterly'),s.env,'owner')).json()).url,'https://sandbox.asaas.com/000/checkoutSession/show/checkout_a');
+  assert.equal(requests,1);
   await assert.rejects(createCheckout(purchase('yearly'),s.env,'owner'),{code:'billing_checkout_already_open'});
   assert.equal((await (await billingStatusResponse(s.env,'other')).json()).checkout,null);
   assert.equal((await handle(purchase(),s.env)).status,401);

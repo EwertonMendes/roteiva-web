@@ -2,7 +2,7 @@ import {billingCatalog,type BillingPlanCode} from './billing-catalog.ts';
 import {activeState} from './access.ts';
 import {billingNotice} from './billing-notices.ts';
 import {asaasConfigured,checkoutEnabled} from './billing-asaas.ts';
-import {checkoutLink,openCheckout} from './billing-checkout.ts';
+import {openCheckout,openCheckoutUrl} from './billing-checkout.ts';
 import type {Env} from './types.ts';
 
 export function billingPlansResponse(env?:Env):Response{
@@ -33,16 +33,17 @@ export async function billingStatusResponse(env:Env,uid:string,now=Date.now()):P
     env.DB.prepare('SELECT state,amount_cents,due_on,details,invoice_path FROM billing_payment_records WHERE owner_uid=? ORDER BY due_on DESC,created_at DESC LIMIT 20')
       .bind(uid).all<PaymentView>()
   ]);
+  const enabled=checkoutEnabled(env,uid);
+  const checkoutUrl=checkout&&enabled?openCheckoutUrl(checkout,now):null;
   return Response.json({
-    checkoutAvailable:checkoutEnabled(env,uid),
+    checkoutAvailable:enabled,
     canStart:checkoutEnabled(env,uid)&&!!access&&!access.active&&!access.suspended&&!checkout&&!subscription?.can_cancel,
     access,
     notice:billingNotice(access,subscription,now),
     checkout:checkout?{
       planCode:checkout.plan_code,
-      status:checkout.status==='ready'&&checkout.expires_at>now?'ready':'pending',
-      url:checkoutEnabled(env,uid)&&checkout.status==='ready'&&checkout.expires_at>now&&checkout.provider_checkout_ref?
-        checkoutLink(checkout.provider_checkout_ref,checkout.checkout_path?'https://sandbox.asaas.com'+checkout.checkout_path:undefined):null,
+      status:checkoutUrl?'ready':'pending',
+      url:checkoutUrl,
     }:null,
     subscription:subscription?{
       planCode:subscription.cadence,
