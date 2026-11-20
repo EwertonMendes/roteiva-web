@@ -16,9 +16,7 @@ A PR #123 agrega a UI do explorador de arquivos e mantém os contratos de mídia
 
 Dropbox pode incluir subpastas e arquivos de uma pasta explicitamente selecionada, com teto de 80 pastas, 500 arquivos e 125 páginas consultadas antes de qualquer mutação; árvores maiores exigem seleção em partes. Google Drive usa `drive.file` e Google Picker: selecionar uma pasta **não** concede automaticamente autorização sobre todos os seus descendentes. Capas legadas que perderam autorização requerem selecionar novamente o mesmo arquivo; o recorte anterior é preservado. O resultado real e o aceite visual dependem de testes autenticados nos provedores.
 
-**Domínio próprio publicado:** [roteiva.com](https://roteiva.com), login no mesmo domínio e API [api.roteiva.com](https://api.roteiva.com), usando os recursos PROD existentes. HTTPS, www, login real, recarga, links antigos e conexões preservadas conferidos; marcas Google verificadas/publicadas. Aprovação dos escopos Drive e produção Dropbox continuam separadas no [roadmap](docs/MVP-ROADMAP.md#domínio-roteivacom--11112026).
-
-A migração para `app.roteiva.com` está em preparação. Acompanhe os [destinos, critérios de aceite e procedimentos de publicação](ROADMAP-MIGRACAO-DOMINIOS.md).
+**Aplicativo PROD publicado em 20/11/2026:** [app.roteiva.com](https://app.roteiva.com) com Firebase Auth na mesma origem e API em [api.roteiva.com](https://api.roteiva.com). O site institucional já serve as páginas públicas pelo endereço do Firebase. A transferência de `roteiva.com` e `www` depende da homologação autenticada com uma conta de acesso ativo. Acompanhe os [destinos, evidências e procedimentos de publicação e rollback](ROADMAP-MIGRACAO-DOMINIOS.md).
 
 **Preparação sem domínio final:** preflight público DEV/PROD aprovado e recuperação de uma cópia cifrada Auth/Firestore PROD validada em emulador. Pedidos dos provedores, ciclo completo com usuários externos, operação contínua e aparelhos físicos continuam com aceites separados. Roteiro e evidências no [roadmap](docs/MVP-ROADMAP.md#preparação-sem-domínio-final--11112026).
 
@@ -31,7 +29,7 @@ A migração para `app.roteiva.com` está em preparação. Acompanhe os [destino
 | Ambiente | Frontend | API | Estado |
 |---|---|---|---|
 | DEV | https://roteiva-web-dev.web.app | https://roteiva-api-dev.roteiva-dev.workers.dev | Migrado; usuários, Firestore, D1 e credenciais preservados |
-| PROD | https://roteiva.com | https://api.roteiva.com | Publicado; schema e serviços isolados, sem dados de negócio |
+| PROD | https://app.roteiva.com | https://api.roteiva.com | Publicado com Firebase, Worker e D1 dedicados |
 
 [Primeira promoção PROD](https://github.com/EwertonMendes/roteiva-web/actions/runs/43023457363) aprovada e concluída por delegação expressa do proprietário, com regressão completa e dois ambientes protegidos. Manifestos dos dois frontends confirmam o mesmo SHA e os respectivos destinos. `PRODUCTION_ENABLED` voltou a false após a publicação; promoções futuras continuam manuais e protegidas.
 
