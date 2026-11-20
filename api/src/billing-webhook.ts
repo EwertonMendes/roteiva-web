@@ -77,7 +77,7 @@ async function boundedPayload(request:Request):Promise<unknown>{
   const data=new Uint8Array(size);
   let offset=0;
   for(const chunk of chunks){data.set(chunk,offset);offset+=chunk.length;}
-  try{return JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(data));}
+  try{return JSON.parse(new TextDecoder('utf-8',{fatal:true,ignoreBOM:false}).decode(data));}
   catch{throw new ApiError(400,'billing_invalid_event');}
 }
 
