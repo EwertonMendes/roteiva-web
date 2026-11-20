@@ -107,7 +107,8 @@ async function reconcilePayment(env:Env,payment:Record<string,unknown>,ref:strin
   if(previous&&(previous.owner_uid!==intent.owner_uid||previous.subscription_id!==subId||
     (previous.due_on&&previous.due_on!==dueOn)))return 'review';
 
-  const change=prior?await termsAtRenewal(env,prior.subscription_id,dueOn):null;
+  const change=prior?await termsAtRenewal(env,prior.subscription_id,dueOn,
+    prior.removed_at!==null?cents(payment.value):undefined):null;
   const amount=change?.amount_cents??intent.amount_cents;
   const refund=await refundedSoFar(env,payment,ref,amount,previous?.refunded_amount_cents??0,eventType);
   if(!refund&&payment.deleted===true&&(previous?.state==='confirmed'||previous?.state==='received'))return 'review';
@@ -160,13 +161,14 @@ async function reconcilePayment(env:Env,payment:Record<string,unknown>,ref:strin
     'AND billing_payment_records.refunded_amount_cents<=excluded.refunded_amount_cents'
   ).bind(crypto.randomUUID(),intent.owner_uid,subId,ref,state,amount,dueOn,now,paid&&paidOn?billingDateInstant(paidOn):previous?.paid_at??null,
     end,paid?now:null,now,now,details,canceledInvoice?null:invoicePath,refund));
-  if(paid&&change?.state==='scheduled'){
+  if(paid&&change&&change.state!=='applied'){
     const verified=" EXISTS(SELECT 1 FROM billing_payment_records WHERE provider='asaas' AND provider_payment_ref=? "+
       "AND subscription_id=? AND refunded_amount_cents=0 AND state IN ('confirmed','received'))";
     statements.push(
       env.DB.prepare("UPDATE access_subscriptions SET cadence=? WHERE id=? AND owner_uid=? AND cadence<>? AND cadence<>'yearly' AND"+verified)
         .bind(change.plan_code,subId,intent.owner_uid,change.plan_code,ref,subId),
-      env.DB.prepare("UPDATE billing_plan_changes SET state='applied' WHERE id=? AND state='scheduled' AND"+verified).bind(change.id,ref,subId),
+      env.DB.prepare("UPDATE billing_plan_changes SET state='applied' WHERE id=? AND state IN ('applying','verifying','scheduled','review') AND"+verified)
+        .bind(change.id,ref,subId),
     );
   }
   if(!prior&&!paid)await env.DB.batch(statements);

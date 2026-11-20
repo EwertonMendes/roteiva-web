@@ -262,3 +262,22 @@ test('verified partial refund withdraws only the affected paid period and resist
   assert.equal(s.sql.prepare("SELECT refunded_amount_cents FROM billing_payment_records WHERE provider_payment_ref='pay_next'").get().refunded_amount_cents,39990);
   assert.equal((await activeState(s.env,'owner',paidUntil-1)).active,true);
 });
+
+
+test('a captured renewal still funds the consented period after an ambiguous upgrade and confirmed cancellation',async t=>{
+  const s=setup(t),remote=provider(t,{loseResponse:true});
+  assert.equal((await requestUpgrade(s.env,'owner',submit())).status,202);
+  assert.equal((await cancelRenewal(cancelRequest(),s.env,'owner')).status,200);
+  simulateProjectionDelivered(s);
+  assert.equal((await activeState(s.env,'owner',paidUntil)).active,false);
+  remote.setStatus('CONFIRMED');
+  await reconcile(s,'PAYMENT_CONFIRMED','pay_next');
+  simulateProjectionDelivered(s);
+
+  const confirmed=await (await billingStatusResponse(s.env,'owner',paidUntil+1000)).json();
+  assert.equal(confirmed.subscription.status,'canceled');
+  assert.equal(confirmed.subscription.planCode,'yearly');
+  assert.equal(confirmed.subscription.paidUntil,new Date(periodEnd(effective,'yearly')).toISOString());
+  assert.equal(s.sql.prepare('SELECT state FROM billing_plan_changes').get().state,'applied');
+  assert.equal(remote.calls(),1);
+});

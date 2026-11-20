@@ -40,13 +40,21 @@ export function currentUpgrade(env:Env,uid:string,subId:string):Promise<Change|n
     .bind(uid,subId).first<Change>();
 }
 
-export async function termsAtRenewal(env:Env,subId:string,dueOn:string):Promise<Change|null>{
+export async function termsAtRenewal(env:Env,subId:string,dueOn:string,afterRemovalAmount?:number|null):Promise<Change|null>{
   const change=await env.DB.prepare(
     "SELECT * FROM billing_plan_changes WHERE subscription_id=? AND effective_on<=? "+
-    "AND state IN ('applying','verifying','scheduled','applied') ORDER BY effective_on DESC LIMIT 1"
+    "AND (state IN ('applying','verifying','scheduled','applied') OR (?=1 AND state='review')) ORDER BY effective_on DESC LIMIT 1"
+  ).bind(subId,dueOn,afterRemovalAmount!==undefined?1:0).first<Change>();
+  if(!change||change.state==='scheduled'||change.state==='applied')return change;
+  if(afterRemovalAmount===undefined)throw new ApiError(503,'billing_upgrade_verifying');
+  // After removal there is no recurrence left to verify. A payment that
+  // already settled can match the exact amount and first date consented
+  // before the PUT. Otherwise use the last verified terms.
+  if(change.next_due_on&&change.effective_on===dueOn&&change.amount_cents===afterRemovalAmount)return change;
+  return env.DB.prepare(
+    "SELECT * FROM billing_plan_changes WHERE subscription_id=? AND effective_on<=? "+
+    "AND state IN ('scheduled','applied') ORDER BY effective_on DESC LIMIT 1"
   ).bind(subId,dueOn).first<Change>();
-  if(change&&(change.state==='applying'||change.state==='verifying'))throw new ApiError(503,'billing_upgrade_verifying');
-  return change;
 }
 
 function contractForUpgrade(env:Env,uid:string):Promise<Contract|null>{
