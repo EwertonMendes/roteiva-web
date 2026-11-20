@@ -16,9 +16,11 @@ test('cache-only listener recovers from the server and ignores the superseded su
  assert.equal(values.length,2);assert.equal(values.at(-1).suspended,true);assert.deepEqual(errors,[]);
 });
 test('silent listener with a hanging server read fails closed within the read deadline',async(t)=>{
+ t.mock.timers.enable({apis:['setTimeout']});
  const values=[],errors=[];
  const stop=observeAccess(()=>()=>{},()=>new Promise(()=>{}),v=>values.push(v),e=>errors.push(e),{firstSnapshotMs:5,serverTimeoutMs:5});t.after(stop);
- await new Promise(resolve=>setTimeout(resolve,25));
+ t.mock.timers.tick(5);await settle();
+ t.mock.timers.tick(5);await settle();
  assert.deepEqual(values,[]);assert.equal(errors.length,1);assert.equal(errors[0].code,'deadline-exceeded');
 });
 test('silent listener restart budget is finite and logout cancels the watchdog',async(t)=>{

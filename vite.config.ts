@@ -12,7 +12,7 @@ export default defineConfig(({mode,isPreview}) => {
     generateBundle() {
       if (!config) throw new Error('Missing build identity');
       this.emitFile({type:'asset',fileName:'roteiva-build.json',source:JSON.stringify({
-        environment:config.appEnv,mode,apiOrigin:config.apiBaseUrl,projectId:config.firebase?.projectId,
+        environment:config.appEnv,mode,apiOrigin:config.apiBaseUrl,projectId:config.firebase?.projectId,authDomain:config.firebase?.authDomain,
         sha:process.env.GITHUB_SHA || process.env.SOURCE_SHA || null,
       })});
     },

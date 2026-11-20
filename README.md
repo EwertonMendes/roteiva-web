@@ -18,6 +18,8 @@ Dropbox pode incluir subpastas e arquivos de uma pasta explicitamente selecionad
 
 **Domínio próprio publicado:** [roteiva.com](https://roteiva.com), login no mesmo domínio e API [api.roteiva.com](https://api.roteiva.com), usando os recursos PROD existentes. HTTPS, www, login real, recarga, links antigos e conexões preservadas conferidos; marcas Google verificadas/publicadas. Aprovação dos escopos Drive e produção Dropbox continuam separadas no [roadmap](docs/MVP-ROADMAP.md#domínio-roteivacom--11112026).
 
+A migração para `app.roteiva.com` está em preparação. Acompanhe os [destinos, critérios de aceite e procedimentos de publicação](ROADMAP-MIGRACAO-DOMINIOS.md).
+
 **Preparação sem domínio final:** preflight público DEV/PROD aprovado e recuperação de uma cópia cifrada Auth/Firestore PROD validada em emulador. Pedidos dos provedores, ciclo completo com usuários externos, operação contínua e aparelhos físicos continuam com aceites separados. Roteiro e evidências no [roadmap](docs/MVP-ROADMAP.md#preparação-sem-domínio-final--11112026).
 
 **Recuperação de sessão e acesso:** leituras iniciais ausentes ou recusadas pelo SDK são conferidas no servidor com a identidade do próprio usuário. A recuperação renova a sessão e restabelece o acompanhamento de acesso sem recriar cadastro ou concessões. O alerta mantém 20 px antes dos botões; publicado e homologado em DEV/PROD; evidências no [roadmap](docs/MVP-ROADMAP.md).

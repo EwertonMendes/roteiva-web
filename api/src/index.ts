@@ -1,4 +1,4 @@
-import {assertEnvironment,assertDatabaseEnvironment,allowedFrontend} from './environment.ts';
+import {assertEnvironment,assertDatabaseEnvironment,allowedFrontend,legacyFrontendAllowed} from './environment.ts';
 import {applyResponsePolicy} from './response-policy.ts';
 import {listCoverImages,coverImage,dropboxCoverImage,fastCoverPreview} from './project-covers.ts';
 import { ApiError, type Env } from './types.ts';
@@ -98,13 +98,13 @@ export async function handle(request: Request, env: Env, ctx?:ExecutionContext):
       const principal=await verifiedTrialPrincipal(request,env,300);
       if(!(await env.API_RATE_LIMIT.limit({key:env.ENVIRONMENT+':delete:'+principal.uid})).success)throw new ApiError(429,'rate_limited');
       response=await requestDeletion(request,env,principal.uid,principal);
-    } else if (url.pathname === '/billing/plans' && request.method === 'GET') {
+    } else if (env.ENVIRONMENT === 'dev' && url.pathname === '/billing/plans' && request.method === 'GET') {
       response=billingPlansResponse();
-    } else if (url.pathname === '/billing/status' && request.method === 'GET') {
+    } else if (env.ENVIRONMENT === 'dev' && url.pathname === '/billing/status' && request.method === 'GET') {
       const uid=await identity(request,env);
       await assertNotDeleting(env,uid);
       response=await billingStatusResponse(env,uid);
-    } else if (url.pathname === '/billing/webhooks/asaas' && request.method === 'POST') {
+    } else if (env.ENVIRONMENT === 'dev' && url.pathname === '/billing/webhooks/asaas' && request.method === 'POST') {
       response=await ingestAsaasWebhook(request,env);
     } else if (url.pathname === '/access/ensure' && request.method === 'POST') {
       if(!allowedFrontend(env,origin))throw new ApiError(403,'origin_required');
@@ -297,7 +297,7 @@ export async function handle(request: Request, env: Env, ctx?:ExecutionContext):
     // Only categorical events. Never emit Request, URL, exception, headers or provider bodies.
     if (!known) console.error(JSON.stringify({event:'dependency_failure',requestId:id}));
   }
-  const result = applyResponsePolicy(response,url.pathname,allowedFrontend(env,origin)?origin!:env.FRONTEND_ORIGIN);
+  const result = applyResponsePolicy(response,url.pathname,allowedFrontend(env,origin)?origin:env.FRONTEND_ORIGIN,legacyFrontendAllowed(env));
   result.headers.set('X-Request-Id',id);
   result.headers.set('Vary','Origin');
   if (allowedFrontend(env,origin)) {

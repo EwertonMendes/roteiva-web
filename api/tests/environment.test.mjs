@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {generateKeyPair,SignJWT,exportJWK,createLocalJWKSet} from 'jose';
-import {environments} from '../../shared/environments.ts';
+import {environments,legacyProdFrontendOrigin} from '../../shared/environments.ts';
 import {assertEnvironment,assertDatabaseEnvironment,allowedFrontend} from '../src/environment.ts';
 import {applyResponsePolicy} from '../src/response-policy.ts';
 import {verifyFirebase} from '../src/auth.ts';
@@ -20,13 +20,48 @@ test('PROD canonical and exact historical origins retain CORS while DEV and look
    assert.match(response.headers.get('Access-Control-Expose-Headers'),/X-Request-Id/);
    assert.match(response.headers.get('X-Request-Id'),/^[a-f0-9-]{36}$/);
  }
- for(const origin of [null,'null','https://www.roteiva.com',environments.dev.frontendOrigin,'https://roteiva.com.evil.example','https://evil.example','http://roteiva.com']){
+ for(const origin of [null,'null',legacyProdFrontendOrigin,'https://www.roteiva.com',environments.dev.frontendOrigin,'https://roteiva.com.evil.example','https://evil.example','http://roteiva.com']){
    assert.equal(allowedFrontend(base,origin),false);
    if(origin!==null){const response=await handle(new Request(environments.prod.apiOrigin+'/health',{headers:{Origin:origin}}),base);assert.equal(response.status,403);assert.equal(response.headers.get('Access-Control-Allow-Origin'),null);}
  }
  assert.equal(allowedFrontend({...base,ENVIRONMENT:'invalid'},'https://roteiva.com'),false);
  for(const origin of [environments.prod.frontendOrigin,...environments.prod.frontendAliases])
    assert.equal(allowedFrontend({...base,ENVIRONMENT:'dev'},origin),false);
+});
+test('legacy root CORS and PDF embedding are bounded to the PROD cutover',async(t)=>{
+ const db=database();t.after(db.close);
+ const base={ENVIRONMENT:'prod',FIREBASE_PROJECT_ID:environments.prod.projectId,
+   FRONTEND_ORIGIN:environments.prod.frontendOrigin,OAUTH_REDIRECT_URI:environments.prod.apiOrigin+'/oauth/drive/callback',DB:db.DB};
+ const env={...base,LEGACY_FRONTEND_UNTIL:new Date(Date.now()+60_000).toISOString()};
+ const preflight=()=>new Request(environments.prod.apiOrigin+'/oauth/drive/start',{
+   method:'OPTIONS',headers:{Origin:legacyProdFrontendOrigin},
+ });
+ const allowed=await handle(preflight(),env);
+ assert.equal(allowed.status,204);
+ assert.equal(allowed.headers.get('Access-Control-Allow-Origin'),legacyProdFrontendOrigin);
+ for(const LEGACY_FRONTEND_UNTIL of ['invalid',new Date(0).toISOString(),new Date(Date.now()+2*86_400_000).toISOString()]){
+   const rejected=await handle(preflight(),{...env,LEGACY_FRONTEND_UNTIL});
+   assert.equal(rejected.status,403);
+   assert.equal(rejected.headers.get('Access-Control-Allow-Origin'),null);
+ }
+ assert.equal(allowedFrontend({...env,ENVIRONMENT:'dev'},legacyProdFrontendOrigin),false);
+ assert.equal(allowedFrontend(env,'https://www.roteiva.com'),false);
+ const pdf=new Response('synthetic',{headers:{'Content-Type':'application/pdf'}});
+ assert.match(applyResponsePolicy(pdf,'/reviews/media',env.FRONTEND_ORIGIN,true).headers.get('Content-Security-Policy'),
+   /frame-ancestors https:\/\/app\.roteiva\.com https:\/\/roteiva\.com$/);
+});
+test('the domain cutover leaves the DEV billing routes unpublished in PROD',async()=>{
+ const config=environments.prod;
+ const env={ENVIRONMENT:'prod',FIREBASE_PROJECT_ID:config.projectId,FRONTEND_ORIGIN:config.frontendOrigin,
+   OAUTH_REDIRECT_URI:config.apiOrigin+'/oauth/drive/callback',API_RATE_LIMIT:{limit:async()=>({success:true})},
+   DB:{prepare(query){
+     assert.match(query,/SELECT environment FROM deployment_identity/);
+     return {first:async()=>({environment:'prod'})};
+   }}};
+ for(const [path,method] of [['plans','GET'],['status','GET'],['webhooks/asaas','POST']]){
+   const response=await handle(new Request(config.apiOrigin+'/billing/'+path,{method}),env);
+   assert.equal(response.status,404,path);
+ }
 });
 for(const name of ['dev','prod'])test(name+' rejects cross-environment configuration, D1 and PDF origins',async(t)=>{
   const contract=environments[name];

@@ -16,6 +16,7 @@ export interface Env {
   ENVIRONMENT: string;
   FIREBASE_PROJECT_ID: string;
   FRONTEND_ORIGIN: string;
+  LEGACY_FRONTEND_UNTIL?: string;
   OAUTH_REDIRECT_URI: string;
   OAUTH_ENABLED: string;
   GOOGLE_CLIENT_ID?: string;

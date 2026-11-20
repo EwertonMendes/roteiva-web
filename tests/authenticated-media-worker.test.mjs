@@ -4,7 +4,7 @@ import vm from 'node:vm';
 import {readFileSync} from 'node:fs';
 import {environments} from '../shared/environments.ts';
 const source=readFileSync(new URL('../public/roteiva-media-sw.js',import.meta.url),'utf8');
-const origin='https://roteiva.com',id='aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa';
+const origin='https://app.roteiva.com',id='aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa';
 test('media worker origin allowlist matches the environment contract',()=>{
  for(const env of Object.values(environments))assert.ok(source.includes(env.apiOrigin));
 });

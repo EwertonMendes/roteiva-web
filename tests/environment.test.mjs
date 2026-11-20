@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync,readdirSync} from 'node:fs';
 import {parseEnvironment} from '../src/lib/environment-config.ts';
-import {environments} from '../shared/environments.ts';
+import {environments,legacyProdFrontendOrigin} from '../shared/environments.ts';
 import {canonicalFrontendUrl} from '../src/lib/canonical-frontend.ts';
 const config=(env)=>({VITE_APP_MODE:'firebase',VITE_APP_ENV:env,VITE_USE_EMULATORS:'false',
   VITE_API_BASE_URL:environments[env].apiOrigin,VITE_FIREBASE_PROJECT_ID:environments[env].projectId,
@@ -10,13 +10,14 @@ const config=(env)=>({VITE_APP_MODE:'firebase',VITE_APP_ENV:env,VITE_USE_EMULATO
   VITE_FIREBASE_APP_ID:'1:123:web:synthetic',VITE_FIREBASE_MESSAGING_SENDER_ID:'123'});
 
 test('old PROD links move to the canonical domain without changing route, query or fragment',()=>{
-  for(const origin of environments.prod.frontendAliases){
+  for(const origin of [legacyProdFrontendOrigin,...environments.prod.frontendAliases]){
     assert.equal(canonicalFrontendUrl(origin+'/review/synthetic?drive=connected#section','prod'),
-      'https://roteiva.com/review/synthetic?drive=connected#section');
-    assert.equal(new URL(canonicalFrontendUrl(origin+'//evil.example/?next=https://evil.example','prod')).origin,'https://roteiva.com');
+      'https://app.roteiva.com/review/synthetic?drive=connected#section');
+    assert.equal(new URL(canonicalFrontendUrl(origin+'//evil.example/?next=https://evil.example','prod')).origin,'https://app.roteiva.com');
+    assert.equal(canonicalFrontendUrl(origin+'/__/auth/handler','prod'),null);
     for(const mode of ['dev','demo','emulator',undefined])assert.equal(canonicalFrontendUrl(origin+'/biblioteca',mode),null);
   }
-  for(const href of ['https://roteiva.com/biblioteca','https://www.roteiva.com/','https://evil.example/',environments.dev.frontendOrigin])
+  for(const href of ['https://app.roteiva.com/biblioteca','https://www.roteiva.com/','https://evil.example/',environments.dev.frontendOrigin])
     assert.equal(canonicalFrontendUrl(href,'prod'),null);
 });
 
@@ -55,8 +56,14 @@ test('production virtual library and owner-confirmed release target are configur
   const worker=JSON.parse(readFileSync('api/wrangler.jsonc','utf8'));
   assert.equal(worker.env.prod.vars.VIRTUAL_LIBRARY_ENABLED,'true');
   assert.equal(worker.env.prod.vars.FIREBASE_PROJECT_ID,'roteiva-web-prod');
+  assert.equal(worker.env.prod.vars.FRONTEND_ORIGIN,environments.prod.frontendOrigin);
   const web=readFileSync('.env.production','utf8');
   assert.match(web,/^VITE_VIRTUAL_LIBRARY=true$/m);
+  assert.match(web,/^VITE_FIREBASE_AUTH_DOMAIN=app\.roteiva\.com$/m);
+  const hosting=JSON.parse(readFileSync('firebase.prod.json','utf8'));
+  const redirects=hosting.auth.providers.googleSignIn.authorizedRedirectUris;
+  assert.ok(redirects.includes('https://app.roteiva.com/__/auth/handler'));
+  assert.ok(redirects.includes('https://roteiva.com/__/auth/handler'));
   const release=readFileSync('.github/workflows/production.yml','utf8');
   assert.match(release,/VITE_VIRTUAL_LIBRARY: 'true'/);
   assert.match(release,/inputs\.confirmation == 'DEPLOY ROTEIVA PROD'/);

@@ -2,6 +2,7 @@
 /node_modules/
 api/.access-migration-counts.json
 /dist/
+/dist-site/
 /dist-pages/
 /dist-demo/
 *.tsbuildinfo

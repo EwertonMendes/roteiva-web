@@ -5,6 +5,20 @@ import {isReviewedAdditiveMigration} from './reviewed-additive-migrations.mjs';
 await remoteMetadata();
 const applied=new Set(query('SELECT name FROM d1_migrations').map(row=>row.name));
 const pending=readdirSync('migrations').filter(name=>/^\d+_[\w-]+\.sql$/.test(name)&&!applied.has(name)).sort();
+const devOnlyBilling = new Set([
+ '0035_billing_foundation.sql',
+ '0036_billing_webhook_events.sql',
+ '0037_billing_payment_ledger.sql',
+]);
+if(target==='prod'){
+ if(process.argv.includes('--domain-cutover')){
+  assert.ok(pending.every(name=>devOnlyBilling.has(name)),
+   'Domain cutover requires the current PROD schema; unexpected pending migrations: '+pending.join(', '));
+ }else{
+  assert.ok(!pending.some(name=>devOnlyBilling.has(name)),
+   'Billing migrations are DEV-only until an approved billing release.');
+ }
+}
 const reviewed=pending.filter(name=>isReviewedAdditiveMigration(name,readFileSync('migrations/'+name,'utf8')));
 const destructive=pending.filter(name=>{
  const original=readFileSync('migrations/'+name,'utf8');

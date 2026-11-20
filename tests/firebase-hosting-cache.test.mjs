@@ -29,10 +29,10 @@ test("Vite hashed assets override the SPA cache policy in a later rule",()=>{
 });
 
 test('header verification uses configured canonical origins and rejects arbitrary URLs before fetching',()=>{
-  for(const origin of ['https://roteiva.com','https://roteiva-web-dev.web.app','https://roteiva-web-prod.web.app'])
+  for(const origin of ['https://app.roteiva.com','https://roteiva-web-dev.web.app','https://roteiva-web-prod.web.app'])
     assert.equal(hostingOrigin(origin+'/'),origin);
-  for(const target of ['https://evil.example','https://roteiva.com.evil.example','http://roteiva.com','https://user:password@roteiva.com',
-    'https://roteiva.com/path','https://roteiva.com/?token=synthetic','https://roteiva.com/#fragment','https://roteiva.com:444'])
+  for(const target of ['https://evil.example','https://roteiva.com','https://app.roteiva.com.evil.example','http://app.roteiva.com','https://user:password@app.roteiva.com',
+    'https://app.roteiva.com/path','https://app.roteiva.com/?token=synthetic','https://app.roteiva.com/#fragment','https://app.roteiva.com:444'])
     assert.throws(()=>hostingOrigin(target));
 });
 const html='<script src="/assets/index-synthetic123.js"></script>';
@@ -42,15 +42,15 @@ function response(asset,policy='no-cache, no-store, must-revalidate'){
 }
 test('brief CDN header propagation recovers while retaining deep-link and hashed-asset checks',async()=>{
   const calls=[];
-  await verifyHostingCache('https://roteiva.com',{delaysMs:[0],sleep:async()=>{},fetcher:async(url,options)=>{
+  await verifyHostingCache('https://app.roteiva.com',{delaysMs:[0],sleep:async()=>{},fetcher:async(url,options)=>{
     calls.push(url);assert.equal(options.redirect,'error');
     return response(url.includes('/assets/'),calls.length===1?'max-age=3600':undefined);
   }});
-  assert.equal(calls.length,7);assert.ok(calls.includes('https://roteiva.com/configuracoes'));
-  assert.equal(calls.at(-1),'https://roteiva.com/assets/index-synthetic123.js');
+  assert.equal(calls.length,7);assert.ok(calls.includes('https://app.roteiva.com/configuracoes'));
+  assert.equal(calls.at(-1),'https://app.roteiva.com/assets/index-synthetic123.js');
 });
 test('persistent incorrect HTML policy fails after bounded reads',async()=>{
-  let calls=0;await assert.rejects(verifyHostingCache('https://roteiva.com',{delaysMs:[0],sleep:async()=>{},
+  let calls=0;await assert.rejects(verifyHostingCache('https://app.roteiva.com',{delaysMs:[0],sleep:async()=>{},
     fetcher:async()=>{calls++;return response(false,'max-age=3600');}}),/was not revalidated/);
   assert.equal(calls,2);
 });

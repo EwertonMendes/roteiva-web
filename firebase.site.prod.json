@@ -1,0 +1,50 @@
+{
+  "hosting": {
+    "site": "roteiva-site-prod",
+    "public": "dist-site",
+    "ignore": [
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "redirects": [
+      {
+        "regex": "^/$",
+        "destination": "https://app.roteiva.com/",
+        "type": 302
+      },
+      {
+        "regex": "^/((?:projetos|clientes|aprovacoes|financeiro|calendario|biblioteca|configuracoes|review)(?:/.*)?|index\\.html)$",
+        "destination": "https://app.roteiva.com/:1",
+        "type": 302
+      }
+    ],
+    "headers": [
+      {
+        "source": "**",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-store"
+          },
+          {
+            "key": "Referrer-Policy",
+            "value": "no-referrer"
+          },
+          {
+            "key": "X-Content-Type-Options",
+            "value": "nosniff"
+          }
+        ]
+      }
+    ]
+  },
+  "emulators": {
+    "hosting": {
+      "host": "127.0.0.1",
+      "port": 5012
+    },
+    "ui": {
+      "enabled": false
+    }
+  }
+}
