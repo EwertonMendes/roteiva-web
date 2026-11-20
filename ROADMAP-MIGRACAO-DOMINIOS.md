@@ -52,6 +52,8 @@ A edição do site institucional ocorrerá em um deploy independente. Reservar o
 
 Se a etapa de preparação falhar, a raiz e www continuam atendidos no site original. Remover a entrada nova somente se for necessário interromper a preparação e se o domínio ainda não tiver recebido usuários. Se o frontend novo falhar, restaurar a versão Hosting `189105` e coordenar com a versão Worker `28d178ea-8949-4f9c-9194-16a2f1fb5f80`. Confirmar o manifesto, a configuração de Auth anterior e o preflight na raiz. Caso a raiz já tenha sido transferida, restaurar primeiro os vínculos raiz e www ao site original e reaplicar apenas os registros de propriedade e TLS solicitados pelo assistente. Checar HTTPS externamente e conferir paths, redirects e sessão em navegador. Manter Firestore e D1 no lugar durante toda a recuperação.
 
+Se links novos já tiverem sido distribuídos, depois de restaurar a SPA na raiz configurar o custom domain `app.roteiva.com` para redirecionar para `roteiva.com`. Antes de reabrir o fluxo de login, verificar que a raiz já serve a versão anterior e que não existe redirect de volta para o app. Conferir caminho, query e fragmento em Chrome. [Atualização de custom domains](https://firebase.google.com/docs/reference/hosting/rest/v1beta1/projects.sites.customDomains/patch)
+
 ## Evidências e pendências
 
 | Etapa | Estado em 20/11/2026 |
@@ -61,6 +63,7 @@ Se a etapa de preparação falhar, a raiz e www continuam atendidos no site orig
 | Firebase Auth | Autorização de `app.roteiva.com` confirmada no console. Cliente Google existente salvo com a nova origem e `https://app.roteiva.com/__/auth/handler` |
 | Drive e Picker | Cliente Web do projeto Drive PROD com a origem nova, mantendo callbacks. Chave Picker com os referrers novos e as restrições Google Drive API e Google Picker API |
 | Dropbox | Callback do código preservado. A sessão atual do console Dropbox não lista o app Roteiva. Confirmar branding e callback com a conta proprietária e validar a conexão com um usuário existente |
+| DEV real | Chrome restaurou a sessão após recarregar, abriu a Biblioteca com contas Drive e Dropbox e abriu o formulário de feedback. A verificação foi somente de leitura |
 | Testes de preparação | Builds DEV/PROD verificados. Os testes unitários cobrem CORS, upload Drive na janela de transição, callback Asaas e guardas de produção. D1 local, dry-run Wrangler e 37 testes das regras Firestore passaram. Os 6 testes do Hosting em Chromium desktop/mobile usaram destino de loopback |
 | Produção atual | A raiz e www continuam no Hosting original. O último SHA público de referência e `/health` PROD foram conferidos. A promoção da migração, testes com conta existente e transferência da raiz permanecem pendentes |
 

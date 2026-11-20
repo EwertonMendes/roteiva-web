@@ -223,12 +223,13 @@ test('minimum-scope cover selection releases the native dialog for Google Picker
   return json({});
  });
  await prepare(page,'virtual-cover-'+info.project.name+'-'+Date.now()+'@example.com');
- await context.route('https://accounts.google.com/gsi/client',route=>route.fulfill({contentType:'application/javascript',body:`window.google={accounts:{oauth2:{initTokenClient:config=>({requestAccessToken:()=>config.callback({access_token:'synthetic-google-token',scope:'openid https://www.googleapis.com/auth/drive.file',expires_in:3600})})}}};`}));
+ // Both SDK scripts are asynchronous and may initialize the shared namespace in either order.
+ await context.route('https://accounts.google.com/gsi/client',route=>route.fulfill({contentType:'application/javascript',body:`window.google??={};window.google.accounts={oauth2:{initTokenClient:config=>({requestAccessToken:()=>config.callback({access_token:'synthetic-google-token',scope:'openid https://www.googleapis.com/auth/drive.file',expires_in:3600})})}};`}));
  await context.route('https://apis.google.com/js/api.js',route=>route.fulfill({contentType:'application/javascript',body:`
  window.gapi={load:(_name,config)=>config.callback()};
  class View{setIncludeFolders(){return this}setSelectFolderEnabled(){return this}setMode(){return this}setMimeTypes(){return this}}
  class Builder{addView(){return this}enableFeature(){return this}setMaxItems(){return this}setAppId(){return this}setDeveloperKey(){return this}setOAuthToken(){return this}setOrigin(){return this}setTitle(){return this}setSize(){return this}setCallback(callback){this.callback=callback;return this}build(){const callback=this.callback;let button;return {setVisible(){button=document.createElement('button');button.style.cssText='position:fixed;top:100px;left:20px;z-index:2147483647;background:white;color:black;padding:16px';button.textContent='Escolher imagem no Picker';button.onclick=()=>callback({action:'picked',docs:[{id:'COVER_FILE_12345',name:'Capa autorizada.png'}]});document.body.append(button)},dispose(){button?.remove()}}}}
- window.google.picker={DocsView:View,PickerBuilder:Builder,ViewId:{DOCS:'DOCS'},DocsViewMode:{LIST:'LIST'},Feature:{MULTISELECT_ENABLED:'MULTISELECT'}};
+ window.google??={};window.google.picker={DocsView:View,PickerBuilder:Builder,ViewId:{DOCS:'DOCS'},DocsViewMode:{LIST:'LIST'},Feature:{MULTISELECT_ENABLED:'MULTISELECT'}};
  `}));
  await page.goto(web+'/projetos');
  png=Buffer.from(await page.evaluate(()=>{const c=document.createElement('canvas');c.width=160;c.height=90;const ctx=c.getContext('2d')!;ctx.fillStyle='#b9c980';ctx.fillRect(0,0,160,90);return c.toDataURL('image/png').split(',')[1];}),'base64');
