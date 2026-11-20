@@ -47,6 +47,36 @@ test('unprovisioned account has no trial or artificial subscription',async()=>{
   assert.equal(state.checkoutAvailable,false);
  }finally{d.close();}
 });
+test('billing history pages all own charges with stable ties and nullable dates',async()=>{
+ const d=fixture();
+ try{
+  const now=Date.now(),env={DB:d.DB};
+  d.sql.prepare('INSERT INTO access_accounts(owner_uid,trial_started_at,trial_ends_at,created_at,updated_at) VALUES(?,?,?,?,?)')
+    .run('other',now,now+604800000,now,now);
+  const insertSub=d.sql.prepare("INSERT INTO access_subscriptions(id,owner_uid,provider,provider_reference,cadence,status,paid_until,updated_at) VALUES(?,?,'asaas',?,'monthly','expired',0,?)");
+  const insertPayment=d.sql.prepare("INSERT INTO billing_payment_records(id,owner_uid,subscription_id,provider,provider_payment_ref,state,amount_cents,currency,due_on,verified_at,created_at,updated_at) VALUES(?,?,?,'asaas',?,'confirmed',?,'BRL',?,?,?,?)");
+  insertSub.run('sub-owner','owner','sub-ref-owner',now);
+  insertSub.run('sub-other','other','sub-ref-other',now);
+  for(let index=0;index<12;index++){
+   const id='row-'+String(index).padStart(2,'0');
+   insertPayment.run(id,'owner','sub-owner','provider-'+id,index+1,index<6?null:'2026-11-20',now,now,now);
+  }
+  insertPayment.run('other-row','other','sub-other','provider-other',999,null,now,now,now);
+  const read=async(cursor=null)=>(await billingStatusResponse(env,'owner',now,cursor)).json();
+  const first=await read();
+  const second=await read(first.nextPaymentCursor);
+  const last=await read(second.nextPaymentCursor);
+  assert.deepEqual(first.payments.map(p=>p.amountCents),[12,11,10,9,8]);
+  assert.deepEqual(second.payments.map(p=>p.amountCents),[7,6,5,4,3]);
+  assert.deepEqual(last.payments.map(p=>p.amountCents),[2,1]);
+  assert.equal(last.nextPaymentCursor,null);
+  assert.equal('subscription' in second,false);
+  assert.equal(JSON.stringify(second).includes('provider-'),false);
+  const other=await (await billingStatusResponse(env,'other',now,second.nextPaymentCursor)).json();
+  assert.deepEqual(other.payments.map(p=>p.amountCents),[999]);
+  await assert.rejects(read('{"id":"row-00","due_on":"bad","created_at":1}'),{status:400,code:'invalid_billing_cursor'});
+ }finally{d.close();}
+});
 test('HTTP route denies requests without verified Firebase ID even if checkout is off',async()=>{
  const d=fixture();
  try{

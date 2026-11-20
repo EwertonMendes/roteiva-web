@@ -8,6 +8,7 @@ import { dataErrorMessage } from "../../data/firestore-workspace";
 import { AccountDeletionAction } from "./AccountDeletionAction";
 import { AccessSummary,useAccess } from "../access/AccessGate";
 import {BillingPanel} from "../access/BillingPanel";
+import {billingInThisBuild} from "../access/billing-data";
 
 const occupations:{value:ProfessionalType;label:string}[]=[
   {value:"freelancer",label:"Videomaker / freelancer"},
@@ -125,7 +126,7 @@ export function SettingsPage({profile,email,photoURL,theme,toggleTheme,onSavePro
       </div>
     </section>
 
-    {onSaveProfile&&<><AccessSummary/><BillingPanel refreshKey={access?.accessUntil.getTime()}/></>}
+    {onSaveProfile&&access&&(billingInThisBuild?<BillingPanel access={access}/>:<AccessSummary/>)}
 
     {onSaveProfile&&<section className="settings-editor settings-danger-zone" aria-label="Zona de perigo">
       <header className="settings-section-head">

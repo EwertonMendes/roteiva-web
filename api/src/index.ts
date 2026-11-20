@@ -119,7 +119,7 @@ export async function handle(request: Request, env: Env, ctx?:ExecutionContext):
     } else if (env.ENVIRONMENT === 'dev' && url.pathname === '/billing/status' && request.method === 'GET') {
       const uid=await identity(request,env);
       await assertNotDeleting(env,uid);
-      response=await billingStatusResponse(env,uid);
+      response=await billingStatusResponse(env,uid,Date.now(),url.searchParams.get('paymentCursor'));
     } else if (env.ENVIRONMENT === 'dev' && url.pathname === '/billing/webhooks/asaas' && request.method === 'POST') {
       response=await ingestAsaasWebhook(request,env);
     } else if (url.pathname === '/access/ensure' && request.method === 'POST') {
