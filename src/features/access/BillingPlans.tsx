@@ -1,5 +1,5 @@
 
-import {useId,useRef,useState} from "react";
+import {useEffect,useId,useRef,useState} from "react";
 import {ArrowRight,Check,CreditCard,LockKeyhole} from "lucide-react";
 import {AppButton} from "../ui/AppButton";
 import {AppInput} from "../ui/AppInput";
@@ -8,26 +8,37 @@ import {BillingArt} from "./BillingArt";
 import {billingDate,cadence,money,planNames,type Plan,type PlanCode,type UpgradeOffer} from "./billing-data";
 
 const months:Record<PlanCode,number> = {monthly:1,quarterly:3,yearly:12};
-export function BillingPlans({catalog,canStart,upgrade,onSelect}:{catalog:Plan[];canStart:boolean;upgrade?:UpgradeOffer|null;onSelect:(plan:Plan)=>void}) {
+type UpgradeComparison=UpgradeOffer&{currentPlan:PlanCode;currentAmountCents:number|null};
+
+export function BillingPlans({catalog,canStart,upgrade,onSelect}:{
+  catalog:Plan[];canStart:boolean;upgrade?:UpgradeComparison|null;onSelect:(plan:Plan)=>void;
+}) {
+  const heading=useRef<HTMLHeadingElement>(null);
+  const isUpgrade=!!upgrade;
+  useEffect(()=>{if(isUpgrade)heading.current?.focus();},[isUpgrade]);
   const monthly = catalog.find(plan=>plan.code==="monthly")?.amountCents;
   const displayed=upgrade?catalog.filter(plan=>upgrade.plans.includes(plan.code)):catalog;
-  return <section className="billing-plan-section" aria-labelledby="billing-plans-title">
+  const comparisonAmount=upgrade?upgrade.currentAmountCents:monthly;
+  const comparisonMonths=upgrade?months[upgrade.currentPlan]:1;
+  const reference=upgrade?"ao seu plano atual":"ao plano mensal";
+  return <section className="billing-plan-section" id="billing-plan-options" aria-labelledby="billing-plans-title">
     <header className="billing-plan-head">
-      <h3 id="billing-plans-title">{upgrade?"Faça upgrade do seu plano":canStart?"Escolha seu plano":"Planos de assinatura"}</h3>
+      <h3 id="billing-plans-title" ref={heading} tabIndex={upgrade?-1:undefined}>{upgrade?"Faça upgrade do seu plano":canStart?"Escolha seu plano":"Planos de assinatura"}</h3>
       <p>{upgrade?`O novo plano começa na renovação de ${billingDate(upgrade.effectiveOn)}.`:
         canStart?"Todos incluem acesso completo ao Roteiva, com renovação por cartão.":"Valores para novas contratações, com renovação por cartão."}</p>
     </header>
-    <ul className="billing-plans">
+    <ul className="billing-plans" data-upgrade-options={upgrade?displayed.length:undefined}>
       {displayed.map(plan => {
-        const savings = monthly ? Math.floor(100*(1-plan.amountCents/(monthly*months[plan.code]))) : 0;
+        const savings = comparisonAmount
+          ?Math.floor(100*(1-plan.amountCents*comparisonMonths/(comparisonAmount*months[plan.code]))):0;
         const highlighted = plan.code==="yearly" && savings>0;
         return <li className="billing-plan" data-featured={highlighted || undefined} data-plan={plan.code} key={plan.code}>
           <div className="billing-plan-art"><BillingArt name={plan.code}/></div>
           <div className="billing-plan-copy">
             <div className="billing-plan-name">
               <h4>{planNames[plan.code]}</h4>
-              {savings>0 && <span className="billing-pill" data-tone="positive" title="Em relação ao plano mensal">
-                {savings}% de economia<span className="billing-sr-only"> em relação ao plano mensal</span>
+              {savings>0 && <span className="billing-pill" data-tone="positive" title={`Em relação ${reference}`}>
+                {savings}% de economia<span className="billing-sr-only"> em relação {reference}</span>
               </span>}
             </div>
             <div className="billing-price"><strong>{money(plan.amountCents)}</strong><span>{cadence[plan.code]}</span></div>
