@@ -1,5 +1,14 @@
 # Arquitetura do Roteiva — MVP SaaS
 
+## Decisão — contrato de checkout seguro e status de assinatura (20/11/2026)
+
+A fundação acrescenta `api/src/billing-checkout-contract.ts`: função pura para montagem de `POST /v3/checkouts` conforme documentação oficial Asaas (cartão recorrente, catálogo versionado, `externalReference` opaco por UUID, `minutesToExpire` fixo, callback somente ao domínio do ambiente, vencimento em data/hora local validada). **Não existe rota pública de criação de checkout:** a data inicial será calculada por lógica confiável no backend após homologação de trial/cortesia, e eventos de callback nunca autorizam acesso.
+
+`api/src/billing-events.ts` classifica notificações somente como pistas para reconciliação com consulta ao estado atual do provedor; eventos fora de ordem, `PAYMENT_CONFIRMED`, `CHECKOUT_PAID`, cobranças em disputa, refund e chargeback **nunca** concedem acesso diretamente. `0037_billing_payment_ledger.sql` prepara ledger vazio para pagamentos posteriormente verificados, com unicidade de pagamento Asaas e chave estrangeira composta vinculando assinatura e dono; não modifica direitos existentes. Nenhum processamento financeiro, reembolso automático, fila ativa ou cobrança foi habilitado.
+
+`GET /billing/status` usa Firebase Auth para identificar o UID e consulta exclusivamente o estado comercial existente no D1, mesmo que a assinatura tenha expirado; não provisiona um novo trial, não publica Firestore, não modifica pagamentos, não exige credenciais Asaas. O retorno é um resumo de plano/prazo e `checkoutAvailable:false`. Qualquer leitura durante `sync_pending` falha fechada. As permissões do workspace e as Rules permanecem intactas.
+
+
 ## Decisão — inbox de Webhooks Asaas com opt-in explícito (20/11/2026)
 
 `api/src/billing-webhook.ts` introduz a fronteira de recepção do webhook Asaas, **somente DEV** e apenas se `BILLING_ENABLED=true`, `ASAAS_API_KEY` e `ASAAS_WEBHOOK_TOKEN` estiverem presentes. A configuração padrão atual não atende a condição: o endpoint responde 404 sem tocar em dados, nenhum secret novo é exigido por pipeline, e nenhum checkout é criado. Mesmo habilitada manualmente, a rota apenas registra os eventos; não renova trial, cortesia ou assinatura, não invoca o Asaas e não publica acesso no Firestore. PROD permanece desativado por uma verificação explícita de ambiente no código até existir reconciliação e homologação.

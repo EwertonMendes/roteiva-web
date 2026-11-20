@@ -37,7 +37,8 @@ export function resolveAccess(account:Account,grants:Grant[],subscriptions:Subsc
   return {active:!suspended&&(unlimited||until>now),source:unlimited||until>now?source:'none',
     accessUntil:iso(until),unlimited,suspended,trialEndsAt:iso(account.trial_ends_at),trialDays:TRIAL_DAYS};
 }
-async function activeState(env:Env,uid:string,now=Date.now()):Promise<AccessState|null> {
+/** Canonical account access read; no writes or enrollment. */
+export async function activeState(env:Env,uid:string,now=Date.now()):Promise<AccessState|null> {
   const account=await env.DB.prepare('SELECT trial_started_at,trial_ends_at,suspended_at,sync_pending FROM access_accounts WHERE owner_uid=?')
     .bind(uid).first<Account&{sync_pending:number}>();
   if(!account)return null;

@@ -19,7 +19,7 @@ import { verifyPickerToken,pickerConfiguration,pickedDriveFile } from './picker.
 import { deletionStatus, requestDeletion, runPendingDeletions, runDeletionMaintenance } from './account-deletion.ts';
 import { monitorDeletionBacklog } from './deletion-monitor.ts';
 import { ensureAccess, assertActiveAccess } from './access.ts';
-import {billingPlansResponse} from './billing.ts';
+import {billingPlansResponse,billingStatusResponse} from './billing.ts';
 import {ingestAsaasWebhook} from './billing-webhook.ts';
 import { backfillAccess } from './access-backfill.ts';
 import {dropboxEnabled,dropboxStart,dropboxLaunch,dropboxCallback,dropboxConnections,dropboxList,dropboxMetadata,dropboxRevoke,dropboxThumbnail} from './dropbox.ts';
@@ -100,6 +100,10 @@ export async function handle(request: Request, env: Env, ctx?:ExecutionContext):
       response=await requestDeletion(request,env,principal.uid,principal);
     } else if (url.pathname === '/billing/plans' && request.method === 'GET') {
       response=billingPlansResponse();
+    } else if (url.pathname === '/billing/status' && request.method === 'GET') {
+      const uid=await identity(request,env);
+      await assertNotDeleting(env,uid);
+      response=await billingStatusResponse(env,uid);
     } else if (url.pathname === '/billing/webhooks/asaas' && request.method === 'POST') {
       response=await ingestAsaasWebhook(request,env);
     } else if (url.pathname === '/access/ensure' && request.method === 'POST') {

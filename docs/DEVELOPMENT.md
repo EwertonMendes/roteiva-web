@@ -1,5 +1,10 @@
 # Desenvolvimento e deploy — Roteiva
 
+## Pré-integração de checkout e status de assinatura (20/11/2026)
+
+Checkout de cartão recorrente: `buildRecurringCardCheckout()` é **apenas um gerador puro de requisição**, sem endpoint nem chamada à API; os três preços vêm do catálogo e a URL de retorno é do próprio ambiente. `planBillingEvent()` nunca aplica uma concessão, exigindo confirmação independente no provedor. Ledger `0037` é aditivo e vazio. `GET /billing/status` exige JWT Firebase válido e responde com acesso efetivo e assinatura D1 (ou nulo), inclusive quando o trial expirou. Não há escrita nessa consulta, nem chave Asaas necessária. Testar com `npm run typecheck && npm test && npm run migrate:local && npm run build` dentro de `api/` e pela CI PR; o smoke de deploy preserva o checkout indisponível. A rota é destinada às futuras telas de contratação e cobrança, não afirma que os pagamentos estão funcionais.
+
+
 ## Inbox de webhook Asaas isolada (20/11/2026)
 
 `POST /billing/webhooks/asaas` está previsto para captura **somente em DEV**, mediante `BILLING_ENABLED=true` e ambos secrets `ASAAS_API_KEY` / `ASAAS_WEBHOOK_TOKEN` configurados manualmente no Worker. **Não configurar agora**: sem aprovação/Sandbox, a rota deve continuar devolvendo 404 e não aceitar eventos. No PROD o handler recusa mesmo com credenciais configuradas, enquanto o processamento financeiro não existir. Token de webhook deve ter 32–255 caracteres sem espaços, ser gerado separadamente da chave de API e informado no campo `authToken` do Asaas. Nunca publicar valor em variáveis de Vite, GitHub ou logs.
