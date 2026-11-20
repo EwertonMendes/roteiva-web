@@ -8,6 +8,7 @@ const files=[
   'sobre.html','suporte.html','privacidade.html','termos.html',
   'legal.css','googleb5008dcbf685c696.html',
   'brand/roteiva-symbol-black.svg','brand/roteiva-wordmark-black.svg',
+  'brand/roteiva-wordmark-white.svg',
   'fonts/ubuntu/Ubuntu-Regular.ttf','fonts/ubuntu/Ubuntu-Bold.ttf','fonts/ubuntu/UFL.txt',
 ];
 const output=new URL('../dist-site/',import.meta.url);

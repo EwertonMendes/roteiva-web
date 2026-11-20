@@ -52,6 +52,8 @@ test('the homepage serves the announcement and links to the app at desktop and m
   const response=await page.goto('/?source=legacy');
   expect(response?.status()).toBe(200);
   await expect(page.getByRole('heading',{name:'Vem novidade por aí.'})).toBeVisible();
+  expect(await page.locator('html').evaluate(el=>getComputedStyle(el).colorScheme)).toBe('dark');
+  await expect(page.getByRole('img',{name:'Roteiva',exact:true})).toHaveAttribute('src','/brand/roteiva-wordmark-white.svg');
   await expect(page.getByRole('link',{name:'Acessar o aplicativo'})).toHaveAttribute('href',app+'/');
   await expect(page.getByRole('link',{name:'Privacidade',exact:true})).toBeVisible();
   expect(await page.locator('html').evaluate(el=>el.scrollWidth<=el.clientWidth)).toBe(true);

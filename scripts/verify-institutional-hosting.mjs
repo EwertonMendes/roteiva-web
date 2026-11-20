@@ -13,6 +13,7 @@ await waitForHostingRelease(async()=>{
   assert.equal(home.status,200,'Institutional homepage');
   const html=await home.text();
   assert.match(html,/id="titulo">Vem novidade por aí\./);
+  assert.ok(html.includes('/brand/roteiva-wordmark-white.svg'),'Missing wordmark for the dark homepage');
   assert.ok(html.includes('href="'+app+'/"'),'Missing link to the application');
   for(const path of ['/projetos/123','/clientes/123','/review','/review/'+'a'.repeat(43)+'?source=legacy']){
     const response=await send(target+path);
@@ -21,7 +22,7 @@ await waitForHostingRelease(async()=>{
   }
   for(const path of ['/sobre.html','/suporte.html','/privacidade.html','/termos.html',
     '/googleb5008dcbf685c696.html','/legal.css','/brand/roteiva-wordmark-black.svg',
-    '/fonts/ubuntu/Ubuntu-Regular.ttf','/__/auth/handler']){
+    '/brand/roteiva-wordmark-white.svg','/fonts/ubuntu/Ubuntu-Regular.ttf','/__/auth/handler']){
     const response=await send(target+path);
     assert.equal(response.status,200,path);
     assert.doesNotMatch(await response.text(),/<div id="root">/i,path+' served the SPA');
