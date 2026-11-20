@@ -71,12 +71,12 @@ Fluxo: React + Firebase Auth → Cloudflare Worker existente → adaptador Asaas
 - [x] CI PR verde ([API](https://github.com/EwertonMendes/roteiva-web/actions/runs/44669406115), [isolada](https://github.com/EwertonMendes/roteiva-web/actions/runs/44669406036)), [merge PR #176](https://github.com/EwertonMendes/roteiva-web/pull/176), publicação [API DEV #44669884336](https://github.com/EwertonMendes/roteiva-web/actions/runs/44669884336) e smoke de `/health`/JWT inválido. Sem alteração PROD. Checkout continua não implementado.
 - [x] Smoke público no DEV `GET /billing/plans` (preços exatos, checkout indisponível), `POST /billing/checkout` 404, `GET /health` 200 e JWT inválido 401 no [workflow API DEV #44670412441](https://github.com/EwertonMendes/roteiva-web/actions/runs/44670412441), após [PR #177](https://github.com/EwertonMendes/roteiva-web/pull/177), SHA `2b4d9c1d18d410b96e01a0d8c0da299fc8cdcbaf`. Apenas fundação; **nenhuma cobrança habilitada**.
 
-### Fase 1.5 — Inbox de webhooks Asaas independente da conta **EM PR, SEM CONFIGURAÇÃO**
+### Fase 1.5 — Inbox de webhooks Asaas independente da conta **PUBLICADA/VALIDADA EM DEV; DESATIVADA POR PADRÃO**
 
 - [x] Código de recepção `POST /billing/webhooks/asaas`, limitado a DEV e opt-in com `BILLING_ENABLED` + ambos segredos; ausência de config = 404 sem impacto nas demais rotas.
 - [x] Autenticação por `asaas-access-token`, limite de 64 KiB, parse tolerante a campos novos, persistência mínima idempotente em `0036_billing_webhook_events.sql`, sem payload bruto ou dados de cartão.
 - [x] Responder 200 só após `INSERT OR IGNORE` confirmado; D1 indisponível = 503. Status de eventos `pending/review`, sem processar ou conceder acesso.
-- [ ] CI e deploy DEV com smoke do endpoint indisponível por padrão; registrar SHA e evidências antes de marcar VALIDADO.
+- [x] [PR #179](https://github.com/EwertonMendes/roteiva-web/pull/179), merge SHA `8733635e1422bae9ad41662f1ab3f4b62eb3a22d`, [testes API #44672092578](https://github.com/EwertonMendes/roteiva-web/actions/runs/44672092578), [regressão isolada #44672092583](https://github.com/EwertonMendes/roteiva-web/actions/runs/44672092583) e [deploy DEV #44672491507](https://github.com/EwertonMendes/roteiva-web/actions/runs/44672491507) aprovados. Migração D1 aplicada, Worker publicado, smoke remoto de `/billing/webhooks/asaas` desativado (404). **Não houve cobrança, concessão ou publicação PROD.**
 - [ ] Próximo passo após Sandbox: ativar manualmente somente DEV, configurar webhook Asaas com token próprio, executar entrega real e reconciliação. Sem autorização de PROD.
 
 ### Fase 2 — Sandbox checkout **PLANEJADO**
