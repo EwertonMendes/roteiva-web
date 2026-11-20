@@ -62,13 +62,14 @@ Fluxo: React + Firebase Auth → Cloudflare Worker existente → adaptador Asaas
 - [ ] Confirmar documentos Asaas e elegibilidade; API real **somente após** aprovação e ensaio controlado. Registrar política fiscal, termos comerciais, cancelamento/reembolso e retenção de dados com responsável.
 - [ ] Identificar dependências atuais da pipeline, acesso e exclusão; medir baseline de custo. Não alterar PROD.
 
-### Fase 1 — Fundação independente do Asaas **IMPLEMENTADA EM BRANCH; DEPLOY DEV PENDENTE**
+### Fase 1 — Fundação independente do Asaas **PUBLICADA E VALIDADA EM DEV (cobrança DESLIGADA)**
 - [x] Salvar este roadmap na raiz e referenciar fontes de verdade.
 - [x] Catálogo imutável (BRL, centavos, periodicidade, preço de versão) + testes.
 - [x] Cliente HTTP de Asaas tipado, endpoints fixos por ambiente, timeout, JSON validado, mensagens de erro sanitizadas, nunca registrar token ou corpo. **Isolado, não chamado pelo app**.
 - [x] Endpoint de leitura `GET /billing/plans` com `checkoutAvailable:false`, sem qualquer autorização para cobrar; flags/chaves opcionais.
 - [x] Migração `0035_billing_foundation.sql` aditiva e testes de integridade para tabelas de customer/checkout vazias; **sem gravar dados financeiros reais**.
-- [ ] CI PR verde, merge em master para deploy DEV e smoke de `/health`/acesso existente; confirmar não mudou PROD.
+- [x] CI PR verde ([API](https://github.com/EwertonMendes/roteiva-web/actions/runs/44669406115), [isolada](https://github.com/EwertonMendes/roteiva-web/actions/runs/44669406036)), [merge PR #176](https://github.com/EwertonMendes/roteiva-web/pull/176), publicação [API DEV #44669884336](https://github.com/EwertonMendes/roteiva-web/actions/runs/44669884336) e smoke de `/health`/JWT inválido. Sem alteração PROD. Checkout continua não implementado.
+- [ ] Rodar smoke público de `/billing/plans` e confirmar `POST /billing/checkout` indisponível na CI seguinte.
 
 ### Fase 2 — Sandbox checkout **PLANEJADO**
 - [ ] Confirmar contrato JSON atual do endpoint POST /v3/checkouts e URL oficial; sem supor campos/retornos.

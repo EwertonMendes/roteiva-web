@@ -2,13 +2,14 @@
 
 ## Fundação de pagamentos Asaas — 20/11/2026
 
-**EM PR — implementação inicial isolada; cobrança NÃO disponível.** Plano detalhado em [ROADMAP-PAGAMENTOS-ASAAS.md](../ROADMAP-PAGAMENTOS-ASAAS.md). A conta Asaas PF foi criada; aprovação documental, Sandbox e credenciais reais ainda não confirmados.
+**PUBLICADO NO DEV; checkout NÃO disponível.** PR [#176](https://github.com/EwertonMendes/roteiva-web/pull/176), SHA `7095f679a79efcb354ae544242d9e3e95fa35636`, [pipeline API DEV 44669884336](https://github.com/EwertonMendes/roteiva-web/actions/runs/44669884336) e [regressão isolada 44669406036](https://github.com/EwertonMendes/roteiva-web/actions/runs/44669406036) aprovadas. Plano detalhado em [ROADMAP-PAGAMENTOS-ASAAS.md](../ROADMAP-PAGAMENTOS-ASAAS.md). A conta Asaas PF foi criada; aprovação documental, Sandbox e credenciais reais ainda não confirmados.
 
 - [x] Roadmap persistido na raiz com políticas de recorrência, cobrança, cancelamento, inadimplência, mudança de periodicidade, segurança e limitações de free tier.
 - [x] Catálogo no backend com valores fixos BRL em centavos e versão de preço; rota pública somente de leitura `GET /billing/plans` informa `checkoutAvailable:false`.
 - [x] Adaptador HTTP Asaas isolado e inativo sem flag e dois segredos; endpoint permitido, URL por ambiente, timeout, ausência de replay e erros sanitizados. **Nenhuma chamada é executada pelo app nesta fase.**
-- [x] Migração aditiva `0035_billing_foundation.sql` cria vínculos de clientes e intenções de checkout vazias, sem modificar registros anteriores. Testes locais de catálogo, fail-closed e constraints previstos na CI de PR.
-- [ ] Validar CI PR, merge para `master`, aplicação da migração no DEV e smoke real sem credenciais Asaas. Apenas depois registrar SHA/workflow.
+- [x] Migração aditiva `0035_billing_foundation.sql` cria vínculos de clientes e intenções de checkout vazias, sem modificar registros anteriores. Testes locais de catálogo, fail-closed e constraints aprovados na CI do PR.
+- [x] CI PR aprovada, merge para `master`, migração DEV aplicada e smoke real de saúde/autenticação sem credenciais Asaas. Links acima.
+- [ ] Smoke adicional de `GET /billing/plans` e bloqueio de `POST /billing/checkout` em produção DEV (pipeline da PR de CI seguinte).
 - [ ] Checkouts, webhooks, cobranças, pagamentos, acesso por assinatura, Pix, UI, mudanças de plano e notificações permanecem PLANEJADOS; PROD sem alteração.
 
 
