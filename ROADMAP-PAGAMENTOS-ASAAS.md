@@ -69,7 +69,7 @@ Fluxo: React + Firebase Auth → Cloudflare Worker existente → adaptador Asaas
 - [x] Endpoint de leitura `GET /billing/plans` com `checkoutAvailable:false`, sem qualquer autorização para cobrar; flags/chaves opcionais.
 - [x] Migração `0035_billing_foundation.sql` aditiva e testes de integridade para tabelas de customer/checkout vazias; **sem gravar dados financeiros reais**.
 - [x] CI PR verde ([API](https://github.com/EwertonMendes/roteiva-web/actions/runs/44669406115), [isolada](https://github.com/EwertonMendes/roteiva-web/actions/runs/44669406036)), [merge PR #176](https://github.com/EwertonMendes/roteiva-web/pull/176), publicação [API DEV #44669884336](https://github.com/EwertonMendes/roteiva-web/actions/runs/44669884336) e smoke de `/health`/JWT inválido. Sem alteração PROD. Checkout continua não implementado.
-- [ ] Rodar smoke público de `/billing/plans` e confirmar `POST /billing/checkout` indisponível na CI seguinte.
+- [x] Smoke público no DEV `GET /billing/plans` (preços exatos, checkout indisponível), `POST /billing/checkout` 404, `GET /health` 200 e JWT inválido 401 no [workflow API DEV #44670412441](https://github.com/EwertonMendes/roteiva-web/actions/runs/44670412441), após [PR #177](https://github.com/EwertonMendes/roteiva-web/pull/177), SHA `2b4d9c1d18d410b96e01a0d8c0da299fc8cdcbaf`. Apenas fundação; **nenhuma cobrança habilitada**.
 
 ### Fase 2 — Sandbox checkout **PLANEJADO**
 - [ ] Confirmar contrato JSON atual do endpoint POST /v3/checkouts e URL oficial; sem supor campos/retornos.
