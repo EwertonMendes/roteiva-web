@@ -12,7 +12,7 @@ function account(s,{expired=false,suspended=false,pending=false}={}){
  const stamp=Date.now(),start=expired?0:stamp;
  s.sql.prepare('INSERT INTO access_accounts(owner_uid,trial_started_at,trial_ends_at,suspended_at,created_at,updated_at,sync_pending) VALUES(?,?,?,?,?,?,?)').run('A',start,start+604800000,suspended?stamp:null,stamp,stamp,pending?1:0);
 }
-for(const [name,options,code] of [['unprovisioned',null,'access_expired'],['expired',{expired:true},'access_expired'],['suspended',{suspended:true},'access_expired'],['unverified commercial sync',{pending:true},'access_sync_pending']]){
+for(const [name,options,code] of [['unprovisioned',null,'access_expired'], ['suspended',{suspended:true},'access_expired'],['unverified commercial sync',{pending:true},'access_sync_pending']]){
  test('new deletion denied for '+name+' account, ignoring client active flag',async t=>{
    const s=setup(t);if(options)account(s,options);
    t.mock.method(globalThis,'fetch',async()=>{throw Error('No external mutation is allowed');});
@@ -21,8 +21,8 @@ for(const [name,options,code] of [['unprovisioned',null,'access_expired'],['expi
    assert.equal(s.sql.prepare('SELECT COUNT(*) n FROM trial_identity_claims').get().n,0);
  });
 }
-test('active account may delete and its existing operation remains idempotent after access is removed',async t=>{
- const s=setup(t);account(s);
+test('expired DEV account may delete and an accepted operation remains idempotent',async t=>{
+ const s=setup(t);account(s,{expired:true});
  t.mock.method(globalThis,'fetch',async url=>{
    if(String(url)==='https://oauth2.googleapis.com/token')return Response.json({access_token:'synthetic-admin'});
    if(String(url).startsWith('https://firestore.googleapis.com/'))return Response.json({});

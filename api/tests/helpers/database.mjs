@@ -30,6 +30,9 @@ export function database(...rows) {
   sql.exec(readFileSync(new URL('../../migrations/0032_feedback_reports.sql',import.meta.url),'utf8'));
   sql.exec(readFileSync(new URL('../../migrations/0033_feedback_retry_safety.sql',import.meta.url),'utf8'));
   sql.exec(readFileSync(new URL('../../migrations/0034_project_deletions.sql',import.meta.url),'utf8'));
+  for(const migration of ['0035_billing_foundation.sql','0036_billing_webhook_events.sql','0037_billing_payment_ledger.sql','0038_billing_reconciliation.sql']){
+    sql.exec(readFileSync(new URL('../../migrations/'+migration,import.meta.url),'utf8'));
+  }
   sql.exec("INSERT INTO deployment_identity VALUES(1,'dev')");
   for (const row of rows) {
     sql.prepare('INSERT INTO drive_connections(id,owner_uid,google_account_id,google_email,encrypted_refresh_token,status,scopes,revision,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)')

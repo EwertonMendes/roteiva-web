@@ -1,21 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
 import {database} from './helpers/database.mjs';
 import {ingestAsaasWebhook,parseAsaasEvent} from '../src/billing-webhook.ts';
 import {handle} from '../src/index.ts';
 
 const TOKEN='w'.repeat(48);
 const mkEnv=(DB,overrides={})=>({
-  ENVIRONMENT:'dev',BILLING_ENABLED:'true',ASAAS_API_KEY:'k'.repeat(32),
+  ENVIRONMENT:'dev',BILLING_ENABLED:'true',ASAAS_API_KEY:'$aact_hmlg_'+'k'.repeat(32),
   ASAAS_WEBHOOK_TOKEN:TOKEN,DB,...overrides
 });
-function fixture(){
-  const d=database();
-  d.sql.exec(readFileSync(new URL('../migrations/0035_billing_foundation.sql',import.meta.url),'utf8'));
-  d.sql.exec(readFileSync(new URL('../migrations/0036_billing_webhook_events.sql',import.meta.url),'utf8'));
-  return d;
-}
+const fixture=database;
 function request(event,options={}){
   return new Request('https://roteiva-api-dev.roteiva-dev.workers.dev/billing/webhooks/asaas',{
     method:'POST',headers:{'Content-Type':'application/json','asaas-access-token':TOKEN,...options.headers},

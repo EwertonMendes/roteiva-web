@@ -133,7 +133,7 @@ jobs:
           assert.equal(catalogResponse.status,200);
           assert.equal(catalogResponse.headers.get('Cache-Control'),'no-store');
           const catalog=await catalogResponse.json();
-          assert.equal(catalog.checkoutAvailable,false,'Never expose an unfinished checkout');
+          assert.equal(typeof catalog.checkoutAvailable,'boolean');
           assert.equal(catalog.currency,'BRL');
           assert.deepEqual(catalog.plans.map(plan=>[plan.code,plan.cycle,plan.amountCents]),[
             ['monthly','MONTHLY',3990],
@@ -141,10 +141,11 @@ jobs:
             ['yearly','YEARLY',39990]
           ]);
           const checkout=await fetch(base+'/billing/checkout',{method:'POST',
-            headers:{'Content-Type':'application/json'},body:'{}'});
-          assert.equal(checkout.status,404,'Checkout creation must not exist before webhook reconciliation');
+            headers:{'Content-Type':'application/json',Origin:'https://roteiva-web-dev.web.app'},body:'{}'});
+          assert.ok([401,404].includes(checkout.status),'Checkout must deny anonymous requests');
+          if(catalog.checkoutAvailable) assert.equal(checkout.status,401);
           const webhook=await fetch(base+'/billing/webhooks/asaas',{method:'POST',
             headers:{'Content-Type':'application/json'},
             body:JSON.stringify({id:'evt_disabled_smoke',event:'PAYMENT_RECEIVED',payment:{id:'pay_disabled_smoke'}})});
-          assert.equal(webhook.status,404,'Incomplete or missing billing configuration must reject webhooks');
+          assert.ok([401,404].includes(webhook.status),'Webhook must deny requests without its secret');
           NODE

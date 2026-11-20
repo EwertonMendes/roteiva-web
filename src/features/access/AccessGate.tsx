@@ -6,6 +6,8 @@ import {ArrowRight,Crown,Gift,ShieldAlert,RefreshCw,LogOut} from "lucide-react";
 import {firebaseServices} from "../../lib/firebase";
 import {useAuth} from "../auth/AuthProvider";
 import {AuthLayout} from "../auth/AuthLayout";
+import {BillingPanel,billingInThisBuild} from "./BillingPanel";
+import {AccountDeletionAction} from "../settings/AccountDeletionAction";
 import "./access.css";
 import {entryToken,entryRequest,entryErrorMessage} from '../../data/bootstrap-request.ts';
 
@@ -28,6 +30,15 @@ export function AccessGate({children}:{children:ReactNode}){
   const [error,setError]=useState("");
   const [attempt,setAttempt]=useState(0);
   const [now,setNow]=useState(Date.now());
+  const usable=!!access&&!access.suspended&&(access.unlimited||access.accessUntil.getTime()>now);
+  useEffect(()=>{
+    if(!usable||!billingInThisBuild)return;
+    const url=new URL(window.location.href);
+    if(url.searchParams.has("billing")){
+      url.searchParams.delete("billing");
+      window.history.replaceState(window.history.state,"",url);
+    }
+  },[usable]);
   useEffect(()=>{
     const clock=setInterval(()=>setNow(Date.now()),30000);
     const onFocus=()=>setNow(Date.now());
@@ -59,8 +70,10 @@ export function AccessGate({children}:{children:ReactNode}){
     description={access.suspended?"Seu espaço está protegido. Consulte o suporte do Roteiva para esclarecer a suspensão.":"O teste gratuito é concedido uma única vez por identidade. Excluir e recriar a conta não libera outro teste. Seu cadastro e seus projetos estão preservados; você poderá continuar quando um novo período de acesso for ativado."}>
     <div className="access-locked">
       <ShieldAlert size={26}/><div><strong>{access.suspended?"Acesso suspenso":"Acesso expirado"}</strong>
-        <span>Seus dados não foram excluídos. A contratação online ainda não está disponível nesta versão de testes.</span></div>
+        <span>Seu cadastro e seus projetos estão preservados.</span></div>
     </div>
+    {!access.suspended&&<BillingPanel locked refreshKey={access.accessUntil.getTime()}/>}
+    {!access.suspended&&billingInThisBuild&&<AccountDeletionAction/>}
     <div className="access-actions">
       <AppButton className="auth-primary" onClick={()=>setAttempt(n=>n+1)}><RefreshCw size={16}/> Verificar acesso novamente <ArrowRight size={16}/></AppButton>
       <AppButton className="auth-link" disabled={busy} onClick={()=>void logout()}><LogOut size={16}/> Sair da conta</AppButton>

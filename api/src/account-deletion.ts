@@ -5,8 +5,9 @@ import { adminToken, deletionConfigured, deleteIdentity, deleteFirestoreChunk, d
 import { decrypt, context } from './crypto.ts';
 import {revokeGuard} from './oauth-guard.ts';
 import {dropboxRevoke} from './dropbox.ts';
-import {eraseAccess,assertActiveAccess} from './access.ts';
+import {activeState,eraseAccess,assertActiveAccess} from './access.ts';
 import {retainTrialIdentity,assertTrialIdentityRetained,type TrialPrincipal} from './trial-identity.ts';
+import {stopBillingForDeletion} from './billing-management.ts';
 
 type Phase='locking'|'revoking'|'firestore'|'identity'|'completed'|'manual_review';
 type Job={owner_uid:string;operation_id:string;phase:Phase;attempts:number;lease_id:string|null;lease_until:number;next_attempt_at:number};
@@ -32,10 +33,16 @@ export async function requestDeletion(request:Request,env:Env,uid:string,princip
     (payload as {acknowledged?:unknown}).acknowledged!==true)throw new ApiError(400,'invalid_confirmation');
   if(!principal)throw new ApiError(503,'trial_identity_required');
   if(principal.uid!==uid)throw new ApiError(401,'invalid_identity');
-  // New requests require actual commercial access, never a client-side flag.
-  // Previously accepted jobs must remain resumable after expiry or data removal.
+  // DEV permits cancellation and departure for a registered, expired owner.
+  // Previously accepted jobs remain resumable after removal of the profile.
   const existing=await env.DB.prepare('SELECT 1 FROM account_deletions WHERE owner_uid=?').bind(uid).first();
-  if(!existing)await assertActiveAccess(env,uid);
+  if(!existing){
+    if(env.ENVIRONMENT!=='dev')await assertActiveAccess(env,uid);
+    else {
+      const access=await activeState(env,uid);
+      if(!access||access.suspended)throw new ApiError(403,'access_expired');
+    }
+  }
   // Before accepting an irreversible request, confirm admin credentials work.
   await adminToken(env);
   // Existing beta accounts must also be claimed before their UID is deleted,
@@ -117,7 +124,7 @@ async function runPhase(env:Env,job:Job,lease:string):Promise<void>{
     await lockAccount(env,uid,token);
     await changePhase(env,job,lease,'revoking');
   }else if(job.phase==='revoking'){
-    if(await revokeConnections(env,uid))await changePhase(env,job,lease,'firestore');
+    if(await stopBillingForDeletion(env,uid)&&await revokeConnections(env,uid))await changePhase(env,job,lease,'firestore');
   }else if(job.phase==='firestore'){
     const token=await adminToken(env);
     const empty=await deleteFirestoreChunk(env,uid,token,20);

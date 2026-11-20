@@ -1,5 +1,15 @@
 # Arquitetura do Roteiva — MVP SaaS
 
+## Decisão — checkout recorrente e conciliação no DEV (20/11/2026)
+
+O Worker oferece `POST /billing/checkout` e `POST /billing/cancel` no DEV. Ambos exigem JWT Firebase, origem DEV e limite por UID. A criação registra primeiro uma intenção única em D1 com preço e versão do catálogo. A API recebe plano, versão e consentimento. O cliente Asaas é cadastrado pelo checkout hospedado ou reutilizado quando já vinculado. O Worker libera a URL exclusiva do Sandbox após persistir a referência. O callback apresenta confirmação em andamento. Resposta ambígua mantém a intenção e aguarda verificação.
+
+O webhook responde 200 após persistir IDs. O cron de um minuto recupera uma pendência com lease, consulta a cobrança no Sandbox e valida checkout, cliente, assinatura, valor e modalidade. A primeira cobrança vincula o contrato; pagamentos de cartão `CONFIRMED` ou `RECEIVED` concedem período de calendário ancorado em `originalDueDate`. Reversões totais e chargebacks recalculam o período com base no ledger e preservam pagamentos posteriores e direitos independentes. Pix permanece indisponível. Casos sem vínculo verificável ou com estorno parcial ficam em revisão.
+
+`0038_billing_reconciliation.sql` preserva os dados comerciais anteriores. O lease protege o processamento e a transição D1 grava ledger, assinatura e trabalho de projeção no mesmo lote. D1 bloqueia acesso durante `sync_pending`, e o Worker publica em Firestore com a versão da projeção e o CAS do perfil. A projeção usa as Rules existentes. Se a publicação falhar, Firestore conserva a projeção anterior até a recuperação; a aplicação deve verificar essa janela em DEV. O cron retenta com backoff limitado. Falhas esgotadas ficam disponíveis para operação de recuperação.
+
+O cancelamento registra uma operação durável e exige confirmação da remoção da recorrência no Asaas. A exclusão de conta DEV aceita usuário registrado expirado com reautenticação. A fase de revogação resolve e encerra checkout/recorrência antes de apagar o vínculo financeiro. Assinaturas ativas e usuários suspensos permanecem sujeitos aos guardas comerciais e administrativos do Worker. As seções a seguir preservam a evolução histórica e as evidências das entregas anteriores.
+
 ## Decisão — avisos financeiros sem efeitos colaterais (20/11/2026)
 
 `api/src/billing-notices.ts` é uma função pura para traduzir o direito efetivo de acesso já calculado em `activeState()` e o resumo de contrato em um único `notice` de interface. O endpoint autenticado `GET /billing/status` devolve `notice.code`, `severity` e `daysRemaining`, sem criar cobrança, sem escrever no D1/Firestore, sem cron e sem expor identificadores externos. A prioridade é **suspensão > cortesia vitalícia > direito primário atual > contrato**: inadimplência de uma assinatura não deve se sobrepor à cortesia independente ainda válida; cancelamento mantém acesso até a data paga. O marcador de renovação a 3 dias é informativo, não indica que cartão falhou.

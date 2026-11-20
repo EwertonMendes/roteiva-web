@@ -1,36 +1,65 @@
-import {billingCatalog} from './billing-catalog.ts';
+import {billingCatalog,type BillingPlanCode} from './billing-catalog.ts';
 import {activeState} from './access.ts';
 import {billingNotice} from './billing-notices.ts';
+import {asaasConfigured,checkoutEnabled} from './billing-asaas.ts';
+import {checkoutLink,openCheckout} from './billing-checkout.ts';
 import type {Env} from './types.ts';
 
-/** Catalog is informational until checkout and reconciliation are homologated. */
-export function billingPlansResponse():Response{
+export function billingPlansResponse(env?:Env):Response{
   return Response.json({
-    checkoutAvailable:false,
+    checkoutAvailable:env?checkoutEnabled(env):false,
     currency:'BRL',
     plans:billingCatalog(),
   });
 }
+
 type SubscriptionView={
-  cadence:'monthly'|'quarterly'|'yearly';
+  id:string;cadence:BillingPlanCode;
   status:'active'|'past_due'|'canceled'|'expired';
-  paid_until:number;
+  paid_until:number;next_due_on:string|null;amount_cents:number|null;can_cancel:number;cancel_after:number|null;cancel_attempts:number|null;
 };
-/** Billing status is available to authenticated users, even with expired access. */
+type PaymentView={state:string;amount_cents:number;due_on:string|null;details:string|null;invoice_path:string|null};
+
+/** Billing status remains readable with an expired trial or paid period. */
 export async function billingStatusResponse(env:Env,uid:string,now=Date.now()):Promise<Response>{
-  const [access,subscription]=await Promise.all([
+  const [access,subscription,checkout,payments]=await Promise.all([
     activeState(env,uid,now),
-    env.DB.prepare("SELECT cadence,status,paid_until FROM access_subscriptions WHERE owner_uid=? ORDER BY CASE status WHEN 'active' THEN 0 WHEN 'past_due' THEN 1 WHEN 'canceled' THEN 2 ELSE 3 END,updated_at DESC LIMIT 1")
-      .bind(uid).first<SubscriptionView>()
+    env.DB.prepare(
+      'SELECT s.id,s.cadence,s.status,s.paid_until,c.next_due_on,i.amount_cents,c.cancel_after,c.cancel_attempts,(c.subscription_id IS NOT NULL AND c.removed_at IS NULL) AS can_cancel '+
+      'FROM access_subscriptions s LEFT JOIN billing_contracts c ON c.subscription_id=s.id LEFT JOIN billing_checkout_intents i ON i.id=c.checkout_intent_id '+
+      "WHERE s.owner_uid=? ORDER BY CASE s.status WHEN 'active' THEN 0 WHEN 'past_due' THEN 1 WHEN 'canceled' THEN 2 ELSE 3 END,s.updated_at DESC LIMIT 1"
+    ).bind(uid).first<SubscriptionView>(),
+    openCheckout(env,uid),
+    env.DB.prepare('SELECT state,amount_cents,due_on,details,invoice_path FROM billing_payment_records WHERE owner_uid=? ORDER BY due_on DESC,created_at DESC LIMIT 20')
+      .bind(uid).all<PaymentView>()
   ]);
   return Response.json({
-    checkoutAvailable:false,
+    checkoutAvailable:checkoutEnabled(env,uid),
+    canStart:checkoutEnabled(env,uid)&&!!access&&!access.active&&!access.suspended&&!checkout&&!subscription?.can_cancel,
     access,
     notice:billingNotice(access,subscription,now),
+    checkout:checkout?{
+      planCode:checkout.plan_code,
+      status:checkout.status==='ready'&&checkout.expires_at>now?'ready':'pending',
+      url:checkoutEnabled(env,uid)&&checkout.status==='ready'&&checkout.expires_at>now&&checkout.provider_checkout_ref?
+        checkoutLink(checkout.provider_checkout_ref,checkout.checkout_path?'https://sandbox.asaas.com'+checkout.checkout_path:undefined):null,
+    }:null,
     subscription:subscription?{
       planCode:subscription.cadence,
       status:subscription.status,
-      paidUntil:new Date(subscription.paid_until).toISOString(),
-    }:null
+      paidUntil:subscription.paid_until>0?new Date(subscription.paid_until).toISOString():null,
+      nextDueOn:subscription.next_due_on,
+      amountCents:subscription.amount_cents,
+      paymentMethod:subscription.amount_cents!==null?'CREDIT_CARD':null,
+      canCancel:!!subscription.can_cancel&&subscription.cancel_after===null&&asaasConfigured(env),
+      cancellation:subscription.can_cancel&&subscription.cancel_after!==null?
+        (subscription.cancel_attempts??0)>=8?'review':'pending':null,
+    }:null,
+    payments:payments.results.map(payment=>({
+      state:payment.details==='refused'&&payment.state==='pending'?'refused':payment.state,
+      amountCents:payment.amount_cents,dueOn:payment.due_on,
+      invoiceUrl:payment.invoice_path&&['pending','overdue'].includes(payment.state)?
+        'https://sandbox.asaas.com'+payment.invoice_path:null,
+    })),
   });
 }

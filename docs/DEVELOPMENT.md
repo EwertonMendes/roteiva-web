@@ -1,5 +1,24 @@
 # Desenvolvimento e deploy — Roteiva
 
+## Integração Asaas Sandbox no DEV
+
+Use exclusivamente [Roteiva DEV](https://roteiva-web-dev.web.app), o Worker `roteiva-api-dev` da conta Roteiva DEV e a conta separada [Asaas Sandbox](https://sandbox.asaas.com/). A chave deve ter prefixo Sandbox e ficar em `ASAAS_API_KEY`. O token próprio do webhook fica em `ASAAS_WEBHOOK_TOKEN`. Mantenha os valores dentro dos consoles seguros, com permissão de saque desmarcada na chave. Ative a recepção com `BILLING_ENABLED=true` no Worker DEV após o deploy e a migração `0038`. Valide que o endpoint `/billing/webhooks/asaas` responde 401 sem token e então retome a fila Roteiva DEV no Asaas v3.
+
+### Homologação Sandbox separada
+
+1. Use identidade Google de QA descartável, já registrada e com trial encerrado. Use `BILLING_CHECKOUT_TEST_UID` no Worker DEV para habilitar a contratação apenas para essa conta. A flag geral `BILLING_CHECKOUT_ENABLED` fica ausente durante o ensaio.
+2. Registre preços, versões e ciclos vistos pela conta de QA. Em duas abas, tente iniciar o mesmo plano e confira um único checkout. Verifique retorno à URL DEV e que o callback sozinho mantém a área restrita.
+3. Use [cartões oficiais de teste](https://docs.asaas.com/docs/faq-sandbox) no link hospedado. Complete cada periodicidade com identidade de teste elegível. Observe o evento no painel Asaas, a conclusão na inbox D1, ledger, projeção `access/current` e liberação automática do workspace. Repita com cartão de recusa e confirme que o acesso continua bloqueado.
+4. Confirme o ciclo seguinte pelo simulador oficial ou mantenha pendente se o Sandbox exigir o calendário real. Verifique tolerância de 3 dias, pagamento tardio, cancelamento com fim de vigência, recontratação após expiração e reversão de pagamento. No caso de estorno antigo, confirme que o período mais recente continua ativo. Verifique o isolamento com duas identidades independentes.
+5. Confira Desktop/Mobile, quotas, latência do cron e smoke após deploy. Registre os resultados no [roadmap de pagamentos](../ROADMAP-PAGAMENTOS-ASAAS.md). Habilite `BILLING_CHECKOUT_ENABLED=true` em DEV somente após os aceites críticos.
+6. Testes locais usam SQLite/D1, fetch simulado e Firebase Emulator. Rode `npm test`, `npm run typecheck`, `npm run migrate:local` e `npm run build` em `api/`. Rode `pnpm test`, `pnpm typecheck`, `pnpm build` e os testes de acesso desktop/mobile na raiz.
+
+### Recuperação e promoção futura
+
+Para interromper novas contratações, remova `BILLING_CHECKOUT_ENABLED` e `BILLING_CHECKOUT_TEST_UID`. Mantenha a recepção e conciliação para contratos existentes. Consulte os IDs de referência e códigos categóricos de `billing_webhook_events`, `billing_access_projections` e `billing_contracts` via operação DEV autorizada. Confira o recurso no Asaas antes de recolocar um evento em fila; ausência da resposta de criação exige confirmação pelo provedor para liberar nova intenção. Para falha de projeção, verifique a versão corrente e a disponibilidade do Firestore antes de reprogramar o item. Preserve a trilha de revisão e mantenha os logs livres de payloads e dados de pagamento.
+
+Futura promoção exige aprovação expressa, credenciais e webhook PROD exclusivos, revisão das políticas comerciais e de retenção, teste de rollback, validação de custos e atualização deliberada do guard de migrações. A migração 0038 pertence à trilha DEV desta entrega. Os workflows existentes publicam DEV e executam smokes públicos de leitura e negação de requisições anônimas.
+
 ## Avisos de vigência da assinatura, apenas leitura (20/11/2026)
 
 A partir de `api/src/billing-notices.ts`, `GET /billing/status` inclui um `notice` que classifica trial, cortesia, acesso pago, cancelamento agendado, tolerância `past_due`, suspensão e expiração, com `daysRemaining` derivado de um instante único de leitura. Não agenda e-mail/SMS, não envia notificações pagas, não altera acesso ou contratos e não requisita Asaas. Testes unitários `api/tests/billing-notices.test.mjs` incluem D-3/D-1, expiração exata e priorização de cortesia. A interface existente não consome os novos campos ainda; o checkout permanece indisponível.

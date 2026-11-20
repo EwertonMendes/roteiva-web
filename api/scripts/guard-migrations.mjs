@@ -9,6 +9,7 @@ const devOnlyBilling = new Set([
  '0035_billing_foundation.sql',
  '0036_billing_webhook_events.sql',
  '0037_billing_payment_ledger.sql',
+ '0038_billing_reconciliation.sql',
 ]);
 if(target==='prod'){
  if(process.argv.includes('--domain-cutover')){
@@ -19,10 +20,10 @@ if(target==='prod'){
    'Billing migrations are DEV-only until an approved billing release.');
  }
 }
-const reviewed=pending.filter(name=>isReviewedAdditiveMigration(name,readFileSync('migrations/'+name,'utf8')));
+const reviewed=pending.filter(name=>isReviewedAdditiveMigration(name,readFileSync('migrations/'+name,'utf8'),target));
 const destructive=pending.filter(name=>{
  const original=readFileSync('migrations/'+name,'utf8');
- if(isReviewedAdditiveMigration(name,original))return false;
+ if(isReviewedAdditiveMigration(name,original,target))return false;
  const sql=original.replace(/--[^\n]*/g,'').replace(/\/\*[\s\S]*?\*\//g,'');
  return /\b(?:DROP\s+(?:TABLE|INDEX|TRIGGER|VIEW)|ALTER\s+TABLE|TRUNCATE|DELETE\s+FROM|UPDATE\s+[\w"`]|INSERT\s+OR\s+REPLACE|REPLACE\s+INTO)/i.test(sql);
 });

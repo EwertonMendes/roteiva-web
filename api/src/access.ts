@@ -39,10 +39,17 @@ export function resolveAccess(account:Account,grants:Grant[],subscriptions:Subsc
 }
 /** Canonical account access read; no writes or enrollment. */
 export async function activeState(env:Env,uid:string,now=Date.now()):Promise<AccessState|null> {
+  return readAccessState(env,uid,now);
+}
+async function readAccessState(env:Env,uid:string,now:number,billingVersion?:string):Promise<AccessState|null> {
   const account=await env.DB.prepare('SELECT trial_started_at,trial_ends_at,suspended_at,sync_pending FROM access_accounts WHERE owner_uid=?')
     .bind(uid).first<Account&{sync_pending:number}>();
   if(!account)return null;
-  if(account.sync_pending!==0)throw new ApiError(503,'access_sync_pending');
+  if(billingVersion){
+    const pending=await env.DB.prepare('SELECT 1 FROM billing_access_projections WHERE owner_uid=? AND version=?')
+      .bind(uid,billingVersion).first();
+    if(!pending||account.sync_pending!==1)throw new ApiError(409,'billing_projection_superseded');
+  }else if(account.sync_pending!==0)throw new ApiError(503,'access_sync_pending');
   const [g,s]=await Promise.all([
     env.DB.prepare('SELECT grant_kind,ends_at FROM access_grants WHERE owner_uid=? AND revoked_at IS NULL AND starts_at<=? AND (ends_at IS NULL OR ends_at>?)')
       .bind(uid,now,now).all<Grant>(),
@@ -66,7 +73,7 @@ async function verifiedProfile(env:Env,uid:string,token:string):Promise<{created
   if(!Number.isFinite(created)||!record.updateTime||!Number.isFinite(Date.parse(record.updateTime)))throw new ApiError(503,'invalid_profile');
   return {created,version:record.updateTime};
 }
-async function publish(env:Env,uid:string,token:string,profileVersion:string):Promise<AccessState> {
+async function publish(env:Env,uid:string,token:string,profileVersion:string,billingVersion?:string):Promise<AccessState> {
   const url='https://firestore.googleapis.com/v1/projects/'+env.FIREBASE_PROJECT_ID+
     '/databases/(default)/documents/users/'+safeUid(uid)+'/access/current';
   // Only server credentials can write here. No public client write path exists.
@@ -77,7 +84,7 @@ async function publish(env:Env,uid:string,token:string,profileVersion:string):Pr
   if(current.status!==404&&!current.ok)throw new ApiError(503,'access_projection_read_'+current.status);
   // Resolve after reading the projection version. A stale writer cannot replace
   // a newer projection because every PATCH is conditional on that version.
-  const state=await activeState(env,uid);
+  const state=await readAccessState(env,uid,Date.now(),billingVersion);
   if(!state)throw new ApiError(503,'access_provision_unavailable');
   await assertNotDeleting(env,uid);
   let precondition='currentDocument.exists=false';
@@ -113,6 +120,12 @@ async function publish(env:Env,uid:string,token:string,profileVersion:string):Pr
   if(!result.ok)throw new ApiError(503,'access_projection_write_'+result.status);
   await assertNotDeleting(env,uid);
   return state;
+}
+export async function publishBillingAccess(env:Env,uid:string,version:string):Promise<void>{
+  await assertNotDeleting(env,uid);
+  const token=await adminToken(env);
+  const profile=await verifiedProfile(env,uid,token);
+  await publish(env,uid,token,profile.version,version);
 }
 export async function ensureAccess(env:Env,uid:string,adminBearer?:string,principal?:TrialPrincipal):Promise<Response> {
   await assertNotDeleting(env,uid);
