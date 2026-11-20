@@ -1,5 +1,12 @@
 # Desenvolvimento e deploy — Roteiva
 
+## Inbox de webhook Asaas isolada (20/11/2026)
+
+`POST /billing/webhooks/asaas` está previsto para captura **somente em DEV**, mediante `BILLING_ENABLED=true` e ambos secrets `ASAAS_API_KEY` / `ASAAS_WEBHOOK_TOKEN` configurados manualmente no Worker. **Não configurar agora**: sem aprovação/Sandbox, a rota deve continuar devolvendo 404 e não aceitar eventos. No PROD o handler recusa mesmo com credenciais configuradas, enquanto o processamento financeiro não existir. Token de webhook deve ter 32–255 caracteres sem espaços, ser gerado separadamente da chave de API e informado no campo `authToken` do Asaas. Nunca publicar valor em variáveis de Vite, GitHub ou logs.
+
+`api/tests/billing-webhook.test.mjs` testa segredo inválido, configuração ausente, replay idempotente, payload desconhecido e grande demais, falha do D1, isolamento e ausência de efeitos financeiros **sem qualquer requisição de rede ao Asaas**. Após o CI e merge, verificar `GET /health`, catálogo e `POST /billing/webhooks/asaas` com JSON e sem token (deve retornar 404), sem mudar login/cortesias. A inbox persiste apenas IDs/metadados e não tem processador ativo; não anunciar liberação de assinaturas nesta fase.
+
+
 ## Fundação de cobrança opcional (20/11/2026)
 
 `api/src/billing-catalog.ts` exporta preços iniciais em centavos. `GET /billing/plans` devolve `checkoutAvailable:false`; sem endpoint de compra, não se gera pagamento. O adaptador Asaas existe somente para desenvolvimento futuro, e seu padrão é falhar fechado. **Não configurar** `BILLING_ENABLED=true` nem segredos no DEV/PROD durante esta entrega; nada depende deles no deploy. Se houver configuração experimental posterior, `ASAAS_API_KEY` e `ASAAS_WEBHOOK_TOKEN` serão segredos separados por ambiente, nunca em `wrangler.jsonc`, GitHub ou Vite. Endpoints aceitos: DEV `https://api-sandbox.asaas.com/v3`, PROD `https://api.asaas.com/v3`.
