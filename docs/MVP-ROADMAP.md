@@ -2,7 +2,7 @@
 
 ## Assinatura Asaas Sandbox DEV — 20/11/2026
 
-**IMPLEMENTADO, EM VALIDAÇÃO:** Checkout recorrente e área de assinatura por conta autenticada, conciliação de cobrança via inbox D1, projeção de acesso, histórico e cancelamento com retentativa. A migração `0038_billing_reconciliation.sql` é aditiva e restrita à entrega DEV. O Asaas Sandbox e dois segredos foram provisionados no Worker DEV; fila do webhook pausada. Homologação financeira ainda pendente. Ver [roadmap Asaas](../ROADMAP-PAGAMENTOS-ASAAS.md#integração-sandbox-dev--20112026).
+**PUBLICADO E VALIDADO NA CONTA QA DEV:** Primeira cobrança mensal, trimestral e anual, recusa de cartão, vinculação ao usuário, webhook Asaas com HTTP 200, conciliação D1, reabertura automática do workspace, cancelamento e estorno total. A migração `0038_billing_reconciliation.sql` foi aplicada no DEV. A versão financeira `b53d710` passou no [smoke real DEV](https://github.com/EwertonMendes/roteiva-web/actions/runs/44803758781). A oferta geral continua indisponível. O próximo ciclo automático de cartão, chargeback real e atualização de cartão permanecem pendentes. Ver [evidências e limitações](../ROADMAP-PAGAMENTOS-ASAAS.md#integração-sandbox-dev--20112026).
 
 ## Fundação de pagamentos Asaas — 20/11/2026
 

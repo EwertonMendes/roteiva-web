@@ -18,7 +18,17 @@
 
 **Sandbox real em andamento.** O deploy DEV do SHA `8c9c953151565f6d623691004a28c49b0f11703e` aplicou a 0038 ([API](https://github.com/EwertonMendes/roteiva-web/actions/runs/44768949805), [Hosting](https://github.com/EwertonMendes/roteiva-web/actions/runs/44768949746)). O webhook autentica o recebimento no Worker e sua fila está ativa. O primeiro checkout mensal foi efetivamente criado pelo Asaas com 200 e estado `ACTIVE`. A resposta real trouxe o caminho `/000/checkoutSession/show/{id}` no domínio Sandbox. A validação DEV foi ampliada para esse formato, mantendo vínculo com ID e origem. Intenções com referência já persistida são retomáveis sem novo POST.
 
-**Bloqueios para ativação geral.** Confirmar pelo menos um pagamento Sandbox ponta a ponta, incluindo a associação da primeira cobrança a `checkoutSession`; testar os três ciclos, recusa, renovação, recuperação, cancelamento, estorno e isolamento de contas. Confirmar a capacidade de recuperar checkout sem resposta quando o evento não contém `externalReference`; o caso permanece bloqueado para revisão, com a mesma intenção. Medir latência e CPU dos crons no plano gratuito. Confirmar políticas de retenção aplicáveis antes de promover. Registre a evidência por caso, inclusive limitações do Sandbox.
+**Homologação Sandbox da primeira compra com cartão — 20/11/2026.** Foram confirmadas as três compras hospedadas na conta descartável. Cloudflare D1 registrou checkout, assinatura e pagamento, e o Firestore restaurou o workspace automaticamente para os três ciclos. O retorno DEV mostrou “Estamos confirmando seu pagamento” até a publicação do direito. O Asaas entregou `PAYMENT_CONFIRMED` com HTTP 200 e `checkoutSession`, `subscription` e `customer` correspondentes. O D1 conciliou o estado lido da API. O cliente de cobrança criado no primeiro checkout foi reutilizado nas contratações seguintes.
+
+| Plano | Primeira cobrança Sandbox | Período pago observado | Resultado adicional |
+|---|---:|---|---|
+| Mensal | R$ 39,90 | Até 20/12/2026 | Cancelamento preservou a vigência. Estorno total conciliado e acesso revogado. |
+| Trimestral | R$ 109,90 | Até 20/02/2027 | Cartão de recusa manteve o workspace bloqueado. A aprovação no mesmo checkout liberou acesso. Cancelamento e estorno total conferidos. |
+| Anual | R$ 399,90 | Até 20/11/2027 | Renovação cancelada pelo Roteiva. O período pago de teste está disponível para inspeção da conta QA. |
+
+O [PR #192](https://github.com/EwertonMendes/roteiva-web/pull/192) corrigiu o prefixo do link observado e a retomada de intenção persistida. Código financeiro publicado no SHA `b53d7108f9d9809353023a5897f9c895298d0f56`, com [deploy API DEV](https://github.com/EwertonMendes/roteiva-web/actions/runs/44801984839), [deploy Hosting DEV](https://github.com/EwertonMendes/roteiva-web/actions/runs/44801984681) e [smoke remoto navegador/API e D1](https://github.com/EwertonMendes/roteiva-web/actions/runs/44803758781) aprovados. As duas primeiras recorrências e a anual foram encerradas no Sandbox. A ativação permanece restrita por `BILLING_CHECKOUT_TEST_UID`; a conta PF do Asaas de produção ficou fora desta execução.
+
+**Pendências para ativação geral.** A renovação automática e a inadimplência de cartão ainda precisam de um ciclo futuro real ou de simulação oficial de fatura recorrente. O painel Sandbox oferece carnê somente para boleto. O processamento de renovação, atraso de três dias, regularização, reversão de cobrança antiga, chargeback e falha de projeção passou em teste isolado. Alterar cadência no fim do período segue o fluxo de cancelamento e nova contratação; o ensaio alternou os três ciclos após os estornos. Permanecem pendentes estorno parcial e chargeback reais, atualização hospedada de cartão, suspensão da recorrência para contas suspensas, atraso com renovação real, exclusão remota sob falha financeira e recuperação da criação perdida quando o Asaas omite `externalReference`. O ensaio de estorno parcial via painel manteve a cobrança anual confirmada e ficou sem confirmação de reversão. A suíte API com 354 testes cobre a parada do checkout durante exclusão e a preservação do vínculo quando o provedor fica indisponível. A elegibilidade do Pix Automático exige conta PJ, e Pix comum permanece fora da oferta. Confirmar política de retenção e orçamento de CPU sob carga antes de promover. [Limites do Sandbox](https://docs.asaas.com/docs/o-que-pode-ser-testado) · [FAQ Pix Automático](https://docs.asaas.com/docs/faq-2).
 
 ## 1. Decisões de produto
 
@@ -110,12 +120,12 @@ Fluxo: React + Firebase Auth → Cloudflare Worker existente → adaptador Asaas
 - [x] [PR #183](https://github.com/EwertonMendes/roteiva-web/pull/183), merge SHA `c246ebd03b0d01fbf8aae2164b34728b9cd3c28b`, CI API [#44675122616](https://github.com/EwertonMendes/roteiva-web/actions/runs/44675122616) e deploy DEV [#44675298640](https://github.com/EwertonMendes/roteiva-web/actions/runs/44675298640) aprovados. O checkout permanece desligado, nenhum efeito financeiro ocorreu, frontend de cobrança segue planejado e PROD não foi modificado.
 - [ ] Confirmar em Sandbox a regra efetiva de Pix PF: o Asaas documenta `CONFIRMED` temporário durante bloqueio cautelar de até 72h; não confiar apenas neste estado para liberar acesso. Fonte: https://docs.asaas.com/reference/criar-nova-cobranca
 
-### Fase 2 — Sandbox checkout **PLANEJADO**
-- [ ] Confirmar contrato JSON atual do endpoint POST /v3/checkouts e URL oficial; sem supor campos/retornos.
-- [ ] Adicionar endpoint autenticado de criação de checkout com idempotência e limitadores por UID; consentimento e preços do backend; vincular externalReference ao intento durável.
-- [ ] Expor retorno seguro no app (nunca confirma pagamento). Evitar checagem cliente por polling; tela de status aguarda projeção e oferece consulta manual limitada.
-- [ ] Pix com fluxo explicitamente distinto se checkout recorrente não suportá-lo.
-- [ ] Testar no Sandbox sem dados reais e sem external API nos testes automáticos.
+### Fase 2 — Sandbox checkout **VALIDADO PARA CARTÃO NA CONTA DE QA**
+- [x] Confirmar contrato JSON do POST /v3/checkouts e link real do Sandbox com prefixo `/000/`.
+- [x] Criar checkout autenticado com intenção única, limite por UID, consentimento e catálogo no backend.
+- [x] Verificar retorno DEV que aguarda a projeção do acesso. Teste de recusa validado no checkout trimestral.
+- [ ] Homologar Pix comum com fluxo explicitamente distinto.
+- [x] Executar primeira compra mensal, trimestral e anual com dados fictícios e CI isolada.
 
 ### Fase 3 — Confirmação financeira/entitlement **PLANEJADO**
 - [ ] Webhook com segredo próprio, persistência durável e dedup; worker de conciliação / leases e retries com limite.

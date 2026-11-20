@@ -13,6 +13,12 @@ Use exclusivamente [Roteiva DEV](https://roteiva-web-dev.web.app), o Worker `rot
 5. Confira Desktop/Mobile, quotas, latência do cron e smoke após deploy. Registre os resultados no [roadmap de pagamentos](../ROADMAP-PAGAMENTOS-ASAAS.md). Habilite `BILLING_CHECKOUT_ENABLED=true` em DEV somente após os aceites críticos.
 6. Testes locais usam SQLite/D1, fetch simulado e Firebase Emulator. Rode `npm test`, `npm run typecheck`, `npm run migrate:local` e `npm run build` em `api/`. Rode `pnpm test`, `pnpm typecheck`, `pnpm build` e os testes de acesso desktop/mobile na raiz.
 
+### Evidência do ensaio remoto
+
+O Sandbox retornou links `https://sandbox.asaas.com/000/checkoutSession/show/{id}`, com o mesmo ID do POST. O adaptador valida origem e caminho, e a retomada por intento pode reconstruir esse link a partir da referência persistida. Em 20/11/2026 foram conciliadas as três primeiras compras por cartão e duas reversões totais. Os detalhes verificados e os links de publicação estão no [roadmap de pagamentos](../ROADMAP-PAGAMENTOS-ASAAS.md#integração-sandbox-dev--20112026).
+
+O painel recusou a geração de carnê da assinatura de cartão pela regra de boleto. Para o teste de renovação, use o procedimento oficial do [Asaas Sandbox para gerar novas cobranças](https://docs.asaas.com/docs/como-gerar-novas-cobran%C3%A7as-de-uma-assinatura), quando disponível à conta, ou aguarde o próximo vencimento da recorrência de QA. Registre a diferença entre uma cobrança futura gerada, seu pagamento confirmado e um evento simulado.
+
 ### Recuperação e promoção futura
 
 Para interromper novas contratações, remova `BILLING_CHECKOUT_ENABLED` e `BILLING_CHECKOUT_TEST_UID`. Mantenha a recepção e conciliação para contratos existentes. Consulte os IDs de referência e códigos categóricos de `billing_webhook_events`, `billing_access_projections` e `billing_contracts` via operação DEV autorizada. Confira o recurso no Asaas antes de recolocar um evento em fila; ausência da resposta de criação exige confirmação pelo provedor para liberar nova intenção. Para falha de projeção, verifique a versão corrente e a disponibilidade do Firestore antes de reprogramar o item. Preserve a trilha de revisão e mantenha os logs livres de payloads e dados de pagamento.

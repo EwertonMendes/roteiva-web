@@ -235,6 +235,29 @@ test('first authoritative response must match amount, customer ownership and sub
   assert.equal((await activeState(s.env,'other')).active,false);
 });
 
+test('deletion preserves checkout linkage on uncertainty and stops a known checkout at the provider',async t=>{
+  const s=setup(t);
+  let creates=0,cancels=0;
+  t.mock.method(globalThis,'fetch',async(url,options)=>{
+    assert.equal(options.method,'POST');
+    if(url==='https://api-sandbox.asaas.com/v3/checkouts'){
+      if(++creates===1)throw Error('lost response');
+      return checkoutResponse('checkout_b');
+    }
+    assert.equal(url,'https://api-sandbox.asaas.com/v3/checkouts/checkout_b/cancel');
+    cancels++;
+    return cancels===1?new Response(null,{status:503}):Response.json({id:'checkout_b',status:'CANCELED'});
+  });
+  assert.equal((await createCheckout(purchase(),s.env,'owner')).status,202);
+  await assert.rejects(stopBillingForDeletion(s.env,'owner'),{code:'billing_deletion_checkout_unresolved'});
+  assert.equal((await createCheckout(purchase(),s.env,'other')).status,201);
+  await assert.rejects(stopBillingForDeletion(s.env,'other'),{code:'billing_provider_unavailable'});
+  assert.equal(s.sql.prepare("SELECT status FROM billing_checkout_intents WHERE owner_uid='other'").get().status,'ready');
+  assert.equal(await stopBillingForDeletion(s.env,'other'),true);
+  assert.equal(s.sql.prepare("SELECT status FROM billing_checkout_intents WHERE owner_uid='other'").get().status,'canceled');
+  assert.equal(s.sql.prepare("SELECT status FROM billing_checkout_intents WHERE owner_uid='owner'").get().status,'pending');
+});
+
 test('end of month and leap year use calendar cycles on the Sao Paulo billing date',()=>{
   assert.equal(periodEnd('2028-01-31','monthly'),billingDateInstant('2028-02-29'));
   assert.equal(periodEnd('2027-01-31','quarterly'),billingDateInstant('2027-04-30'));
