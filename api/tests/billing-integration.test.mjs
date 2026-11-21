@@ -145,7 +145,7 @@ test('PROD canary stays account-scoped and reconciles payments after checkout is
   const s=setup(t);
   const env={...s.env,ENVIRONMENT:'prod',FRONTEND_ORIGIN:'https://app.roteiva.com',
     FIREBASE_PROJECT_ID:'roteiva-web-prod',ASAAS_API_KEY:'$aact_prod_'+'k'.repeat(32),BILLING_CHECKOUT_TEST_UIDS:'owner',
-    BILLING_PIX_ENABLED:'true',FIREBASE_ADMIN_CREDENTIALS_JSON:JSON.stringify({...JSON.parse(credentials),
+    BILLING_PIX_ENABLED:'false',FIREBASE_ADMIN_CREDENTIALS_JSON:JSON.stringify({...JSON.parse(credentials),
       project_id:'roteiva-web-prod',client_email:'test@roteiva-web-prod.iam.gserviceaccount.com'})};
   const paused={...env,BILLING_CHECKOUT_ENABLED:'false'};
   let posts=0,projection;
