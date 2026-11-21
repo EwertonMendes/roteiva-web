@@ -36,9 +36,9 @@ export async function reconcilePixPayment(env:Env,payment:Record<string,unknown>
     existing.amount_cents!==intent.amount_cents))return 'review';
 
   const owner=await env.DB.prepare(
-    "SELECT owner_uid FROM billing_customers WHERE provider_customer_ref=? OR owner_uid=?"
-  ).bind(customer,intent.owner_uid).all<{owner_uid:string}>();
-  if(owner.results.some(x=>x.owner_uid!==intent.owner_uid))return 'review';
+    "SELECT owner_uid,provider_customer_ref FROM billing_customers WHERE provider_customer_ref=? OR owner_uid=?"
+  ).bind(customer,intent.owner_uid).all<{owner_uid:string;provider_customer_ref:string}>();
+  if(owner.results.some(x=>x.owner_uid!==intent.owner_uid||x.provider_customer_ref!==customer))return 'review';
   const now=Date.now();
   const refund=await refundedSoFar(env,payment,ref,intent.amount_cents,existing?.refunded_amount_cents??0,eventType);
   // A Pix from a PF account may remain CONFIRMED during a precautionary hold.
@@ -81,7 +81,7 @@ export async function reconcilePixPayment(env:Env,payment:Record<string,unknown>
       "SELECT ?,owner_uid,'asaas',?,?,'active',?,? FROM billing_checkout_intents WHERE id=? AND owner_uid=? AND status IN ('pending','ready')")
       .bind(intent.id,ref,intent.plan_code,end,now,intent.id,intent.owner_uid),
     env.DB.prepare("INSERT INTO billing_payment_records(id,owner_uid,subscription_id,provider,provider_payment_ref,state,amount_cents,currency,due_on,verified_at,paid_at,period_ends_at,applied_at,created_at,updated_at,refunded_amount_cents,payment_method) "+
-      "VALUES(?,?,?,'asaas',?,'received',?,'BRL',?,?,?,?,?,?,?,?,0,'PIX')")
+      "VALUES(?,?,?,'asaas',?,'received',?,'BRL',?,?,?,?,?,?,?,0,'PIX')")
       .bind(crypto.randomUUID(),intent.owner_uid,intent.id,ref,intent.amount_cents,dueOn,now,
         billingDateInstant(paidOn),end,now,now,now),
     env.DB.prepare("UPDATE billing_checkout_intents SET status='completed',updated_at=?,recovery_after=NULL WHERE id=? AND owner_uid=? AND status IN ('pending','ready')")
