@@ -556,3 +556,38 @@ test('active trial shows purchase options, keeps courtesy visible and fits compa
   await dialog.getByRole('button',{name:'Voltar'}).click();
   expect(checkouts).toBe(0);
 });
+
+test('trial users can browse commercial prices without enabling a checkout',{tag:'@ci-smoke'},async({page},info)=>{
+  await signup(page,'billing-browse-only-'+info.project.name+'@example.com');
+  const headers={'Access-Control-Allow-Origin':cloud,'Access-Control-Allow-Methods':'GET,POST,OPTIONS',
+    'Access-Control-Allow-Headers':'Authorization, Content-Type'};
+  let checkoutPosts=0;
+  await page.route(/^http:\/\/127\.0\.0\.1:8787\/billing\/(status|plans|checkout)$/,async route=>{
+    const url=new URL(route.request().url());
+    if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
+    if(url.pathname.endsWith('/plans'))return route.fulfill({headers,json:{plans:[
+      {code:'monthly',amountCents:3990,version:'2026-11-v1'},
+      {code:'quarterly',amountCents:10990,version:'2026-11-v1'},
+      {code:'yearly',amountCents:39990,version:'2026-11-v1'},
+    ]}});
+    if(url.pathname.endsWith('/checkout')){
+      checkoutPosts++;
+      return route.fulfill({status:403,headers,json:{error:{code:'billing_unavailable'}}});
+    }
+    return route.fulfill({headers,json:{
+      checkoutAvailable:false,cardAvailable:false,pixAvailable:false,canRenewWithPix:false,canStart:false,
+      courtesyUntil:null,notice:null,checkout:null,subscription:null,payments:[],nextPaymentCursor:null,
+    }});
+  });
+  await page.goto(cloud+'/configuracoes');
+  const billing=page.getByRole('region',{name:'Assinatura',exact:true});
+  await expect(billing.getByRole('heading',{name:'Período de teste gratuito'})).toBeVisible();
+  await billing.getByRole('button',{name:'Conhecer planos e contratar'}).click();
+  await expect(billing.getByRole('heading',{name:'Planos de assinatura'})).toBeVisible();
+  await expect(billing.getByText(/contratação online está temporariamente indisponível/i)).toBeVisible();
+  await expect(billing.getByText('R$ 39,90')).toBeVisible();
+  await expect(billing.getByText('R$ 109,90')).toBeVisible();
+  await expect(billing.getByText('R$ 399,90')).toBeVisible();
+  await expect(billing.getByRole('button',{name:/Escolher/})).toHaveCount(0);
+  expect(checkoutPosts).toBe(0);
+});
