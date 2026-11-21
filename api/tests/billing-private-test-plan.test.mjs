@@ -102,7 +102,7 @@ test('public PROD rollout offers R$5 to any eligible UID without allowlists; fro
   assert.equal(payload.items[0].value,5);
   assert.equal(payload.subscription,undefined);
   const row=f.sql.prepare('SELECT owner_uid,plan_code,pricing_version,amount_cents,payment_method FROM billing_checkout_intents').get();
-  assert.deepEqual(row,{owner_uid:'other',plan_code:'monthly',pricing_version:TEST_BILLING_VERSION,
+  assert.deepEqual({...row},{owner_uid:'other',plan_code:'monthly',pricing_version:TEST_BILLING_VERSION,
     amount_cents:500,payment_method:'PIX'});
   await assert.rejects(createCheckout(request('monthly'),env,'other',f.now),
     {code:'billing_checkout_already_open'});
