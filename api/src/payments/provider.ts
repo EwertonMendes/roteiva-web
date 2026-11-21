@@ -5,7 +5,6 @@
  */
 export type PaymentMethod='CREDIT_CARD'|'PIX';
 export type RenewalMode='automatic'|'manual';
-export type GatewayCheckoutState='ACTIVE'|'PAID'|'CANCELED'|'EXPIRED'|'UNKNOWN';
 export type GatewayPaymentStatus='PENDING'|'CONFIRMED'|'RECEIVED'|'REFUNDED'|'OTHER';
 export type GatewayPayment={
   id:string;checkoutRef:string|null;customerRef:string|null;
@@ -16,7 +15,6 @@ export interface PaymentGateway {
   readonly code:string;
   createCheckout(payload:Record<string,unknown>):Promise<{id:string;link?:unknown}>;
   cancelCheckout(id:string):Promise<'canceled'|'unconfirmed'>;
-  checkoutState(id:string):Promise<GatewayCheckoutState>;
   listCheckoutPayments(id:string):Promise<readonly GatewayPayment[]>;
   payment(id:string):Promise<GatewayPayment>;
 }
