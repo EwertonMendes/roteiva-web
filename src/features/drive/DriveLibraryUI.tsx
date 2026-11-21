@@ -4,7 +4,7 @@ import {AppButton} from "../ui/AppButton";
 import {AppModal,AppModalHeader,AppModalBody,AppModalFooter} from "../ui/AppModal";
 import {CollectionState} from "../ui/CollectionState";
 import { AppSelect } from "../ui/AppSelect";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import {DriveThumbnail} from "./DriveThumbnail";
 import { ArrowLeft, Check, ChevronLeft, ChevronRight, Grid2X2, List, ExternalLink, File, FileAudio, FileImage, FileText, FileVideo, Folder, FolderOpen, Link2, Search, X, MoreHorizontal, Upload } from "lucide-react";
 
@@ -311,11 +311,18 @@ export function DrivePreview({item,onClose,onPrevious,onNext,position,total}:{it
 }
 
 export function DriveUnlinkConfirm({name,onCancel,onConfirm,busy}:{name:string;onCancel:()=>void;onConfirm:()=>void;busy:boolean}){
-  return <AppModal size="compact" className="rl-confirm" aria-label="Desvincular pasta"
+  const titleId=useId(),descriptionId=useId();
+  return <AppModal size="compact" className="rl-confirm rt-confirm-dialog"
+    aria-labelledby={titleId} aria-describedby={descriptionId}
     onCloseRequest={()=>{if(!busy)onCancel();}}>
     <div className="rt-modal__layout">
-      <AppModalHeader icon={<ModalUnlink size={26}/>} description="Este projeto deixará de exibir a pasta, sem apagar os arquivos." title={<>Desvincular “{name}”?</>} onClose={onCancel} closeDisabled={busy}/>
-      <AppModalBody><p>A pasta deixará de aparecer neste projeto. Nenhum arquivo será apagado do seu Google Drive.</p></AppModalBody>
+      <div className="rt-confirm-content">
+        <AppModalHeader icon={<ModalUnlink size={26}/>} title={<>Desvincular “{name}”?</>}
+          titleId={titleId} onClose={onCancel} closeDisabled={busy}/>
+        <AppModalBody><p id={descriptionId} className="rt-confirm-description">
+          A pasta deixará de aparecer neste projeto. Nenhum arquivo será apagado do seu Google Drive.
+        </p></AppModalBody>
+      </div>
       <AppModalFooter>
         <AppButton variant="secondary" type="button" disabled={busy} onClick={onCancel}>Manter pasta</AppButton>
         <AppButton variant="primary" type="button" disabled={busy} onClick={onConfirm}>{busy?"Desvinculando…":"Desvincular"}</AppButton>
