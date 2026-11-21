@@ -30,7 +30,7 @@ test('authenticated return queues one durable verified checkout recovery, never 
   assert.equal((await first.json()).status,'checking');
   const second=await requestCheckoutReturnCheck(d.env,'owner',intentId);
   assert.equal(second.status,202);
-  assert.equal(d.sql.prepare("SELECT count(*) n FROM billing_webhook_events WHERE event_id=?").get('recovery:'+intentId).n,1);
+  assert.equal(d.sql.prepare("SELECT count(*) n FROM billing_webhook_events WHERE event_id=?").get('return:'+intentId).n,1);
   assert.equal(d.sql.prepare('SELECT count(*) n FROM access_subscriptions').get().n,0);
   assert.equal(d.sql.prepare('SELECT count(*) n FROM billing_payment_records').get().n,0);
   assert.equal((await (await requestCheckoutReturnCheck(d.env,'other',intentId)).json()).status,'not_found');
