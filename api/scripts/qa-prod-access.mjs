@@ -106,7 +106,7 @@ async function uidFromVerifiedEmail(token,email) {
   return user.localId;
 }
 const firestoreRoot='https://firestore.googleapis.com/v1/projects/'+PROJECT+'/databases/(default)/documents';
-const firestoreName=(uid,relative)=>'projects/'+PROJECT+'/databases/(default)/documents/users/'+uid+'/'+relative;
+const firestoreName=(uid,relative)=>'projects/'+PROJECT+'/databases/(default)/documents/users/'+uid+(relative?'/'+relative:'');
 const fsUrl=(name)=>'https://firestore.googleapis.com/v1/'+name;
 async function fsGet(token,name,canBeMissing=false) {
   const response=await fetch(fsUrl(name),{redirect:'error',headers:{Authorization:'Bearer '+token},
