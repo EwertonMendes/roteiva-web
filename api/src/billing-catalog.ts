@@ -15,18 +15,24 @@ const plans:readonly BillingPlan[]=Object.freeze([
   Object.freeze({code:'quarterly',cycle:'QUARTERLY',amountCents:10990,currency:'BRL',version:BILLING_CATALOG_VERSION}),
   Object.freeze({code:'yearly',cycle:'YEARLY',amountCents:39990,currency:'BRL',version:BILLING_CATALOG_VERSION}),
 ]);
-const privateTestOffer:BillingOffer=Object.freeze({
+const temporaryTestOffer:BillingOffer=Object.freeze({
   code:'test',cycle:'MONTHLY',amountCents:TEST_BILLING_AMOUNT_CENTS,currency:'BRL',version:TEST_BILLING_VERSION
 });
 
-/** A strictly single-UID, production-only, opt-in canary. Never authorize by email or a client flag. */
+/**
+ * Temporary R$5 offer, server-controlled and PROD-only. An explicit public
+ * rollout allows all eligible accounts; otherwise the exact UID canary works.
+ * Neither the browser nor an email address can turn either switch on.
+ */
 export function canUsePrivateTestOffer(env:Env,uid?:string):boolean{
   const owner=env.BILLING_TEST_PLAN_UID??'';
+  const publiclyReleased=env.BILLING_CHECKOUT_ENABLED==='true'&&
+    env.BILLING_PUBLIC_ROLLOUT_ENABLED==='true';
   return env.ENVIRONMENT==='prod'&&env.BILLING_TEST_PLAN_ENABLED==='true'&&
-    /^[A-Za-z0-9_-]{1,128}$/.test(owner)&&uid===owner;
+    (publiclyReleased||(/^[A-Za-z0-9_-]{1,128}$/.test(owner)&&uid===owner));
 }
 export function billingCatalog(env?:Env,uid?:string):readonly BillingOffer[]{
-  return env&&canUsePrivateTestOffer(env,uid)?[...plans,privateTestOffer]:plans;
+  return env&&canUsePrivateTestOffer(env,uid)?[...plans,temporaryTestOffer]:plans;
 }
 export function requireBillingPlan(code:unknown):BillingPlan{
   const plan=plans.find(item=>item.code===code);

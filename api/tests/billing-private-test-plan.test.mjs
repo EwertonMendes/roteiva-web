@@ -56,14 +56,57 @@ test('minimum R$5 offer is server-owned and only visible to one exact PROD UID',
   assert.deepEqual(billingCatalog({...f.env,BILLING_TEST_PLAN_UID:'other'},'owner').map(p=>p.code),
     ['monthly','quarterly','yearly']);
   assert.deepEqual(billingCatalog({...f.env,BILLING_PUBLIC_ROLLOUT_ENABLED:'true'},'other').map(p=>p.code),
-    ['monthly','quarterly','yearly']);
+    ['monthly','quarterly','yearly','test']);
   assert.equal(TEST_BILLING_AMOUNT_CENTS,500);
-  await assert.rejects(createCheckout(request(),{...f.env,BILLING_PUBLIC_ROLLOUT_ENABLED:'true'},'other',f.now),{
-    code:'not_found'});
   await assert.rejects(createCheckout(request(),{...f.env,BILLING_TEST_PLAN_ENABLED:'false'},'owner',f.now),{
     code:'not_found'});
   await assert.rejects(createCheckout(request(),{...f.env,BILLING_CHECKOUT_ENABLED:'false'},'owner',f.now),{
     code:'not_found'});
+});
+
+test('public PROD rollout offers R$5 to any eligible UID without allowlists; frontend cannot override the price',async t=>{
+  const f=setup(t);
+  const env={...f.env,BILLING_PUBLIC_ROLLOUT_ENABLED:'true',BILLING_CHECKOUT_TEST_UIDS:'',
+    BILLING_TEST_PLAN_UID:undefined};
+  for(const uid of ['owner','other',undefined]){
+    const response=billingPlansResponse(env,uid);
+    assert.equal(response.headers.get('Cache-Control'),'private, no-store');
+    const result=await response.json();
+    assert.equal(result.checkoutAvailable,true);
+    assert.deepEqual(result.plans.map(p=>[p.code,p.amountCents]),[
+      ['monthly',3990],['quarterly',10990],['yearly',39990],['test',500]
+    ]);
+  }
+  assert.deepEqual(billingCatalog({...env,BILLING_TEST_PLAN_ENABLED:'false'},'other').map(p=>p.code),
+    ['monthly','quarterly','yearly']);
+  assert.deepEqual(billingCatalog({...env,BILLING_CHECKOUT_ENABLED:'false'},'other').map(p=>p.code),
+    ['monthly','quarterly','yearly']);
+  assert.deepEqual(billingCatalog({...env,ENVIRONMENT:'dev'},'other').map(p=>p.code),
+    ['monthly','quarterly','yearly']);
+  let calls=0,payload;
+  t.mock.method(globalThis,'fetch',async (_url,options)=>{
+    calls++;
+    payload=JSON.parse(options.body);
+    return Response.json({id:'checkout_public_other'});
+  });
+  for(const tamper of [{amountCents:1},{value:0.01},{price:0},{ownerUid:'owner'}]){
+    await assert.rejects(createCheckout(request('test',tamper),env,'other',f.now),
+      {code:'billing_consent_required'});
+  }
+  assert.equal(calls,0);
+  const created=await createCheckout(request('test',{paymentMethod:'PIX'}),env,'other',f.now);
+  assert.equal(created.status,201);
+  assert.equal(calls,1);
+  assert.deepEqual(payload.billingTypes,['PIX']);
+  assert.deepEqual(payload.chargeTypes,['DETACHED']);
+  assert.equal(payload.items[0].value,5);
+  assert.equal(payload.subscription,undefined);
+  const row=f.sql.prepare('SELECT owner_uid,plan_code,pricing_version,amount_cents,payment_method FROM billing_checkout_intents').get();
+  assert.deepEqual({...row},{owner_uid:'other',plan_code:'monthly',pricing_version:TEST_BILLING_VERSION,
+    amount_cents:500,payment_method:'PIX'});
+  await assert.rejects(createCheckout(request('monthly'),env,'other',f.now),
+    {code:'billing_checkout_already_open'});
+  assert.equal(calls,1,'same owner cannot switch a discounted test checkout into commercial monthly');
 });
 
 test('tampered price and plan version are rejected, no discounted commercial checkout is possible',async t=>{
