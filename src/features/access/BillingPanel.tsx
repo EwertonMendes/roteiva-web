@@ -180,7 +180,7 @@ function BillingAccount({uid,access,locked}:{uid:string;access:AccessInfo;locked
       grace={status?.notice?.code==="payment_grace"} onCancel={()=>setCanceling(true)}
       onUpgrade={upgradeOffer?()=>setShowPlans(value=>!value):undefined} showPlans={showPlans}/>}
     {callback==="return"&&returnState==="checking"&&<p className="billing-notice" role="status">
-      Estamos conferindo o pagamento com segurança. Assim que o Asaas confirmar, seu acesso será liberado automaticamente.
+      Estamos conferindo o pagamento com segurança. Assim que o pagamento for confirmado, seu acesso será liberado automaticamente.
     </p>}
     {callback==="return"&&returnState==="delayed"&&<div className="billing-notice" role="status">
       <strong>A confirmação está demorando mais que o esperado.</strong>
@@ -194,7 +194,7 @@ function BillingAccount({uid,access,locked}:{uid:string;access:AccessInfo;locked
     {message&&<p className="billing-notice" role="status">{message}</p>}
     {upgrade&&!access.suspended&&<div className="billing-notice" role="status">
       {upgrade.status==="scheduled"?<p><strong>Upgrade agendado.</strong> O plano {planNames[upgrade.planCode].toLowerCase()} começa em {billingDate(upgrade.effectiveOn)}. A próxima cobrança será de {money(upgrade.amountCents)}.</p>:
-        upgrade.status==="pending"?<p>O upgrade aguarda confirmação do Asaas.</p>:
+        upgrade.status==="pending"?<p>O upgrade aguarda confirmação do pagamento.</p>:
           <p>O upgrade precisa de revisão. <a className="billing-support-link" href="/suporte.html">Fale com o suporte</a>.</p>}
     </div>}
     {checkoutPending&&!status?.checkout&&!access.suspended&&<p className="billing-notice" role="status">Estamos verificando a criação do checkout.</p>}
@@ -202,7 +202,7 @@ function BillingAccount({uid,access,locked}:{uid:string;access:AccessInfo;locked
     {error&&<p className="billing-inline-error" role="alert">{error}</p>}
     {status?.checkout&&!access.suspended&&callback!=="return"&&<div className="billing-notice billing-next-action">
       <div><strong>Checkout {planNames[status.checkout.planCode].toLowerCase()} · {status.checkout.paymentMethod==="PIX"?"Pix":"Cartão de crédito"}</strong>
-        <p role={checkoutUrl?undefined:"status"}>{checkoutUrl?"Conclua o pagamento no Asaas.":"Estamos verificando a tentativa de contratação."}</p>
+        <p role={checkoutUrl?undefined:"status"}>{checkoutUrl?"Conclua o pagamento na página segura.":"Estamos verificando a tentativa de contratação."}</p>
       </div>
       <div className="billing-checkout-actions">
         {checkoutUrl&&<a className="billing-text-link" href={checkoutUrl} rel="noreferrer">Retomar checkout <ArrowUpRight size={17}/></a>}
@@ -228,7 +228,7 @@ function BillingAccount({uid,access,locked}:{uid:string;access:AccessInfo;locked
       onClose={()=>setSelected(null)} onConfirm={method=>confirmCheckout(selected,method)}/>}
     {switchingCheckout&&status?.checkout&&<ConfirmationDialog
       title="Trocar plano ou pagamento?"
-      description="Vamos cancelar a tentativa atual no Asaas antes de permitir uma nova escolha. Caso exista pagamento ou uma confirmação em andamento, a troca será bloqueada para evitar duas cobranças."
+      description="Vamos cancelar a tentativa de pagamento atual antes de permitir uma nova escolha. Caso exista pagamento ou uma confirmação em andamento, a troca será bloqueada para evitar duas cobranças."
       confirmLabel="Cancelar tentativa e escolher" cancelLabel="Manter checkout"
       onCancel={()=>setSwitchingCheckout(false)} onConfirm={abandonCheckout}/>} 
     {selectedUpgrade&&upgradeOffer&&<ConfirmationDialog title={`Upgrade para o plano ${planNames[selectedUpgrade.plan.code].toLowerCase()}`}
@@ -300,7 +300,7 @@ function PlanSummary({subscription,access,locked,illustrated,grace,onCancel,onUp
     </dl>
     {(subscription.status==="past_due"||subscription.cancellation||canCancel||onUpgrade)&&<div className="billing-manage">
       {subscription.status==="past_due"&&<p>{grace?`Seu acesso continua até ${billingDate(access.accessUntil)}. `:""}Consulte o histórico para regularizar a cobrança em atraso.</p>}
-      {subscription.cancellation==="pending"&&<p role="status">O cancelamento aguarda confirmação do Asaas.</p>}
+      {subscription.cancellation==="pending"&&<p role="status">O cancelamento está sendo confirmado.</p>}
       {subscription.cancellation==="review"&&<p>O cancelamento precisa de revisão. <a href="/suporte.html">Fale com o suporte</a>.</p>}
       {canCancel&&<AppButton variant="secondary" onClick={onCancel}>Cancelar renovação</AppButton>}
       {onUpgrade&&<AppButton variant="primary" onClick={onUpgrade} aria-expanded={showPlans} aria-controls={showPlans?"billing-plan-options":undefined}>
