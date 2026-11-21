@@ -134,3 +134,29 @@ test('mobile drawer locks page scroll, restores the position and permits routing
  await expect(drawer).not.toHaveClass(/mobile-open/);
  expect(await page.evaluate(()=>document.body.style.position)).toBe('');
 });
+
+test('mobile drawer keeps keyboard focus visible and restores the opener on Escape',async({page},info)=>{
+ test.skip(info.project.name!=='mobile','Mobile drawer keyboard navigation');
+ await page.setViewportSize({width:390,height:844});
+ await page.goto('http://127.0.0.1:4174/');
+ await page.locator('.brand-intro').waitFor({state:'detached'});
+ const drawer=page.locator('#workspace-navigation');
+ const topOpener=page.getByRole('button',{name:'Abrir menu',exact:true});
+ const bottomOpener=page.getByRole('button',{name:'Mais opções de navegação',exact:true});
+ await expect(drawer).toHaveAttribute('inert','');
+ await topOpener.focus();
+ await page.keyboard.press('Shift+Tab');
+ expect(await drawer.evaluate(el=>el.contains(document.activeElement))).toBe(false);
+ await bottomOpener.press('Enter');
+ const close=drawer.getByRole('button',{name:'Fechar menu',exact:true});
+ await expect(close).toBeFocused();
+ await expect(page.locator('main.main')).toHaveAttribute('inert','');
+ await page.keyboard.press('Shift+Tab');
+ await expect(drawer.getByRole('button',{name:'Opções da conta',exact:true})).toBeFocused();
+ await page.keyboard.press('Tab');
+ await expect(close).toBeFocused();
+ await page.keyboard.press('Escape');
+ await expect(bottomOpener).toBeFocused();
+ await expect(drawer).toHaveAttribute('inert','');
+ await expect(page.locator('main.main')).not.toHaveAttribute('inert','');
+});

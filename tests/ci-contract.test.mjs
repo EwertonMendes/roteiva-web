@@ -119,6 +119,10 @@ test("PROD promotion runs full regression in parallel without weakening authoriz
   assert.match(browser, /ffmpeg/);
   assert.match(browser, /firebase emulators:exec --project demo-roteiva --only auth,firestore/);
   assert.doesNotMatch(browser, /--grep|--project=desktop|--project=mobile/, "Every browser project/test must run on one shard");
+  assert.match(prod, /needs: \[authorize, checks, browser\]\s+if: \$\{\{ !inputs\.frontend_only \}\}/);
+  assert.match(prod, /needs\.checks\.result == 'success' && needs\.browser\.result == 'success'/);
+  assert.match(prod, /inputs\.frontend_only && needs\.worker\.result == 'skipped'/);
+  assert.match(prod, /!inputs\.domain_cutover && !inputs\.frontend_only[^\n]*\n\s+run:[^\n]*--only firestore:rules,firestore:indexes,hosting:/);
 });
 
 test("the institutional deployment has its own site and uses the protected PROD environment", () => {

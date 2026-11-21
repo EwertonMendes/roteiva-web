@@ -43,7 +43,7 @@ import {ConfirmationDialog} from "./features/ui/ConfirmationDialog";
 import {AppModal,AppModalHeader,AppModalBody,AppModalFooter,AppModalSection} from "./features/ui/AppModal";
 import {isValidCivilDate,todayKey} from "./features/calendar/calendar-dates";
 import { toISO as toISOAdded, parseMoney, splitInstallments } from "./studio-finance";
-import { FormEvent, useEffect, useLayoutEffect, useMemo, useState, useCallback, useRef } from "react";
+import { FormEvent, type KeyboardEvent, type MouseEvent, useEffect, useLayoutEffect, useMemo, useState, useCallback, useRef } from "react";
 
 import { isDemo, useEmulators } from "./lib/firebase";
 import { hrefForWorkspaceRoute, routeFromLocation, type WorkspaceRoute } from "./lib/workspace-routing";
@@ -137,6 +137,10 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
   const [eventModalOpen, setEventModalOpen] = useState(false);
   const [deletingCalendarEvent,setDeletingCalendarEvent]=useState<CalendarEvent|null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [mobileViewport, setMobileViewport] = useState(() => window.matchMedia("(max-width: 820px)").matches);
+  const mobileDrawerClose = useRef<HTMLButtonElement>(null);
+  const mobileDrawerTrigger = useRef<HTMLButtonElement>(null);
+  const restoreMobileDrawerFocus = useRef(false);
   // Closing restores position; navigation from the drawer resets the next page.
   const resetScrollAfterMobileNavigation = useRef(false);
   const [demoTheme, setDemoTheme] = useState<Theme>(()=>readStoredTheme(themeStorageKey()) ?? systemTheme());
@@ -307,12 +311,53 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     return ()=>window.removeEventListener("storage",onStorage);
   },[]);
 
+  useLayoutEffect(() => {
+    const mobile=window.matchMedia("(max-width: 820px)");
+    const update=()=>{
+      setMobileViewport(mobile.matches);
+      if(!mobile.matches)setMobileOpen(false);
+    };
+    update();
+    mobile.addEventListener("change",update);
+    return()=>mobile.removeEventListener("change",update);
+  },[]);
+
+  function openMobileDrawer(event:MouseEvent<HTMLButtonElement>){
+    mobileDrawerTrigger.current=event.currentTarget;
+    setMobileOpen(true);
+  }
+
+  function dismissMobileDrawer(){
+    restoreMobileDrawerFocus.current=true;
+    setMobileOpen(false);
+  }
+
+  function handleMobileDrawerKey(event:KeyboardEvent<HTMLElement>){
+    if(!mobileOpen||event.defaultPrevented)return;
+    if(event.key==="Escape"){
+      event.preventDefault();
+      dismissMobileDrawer();
+    }
+    if(event.key!=="Tab")return;
+    const buttons=[...event.currentTarget.querySelectorAll<HTMLButtonElement>("button:not(:disabled):not([tabindex='-1'])")]
+      .filter(button=>button.getClientRects().length>0&&!button.closest("[inert]"));
+    const edge=event.shiftKey?buttons[0]:buttons.at(-1);
+    if(event.target!==edge)return;
+    event.preventDefault();
+    (event.shiftKey?buttons.at(-1):buttons[0])?.focus();
+  }
+
   // iOS Safari may scroll behind an overlay even with overflow:hidden.
   // Fix the page at its existing scroll offset; the sidebar nav can still scroll.
   useLayoutEffect(() => {
-    if (!mobileOpen) return;
-    const mobile = window.matchMedia("(max-width: 820px)");
-    if (!mobile.matches) { setMobileOpen(false); return; }
+    if (!mobileOpen) {
+      if(restoreMobileDrawerFocus.current){
+        restoreMobileDrawerFocus.current=false;
+        mobileDrawerTrigger.current?.focus({preventScroll:true});
+      }
+      return;
+    }
+    if (!mobileViewport) return;
     const root = document.documentElement;
     const body = document.body;
     const previous = {
@@ -331,12 +376,8 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
     body.style.overflow = "hidden";
     root.style.overflow = "hidden";
     root.style.overscrollBehavior = "none";
-    const onBreakpointChange = (event: MediaQueryListEvent) => {
-      if (!event.matches) setMobileOpen(false);
-    };
-    mobile.addEventListener("change", onBreakpointChange);
+    mobileDrawerClose.current?.focus({preventScroll:true});
     return () => {
-      mobile.removeEventListener("change", onBreakpointChange);
       body.style.position = previous.position;
       body.style.top = previous.top;
       body.style.left = previous.left;
@@ -349,7 +390,7 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
       resetScrollAfterMobileNavigation.current = false;
       window.scrollTo(reset ? 0 : x, reset ? 0 : y);
     };
-  }, [mobileOpen]);
+  }, [mobileOpen,mobileViewport]);
 
   // The Pages demo preserves its existing browser-only snapshot contract.
   // Firebase never persists a render/effect: business mutations call commands.
@@ -650,10 +691,11 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
 
   return (
     <div className={`app-shell app-view-${view}${view==="clients"&&!selectedClient?" app-client-directory":""}`} inert={saving || undefined}>
-      <aside className={`sidebar ${mobileOpen ? "mobile-open" : ""}`}>
+      <aside id="workspace-navigation" className={`sidebar ${mobileOpen ? "mobile-open" : ""}`}
+        inert={mobileViewport&&!mobileOpen} onKeyDown={handleMobileDrawerKey}>
         <div className="brand-lockup">
           <BrandLogo theme={theme} />
-          <AppButton className="mobile-close" onClick={() => setMobileOpen(false)} aria-label="Fechar menu"><X size={18} /></AppButton>
+          <AppButton ref={mobileDrawerClose} className="mobile-close" onClick={dismissMobileDrawer} aria-label="Fechar menu"><X size={18} /></AppButton>
         </div>
         <nav>
           <small className="nav-label">ESPAÇO DE TRABALHO</small>
@@ -673,13 +715,13 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
           {photoURL ? <img className="profile-photo" src={photoURL} alt="Foto do usuário" referrerPolicy="no-referrer" /> : <span>{firstName.slice(0, 2).toUpperCase()}</span>}<div><b>{firstName}</b><small>{email}</small></div><SidebarAccountMenu key={view} theme={theme} onToggleTheme={toggleTheme} onLogout={onLogout?signOut:undefined}/>
         </div>
       </aside>
-      {mobileOpen && <AppButton className="mobile-scrim" aria-label="Fechar menu" onClick={() => setMobileOpen(false)} />}
+      {mobileOpen && <AppButton className="mobile-scrim" aria-label="Fechar menu" tabIndex={-1} onClick={dismissMobileDrawer} />}
       {view === "overview" && activityOpen && <ActivityHistoryDrawer activities={activities} onClose={() => setActivityOpen(false)}/>}
 
-      <main className="main">
+      <main className="main" inert={mobileOpen}>
         <section className="page">
           {isDemo ? <div className="pages-demo-notice" role="note"><b>Modo demonstração</b><span>Explore o Roteiva com dados salvos apenas neste navegador. Entre na sua conta para trabalhar com seus próprios projetos.</span></div> : null}
-          <AppButton type="button" className="menu-button page-menu-button" onClick={() => setMobileOpen(true)} aria-label="Abrir menu" aria-expanded={mobileOpen}><Menu size={20} /></AppButton>
+          <AppButton type="button" className="menu-button page-menu-button" onClick={openMobileDrawer} aria-label="Abrir menu" aria-expanded={mobileOpen} aria-controls="workspace-navigation"><Menu size={20} /></AppButton>
           <div className="page-heading">
             <div><span className="eyebrow">ROTEIVA / {view === "overview" ? "PAINEL" : pageTitles[view][0].toUpperCase()}</span><h1>{pageTitles[view][0]}</h1><p>{pageTitles[view][1]}</p></div>
             <div className="heading-actions">
@@ -781,12 +823,12 @@ export default function DashboardClient({ firstName, email, photoURL, profile, o
         confirmLabel="Excluir compromisso" cancelLabel="Manter compromisso"
         onCancel={()=>setDeletingCalendarEvent(null)}
         onConfirm={confirmDeleteCalendarEvent}/>}
-      <nav className="mobile-bottom-nav" aria-label="Navegação no celular">
+      <nav className="mobile-bottom-nav" aria-label="Navegação no celular" inert={mobileOpen}>
         <AppButton className={view === "overview" ? "active" : ""} aria-current={view === "overview" ? "page" : undefined} onClick={()=>changeView("overview")}><LayoutDashboard size={20}/><span>Início</span></AppButton>
         <AppButton className={view === "projects" ? "active" : ""} aria-current={view === "projects" ? "page" : undefined} onClick={()=>changeView("projects")}><Folder size={20}/><span>Projetos</span></AppButton>
         <AppButton className={view === "calendar" ? "active" : ""} aria-current={view === "calendar" ? "page" : undefined} onClick={()=>changeView("calendar")}><CalendarDays size={20}/><span>Agenda</span></AppButton>
         <AppButton className={view === "finance" ? "active" : ""} aria-current={view === "finance" ? "page" : undefined} onClick={()=>changeView("finance")}><WalletCards size={20}/><span>Financeiro</span></AppButton>
-        <AppButton className={["clients","reviews","library"].includes(view) ? "active" : ""} aria-label="Mais opções de navegação" onClick={()=>setMobileOpen(true)}><Menu size={20}/><span>Mais</span></AppButton>
+        <AppButton className={["clients","reviews","library"].includes(view) ? "active" : ""} aria-label="Mais opções de navegação" aria-expanded={mobileOpen} aria-controls="workspace-navigation" onClick={openMobileDrawer}><Menu size={20}/><span>Mais</span></AppButton>
       </nav>
     </div>
   );
