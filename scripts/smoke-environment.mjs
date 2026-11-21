@@ -14,8 +14,21 @@ if(target==='prod'){
     assert.equal(catalog.status,200);
     const billing=await catalog.json();
     assert.equal(billing.currency,'BRL');
-    assert.equal(billing.checkoutAvailable,false,'PROD checkout must remain restricted to testers');
-    assert.equal(billing.plans.length,3);
+    // A public billing release is an explicit, owner-approved production
+    // workflow input; a canary-only release must remain closed anonymously.
+    const publicCheckout=process.env.PRODUCTION_BILLING_CHECKOUT_ENABLED==='true'&&
+      process.env.PRODUCTION_BILLING_PUBLIC_ROLLOUT_ENABLED==='true';
+    const publicTestOffer=publicCheckout&&process.env.PRODUCTION_BILLING_TEST_PLAN_ENABLED==='true';
+    assert.equal(billing.checkoutAvailable,publicCheckout,
+      'PROD checkout visibility must match the protected public-rollout decision');
+    const expected=[
+      {code:'monthly',amountCents:3990},
+      {code:'quarterly',amountCents:10990},
+      {code:'yearly',amountCents:39990},
+      ...(publicTestOffer?[{code:'test',amountCents:500}]:[])
+    ];
+    assert.deepEqual(billing.plans.map(plan=>({code:plan.code,amountCents:plan.amountCents})),expected,
+      'PROD server-controlled prices and test-offer visibility must match the release');
     assert.equal((await send('/billing/status')).status,401);
     assert.equal((await send('/billing/webhooks/asaas',{method:'POST'})).status,401);
   }else{
