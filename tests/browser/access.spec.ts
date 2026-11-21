@@ -342,7 +342,7 @@ test('billing summary, responsive history and restricted checkout use the same b
     await expect(illustration).toHaveAttribute('src',new RegExp('/brand/billing/'+asset+'\\.webp$'));
     await expect.poll(()=>illustration.evaluate(img=>(img as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
     await expect(consent.getByRole('checkbox')).not.toBeChecked();
-    await expect(consent.getByRole('button',{name:'Continuar para o Asaas Sandbox'})).toBeDisabled();
+    await expect(consent.getByRole('button',{name:'Continuar para o pagamento'})).toBeDisabled();
     for(const theme of ['light','dark']){
       await page.evaluate(value=>{document.documentElement.dataset.theme=value;},theme);
       await expect.poll(()=>consent.evaluate(modal=>{
@@ -371,7 +371,7 @@ test('billing summary, responsive history and restricted checkout use the same b
   await page.getByRole('button',{name:'Escolher anual'}).click();
   const dialog=page.getByRole('dialog',{name:'Plano anual'});
   await expect(dialog).toBeVisible();
-  const confirm=dialog.getByRole('button',{name:'Continuar para o Asaas Sandbox'});
+  const confirm=dialog.getByRole('button',{name:'Continuar para o pagamento'});
   await expect(confirm).toBeDisabled();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('button',{name:'Escolher anual'})).toBeFocused();
