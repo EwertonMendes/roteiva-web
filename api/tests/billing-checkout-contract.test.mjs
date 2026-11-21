@@ -17,16 +17,16 @@ test('builds each recurring CREDIT_CARD payload from trusted price catalog, not 
    assert.equal(body.subscription.nextDueDate,date);
    assert.equal(body.externalReference,intentId);
    assert.equal(body.items[0].quantity,1);
-   assert.equal(body.callback.successUrl,'https://roteiva-web-dev.web.app/?billing=return');
+   assert.equal(body.callback.successUrl,'https://roteiva-web-dev.web.app/?billing=return&intent='+intentId);
    assert.equal(Object.hasOwn(body,'customerData'),false);
  }
 });
 test('production callback cannot be redirected to another origin',()=>{
  const data={planCode:'yearly',intentId,nextDueDate:date};
  assert.deepEqual(buildRecurringCardCheckout(prod,data).callback,{
-   cancelUrl:'https://app.roteiva.com/?billing=cancelled',
-   expiredUrl:'https://app.roteiva.com/?billing=expired',
-   successUrl:'https://app.roteiva.com/?billing=return',
+   cancelUrl:'https://app.roteiva.com/?billing=cancelled&intent='+intentId,
+   expiredUrl:'https://app.roteiva.com/?billing=expired&intent='+intentId,
+   successUrl:'https://app.roteiva.com/?billing=return&intent='+intentId,
  });
  assert.throws(()=>buildRecurringCardCheckout({...prod,FRONTEND_ORIGIN:'https://evil.example'},data),{code:'billing_invalid_environment'});
  assert.throws(()=>buildRecurringCardCheckout({ENVIRONMENT:'staging',FRONTEND_ORIGIN:'https://evil.example'},data),{code:'billing_invalid_environment'});
