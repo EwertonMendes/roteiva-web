@@ -16,7 +16,7 @@ function fixture(t){
  d.sql.prepare('INSERT INTO access_accounts(owner_uid,trial_started_at,trial_ends_at,created_at,updated_at) VALUES(?,?,?,?,?)')
    .run('owner',0,604800000,now,now);
  return {...d,env:{DB:d.DB,ENVIRONMENT:'dev',FRONTEND_ORIGIN:origin,
-  BILLING_ENABLED:'true',BILLING_CHECKOUT_ENABLED:'true',BILLING_PIX_ENABLED:'true',
+  BILLING_ENABLED:'true',BILLING_CHECKOUT_ENABLED:'true',BILLING_PIX_ENABLED:'true',BILLING_CHECKOUT_TEST_UID:'owner',
   ASAAS_API_KEY:'$aact_hmlg_'+'k'.repeat(32),ASAAS_WEBHOOK_TOKEN:'w'.repeat(48)}};
 }
 const request=(planCode='monthly',paymentMethod='PIX')=>new Request(base+'/billing/checkout',{
