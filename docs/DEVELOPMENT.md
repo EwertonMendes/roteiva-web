@@ -1,5 +1,7 @@
 # Desenvolvimento e deploy — Roteiva
 
+Para uma correção exclusiva de interface, selecione `frontend_only=true` na promoção protegida de PROD. A pipeline exige o SHA aprovado de `master`, os testes e a aprovação de `firebase-production`, e publica somente o Firebase Hosting. Use os modos de promoção de domínio, cobrança e esquema em execuções próprias.
+
 ## Integração Asaas Sandbox no DEV
 
 **Retorno de pagamento (DEV):** o callback do checkout inclui um identificador não secreto da intenção. `POST /billing/return/verify` exige Firebase ID Token, Origin DEV permitido, rate limit e associação exata ao UID; não recebe nem cria cobranças. Apenas agenda a conciliação autoritativa existente. Após o retorno, a UI acompanha `GET /billing/status` por uma janela limitada, mostra orientação de atraso se necessário e libera o workspace somente quando o documento `access/current` for publicado pelo Worker. O webhook também tenta processar a inbox imediatamente via `waitUntil`, preservando o Cron como fallback. Testar retorno tardio, webhook atrasado, cliente diferente, origin inválido, duplicidade, cancelamento, expirado e falhas do provedor. O Asaas Checkout publica callback URLs, mas a especificação da criação não documenta `autoRedirect`; não enviar campos não documentados nem prometer que a página do Asaas dispensará o clique de retorno. A confirmação financeira nunca vem da URL.

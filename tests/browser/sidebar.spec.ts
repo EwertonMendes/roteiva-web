@@ -134,3 +134,56 @@ test('mobile drawer locks page scroll, restores the position and permits routing
  await expect(drawer).not.toHaveClass(/mobile-open/);
  expect(await page.evaluate(()=>document.body.style.position)).toBe('');
 });
+
+test('mobile drawer keeps keyboard focus visible and restores the opener on Escape',async({page},info)=>{
+ test.skip(info.project.name!=='mobile','Mobile drawer keyboard navigation');
+ await page.setViewportSize({width:390,height:844});
+ await page.goto('http://127.0.0.1:4174/');
+ await page.locator('.brand-intro').waitFor({state:'detached'});
+ const drawer=page.locator('#workspace-navigation');
+ const topOpener=page.getByRole('button',{name:'Abrir menu',exact:true});
+ const bottomOpener=page.getByRole('button',{name:'Mais opções de navegação',exact:true});
+ await expect(drawer).toHaveAttribute('inert','');
+ await topOpener.focus();
+ await page.keyboard.press('Shift+Tab');
+ expect(await drawer.evaluate(el=>el.contains(document.activeElement))).toBe(false);
+ await bottomOpener.press('Enter');
+ const close=drawer.getByRole('button',{name:'Fechar menu',exact:true});
+ await expect(close).toBeFocused();
+ await expect(page.locator('main.main')).toHaveAttribute('inert','');
+ await page.keyboard.press('Shift+Tab');
+ await expect(drawer.getByRole('button',{name:'Opções da conta',exact:true})).toBeFocused();
+ await page.keyboard.press('Tab');
+ await expect(close).toBeFocused();
+ await page.keyboard.press('Escape');
+ await expect(bottomOpener).toBeFocused();
+ await expect(drawer).toHaveAttribute('inert','');
+ await expect(page.locator('main.main')).not.toHaveAttribute('inert','');
+});
+
+test('mobile bar fits its labels when 320 px leaves room for a vertical scrollbar',async({page},info)=>{
+  test.skip(info.project.name!=='mobile','Mobile navigation label layout');
+  // A classic 15 px scrollbar can leave just 305 px of content on a 320 px screen.
+  await page.setViewportSize({width:305,height:720});
+  await page.goto('http://127.0.0.1:4174/');
+  await page.locator('.brand-intro').waitFor({state:'detached'});
+  await page.evaluate(()=>document.fonts.ready.then(()=>undefined));
+  const bottom=page.getByRole('navigation',{name:'Navegação no celular'});
+  await bottom.getByRole('button',{name:'Financeiro',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Gestão financeira',exact:true})).toBeVisible();
+  const measurements=await bottom.evaluate(nav=>({
+    viewport:document.documentElement.clientWidth,
+    pageWidth:document.documentElement.scrollWidth,
+    labels:[...nav.querySelectorAll('button > span')].map(label=>({
+      text:label.textContent,
+      height:label.getBoundingClientRect().height,
+      lineHeight:parseFloat(getComputedStyle(label).lineHeight)
+    }))
+  }));
+  expect(measurements.pageWidth).toBeLessThanOrEqual(measurements.viewport);
+  expect(measurements.labels).toHaveLength(5);
+  for(const label of measurements.labels){
+    expect(label.height,label.text ?? '').toBeLessThanOrEqual(label.lineHeight+1);
+  }
+  await page.screenshot({path:info.outputPath('barra-mobile-305.png')});
+});

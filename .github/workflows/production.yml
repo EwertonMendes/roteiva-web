@@ -20,6 +20,10 @@ on:
         description: "TEMPORARY: enable REAL R$5 test checkout for all eligible PROD users (card + PIX)"
         type: boolean
         default: false
+      frontend_only:
+        description: Publish only app Hosting for a verified interface change
+        type: boolean
+        default: false
 permissions:
   contents: read
   pull-requests: read
@@ -44,10 +48,19 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           APPROVED_SHA: ${{ inputs.sha }}
           CONFIRMATION: ${{ inputs.confirmation }}
+          FRONTEND_ONLY: ${{ inputs.frontend_only }}
+          BILLING_SCHEMA: ${{ inputs.billing_schema }}
+          PUBLIC_TEST_BILLING: ${{ inputs.public_test_billing }}
+          DOMAIN_CUTOVER: ${{ inputs.domain_cutover }}
         run: |
           set -euo pipefail
           test "$GITHUB_ACTOR" = "$GITHUB_REPOSITORY_OWNER"
           test "$CONFIRMATION" = 'DEPLOY ROTEIVA PROD'
+          if [ "$FRONTEND_ONLY" = 'true' ]; then
+            test "$BILLING_SCHEMA" != 'true'
+            test "$PUBLIC_TEST_BILLING" != 'true'
+            test "$DOMAIN_CUTOVER" != 'true'
+          fi
           [[ "$APPROVED_SHA" =~ ^[a-f0-9]{40}$ ]]
           test "$APPROVED_SHA" = "$GITHUB_SHA"
           test "$(git ls-remote origin refs/heads/master | cut -f1)" = "$APPROVED_SHA"
@@ -167,6 +180,7 @@ jobs:
           retention-days: 7
   worker:
     needs: [authorize, checks, browser]
+    if: ${{ !inputs.frontend_only }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: cloudflare-production
@@ -247,7 +261,11 @@ jobs:
       - name: Verify deployed environment and authorization
         run: node ../scripts/smoke-environment.mjs prod
   frontend:
-    needs: worker
+    needs: [authorize, checks, browser, worker]
+    if: >-
+      !cancelled() && needs.authorize.result == 'success' &&
+      needs.checks.result == 'success' && needs.browser.result == 'success' &&
+      (needs.worker.result == 'success' || (inputs.frontend_only && needs.worker.result == 'skipped'))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: firebase-production
@@ -263,6 +281,7 @@ jobs:
       VITE_FIREBASE_STORAGE_BUCKET: ${{ vars.VITE_FIREBASE_STORAGE_BUCKET }}
       VITE_DROPBOX_ENABLED: 'true'
       VITE_VIRTUAL_LIBRARY: 'true'
+      FRONTEND_ONLY: ${{ inputs.frontend_only }}
       DOMAIN_CUTOVER: ${{ inputs.domain_cutover }}
       PRODUCTION_BILLING_ENABLED: ${{ vars.PRODUCTION_BILLING_ENABLED }}
       # The frontend smoke must validate the same rollout authorized by the
@@ -287,18 +306,23 @@ jobs:
           pnpm build:prod
           node scripts/verify-static-build.mjs dist /
           node scripts/verify-environment-build.mjs prod
-          node scripts/smoke-environment.mjs prod
+          if [ "$FRONTEND_ONLY" = 'true' ]; then
+            node scripts/verify-domain-app.mjs --before-deploy
+          else
+            node scripts/smoke-environment.mjs prod
+          fi
       - uses: google-github-actions/auth@v3
         with:
           credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
       - name: Verify deployment credential project
         run: node --input-type=module -e "import fs from 'node:fs';if(JSON.parse(fs.readFileSync(process.env.GOOGLE_APPLICATION_CREDENTIALS)).project_id!=='roteiva-web-prod')process.exit(1)"
       - name: Publish verified rules, indexes and Hosting
-        if: ${{ !inputs.domain_cutover }}
+        if: ${{ !inputs.domain_cutover && !inputs.frontend_only }}
         run: pnpm exec firebase deploy --config firebase.prod.json --only firestore:rules,firestore:indexes,hosting:roteiva-web-prod --project roteiva-web-prod --non-interactive
-      - name: Publish the app Hosting site for the domain cutover
-        if: ${{ inputs.domain_cutover }}
+      - name: Publish only the app Hosting site
+        if: ${{ inputs.domain_cutover || inputs.frontend_only }}
         run: pnpm exec firebase deploy --config firebase.prod.json --only hosting:roteiva-web-prod --project roteiva-web-prod --non-interactive
       - run: node scripts/verify-hosting-cache.mjs https://app.roteiva.com
       - run: node scripts/verify-domain-app.mjs
       - run: node scripts/smoke-environment.mjs prod
+        if: ${{ !inputs.frontend_only }}
