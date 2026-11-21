@@ -22,9 +22,10 @@ export async function abandonUnpaidCheckout(request:Request,env:Env,uid:string):
 
   const gateway=paymentGateway(env);
   const ref=intent.provider_checkout_ref;
-  const state=await gateway.checkoutState(ref);
-  if(state==='PAID'||state==='UNKNOWN')throw new ApiError(409,'billing_checkout_payment_verifying');
-  if(state==='ACTIVE'&&await gateway.cancelCheckout(ref)!=='canceled')
+  // Asaas documents POST /checkouts/{id}/cancel; there is no documented
+  // GET-by-checkout status operation. A non-confirmed cancellation remains
+  // fail-closed. If payment has already happened, Asaas rejects cancellation.
+  if(await gateway.cancelCheckout(ref)!=='canceled')
     throw new ApiError(409,'billing_checkout_cancel_unconfirmed');
 
   // Do not let a completed transaction race with a switch. Even a canceled
@@ -38,7 +39,7 @@ export async function abandonUnpaidCheckout(request:Request,env:Env,uid:string):
     "WHERE id=? AND owner_uid=? AND provider_checkout_ref=? AND status IN ('pending','ready') "+
     "AND NOT EXISTS (SELECT 1 FROM billing_contracts WHERE checkout_intent_id=?) "+
     "AND NOT EXISTS (SELECT 1 FROM billing_payment_records WHERE subscription_id=?)"
-  ).bind(state==='EXPIRED'?'expired':'canceled',now,intent.id,uid,ref,intent.id,intent.id).run();
+  ).bind('canceled',now,intent.id,uid,ref,intent.id,intent.id).run();
   if(changed.meta.changes!==1)throw new ApiError(409,'billing_checkout_payment_verifying');
   return Response.json({status:'closed'});
 }
