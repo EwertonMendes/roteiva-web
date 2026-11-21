@@ -144,6 +144,8 @@ test('R$5 PIX is one-off, settlement preserves trial, idempotent and cannot be s
   await reconcileBilling(paused);
   assert.equal(f.sql.prepare('SELECT COUNT(*) AS n FROM billing_payment_records').get().n,1);
   assert.equal(postCount,1);
+  // Simulate the Firestore projection ACK before asserting the post-payment eligibility gate.
+  f.sql.prepare("UPDATE access_accounts SET sync_pending=0 WHERE owner_uid='owner'").run();
   await assert.rejects(createCheckout(request('test',{paymentMethod:'PIX'}),f.env,'owner',f.now),
     {code:'billing_access_still_active'});
   const status=await (await billingStatusResponse(paused,'owner',f.now)).json();
@@ -177,6 +179,8 @@ test('R$5 recurring card settles against the original trusted intent and keeps o
   assert.equal(f.sql.prepare('SELECT COUNT(*) AS n FROM billing_contracts').get().n,1);
   assert.equal(f.sql.prepare('SELECT paid_until FROM access_subscriptions').get().paid_until,periodEnd(due,'monthly')+credit);
   assert.equal(f.sql.prepare('SELECT amount_cents FROM billing_payment_records').get().amount_cents,500);
+  // The production Firestore ACK is outside the isolated D1 test harness.
+  f.sql.prepare("UPDATE access_accounts SET sync_pending=0 WHERE owner_uid='owner'").run();
   const status=await (await billingStatusResponse(paused,'owner',f.now)).json();
   assert.equal(status.subscription.isTestPlan,true);
   assert.equal(status.subscription.renewalMode,'automatic');
