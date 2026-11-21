@@ -128,3 +128,33 @@ test('switch cancels only a verified unpaid checkout; old attempt persists for a
  assert.equal(s.sql.prepare('SELECT COUNT(*) n FROM billing_checkout_intents').get().n,2);
  assert.equal(s.sql.prepare('SELECT COUNT(*) n FROM billing_contracts').get().n,0);
 });
+
+test('Provider 400 on Pix is definitive, logged without PII and does not block existing card',async t=>{
+ const s=fixture(t);
+ const warnings=[];
+ t.mock.method(console,'warn',value=>warnings.push(String(value)));
+ let posted=0;
+ t.mock.method(globalThis,'fetch',async(url,options)=>{
+   assert.ok(String(url).endsWith('/checkouts'));
+   posted++;
+   const payload=JSON.parse(options.body);
+   if(payload.billingTypes[0]==='PIX')return Response.json({errors:[
+     {code:'invalid_object',description:'Campo billingTypes não habilitado para contato client@example.com CPF 12345678900'}
+   ]},{status:400});
+   assert.deepEqual(payload.billingTypes,['CREDIT_CARD']);
+   assert.deepEqual(payload.chargeTypes,['RECURRENT']);
+   return Response.json({id:'checkout_card_after_pix'});
+ });
+ await assert.rejects(createCheckout(request('monthly','PIX'),s.env,'owner'),
+   {status:422,code:'billing_pix_checkout_rejected'});
+ assert.deepEqual(s.sql.prepare('SELECT status,payment_method,provider_checkout_ref FROM billing_checkout_intents ORDER BY created_at').all(),
+   [{status:'failed',payment_method:'PIX',provider_checkout_ref:null}]);
+ assert.equal(warnings.length,1);
+ assert.match(warnings[0],/billing_pix_checkout_rejected/);
+ assert.match(warnings[0],/invalid_object/);
+ assert.doesNotMatch(warnings[0],/client@example|12345678900/);
+ const response=await createCheckout(request('monthly','CREDIT_CARD'),s.env,'owner');
+ assert.equal(response.status,201);
+ assert.equal(posted,2);
+ assert.equal(s.sql.prepare("SELECT COUNT(*) AS n FROM billing_checkout_intents WHERE status='ready' AND payment_method='CREDIT_CARD'").get().n,1);
+});
