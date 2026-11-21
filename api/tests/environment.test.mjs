@@ -71,7 +71,7 @@ test('PROD billing routes stay closed by default and unauthenticated smoke never
  assert.equal((await call('status')).status,401);
  assert.equal((await call('webhooks/asaas','POST')).status,401);
  assert.equal((await call('return/verify','POST',{Origin:config.frontendOrigin})).status,401);
- assert.equal((await call('checkout','POST',{Origin:config.frontendOrigin})).status,404);
+ assert.equal((await call('checkout','POST',{Origin:config.frontendOrigin})).status,401);
 });
 for(const name of ['dev','prod'])test(name+' rejects cross-environment configuration, D1 and PDF origins',async(t)=>{
   const contract=environments[name];
