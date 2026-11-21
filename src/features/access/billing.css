@@ -547,3 +547,27 @@ dialog.rt-parity-modal.billing-consent .rt-modal__footer .rt-button:disabled {
   .billing-access-art { min-height: 0; height: clamp(6.25rem, 28vw, 9rem); padding: .65rem; }
   .billing-access-copy { padding-bottom: 1rem; }
 }
+
+
+/* Payment-method choice is local to billing consent, never global form inputs. */
+.billing-payment-methods{display:grid;grid-template-columns:1fr;gap:10px;margin:14px 0 18px;min-width:0}
+.billing-payment-choice{
+  display:flex;align-items:center;gap:11px;min-width:0;padding:12px 13px;
+  border:1px solid var(--line);border-radius:12px;background:var(--subtle);
+  cursor:pointer;line-height:1.35;
+}
+.billing-payment-choice[data-selected="true"]{
+  border-color:var(--field-focus-border);
+  box-shadow:0 0 0 1px var(--field-focus-border);
+}
+.billing-payment-choice>.rt-input[type="radio"]{width:17px;height:17px;flex:0 0 17px;accent-color:var(--field-focus-border);margin:0}
+.billing-payment-choice>svg{flex:0 0 19px}
+.billing-payment-choice>span{display:grid;gap:3px;min-width:0}
+.billing-payment-choice strong{font-size:.89rem;font-weight:750}
+.billing-payment-choice small{font-size:.78rem;color:var(--billing-text-muted);line-height:1.45}
+.billing-checkout-actions{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:10px}
+.billing-checkout-actions .rt-button{min-height:42px}
+@media(max-width:540px){
+  .billing-checkout-actions{width:100%;justify-content:stretch}
+  .billing-checkout-actions .rt-button,.billing-checkout-actions .billing-text-link{flex:1 1 auto;justify-content:center}
+}
