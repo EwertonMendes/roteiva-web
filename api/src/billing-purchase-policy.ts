@@ -6,7 +6,7 @@ export const MAX_COURTESY_CREDIT_MS=365*24*60*60*1000;
 const dateFormat=new Intl.DateTimeFormat('sv-SE',{
   timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'
 });
-const localDay=(time:number)=>dateFormat.format(new Date(time));
+export const localDay=(time:number)=>dateFormat.format(new Date(time));
 
 type AccountRow={trial_ends_at:number;suspended_at:number|null;sync_pending:number};
 type GrantRow={last_finite:number|null;lifetime:number};
