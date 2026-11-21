@@ -48,6 +48,8 @@ As recorrências dos dois testes mensais foram canceladas e suas primeiras cobra
 
 Na revalidação de 20/11/2026, o painel do Sandbox recusou estornar parcialmente R$ 10,00 da cobrança fictícia feita no mesmo dia e informou que o estorno parcial só pode ser solicitado no dia seguinte. O ensaio não alterou a assinatura de QA. A conciliação de estorno parcial e a corrida entre cancelamento, resposta perdida do upgrade e confirmação tardia passaram com respostas simuladas.
 
+**Revalidação em 21/11/2026.** O Sandbox aceitou o estorno parcial de R$ 10,00 às 01h18 BRT sobre a cobrança trimestral de R$ 109,90. Às 11h36 ele continuava em progresso, com o controle de confirmação desabilitado. O D1 e o Firestore mantiveram a vigência até 20/02/2027. A cobrança anual de R$ 399,90 continuava agendada para essa data e o Sandbox mostrava somente a cobrança original. A conclusão do estorno, a primeira renovação anual e o cancelamento com fatura recorrente em aberto seguem pendentes. [Evidências de homologação](BILLING-PIX-PORTABILITY-DEV.md#chrome-provider-and-ledger-evidence).
+
 ## 1. Decisões de produto
 
 - **Um só nível funcional** (acesso completo) em três contratos: `monthly` R$ 39,90 (3.990 centavos, `MONTHLY`), `quarterly` R$ 109,90 (10.990 centavos, `QUARTERLY`) e `yearly` R$ 399,90 (39.990 centavos, `YEARLY`). Uma única moeda BRL.
