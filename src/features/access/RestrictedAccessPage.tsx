@@ -1,6 +1,7 @@
 
-import {useEffect} from "react";
-import {ArrowUpRight,Clock3,LogOut,RefreshCw,ShieldAlert} from "lucide-react";
+import {useEffect,useState} from "react";
+import {ArrowUpRight,Clock3,LogOut,RefreshCw,ShieldAlert,UserRound} from "lucide-react";
+import type {User} from "firebase/auth";
 import type {AccessInfo} from "../../data/access-watch";
 import {AccountDeletionAction} from "../settings/AccountDeletionAction";
 import {AppButton} from "../ui/AppButton";
@@ -9,7 +10,16 @@ import {BillingArt} from "./BillingArt";
 import {BillingPanel} from "./BillingPanel";
 import {billingInThisBuild,type CheckoutReturn} from "./billing-data";
 
-export function RestrictedAccessPage({access,busy,checking,accessError,checkoutReturn,onRetry,onLogout}:{
+function AccountAvatar({photoURL}:{photoURL:string|null}) {
+  const [failed,setFailed]=useState(false);
+  return <span className="billing-access-avatar" aria-hidden="true">
+    {photoURL&&!failed?<img src={photoURL} alt="" referrerPolicy="no-referrer" onError={()=>setFailed(true)}/>:
+      <UserRound size={20}/>}
+  </span>;
+}
+
+export function RestrictedAccessPage({account,access,busy,checking,accessError,checkoutReturn,onRetry,onLogout}:{
+  account:Pick<User,"uid"|"displayName"|"email"|"photoURL">;
   access:AccessInfo;busy:boolean;checking:boolean;accessError:string;checkoutReturn:CheckoutReturn|null;
   onRetry:()=>void;onLogout:()=>void;
 }) {
@@ -23,7 +33,18 @@ export function RestrictedAccessPage({access,busy,checking,accessError,checkoutR
       <header className="billing-access-nav">
         <BrandLogo theme="light" className="billing-logo-light"/>
         <BrandLogo theme="dark" className="billing-logo-dark"/>
-        <AppButton variant="ghost" disabled={busy} onClick={onLogout}><LogOut size={17} aria-hidden="true"/> Sair da conta</AppButton>
+        <div className="billing-access-session">
+          <div className="billing-access-account" role="group" aria-label="Conta conectada">
+            <AccountAvatar key={JSON.stringify([account.uid,account.photoURL])} photoURL={account.photoURL}/>
+            <div className="billing-access-identity">
+              <strong>{account.displayName?.trim()||"Conta conectada"}</strong>
+              {account.email&&<small>{account.email}</small>}
+            </div>
+          </div>
+          <AppButton variant="ghost" disabled={busy} onClick={onLogout}>
+            <LogOut size={17} aria-hidden="true"/> Sair da conta
+          </AppButton>
+        </div>
       </header>
       <section className="billing-access-hero" aria-labelledby="billing-access-title">
         <div className="billing-access-copy">

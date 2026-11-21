@@ -241,7 +241,7 @@ test('checkout callback requests one owner-scoped recovery and opens workspace o
 });
 
 test('billing summary, responsive history and restricted checkout use the same billing data',{tag:'@ci-smoke'},async({page},info)=>{
-  const email='billing-layout-'+info.project.name+'@example.com';
+  const email='homologacao-de-assinatura-e-renovacao-'+info.project.name+'@example.com';
   await signup(page,email);
   if(info.project.name==='mobile') await page.setViewportSize({width:320,height:780});
   const validInvoice='https://sandbox.asaas.com/i/test-fatura';
@@ -334,6 +334,11 @@ test('billing summary, responsive history and restricted checkout use the same b
   stage='expired';
   await changeAccess(email,{accessUntil:Timestamp.fromMillis(Date.now()-60000)});
   await expect(page.getByRole('heading',{name:'Seu período de acesso terminou.'})).toBeVisible();
+  const account=page.getByRole('group',{name:'Conta conectada'});
+  await expect(account.getByText('Teste de acesso',{exact:true})).toBeVisible();
+  await expect(account.getByText(email,{exact:true})).toBeVisible();
+  await expect(account.locator('.billing-access-avatar svg')).toBeVisible();
+  await expect(page.getByRole('button',{name:'Sair da conta'})).toBeEnabled();
   await expect(page.getByRole('heading',{name:'Escolha seu plano'})).toBeVisible();
   await expect.poll(()=>page.locator('.billing-access img.billing-art').evaluateAll(images=>images.every(image=>(image as HTMLImageElement).naturalWidth>0))).toBe(true);
   await expect.poll(()=>fitsViewport('.billing-access')).toBe(true);
@@ -389,6 +394,7 @@ test('billing summary, responsive history and restricted checkout use the same b
   stage='suspended';
   await changeAccess(email,{suspended:true});
   await expect(page.getByRole('heading',{name:'Acesso temporariamente suspenso.'})).toBeVisible();
+  await expect(account.getByText(email,{exact:true})).toBeVisible();
   await expect(page.getByRole('link',{name:'Fale com o suporte'})).toBeVisible();
   await expect(page.getByRole('heading',{name:'Plano anual'})).toBeVisible();
   await expect(page.getByRole('button',{name:/Escolher|Excluir conta/})).toHaveCount(0);

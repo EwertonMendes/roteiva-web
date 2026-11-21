@@ -101,7 +101,8 @@ async function reconcile(s,kind,id){
   await reconcileBilling(s.env);
 }
 
-test('an eligible owner can schedule an upgrade once, including a generated invoice, and changes access only after payment',async t=>{
+test('fast-forward renewal applies an upgrade once, after the generated invoice is paid',async t=>{
+  t.mock.timers.enable({apis:['Date'],now});
   const s=setup(t),remote=provider(t,{pending:true});
   const status=async()=>await (await billingStatusResponse(s.env,'owner')).json();
   assert.deepEqual((await status()).subscription.upgradeOffer,{effectiveOn:effective,plans:['quarterly','yearly']});
@@ -124,13 +125,28 @@ test('an eligible owner can schedule an upgrade once, including a generated invo
   assert.equal((await requestUpgrade(s.env,'owner',submit())).status,200);
   await reconcile(s,'PAYMENT_UPDATED','pay_next');
   assert.equal(s.sql.prepare("SELECT amount_cents FROM billing_payment_records WHERE provider_payment_ref='pay_next'").get().amount_cents,39990);
-  remote.setStatus('CONFIRMED');
+  simulateProjectionDelivered(s);
+  t.mock.timers.setTime(paidUntil-1);
+  assert.equal((await activeState(s.env,'owner')).active,true);
+  t.mock.timers.setTime(paidUntil);
+  assert.equal((await activeState(s.env,'owner')).active,false);
+  assert.equal((await status()).subscription.planCode,'monthly');
+  t.mock.timers.setTime(paidUntil+60_000);
+  remote.setRenewal({status:'CONFIRMED',paymentDate:effective});
+  await reconcile(s,'PAYMENT_CONFIRMED','pay_next');
   await reconcile(s,'PAYMENT_CONFIRMED','pay_next');
   const access=s.sql.prepare("SELECT cadence,paid_until FROM access_subscriptions WHERE id='contract'").get();
   assert.equal(access.cadence,'yearly');
   assert.equal(access.paid_until,periodEnd(effective,'yearly'));
+  const payments=s.sql.prepare("SELECT state,amount_cents,paid_at FROM billing_payment_records WHERE provider_payment_ref='pay_next'").all();
+  assert.deepEqual(payments.map(row=>({...row})),[{state:'confirmed',amount_cents:39990,paid_at:paidUntil}]);
   assert.equal(s.sql.prepare('SELECT state FROM billing_plan_changes').get().state,'applied');
-  s.sql.exec("UPDATE access_accounts SET sync_pending=0; DELETE FROM billing_access_projections");
+  simulateProjectionDelivered(s);
+  assert.equal((await activeState(s.env,'owner')).active,true);
+  const renewed=(await status()).subscription;
+  assert.equal(renewed.planCode,'yearly');
+  assert.equal(renewed.amountCents,39990);
+  assert.equal(renewed.upgrade,null);
   await reconcile(s,'PAYMENT_REFUNDED','pay_old');
   assert.equal(s.sql.prepare("SELECT paid_until FROM access_subscriptions WHERE id='contract'").get().paid_until,periodEnd(effective,'yearly'));
   assert.equal(s.sql.prepare('SELECT COUNT(*) n FROM access_subscriptions').get().n,1);

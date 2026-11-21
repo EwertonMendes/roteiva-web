@@ -115,8 +115,8 @@ export function AccessGate({children}:{children:ReactNode}){
       <AppButton className="auth-link" disabled={busy} onClick={()=>void logout()}>Trocar conta</AppButton>
     </div>
   </AuthLayout>;
-  if(!access)return <main className="studio-loading" role="status">{returnParams?"Conferindo seu pagamento…":"Confirmando seu acesso ao Roteiva…"}</main>;
-  if(!usable)return <RestrictedAccessPage access={access} busy={busy} checking={checking} accessError={error}
+  if(!access||!user)return <main className="studio-loading" role="status">{returnParams?"Conferindo seu pagamento…":"Confirmando seu acesso ao Roteiva…"}</main>;
+  if(!usable)return <RestrictedAccessPage account={user} access={access} busy={busy} checking={checking} accessError={error}
     checkoutReturn={checkoutReturn} onRetry={()=>setAttempt(n=>n+1)} onLogout={()=>void logout()}/>;
   return <AccessContext.Provider value={access}>{children}</AccessContext.Provider>;
 }
