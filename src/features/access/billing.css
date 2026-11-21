@@ -613,3 +613,18 @@ dialog.rt-parity-modal.billing-consent .rt-modal__footer .rt-button:disabled {
   .billing-checkout-actions{width:100%;justify-content:stretch}
   .billing-checkout-actions .rt-button,.billing-checkout-actions .billing-text-link{flex:1 1 auto;justify-content:center}
 }
+
+
+/* Courtesy copy stays within the billing card and wraps on narrow phones. */
+.billing-consent-courtesy{
+  margin:12px 0 16px;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:var(--subtle);
+  padding:12px 14px;
+  color:var(--ink);
+  font-size:var(--type-support);
+  line-height:1.55;
+  overflow-wrap:anywhere;
+}
+.billing-consent-courtesy strong{font-weight:750}
