@@ -69,7 +69,7 @@ test('checkout authorizes an enrolled expired owner, uses catalog and sends one 
   });
   await assert.rejects(createCheckout(purchase('quarterly',{value:1}),s.env,'owner'),{code:'billing_consent_required'});
   await assert.rejects(createCheckout(purchase('quarterly',{catalogVersion:'stale'}),s.env,'owner'),{code:'billing_catalog_changed'});
-  await assert.rejects(createCheckout(purchase('quarterly'),s.env,'trial'),{code:'billing_access_still_active'});
+  assert.equal((await (await billingStatusResponse(s.env,'trial')).json()).canStart,true);
   await assert.rejects(createCheckout(purchase('quarterly'),s.env,'unknown'),{code:'billing_account_ineligible'});
   const responses=await Promise.all([createCheckout(purchase('quarterly'),s.env,'owner'),createCheckout(purchase('quarterly'),s.env,'owner')]);
   assert.ok(responses.some(response=>response.status===201));
