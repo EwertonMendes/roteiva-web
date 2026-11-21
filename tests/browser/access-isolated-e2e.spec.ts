@@ -181,7 +181,7 @@ test("billing requires consent and a callback alone never restores the workspace
 });
 
 test("an expired checkout without a URL still offers safe recovery and cleans up callbacks",{tag:"@ci-smoke"},async({page},info)=>{
-  const email="isolated-switch-"+info.project.name+"@example.com";
+  const email="isolated-switch-"+info.project.name+"-"+info.repeatEachIndex+"@example.com";
   await register(page,email);
   const uid=await uidFor(email);
   await setEntitlement(uid,{accessUntil:Timestamp.fromMillis(Date.now()-60000)});
