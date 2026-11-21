@@ -126,7 +126,7 @@ export function AccountDeletionAction(){
         <div className="account-delete-preserve"><CheckCircle2 size={17}/><span>Os arquivos originais do seu Google Drive não serão apagados.</span></div>
         <p className="account-delete-advice">Se precisar de uma cópia dos seus registros, cancele e exporte os dados antes de continuar.</p>
         <div className="account-delete-confirm-field">
-          <label htmlFor="delete-confirm">Digite <strong>{CONFIRM}</strong> para confirmar</label>
+          <label htmlFor="delete-confirm">Digite <strong>{CONFIRM}</strong> para confirmar:</label>
           <AppInput id="delete-confirm" value={text} onChange={e=>setText(e.target.value)} placeholder={CONFIRM} autoComplete="off" spellCheck={false} disabled={busy}/>
         </div>
         <label className="account-delete-check"><AppInput type="checkbox" checked={checked} disabled={busy} onChange={e=>setChecked(e.target.checked)}/>
