@@ -46,9 +46,9 @@ export function projectedAccess(uid,end,now) {
     updatedAt:{timestampValue:new Date(now).toISOString()},
   };
 }
-function required(name) {
+function required(name,allowWhitespace=false) {
   const value=process.env[name];
-  assert.ok(value&&value.trim()===value,'Missing protected '+name);
+  assert.ok(value&&(!allowWhitespace?value.trim()===value:true),'Missing protected '+name);
   return value;
 }
 function ensureIdentity() {
@@ -62,7 +62,7 @@ function ensureIdentity() {
   assert.match(email,/^[^\s@]{1,64}@[^\s@]{1,190}\.[A-Za-z]{2,}$/);
   const action=required('QA_ACTION');
   assert.ok(action==='expire'||action==='restore');
-  const sa=JSON.parse(required('FIREBASE_ADMIN_CREDENTIALS_JSON'));
+  const sa=JSON.parse(required('FIREBASE_ADMIN_CREDENTIALS_JSON',true));
   assert.equal(sa.type,'service_account');
   assert.equal(sa.project_id,PROJECT);
   assert.match(sa.client_email,/^.+@roteiva-web-prod\.iam\.gserviceaccount\.com$/);
