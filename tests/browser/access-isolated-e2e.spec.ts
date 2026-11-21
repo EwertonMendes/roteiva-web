@@ -85,7 +85,7 @@ async function readEntitlement(uid:string){
   });
 }
 
-test("isolated E2E: trial expiry locks UI and Firestore; retries and refresh cannot renew it",async({page},info)=>{
+test("isolated E2E: trial expiry locks UI and Firestore; retries and refresh cannot renew it",{tag:"@ci-smoke"},async({page},info)=>{
   const email="isolated-expiry-"+info.project.name+"@example.com";
   await register(page,email);
   await makeClient(page,"Cliente protegido E2E");
@@ -112,8 +112,24 @@ test("isolated E2E: trial expiry locks UI and Firestore; retries and refresh can
   await expect(page.getByRole("heading",{name:"Seu período de acesso terminou."})).toBeVisible();
   await page.reload();
   await expect(page.getByRole("heading",{name:"Seu período de acesso terminou."})).toBeVisible();
+  let resumeCheck=()=>{};
+  const heldCheck=new Promise<void>(resolve=>{resumeCheck=resolve;});
+  let checks=0;
+  await page.route(api+"/access/ensure",async route=>{
+    if(route.request().method()==="POST"){
+      checks++;
+      await heldCheck;
+    }
+    return route.fallback();
+  });
   await page.getByRole("button",{name:/Verificar acesso novamente/}).click();
-  await expect(page.getByRole("heading",{name:"Seu período de acesso terminou."})).toBeVisible();
+  try{
+    await expect(page.getByRole("button",{name:"Verificando acesso…"})).toBeDisabled();
+    await expect(page.getByRole("heading",{name:"Seu período de acesso terminou."})).toBeVisible();
+    await expect(page.locator(".studio-loading")).toHaveCount(0);
+  }finally{resumeCheck();}
+  await expect(page.getByRole("button",{name:"Verificar acesso novamente"})).toBeEnabled();
+  expect(checks).toBe(1);
   const after=await readEntitlement(uid);
   expect(after?.trialEndsAt.toMillis()).toBe(before?.trialEndsAt.toMillis());
   expect(after?.accessUntil.toMillis()).toBeLessThan(Date.now());
@@ -153,7 +169,7 @@ test("billing requires consent and a callback alone never restores the workspace
   await page.goto(cloud+"/");
   await expect(page.getByText(/109,90/)).toBeVisible();
   await page.getByRole("button",{name:"Escolher trimestral"}).click();
-  const submit=page.getByRole("button",{name:"Continuar para o Asaas Sandbox"});
+  const submit=page.getByRole("button",{name:"Continuar para o pagamento"});
   await expect(submit).toBeDisabled();
   await page.getByRole("checkbox",{name:/Aceito a cobrança/}).check();
   await submit.click();
@@ -162,6 +178,47 @@ test("billing requires consent and a callback alone never restores the workspace
   await expect(page.locator(".app-shell")).toHaveCount(0);
   await setEntitlement(uid,{source:"subscription",accessUntil:Timestamp.fromMillis(Date.now()+86400000)});
   await expect(page.locator(".app-shell")).toBeVisible();
+});
+
+test("an expired checkout without a URL still offers safe recovery and cleans up callbacks",{tag:"@ci-smoke"},async({page},info)=>{
+  const email="isolated-switch-"+info.project.name+"-"+info.repeatEachIndex+"@example.com";
+  await register(page,email);
+  const uid=await uidFor(email);
+  await setEntitlement(uid,{accessUntil:Timestamp.fromMillis(Date.now()-60000)});
+  const intentId="d7d87e1c-4f28-4d01-91d4-2c488e0cb044";
+  let closes=0,closed=false;
+  await page.route(api+"/billing/**",async route=>{
+    const headers={"Access-Control-Allow-Origin":cloud,"Access-Control-Allow-Methods":"POST, GET, OPTIONS",
+      "Access-Control-Allow-Headers":"Authorization, Content-Type"};
+    if(route.request().method()==="OPTIONS")return route.fulfill({status:204,headers});
+    const path=new URL(route.request().url()).pathname;
+    if(path==="/billing/checkout/abandon"){
+      expect(route.request().postDataJSON()).toEqual({intentId,confirmed:true});
+      closes++;
+      return route.fulfill({status:202,headers,json:{status:"pending"}});
+    }
+    if(path==="/billing/plans")return route.fulfill({headers,json:{plans:[
+      {code:"monthly",amountCents:3990,version:"test"},
+    ]}});
+    return route.fulfill({headers,json:{checkoutAvailable:true,cardAvailable:true,canStart:closed,
+      notice:null,subscription:null,payments:[],checkout:closed?null:{
+        intentId,planCode:"monthly",paymentMethod:"CREDIT_CARD",status:closes?"closing":"pending",url:null,canCancel:!closes,
+      },
+    }});
+  });
+  await page.goto(cloud+"/?billing=expired&intent="+intentId+"&campaign=qa");
+  await expect(page.getByRole("link",{name:"Retomar checkout"})).toHaveCount(0);
+  await page.getByRole("button",{name:"Trocar plano ou pagamento"}).click();
+  await page.getByRole("dialog").getByRole("button",{name:"Cancelar tentativa e escolher"}).click();
+  await expect(page.getByText("Estamos confirmando o encerramento da tentativa anterior.")).toBeVisible();
+  expect(new URL(page.url()).search).toBe("?campaign=qa");
+  await page.getByRole("button",{name:"Atualizar situação"}).click();
+  // Let the server complete only after the action exists and was usable.
+  // Otherwise the background refresh can remove the button before the click.
+  closed=true;
+  await expect(page.getByRole("button",{name:"Escolher mensal"})).toBeVisible();
+  expect(closes).toBe(1);
+  await expect(page.locator(".app-shell")).toHaveCount(0);
 });
 
 test("isolated E2E: two real emulator Google sessions cannot access each other's records",{tag:"@ci-smoke"},async({page},info)=>{

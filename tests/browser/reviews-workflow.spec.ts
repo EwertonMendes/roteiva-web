@@ -633,7 +633,7 @@ test('Dropbox: vincular pasta funciona com Todos os projetos, sem mudar o filtro
   expect(geometry.right).toBeLessThanOrEqual(geometry.viewportWidth);
   expect(geometry.left).toBeGreaterThanOrEqual(0);
   await menu.getByRole('menuitem',{name:'Desvincular do projeto'}).click();
-  const unlinkDialog=page.getByRole('dialog',{name:'Desvincular pasta'});
+  const unlinkDialog=page.getByRole('dialog',{name:'Desvincular “Materiais Dropbox”?',exact:true});
   await expectCompactConfirmationGeometry(unlinkDialog);
   await unlinkDialog.getByRole('button',{name:'Manter pasta'}).click();
   await expect(library.getByRole('button',{name:'Opções da pasta Materiais Dropbox'})).toBeVisible();

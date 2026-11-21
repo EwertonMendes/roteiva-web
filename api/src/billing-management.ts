@@ -62,7 +62,7 @@ async function attemptCancellation(env:Env,uid:string,contract:Recurrence):Promi
 }
 
 export async function retryBillingCancellation(env:Env):Promise<void>{
-  if(env.ENVIRONMENT!=='dev'||!asaasConfigured(env))return;
+  if(!asaasConfigured(env))return;
   const job=await env.DB.prepare(
     'SELECT c.owner_uid,c.subscription_id,s.provider_reference FROM billing_contracts c JOIN access_subscriptions s ON s.id=c.subscription_id '+
     'WHERE c.removed_at IS NULL AND c.cancel_after<=? AND c.cancel_attempts<8 '+
@@ -74,7 +74,7 @@ export async function retryBillingCancellation(env:Env):Promise<void>{
 }
 
 export async function cancelRenewal(request:Request,env:Env,uid:string):Promise<Response>{
-  if(env.ENVIRONMENT!=='dev'||!asaasConfigured(env))throw new ApiError(404,'not_found');
+  if(!asaasConfigured(env))throw new ApiError(404,'not_found');
   const data=await readBillingJson(request,1024) as {confirmed?:unknown}|null;
   if(data?.confirmed!==true||Object.keys(data).length!==1)throw new ApiError(400,'billing_consent_required');
   const contract=await recurringContract(env,uid);
@@ -120,7 +120,11 @@ async function stopOpenCheckout(env:Env,intent:CheckoutIntent):Promise<void>{
 }
 
 export async function stopBillingForDeletion(env:Env,uid:string):Promise<boolean>{
-  if(env.ENVIRONMENT!=='dev')return true;
+  // PROD accounts can predate the billing schema. Once it exists, payment
+  // relationships must be checked even if the integration is paused.
+  if(env.ENVIRONMENT==='prod'&&!await env.DB.prepare(
+    "SELECT 1 FROM sqlite_master WHERE type='table' AND name='billing_contracts'"
+  ).first())return true;
   const [intent,contract]=await Promise.all([openCheckout(env,uid),recurringContract(env,uid)]);
   if(!intent&&!contract)return true;
   if(!asaasConfigured(env))throw new ApiError(503,'billing_deletion_unavailable');

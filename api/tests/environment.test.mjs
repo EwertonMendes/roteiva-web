@@ -50,7 +50,7 @@ test('legacy root CORS and PDF embedding are bounded to the PROD cutover',async(
  assert.match(applyResponsePolicy(pdf,'/reviews/media',env.FRONTEND_ORIGIN,true).headers.get('Content-Security-Policy'),
    /frame-ancestors https:\/\/app\.roteiva\.com https:\/\/roteiva\.com$/);
 });
-test('the domain cutover leaves the DEV billing routes unpublished in PROD',async()=>{
+test('PROD billing routes stay closed by default and unauthenticated smoke never writes',async()=>{
  const config=environments.prod;
  const env={ENVIRONMENT:'prod',FIREBASE_PROJECT_ID:config.projectId,FRONTEND_ORIGIN:config.frontendOrigin,
    OAUTH_REDIRECT_URI:config.apiOrigin+'/oauth/drive/callback',API_RATE_LIMIT:{limit:async()=>({success:true})},
@@ -62,6 +62,16 @@ test('the domain cutover leaves the DEV billing routes unpublished in PROD',asyn
    const response=await handle(new Request(config.apiOrigin+'/billing/'+path,{method}),env);
    assert.equal(response.status,404,path);
  }
+ const configured={...env,BILLING_ENABLED:'true',BILLING_CHECKOUT_TEST_UIDS:'qa',
+   BILLING_CHECKOUT_ENABLED:'false',ASAAS_API_KEY:'$aact_prod_'+'p'.repeat(32),ASAAS_WEBHOOK_TOKEN:'w'.repeat(48)};
+ const call=(path,method='GET',headers)=>handle(new Request(config.apiOrigin+'/billing/'+path,{method,headers}),configured);
+ const catalog=await call('plans');
+ assert.equal(catalog.status,200);
+ assert.equal((await catalog.json()).checkoutAvailable,false);
+ assert.equal((await call('status')).status,401);
+ assert.equal((await call('webhooks/asaas','POST')).status,401);
+ assert.equal((await call('return/verify','POST',{Origin:config.frontendOrigin})).status,401);
+ assert.equal((await call('checkout','POST',{Origin:config.frontendOrigin})).status,404);
 });
 for(const name of ['dev','prod'])test(name+' rejects cross-environment configuration, D1 and PDF origins',async(t)=>{
   const contract=environments[name];

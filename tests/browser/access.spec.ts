@@ -230,17 +230,18 @@ test('checkout callback requests one owner-scoped recovery and opens workspace o
   await expect(page.getByText(/Estamos conferindo o pagamento com segurança/)).toBeVisible();
   await expect.poll(()=>checks).toBeGreaterThanOrEqual(1);
   await expect.poll(()=>ensureAttempts).toBeGreaterThanOrEqual(3);
-  // StrictMode can replay effects; the server deduplicates recovery by intent.
+  await expect.poll(()=>new URL(page.url()).searchParams.has('billing')).toBe(false);
+  expect(checks).toBe(1);
   await expect(page.locator('.app-shell')).toHaveCount(0);
   await changeAccess(email,{accessUntil:Timestamp.fromMillis(Date.now()+86400000),source:'subscription'});
   await expect(page.locator('.app-shell')).toBeVisible();
   await expect.poll(()=>new URL(page.url()).searchParams.has('billing')).toBe(false);
   expect(new URL(page.url()).searchParams.has('intent')).toBe(false);
-  expect(checks).toBeGreaterThanOrEqual(1);
+  expect(checks).toBe(1);
 });
 
 test('billing summary, responsive history and restricted checkout use the same billing data',{tag:'@ci-smoke'},async({page},info)=>{
-  const email='billing-layout-'+info.project.name+'@example.com';
+  const email='homologacao-de-assinatura-e-renovacao-'+info.project.name+'@example.com';
   await signup(page,email);
   if(info.project.name==='mobile') await page.setViewportSize({width:320,height:780});
   const validInvoice='https://sandbox.asaas.com/i/test-fatura';
@@ -272,7 +273,11 @@ test('billing summary, responsive history and restricted checkout use the same b
       return route.fulfill({headers,json:{payments:[older],nextPaymentCursor:null}});
     }
     return route.fulfill({headers,json:{
-      checkoutAvailable:true,canStart:stage==='expired'&&!checkoutRequests,checkout:null,notice:null,
+      checkoutAvailable:true,canStart:stage==='expired'&&!checkoutRequests,notice:null,
+      checkout:stage==='expired'&&checkoutRequests?{
+        intentId:'c5efbd52-67c7-4e38-8be9-82fd81c19ef3',planCode:'yearly',
+        paymentMethod:'CREDIT_CARD',status:'pending',url:null,canCancel:false,
+      }:null,
       subscription:stage==='expired'?null:{
         planCode:'yearly',status:'canceled',paidUntil:'2027-11-20T15:00:00.000Z',nextDueOn:null,
         amountCents:39990,paymentMethod:'CREDIT_CARD',canCancel:false,cancellation:null,
@@ -329,6 +334,11 @@ test('billing summary, responsive history and restricted checkout use the same b
   stage='expired';
   await changeAccess(email,{accessUntil:Timestamp.fromMillis(Date.now()-60000)});
   await expect(page.getByRole('heading',{name:'Seu período de acesso terminou.'})).toBeVisible();
+  const account=page.getByRole('group',{name:'Conta conectada'});
+  await expect(account.getByText('Teste de acesso',{exact:true})).toBeVisible();
+  await expect(account.getByText(email,{exact:true})).toBeVisible();
+  await expect(account.locator('.billing-access-avatar svg')).toBeVisible();
+  await expect(page.getByRole('button',{name:'Sair da conta'})).toBeEnabled();
   await expect(page.getByRole('heading',{name:'Escolha seu plano'})).toBeVisible();
   await expect.poll(()=>page.locator('.billing-access img.billing-art').evaluateAll(images=>images.every(image=>(image as HTMLImageElement).naturalWidth>0))).toBe(true);
   await expect.poll(()=>fitsViewport('.billing-access')).toBe(true);
@@ -342,7 +352,7 @@ test('billing summary, responsive history and restricted checkout use the same b
     await expect(illustration).toHaveAttribute('src',new RegExp('/brand/billing/'+asset+'\\.webp$'));
     await expect.poll(()=>illustration.evaluate(img=>(img as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
     await expect(consent.getByRole('checkbox')).not.toBeChecked();
-    await expect(consent.getByRole('button',{name:'Continuar para o Asaas Sandbox'})).toBeDisabled();
+    await expect(consent.getByRole('button',{name:'Continuar para o pagamento'})).toBeDisabled();
     for(const theme of ['light','dark']){
       await page.evaluate(value=>{document.documentElement.dataset.theme=value;},theme);
       await expect.poll(()=>consent.evaluate(modal=>{
@@ -371,23 +381,24 @@ test('billing summary, responsive history and restricted checkout use the same b
   await page.getByRole('button',{name:'Escolher anual'}).click();
   const dialog=page.getByRole('dialog',{name:'Plano anual'});
   await expect(dialog).toBeVisible();
-  const confirm=dialog.getByRole('button',{name:'Continuar para o Asaas Sandbox'});
+  const confirm=dialog.getByRole('button',{name:'Continuar para o pagamento'});
   await expect(confirm).toBeDisabled();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('button',{name:'Escolher anual'})).toBeFocused();
   await page.getByRole('button',{name:'Escolher anual'}).click();
   await dialog.getByRole('checkbox').check();
   await confirm.click();
-  await expect(page.getByText('Estamos verificando a criação do checkout.')).toBeVisible();
+  await expect(page.getByText('Estamos verificando a tentativa de contratação.')).toBeVisible();
   expect(checkoutRequests).toBe(1);
 
   stage='suspended';
   await changeAccess(email,{suspended:true});
   await expect(page.getByRole('heading',{name:'Acesso temporariamente suspenso.'})).toBeVisible();
+  await expect(account.getByText(email,{exact:true})).toBeVisible();
   await expect(page.getByRole('link',{name:'Fale com o suporte'})).toBeVisible();
   await expect(page.getByRole('heading',{name:'Plano anual'})).toBeVisible();
   await expect(page.getByRole('button',{name:/Escolher|Excluir conta/})).toHaveCount(0);
-  await expect(page.getByText('Estamos verificando a criação do checkout.')).toHaveCount(0);
+  await expect(page.getByText('Estamos verificando a tentativa de contratação.')).toHaveCount(0);
   await expect(page.locator('.app-shell')).toHaveCount(0);
   await expect.poll(()=>fitsViewport('.billing-access')).toBe(true);
   if(process.env.ROTEIVA_BILLING_CAPTURE) await page.screenshot({path:info.outputPath('suspensa.png'),fullPage:true});

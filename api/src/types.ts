@@ -9,7 +9,10 @@ export interface Env {
   /** Optional billing integration: absent means no checkout and no financial effect. */
   BILLING_ENABLED?: string;
   BILLING_CHECKOUT_ENABLED?: string;
+  /** A separate opt-in flag, independent of existing recurring card billing. */
+  BILLING_PIX_ENABLED?: string;
   BILLING_CHECKOUT_TEST_UID?: string;
+  BILLING_CHECKOUT_TEST_UIDS?: string;
   ASAAS_API_KEY?: string;
   ASAAS_WEBHOOK_TOKEN?: string;
   FEEDBACK_EMAIL?: {send(message:{to:string;from:string;subject:string;text:string;html?:string;replyTo?:string;

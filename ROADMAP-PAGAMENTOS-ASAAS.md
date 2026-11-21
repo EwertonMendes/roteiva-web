@@ -1,5 +1,7 @@
 # Roteiva — Roadmap de pagamentos e assinaturas (Asaas)
 
+**Homologação do PR #201, 21/11/2026.** A consulta real ao log do Sandbox identificou ausência de chave Pix na criação de checkout avulso. O painel aceitou a solicitação de chave aleatória. A auditoria do D1 ligou as sete revisões de `CHECKOUT_PAID` com erro de visibilidade a pagamentos já conciliados. [Decisões, recuperação e critérios de aceite](BILLING-PIX-PORTABILITY-DEV.md).
+
 > **Fonte persistente da decisão de produto.** Criado em 20/11/2026. `docs/MVP-ROADMAP.md` registra o progresso factual; `docs/ARCHITECTURE.md` registra os contratos de arquitetura. Este documento registra as regras e os critérios para retomada em outra conversa. Nunca marcar etapas como concluídas sem código, testes e evidências.
 >
 > **Estado inicial:** planejamento aprovado; conta Asaas PF criada, categoria "Vendo produtos → Software (licenças e programas)", documentos de identificação/ativação de produção pendentes. Não há chave de API ou webhook comprovadamente provisionados. **PROD permanece sem cobrança e sem alterações.**
@@ -45,6 +47,8 @@ Em 20/11/2026, a conta QA realizou três contratações fictícias pelo checkout
 As recorrências dos dois testes mensais foram canceladas e suas primeiras cobranças estornadas no Sandbox para isolar os ensaios. O plano trimestral e seu upgrade anual foram deixados agendados para conferência. As próximas faturas de cartão ainda não existiam durante o teste. O painel ofereceu a geração de carnê somente para boleto. A alteração de uma fatura já emitida e a ativação após uma renovação de cartão foram exercitadas nos testes de API com respostas simuladas. A confirmação no provedor desses dois cenários permanece pendente. [Comportamento das cobranças recorrentes](https://docs.asaas.com/docs/faq-assinaturas).
 
 Na revalidação de 20/11/2026, o painel do Sandbox recusou estornar parcialmente R$ 10,00 da cobrança fictícia feita no mesmo dia e informou que o estorno parcial só pode ser solicitado no dia seguinte. O ensaio não alterou a assinatura de QA. A conciliação de estorno parcial e a corrida entre cancelamento, resposta perdida do upgrade e confirmação tardia passaram com respostas simuladas.
+
+**Revalidação em 21/11/2026.** O Sandbox aceitou o estorno parcial de R$ 10,00 às 01h18 BRT sobre a cobrança trimestral de R$ 109,90. Às 11h36 ele continuava em progresso, com o controle de confirmação desabilitado. O D1 e o Firestore mantiveram a vigência até 20/02/2027. A cobrança anual de R$ 399,90 continuava agendada para essa data e o Sandbox mostrava somente a cobrança original. A conclusão do estorno, a primeira renovação anual e o cancelamento com fatura recorrente em aberto seguem pendentes. [Evidências de homologação](BILLING-PIX-PORTABILITY-DEV.md#chrome-provider-and-ledger-evidence).
 
 ## 1. Decisões de produto
 

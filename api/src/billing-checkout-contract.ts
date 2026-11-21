@@ -24,7 +24,7 @@ function checkLocalDueDate(value:string):void{
 /**
  * Pure request builder for Asaas /v3/checkouts (no I/O or customer/card data).
  * This must receive a trusted first-charge date calculated by the server.
- * The Sandbox route controls when offers can be created.
+ * The environment's checkout gate controls when offers can be created.
  */
 export function buildRecurringCardCheckout(env:CheckoutEnv,input:CheckoutInput){
   const plan=requireBillingPlan(input.planCode);
@@ -56,5 +56,36 @@ export function buildRecurringCardCheckout(env:CheckoutEnv,input:CheckoutInput){
       value:plan.amountCents/100
     }],
     subscription:{cycle:plan.cycle,nextDueDate:input.nextDueDate}
+  };
+}
+
+
+/**
+ * Manual one-period purchase. This intentionally contains NO subscription
+ * object: a Pix payment must never create automatic renewals.
+ */
+export function buildDetachedPixCheckout(env:CheckoutEnv,input:CheckoutInput){
+  const plan=requireBillingPlan(input.planCode);
+  if(!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(input.intentId))
+    throw new ApiError(400,'billing_invalid_intent');
+  let origin:string;
+  try{
+    const config=environment(env.ENVIRONMENT);
+    if(config.frontendOrigin!==env.FRONTEND_ORIGIN)throw Error('wrong origin');
+    origin=config.frontendOrigin;
+  }catch{throw new ApiError(503,'billing_invalid_environment');}
+  return {
+    billingTypes:['PIX'],chargeTypes:['DETACHED'],
+    externalReference:input.intentId,minutesToExpire:30,
+    callback:{
+      cancelUrl:origin+'/?billing=cancelled&intent='+input.intentId,
+      expiredUrl:origin+'/?billing=expired&intent='+input.intentId,
+      successUrl:origin+'/?billing=return&intent='+input.intentId
+    },
+    items:[{
+      name:'Roteiva '+labels[plan.code]+' (Pix manual)',
+      description:'Um período de acesso ao Roteiva, sem renovação automática',
+      quantity:1,value:plan.amountCents/100
+    }]
   };
 }

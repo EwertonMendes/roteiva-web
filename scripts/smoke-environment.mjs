@@ -9,7 +9,18 @@ const cors=await send('/oauth/drive/start',{method:'OPTIONS',headers:{Origin:con
 assert.equal(cors.status,204);assert.equal(cors.headers.get('Access-Control-Allow-Origin'),config.frontendOrigin);
 assert.match(cors.headers.get('Content-Security-Policy'),/frame-ancestors 'none'/);
 if(target==='prod'){
-  assert.equal((await send('/billing/plans')).status,404,'DEV billing must remain unpublished in PROD');
+  const catalog=await send('/billing/plans');
+  if(process.env.PRODUCTION_BILLING_ENABLED==='true'){
+    assert.equal(catalog.status,200);
+    const billing=await catalog.json();
+    assert.equal(billing.currency,'BRL');
+    assert.equal(billing.checkoutAvailable,false,'PROD checkout must remain restricted to testers');
+    assert.equal(billing.plans.length,3);
+    assert.equal((await send('/billing/status')).status,401);
+    assert.equal((await send('/billing/webhooks/asaas',{method:'POST'})).status,401);
+  }else{
+    assert.equal(catalog.status,404,'Billing must remain unpublished before activation');
+  }
   const legacy=await send('/oauth/drive/start',{method:'OPTIONS',headers:{Origin:legacyProdFrontendOrigin}});
   const windowOpen=process.env.DOMAIN_CUTOVER==='true';
   assert.equal(legacy.status,windowOpen?204:403);

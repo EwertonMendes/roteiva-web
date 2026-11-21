@@ -18,16 +18,23 @@ export const reviewedAdditiveMigrations=Object.freeze({
   // Schema-only tables/triggers; exact reviewed blob, no updates/deletes against existing rows.
   '0034_project_deletions.sql':'be2f4fa9a2455511202cac91e993190d84a88a87',
 });
-const reviewedDevAdditiveMigrations=Object.freeze({
+export const reviewedBillingMigrations=Object.freeze({
+  '0035_billing_foundation.sql':'bb61935ad06a53f7b3d49084e946d70e2aa68f9f',
+  '0036_billing_webhook_events.sql':'b976154d174f355211258d2a8d8cee4044d0d6cd',
+  '0037_billing_payment_ledger.sql':'9f6c1f6ce5288846e7cddbb06505ae12c9ba1fc8',
   '0038_billing_reconciliation.sql':'7ac16cd8702627ad3b21e2433cfebac31544a447',
+  '0039_billing_plan_changes.sql':'24c92936a3ef056a0bd390bab5107140e18718c5',
   '0040_billing_refund_amount.sql':'345d0ff8cc48e404598c5daceffaf83047d1a633',
+  // Reviewed additive payment-method columns, existing card records retain their default.
+  '0041_billing_payment_methods.sql':'c01503390e4babc0414b1628c0adcd89d693c8dd',
 });
 
 export function gitBlobSha(content){
  const buffer=Buffer.from(content,'utf8');
  return createHash('sha1').update(`blob ${buffer.byteLength}\0`).update(buffer).digest('hex');
 }
-export function isReviewedAdditiveMigration(name,content,environment){
- const expected=reviewedAdditiveMigrations[name]??(environment==='dev'?reviewedDevAdditiveMigrations[name]:undefined);
+export function isReviewedAdditiveMigration(name,content,environment,approvedBillingSchema=false){
+ const billingAllowed=environment==='dev'||environment==='prod'&&approvedBillingSchema;
+ const expected=reviewedAdditiveMigrations[name]??(billingAllowed?reviewedBillingMigrations[name]:undefined);
  return typeof expected==='string'&&gitBlobSha(content)===expected;
 }

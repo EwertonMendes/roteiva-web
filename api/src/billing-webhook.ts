@@ -88,8 +88,7 @@ export async function readBillingJson(request:Request,limit=MAX_WEBHOOK_BYTES):P
  * deduplicates effects even if Asaas delivers them under different event IDs.
  */
 export async function ingestAsaasWebhook(request:Request,env:Env):Promise<Response>{
-  // Only the isolated DEV worker participates in the Sandbox rollout.
-  if(env.ENVIRONMENT!=='dev'||!asaasConfigured(env))throw new ApiError(404,'not_found');
+  if(!asaasConfigured(env))throw new ApiError(404,'not_found');
   if(request.method!=='POST')throw new ApiError(405,'method_not_allowed');
   if(!(await tokenMatches(request.headers.get('asaas-access-token'),env.ASAAS_WEBHOOK_TOKEN!)))
     throw new ApiError(401,'billing_webhook_unauthorized');

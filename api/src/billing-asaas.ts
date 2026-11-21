@@ -20,13 +20,31 @@ export function providerRef(value:unknown):string|null {
   return typeof value==='string' && /^[A-Za-z0-9_-]{1,160}$/.test(value)?value:null;
 }
 
+export function checkoutTestUsers(env:Env):string[]{
+  return [env.BILLING_CHECKOUT_TEST_UID??'',...(env.BILLING_CHECKOUT_TEST_UIDS??'').split(',')]
+    .map(uid=>uid.trim()).filter(uid=>/^[A-Za-z0-9_-]{1,128}$/.test(uid));
+}
+
+export function pixEnabled(env:Env,uid?:string):boolean{
+  return env.ENVIRONMENT==='dev'&&asaasConfigured(env)&&env.BILLING_PIX_ENABLED==='true'&&
+    !!uid&&checkoutTestUsers(env).includes(uid);
+}
+
+export function billingRouted(env:Env):boolean{
+  return env.ENVIRONMENT==='dev'||env.ENVIRONMENT==='prod'&&asaasConfigured(env);
+}
+
 export function checkoutRouted(env:Env):boolean{
-  return env.ENVIRONMENT==='dev'&&asaasConfigured(env)&&
-    (env.BILLING_CHECKOUT_ENABLED==='true'||!!env.BILLING_CHECKOUT_TEST_UID);
+  if(!asaasConfigured(env))return false;
+  const hasTestUsers=checkoutTestUsers(env).length>0;
+  return env.ENVIRONMENT==='prod'
+    ?env.BILLING_CHECKOUT_ENABLED==='true'&&hasTestUsers
+    :env.BILLING_CHECKOUT_ENABLED==='true'||hasTestUsers;
 }
 
 export function checkoutEnabled(env:Env,uid?:string):boolean{
-  return checkoutRouted(env)&&(env.BILLING_CHECKOUT_ENABLED==='true'||!!uid&&uid===env.BILLING_CHECKOUT_TEST_UID);
+  return checkoutRouted(env)&&(env.ENVIRONMENT==='dev'&&env.BILLING_CHECKOUT_ENABLED==='true'||
+    !!uid&&checkoutTestUsers(env).includes(uid));
 }
 
 /** Upstream status is used internally. The provider's error body is discarded. */
@@ -60,7 +78,31 @@ export async function asaasRequest<T extends Record<string,unknown>>(
       signal:AbortSignal.timeout(10000),
     });
   }catch{throw new AsaasError();}
-  if(!response.ok)throw new AsaasError(response.status);
+  if(!response.ok){
+    // Financial provider responses may contain customer details. Never log
+    // the body or an untrusted description. Classify only known, static error
+    // codes/field names so a Sandbox rejection is diagnosable without PII.
+    if(env.ENVIRONMENT==='dev'&&resource==='/checkouts'&&
+      Array.isArray(body?.billingTypes)&&body.billingTypes.includes('PIX')){
+      let issues:unknown;
+      try{issues=(await response.clone().json() as {errors?:unknown}).errors;}catch{/* ignore malformed provider body */}
+      const allowedFields=['billingTypes','chargeTypes','callback','items','customer','customerData','subscription','externalReference','minutesToExpire','pix','chave','habilitad'];
+      const validations=Array.isArray(issues)?issues.slice(0,4).map(item=>{
+        const issue=item&&typeof item==='object'?item as Record<string,unknown>:{};
+        const code=['invalid_object','invalid_action','invalid_value','invalid_billing_type'].includes(String(issue.code))?
+          String(issue.code):'unknown';
+        const description=typeof issue.description==='string'?issue.description.toLowerCase():'';
+        return {code,fields:allowedFields.filter(field=>description.includes(field.toLowerCase())),
+          ...(/criar uma chave pix/.test(description)?{reason:'pix_account_key_required'}:{})};
+      }):[];
+      console.warn(JSON.stringify({
+        event:'billing_pix_checkout_rejected',
+        status:response.status,
+        validations,
+      }));
+    }
+    throw new AsaasError(response.status);
+  }
   let data:unknown;
   try{data=await response.json();}catch{throw new ApiError(502,'billing_provider_invalid_response');}
   if(!data||typeof data!=='object'||Array.isArray(data))

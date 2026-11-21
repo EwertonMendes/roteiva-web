@@ -22,10 +22,11 @@ import { ensureAccess, assertActiveAccess } from './access.ts';
 import {billingPlansResponse,billingStatusResponse} from './billing.ts';
 import {ingestAsaasWebhook} from './billing-webhook.ts';
 import {createCheckout} from './billing-checkout.ts';
+import {abandonUnpaidCheckout,checkoutRecoveryRouted} from './billing-checkout-change.ts';
 import {requestCheckoutReturnCheck} from './billing-return.ts';
 import {flushBillingProjection} from './billing-projection.ts';
 import {readBillingJson} from './billing-webhook.ts';
-import {asaasConfigured,checkoutRouted} from './billing-asaas.ts';
+import {asaasConfigured,billingRouted,checkoutRouted} from './billing-asaas.ts';
 import {cancelRenewal,retryBillingCancellation} from './billing-management.ts';
 import {reconcileBilling} from './billing-reconciliation.ts';
 import {recoverUpgrade,requestUpgrade,upgradeRouted} from './billing-upgrade.ts';
@@ -106,7 +107,7 @@ export async function handle(request: Request, env: Env, ctx?:ExecutionContext):
       const principal=await verifiedTrialPrincipal(request,env,300);
       if(!(await env.API_RATE_LIMIT.limit({key:env.ENVIRONMENT+':delete:'+principal.uid})).success)throw new ApiError(429,'rate_limited');
       response=await requestDeletion(request,env,principal.uid,principal);
-    } else if (env.ENVIRONMENT === 'dev' && url.pathname === '/billing/plans' && request.method === 'GET') {
+    } else if (billingRouted(env) && url.pathname === '/billing/plans' && request.method === 'GET') {
       response=billingPlansResponse(env);
     } else if (checkoutRouted(env) && url.pathname === '/billing/checkout' && request.method === 'POST') {
       if(!allowedFrontend(env,origin))throw new ApiError(403,'origin_required');
@@ -114,19 +115,28 @@ export async function handle(request: Request, env: Env, ctx?:ExecutionContext):
       await assertNotDeleting(env,uid);
       if(!(await env.API_RATE_LIMIT.limit({key:env.ENVIRONMENT+':billing:'+uid})).success)throw new ApiError(429,'rate_limited');
       response=await createCheckout(request,env,uid);
+    } else if (checkoutRecoveryRouted(env) && url.pathname==='/billing/checkout/abandon' && request.method==='POST') {
+      if(!allowedFrontend(env,origin))throw new ApiError(403,'origin_required');
+      const uid=await identity(request,env);
+      await assertNotDeleting(env,uid);
+      if(!(await env.API_RATE_LIMIT.limit({key:env.ENVIRONMENT+':billing:'+uid})).success)throw new ApiError(429,'rate_limited');
+      response=await abandonUnpaidCheckout(request,env,uid);
+      if(response.status===202){
+        ctx?.waitUntil(reconcileBilling(env).catch(()=>console.error(JSON.stringify({event:'billing_checkout_close_retry'}))));
+      }
     } else if (upgradeRouted(env) && url.pathname==='/billing/upgrade' && request.method==='POST') {
       if(!allowedFrontend(env,origin))throw new ApiError(403,'origin_required');
       const uid=await identity(request,env);
       await assertNotDeleting(env,uid);
       if(!(await env.API_RATE_LIMIT.limit({key:env.ENVIRONMENT+':billing:'+uid})).success)throw new ApiError(429,'rate_limited');
       response=await requestUpgrade(env,uid,request);
-    } else if (env.ENVIRONMENT==='dev' && asaasConfigured(env) && url.pathname==='/billing/cancel' && request.method==='POST') {
+    } else if (asaasConfigured(env) && url.pathname==='/billing/cancel' && request.method==='POST') {
       if(!allowedFrontend(env,origin))throw new ApiError(403,'origin_required');
       const uid=await identity(request,env);
       await assertNotDeleting(env,uid);
       if(!(await env.API_RATE_LIMIT.limit({key:env.ENVIRONMENT+':billing:'+uid})).success)throw new ApiError(429,'rate_limited');
       response=await cancelRenewal(request,env,uid);
-    } else if (env.ENVIRONMENT==='dev' && url.pathname==='/billing/return/verify' && request.method==='POST') {
+    } else if (billingRouted(env) && url.pathname==='/billing/return/verify' && request.method==='POST') {
       if(!allowedFrontend(env,origin))throw new ApiError(403,'origin_required');
       const uid=await identity(request,env);
       await assertNotDeleting(env,uid);
@@ -144,11 +154,11 @@ export async function handle(request: Request, env: Env, ctx?:ExecutionContext):
         // still awaits a retry. Publishing this user's pending projection is safe.
         ctx?.waitUntil(flushBillingProjection(env,uid).catch(()=>console.error(JSON.stringify({event:'billing_return_projection_retry'}))));
       }
-    } else if (env.ENVIRONMENT === 'dev' && url.pathname === '/billing/status' && request.method === 'GET') {
+    } else if (billingRouted(env) && url.pathname === '/billing/status' && request.method === 'GET') {
       const uid=await identity(request,env);
       await assertNotDeleting(env,uid);
       response=await billingStatusResponse(env,uid,Date.now(),url.searchParams.get('paymentCursor'));
-    } else if (env.ENVIRONMENT === 'dev' && url.pathname === '/billing/webhooks/asaas' && request.method === 'POST') {
+    } else if (billingRouted(env) && url.pathname === '/billing/webhooks/asaas' && request.method === 'POST') {
       response=await ingestAsaasWebhook(request,env);
       // Acknowledge only after durable storage, then reconcile promptly.
       // Scheduled recovery remains the independent fallback.

@@ -2,7 +2,7 @@
 import {useEffect,useId,useRef,useState} from "react";
 import {ArrowUpRight,ChevronLeft,ChevronRight,ReceiptText} from "lucide-react";
 import {AppButton} from "../ui/AppButton";
-import {billingDate,billingRequest,money,sandboxLink,type PaymentPage} from "./billing-data";
+import {billingDate,billingRequest,hostedPaymentLink,money,type PaymentPage} from "./billing-data";
 
 const outcomes:Record<string,{label:string;tone:string}> = {
   pending:{label:"Pendente",tone:"warning"},
@@ -19,18 +19,22 @@ const inReview = {label:"Em análise",tone:"neutral"};
 
 export function BillingHistory({firstPage,uid}:{firstPage:PaymentPage;uid:string}) {
   const heading = useId();
-  const [pages,setPages] = useState([firstPage]);
+  const [cache,setCache] = useState<{startCursor:string|null|undefined;pages:PaymentPage[]}>({
+    startCursor:firstPage.nextPaymentCursor,pages:[],
+  });
   const [index,setIndex] = useState(0);
   const [loading,setLoading] = useState(false);
   const [error,setError] = useState("");
   const request = useRef<AbortController|null>(null);
   useEffect(() => () => request.current?.abort(),[]);
-  const current = pages[index];
+  const current = index===0?firstPage:cache.pages[index-1];
 
   async function next() {
     if(request.current || !current.nextPaymentCursor) return;
     setError("");
-    if(pages[index+1]) {
+    const startCursor=index===0?firstPage.nextPaymentCursor:cache.startCursor;
+    const pages=startCursor===cache.startCursor?cache.pages:[];
+    if(pages[index]) {
       setIndex(index+1);
       return;
     }
@@ -41,7 +45,7 @@ export function BillingHistory({firstPage,uid}:{firstPage:PaymentPage;uid:string
       const query = new URLSearchParams({paymentCursor:current.nextPaymentCursor});
       const result = await billingRequest<PaymentPage>("/billing/status?"+query,uid,undefined,controller.signal);
       if(controller.signal.aborted) return;
-      setPages(previous=>[...previous,result]);
+      setCache({startCursor,pages:[...pages,result]});
       setIndex(index+1);
     } catch {
       if(!controller.signal.aborted) setError("Não foi possível carregar a próxima página. Tente novamente.");
@@ -65,7 +69,7 @@ export function BillingHistory({firstPage,uid}:{firstPage:PaymentPage;uid:string
       </div>
       {current.payments.map((payment,row) => {
         const state = outcomes[payment.state] ?? inReview;
-        const invoice = sandboxLink(payment.invoiceUrl,"invoice");
+        const invoice = hostedPaymentLink(payment.invoiceUrl,"invoice");
         const due = payment.dueOn ? billingDate(payment.dueOn) : "Data indisponível";
         return <div className="billing-table-row" role="row" key={row}>
           <span className="billing-table-date" role="cell">{payment.dueOn?<time dateTime={payment.dueOn}>{due}</time>:due}</span>
@@ -75,7 +79,7 @@ export function BillingHistory({firstPage,uid}:{firstPage:PaymentPage;uid:string
               <small className="billing-refunded-amount">{money(payment.refundedAmountCents)} estornados</small>}
           </span>
           <span className="billing-table-invoice" role="cell">
-            {invoice ? <a href={invoice} target="_blank" rel="noreferrer" aria-label={`Abrir fatura de ${due} no Asaas (nova aba)`}>Fatura <ArrowUpRight size={14}/></a> :
+            {invoice ? <a href={invoice} target="_blank" rel="noreferrer" aria-label={`Abrir fatura de ${due} (nova aba)`}>Fatura <ArrowUpRight size={14}/></a> :
               <><span className="billing-sr-only">Fatura indisponível</span><span aria-hidden="true">—</span></>}
           </span>
         </div>;

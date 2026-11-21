@@ -114,15 +114,21 @@ export function AccountDeletionAction(){
     {opened&&<AppModal size="medium" className="account-delete-dialog" onCloseRequest={dismiss}
       aria-labelledby="delete-title" aria-describedby="delete-desc">
       <div className="rt-modal__layout">
-        <AppModalHeader icon={<ModalShieldAlert size={26}/>} title="Excluir sua conta?" titleId="delete-title" description="Confira os dados antes de confirmar esta ação permanente."
-          eyebrow="CONFIRMAÇÃO DE SEGURANÇA" onClose={dismiss} closeDisabled={busy}/>
+        <AppModalHeader icon={<ModalShieldAlert size={26}/>} title="Excluir sua conta?" titleId="delete-title"
+          description="Revise as consequências desta ação permanente." onClose={dismiss} closeDisabled={busy}/>
         <AppModalBody>
-        <p id="delete-desc">Esta ação é <strong>permanente</strong>. Seu perfil, projetos, clientes, agenda, financeiro e demais informações no Roteiva serão eliminados. Não será possível recuperá-los. Um marcador pseudonimizado da identidade utilizada no teste gratuito será preservado para evitar novas concessões gratuitas.</p>
-        {user?.email&&<p>Você está excluindo a conta <strong>{user.email}</strong>.</p>}
+        <div className="account-delete-consequences" id="delete-desc">
+          <strong>Esta ação é permanente e irreversível.</strong>
+          <p>Seu perfil, projetos, clientes, agenda, financeiro e demais informações no Roteiva serão eliminados e não poderão ser recuperados.</p>
+          <p>Um marcador pseudonimizado da identidade utilizada no teste gratuito será preservado para evitar novas concessões gratuitas.</p>
+          {user?.email&&<p>Conta selecionada: <strong>{user.email}</strong>.</p>}
+        </div>
         <div className="account-delete-preserve"><CheckCircle2 size={17}/><span>Os arquivos originais do seu Google Drive não serão apagados.</span></div>
-        <p>Se precisar de uma cópia dos seus registros, cancele e exporte os dados antes de continuar.</p>
-        <label htmlFor="delete-confirm">Digite <strong>{CONFIRM}</strong> para confirmar:</label>
-        <AppInput id="delete-confirm" value={text} onChange={e=>setText(e.target.value)} placeholder={CONFIRM} autoComplete="off" spellCheck={false} disabled={busy}/>
+        <p className="account-delete-advice">Se precisar de uma cópia dos seus registros, cancele e exporte os dados antes de continuar.</p>
+        <div className="account-delete-confirm-field">
+          <label htmlFor="delete-confirm">Digite <strong>{CONFIRM}</strong> para confirmar:</label>
+          <AppInput id="delete-confirm" value={text} onChange={e=>setText(e.target.value)} placeholder={CONFIRM} autoComplete="off" spellCheck={false} disabled={busy}/>
+        </div>
         <label className="account-delete-check"><AppInput type="checkbox" checked={checked} disabled={busy} onChange={e=>setChecked(e.target.checked)}/>
           <span>Entendo que esta exclusão é irreversível.</span>
         </label>
