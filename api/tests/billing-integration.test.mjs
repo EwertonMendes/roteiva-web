@@ -7,6 +7,7 @@ import {billingStatusResponse} from '../src/billing.ts';
 import {activeState} from '../src/access.ts';
 import {ingestAsaasWebhook} from '../src/billing-webhook.ts';
 import {reconcileBilling} from '../src/billing-reconciliation.ts';
+import {requestCheckoutReturnCheck} from '../src/billing-return.ts';
 import {cancelRenewal,retryBillingCancellation,stopBillingForDeletion} from '../src/billing-management.ts';
 import {billingDateInstant,cents,periodEnd} from '../src/billing-period.ts';
 import {handle} from '../src/index.ts';
@@ -84,6 +85,46 @@ test('checkout authorizes an enrolled expired owner, uses catalog and sends one 
   assert.equal((await (await billingStatusResponse(canary,'owner')).json()).checkoutAvailable,true);
   assert.equal((await (await billingStatusResponse(canary,'other')).json()).checkoutAvailable,false);
   await assert.rejects(createCheckout(purchase(),canary,'other'),{code:'not_found'});
+});
+
+test('return recovery verifies Asaas payment immediately and still preserves cron retry',async t=>{
+  const s=setup(t);
+  let projection,commits=0,reads=0;
+  t.mock.method(globalThis,'fetch',async(url,options)=>{
+    const path=String(url);
+    if(path==='https://oauth2.googleapis.com/token')return Response.json({access_token:'test-admin'});
+    if(path.includes('/documents/users/owner/access/current'))
+      return projection?Response.json(projection):new Response(null,{status:404});
+    if(path.includes('/documents/users/owner'))return Response.json({fields:{ownerUid:{stringValue:'owner'}},
+      createTime:'2026-11-20T00:00:00Z',updateTime:'2026-11-20T00:00:01Z'});
+    if(path.endsWith('/documents:commit')){
+      const [,access]=JSON.parse(options.body).writes;
+      projection={updateTime:new Date(now+ ++commits).toISOString(),fields:access.update.fields};
+      return Response.json({});
+    }
+    if(path.endsWith('/checkouts'))return checkoutResponse();
+    if(path.includes('/payments?checkoutSession=checkout_a')){
+      reads++;
+      return Response.json({data:[providerPayment()],hasMore:false});
+    }
+    if(path.endsWith('/subscriptions/sub_a'))return Response.json(providerSubscription());
+    throw Error('unexpected network request');
+  });
+  assert.equal((await createCheckout(purchase(),s.env,'owner')).status,201);
+  const id=s.sql.prepare('SELECT id FROM billing_checkout_intents WHERE owner_uid=?').get('owner').id;
+  assert.equal((await requestCheckoutReturnCheck(s.env,'owner',id)).status,202);
+  assert.equal((await requestCheckoutReturnCheck(s.env,'owner',id)).status,202);
+  assert.equal(s.sql.prepare("SELECT count(*) n FROM billing_webhook_events WHERE event_id=?").get('return:'+id).n,1);
+  await reconcileBilling(s.env);
+  assert.equal(reads,1);
+  assert.equal((await activeState(s.env,'owner')).active,true);
+  assert.equal(commits,1);
+  assert.equal(s.sql.prepare("SELECT status FROM billing_webhook_events WHERE event_id=?").get('return:'+id).status,'processed');
+  // Independent scheduler recovery remains possible if the first provider read
+  // had observed a not-yet-confirmed transaction instead.
+  s.sql.exec("UPDATE billing_checkout_intents SET status='ready',recovery_after=0");
+  await reconcileBilling(s.env); // schedule retry, without rereading provider immediately
+  assert.equal(s.sql.prepare("SELECT count(*) n FROM billing_webhook_events WHERE event_id=?").get('recovery:'+id).n,1);
 });
 
 test('ambiguous checkout creation stays fenced across restarts and can recover from a provider event',async t=>{
