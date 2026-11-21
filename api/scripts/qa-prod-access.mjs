@@ -81,7 +81,7 @@ export function safeGoogleErrorCategory(payload) {
   const code=values.find(value=>typeof value==='string'&&/^[A-Za-z][A-Za-z0-9_]{2,63}$/.test(value));
   return code||'unclassified';
 }
-class ServiceCallError extends Error {
+export class ServiceCallError extends Error {
   constructor(label,status,category) {
     super(label+' returned HTTP '+status+' ('+category+')');
     this.status=status;
