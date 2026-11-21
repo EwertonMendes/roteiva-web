@@ -134,6 +134,7 @@ test("billing requires consent and a callback alone never restores the workspace
     if(path==="/billing/plans")return route.fulfill({headers,json:{plans:[
       {code:"monthly",amountCents:3990,version:"test"},{code:"quarterly",amountCents:10990,version:"test"},
       {code:"yearly",amountCents:39990,version:"test"}]}});
+    if(path==="/billing/return/verify")return route.fulfill({status:202,headers,json:{status:"checking"}});
     if(path==="/billing/checkout"){
       requested++;
       expect(route.request().postDataJSON()).toEqual({planCode:"quarterly",catalogVersion:"test",acceptedImmediateCharge:true});
