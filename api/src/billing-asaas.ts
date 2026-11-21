@@ -26,8 +26,10 @@ export function checkoutTestUsers(env:Env):string[]{
 }
 
 export function pixEnabled(env:Env,uid?:string):boolean{
-  return env.ENVIRONMENT==='dev'&&asaasConfigured(env)&&env.BILLING_PIX_ENABLED==='true'&&
-    !!uid&&checkoutTestUsers(env).includes(uid);
+  // Explicit opt-in on EACH environment. A successful Sandbox deployment can
+  // never silently enable production PIX; refunds/webhooks remain routable.
+  return (env.ENVIRONMENT==='dev'||env.ENVIRONMENT==='prod')&&
+    asaasConfigured(env)&&env.BILLING_PIX_ENABLED==='true'&&checkoutEnabled(env,uid);
 }
 
 export function billingRouted(env:Env):boolean{
@@ -38,13 +40,16 @@ export function checkoutRouted(env:Env):boolean{
   if(!asaasConfigured(env))return false;
   const hasTestUsers=checkoutTestUsers(env).length>0;
   return env.ENVIRONMENT==='prod'
-    ?env.BILLING_CHECKOUT_ENABLED==='true'&&hasTestUsers
+    ?hasTestUsers||(env.BILLING_CHECKOUT_ENABLED==='true'&&env.BILLING_PUBLIC_ROLLOUT_ENABLED==='true')
     :env.BILLING_CHECKOUT_ENABLED==='true'||hasTestUsers;
 }
 
 export function checkoutEnabled(env:Env,uid?:string):boolean{
-  return checkoutRouted(env)&&(env.ENVIRONMENT==='dev'&&env.BILLING_CHECKOUT_ENABLED==='true'||
-    !!uid&&checkoutTestUsers(env).includes(uid));
+  return checkoutRouted(env)&&(
+    env.ENVIRONMENT==='dev'&&env.BILLING_CHECKOUT_ENABLED==='true'||
+    env.ENVIRONMENT==='prod'&&env.BILLING_CHECKOUT_ENABLED==='true'&&env.BILLING_PUBLIC_ROLLOUT_ENABLED==='true'||
+    !!uid&&checkoutTestUsers(env).includes(uid)
+  );
 }
 
 /** Upstream status is used internally. The provider's error body is discarded. */
