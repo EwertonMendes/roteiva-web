@@ -375,3 +375,6 @@ dialog.rt-parity-modal.rt-confirm-dialog .rt-modal__footer .rt-button {
     min-height:44px;
   }
 }
+
+/* Leave the already-approved create/rename editor's direct flex items intact. */
+dialog.rt-parity-modal.virtual-library-editor:not(.rt-confirm-dialog) .virtual-library-editor-content {display:contents}
