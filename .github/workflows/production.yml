@@ -16,6 +16,10 @@ on:
         description: Apply the reviewed billing migrations on the first billing release
         type: boolean
         default: false
+      public_test_billing:
+        description: "TEMPORARY: enable REAL R$5 test checkout for all eligible PROD users (card + PIX)"
+        type: boolean
+        default: false
 permissions:
   contents: read
   pull-requests: read
@@ -178,10 +182,13 @@ jobs:
       DOMAIN_CUTOVER: ${{ inputs.domain_cutover }}
       BILLING_SCHEMA: ${{ inputs.billing_schema }}
       PRODUCTION_BILLING_ENABLED: ${{ vars.PRODUCTION_BILLING_ENABLED }}
-      PRODUCTION_BILLING_CHECKOUT_ENABLED: ${{ vars.PRODUCTION_BILLING_CHECKOUT_ENABLED }}
-      PRODUCTION_BILLING_PIX_ENABLED: ${{ vars.PRODUCTION_BILLING_PIX_ENABLED }}
-      PRODUCTION_BILLING_PUBLIC_ROLLOUT_ENABLED: ${{ vars.PRODUCTION_BILLING_PUBLIC_ROLLOUT_ENABLED }}
-      PRODUCTION_BILLING_TEST_PLAN_ENABLED: ${{ vars.PRODUCTION_BILLING_TEST_PLAN_ENABLED }}
+      # Owner-only workflow dispatch + protected environment approval: this
+      # one-time flag activates real-money R$5 public testing, without a UID.
+      # Normal deployments continue to use protected repository variables.
+      PRODUCTION_BILLING_CHECKOUT_ENABLED: ${{ inputs.public_test_billing && 'true' || vars.PRODUCTION_BILLING_CHECKOUT_ENABLED }}
+      PRODUCTION_BILLING_PIX_ENABLED: ${{ inputs.public_test_billing && 'true' || vars.PRODUCTION_BILLING_PIX_ENABLED }}
+      PRODUCTION_BILLING_PUBLIC_ROLLOUT_ENABLED: ${{ inputs.public_test_billing && 'true' || vars.PRODUCTION_BILLING_PUBLIC_ROLLOUT_ENABLED }}
+      PRODUCTION_BILLING_TEST_PLAN_ENABLED: ${{ inputs.public_test_billing && 'true' || vars.PRODUCTION_BILLING_TEST_PLAN_ENABLED }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
