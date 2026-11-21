@@ -47,7 +47,8 @@ async function paymentPage(env:Env,uid:string,cursor:string|null){
   return {
     nextPaymentCursor:results.length>PAGE_SIZE?JSON.stringify({id:last.id,due_on:last.due_on,created_at:last.created_at}):null,
     payments:results.slice(0,PAGE_SIZE).map(payment=>({
-      state:payment.details??payment.state,paymentMethod:payment.payment_method,
+      state:payment.details??payment.state,
+      ...(payment.payment_method==='PIX'?{paymentMethod:'PIX'}:{}),
       amountCents:payment.amount_cents,dueOn:payment.due_on,
       ...(payment.refunded_amount_cents>0?{refundedAmountCents:payment.refunded_amount_cents}:{}),
       invoiceUrl:payment.invoice_path&&['pending','overdue'].includes(payment.state)?
