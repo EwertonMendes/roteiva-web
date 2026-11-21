@@ -67,7 +67,29 @@ export async function asaasRequest<T extends Record<string,unknown>>(
       signal:AbortSignal.timeout(10000),
     });
   }catch{throw new AsaasError();}
-  if(!response.ok)throw new AsaasError(response.status);
+  if(!response.ok){
+    // Financial provider responses may contain customer details. Never log
+    // the body or an untrusted description. Classify only known, static error
+    // codes/field names so a Sandbox rejection is diagnosable without PII.
+    if(env.ENVIRONMENT==='dev'&&resource==='/checkouts'&&
+      Array.isArray(body?.billingTypes)&&body.billingTypes.includes('PIX')){
+      let issues:unknown;
+      try{issues=(await response.clone().json() as {errors?:unknown}).errors;}catch{/* ignore malformed provider body */}
+      const allowedFields=['billingTypes','chargeTypes','callback','items','customer','customerData','subscription','externalReference','minutesToExpire','pix','chave','habilitad'];
+      const validations=Array.isArray(issues)?issues.slice(0,4).map(item=>{
+        const issue=item&&typeof item==='object'?item as Record<string,unknown>:{};
+        const code=typeof issue.code==='string'&&/^[a-zA-Z_]{1,40}$/.test(issue.code)?issue.code:'unknown';
+        const description=typeof issue.description==='string'?issue.description.toLowerCase():'';
+        return {code,fields:allowedFields.filter(field=>description.includes(field.toLowerCase()))};
+      }):[];
+      console.warn(JSON.stringify({
+        event:'billing_pix_checkout_rejected',
+        status:response.status,
+        validations,
+      }));
+    }
+    throw new AsaasError(response.status);
+  }
   let data:unknown;
   try{data=await response.json();}catch{throw new ApiError(502,'billing_provider_invalid_response');}
   if(!data||typeof data!=='object'||Array.isArray(data))
