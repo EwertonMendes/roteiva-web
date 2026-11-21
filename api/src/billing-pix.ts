@@ -1,7 +1,7 @@
 import {providerRef} from './billing-asaas.ts';
 import {openCheckout,type CheckoutIntent} from './billing-checkout.ts';
 import {billingDateInstant,cents,civilDate} from './billing-period.ts';
-import {purchaseWindow,manualPaidUntil} from './billing-purchase-policy.ts';
+import {purchaseWindow,manualPaidUntil,localDay} from './billing-purchase-policy.ts';
 import {queueBillingProjection} from './billing-projection.ts';
 import {refundedSoFar} from './billing-refunds.ts';
 import {ApiError,type Env} from './types.ts';
