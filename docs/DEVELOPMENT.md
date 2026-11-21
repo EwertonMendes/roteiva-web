@@ -2,6 +2,8 @@
 
 ## Integração Asaas Sandbox no DEV
 
+**Retorno de pagamento (DEV):** o callback do checkout inclui um identificador não secreto da intenção. `POST /billing/return/verify` exige Firebase ID Token, Origin DEV permitido, rate limit e associação exata ao UID; não recebe nem cria cobranças. Apenas agenda a conciliação autoritativa existente. Após o retorno, a UI acompanha `GET /billing/status` por uma janela limitada, mostra orientação de atraso se necessário e libera o workspace somente quando o documento `access/current` for publicado pelo Worker. O webhook também tenta processar a inbox imediatamente via `waitUntil`, preservando o Cron como fallback. Testar retorno tardio, webhook atrasado, cliente diferente, origin inválido, duplicidade, cancelamento, expirado e falhas do provedor. O Asaas Checkout publica callback URLs, mas a especificação da criação não documenta `autoRedirect`; não enviar campos não documentados nem prometer que a página do Asaas dispensará o clique de retorno. A confirmação financeira nunca vem da URL.
+
 Use exclusivamente [Roteiva DEV](https://roteiva-web-dev.web.app), o Worker `roteiva-api-dev` da conta Roteiva DEV e a conta separada [Asaas Sandbox](https://sandbox.asaas.com/). A chave deve ter prefixo Sandbox e ficar em `ASAAS_API_KEY`. O token próprio do webhook fica em `ASAAS_WEBHOOK_TOKEN`. Mantenha os valores dentro dos consoles seguros, com permissão de saque desmarcada na chave. Ative a recepção com `BILLING_ENABLED=true` no Worker DEV após o deploy e a migração `0038`. Valide que o endpoint `/billing/webhooks/asaas` responde 401 sem token e então retome a fila Roteiva DEV no Asaas v3.
 
 ### Homologação Sandbox separada
