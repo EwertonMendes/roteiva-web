@@ -70,8 +70,30 @@ function ensureIdentity() {
   assert.match(sa.private_key,/BEGIN PRIVATE KEY/);
   return {email,action,sa,cloudflareKey:required('CLOUDFLARE_API_TOKEN')};
 }
+/**
+ * Surface only fixed, machine-readable Google error categories. The raw body
+ * can include the account email and is NEVER copied to Actions logs.
+ */
+export function safeGoogleErrorCategory(payload) {
+  const error=payload&&typeof payload==='object'?payload.error:null;
+  if(!error||typeof error!=='object')return 'unclassified';
+  const values=[error.status,error.message?.split(':',1)[0]?.trim(),error.errors?.[0]?.reason];
+  const code=values.find(value=>typeof value==='string'&&/^[A-Za-z][A-Za-z0-9_]{2,63}$/.test(value));
+  return code||'unclassified';
+}
+export class ServiceCallError extends Error {
+  constructor(label,status,category) {
+    super(label+' returned HTTP '+status+' ('+category+')');
+    this.status=status;
+    this.category=category;
+  }
+}
 async function safeResponse(response,label) {
-  if(!response.ok)throw new Error(label+' returned HTTP '+response.status);
+  if(!response.ok){
+    let category='unclassified';
+    try{category=safeGoogleErrorCategory(await response.json());}catch{/* never log response bodies */}
+    throw new ServiceCallError(label,response.status,category);
+  }
   return response.json();
 }
 async function tokenFor(sa) {
@@ -94,10 +116,31 @@ async function google(token,path,method='GET',body) {
     ...(body===undefined?{}:{body:JSON.stringify(body)}),signal:AbortSignal.timeout(15000)});
   return safeResponse(response,'Firebase admin request');
 }
-async function uidFromVerifiedEmail(token,email) {
-  const response=await google(token,'https://identitytoolkit.googleapis.com/v1/projects/'+PROJECT+'/accounts:lookup',
-    'POST',{email:[email]});
-  const users=response.users||[];
+/**
+ * Both request routes are documented Google Identity Toolkit admin APIs.
+ * Some Firebase projects only accept the project-scoped route, others accept
+ * the top-level route with an explicit, authenticated targetProjectId.
+ * Never weaken matching or fall back to D1 email guesses.
+ */
+export async function uidFromVerifiedEmail(token,email,request=google) {
+  const projectScoped='https://identitytoolkit.googleapis.com/v1/projects/'+PROJECT+'/accounts:lookup';
+  let response;
+  try{
+    response=await request(token,projectScoped,'POST',{email:[email]});
+  }catch(firstError){
+    if(!(firstError instanceof ServiceCallError)||firstError.status!==400)
+      throw firstError;
+    try{
+      response=await request(token,'https://identitytoolkit.googleapis.com/v1/accounts:lookup',
+        'POST',{email:[email],targetProjectId:PROJECT});
+    }catch(secondError){
+      throw new Error('Firebase Auth exact-email lookup failed on both documented routes. '+
+        'Project-scoped: '+firstError.message+'; top-level: '+
+        (secondError instanceof ServiceCallError?secondError.message:'request unavailable'));
+    }
+  }
+  const users=response?.users||[];
+  assert.ok(Array.isArray(users),'Invalid Firebase Auth user lookup response');
   assert.equal(users.length,1,'Firebase Authentication must resolve exactly one account');
   const user=users[0];
   assert.equal(String(user.email||'').toLowerCase(),email,'Firebase returned a different email');
