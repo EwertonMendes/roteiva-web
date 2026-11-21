@@ -73,12 +73,22 @@ export function CheckoutConsent({plan,onClose,onConfirm}:{
   return <AppModal size="compact" className="billing-consent" aria-labelledby={titleId} aria-describedby={descriptionId} onCloseRequest={close}>
     <div className="rt-modal__layout">
       <AppModalHeader title={`Plano ${planNames[plan.code].toLowerCase()}`} titleId={titleId}
-        description="Revise a cobrança antes de abrir o checkout." descriptionId={descriptionId}
+        description="Revise os valores e confirme a cobrança recorrente." descriptionId={descriptionId}
         icon={<CreditCard size={21}/>} onClose={close} closeDisabled={working}/>
       <AppModalBody>
-        <div className="billing-consent-total">
-          <div className="billing-price"><strong>{money(plan.amountCents)}</strong><span>{cadence[plan.code]}</span></div>
-          <span><LockKeyhole size={15} aria-hidden="true"/> Pagamento no Asaas Sandbox</span>
+        <div className="billing-consent-summary">
+          <div className="billing-consent-details">
+            <p className="billing-consent-eyebrow">Plano selecionado</p>
+            <div className="billing-price">
+              <strong>{money(plan.amountCents)}</strong><span>{cadence[plan.code]}</span>
+            </div>
+            <span className="billing-consent-security">
+              <LockKeyhole size={15} aria-hidden="true"/> Pagamento no Asaas Sandbox
+            </span>
+          </div>
+          <div className="billing-consent-art" aria-hidden="true">
+            <BillingArt name={plan.code}/>
+          </div>
         </div>
         <label className="billing-consent-check">
           <AppInput type="checkbox" checked={accepted} disabled={working} onChange={event=>setAccepted(event.target.checked)}/>
@@ -87,8 +97,8 @@ export function CheckoutConsent({plan,onClose,onConfirm}:{
         {error&&<p className="billing-inline-error" role="alert">{error}</p>}
       </AppModalBody>
       <AppModalFooter>
-        <AppButton variant="secondary" onClick={close} disabled={working}>Voltar</AppButton>
-        <AppButton disabled={!accepted||working} loading={working} onClick={()=>void confirm()}>
+        <AppButton type="button" variant="secondary" onClick={close} disabled={working}>Voltar</AppButton>
+        <AppButton type="button" variant="primary" disabled={!accepted||working} loading={working} onClick={()=>void confirm()}>
           <Check size={17} aria-hidden="true"/> {working?"Abrindo checkout…":"Continuar para o Asaas Sandbox"}
         </AppButton>
       </AppModalFooter>

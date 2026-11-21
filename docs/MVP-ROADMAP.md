@@ -1,5 +1,7 @@
 # Roadmap vivo — Roteiva MVP
 
+**Confirmação visual de checkout — em validação DEV (20/11/2026):** os três modais de consentimento foram ajustados com ilustração já existente do plano, área de preços/termos alinhada e ações responsivas. O botão principal usa a variante compartilhada correta, preservando consentimento obrigatório e chamada ao checkout sem alteração de contrato. Regressão de geometria e imagem para mensal/trimestral/anual, claro/escuro e mobile em `tests/browser/access.spec.ts`. Aprovação visual do proprietário ainda pendente; PROD não participa.
+
 ## Assinatura Asaas Sandbox DEV — 20/11/2026
 
 **Renovação, cancelamento e estorno — regressões implementadas:** testes de D1 verificam vigência inalterada antes da cobrança, recusa e tolerância de 72 horas, cancelamento concorrente com upgrade, fatura pendente removida e confirmação válida entregue depois do cancelamento. O estorno parcial passa a ser conciliado com a evidência atual do Asaas e deixa de sustentar a vigência automática da cobrança afetada. A primeira renovação de cartão no novo ciclo e o cancelamento com fatura de cartão já gerada ainda aguardam validação no provedor. Evidências em `api/tests/billing-upgrade.test.mjs` e `tests/browser/access.spec.ts`.

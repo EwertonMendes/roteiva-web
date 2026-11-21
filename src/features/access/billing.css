@@ -185,20 +185,188 @@
 .billing-plan-name { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .65rem; }
 .billing-plan-name h4 { font-size: 1.15rem; line-height: 1.2; }
 .billing-plan .billing-plan-action { margin-top: auto; justify-content: space-between; min-height: 2.8rem; }
-.billing-consent-total {
+/* Checkout confirmation uses its own layout: no global modal or button overrides. */
+dialog.rt-parity-modal.billing-consent {
+  width: min(560px, calc(100vw - 32px));
+  --billing-consent-image-bg: #eee7dc;
+}
+[data-theme="dark"] dialog.rt-parity-modal.billing-consent {
+  --billing-consent-image-bg: #2d2721;
+}
+dialog.rt-parity-modal.billing-consent .rt-modal__header {
+  gap: 14px;
+  padding: 26px 30px 0;
+}
+dialog.rt-parity-modal.billing-consent .rt-modal__heading h2 {
+  font-size: clamp(1.5rem, 3.1vw, 2rem);
+  line-height: 1.18;
+  overflow-wrap: normal;
+}
+dialog.rt-parity-modal.billing-consent .rt-modal__heading p {
+  margin-top: 6px;
+  font-size: .9rem;
+  line-height: 1.45;
+}
+dialog.rt-parity-modal.billing-consent .rt-modal__body {
+  flex: 0 1 auto;
+  padding: 20px 30px 24px;
+}
+.billing-consent-summary {
   display: grid;
-  gap: .45rem;
-  margin-bottom: .9rem;
-  padding: .9rem 1rem;
+  grid-template-columns: minmax(0, 1fr) 136px;
+  align-items: stretch;
+  gap: 1rem;
+  min-width: 0;
+  padding: .75rem;
   border: 1px solid var(--line);
-  border-radius: .65rem;
+  border-radius: 14px;
   background: var(--subtle);
 }
-.billing-consent-total > span,
-.billing-consent-check { display: flex; align-items: flex-start; gap: .6rem; font-size: .9rem; line-height: 1.5; }
-.billing-consent-total svg { margin-top: .14rem; }
-.billing-consent-check input { flex: none; margin-top: .2rem; }
+.billing-consent-details {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: .6rem;
+  min-width: 0;
+  padding: .25rem .35rem;
+}
+.billing-consent-eyebrow {
+  margin: 0;
+  color: var(--muted);
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.billing-consent-summary .billing-price { gap: .2rem .5rem; }
+.billing-consent-summary .billing-price strong {
+  font-size: clamp(1.55rem, 4vw, 2.1rem);
+  line-height: 1.14;
+}
+.billing-consent-security {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  color: var(--muted);
+  font-size: .79rem;
+  line-height: 1.4;
+}
+.billing-consent-art {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  min-height: 125px;
+  padding: .45rem;
+  overflow: hidden;
+  border-radius: 10px;
+  background: radial-gradient(circle at 50% 65%, color-mix(in srgb, var(--billing-art-ring, #c8b396) 22%, transparent), transparent 72%), var(--billing-consent-image-bg);
+}
+.billing-consent-art .billing-art {
+  width: 100%;
+  height: 100%;
+  max-height: 8.25rem;
+  object-fit: contain;
+}
+dialog.rt-parity-modal.billing-consent .billing-consent-check {
+  display: grid;
+  grid-template-columns: 19px minmax(0, 1fr);
+  align-items: start;
+  gap: .75rem;
+  margin-top: 1.05rem;
+  font-size: .92rem;
+  font-weight: 500;
+  line-height: 1.5;
+  cursor: pointer;
+}
+.billing-consent-check .rt-input[type="checkbox"] {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: .17rem 0 0;
+  accent-color: var(--field-focus-border);
+  cursor: pointer;
+}
+.billing-consent-check > span { min-width: 0; font-weight: 500; }
 .billing-consent .billing-inline-error { margin-top: .9rem; }
+
+dialog.rt-parity-modal.billing-consent .rt-modal__footer {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 10px;
+  min-height: 0;
+  padding: 16px 30px 22px;
+}
+dialog.rt-parity-modal.billing-consent .rt-modal__footer .rt-button {
+  min-width: 0;
+  min-height: 48px;
+  padding: 0 14px;
+  font-size: .88rem;
+  white-space: nowrap;
+}
+dialog.rt-parity-modal.billing-consent .rt-modal__footer .rt-button--primary {
+  border-color: transparent;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+dialog.rt-parity-modal.billing-consent .rt-modal__footer .rt-button--primary:hover:not(:disabled) {
+  background: var(--accent);
+  opacity: .9;
+}
+dialog.rt-parity-modal.billing-consent .rt-modal__footer .rt-button:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+@media (max-width: 540px) {
+  dialog.rt-parity-modal.billing-consent {
+    width: calc(100vw - 20px);
+    max-width: calc(100vw - 20px);
+  }
+  dialog.rt-parity-modal.billing-consent .rt-modal__header {
+    gap: 10px;
+    padding: 20px 20px 0;
+  }
+  dialog.rt-parity-modal.billing-consent .rt-modal__heading h2 {
+    font-size: clamp(1.3rem, 6vw, 1.75rem);
+  }
+  dialog.rt-parity-modal.billing-consent .rt-modal__close {
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+    min-height: 38px;
+    flex-basis: 38px;
+  }
+  dialog.rt-parity-modal.billing-consent .rt-modal__body {
+    padding: 18px 20px 20px;
+  }
+  dialog.rt-parity-modal.billing-consent .rt-modal__footer {
+    display: flex;
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: 9px;
+    padding: 14px 20px max(18px, env(safe-area-inset-bottom));
+  }
+  dialog.rt-parity-modal.billing-consent .rt-modal__footer .rt-button {
+    width: 100%;
+    min-height: 44px;
+    white-space: normal;
+  }
+  .billing-consent-summary {
+    grid-template-columns: minmax(0, 1fr) 104px;
+    gap: .5rem;
+    padding: .65rem;
+  }
+  .billing-consent-details { gap: .35rem; }
+  .billing-consent-art { min-height: 112px; }
+  .billing-consent-summary .billing-price strong { font-size: 1.5rem; }
+  .billing-consent-summary .billing-price > span { font-size: .8rem; }
+}
+@media (max-width: 400px) {
+  .billing-consent-summary { grid-template-columns: minmax(0, 1fr) 88px; }
+  .billing-consent-art { min-height: 104px; }
+  .billing-consent-security { font-size: .73rem; }
+}
+
 .rt-parity-modal.billing-upgrade-confirmation .rt-modal__footer .rt-button {
   min-width: 0;
   padding: .5rem .875rem;

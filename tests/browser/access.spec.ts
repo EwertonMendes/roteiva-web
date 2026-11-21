@@ -285,6 +285,41 @@ test('billing summary, responsive history and restricted checkout use the same b
   await expect.poll(()=>page.locator('.billing-access img.billing-art').evaluateAll(images=>images.every(image=>(image as HTMLImageElement).naturalWidth>0))).toBe(true);
   await expect.poll(()=>fitsViewport('.billing-access')).toBe(true);
   if(process.env.ROTEIVA_BILLING_CAPTURE) await page.screenshot({path:info.outputPath('planos.png'),fullPage:true});
+  // Each plan shows its own illustration and stays aligned in dark/light and 320px mobile.
+  for(const [plan,asset] of [['mensal','monthly'],['trimestral','quarterly'],['anual','yearly']] as const){
+    await page.getByRole('button',{name:`Escolher ${plan}`}).click();
+    const consent=page.getByRole('dialog',{name:`Plano ${plan}`});
+    await expect(consent).toBeVisible();
+    const illustration=consent.locator('.billing-consent-art img.billing-art');
+    await expect(illustration).toHaveAttribute('src',new RegExp('/brand/billing/'+asset+'\\.webp$'));
+    await expect.poll(()=>illustration.evaluate(img=>(img as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+    await expect(consent.getByRole('checkbox')).not.toBeChecked();
+    await expect(consent.getByRole('button',{name:'Continuar para o Asaas Sandbox'})).toBeDisabled();
+    for(const theme of ['light','dark']){
+      await page.evaluate(value=>{document.documentElement.dataset.theme=value;},theme);
+      await expect.poll(()=>consent.evaluate(modal=>{
+        const bounds=modal.getBoundingClientRect();
+        const content=Array.from(modal.querySelectorAll<HTMLElement>(
+          '.rt-modal__header,.rt-modal__body,.rt-modal__footer,.billing-consent-summary,.billing-consent-check,.billing-consent-art,.rt-modal__footer button'));
+        const buttons=Array.from(modal.querySelectorAll<HTMLButtonElement>('.rt-modal__footer button'));
+        const withoutOverflow=content.every(element=>{
+          const rect=element.getBoundingClientRect();
+          return rect.left>=bounds.left-1&&rect.right<=bounds.right+1&&
+            element.scrollWidth<=element.clientWidth+1;
+        });
+        const first=buttons[0]?.getBoundingClientRect(),second=buttons[1]?.getBoundingClientRect();
+        const noOverlap=!!first&&!!second&&(
+          first.right<=second.left+1||second.bottom<=first.top+1||first.bottom<=second.top+1
+        );
+        return withoutOverflow&&noOverlap&&document.documentElement.scrollWidth<=window.innerWidth+1;
+      })).toBe(true);
+      if(process.env.ROTEIVA_BILLING_CAPTURE)
+        await consent.screenshot({path:info.outputPath(`consent-${plan}-${theme}.png`)});
+    }
+    await consent.getByRole('button',{name:'Voltar'}).click();
+    await expect(consent).toHaveCount(0);
+  }
+
   await page.getByRole('button',{name:'Escolher anual'}).click();
   const dialog=page.getByRole('dialog',{name:'Plano anual'});
   await expect(dialog).toBeVisible();
