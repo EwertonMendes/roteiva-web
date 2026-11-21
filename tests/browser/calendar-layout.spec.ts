@@ -1,4 +1,5 @@
 import {test,expect,type Page} from "./fixtures";
+import {expectCompactConfirmationGeometry} from "./compact-confirmation-geometry";
 
 const host="http://127.0.0.1:4173";
 
@@ -304,6 +305,10 @@ test("nested day/editor/confirmation dialogs keep the underlying day and lock ba
   const confirm=page.locator("dialog.rt-confirm-dialog");
   await expect(confirm).toBeVisible();
   await expect(confirm).toContainText("Excluir compromisso?");
+  for(const theme of ["light","dark"] as const){
+    await page.evaluate(value=>{document.documentElement.dataset.theme=value;},theme);
+    await expectCompactConfirmationGeometry(confirm);
+  }
   await expect(day).toBeVisible();
   await expectBackgroundLocked();
   await page.keyboard.press("Escape");
