@@ -47,16 +47,16 @@ const upgradeErrors:Record<string,string> = {
   billing_catalog_changed:"Os valores mudaram. Atualize a assinatura para comparar os planos novamente.",
   billing_upgrade_terms_changed:"A data da renovação mudou. Atualize a assinatura para conferir a nova data.",
   billing_upgrade_invoice_conflict:"Há uma fatura que precisa ser conferida antes da mudança. Consulte o histórico ou fale com o suporte.",
-  billing_upgrade_provider_rejected:"O Asaas não aceitou a mudança nesta recorrência. Fale com o suporte para verificar o cartão.",
+  billing_upgrade_provider_rejected:"Não foi possível atualizar a renovação no cartão. Fale com o suporte para verificar a assinatura.",
   billing_upgrade_in_progress:"Já existe uma mudança em andamento. Atualize a assinatura para acompanhar.",
   billing_upgrade_unavailable:"A assinatura não está elegível para essa mudança. Atualize a assinatura para conferir a situação.",
   billing_checkout_already_open:"Já existe um checkout para outro plano ou forma de pagamento. Retorne e escolha Trocar plano.",
   billing_checkout_not_switchable:"A tentativa anterior está sendo verificada. Confira o pagamento antes de trocar.",
   billing_checkout_payment_verifying:"Pode existir um pagamento dessa tentativa. Não faça outra compra; verifique o histórico e tente novamente.",
-  billing_checkout_cancel_unconfirmed:"O cancelamento não foi confirmado pelo Asaas. O checkout anterior permanece protegido; tente novamente.",
+  billing_checkout_cancel_unconfirmed:"O cancelamento da tentativa não foi confirmado. Por segurança, o pagamento anterior continua protegido; verifique novamente.",
   billing_access_still_active:"Você já possui acesso pago. Para mudar a forma de pagamento, verifique a renovação atual primeiro.",
   billing_account_ineligible:"Esta conta não pode iniciar outra contratação neste momento. Atualize sua assinatura.",
-  billing_provider_unavailable:"O Asaas não respondeu agora. Nenhuma nova tentativa deve ser criada até conferirmos a anterior.",
+  billing_provider_unavailable:"Não foi possível confirmar a solicitação de pagamento. Atualize a assinatura antes de tentar novamente, para evitar cobranças duplicadas.",
 };
 
 export async function billingRequest<T>(path:string,uid:string,body?:object,signal?:AbortSignal):Promise<T> {
