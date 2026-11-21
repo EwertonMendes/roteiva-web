@@ -1,7 +1,7 @@
 import {ApiError,type Env} from './types.ts';
 
 export type AsaasResource='/customers'|'/checkouts'|'/subscriptions'|
-  `/payments/${string}`|`/subscriptions/${string}`|`/checkouts/${string}/cancel`|
+  `/payments/${string}`|`/subscriptions/${string}`|`/checkouts/${string}`|`/checkouts/${string}/cancel`|
   `/payments?checkoutSession=${string}&limit=2`|`/payments?subscription=${string}&dueDate%5Bge%5D=${string}&limit=3`|
   `/subscriptions/${string}/payments?status=PENDING`|`/payments/${string}/refunds`;
 export type AsaasMethod='GET'|'POST'|'PUT'|'DELETE';
@@ -18,6 +18,11 @@ export function asaasConfigured(env:Env):boolean{
 
 export function providerRef(value:unknown):string|null {
   return typeof value==='string' && /^[A-Za-z0-9_-]{1,160}$/.test(value)?value:null;
+}
+
+export function pixEnabled(env:Env,uid?:string):boolean{
+  return env.ENVIRONMENT==='dev'&&asaasConfigured(env)&&env.BILLING_PIX_ENABLED==='true'&&
+    (env.BILLING_CHECKOUT_ENABLED==='true'||!!uid&&uid===env.BILLING_CHECKOUT_TEST_UID);
 }
 
 export function checkoutRouted(env:Env):boolean{
@@ -44,7 +49,7 @@ export async function asaasRequest<T extends Record<string,unknown>>(
 ):Promise<T>{
   if(!asaasConfigured(env))throw new ApiError(503,'billing_unavailable');
   const permitted=method==='GET'?
-    /^\/(customers|checkouts|subscriptions|(?:payments|subscriptions)\/[A-Za-z0-9_-]{1,160}|payments\/[A-Za-z0-9_-]{1,160}\/refunds|payments\?checkoutSession=[A-Za-z0-9_-]{1,160}&limit=2|payments\?subscription=[A-Za-z0-9_-]{1,160}&dueDate%5Bge%5D=20\d\d-\d\d-\d\d&limit=3|subscriptions\/[A-Za-z0-9_-]{1,160}\/payments\?status=PENDING)$/.test(resource):
+    /^\/(customers|checkouts|subscriptions|(?:payments|subscriptions|checkouts)\/[A-Za-z0-9_-]{1,160}|payments\/[A-Za-z0-9_-]{1,160}\/refunds|payments\?checkoutSession=[A-Za-z0-9_-]{1,160}&limit=2|payments\?subscription=[A-Za-z0-9_-]{1,160}&dueDate%5Bge%5D=20\d\d-\d\d-\d\d&limit=3|subscriptions\/[A-Za-z0-9_-]{1,160}\/payments\?status=PENDING)$/.test(resource):
     method==='POST'?/^\/(customers|checkouts|subscriptions|checkouts\/[A-Za-z0-9_-]{1,160}\/cancel)$/.test(resource):
     (method==='PUT'||method==='DELETE')&&/^\/subscriptions\/[A-Za-z0-9_-]{1,160}$/.test(resource);
   if(!permitted||((method==='GET'||method==='DELETE')&&body!==undefined))throw new ApiError(400,'billing_invalid_request');
