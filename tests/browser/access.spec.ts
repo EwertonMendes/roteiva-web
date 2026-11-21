@@ -533,7 +533,7 @@ test('active trial shows purchase options, keeps courtesy visible and fits compa
   await billing.getByRole('button',{name:'Escolher mensal'}).click();
   const dialog=page.getByRole('dialog');
   await expect(dialog.getByText(/Sua cortesia está garantida até/)).toBeVisible();
-  await expect(dialog.getByText(/Os dias restantes serão acrescentados ao acesso/)).toBeVisible();
+  await expect(dialog.getByText(/os dias restantes serão acrescentados ao acesso/i)).toBeVisible();
   await dialog.getByRole('radio',{name:/Pix/}).check();
   await expect(dialog.getByText(/O período pago será acrescentado ao final dela/)).toBeVisible();
   await expect(dialog.getByText(/Não haverá cobrança automática/)).toBeVisible();
