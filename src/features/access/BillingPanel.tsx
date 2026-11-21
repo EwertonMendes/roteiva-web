@@ -194,10 +194,13 @@ function BillingAccount({uid,access,locked,checkoutReturn}:{
     </div>}
     {locked&&status&&!access.suspended&&!status.checkout&&!canStart&&!status.checkoutAvailable&&
       <p className="billing-notice">Contratação online indisponível no momento.</p>}
-    {!locked&&!upgradeOffer&&!upgrade&&status?.checkoutAvailable&&!status.checkout&&
+    {!locked&&!upgradeOffer&&!upgrade&&status&&!status.checkout&&
       <AppButton variant="secondary" className="billing-toggle-plans" aria-expanded={showPlans} onClick={()=>setShowPlans(value=>!value)}>
         {showPlans?"Ocultar planos":access.source==="trial"||access.source==="complimentary"?"Conhecer planos e contratar":canStartPix?"Renovar com Pix":"Ver planos"} <ChevronDown size={17} aria-hidden="true"/>
       </AppButton>}
+    {showPlans&&status&&!status.checkoutAvailable&&!status.checkout&&<p className="billing-notice" role="status">
+      Você já pode conhecer os planos. A contratação online está temporariamente indisponível; nenhuma cobrança será iniciada até a liberação do pagamento.
+    </p>}
     {showPlans&&status?.courtesyUntil&&canStart&&<p className="billing-notice" role="status">
       Sua cortesia continua até {billingDate(status.courtesyUntil)}. Ao contratar agora, os dias restantes serão preservados.
       No cartão a cobrança é realizada agora e a renovação continua na periodicidade escolhida.

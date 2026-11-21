@@ -1,0 +1,60 @@
+name: Protected PROD test-account access expiry
+on:
+  workflow_dispatch:
+    inputs:
+      target_email:
+        description: Exact email in roteiva-web-prod Firebase Authentication
+        required: true
+        type: string
+      action:
+        description: Expire or restore the test account using the private Firestore backup
+        required: true
+        type: choice
+        options:
+          - expire
+          - restore
+      confirmation:
+        description: Type EXPIRE ROTEIVA PROD TEST
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: roteiva-prod-qa-access
+  cancel-in-progress: false
+jobs:
+  qa:
+    if: >-
+      github.ref == 'refs/heads/master' &&
+      github.actor == github.repository_owner &&
+      inputs.confirmation == 'EXPIRE ROTEIVA PROD TEST'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: cloudflare-production
+    env:
+      QA_TARGET_EMAIL: ${{ inputs.target_email }}
+      QA_ACTION: ${{ inputs.action }}
+      QA_CONFIRMATION: ${{ inputs.confirmation }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_D1_DATABASE_ID: ${{ vars.CLOUDFLARE_D1_DATABASE_ID }}
+      FIREBASE_ADMIN_CREDENTIALS_JSON: ${{ secrets.FIREBASE_ADMIN_CREDENTIALS_JSON }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+      - name: Require current approved master and correct PROD target
+        run: |
+          set -euo pipefail
+          test "$(git ls-remote origin refs/heads/master | cut -f1)" = "$GITHUB_SHA"
+          test "$GITHUB_REPOSITORY" = 'EwertonMendes/roteiva-web'
+          test "$GITHUB_ACTOR" = "$GITHUB_REPOSITORY_OWNER"
+          test "$QA_CONFIRMATION" = 'EXPIRE ROTEIVA PROD TEST'
+          test "$CLOUDFLARE_ACCOUNT_ID" = '836f81609b80e6b75be8e33d80c59dd5'
+          test "$CLOUDFLARE_D1_DATABASE_ID" = '082ca9da-af45-4162-a581-ed2c8c1938cb'
+      - run: npm ci --prefix api --ignore-scripts --no-audit --no-fund
+      - name: Resolve verified Firebase UID and synchronize protected D1/Firestore state
+        run: node api/scripts/qa-prod-access.mjs
