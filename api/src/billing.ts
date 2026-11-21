@@ -13,7 +13,7 @@ export function billingPlansResponse(env?:Env,uid?:string):Response{
     checkoutAvailable:env?checkoutEnabled(env,uid):false,
     currency:'BRL',
     plans:billingCatalog(env,uid),
-  });
+  },{headers:{'Cache-Control':'private, no-store'}});
 }
 
 type SubscriptionView={
