@@ -19,7 +19,7 @@ export function billingPlansResponse(env?:Env,uid?:string):Response{
 type SubscriptionView={
   id:string;cadence:BillingPlanCode;
   status:'active'|'past_due'|'canceled'|'expired';
-  paid_until:number;next_due_on:string|null;amount_cents:number|null;can_cancel:number;cancel_after:number|null;cancel_attempts:number|null;stopped_at:number|null;payment_method:'CREDIT_CARD'|'PIX'|null;
+  paid_until:number;next_due_on:string|null;amount_cents:number|null;can_cancel:number;cancel_after:number|null;cancel_attempts:number|null;stopped_at:number|null;payment_method:'CREDIT_CARD'|'PIX'|null;pricing_version:string|null;
 };
 type PaymentPosition={id:string;due_on:string|null;created_at:number};
 type PaymentView=PaymentPosition&{state:string;amount_cents:number;refunded_amount_cents:number;details:string|null;invoice_path:string|null;payment_method:string};
