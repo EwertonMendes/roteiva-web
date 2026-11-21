@@ -29,7 +29,7 @@ export type BillingStatus = PaymentPage & {
   canRenewWithPix:boolean;
   canStart:boolean;
   notice:{code:string}|null;
-  checkout:{intentId:string;planCode:PlanCode;paymentMethod:PaymentMethod;status:"ready"|"pending";url:string|null}|null;
+  checkout:{intentId:string;planCode:PlanCode;paymentMethod:PaymentMethod;status:"ready"|"pending"|"closing"|"payment_pending"|"review";url:string|null;canCancel?:boolean}|null;
   subscription:Subscription|null;
 };
 export const planNames:Record<PlanCode,string> = {monthly:"Mensal",quarterly:"Trimestral",yearly:"Anual"};

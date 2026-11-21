@@ -164,6 +164,45 @@ test("billing requires consent and a callback alone never restores the workspace
   await expect(page.locator(".app-shell")).toBeVisible();
 });
 
+test("an expired checkout without a URL still offers safe recovery and cleans up callbacks",{tag:"@ci-smoke"},async({page},info)=>{
+  const email="isolated-switch-"+info.project.name+"@example.com";
+  await register(page,email);
+  const uid=await uidFor(email);
+  await setEntitlement(uid,{accessUntil:Timestamp.fromMillis(Date.now()-60000)});
+  const intentId="d7d87e1c-4f28-4d01-91d4-2c488e0cb044";
+  let closes=0,closed=false;
+  await page.route(api+"/billing/**",async route=>{
+    const headers={"Access-Control-Allow-Origin":cloud,"Access-Control-Allow-Methods":"POST, GET, OPTIONS",
+      "Access-Control-Allow-Headers":"Authorization, Content-Type"};
+    if(route.request().method()==="OPTIONS")return route.fulfill({status:204,headers});
+    const path=new URL(route.request().url()).pathname;
+    if(path==="/billing/checkout/abandon"){
+      expect(route.request().postDataJSON()).toEqual({intentId,confirmed:true});
+      closes++;
+      return route.fulfill({status:202,headers,json:{status:"pending"}});
+    }
+    if(path==="/billing/plans")return route.fulfill({headers,json:{plans:[
+      {code:"monthly",amountCents:3990,version:"test"},
+    ]}});
+    return route.fulfill({headers,json:{checkoutAvailable:true,cardAvailable:true,canStart:closed,
+      notice:null,subscription:null,payments:[],checkout:closed?null:{
+        intentId,planCode:"monthly",paymentMethod:"CREDIT_CARD",status:closes?"closing":"pending",url:null,canCancel:!closes,
+      },
+    }});
+  });
+  await page.goto(cloud+"/?billing=expired&intent="+intentId+"&campaign=qa");
+  await expect(page.getByRole("link",{name:"Retomar checkout"})).toHaveCount(0);
+  await page.getByRole("button",{name:"Trocar plano ou pagamento"}).click();
+  await page.getByRole("dialog").getByRole("button",{name:"Cancelar tentativa e escolher"}).click();
+  await expect(page.getByText("Estamos confirmando o encerramento da tentativa anterior.")).toBeVisible();
+  expect(new URL(page.url()).search).toBe("?campaign=qa");
+  closed=true;
+  await page.getByRole("button",{name:"Atualizar situação"}).click();
+  await expect(page.getByRole("button",{name:"Escolher mensal"})).toBeVisible();
+  expect(closes).toBe(1);
+  await expect(page.locator(".app-shell")).toHaveCount(0);
+});
+
 test("isolated E2E: two real emulator Google sessions cannot access each other's records",{tag:"@ci-smoke"},async({page},info)=>{
   const first="isolated-first-"+info.project.name+"@example.com";
   const second="isolated-second-"+info.project.name+"@example.com";

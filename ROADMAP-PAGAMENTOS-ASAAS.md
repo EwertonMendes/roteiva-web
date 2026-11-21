@@ -1,5 +1,7 @@
 # Roteiva — Roadmap de pagamentos e assinaturas (Asaas)
 
+**Homologação do PR #201, 21/11/2026.** A consulta real ao log do Sandbox identificou ausência de chave Pix na criação de checkout avulso. O painel aceitou a solicitação de chave aleatória. A auditoria do D1 ligou as sete revisões de `CHECKOUT_PAID` com erro de visibilidade a pagamentos já conciliados. [Decisões, recuperação e critérios de aceite](BILLING-PIX-PORTABILITY-DEV.md).
+
 > **Fonte persistente da decisão de produto.** Criado em 20/11/2026. `docs/MVP-ROADMAP.md` registra o progresso factual; `docs/ARCHITECTURE.md` registra os contratos de arquitetura. Este documento registra as regras e os critérios para retomada em outra conversa. Nunca marcar etapas como concluídas sem código, testes e evidências.
 >
 > **Estado inicial:** planejamento aprovado; conta Asaas PF criada, categoria "Vendo produtos → Software (licenças e programas)", documentos de identificação/ativação de produção pendentes. Não há chave de API ou webhook comprovadamente provisionados. **PROD permanece sem cobrança e sem alterações.**

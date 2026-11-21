@@ -1,4 +1,6 @@
 # Arquitetura
+
+**Recuperação de checkout DEV, PR #201.** O mesmo inbox serializado por lease recebe um pedido de encerramento por tentativa. A expiração local desabilita o link, e só evidência terminal com leitura independente dos pagamentos libera uma nova contratação. Um evento pago pendente bloqueia o encerramento. A alteração da lista de QA afeta compras novas. A recuperação continua vinculada ao UID do checkout original.
 > **Retorno do checkout Asaas (DEV):** a URL `?billing=return&intent=<uuid>` serve somente à navegação. O frontend faz uma consulta de reconciliação autenticada, limitada à intenção do usuário, e acompanha por tempo finito o estado canônico do servidor. O Worker insere um único evento determinístico na inbox D1, processado pelo mesmo conciliador com lease/consulta autoritativa ao Asaas; webhooks também iniciam o conciliador após a persistência. Nenhum callback ou status de frontend concede acesso: a transição do workspace exige a projeção autorizada do Firestore. Cancelamento, expiração, indisponibilidade e atraso nunca são declarados cobrança paga ou fracassada sem confirmação.
  do Roteiva — MVP SaaS
 

@@ -1,5 +1,6 @@
 import {asaasConfigured,AsaasError,asaasRequest,providerRef} from './billing-asaas.ts';
-import {checkoutLink,type CheckoutIntent} from './billing-checkout.ts';
+import {checkoutLink,openCheckout,type CheckoutIntent} from './billing-checkout.ts';
+import {observeCheckoutClosure,queueCheckoutClosure} from './billing-checkout-change.ts';
 import {planBillingEvent} from './billing-events.ts';
 import {billingDateInstant,cents,civilDate,periodEnd} from './billing-period.ts';
 import {flushBillingProjection,queueBillingProjection} from './billing-projection.ts';
@@ -118,7 +119,19 @@ async function reconcilePayment(env:Env,payment:Record<string,unknown>,ref:strin
   if(cents(payment.value)!==amount&&
     !(refund>0&&(previous?.amount_cents===amount||cents(payment.originalValue)===amount)))return 'review';
   if(!prior){
-    if(!['pending','ready'].includes(intent.status))return 'review';
+    const closed=['canceled','expired'].includes(intent.status);
+    if(!['pending','ready'].includes(intent.status)&&(!closed||
+      !['CONFIRMED','RECEIVED'].includes(String(payment.status))))return 'review';
+    if(closed){
+      const anotherCheckout=await openCheckout(env,intent.owner_uid);
+      const otherContract=await env.DB.prepare("SELECT 1 FROM billing_contracts WHERE owner_uid=? AND removed_at IS NULL")
+        .bind(intent.owner_uid).first();
+      if(anotherCheckout||otherContract)return 'review';
+      // Contract creation requires an open intent. Reopen only in the same
+      // transaction as the verified payment; the unique index fences new checkout.
+      statements.push(env.DB.prepare("UPDATE billing_checkout_intents SET status='pending' WHERE id=? AND status IN ('canceled','expired')")
+        .bind(intent.id));
+    }
     const contract=await asaasRequest(env,'GET',`/subscriptions/${subscription}`);
     if(contract.id!==subscription||contract.customer!==customer||
       contract.billingType!=='CREDIT_CARD'||cents(contract.value)!==amount||
@@ -186,11 +199,29 @@ async function reconcileCheckout(env:Env,event:InboxEvent,ref:string):Promise<'p
   }
   const intent=await intentByCheckout(env,ref);
   if(!intent)throw new ApiError(503,'billing_checkout_unlinked');
+  if(event.event_type==='CHECKOUT_PAID'&&intent.status==='completed'){
+    const verified=await env.DB.prepare(
+      "SELECT 1 FROM billing_payment_records WHERE owner_uid=? AND subscription_id=? AND provider='asaas' "+
+      "AND (applied_at IS NOT NULL OR paid_at IS NOT NULL OR state='refunded') LIMIT 1"
+    ).bind(intent.owner_uid,intent.id).first();
+    if(verified)return 'processed';
+  }
   if((event.event_id.startsWith('recovery:')||event.event_id.startsWith('return:'))&&!['pending','ready'].includes(intent.status))return 'ignored';
-  if(event.event_type==='CHECKOUT_CANCELED'||event.event_type==='CHECKOUT_EXPIRED'){
-    const status=event.event_type==='CHECKOUT_CANCELED'?'canceled':'expired';
-    await env.DB.prepare("UPDATE billing_checkout_intents SET status=?,updated_at=? WHERE id=? AND status IN ('pending','ready')")
-      .bind(status,now,intent.id).run();
+  if(['CHECKOUT_CANCELED','CHECKOUT_EXPIRED','CHECKOUT_CLOSE'].includes(event.event_type)){
+    const proof=event.event_type==='CHECKOUT_CANCELED'?'canceled':event.event_type==='CHECKOUT_EXPIRED'?'expired':undefined;
+    const closure=await observeCheckoutClosure(env,intent,ref,proof);
+    if(closure.state==='has_payment'){
+      const {payment}=closure;
+      const status=intent.payment_method==='PIX'
+        ?await reconcilePixPayment(env,payment.raw,payment.id,event.event_type)
+        :await reconcilePayment(env,payment.raw,payment.id);
+      const latest=await intentByCheckout(env,ref);
+      if(latest?.status==='completed')return status;
+      // Keep the checkout locked while settlement is unresolved. A pending
+      // payment or an empty lookup without terminal proof cannot release it.
+      if(status==='review')return 'review';
+      throw new ApiError(503,'billing_checkout_payment_verifying');
+    }
   }else if(event.event_type==='CHECKOUT_CREATED'){
     if(intent.expires_at>now&&!await accountDeleting(env,intent.owner_uid)){
       const url=new URL(checkoutLink(ref));
@@ -242,7 +273,12 @@ async function processInbox(env:Env):Promise<boolean>{
   const event=await env.DB.prepare(
     "UPDATE billing_webhook_events SET status='pending',lease_id=?,lease_until=?,attempts=attempts+1 WHERE provider='asaas' AND event_id=("+
     "SELECT event_id FROM billing_webhook_events WHERE provider='asaas' AND (status='pending' OR "+
-    "(status='review' AND event_type='PAYMENT_PARTIALLY_REFUNDED' AND attempts=1 AND processed_at IS NOT NULL AND last_error_code IS NULL)) "+
+    "(status='review' AND event_type='PAYMENT_PARTIALLY_REFUNDED' AND attempts=1 AND processed_at IS NOT NULL AND last_error_code IS NULL) OR "+
+    "(status='review' AND event_type='CHECKOUT_PAID' AND attempts=8 AND last_error_code='billing_payment_not_visible' "+
+    "AND EXISTS(SELECT 1 FROM billing_checkout_intents i JOIN billing_payment_records p ON p.subscription_id=i.id "+
+    "AND p.owner_uid=i.owner_uid AND p.provider=i.provider "+
+    "WHERE i.provider='asaas' AND i.provider_checkout_ref=billing_webhook_events.resource_ref AND i.status='completed' "+
+    "AND (p.applied_at IS NOT NULL OR p.paid_at IS NOT NULL OR p.state='refunded')))) "+
     'AND resource_ref IS NOT NULL AND next_attempt_at<=? AND lease_until<=? '+
     "AND NOT EXISTS(SELECT 1 FROM billing_webhook_events WHERE provider='asaas' AND status='pending' AND lease_until>?) "+
     'ORDER BY next_attempt_at,received_at LIMIT 1) RETURNING event_id,event_type,resource_ref,checkout_intent_ref,attempts'
@@ -250,7 +286,8 @@ async function processInbox(env:Env):Promise<boolean>{
   if(!event)return false;
   let status:'processed'|'ignored'|'pending'|'review'='review',code:string|null=null;
   try{
-    const action=(event.event_id.startsWith('recovery:')||event.event_id.startsWith('return:'))?'reconcile_checkout':planBillingEvent(event.event_type).action;
+    const action=event.event_type==='CHECKOUT_CLOSE'||event.event_type==='CHECKOUT_RECOVERY'
+      ?'reconcile_checkout':planBillingEvent(event.event_type).action;
     const ref=providerRef(event.resource_ref);
     if(ref&&action==='reconcile_payment'){
       try{
@@ -283,6 +320,16 @@ async function processInbox(env:Env):Promise<boolean>{
 
 async function recoverCheckout(env:Env):Promise<void>{
   const now=Date.now();
+  const expired=await env.DB.prepare(
+    "SELECT i.id,i.owner_uid FROM billing_checkout_intents i WHERE i.status IN ('pending','ready') "+
+    "AND i.expires_at<=? AND i.provider_checkout_ref IS NOT NULL "+
+    "AND NOT EXISTS(SELECT 1 FROM billing_webhook_events e WHERE e.provider=i.provider AND e.event_id='close:'||i.id) "+
+    "ORDER BY i.expires_at LIMIT 1"
+  ).bind(now).first<{id:string;owner_uid:string}>();
+  if(expired){
+    await queueCheckoutClosure(env,expired.id,expired.owner_uid,now);
+    return;
+  }
   const pending=await env.DB.prepare(
     "SELECT id FROM billing_checkout_intents WHERE status IN ('pending','ready') "+
     'AND provider_checkout_ref IS NOT NULL AND recovery_after<=? ORDER BY recovery_after LIMIT 1'

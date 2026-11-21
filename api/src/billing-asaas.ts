@@ -20,20 +20,23 @@ export function providerRef(value:unknown):string|null {
   return typeof value==='string' && /^[A-Za-z0-9_-]{1,160}$/.test(value)?value:null;
 }
 
+export function checkoutTestUsers(env:Env):string[]{
+  return [env.BILLING_CHECKOUT_TEST_UID??'',...(env.BILLING_CHECKOUT_TEST_UIDS??'').split(',')]
+    .map(uid=>uid.trim()).filter(uid=>/^[A-Za-z0-9_-]{1,128}$/.test(uid));
+}
+
 export function pixEnabled(env:Env,uid?:string):boolean{
-  // Staged rollout: only the existing Sandbox canary until separately approved
-  // for all DEV accounts. A global card checkout flag does not enable PIX.
   return env.ENVIRONMENT==='dev'&&asaasConfigured(env)&&env.BILLING_PIX_ENABLED==='true'&&
-    !!uid&&uid===env.BILLING_CHECKOUT_TEST_UID;
+    !!uid&&checkoutTestUsers(env).includes(uid);
 }
 
 export function checkoutRouted(env:Env):boolean{
   return env.ENVIRONMENT==='dev'&&asaasConfigured(env)&&
-    (env.BILLING_CHECKOUT_ENABLED==='true'||!!env.BILLING_CHECKOUT_TEST_UID);
+    (env.BILLING_CHECKOUT_ENABLED==='true'||checkoutTestUsers(env).length>0);
 }
 
 export function checkoutEnabled(env:Env,uid?:string):boolean{
-  return checkoutRouted(env)&&(env.BILLING_CHECKOUT_ENABLED==='true'||!!uid&&uid===env.BILLING_CHECKOUT_TEST_UID);
+  return checkoutRouted(env)&&(env.BILLING_CHECKOUT_ENABLED==='true'||!!uid&&checkoutTestUsers(env).includes(uid));
 }
 
 /** Upstream status is used internally. The provider's error body is discarded. */
@@ -78,9 +81,11 @@ export async function asaasRequest<T extends Record<string,unknown>>(
       const allowedFields=['billingTypes','chargeTypes','callback','items','customer','customerData','subscription','externalReference','minutesToExpire','pix','chave','habilitad'];
       const validations=Array.isArray(issues)?issues.slice(0,4).map(item=>{
         const issue=item&&typeof item==='object'?item as Record<string,unknown>:{};
-        const code=typeof issue.code==='string'&&/^[a-zA-Z_]{1,40}$/.test(issue.code)?issue.code:'unknown';
+        const code=['invalid_object','invalid_action','invalid_value','invalid_billing_type'].includes(String(issue.code))?
+          String(issue.code):'unknown';
         const description=typeof issue.description==='string'?issue.description.toLowerCase():'';
-        return {code,fields:allowedFields.filter(field=>description.includes(field.toLowerCase()))};
+        return {code,fields:allowedFields.filter(field=>description.includes(field.toLowerCase())),
+          ...(/criar uma chave pix/.test(description)?{reason:'pix_account_key_required'}:{})};
       }):[];
       console.warn(JSON.stringify({
         event:'billing_pix_checkout_rejected',

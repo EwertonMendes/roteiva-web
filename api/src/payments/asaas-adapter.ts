@@ -34,7 +34,7 @@ export function asaasGateway(env:Env):PaymentGateway {
     },
     async listCheckoutPayments(id) {
       const response=await asaasRequest(env,'GET',`/payments?checkoutSession=${id}&limit=2`);
-      if(!Array.isArray(response.data)||response.hasMore===true||response.data.length>1)
+      if(!Array.isArray(response.data)||response.hasMore!==false||response.data.length>1)
         throw new ApiError(503,'billing_checkout_payment_review');
       return response.data.map(item=>{
         if(!item||typeof item!=='object'||Array.isArray(item))

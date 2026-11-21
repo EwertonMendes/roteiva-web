@@ -1,5 +1,5 @@
 import {providerRef} from './billing-asaas.ts';
-import {type CheckoutIntent} from './billing-checkout.ts';
+import {openCheckout,type CheckoutIntent} from './billing-checkout.ts';
 import {billingDateInstant,cents,civilDate,periodEnd} from './billing-period.ts';
 import {queueBillingProjection} from './billing-projection.ts';
 import {refundedSoFar} from './billing-refunds.ts';
@@ -60,23 +60,15 @@ export async function reconcilePixPayment(env:Env,payment:Record<string,unknown>
   }
   if(payment.status!=='RECEIVED')return 'review';
   if(existing)return existing.state==='received'?'processed':'review';
-  if(!['pending','ready'].includes(intent.status))return 'review';
+  const closed=['canceled','expired'].includes(intent.status);
+  if(!closed&&!['pending','ready'].includes(intent.status))return 'review';
+  if(closed&&await openCheckout(env,intent.owner_uid))return 'review';
   const paidOn=civilDate(payment.paymentDate??payment.confirmedDate);
   if(!paidOn)return 'review';
   const activeContract=await env.DB.prepare(
     'SELECT 1 FROM billing_contracts WHERE owner_uid=? AND removed_at IS NULL LIMIT 1'
   ).bind(intent.owner_uid).first();
   if(activeContract)return 'review';
-  const priorPix=await env.DB.prepare(
-    "SELECT 1 FROM access_subscriptions WHERE owner_uid=? AND status IN ('active','past_due','canceled') AND paid_until>? AND id!=? LIMIT 1"
-  ).bind(intent.owner_uid,now,intent.id).first();
-  // Renewing manual access is allowed. Card recurrences are not.
-  if(priorPix){
-    const recurring=await env.DB.prepare(
-      'SELECT 1 FROM billing_contracts WHERE owner_uid=? LIMIT 1'
-    ).bind(intent.owner_uid).first();
-    if(recurring)return 'review';
-  }
   const last=await env.DB.prepare(
     "SELECT MAX(paid_until) AS until FROM access_subscriptions WHERE owner_uid=? AND status IN ('active','past_due','canceled')"
   ).bind(intent.owner_uid).first<{until:number|null}>();
@@ -85,6 +77,8 @@ export async function reconcilePixPayment(env:Env,payment:Record<string,unknown>
   if(end<=anchor)return 'review';
   const dueOn=civilDate(payment.originalDueDate??payment.dueDate)??dayAt(now);
   const changed=await env.DB.batch([
+    ...(closed?[env.DB.prepare("UPDATE billing_checkout_intents SET status='pending' WHERE id=? AND status IN ('canceled','expired')")
+      .bind(intent.id)]:[]),
     env.DB.prepare("INSERT OR IGNORE INTO billing_customers(owner_uid,provider,provider_customer_ref,created_at,updated_at) VALUES(?,'asaas',?,?,?)")
       .bind(intent.owner_uid,customer,now,now),
     env.DB.prepare("INSERT INTO access_subscriptions(id,owner_uid,provider,provider_reference,cadence,status,paid_until,updated_at) "+

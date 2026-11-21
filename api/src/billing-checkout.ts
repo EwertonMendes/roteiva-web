@@ -18,10 +18,16 @@ export type CheckoutIntent={
   id:string;owner_uid:string;plan_code:BillingPlanCode;pricing_version:string;amount_cents:number;
   status:'pending'|'ready'|'completed'|'expired'|'canceled'|'failed';payment_method:PaymentMethod;
   provider_checkout_ref:string|null;checkout_path:string|null;expires_at:number;first_due_on:string|null;
+  close_status?:'pending'|'processed'|'ignored'|'review'|null;
+  close_error?:string|null;
 };
 
 export function openCheckout(env:Env,uid:string):Promise<CheckoutIntent|null>{
-  return env.DB.prepare("SELECT * FROM billing_checkout_intents WHERE owner_uid=? AND status IN ('pending','ready')")
+  return env.DB.prepare(
+    "SELECT i.*,e.status AS close_status,e.last_error_code AS close_error FROM billing_checkout_intents i "+
+    "LEFT JOIN billing_webhook_events e ON e.provider=i.provider AND e.event_id='close:'||i.id "+
+    "WHERE i.owner_uid=? AND i.status IN ('pending','ready')"
+  )
     .bind(uid).first<CheckoutIntent>();
 }
 
@@ -40,8 +46,9 @@ export function checkoutLink(id:string,link?:unknown):string{
 }
 
 export function openCheckoutUrl(row:CheckoutIntent,now:number):string|null{
-  if(row.expires_at<=now||!row.provider_checkout_ref)return null;
-  return checkoutLink(row.provider_checkout_ref,row.checkout_path?sandboxOrigin+row.checkout_path:undefined);
+  if(row.close_status||row.expires_at<=now||!row.provider_checkout_ref)return null;
+  try{return checkoutLink(row.provider_checkout_ref,row.checkout_path?sandboxOrigin+row.checkout_path:undefined);}
+  catch{return null;}
 }
 
 function resume(row:CheckoutIntent,planCode:BillingPlanCode,method:PaymentMethod,now:number):Response{
@@ -86,10 +93,11 @@ export async function createCheckout(request:Request,env:Env,uid:string,now=Date
     "SELECT ?,owner_uid,'asaas',?,?,?,'pending',?,?,?,?,? FROM access_accounts WHERE owner_uid=? AND suspended_at IS NULL AND sync_pending=0 AND trial_ends_at<=? "+
     "AND NOT EXISTS(SELECT 1 FROM account_deletions WHERE owner_uid=?) "+
     "AND NOT EXISTS(SELECT 1 FROM access_grants WHERE owner_uid=? AND revoked_at IS NULL AND starts_at<=? AND (ends_at IS NULL OR ends_at>?)) "+
-    "AND (?='PIX' OR NOT EXISTS(SELECT 1 FROM access_subscriptions WHERE owner_uid=? AND status IN ('active','past_due','canceled') AND paid_until>?)) "+
+    "AND NOT EXISTS(SELECT 1 FROM access_subscriptions s WHERE s.owner_uid=? AND s.status IN ('active','past_due','canceled') "+
+    "AND s.paid_until>? AND (?<>'PIX' OR EXISTS(SELECT 1 FROM billing_contracts c WHERE c.subscription_id=s.id))) "+
     "AND NOT EXISTS(SELECT 1 FROM billing_contracts WHERE owner_uid=? AND removed_at IS NULL)"
   ).bind(id,plan.code,plan.version,plan.amountCents,now,now+CHECKOUT_LIFETIME,now,firstDueDate.slice(0,10),method,
-    uid,now,uid,uid,now,now,method,uid,now,uid).run();
+    uid,now,uid,uid,now,now,uid,now,method,uid).run();
   if(result.meta.changes!==1){
     const existing=await openCheckout(env,uid);
     if(existing)return resume(existing,plan.code,method,now);

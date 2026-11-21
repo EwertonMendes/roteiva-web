@@ -1,6 +1,6 @@
 
 import {activeState} from './access.ts';
-import {asaasConfigured,AsaasError,asaasRequest,checkoutEnabled,providerRef} from './billing-asaas.ts';
+import {asaasConfigured,AsaasError,asaasRequest,checkoutEnabled,checkoutTestUsers,providerRef} from './billing-asaas.ts';
 import {requireBillingPlan,type BillingPlanCode} from './billing-catalog.ts';
 import {billingDateInstant,cents,civilDate,periodEnd} from './billing-period.ts';
 import {readBillingJson} from './billing-webhook.ts';
@@ -23,11 +23,11 @@ type Contract={
 type RemoteContract={ref:string;customer:string};
 
 export function upgradeRouted(env:Env):boolean{
-  // The existing dedicated Sandbox account is the only account enabled for upgrade homologation.
-  return !!env.BILLING_CHECKOUT_TEST_UID&&checkoutEnabled(env,env.BILLING_CHECKOUT_TEST_UID);
+  // Upgrade rollout is restricted to explicitly configured DEV test users.
+  return checkoutTestUsers(env).some(uid=>checkoutEnabled(env,uid));
 }
 export function upgradeOffer(env:Env,uid:string,plan:BillingPlanCode,paidUntil:number,now:number){
-  if(!upgradeRouted(env)||uid!==env.BILLING_CHECKOUT_TEST_UID||
+  if(!upgradeRouted(env)||!checkoutTestUsers(env).includes(uid)||
     paidUntil<=now+MUTATION_WINDOW||!destinations[plan].length)return null;
   const effectiveOn=civilDate(new Date(paidUntil).toISOString().slice(0,10));
   if(!effectiveOn||billingDateInstant(effectiveOn)!==paidUntil)return null;
@@ -115,7 +115,7 @@ function mark(env:Env,id:string,state:'verifying'|'rejected'|'review',retryAt=0)
 }
 
 export async function requestUpgrade(env:Env,uid:string,request:Request):Promise<Response>{
-  if(!upgradeRouted(env)||uid!==env.BILLING_CHECKOUT_TEST_UID)throw new ApiError(404,'not_found');
+  if(!upgradeRouted(env)||!checkoutTestUsers(env).includes(uid))throw new ApiError(404,'not_found');
   const body=await readBillingJson(request,1024) as {
     planCode?:unknown;catalogVersion?:unknown;effectiveOn?:unknown;confirmed?:unknown;
   }|null;

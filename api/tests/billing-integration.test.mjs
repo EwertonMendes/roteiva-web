@@ -130,7 +130,11 @@ test('return recovery verifies Asaas payment immediately and still preserves cro
 test('ambiguous checkout creation stays fenced across restarts and can recover from a provider event',async t=>{
   const s=setup(t);
   let posts=0;
-  t.mock.method(globalThis,'fetch',async()=>{posts++;throw Error('lost response');});
+  t.mock.method(globalThis,'fetch',async(url,options)=>{
+    if(options.method==='GET'&&String(url).includes('checkoutSession=checkout_a'))
+      return Response.json({data:[],hasMore:false});
+    posts++;throw Error('lost response');
+  });
   assert.equal((await createCheckout(purchase(),s.env,'owner')).status,202);
   assert.equal((await createCheckout(purchase(),s.env,'owner')).status,202);
   const intent=s.sql.prepare('SELECT * FROM billing_checkout_intents').get();

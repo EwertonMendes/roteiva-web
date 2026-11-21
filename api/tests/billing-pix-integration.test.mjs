@@ -4,6 +4,7 @@ import {database} from './helpers/database.mjs';
 import {createCheckout} from '../src/billing-checkout.ts';
 import {abandonUnpaidCheckout} from '../src/billing-checkout-change.ts';
 import {ingestAsaasWebhook} from '../src/billing-webhook.ts';
+import {billingStatusResponse} from '../src/billing.ts';
 import {reconcileBilling} from '../src/billing-reconciliation.ts';
 import {buildDetachedPixCheckout,buildRecurringCardCheckout} from '../src/billing-checkout-contract.ts';
 
@@ -99,34 +100,71 @@ test('PIX stays fenced in CONFIRMED (PF caution), RECEIVED grants exactly once; 
  assert.equal(s.sql.prepare('SELECT paid_until FROM access_subscriptions').get().paid_until,0);
  assert.equal(s.sql.prepare('SELECT state FROM billing_payment_records').get().state,'refunded');
 });
-test('switch cancels only a verified unpaid checkout; old attempt persists for audit',async t=>{
+test('switch persists one request and requires terminal evidence across allowlist changes and expiry',async t=>{
  const s=fixture(t);
- let posts=0,cancels=0,paid=false;
- t.mock.method(globalThis,'fetch',async(url,options)=>{
+ let posts=0,cancels=0,ambiguous=true;
+ t.mock.method(globalThis,'fetch',async(url)=>{
   const path=String(url);
   if(path.endsWith('/checkouts')){posts++;return Response.json({id:'checkout_'+posts});}
   if(path.endsWith('/checkouts/checkout_1/cancel')){
     cancels++;
-    return paid?new Response('{}',{status:400}):Response.json({id:'checkout_1',status:'CANCELED'});
+    return ambiguous?new Response('{}',{status:400}):Response.json({id:'checkout_1',status:'CANCELED'});
   }
-  if(path.includes('/payments?checkoutSession=checkout_1'))return Response.json({data:paid?[payment('RECEIVED')]:[],hasMore:false});
+  if(path.includes('/payments?checkoutSession=checkout_1'))return Response.json({data:[],hasMore:false});
   throw Error('unexpected request: '+path);
  });
  await createCheckout(request('monthly'),s.env,'owner');
  const old=s.sql.prepare('SELECT id FROM billing_checkout_intents').get().id;
+ const state=async()=>await (await billingStatusResponse(s.env,'owner')).json();
  const abandon=()=>abandonUnpaidCheckout(new Request(base+'/billing/checkout/abandon',{method:'POST',
   headers:{'content-type':'application/json'},body:JSON.stringify({intentId:old,confirmed:true})}),s.env,'owner');
- paid=true;
- await assert.rejects(abandon(),{code:'billing_checkout_payment_verifying'});
+ s.env.BILLING_CHECKOUT_ENABLED='false';
+ s.env.BILLING_CHECKOUT_TEST_UID='someone_else';
+ assert.equal((await state()).checkoutAvailable,false);
+ assert.ok((await state()).checkout.url);
+ s.sql.prepare("UPDATE billing_checkout_intents SET created_at=?,expires_at=? WHERE id=?")
+  .run(Date.now()-60000,Date.now()-1,old);
+ assert.equal((await state()).checkout.url,null);
+ assert.equal((await state()).checkout.canCancel,true);
+ assert.deepEqual((await Promise.all([abandon(),abandon()])).map(x=>x.status),[202,202]);
+ await reconcileBilling(s.env);
  assert.equal(cancels,1);
- paid=false;
- assert.equal((await abandon()).status,200);
+ assert.equal((await state()).checkout.status,'closing');
+ assert.equal(s.sql.prepare("SELECT count(*) n FROM billing_webhook_events WHERE event_type='CHECKOUT_CLOSE'").get().n,1);
+ s.env.BILLING_CHECKOUT_TEST_UIDS='someone_else, owner';
+ await assert.rejects(createCheckout(request('yearly'),s.env,'owner'),{code:'billing_checkout_already_open'});
+ ambiguous=false;
+ s.sql.prepare("UPDATE billing_webhook_events SET next_attempt_at=0").run();
+ await reconcileBilling(s.env);
  assert.equal(cancels,2);
  assert.equal(s.sql.prepare('SELECT status FROM billing_checkout_intents WHERE id=?').get(old).status,'canceled');
  await createCheckout(request('yearly'),s.env,'owner');
  assert.equal(posts,2);
  assert.equal(s.sql.prepare('SELECT COUNT(*) n FROM billing_checkout_intents').get().n,2);
  assert.equal(s.sql.prepare('SELECT COUNT(*) n FROM billing_contracts').get().n,0);
+});
+
+test('closure is fenced by an authenticated paid signal even when the provider list lags',async t=>{
+ const s=fixture(t);
+ const calls=[];
+ t.mock.method(globalThis,'fetch',async(url)=>{
+  const path=String(url);calls.push(path);
+  if(path.endsWith('/checkouts'))return Response.json({id:'checkout_pix'});
+  if(path.includes('/payments?checkoutSession=checkout_pix'))return Response.json({data:[],hasMore:false});
+  throw Error('unexpected request: '+path);
+ });
+ await createCheckout(request(),s.env,'owner');
+ const {id}=s.sql.prepare('SELECT id FROM billing_checkout_intents').get();
+ const response=await abandonUnpaidCheckout(new Request(base+'/billing/checkout/abandon',{method:'POST',
+  headers:{'content-type':'application/json'},body:JSON.stringify({intentId:id,confirmed:true})}),s.env,'owner');
+ assert.equal(response.status,202);
+ await notify(s.env,'CHECKOUT_PAID','checkout','checkout_pix');
+ await reconcileBilling(s.env);
+ assert.equal(s.sql.prepare('SELECT status FROM billing_checkout_intents').get().status,'ready');
+ assert.ok(calls.every(path=>!path.endsWith('/cancel')));
+ const {checkout}=await (await billingStatusResponse(s.env,'owner')).json();
+ assert.equal(checkout.status,'payment_pending');
+ assert.equal(checkout.url,null);
 });
 
 test('Provider 400 on Pix is definitive, logged without PII and does not block existing card',async t=>{

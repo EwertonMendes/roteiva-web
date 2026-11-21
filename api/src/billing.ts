@@ -60,7 +60,7 @@ async function paymentPage(env:Env,uid:string,cursor:string|null){
 /** Billing status remains readable with an expired trial or paid period. */
 export async function billingStatusResponse(env:Env,uid:string,now=Date.now(),cursor:string|null=null):Promise<Response>{
   if(cursor!==null)return Response.json(await paymentPage(env,uid,cursor));
-  const [access,subscription,checkout,history,runningCard]=await Promise.all([
+  const [access,subscription,checkout,history,blockingCard]=await Promise.all([
     activeState(env,uid,now),
     env.DB.prepare(
       'SELECT s.id,s.cadence,s.status,s.paid_until,c.next_due_on,c.stopped_at,c.cancel_after,c.cancel_attempts,(c.subscription_id IS NOT NULL AND c.removed_at IS NULL) AS can_cancel '+
@@ -70,26 +70,32 @@ export async function billingStatusResponse(env:Env,uid:string,now=Date.now(),cu
     ).bind(uid).first<SubscriptionView>(),
     openCheckout(env,uid),
     paymentPage(env,uid,null),
-    env.DB.prepare('SELECT 1 AS running FROM billing_contracts WHERE owner_uid=? AND removed_at IS NULL LIMIT 1').bind(uid).first(),
+    env.DB.prepare('SELECT 1 FROM billing_contracts c JOIN access_subscriptions s ON s.id=c.subscription_id '+
+      "WHERE c.owner_uid=? AND (c.removed_at IS NULL OR (s.status<>'expired' AND s.paid_until>?)) LIMIT 1")
+      .bind(uid,now).first(),
   ]);
   const enabled=checkoutEnabled(env,uid);
   const pix=pixEnabled(env,uid);
-  const checkoutUrl=checkout&&enabled?openCheckoutUrl(checkout,now):null;
+  const checkoutUrl=checkout&&!access?.suspended?openCheckoutUrl(checkout,now):null;
+  const checkoutStatus=checkout?.close_status==='review'||checkout&&checkout.expires_at<=now&&!checkout.provider_checkout_ref?'review':
+    checkout?.close_error==='billing_checkout_payment_verifying'?'payment_pending':
+    checkout?.close_status?'closing':checkoutUrl?'ready':'pending';
   const upgrade=subscription?.can_cancel&&subscription.stopped_at===null&&subscription.cancel_after===null
     ?await currentUpgrade(env,uid,subscription.id):null;
   return Response.json({
     checkoutAvailable:enabled||pix,
     cardAvailable:enabled,
     pixAvailable:pix,
-    canRenewWithPix:pix&&!!access&&!access.suspended&&!checkout&&!runningCard&&
+    canRenewWithPix:pix&&!!access&&!access.suspended&&!checkout&&!blockingCard&&
       (!access.active||access.source==='subscription'),
-    canStart:checkoutEnabled(env,uid)&&!!access&&!access.active&&!access.suspended&&!checkout&&!subscription?.can_cancel,
+    canStart:checkoutEnabled(env,uid)&&!!access&&!access.active&&!access.suspended&&!checkout&&!blockingCard,
     access,
     notice:billingNotice(access,subscription,now),
     checkout:checkout?{
       intentId:checkout.id,planCode:checkout.plan_code,
       paymentMethod:checkout.payment_method??'CREDIT_CARD',
-      status:checkoutUrl?'ready':'pending',
+      status:checkoutStatus,
+      canCancel:!!checkout.provider_checkout_ref&&!checkout.close_status&&!access?.suspended&&asaasConfigured(env),
       url:checkoutUrl,
     }:null,
     subscription:subscription?{

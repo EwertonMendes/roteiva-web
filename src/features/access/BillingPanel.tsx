@@ -17,9 +17,12 @@ const subscriptionStates:Record<string,{label:string;tone:string}> = {
   canceled:{label:"Renovação cancelada",tone:"warning"},
   expired:{label:"Expirada",tone:"neutral"},
 };
-const callbacks:Record<string,string> = {
-  cancelled:"O checkout foi interrompido. Se você chegou a pagar, sua confirmação continuará sendo processada. Consulte o histórico antes de tentar novamente.",
-  expired:"O prazo do checkout terminou. Se houve cobrança, aguarde a confirmação antes de iniciar outra contratação.",
+const checkoutStatusCopy:Record<NonNullable<BillingStatus["checkout"]>["status"],string>={
+  ready:"Conclua o pagamento ou encerre a tentativa para escolher outra forma de pagamento.",
+  pending:"Estamos verificando a tentativa de contratação.",
+  closing:"Estamos confirmando o encerramento da tentativa anterior.",
+  payment_pending:"Identificamos um pagamento em processamento. Aguarde a confirmação antes de contratar novamente.",
+  review:"Sua tentativa precisa de conferência. Se houve cobrança, fale com o suporte.",
 };
 
 export function BillingPanel({access,locked=false}:{access:AccessInfo;locked?:boolean}) {
@@ -43,21 +46,56 @@ function BillingAccount({uid,access,locked}:{uid:string;access:AccessInfo;locked
   const [message,setMessage] = useState("");
   const [checkoutPending,setCheckoutPending] = useState(false);
   const [returnState,setReturnState] = useState<"idle"|"checking"|"delayed"|"unavailable">("idle");
+  const [{kind:callback,intent:returnIntent}] = useState(()=>{
+    const params=new URLSearchParams(window.location.search);
+    return {kind:locked?params.get("billing"):null,intent:params.get("intent")};
+  });
+  const waitingForReturn=callback==="return"&&returnState!=="unavailable";
   const refreshKey = access.accessUntil.getTime();
-  const callback = locked ? new URLSearchParams(window.location.search).get("billing") : null;
-  const returnIntent = locked ? new URLSearchParams(window.location.search).get("intent") : null;
+  useEffect(()=>{
+    if(!callback)return;
+    const url=new URL(window.location.href);
+    url.searchParams.delete("billing");
+    url.searchParams.delete("intent");
+    window.history.replaceState(window.history.state,"",url);
+  },[callback]);
   const status = result?.status;
   const subscription = status?.subscription;
   const checkoutUrl = access.suspended ? undefined : sandboxLink(status?.checkout?.url,"checkout");
-  const canStartCard = locked && callback!=="return" && !!status?.canStart && !access.suspended;
-  const canStartPix = callback!=="return"&&!!status?.pixAvailable&&!!status?.canRenewWithPix&&!access.suspended;
+  const canStartCard = locked && !waitingForReturn && !!status?.canStart && !access.suspended;
+  const canStartPix = !waitingForReturn&&!!status?.pixAvailable&&!!status?.canRenewWithPix&&!access.suspended;
   const canStart=canStartCard||canStartPix;
   const upgradeOffer = !locked&&!access.suspended ? subscription?.upgradeOffer : null;
   const upgrade = subscription?.upgrade;
   const readCatalog = !access.suspended && (locked&&canStart || showPlans);
+  const checkoutState=status?.checkout?.status;
+  const checkingCheckout=checkoutPending||checkoutState==="closing"||checkoutState==="payment_pending"||checkoutState==="pending";
+
+  useEffect(()=>{
+    if(!checkingCheckout||access.suspended||waitingForReturn)return;
+    const controller=new AbortController();
+    let timer:ReturnType<typeof setTimeout>;
+    const delays=[2000,5000,11000,24000,47000];
+    const poll=(index:number)=>{
+      timer=setTimeout(async()=>{
+        try{
+          const current=await billingRequest<BillingStatus>("/billing/status",uid,undefined,controller.signal);
+          if(controller.signal.aborted)return;
+          setCheckoutPending(false);
+          setResult(previous=>({status:current,revision:(previous?.revision??0)+1}));
+          if(!current.checkout||["ready","review"].includes(current.checkout.status))return;
+        }catch{
+          if(controller.signal.aborted)return;
+        }
+        if(index+1<delays.length)poll(index+1);
+      },delays[index]);
+    };
+    poll(0);
+    return()=>{controller.abort();clearTimeout(timer);};
+  },[uid,checkingCheckout,access.suspended,waitingForReturn,attempt]);
 
   useEffect(() => {
-    if(callback==="return")return; // The bounded callback recovery owns status reads.
+    if(waitingForReturn)return; // The bounded callback recovery owns status reads.
     const controller = new AbortController();
     setError("");
     void billingRequest<BillingStatus>("/billing/status",uid,undefined,controller.signal).then(data=>{
@@ -66,7 +104,7 @@ function BillingAccount({uid,access,locked}:{uid:string;access:AccessInfo;locked
       if(!controller.signal.aborted) setError("Não foi possível consultar os dados da assinatura.");
     });
     return ()=>controller.abort();
-  },[uid,attempt,refreshKey,access.suspended,callback]);
+  },[uid,attempt,refreshKey,access.suspended,waitingForReturn]);
 
   useEffect(() => {
     if(callback!=="return"||!locked||access.suspended)return;
@@ -141,11 +179,13 @@ function BillingAccount({uid,access,locked}:{uid:string;access:AccessInfo;locked
     const response=await billingRequest<{status:string}>("/billing/checkout/abandon",uid,{
       intentId:status.checkout.intentId,confirmed:true
     });
-    if(response.status!=='closed')throw Error("O checkout anterior ainda está sendo verificado.");
     setSwitchingCheckout(false);
     setCheckoutPending(false);
-    setMessage("Checkout anterior cancelado com segurança. Agora escolha o plano e a forma de pagamento.");
-    setShowPlans(true);
+    if(response.status==="pending"){
+      setResult(previous=>previous?.status.checkout?{...previous,status:{...previous.status,checkout:{
+        ...previous.status.checkout,status:"closing",url:null,canCancel:false,
+      }}}:previous);
+    }else if(response.status==="closed")setShowPlans(true);
     refresh();
   }
 
@@ -190,7 +230,6 @@ function BillingAccount({uid,access,locked}:{uid:string;access:AccessInfo;locked
     {callback==="return"&&returnState==="unavailable"&&<p className="billing-notice" role="alert">
       Não localizamos uma contratação em andamento para esta conta. Confira se você voltou com a mesma conta usada no pagamento. Se houve cobrança, fale com o <a href="/suporte.html">suporte</a> antes de tentar de novo.
     </p>}
-    {callback&&callbacks[callback]&&<p className="billing-notice" role="status">{callbacks[callback]}</p>}
     {message&&<p className="billing-notice" role="status">{message}</p>}
     {upgrade&&!access.suspended&&<div className="billing-notice" role="status">
       {upgrade.status==="scheduled"?<p><strong>Upgrade agendado.</strong> O plano {planNames[upgrade.planCode].toLowerCase()} começa em {billingDate(upgrade.effectiveOn)}. A próxima cobrança será de {money(upgrade.amountCents)}.</p>:
@@ -200,13 +239,15 @@ function BillingAccount({uid,access,locked}:{uid:string;access:AccessInfo;locked
     {checkoutPending&&!status?.checkout&&!access.suspended&&<p className="billing-notice" role="status">Estamos verificando a criação do checkout.</p>}
     {!status&&!error&&<p className="billing-notice" role="status">Consultando assinatura…</p>}
     {error&&<p className="billing-inline-error" role="alert">{error}</p>}
-    {status?.checkout&&!access.suspended&&callback!=="return"&&<div className="billing-notice billing-next-action">
+    {status?.checkout&&!access.suspended&&<div className="billing-notice billing-next-action">
       <div><strong>Checkout {planNames[status.checkout.planCode].toLowerCase()} · {status.checkout.paymentMethod==="PIX"?"Pix":"Cartão de crédito"}</strong>
-        <p role={checkoutUrl?undefined:"status"}>{checkoutUrl?"Conclua o pagamento na página segura.":"Estamos verificando a tentativa de contratação."}</p>
+        <p role={checkoutUrl?undefined:"status"}>{checkoutStatusCopy[status.checkout.status]}</p>
       </div>
       <div className="billing-checkout-actions">
         {checkoutUrl&&<a className="billing-text-link" href={checkoutUrl} rel="noreferrer">Retomar checkout <ArrowUpRight size={17}/></a>}
-        {checkoutUrl&&<AppButton variant="secondary" onClick={()=>setSwitchingCheckout(true)}>Trocar plano ou pagamento</AppButton>}
+        {(status.checkout.canCancel??!!checkoutUrl)&&<AppButton variant="secondary" onClick={()=>setSwitchingCheckout(true)}>Trocar plano ou pagamento</AppButton>}
+        {!checkoutUrl&&<AppButton variant="secondary" onClick={refresh}><RefreshCw size={16} aria-hidden="true"/> Atualizar situação</AppButton>}
+        {status.checkout.status==="review"&&<a className="billing-text-link" href="/suporte.html">Fale com o suporte</a>}
       </div>
     </div>}
     {locked&&status&&!access.suspended&&!status.checkout&&!canStart&&!status.checkoutAvailable&&

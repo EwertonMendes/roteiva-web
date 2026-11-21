@@ -8,7 +8,7 @@ Use exclusivamente [Roteiva DEV](https://roteiva-web-dev.web.app), o Worker `rot
 
 ### Homologação Sandbox separada
 
-1. Use identidade Google de QA descartável, já registrada e com trial encerrado. Use `BILLING_CHECKOUT_TEST_UID` no Worker DEV para habilitar a contratação apenas para essa conta. A flag geral `BILLING_CHECKOUT_ENABLED` fica ausente durante o ensaio.
+1. Use identidade Google de QA descartável, já registrada e com trial encerrado. Use `BILLING_CHECKOUT_TEST_UIDS` como lista de UIDs separados por vírgula no Worker DEV. O binding legado `BILLING_CHECKOUT_TEST_UID` continua aceito. A retirada de um UID impede novas contratações e preserva a recuperação dos checkouts existentes. A flag geral `BILLING_CHECKOUT_ENABLED` fica ausente durante o ensaio.
 2. Registre preços, versões e ciclos vistos pela conta de QA. Em duas abas, tente iniciar o mesmo plano e confira um único checkout. Verifique retorno à URL DEV e que o callback sozinho mantém a área restrita.
 3. Use [cartões oficiais de teste](https://docs.asaas.com/docs/faq-sandbox) no link hospedado. Complete cada periodicidade com identidade de teste elegível. Observe o evento no painel Asaas, a conclusão na inbox D1, ledger, projeção `access/current` e liberação automática do workspace. Repita com cartão de recusa e confirme que o acesso continua bloqueado.
 4. Confirme o ciclo seguinte pelo simulador oficial ou mantenha pendente se o Sandbox exigir o calendário real. Verifique tolerância de 3 dias, pagamento tardio, cancelamento com fim de vigência, recontratação após expiração e reversão de pagamento. No caso de estorno antigo, confirme que o período mais recente continua ativo. Verifique o isolamento com duas identidades independentes.
