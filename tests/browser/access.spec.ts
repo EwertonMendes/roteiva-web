@@ -1,4 +1,5 @@
 import {test,expect,type Page} from './fixtures';
+import {expectCompactConfirmationGeometry} from './compact-confirmation-geometry';
 import {initializeTestEnvironment} from '@firebase/rules-unit-testing';
 import {collection,doc,getDoc,getDocs,query,updateDoc,setDoc,deleteDoc,where,Timestamp} from 'firebase/firestore';
 
@@ -429,6 +430,21 @@ test('settings upgrade compares plans and schedules the confirmed renewal',{tag:
     }});
   });
   await page.goto(cloud+'/configuracoes');
+  // All compact confirmations share the same pinned footer and scrollable
+  // content. The cancellation dialog has the long date text from the report.
+  await page.getByRole('button',{name:'Cancelar renovação'}).click();
+  const cancellation=page.getByRole('dialog',{name:'Cancelar renovação?'});
+  await expect(cancellation.getByText(/Você mantém seu acesso pago até/)).toBeVisible();
+  for(const theme of ['light','dark'] as const){
+    await page.evaluate(value=>{document.documentElement.dataset.theme=value;},theme);
+    await expectCompactConfirmationGeometry(cancellation);
+  }
+  const previousSize=page.viewportSize()!;
+  await page.setViewportSize({width:320,height:340});
+  await expectCompactConfirmationGeometry(cancellation);
+  await page.setViewportSize(previousSize);
+  await cancellation.getByRole('button',{name:'Manter assinatura'}).click();
+  await expect(cancellation).toHaveCount(0);
   const upgrade=page.getByRole('button',{name:'Fazer upgrade'});
   await upgrade.click();
   const options=page.getByRole('region',{name:'Faça upgrade do seu plano'});
@@ -439,6 +455,10 @@ test('settings upgrade compares plans and schedules the confirmed renewal',{tag:
   await page.getByRole('button',{name:'Mudar para anual'}).click();
   const dialog=page.getByRole('dialog',{name:'Upgrade para o plano anual'});
   await expect(dialog.getByText(/12 de abr.*2027.*399,90.*cartão atual.*Nenhum valor/)).toBeVisible();
+  for(const theme of ['light','dark'] as const){
+    await page.evaluate(value=>{document.documentElement.dataset.theme=value;},theme);
+    await expectCompactConfirmationGeometry(dialog);
+  }
   expect(await dialog.locator('footer button').evaluateAll(buttons=>buttons.every(button=>{
     const range=document.createRange();
     range.selectNodeContents(button);
