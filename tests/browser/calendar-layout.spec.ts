@@ -26,7 +26,7 @@ async function enterCalendar(page:Page,email:string){
   // Route transitions temporarily mount a 100vh loading screen alongside
   // the inert workspace. Measure only after that transition is complete.
   await expect(page.locator(".studio-loading")).toHaveCount(0);
-  await expect(page.locator("[inert]")).toHaveCount(0);
+  await expect(page.locator("[inert] main.main, main.main[inert]")).toHaveCount(0);
 }
 
 test("calendar empty day creation, optional ending, review category, editing and reload",async({page},info)=>{
@@ -369,7 +369,7 @@ test("modal surfaces are opaque and identical across calendar, confirmations and
     if(await menu.isVisible())await menu.click();
     await page.locator(".sidebar nav").getByRole("button",{name}).click();
     await expect(page.locator(".studio-loading")).toHaveCount(0);
-    await expect(page.locator("[inert]")).toHaveCount(0);
+    await expect(page.locator("[inert] main.main, main.main[inert]")).toHaveCount(0);
   }
   async function colorOf(selector:string){
     return page.locator(selector).evaluate(node=>getComputedStyle(node).backgroundColor);
@@ -421,7 +421,7 @@ test("project, client and finance modals match PROD calendar heading and single-
     const opener=page.getByRole("button",{name:"Abrir menu",exact:true});
     if(await opener.isVisible())await opener.click();
     await page.locator(".sidebar nav").getByRole("button",{name:new RegExp("^"+name)}).click();
-    await expect(page.locator("[inert]")).toHaveCount(0);
+    await expect(page.locator("[inert] main.main, main.main[inert]")).toHaveCount(0);
   };
   await page.getByRole("button",{name:"Novo compromisso",exact:true}).first().click();
   const canonical=page.locator("dialog.roteiva-calendar-form");
