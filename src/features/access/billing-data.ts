@@ -56,6 +56,7 @@ const upgradeErrors:Record<string,string> = {
   billing_checkout_cancel_unconfirmed:"O cancelamento da tentativa não foi confirmado. Por segurança, o pagamento anterior continua protegido; verifique novamente.",
   billing_access_still_active:"Você já possui acesso pago. Para mudar a forma de pagamento, verifique a renovação atual primeiro.",
   billing_account_ineligible:"Esta conta não pode iniciar outra contratação neste momento. Atualize sua assinatura.",
+  billing_pix_checkout_rejected:"O Pix não pôde ser iniciado no ambiente de testes. Nenhuma cobrança foi criada. Você pode voltar e escolher cartão de crédito.",
   billing_provider_unavailable:"Não foi possível confirmar a solicitação de pagamento. Atualize a assinatura antes de tentar novamente, para evitar cobranças duplicadas.",
 };
 
