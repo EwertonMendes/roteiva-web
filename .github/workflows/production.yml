@@ -181,6 +181,7 @@ jobs:
       PRODUCTION_BILLING_CHECKOUT_ENABLED: ${{ vars.PRODUCTION_BILLING_CHECKOUT_ENABLED }}
       PRODUCTION_BILLING_PIX_ENABLED: ${{ vars.PRODUCTION_BILLING_PIX_ENABLED }}
       PRODUCTION_BILLING_PUBLIC_ROLLOUT_ENABLED: ${{ vars.PRODUCTION_BILLING_PUBLIC_ROLLOUT_ENABLED }}
+      PRODUCTION_BILLING_TEST_PLAN_ENABLED: ${{ vars.PRODUCTION_BILLING_TEST_PLAN_ENABLED }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -218,6 +219,7 @@ jobs:
           ASAAS_API_KEY: ${{ secrets.ASAAS_API_KEY }}
           ASAAS_WEBHOOK_TOKEN: ${{ secrets.ASAAS_WEBHOOK_TOKEN }}
           BILLING_CHECKOUT_TEST_UIDS: ${{ secrets.BILLING_CHECKOUT_TEST_UIDS }}
+          BILLING_TEST_PLAN_UID: ${{ secrets.BILLING_TEST_PLAN_UID }}
         run: node scripts/prepare-worker-secrets.mjs prod
       - name: Apply additive schema and seal durable identity
         if: ${{ !inputs.domain_cutover }}
