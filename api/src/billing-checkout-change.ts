@@ -25,8 +25,14 @@ export async function abandonUnpaidCheckout(request:Request,env:Env,uid:string):
   // Asaas documents POST /checkouts/{id}/cancel; there is no documented
   // GET-by-checkout status operation. A non-confirmed cancellation remains
   // fail-closed. If payment has already happened, Asaas rejects cancellation.
-  if(await gateway.cancelCheckout(ref)!=='canceled')
-    throw new ApiError(409,'billing_checkout_cancel_unconfirmed');
+  try{
+    if(await gateway.cancelCheckout(ref)!=='canceled')
+      throw new ApiError(409,'billing_checkout_cancel_unconfirmed');
+  }catch(error){
+    if(error instanceof AsaasError&&[400,404].includes(error.upstreamStatus??0))
+      throw new ApiError(409,'billing_checkout_payment_verifying');
+    throw error;
+  }
 
   // Do not let a completed transaction race with a switch. Even a canceled
   // Checkout must not be treated as unpaid if a payment is already visible.
