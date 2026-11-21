@@ -273,7 +273,11 @@ test('billing summary, responsive history and restricted checkout use the same b
       return route.fulfill({headers,json:{payments:[older],nextPaymentCursor:null}});
     }
     return route.fulfill({headers,json:{
-      checkoutAvailable:true,canStart:stage==='expired'&&!checkoutRequests,checkout:null,notice:null,
+      checkoutAvailable:true,canStart:stage==='expired'&&!checkoutRequests,notice:null,
+      checkout:stage==='expired'&&checkoutRequests?{
+        intentId:'c5efbd52-67c7-4e38-8be9-82fd81c19ef3',planCode:'yearly',
+        paymentMethod:'CREDIT_CARD',status:'pending',url:null,canCancel:false,
+      }:null,
       subscription:stage==='expired'?null:{
         planCode:'yearly',status:'canceled',paidUntil:'2027-11-20T15:00:00.000Z',nextDueOn:null,
         amountCents:39990,paymentMethod:'CREDIT_CARD',canCancel:false,cancellation:null,
@@ -379,7 +383,7 @@ test('billing summary, responsive history and restricted checkout use the same b
   await page.getByRole('button',{name:'Escolher anual'}).click();
   await dialog.getByRole('checkbox').check();
   await confirm.click();
-  await expect(page.getByText('Estamos verificando a criação do checkout.')).toBeVisible();
+  await expect(page.getByText('Estamos verificando a tentativa de contratação.')).toBeVisible();
   expect(checkoutRequests).toBe(1);
 
   stage='suspended';
@@ -388,7 +392,7 @@ test('billing summary, responsive history and restricted checkout use the same b
   await expect(page.getByRole('link',{name:'Fale com o suporte'})).toBeVisible();
   await expect(page.getByRole('heading',{name:'Plano anual'})).toBeVisible();
   await expect(page.getByRole('button',{name:/Escolher|Excluir conta/})).toHaveCount(0);
-  await expect(page.getByText('Estamos verificando a criação do checkout.')).toHaveCount(0);
+  await expect(page.getByText('Estamos verificando a tentativa de contratação.')).toHaveCount(0);
   await expect(page.locator('.app-shell')).toHaveCount(0);
   await expect.poll(()=>fitsViewport('.billing-access')).toBe(true);
   if(process.env.ROTEIVA_BILLING_CAPTURE) await page.screenshot({path:info.outputPath('suspensa.png'),fullPage:true});

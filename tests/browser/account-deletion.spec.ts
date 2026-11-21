@@ -125,7 +125,7 @@ for(const needsReauth of [false,true])test('deletion reuses recent login and ask
     await expect(dialog.getByRole('alert')).toContainText('Essa conta Google é diferente');
     await expect(dialog.getByRole('alert')).toContainText(email);
     expect(submissions).toBe(1);
-    await expect(dialog.getByText('Você está excluindo a conta', {exact:false})).toContainText(email);
+    await expect(dialog.getByText('Conta selecionada:', {exact:false})).toContainText(email);
     pending=page.waitForEvent('popup');await confirmGoogle.click();
     popup=await pending;await popup.waitForLoadState('load');
     await popup.getByText(email,{exact:true}).click();

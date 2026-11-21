@@ -33,21 +33,23 @@ test('mockup settings keeps separate sections, responsive geometry and verified 
   await openSettings(page,'settings-layout-'+info.project.name+'@example.com');
   // Catch fixed-width layouts that leave a large empty gutter on wide monitors.
   if(info.project.name==='desktop')await page.setViewportSize({width:1728,height:960});
-  for(const section of ['.settings-identity','.settings-profile','.settings-studio','.settings-preferences','.access-settings','.settings-danger-zone']){
+  for(const section of ['.settings-identity','.settings-profile','.settings-studio','.settings-preferences','.billing-panel','.settings-danger-zone']){
     await expect(page.locator(section)).toBeVisible();
   }
   await expect(page.getByRole('heading',{name:'Perfil profissional'})).toBeVisible();
   await expect(page.getByRole('heading',{name:'Meu estúdio'})).toBeVisible();
   await expect(page.getByRole('heading',{name:'Aparência do Roteiva'})).toBeVisible();
   await expect(page.locator('.settings-profile-summary')).toContainText('settings-layout-'+info.project.name+'@example.com');
-  await expect(page.locator('.access-settings-detail')).toContainText('Disponível até');
+  const billing=page.getByRole('region',{name:'Assinatura',exact:true});
+  await expect(billing.getByRole('heading',{name:'Período de teste gratuito'})).toBeVisible();
+  await expect(billing.locator('.billing-account-date')).toContainText('Disponível até');
   await expect(page.getByRole('textbox',{name:'E-mail de acesso'})).toHaveAttribute('readonly');
   const geometry=await page.evaluate(()=>{
     const panel=document.querySelector('.settings-studio-controls')!.getBoundingClientRect();
     const pageElement=document.querySelector('.page')!;
     const pageRect=pageElement.getBoundingClientRect();
     const contentRight=pageRect.right-parseFloat(getComputedStyle(pageElement).paddingRight);
-    const cards=[...document.querySelectorAll('.settings-layout > .settings-identity, .settings-layout > .settings-editor, .settings-details > .settings-editor')].map(e=>e.getBoundingClientRect());
+    const cards=[...document.querySelectorAll('.settings-layout > .settings-identity, .settings-layout > .settings-editor, .settings-layout > .billing-panel, .settings-details > .settings-editor')].map(e=>e.getBoundingClientRect());
     const layout=document.querySelector('.settings-layout')!.getBoundingClientRect();
     const fields=[...document.querySelectorAll('.settings-studio-controls .settings-field')].map(e=>e.getBoundingClientRect());
     const action=document.querySelector('.settings-save-button')!.getBoundingClientRect();
