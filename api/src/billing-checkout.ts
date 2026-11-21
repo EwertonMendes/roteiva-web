@@ -86,7 +86,7 @@ export async function createCheckout(request:Request,env:Env,uid:string,now=Date
     "SELECT ?,owner_uid,'asaas',?,?,?,'pending',?,?,?,?,? FROM access_accounts WHERE owner_uid=? AND suspended_at IS NULL AND sync_pending=0 AND trial_ends_at<=? "+
     "AND NOT EXISTS(SELECT 1 FROM account_deletions WHERE owner_uid=?) "+
     "AND NOT EXISTS(SELECT 1 FROM access_grants WHERE owner_uid=? AND revoked_at IS NULL AND starts_at<=? AND (ends_at IS NULL OR ends_at>?)) "+
-    "AND (?='PIX' OR NOT EXISTS(SELECT 1 FROM access_subscriptions WHERE owner_uid=? AND (status IN ('active','past_due') OR (status='canceled' AND paid_until>?)))) "+
+    "AND (?='PIX' OR NOT EXISTS(SELECT 1 FROM access_subscriptions WHERE owner_uid=? AND status IN ('active','past_due','canceled') AND paid_until>?)) "+
     "AND NOT EXISTS(SELECT 1 FROM billing_contracts WHERE owner_uid=? AND removed_at IS NULL)"
   ).bind(id,plan.code,plan.version,plan.amountCents,now,now+CHECKOUT_LIFETIME,now,firstDueDate.slice(0,10),method,
     uid,now,uid,uid,now,now,method,uid,now,uid).run();
