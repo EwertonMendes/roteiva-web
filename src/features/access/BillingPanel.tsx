@@ -1,6 +1,6 @@
 
 import {useEffect,useId,useState} from "react";
-import {ArrowUpRight,CalendarDays,ChevronDown,CreditCard,RefreshCw,TrendingUp} from "lucide-react";
+import {ArrowUpRight,CalendarDays,ChevronDown,CreditCard,QrCode,RefreshCw,TrendingUp} from "lucide-react";
 import type {AccessInfo} from "../../data/access-watch";
 import {AppButton} from "../ui/AppButton";
 import {ConfirmationDialog} from "../ui/ConfirmationDialog";
@@ -8,7 +8,7 @@ import {useAuth} from "../auth/AuthProvider";
 import {BillingArt} from "./BillingArt";
 import {BillingHistory} from "./BillingHistory";
 import {BillingPlans,CheckoutConsent} from "./BillingPlans";
-import {billingDate,billingInThisBuild,billingRequest,cadence,money,planNames,sandboxLink,type BillingStatus,type Plan,type Subscription} from "./billing-data";
+import {billingDate,billingInThisBuild,billingRequest,cadence,money,planNames,sandboxLink,type BillingStatus,type Plan,type Subscription,type PaymentMethod} from "./billing-data";
 import "./billing.css";
 
 const subscriptionStates:Record<string,{label:string;tone:string}> = {
@@ -36,6 +36,7 @@ function BillingAccount({uid,access,locked}:{uid:string;access:AccessInfo;locked
   const [selected,setSelected] = useState<Plan|null>(null);
   const [selectedUpgrade,setSelectedUpgrade] = useState<{plan:Plan;effectiveOn:string}|null>(null);
   const [canceling,setCanceling] = useState(false);
+  const [switchingCheckout,setSwitchingCheckout] = useState(false);
   const [showPlans,setShowPlans] = useState(false);
   const [error,setError] = useState("");
   const [catalogError,setCatalogError] = useState(false);
@@ -48,10 +49,12 @@ function BillingAccount({uid,access,locked}:{uid:string;access:AccessInfo;locked
   const status = result?.status;
   const subscription = status?.subscription;
   const checkoutUrl = access.suspended ? undefined : sandboxLink(status?.checkout?.url,"checkout");
-  const canStart = locked && callback!=="return" && !!status?.canStart && !access.suspended;
+  const canStartCard = locked && callback!=="return" && !!status?.canStart && !access.suspended;
+  const canStartPix = callback!=="return"&&!!status?.pixAvailable&&!!status?.canRenewWithPix&&!access.suspended;
+  const canStart=canStartCard||canStartPix;
   const upgradeOffer = !locked&&!access.suspended ? subscription?.upgradeOffer : null;
   const upgrade = subscription?.upgrade;
-  const readCatalog = !access.suspended && (canStart || showPlans);
+  const readCatalog = !access.suspended && (locked&&canStart || showPlans);
 
   useEffect(() => {
     if(callback==="return")return; // The bounded callback recovery owns status reads.
@@ -120,15 +123,29 @@ function BillingAccount({uid,access,locked}:{uid:string;access:AccessInfo;locked
 
   const refresh = () => setAttempt(value=>value+1);
 
-  async function confirmCheckout(plan:Plan) {
-    if(!canStart) return;
+  async function confirmCheckout(plan:Plan,method:PaymentMethod) {
+    if(method==='PIX'?!canStartPix:!canStartCard)return;
     const response = await billingRequest<{url?:string;status:string}>("/billing/checkout",uid,{
       planCode:plan.code,catalogVersion:plan.version,acceptedImmediateCharge:true,
+      ...(method==='PIX'?{paymentMethod:method}:{}),
     });
     const url = sandboxLink(response.url,"checkout");
     if(url){ window.location.assign(url);return; }
     setSelected(null);
     setCheckoutPending(true);
+    refresh();
+  }
+
+  async function abandonCheckout() {
+    if(!status?.checkout)return;
+    const response=await billingRequest<{status:string}>("/billing/checkout/abandon",uid,{
+      intentId:status.checkout.intentId,confirmed:true
+    });
+    if(response.status!=='closed')throw Error("O checkout anterior ainda está sendo verificado.");
+    setSwitchingCheckout(false);
+    setCheckoutPending(false);
+    setMessage("Checkout anterior cancelado com segurança. Agora escolha o plano e a forma de pagamento.");
+    setShowPlans(true);
     refresh();
   }
 
@@ -184,18 +201,21 @@ function BillingAccount({uid,access,locked}:{uid:string;access:AccessInfo;locked
     {!status&&!error&&<p className="billing-notice" role="status">Consultando assinatura…</p>}
     {error&&<p className="billing-inline-error" role="alert">{error}</p>}
     {status?.checkout&&!access.suspended&&callback!=="return"&&<div className="billing-notice billing-next-action">
-      <div><strong>Checkout {planNames[status.checkout.planCode].toLowerCase()}</strong>
+      <div><strong>Checkout {planNames[status.checkout.planCode].toLowerCase()} · {status.checkout.paymentMethod==="PIX"?"Pix":"Cartão de crédito"}</strong>
         <p role={checkoutUrl?undefined:"status"}>{checkoutUrl?"Conclua o pagamento no Asaas.":"Estamos verificando a tentativa de contratação."}</p>
       </div>
-      {checkoutUrl&&<a className="billing-text-link" href={checkoutUrl} rel="noreferrer">Retomar checkout <ArrowUpRight size={17}/></a>}
+      <div className="billing-checkout-actions">
+        {checkoutUrl&&<a className="billing-text-link" href={checkoutUrl} rel="noreferrer">Retomar checkout <ArrowUpRight size={17}/></a>}
+        {checkoutUrl&&<AppButton variant="secondary" onClick={()=>setSwitchingCheckout(true)}>Trocar plano ou pagamento</AppButton>}
+      </div>
     </div>}
     {locked&&status&&!access.suspended&&!status.checkout&&!canStart&&!status.checkoutAvailable&&
       <p className="billing-notice">Contratação online indisponível no momento.</p>}
     {!locked&&!upgradeOffer&&!upgrade&&status?.checkoutAvailable&&!status.checkout&&
       <AppButton variant="secondary" className="billing-toggle-plans" aria-expanded={showPlans} onClick={()=>setShowPlans(value=>!value)}>
-        {showPlans?"Ocultar planos":"Ver planos"} <ChevronDown size={17} aria-hidden="true"/>
+        {showPlans?"Ocultar planos":canStartPix?"Renovar ou trocar plano":"Ver planos"} <ChevronDown size={17} aria-hidden="true"/>
       </AppButton>}
-    {readCatalog&&catalog.length>0&&<BillingPlans catalog={catalog} canStart={canStart}
+    {readCatalog&&catalog.length>0&&<BillingPlans catalog={catalog} canStart={canStart} pixAvailable={!!status?.pixAvailable}
       upgrade={upgradeOffer&&subscription?{...upgradeOffer,currentPlan:subscription.planCode,currentAmountCents:subscription.amountCents}:null}
       onSelect={plan=>upgradeOffer?setSelectedUpgrade({plan,effectiveOn:upgradeOffer.effectiveOn}):setSelected(plan)}/>}
     {readCatalog&&!catalog.length&&!catalogError&&<p className="billing-notice" role="status">Consultando os planos…</p>}
@@ -204,7 +224,13 @@ function BillingAccount({uid,access,locked}:{uid:string;access:AccessInfo;locked
       (!access.suspended&&(callback!=="return"&&status?.checkout?.status==="pending"||(checkoutPending&&!status?.checkout))))&&
       <AppButton variant="secondary" className="billing-refresh" onClick={refresh}><RefreshCw size={16} aria-hidden="true"/> Atualizar assinatura</AppButton>}
     {status&&(!locked||status.payments.length>0)&&<BillingHistory key={result?.revision} firstPage={status} uid={uid}/>}
-    {selected&&canStart&&<CheckoutConsent plan={selected} onClose={()=>setSelected(null)} onConfirm={()=>confirmCheckout(selected)}/>}
+    {selected&&canStart&&<CheckoutConsent plan={selected} pixAvailable={canStartPix} cardAvailable={canStartCard}
+      onClose={()=>setSelected(null)} onConfirm={method=>confirmCheckout(selected,method)}/>}
+    {switchingCheckout&&status?.checkout&&<ConfirmationDialog
+      title="Trocar plano ou pagamento?"
+      description="Vamos cancelar a tentativa atual no Asaas antes de permitir uma nova escolha. Caso exista pagamento ou uma confirmação em andamento, a troca será bloqueada para evitar duas cobranças."
+      confirmLabel="Cancelar tentativa e escolher" cancelLabel="Manter checkout"
+      onCancel={()=>setSwitchingCheckout(false)} onConfirm={abandonCheckout}/>} 
     {selectedUpgrade&&upgradeOffer&&<ConfirmationDialog title={`Upgrade para o plano ${planNames[selectedUpgrade.plan.code].toLowerCase()}`}
       description={`Em ${billingDate(selectedUpgrade.effectiveOn)}, a renovação será de ${money(selectedUpgrade.plan.amountCents)} ${cadence[selectedUpgrade.plan.code]}, no cartão atual. Nenhum valor será cobrado agora.`}
       className="billing-upgrade-confirmation" tone="default" confirmLabel="Confirmar upgrade" cancelLabel="Voltar" onCancel={()=>setSelectedUpgrade(null)}
@@ -234,8 +260,13 @@ function PlanSummary({subscription,access,locked,illustrated,grace,onCancel,onUp
   subscription:Subscription;access:AccessInfo;locked:boolean;illustrated:boolean;grace:boolean;onCancel:()=>void;
   onUpgrade?:()=>void;showPlans:boolean;
 }) {
-  const status = subscriptionStates[subscription.status] ?? {label:"Em análise",tone:"neutral"};
-  const next = subscription.status==="active" ? subscription.nextDueOn : null;
+  const isPix=subscription.paymentMethod==="PIX";
+  const status = isPix
+    ?(subscription.paidUntil&&Date.parse(subscription.paidUntil)>Date.now()
+      ?{label:"Período pago por Pix",tone:"positive"}
+      :{label:"Período expirado",tone:"neutral"})
+    :subscriptionStates[subscription.status] ?? {label:"Em análise",tone:"neutral"};
+  const next = !isPix&&subscription.status==="active" ? subscription.nextDueOn : null;
   const paidUntil = subscription.paidUntil;
   const canCancel = subscription.canCancel;
   return <div className="billing-current">
@@ -256,6 +287,9 @@ function PlanSummary({subscription,access,locked,illustrated,grace,onCancel,onUp
       </div></div>}
       {next&&<div><CalendarDays size={19} aria-hidden="true"/><div><dt>Próxima cobrança</dt>
         <dd><time dateTime={next}>{billingDate(next)}</time></dd></div></div>}
+      {isPix&&<div><QrCode size={19} aria-hidden="true"/><div>
+        <dt>Forma de pagamento</dt><dd>Pix · renovação manual</dd>
+      </div></div>}
       {subscription.paymentMethod==="CREDIT_CARD"&&<div><CreditCard size={19} aria-hidden="true"/><div>
         <dt>Forma de pagamento</dt><dd>Cartão de crédito</dd>
       </div></div>}
