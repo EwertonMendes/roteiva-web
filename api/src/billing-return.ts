@@ -22,13 +22,13 @@ export async function requestCheckoutReturnCheck(env:Env,uid:string,intentId:unk
   if(!['pending','ready'].includes(intent.status)||!intent.provider_checkout_ref)
     return Response.json({status:'pending'});
   const now=Date.now();
-  // Reuse the same deterministic recovery identity as the scheduler. Repeated
-  // returns, refreshes and simultaneous tabs never create duplicate provider reads.
+  // A distinct deterministic return event leaves the scheduled recovery intact.
+  // Repeated returns and simultaneous tabs never create duplicate provider reads.
   await env.DB.prepare(
     "INSERT OR IGNORE INTO billing_webhook_events(provider,event_id,event_type,resource_type,resource_ref,status,received_at,updated_at) "+
     "SELECT 'asaas',?,'CHECKOUT_RECOVERY','checkout',provider_checkout_ref,'pending',?,? "+
     "FROM billing_checkout_intents WHERE id=? AND owner_uid=? AND provider='asaas' "+
     "AND status IN ('pending','ready') AND provider_checkout_ref=?"
-  ).bind('recovery:'+intent.id,now,now,intent.id,uid,intent.provider_checkout_ref).run();
+  ).bind('return:'+intent.id,now,now,intent.id,uid,intent.provider_checkout_ref).run();
   return Response.json({status:'checking'},{status:202});
 }
