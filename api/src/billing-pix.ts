@@ -1,6 +1,7 @@
 import {providerRef} from './billing-asaas.ts';
 import {openCheckout,type CheckoutIntent} from './billing-checkout.ts';
-import {billingDateInstant,cents,civilDate,periodEnd} from './billing-period.ts';
+import {billingDateInstant,cents,civilDate} from './billing-period.ts';
+import {purchaseWindow,manualPaidUntil} from './billing-purchase-policy.ts';
 import {queueBillingProjection} from './billing-projection.ts';
 import {refundedSoFar} from './billing-refunds.ts';
 import {ApiError,type Env} from './types.ts';
@@ -9,8 +10,6 @@ import {ApiError,type Env} from './types.ts';
  * owns one immutable period and a separate access-subscriptions row.
  * Old card subscriptions and their reconciliation path are untouched. */
 type Existing={owner_uid:string;subscription_id:string;state:string;amount_cents:number;refunded_amount_cents:number;period_ends_at:number|null};
-const dateFormat=new Intl.DateTimeFormat('sv-SE',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'});
-const dayAt=(now:number)=>dateFormat.format(new Date(now));
 
 export async function reconcilePixPayment(env:Env,payment:Record<string,unknown>,ref:string,
   eventType?:string):Promise<'processed'|'ignored'|'review'> {
@@ -69,11 +68,13 @@ export async function reconcilePixPayment(env:Env,payment:Record<string,unknown>
     'SELECT 1 FROM billing_contracts WHERE owner_uid=? AND removed_at IS NULL LIMIT 1'
   ).bind(intent.owner_uid).first();
   if(activeContract)return 'review';
-  const last=await env.DB.prepare(
-    "SELECT MAX(paid_until) AS until FROM access_subscriptions WHERE owner_uid=? AND status IN ('active','past_due','canceled')"
-  ).bind(intent.owner_uid).first<{until:number|null}>();
-  const anchor=Math.max(now,last?.until??0);
-  const end=periodEnd(dayAt(anchor),intent.plan_code);
+  const paidState=await purchaseWindow(env,intent.owner_uid,now);
+  // Never add a new manual purchase to a separately paid, still-valid period.
+  // The SQL checkout creation fence normally prevents this. Also protect
+  // against payments from late/canceled checkouts and concurrent sessions.
+  if(paidState.paidUntil>now)return 'review';
+  const anchor=Math.max(now,paidState.courtesyUntil);
+  const end=manualPaidUntil(anchor,intent.plan_code);
   if(end<=anchor)return 'review';
   const dueOn=civilDate(payment.originalDueDate??payment.dueDate)??dayAt(now);
   const changed=await env.DB.batch([
