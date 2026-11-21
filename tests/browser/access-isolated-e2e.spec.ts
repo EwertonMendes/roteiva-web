@@ -153,7 +153,7 @@ test("billing requires consent and a callback alone never restores the workspace
   await page.goto(cloud+"/");
   await expect(page.getByText(/109,90/)).toBeVisible();
   await page.getByRole("button",{name:"Escolher trimestral"}).click();
-  const submit=page.getByRole("button",{name:"Continuar para o Asaas Sandbox"});
+  const submit=page.getByRole("button",{name:"Continuar para o pagamento"});
   await expect(submit).toBeDisabled();
   await page.getByRole("checkbox",{name:/Aceito a cobrança/}).check();
   await submit.click();
