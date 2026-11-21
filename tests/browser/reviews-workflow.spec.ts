@@ -1,6 +1,7 @@
 import {assertReviewPageGuards} from "./review-browser-guards";
 import { chooseAppSelect } from "./select-helpers";
 import {test,expect,type Page} from './fixtures';
+import {expectCompactConfirmationGeometry} from "./compact-confirmation-geometry";
 import {initializeTestEnvironment} from '@firebase/rules-unit-testing';
 import {collection,doc,getDocs,query,setDoc,where,Timestamp} from 'firebase/firestore';
 const root='http://127.0.0.1:4173',api='http://127.0.0.1:8787';
@@ -343,7 +344,7 @@ test('profissional cria, cliente comenta/pede ajustes, V2 aprovada e encerrament
   await expect(approvedDetail.getByText('Aumentar legenda',{exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Encerrar revisão',exact:true}).click();
   const closeConfirmation=page.getByRole('dialog',{name:'Encerrar esta aprovação?'});
-  await expect(closeConfirmation).toBeVisible();
+  await expectCompactConfirmationGeometry(closeConfirmation);
   await closeConfirmation.getByRole('button',{name:'Encerrar aprovação'}).click();
   await expect(closeConfirmation).toHaveCount(0);
   await expect(page.getByRole('dialog',{name:'Detalhes da revisão'})).toHaveCount(0);
@@ -632,8 +633,9 @@ test('Dropbox: vincular pasta funciona com Todos os projetos, sem mudar o filtro
   expect(geometry.right).toBeLessThanOrEqual(geometry.viewportWidth);
   expect(geometry.left).toBeGreaterThanOrEqual(0);
   await menu.getByRole('menuitem',{name:'Desvincular do projeto'}).click();
-  await expect(page.getByRole('dialog',{name:'Desvincular pasta'})).toBeVisible();
-  await page.getByRole('button',{name:'Manter pasta'}).click();
+  const unlinkDialog=page.getByRole('dialog',{name:'Desvincular pasta'});
+  await expectCompactConfirmationGeometry(unlinkDialog);
+  await unlinkDialog.getByRole('button',{name:'Manter pasta'}).click();
   await expect(library.getByRole('button',{name:'Opções da pasta Materiais Dropbox'})).toBeVisible();
 
   const env=await initializeTestEnvironment({projectId:'demo-roteiva',firestore:{host:'127.0.0.1',port:8080}});
