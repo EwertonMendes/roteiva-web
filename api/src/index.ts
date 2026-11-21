@@ -22,6 +22,7 @@ import { ensureAccess, assertActiveAccess } from './access.ts';
 import {billingPlansResponse,billingStatusResponse} from './billing.ts';
 import {ingestAsaasWebhook} from './billing-webhook.ts';
 import {createCheckout} from './billing-checkout.ts';
+import {abandonUnpaidCheckout} from './billing-checkout-change.ts';
 import {requestCheckoutReturnCheck} from './billing-return.ts';
 import {flushBillingProjection} from './billing-projection.ts';
 import {readBillingJson} from './billing-webhook.ts';
@@ -114,6 +115,12 @@ export async function handle(request: Request, env: Env, ctx?:ExecutionContext):
       await assertNotDeleting(env,uid);
       if(!(await env.API_RATE_LIMIT.limit({key:env.ENVIRONMENT+':billing:'+uid})).success)throw new ApiError(429,'rate_limited');
       response=await createCheckout(request,env,uid);
+    } else if (checkoutRouted(env) && url.pathname==='/billing/checkout/abandon' && request.method==='POST') {
+      if(!allowedFrontend(env,origin))throw new ApiError(403,'origin_required');
+      const uid=await identity(request,env);
+      await assertNotDeleting(env,uid);
+      if(!(await env.API_RATE_LIMIT.limit({key:env.ENVIRONMENT+':billing:'+uid})).success)throw new ApiError(429,'rate_limited');
+      response=await abandonUnpaidCheckout(request,env,uid);
     } else if (upgradeRouted(env) && url.pathname==='/billing/upgrade' && request.method==='POST') {
       if(!allowedFrontend(env,origin))throw new ApiError(403,'origin_required');
       const uid=await identity(request,env);
