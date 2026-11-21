@@ -40,7 +40,9 @@ async function webhook(env,paymentId,eventId,event='PAYMENT_RECEIVED'){
 
 test('minimum R$5 offer is server-owned and only visible to one exact PROD UID',async t=>{
   const f=setup(t);
-  const owner=await (await billingPlansResponse(f.env,'owner')).json();
+  const ownerResponse=billingPlansResponse(f.env,'owner');
+  assert.equal(ownerResponse.headers.get('Cache-Control'),'private, no-store');
+  const owner=await ownerResponse.json();
   const other=await (await billingPlansResponse(f.env,'other')).json();
   assert.equal(owner.plans.length,4);
   assert.deepEqual(owner.plans.find(plan=>plan.code==='test'),{
