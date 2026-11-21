@@ -1,4 +1,4 @@
-import {checkoutEnabled} from './billing-asaas.ts';
+import {checkoutEnabled,AsaasError} from './billing-asaas.ts';
 import {openCheckout} from './billing-checkout.ts';
 import {readBillingJson} from './billing-webhook.ts';
 import {paymentGateway} from './payments/asaas-adapter.ts';
