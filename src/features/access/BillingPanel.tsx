@@ -66,7 +66,7 @@ function BillingAccount({uid,access,locked,checkoutReturn}:{
     const delays=waitingForReturn?[1500,2500,4000,6000,8000,10000]:[2000,5000,11000,24000,47000];
     const read=async(index:number)=>{
       if(controller.signal.aborted)return;
-      let wait=waitingForReturn;
+      let wait=waitingForReturn||index>0;
       try{
         const current=await billingRequest<BillingStatus>("/billing/status",uid,undefined,controller.signal);
         if(controller.signal.aborted)return;
@@ -74,7 +74,7 @@ function BillingAccount({uid,access,locked,checkoutReturn}:{
         setCheckoutPending(false);
         setStatus(current);
         const checkoutState=current.checkout?.status;
-        wait=wait||!access.suspended&&["pending","closing","payment_pending"].some(state=>state===checkoutState);
+        wait=waitingForReturn||!access.suspended&&["pending","closing","payment_pending"].some(state=>state===checkoutState);
       }catch{
         if(controller.signal.aborted)return;
         if(!wait)setError("Não foi possível consultar os dados da assinatura.");

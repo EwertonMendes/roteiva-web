@@ -212,8 +212,10 @@ test("an expired checkout without a URL still offers safe recovery and cleans up
   await page.getByRole("dialog").getByRole("button",{name:"Cancelar tentativa e escolher"}).click();
   await expect(page.getByText("Estamos confirmando o encerramento da tentativa anterior.")).toBeVisible();
   expect(new URL(page.url()).search).toBe("?campaign=qa");
-  closed=true;
   await page.getByRole("button",{name:"Atualizar situação"}).click();
+  // Let the server complete only after the action exists and was usable.
+  // Otherwise the background refresh can remove the button before the click.
+  closed=true;
   await expect(page.getByRole("button",{name:"Escolher mensal"})).toBeVisible();
   expect(closes).toBe(1);
   await expect(page.locator(".app-shell")).toHaveCount(0);
