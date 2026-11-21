@@ -433,17 +433,22 @@ export function VirtualLibrary({projects,selectedProjectId,onSelectProject,initi
   {base&&<AppInput ref={fileInput} type="file" multiple hidden onChange={e=>{const files=Array.from(e.target.files||[]);e.target.value='';void upload(files);}}/>}
  {edit?.action==='move'&&edit.node&&<MoveDestinationDialog key={edit.node.id} base={base} source={edit.node}
   busy={busy} error={error} onClose={()=>{setError('');setEdit(null);}} onConfirm={dest=>void save(dest)}/>}
- {edit&&edit.action!=='move'&&<AppModal size="compact" className="virtual-library-editor" aria-labelledby="virtual-library-title"
+ {edit&&edit.action!=='move'&&<AppModal size="compact"
+  className={`virtual-library-editor${edit.action==='trash'||edit.action==='restore'?' rt-confirm-dialog':''}`}
+  aria-labelledby="virtual-library-title"
+  aria-describedby={edit.action==='trash'||edit.action==='restore'?'virtual-library-confirm-description':undefined}
   onCloseRequest={()=>{if(!busy){setError('');setEdit(null);}}}>
   <form className="rt-modal__layout" onSubmit={e=>{e.preventDefault();void save();}}>
-   <AppModalHeader icon={<ModalFolderPlus size={26}/>} description={{create:"Escolha um nome para organizar seus arquivos.",rename:"Defina o novo nome da pasta ou arquivo.",restore:"Devolva o item à sua organização.",trash:"O arquivo original permanece na conta conectada."}[edit.action]} title={{create:'Nova pasta',rename:'Renomear',restore:'Restaurar',trash:'Remover do Roteiva'}[edit.action]}
-     titleId="virtual-library-title" onClose={()=>{setError('');setEdit(null);}} closeDisabled={busy}/>
-   <AppModalBody>
-    {error&&<div role="alert" className="virtual-library-error">{error}</div>}
-   {(edit.action==='create'||edit.action==='rename')&&<label>Nome<AppInput ref={nameInput} aria-label="Nome" required maxLength={120} value={name} onChange={e=>setName(e.target.value)}/></label>}
-   {edit.action==='trash'&&<p>Remover este item da Biblioteca? Os arquivos originais permanecem no Google Drive ou Dropbox.</p>}
-   {edit.action==='restore'&&<p>Restaurar este item. Caso a pasta original também esteja na lixeira, restaure primeiro a pasta.</p>}
-   </AppModalBody>
+   <div className={edit.action==='trash'||edit.action==='restore'?'rt-confirm-content':'virtual-library-editor-content'}>
+    <AppModalHeader icon={<ModalFolderPlus size={26}/>} description={edit.action==='create'?"Escolha um nome para organizar seus arquivos.":edit.action==='rename'?"Defina o novo nome da pasta ou arquivo.":undefined} title={{create:'Nova pasta',rename:'Renomear',restore:'Restaurar',trash:'Remover do Roteiva'}[edit.action]}
+      titleId="virtual-library-title" onClose={()=>{setError('');setEdit(null);}} closeDisabled={busy}/>
+    <AppModalBody>
+     {error&&<div role="alert" className="virtual-library-error">{error}</div>}
+     {(edit.action==='create'||edit.action==='rename')&&<label>Nome<AppInput ref={nameInput} aria-label="Nome" required maxLength={120} value={name} onChange={e=>setName(e.target.value)}/></label>}
+     {edit.action==='trash'&&<p id="virtual-library-confirm-description" className="rt-confirm-description">Remover este item da Biblioteca? Os arquivos originais permanecem no Google Drive ou Dropbox.</p>}
+     {edit.action==='restore'&&<p id="virtual-library-confirm-description" className="rt-confirm-description">Restaurar este item. Caso a pasta original também esteja na lixeira, restaure primeiro a pasta.</p>}
+    </AppModalBody>
+   </div>
    <AppModalFooter>
     <AppButton variant="primary" type="submit" disabled={busy||((edit.action==='create'||edit.action==='rename')&&!name.trim())}>{busy?'Salvando…':edit.action==='trash'?'Remover da Biblioteca':edit.action==='restore'?'Restaurar':'Confirmar'}</AppButton>
     <AppButton variant="secondary" type="button" disabled={busy} onClick={()=>{setError('');setEdit(null);}}>Cancelar</AppButton>

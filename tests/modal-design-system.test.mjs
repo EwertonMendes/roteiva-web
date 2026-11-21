@@ -87,3 +87,24 @@ test("compact adorned AppInput keeps its 44px frame instead of 52px modal form s
   assert.match(css,/height:44px;min-height:44px/);
   assert.match(read("features/projects/CoverEditor.tsx"),/controlSize="sm" leading=\{<Search size=\{18\}\/?>\}/);
 });
+
+
+test("compact confirmations scroll the title/message together above a fixed footer",()=>{
+  const shared=read("features/ui/ConfirmationDialog.tsx");
+  const css=read("features/ui/app-modal.css");
+  assert.match(shared,/className="rt-confirm-content"/);
+  assert.match(shared,/<p id=\{descriptionId\} className="rt-confirm-description">\{description\}<\/p>/);
+  assert.doesNotMatch(shared,/<AppModalHeader[^>]+description=\{description\}/);
+  assert.match(css,/dialog\.rt-parity-modal\.rt-confirm-dialog \.rt-confirm-content/);
+  assert.match(css,/overflow-y:auto;/);
+  assert.match(css,/dialog\.rt-parity-modal\.rt-confirm-dialog \.rt-modal__footer/);
+  assert.match(css,/flex-direction:column-reverse/);
+  const unlink=read("features/drive/DriveLibraryUI.tsx");
+  assert.match(unlink,/className="rl-confirm rt-confirm-dialog"/);
+  assert.match(unlink,/className="rt-confirm-description"/);
+  const library=read("features/drive/VirtualLibrary.tsx");
+  assert.match(library,/rt-confirm-dialog/);
+  assert.match(library,/virtual-library-editor-content/);
+  // Approved create/rename forms still render direct modal flex items.
+  assert.match(css,/virtual-library-editor:not\(\.rt-confirm-dialog\) \.virtual-library-editor-content \{display:contents\}/);
+});

@@ -1,4 +1,5 @@
 import {test,expect,type Page} from './fixtures';
+import {expectCompactConfirmationGeometry} from './compact-confirmation-geometry';
 const web='http://127.0.0.1:4173',api='http://127.0.0.1:8787';
 const connection='aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa';
 test.skip(!process.env.VIRTUAL_LIBRARY_E2E,'Run with the dedicated virtual-library build/config.');
@@ -173,11 +174,17 @@ test('virtual navigation preserves folder commands and a partial Dropbox batch r
  await expect(move.getByText('Este item já está nesta pasta.')).toBeVisible();
  await expect(move.getByRole('button',{name:'Mover para cá'})).toBeDisabled();
  await move.getByRole('button',{name:'Cancelar'}).click();
- await libraryMenu(page,'Brutos','Remover da Biblioteca');await page.getByRole('button',{name:'Remover da Biblioteca',exact:true}).last().click();
+ await libraryMenu(page,'Brutos','Remover da Biblioteca');
+ const removeDialog=page.getByRole('dialog',{name:'Remover do Roteiva'});
+ await expectCompactConfirmationGeometry(removeDialog);
+ await removeDialog.getByRole('button',{name:'Remover da Biblioteca',exact:true}).click();
  await expect(page.getByRole('button',{name:'Brutos',exact:true})).toHaveCount(0);
  await page.getByRole('button',{name:'Lixeira',exact:true}).click();
  await expect(page.getByText('Itens removidos da Biblioteca. Os arquivos originais continuam no Google Drive ou Dropbox.')).toBeVisible();
- await libraryMenu(page,'Brutos','Restaurar');await page.getByRole('dialog',{name:'Restaurar'}).getByRole('button',{name:'Restaurar',exact:true}).click();
+ await libraryMenu(page,'Brutos','Restaurar');
+ const restoreDialog=page.getByRole('dialog',{name:'Restaurar'});
+ await expectCompactConfirmationGeometry(restoreDialog);
+ await restoreDialog.getByRole('button',{name:'Restaurar',exact:true}).click();
  await expect(page.getByRole('button',{name:'Brutos',exact:true})).toHaveCount(0);
  await page.getByRole('button',{name:'Voltar aos arquivos',exact:true}).click();await page.getByRole('button',{name:'Vídeos',exact:true}).click();
  await expect(page.getByRole('button',{name:'Brutos',exact:true})).toBeVisible();
