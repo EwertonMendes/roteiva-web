@@ -76,7 +76,7 @@ export async function reconcilePixPayment(env:Env,payment:Record<string,unknown>
   const anchor=Math.max(now,paidState.courtesyUntil);
   const end=manualPaidUntil(anchor,intent.plan_code);
   if(end<=anchor)return 'review';
-  const dueOn=civilDate(payment.originalDueDate??payment.dueDate)??dayAt(now);
+  const dueOn=civilDate(payment.originalDueDate??payment.dueDate)??localDay(now);
   const changed=await env.DB.batch([
     ...(closed?[env.DB.prepare("UPDATE billing_checkout_intents SET status='pending' WHERE id=? AND status IN ('canceled','expired')")
       .bind(intent.id)]:[]),
