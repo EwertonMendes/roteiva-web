@@ -12,6 +12,10 @@ on:
         description: Publish the domain cutover without D1 or Firestore changes
         type: boolean
         default: false
+      billing_schema:
+        description: Apply the reviewed billing migrations on the first billing release
+        type: boolean
+        default: false
 permissions:
   contents: read
   pull-requests: read
@@ -172,6 +176,9 @@ jobs:
       API_BASE_URL: ${{ vars.API_BASE_URL }}
       WRANGLER_SEND_METRICS: 'false'
       DOMAIN_CUTOVER: ${{ inputs.domain_cutover }}
+      BILLING_SCHEMA: ${{ inputs.billing_schema }}
+      PRODUCTION_BILLING_ENABLED: ${{ vars.PRODUCTION_BILLING_ENABLED }}
+      PRODUCTION_BILLING_CHECKOUT_ENABLED: ${{ vars.PRODUCTION_BILLING_CHECKOUT_ENABLED }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -189,8 +196,11 @@ jobs:
           node scripts/guard-environment.mjs prod --before-migrations
           node scripts/guard-token-scope.mjs prod
           if [ "$DOMAIN_CUTOVER" = 'true' ]; then
+            test "$BILLING_SCHEMA" != 'true'
             node scripts/guard-migrations.mjs prod --domain-cutover
             node scripts/guard-environment.mjs prod
+          elif [ "$BILLING_SCHEMA" = 'true' ]; then
+            node scripts/guard-migrations.mjs prod --billing-schema
           else
             node scripts/guard-migrations.mjs prod
           fi
@@ -203,6 +213,9 @@ jobs:
           DROPBOX_APP_KEY: ${{ secrets.DROPBOX_APP_KEY }}
           DROPBOX_APP_SECRET: ${{ secrets.DROPBOX_APP_SECRET }}
           FIREBASE_ADMIN_CREDENTIALS_JSON: ${{ secrets.FIREBASE_ADMIN_CREDENTIALS_JSON }}
+          ASAAS_API_KEY: ${{ secrets.ASAAS_API_KEY }}
+          ASAAS_WEBHOOK_TOKEN: ${{ secrets.ASAAS_WEBHOOK_TOKEN }}
+          BILLING_CHECKOUT_TEST_UIDS: ${{ secrets.BILLING_CHECKOUT_TEST_UIDS }}
         run: node scripts/prepare-worker-secrets.mjs prod
       - name: Apply additive schema and seal durable identity
         if: ${{ !inputs.domain_cutover }}
@@ -240,6 +253,8 @@ jobs:
       VITE_DROPBOX_ENABLED: 'true'
       VITE_VIRTUAL_LIBRARY: 'true'
       DOMAIN_CUTOVER: ${{ inputs.domain_cutover }}
+      PRODUCTION_BILLING_ENABLED: ${{ vars.PRODUCTION_BILLING_ENABLED }}
+      VITE_PRODUCTION_BILLING_ENABLED: ${{ vars.PRODUCTION_BILLING_ENABLED }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

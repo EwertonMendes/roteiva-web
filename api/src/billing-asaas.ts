@@ -30,13 +30,21 @@ export function pixEnabled(env:Env,uid?:string):boolean{
     !!uid&&checkoutTestUsers(env).includes(uid);
 }
 
+export function billingRouted(env:Env):boolean{
+  return env.ENVIRONMENT==='dev'||env.ENVIRONMENT==='prod'&&asaasConfigured(env);
+}
+
 export function checkoutRouted(env:Env):boolean{
-  return env.ENVIRONMENT==='dev'&&asaasConfigured(env)&&
-    (env.BILLING_CHECKOUT_ENABLED==='true'||checkoutTestUsers(env).length>0);
+  if(!asaasConfigured(env))return false;
+  const hasTestUsers=checkoutTestUsers(env).length>0;
+  return env.ENVIRONMENT==='prod'
+    ?env.BILLING_CHECKOUT_ENABLED==='true'&&hasTestUsers
+    :env.BILLING_CHECKOUT_ENABLED==='true'||hasTestUsers;
 }
 
 export function checkoutEnabled(env:Env,uid?:string):boolean{
-  return checkoutRouted(env)&&(env.BILLING_CHECKOUT_ENABLED==='true'||!!uid&&checkoutTestUsers(env).includes(uid));
+  return checkoutRouted(env)&&(env.ENVIRONMENT==='dev'&&env.BILLING_CHECKOUT_ENABLED==='true'||
+    !!uid&&checkoutTestUsers(env).includes(uid));
 }
 
 /** Upstream status is used internally. The provider's error body is discarded. */

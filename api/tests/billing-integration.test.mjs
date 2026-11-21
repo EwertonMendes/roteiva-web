@@ -131,12 +131,79 @@ test('return recovery verifies Asaas payment immediately and still preserves cro
 test('provider-hosted links are bound to their environment and object IDs',()=>{
   const hosted=asaasGateway({ENVIRONMENT:'prod'});
   assert.equal(hosted.checkoutUrl('checkout_test'),'https://asaas.com/checkoutSession/show?id=checkout_test');
-  assert.equal(hosted.invoiceUrl('/i/invoice_test'),'https://asaas.com/i/invoice_test');
+  assert.equal(hosted.invoiceUrl('/i/invoice_test'),'https://www.asaas.com/i/invoice_test');
   assert.equal(hosted.invoiceUrl('/i/invoice_test?return=elsewhere'),null);
+  assert.equal(hosted.invoicePath('https://www.asaas.com/i/invoice_test'),'/i/invoice_test');
+  assert.equal(hosted.invoicePath('https://sandbox.asaas.com/i/invoice_test'),null);
   assert.throws(()=>hosted.checkoutPath('checkout_test','https://sandbox.asaas.com/checkoutSession/show/checkout_test'),
     {code:'billing_provider_invalid_response'});
   assert.throws(()=>hosted.checkoutPath('checkout_test','https://asaas.com/checkoutSession/show?id=other_checkout'),
     {code:'billing_provider_invalid_response'});
+});
+
+test('PROD canary stays account-scoped and reconciles payments after checkout is paused',async t=>{
+  const s=setup(t);
+  const env={...s.env,ENVIRONMENT:'prod',FRONTEND_ORIGIN:'https://app.roteiva.com',
+    FIREBASE_PROJECT_ID:'roteiva-web-prod',ASAAS_API_KEY:'$aact_prod_'+'k'.repeat(32),BILLING_CHECKOUT_TEST_UIDS:'owner',
+    BILLING_PIX_ENABLED:'true',FIREBASE_ADMIN_CREDENTIALS_JSON:JSON.stringify({...JSON.parse(credentials),
+      project_id:'roteiva-web-prod',client_email:'test@roteiva-web-prod.iam.gserviceaccount.com'})};
+  const paused={...env,BILLING_CHECKOUT_ENABLED:'false'};
+  let posts=0,projection;
+  let confirmed=false;
+  t.mock.method(globalThis,'fetch',async(url,options)=>{
+    const request=new URL(url);
+    if(request.href==='https://oauth2.googleapis.com/token')return Response.json({access_token:'test-admin'});
+    if(request.origin==='https://firestore.googleapis.com'){
+      assert.match(request.pathname,/^\/v1\/projects\/roteiva-web-prod\//);
+      if(request.pathname.endsWith('/documents/users/owner/access/current'))return new Response(null,{status:404});
+      if(request.pathname.endsWith('/documents/users/owner'))return Response.json({fields:{ownerUid:{stringValue:'owner'}},
+        createTime:'2026-11-20T00:00:00Z',updateTime:'2026-11-20T00:00:01Z'});
+      if(request.pathname.endsWith('/documents:commit')){
+        const [,access]=JSON.parse(options.body).writes;
+        projection=access.update.fields;
+        return Response.json({});
+      }
+      throw Error('unexpected Firestore request');
+    }
+    assert.equal(request.origin,'https://api.asaas.com');
+    assert.equal(options.headers.access_token,env.ASAAS_API_KEY);
+    if(request.pathname==='/v3/checkouts'&&options.method==='POST'){
+      posts++;
+      const payload=JSON.parse(options.body);
+      assert.match(payload.callback.successUrl,/^https:\/\/app\.roteiva\.com\//);
+      assert.deepEqual(payload.billingTypes,['CREDIT_CARD']);
+      return Response.json({id:'checkout_a'});
+    }
+    if(request.pathname==='/v3/payments/pay_a'){
+      return Response.json(providerPayment({status:confirmed?'CONFIRMED':'PENDING',invoiceUrl:'https://www.asaas.com/i/qa'}));
+    }
+    if(request.pathname==='/v3/subscriptions/sub_a')return Response.json(providerSubscription());
+    throw Error('unexpected provider request');
+  });
+  const status=async(config,uid)=>await (await billingStatusResponse(config,uid)).json();
+  assert.equal((await status(env,'owner')).canStart,true);
+  assert.equal((await status(env,'owner')).pixAvailable,false);
+  assert.equal((await status(env,'other')).canStart,false);
+  await assert.rejects(createCheckout(purchase(),env,'other'),{code:'not_found'});
+  await assert.rejects(createCheckout(purchase('monthly',{paymentMethod:'PIX'}),env,'owner'),{code:'not_found'});
+  await assert.rejects(createCheckout(purchase(),paused,'owner'),{code:'not_found'});
+  assert.equal(posts,0);
+  const checkout=await createCheckout(purchase(),env,'owner');
+  assert.equal(checkout.status,201);
+  assert.equal((await checkout.json()).url,'https://asaas.com/checkoutSession/show?id=checkout_a');
+  assert.equal(posts,1);
+  await event(paused,'PAYMENT_CREATED','payment','pay_a');
+  await reconcileBilling(paused);
+  assert.equal((await status(paused,'owner')).payments[0].invoiceUrl,'https://www.asaas.com/i/qa');
+  assert.equal((await activeState(paused,'owner')).active,false);
+  confirmed=true;
+  await event(paused,'PAYMENT_CONFIRMED','payment','pay_a');
+  await reconcileBilling(paused);
+  assert.equal((await status(paused,'owner')).payments[0].state,'confirmed');
+  assert.equal(projection.source.stringValue,'subscription');
+  assert.equal((await activeState(paused,'owner')).active,true);
+  assert.equal((await status(paused,'other')).payments.length,0);
+  await assert.rejects(stopBillingForDeletion({...paused,BILLING_ENABLED:'false'},'owner'),{code:'billing_deletion_unavailable'});
 });
 
 test('ambiguous checkout creation stays fenced across restarts and can recover from a provider event',async t=>{

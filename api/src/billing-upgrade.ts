@@ -23,7 +23,7 @@ type Contract={
 type RemoteContract={ref:string;customer:string};
 
 export function upgradeRouted(env:Env):boolean{
-  // Upgrade rollout is restricted to explicitly configured DEV test users.
+  // Upgrades are available only to the configured test users during rollout.
   return checkoutTestUsers(env).some(uid=>checkoutEnabled(env,uid));
 }
 export function upgradeOffer(env:Env,uid:string,plan:BillingPlanCode,paidUntil:number,now:number){
@@ -194,7 +194,7 @@ export async function requestUpgrade(env:Env,uid:string,request:Request):Promise
 }
 
 export async function recoverUpgrade(env:Env):Promise<void>{
-  if(env.ENVIRONMENT!=='dev'||!asaasConfigured(env))return;
+  if(!asaasConfigured(env))return;
   const now=Date.now();
   const change=await env.DB.prepare(
     "UPDATE billing_plan_changes SET attempts=attempts+1,retry_at=? WHERE id=("+

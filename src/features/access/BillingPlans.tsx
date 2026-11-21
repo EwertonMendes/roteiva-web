@@ -5,7 +5,7 @@ import {AppButton} from "../ui/AppButton";
 import {AppInput} from "../ui/AppInput";
 import {AppModal,AppModalBody,AppModalFooter,AppModalHeader} from "../ui/AppModal";
 import {BillingArt} from "./BillingArt";
-import {billingDate,cadence,money,planNames,type Plan,type PlanCode,type UpgradeOffer,type PaymentMethod} from "./billing-data";
+import {billingDate,cadence,money,planNames,productionBilling,type Plan,type PlanCode,type UpgradeOffer,type PaymentMethod} from "./billing-data";
 
 const months:Record<PlanCode,number> = {monthly:1,quarterly:3,yearly:12};
 type UpgradeComparison=UpgradeOffer&{currentPlan:PlanCode;currentAmountCents:number|null};
@@ -84,7 +84,7 @@ export function CheckoutConsent({plan,pixAvailable,cardAvailable,onClose,onConfi
               <strong>{money(plan.amountCents)}</strong><span>{cadence[plan.code]}</span>
             </div>
             <span className="billing-consent-security">
-              <LockKeyhole size={15} aria-hidden="true"/> Pagamento seguro no ambiente de teste
+              <LockKeyhole size={15} aria-hidden="true"/> {productionBilling?"Pagamento processado pelo Asaas":"Pagamento seguro no ambiente de teste"}
             </span>
           </div>
           <div className="billing-consent-art" aria-hidden="true">

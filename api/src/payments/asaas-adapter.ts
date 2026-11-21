@@ -20,13 +20,15 @@ function payment(record:Record<string,unknown>):GatewayPayment {
 }
 
 const hostedOrigin=(env:Env)=>env.ENVIRONMENT==='prod'?'https://asaas.com':'https://sandbox.asaas.com';
+const sameHostedEnvironment=(expected:string,actual:string)=>actual===expected||
+  expected==='https://asaas.com'&&actual==='https://www.asaas.com';
 
 function hostedCheckout(origin:string,id:string,link?:unknown):URL {
   if(!providerRef(id))throw new ApiError(502,'billing_provider_invalid_response');
   if(link===undefined||link===null)return new URL(origin+(origin==='https://sandbox.asaas.com'?
     '/000/checkoutSession/show/'+id:'/checkoutSession/show?id='+id));
   const url=typeof link==='string'?URL.parse(link):null;
-  if(url?.origin===origin&&!url.username&&!url.password&&!url.hash&&
+  if(url&&sameHostedEnvironment(origin,url.origin)&&!url.username&&!url.password&&!url.hash&&
     ((['/checkoutSession/show/'+id,'/000/checkoutSession/show/'+id].includes(url.pathname)&&!url.search)||
      (url.pathname==='/checkoutSession/show'&&url.search==='?id='+id)))return url;
   throw new ApiError(502,'billing_provider_invalid_response');
@@ -34,13 +36,14 @@ function hostedCheckout(origin:string,id:string,link?:unknown):URL {
 
 function hostedInvoice(origin:string,link:unknown):string|null {
   const url=typeof link==='string'?URL.parse(link):null;
-  return url?.origin===origin&&!url.username&&!url.password&&!url.search&&!url.hash&&
+  return url&&sameHostedEnvironment(origin,url.origin)&&!url.username&&!url.password&&!url.search&&!url.hash&&
     /^\/i\/[A-Za-z0-9_-]{1,120}$/.test(url.pathname)?url.pathname:null;
 }
 
 /** Translate checkout commands and allowlist hosted redirects at the provider boundary. */
 export function asaasGateway(env:Env):PaymentGateway {
   const origin=hostedOrigin(env);
+  const invoiceOrigin=env.ENVIRONMENT==='prod'?'https://www.asaas.com':origin;
   return {
     code:'asaas',
     prepareCheckout(input) {
@@ -60,7 +63,7 @@ export function asaasGateway(env:Env):PaymentGateway {
     },
     checkoutUrl(id,path) { return hostedCheckout(origin,id,path?origin+path:undefined).href; },
     invoicePath(link) { return hostedInvoice(origin,link); },
-    invoiceUrl(path) { return path&&hostedInvoice(origin,origin+path)?origin+path:null; },
+    invoiceUrl(path) { return path&&hostedInvoice(origin,invoiceOrigin+path)?invoiceOrigin+path:null; },
     async cancelCheckout(id) {
       const response=await asaasRequest(env,'POST',`/checkouts/${id}/cancel`);
       return response.id===id&&response.status==='CANCELED'?'canceled':'unconfirmed';

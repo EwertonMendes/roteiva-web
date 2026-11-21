@@ -348,7 +348,7 @@ async function recoverCheckout(env:Env):Promise<void>{
 }
 
 export async function reconcileBilling(env:Env):Promise<void>{
-  if(env.ENVIRONMENT!=='dev'||!asaasConfigured(env))return;
+  if(!asaasConfigured(env))return;
   try{
     if(!await processInbox(env))await recoverCheckout(env);
   }finally{await flushBillingProjection(env);}

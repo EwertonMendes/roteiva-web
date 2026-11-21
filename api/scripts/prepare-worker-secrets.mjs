@@ -21,6 +21,28 @@ assert.match(secrets.GOOGLE_PICKER_API_KEY,/^AIza[A-Za-z0-9_-]{30,}$/);
 const account=JSON.parse(secrets.FIREBASE_ADMIN_CREDENTIALS_JSON);
 assert.equal(account.type,'service_account');assert.equal(account.project_id,config.vars.FIREBASE_PROJECT_ID);
 assert.ok(account.client_email?.endsWith('@roteiva-web-prod.iam.gserviceaccount.com'));createPrivateKey(account.private_key);
+const billing=process.env.PRODUCTION_BILLING_ENABLED==='true';
+const checkout=process.env.PRODUCTION_BILLING_CHECKOUT_ENABLED==='true';
+assert.ok(!checkout||billing,'Billing must be configured before canary checkout');
+if(billing){
+ const key=process.env.ASAAS_API_KEY??'';
+ const webhook=process.env.ASAAS_WEBHOOK_TOKEN??'';
+ const configuredUsers=(process.env.BILLING_CHECKOUT_TEST_UIDS??'').split(',').map(uid=>uid.trim()).filter(Boolean);
+ assert.match(key,/^\$aact_prod_[A-Za-z0-9_+=\/-]{16,}$/);
+ assert.match(webhook,/^\S{32,255}$/);
+ assert.notEqual(webhook,key);
+ assert.ok(!checkout||configuredUsers.length>0,'Production checkout needs a tester');
+ for(const uid of configuredUsers)assert.match(uid,/^[A-Za-z0-9_-]{1,128}$/);
+ const provider=await fetch('https://api.asaas.com/v3/myAccount/accountNumber',{
+  headers:{access_token:key,'User-Agent':'Roteiva/1.0'},redirect:'error',signal:AbortSignal.timeout(10000),
+ });
+ await provider.body?.cancel();
+ assert.equal(provider.status,200,'Asaas PROD read-only authentication failed');
+ Object.assign(secrets,{ASAAS_API_KEY:key,ASAAS_WEBHOOK_TOKEN:webhook,BILLING_ENABLED:'true',
+  BILLING_CHECKOUT_ENABLED:String(checkout)});
+ if(configuredUsers.length)secrets.BILLING_CHECKOUT_TEST_UIDS=configuredUsers.join(',');
+ console.log('Asaas PROD read-only authentication passed. Bank details and credentials suppressed.');
+}
 assert.ok(process.env.RUNNER_TEMP,'GitHub private runner temporary directory required');
 writeFileSync(join(process.env.RUNNER_TEMP,'roteiva-prod-secrets.json'),JSON.stringify(secrets),{mode:0o600});
 console.log('Validated PROD secret structure and prepared additive atomic upload. No values logged.');

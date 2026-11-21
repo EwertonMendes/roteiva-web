@@ -2,7 +2,7 @@
 import {useEffect,useId,useRef,useState} from "react";
 import {ArrowUpRight,ChevronLeft,ChevronRight,ReceiptText} from "lucide-react";
 import {AppButton} from "../ui/AppButton";
-import {billingDate,billingRequest,money,sandboxLink,type PaymentPage} from "./billing-data";
+import {billingDate,billingRequest,hostedPaymentLink,money,type PaymentPage} from "./billing-data";
 
 const outcomes:Record<string,{label:string;tone:string}> = {
   pending:{label:"Pendente",tone:"warning"},
@@ -69,7 +69,7 @@ export function BillingHistory({firstPage,uid}:{firstPage:PaymentPage;uid:string
       </div>
       {current.payments.map((payment,row) => {
         const state = outcomes[payment.state] ?? inReview;
-        const invoice = sandboxLink(payment.invoiceUrl,"invoice");
+        const invoice = hostedPaymentLink(payment.invoiceUrl,"invoice");
         const due = payment.dueOn ? billingDate(payment.dueOn) : "Data indisponível";
         return <div className="billing-table-row" role="row" key={row}>
           <span className="billing-table-date" role="cell">{payment.dueOn?<time dateTime={payment.dueOn}>{due}</time>:due}</span>

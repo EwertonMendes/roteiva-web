@@ -9,7 +9,7 @@ type Closure = 'canceled'|'expired';
 type Observation = {state:'closed'|'unchanged'}|{state:'has_payment';payment:GatewayPayment};
 
 export function checkoutRecoveryRouted(env:Env):boolean {
-  return env.ENVIRONMENT==='dev'&&asaasConfigured(env);
+  return asaasConfigured(env);
 }
 
 export async function queueCheckoutClosure(env:Env,intentId:string,uid:string,now=Date.now()):Promise<boolean>{

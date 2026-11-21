@@ -7,7 +7,7 @@ import {ApiError,type Env} from './types.ts';
  * payments or access projections; the existing Asaas-verified worker does that.
  */
 export async function requestCheckoutReturnCheck(env:Env,uid:string,intentId:unknown):Promise<Response>{
-  if(env.ENVIRONMENT!=='dev'||!asaasConfigured(env))throw new ApiError(404,'not_found');
+  if(!asaasConfigured(env))throw new ApiError(404,'not_found');
   if(intentId!==null&&(typeof intentId!=='string'||!/^[0-9a-f-]{36}$/i.test(intentId)))
     throw new ApiError(400,'billing_invalid_intent');
   const intent=await (intentId?

@@ -8,7 +8,7 @@ import {useAuth} from "../auth/AuthProvider";
 import {BillingArt} from "./BillingArt";
 import {BillingHistory} from "./BillingHistory";
 import {BillingPlans,CheckoutConsent} from "./BillingPlans";
-import {billingDate,billingInThisBuild,billingRequest,cadence,money,planNames,sandboxLink,type BillingStatus,type CheckoutReturn,type Plan,type Subscription,type PaymentMethod} from "./billing-data";
+import {billingDate,billingInThisBuild,billingRequest,cadence,hostedPaymentLink,money,planNames,type BillingStatus,type CheckoutReturn,type Plan,type Subscription,type PaymentMethod} from "./billing-data";
 import "./billing.css";
 
 const subscriptionStates:Record<string,{label:string;tone:string}> = {
@@ -53,7 +53,7 @@ function BillingAccount({uid,access,locked,checkoutReturn}:{
   const waitingForReturn=checkoutReturn==="verifying"&&!access.suspended;
   const refreshKey = access.accessUntil.getTime();
   const subscription = status?.subscription;
-  const checkoutUrl = access.suspended ? undefined : sandboxLink(status?.checkout?.url,"checkout");
+  const checkoutUrl = access.suspended ? undefined : hostedPaymentLink(status?.checkout?.url,"checkout");
   const canStartCard = locked && !waitingForReturn && !checkoutPending && !!status?.canStart && !access.suspended;
   const canStartPix = !waitingForReturn&&!checkoutPending&&!!status?.pixAvailable&&!!status?.canRenewWithPix&&!access.suspended;
   const canStart=canStartCard||canStartPix;
@@ -109,7 +109,7 @@ function BillingAccount({uid,access,locked,checkoutReturn}:{
       planCode:plan.code,catalogVersion:plan.version,acceptedImmediateCharge:true,
       ...(method==='PIX'?{paymentMethod:method}:{}),
     });
-    const url = sandboxLink(response.url,"checkout");
+    const url = hostedPaymentLink(response.url,"checkout");
     if(url){ window.location.assign(url);return; }
     setSelected(null);
     setCheckoutPending(true);

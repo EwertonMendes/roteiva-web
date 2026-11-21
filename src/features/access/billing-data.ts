@@ -35,7 +35,9 @@ export type BillingStatus = PaymentPage & {
 };
 export const planNames:Record<PlanCode,string> = {monthly:"Mensal",quarterly:"Trimestral",yearly:"Anual"};
 export const cadence:Record<PlanCode,string> = {monthly:"por mês",quarterly:"a cada 3 meses",yearly:"por ano"};
-export const billingInThisBuild = appEnvironment.appEnv==="dev" || appEnvironment.appEnv==="emulator";
+export const productionBilling = appEnvironment.appEnv==="prod";
+export const billingInThisBuild = appEnvironment.appEnv==="dev" || appEnvironment.appEnv==="emulator" ||
+  productionBilling && import.meta.env.VITE_PRODUCTION_BILLING_ENABLED==="true";
 const currency = new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"});
 const dateFormat = new Intl.DateTimeFormat("pt-BR",{timeZone:"America/Sao_Paulo",dateStyle:"medium"});
 export const money = (cents:number) => currency.format(cents/100);
@@ -87,9 +89,10 @@ export async function billingRequest<T>(path:string,uid:string,body?:object,sign
   return data;
 }
 
-export function sandboxLink(value:string|null|undefined,kind:"checkout"|"invoice"):string|undefined {
+export function hostedPaymentLink(value:string|null|undefined,kind:"checkout"|"invoice"):string|undefined {
   const url = value?URL.parse(value):null;
-  if(url?.origin!=="https://sandbox.asaas.com"||url.username||url.password||url.hash) return;
+  const origins=productionBilling?["https://asaas.com","https://www.asaas.com"]:["https://sandbox.asaas.com"];
+  if(!url||!origins.includes(url.origin)||url.username||url.password||url.hash) return;
   if(kind==="invoice"&&/^\/i\/[A-Za-z0-9_-]+$/.test(url.pathname)&&!url.search) return url.href;
   if(kind==="checkout"&&(
     /^(?:\/000)?\/checkoutSession\/show\/[A-Za-z0-9_-]+$/.test(url.pathname)&&!url.search||

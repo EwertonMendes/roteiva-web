@@ -1,32 +1,29 @@
 import assert from 'node:assert/strict';
 import {readFileSync,readdirSync} from 'node:fs';
 import {query,remoteMetadata,target} from './environment.mjs';
-import {isReviewedAdditiveMigration} from './reviewed-additive-migrations.mjs';
+import {isReviewedAdditiveMigration,reviewedBillingMigrations} from './reviewed-additive-migrations.mjs';
 await remoteMetadata();
 const applied=new Set(query('SELECT name FROM d1_migrations').map(row=>row.name));
 const pending=readdirSync('migrations').filter(name=>/^\d+_[\w-]+\.sql$/.test(name)&&!applied.has(name)).sort();
-const devOnlyBilling = new Set([
- '0035_billing_foundation.sql',
- '0036_billing_webhook_events.sql',
- '0037_billing_payment_ledger.sql',
- '0038_billing_reconciliation.sql',
- '0039_billing_plan_changes.sql',
- '0040_billing_refund_amount.sql',
- '0041_billing_payment_methods.sql',
-]);
+const billingMigrations=new Set(Object.keys(reviewedBillingMigrations));
+const approvedBillingSchema=process.argv.includes('--billing-schema');
+const domainCutover=process.argv.includes('--domain-cutover');
+assert.ok(!approvedBillingSchema||target==='prod'&&!domainCutover,'Billing schema requires a dedicated PROD promotion');
+const isReviewed=name=>isReviewedAdditiveMigration(name,readFileSync('migrations/'+name,'utf8'),target,approvedBillingSchema);
 if(target==='prod'){
- if(process.argv.includes('--domain-cutover')){
-  assert.ok(pending.every(name=>devOnlyBilling.has(name)),
+ if(domainCutover){
+  assert.ok(pending.every(name=>billingMigrations.has(name)),
    'Domain cutover requires the current PROD schema; unexpected pending migrations: '+pending.join(', '));
  }else{
-  assert.ok(!pending.some(name=>devOnlyBilling.has(name)),
-   'Billing migrations are DEV-only until an approved billing release.');
+  for(const name of pending.filter(name=>billingMigrations.has(name))){
+   assert.ok(approvedBillingSchema&&isReviewed(name),'Billing migration needs an approved, exact PROD schema: '+name);
+  }
  }
 }
-const reviewed=pending.filter(name=>isReviewedAdditiveMigration(name,readFileSync('migrations/'+name,'utf8'),target));
+const reviewed=pending.filter(isReviewed);
 const destructive=pending.filter(name=>{
  const original=readFileSync('migrations/'+name,'utf8');
- if(isReviewedAdditiveMigration(name,original,target))return false;
+ if(isReviewed(name))return false;
  const sql=original.replace(/--[^\n]*/g,'').replace(/\/\*[\s\S]*?\*\//g,'');
  return /\b(?:DROP\s+(?:TABLE|INDEX|TRIGGER|VIEW)|ALTER\s+TABLE|TRUNCATE|DELETE\s+FROM|UPDATE\s+[\w"`]|INSERT\s+OR\s+REPLACE|REPLACE\s+INTO)/i.test(sql);
 });

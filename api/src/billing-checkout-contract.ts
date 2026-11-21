@@ -24,7 +24,7 @@ function checkLocalDueDate(value:string):void{
 /**
  * Pure request builder for Asaas /v3/checkouts (no I/O or customer/card data).
  * This must receive a trusted first-charge date calculated by the server.
- * The Sandbox route controls when offers can be created.
+ * The environment's checkout gate controls when offers can be created.
  */
 export function buildRecurringCardCheckout(env:CheckoutEnv,input:CheckoutInput){
   const plan=requireBillingPlan(input.planCode);
