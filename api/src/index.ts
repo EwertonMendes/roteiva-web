@@ -23,6 +23,7 @@ import {billingPlansResponse,billingStatusResponse} from './billing.ts';
 import {ingestAsaasWebhook} from './billing-webhook.ts';
 import {createCheckout} from './billing-checkout.ts';
 import {requestCheckoutReturnCheck} from './billing-return.ts';
+import {flushBillingProjection} from './billing-projection.ts';
 import {readBillingJson} from './billing-webhook.ts';
 import {asaasConfigured,checkoutRouted} from './billing-asaas.ts';
 import {cancelRenewal,retryBillingCancellation} from './billing-management.ts';
@@ -136,9 +137,12 @@ export async function handle(request: Request, env: Env, ctx?:ExecutionContext):
         throw new ApiError(400,'billing_invalid_intent');
       response=await requestCheckoutReturnCheck(env,uid,data.intentId);
       if(response.status===202){
-        // Do not make the customer wait for the next minute's cron. The same
-        // leased inbox guarantees the provider is verified before access changes.
+        // The leased inbox verifies the provider; do not wait for the cron.
         ctx?.waitUntil(reconcileBilling(env).catch(()=>console.error(JSON.stringify({event:'billing_return_reconciliation_retry'}))));
+      }else if(response.ok){
+        // The financial event can be settled while its Firestore projection
+        // still awaits a retry. Publishing this user's pending projection is safe.
+        ctx?.waitUntil(flushBillingProjection(env,uid).catch(()=>console.error(JSON.stringify({event:'billing_return_projection_retry'}))));
       }
     } else if (env.ENVIRONMENT === 'dev' && url.pathname === '/billing/status' && request.method === 'GET') {
       const uid=await identity(request,env);
