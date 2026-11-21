@@ -191,6 +191,40 @@ test('new identity cannot bypass an unavailable deletion-status guard',async({pa
 });
 
 
+test('checkout callback requests one owner-scoped recovery and opens workspace only after verified projection',{tag:'@ci-smoke'},async({page},info)=>{
+  const email='billing-return-'+info.project.name+'@example.com';
+  const intentId='d7d87e1c-4f28-4d01-91d4-2c488e0cb044';
+  await signup(page,email);
+  await changeAccess(email,{accessUntil:Timestamp.fromMillis(Date.now()-60000),unlimited:false});
+  await expect(page.getByRole('heading',{name:'Seu período de acesso terminou.'})).toBeVisible();
+  const headers={'Access-Control-Allow-Origin':cloud,'Access-Control-Allow-Methods':'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers':'Authorization, Content-Type'};
+  let checks=0;
+  await page.route(/^http:\/\/127\.0\.0\.1:8787\/billing\/(return\/verify|status|plans)$/,async route=>{
+    const request=route.request();
+    if(request.method()==='OPTIONS')return route.fulfill({status:204,headers});
+    if(request.url().endsWith('/return/verify')){
+      checks++;
+      expect(request.method()).toBe('POST');
+      expect(request.postDataJSON()).toEqual({intentId});
+      return route.fulfill({status:202,headers,json:{status:'checking'}});
+    }
+    if(request.url().endsWith('/plans'))return route.fulfill({headers,json:{plans:[]}});
+    return route.fulfill({headers,json:{
+      checkoutAvailable:true,canStart:false,checkout:null,subscription:null,notice:null,payments:[],
+      access:{active:false,suspended:false,source:'none'},nextPaymentCursor:null,
+    }});
+  });
+  await page.goto(cloud+'/?billing=return&intent='+intentId);
+  await expect(page.getByText(/Estamos conferindo o pagamento com segurança/)).toBeVisible();
+  await expect.poll(()=>checks).toBe(1);
+  await expect(page.locator('.app-shell')).toHaveCount(0);
+  await changeAccess(email,{accessUntil:Timestamp.fromMillis(Date.now()+86400000),source:'subscription'});
+  await expect(page.locator('.app-shell')).toBeVisible();
+  await expect.poll(()=>new URL(page.url()).searchParams.has('billing')).toBe(false);
+  expect(checks).toBe(1);
+});
+
 test('billing summary, responsive history and restricted checkout use the same billing data',{tag:'@ci-smoke'},async({page},info)=>{
   const email='billing-layout-'+info.project.name+'@example.com';
   await signup(page,email);
