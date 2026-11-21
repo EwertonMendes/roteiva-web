@@ -75,7 +75,7 @@ export function CheckoutConsent({plan,pixAvailable,cardAvailable,onClose,onConfi
     <div className="rt-modal__layout">
       <AppModalHeader title={`Plano ${planNames[plan.code].toLowerCase()}`} titleId={titleId}
         description={method==="PIX"?"Revise o período e confirme o pagamento único por Pix.":"Revise os valores e confirme a cobrança recorrente."} descriptionId={descriptionId}
-        icon={<CreditCard size={21}/>} onClose={close} closeDisabled={working}/>
+        icon={method==="PIX"?<QrCode size={21}/>:<CreditCard size={21}/>} onClose={close} closeDisabled={working}/>
       <AppModalBody>
         <div className="billing-consent-summary">
           <div className="billing-consent-details">
@@ -84,7 +84,7 @@ export function CheckoutConsent({plan,pixAvailable,cardAvailable,onClose,onConfi
               <strong>{money(plan.amountCents)}</strong><span>{cadence[plan.code]}</span>
             </div>
             <span className="billing-consent-security">
-              <LockKeyhole size={15} aria-hidden="true"/> Pagamento no Asaas Sandbox
+              <LockKeyhole size={15} aria-hidden="true"/> Pagamento seguro no ambiente de teste
             </span>
           </div>
           <div className="billing-consent-art" aria-hidden="true">
@@ -116,7 +116,7 @@ export function CheckoutConsent({plan,pixAvailable,cardAvailable,onClose,onConfi
       <AppModalFooter>
         <AppButton type="button" variant="secondary" onClick={close} disabled={working}>Voltar</AppButton>
         <AppButton type="button" variant="primary" disabled={!accepted||working} loading={working} onClick={()=>void confirm()}>
-          <Check size={17} aria-hidden="true"/> {working?"Abrindo checkout…":"Continuar para o Asaas Sandbox"}
+          <Check size={17} aria-hidden="true"/> {working?"Abrindo checkout…":"Continuar para o pagamento"}
         </AppButton>
       </AppModalFooter>
     </div>
