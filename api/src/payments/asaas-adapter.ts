@@ -32,11 +32,6 @@ export function asaasGateway(env:Env):PaymentGateway {
       const response=await asaasRequest(env,'POST',`/checkouts/${id}/cancel`);
       return response.id===id&&response.status==='CANCELED'?'canceled':'unconfirmed';
     },
-    async checkoutState(id) {
-      const response=await asaasRequest(env,'GET',`/checkouts/${id}`);
-      return response.id===id&&['ACTIVE','PAID','CANCELED','EXPIRED'].includes(String(response.status))
-        ?response.status as 'ACTIVE'|'PAID'|'CANCELED'|'EXPIRED':'UNKNOWN';
-    },
     async listCheckoutPayments(id) {
       const response=await asaasRequest(env,'GET',`/payments?checkoutSession=${id}&limit=2`);
       if(!Array.isArray(response.data)||response.hasMore===true||response.data.length>1)
