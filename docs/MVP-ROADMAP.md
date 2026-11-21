@@ -1,5 +1,7 @@
 # Roadmap vivo — Roteiva MVP
 
+**Retorno do Checkout Asaas — correção preparada para homologação DEV (21/11/2026):** callback carrega somente ID opaco da intenção, o Worker agenda reconciliação imediata com lease/idempotência no D1 e os webhooks a antecipam sem bloquear ACK. A UI aplica checagem finita com tratamento amigável de atraso, cancelamento e expiração, preservando o controle de acesso exclusivamente pelo Firestore. Testes: `api/tests/billing-return.test.mjs`, `api/tests/billing-checkout-contract.test.mjs` e `tests/browser/access.spec.ts`. Aceite com Asaas Sandbox e conta Hytools pendente; não marcar como homologado apenas com CI. PROD sem alteração.
+
 **Confirmação visual de checkout — em validação DEV (20/11/2026):** os três modais de consentimento foram ajustados com ilustração já existente do plano, área de preços/termos alinhada e ações responsivas. O botão principal usa a variante compartilhada correta, preservando consentimento obrigatório e chamada ao checkout sem alteração de contrato. Regressão de geometria e imagem para mensal/trimestral/anual, claro/escuro e mobile em `tests/browser/access.spec.ts`. Aprovação visual do proprietário ainda pendente; PROD não participa.
 
 ## Assinatura Asaas Sandbox DEV — 20/11/2026
