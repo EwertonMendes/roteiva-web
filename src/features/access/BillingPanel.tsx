@@ -54,7 +54,7 @@ function BillingAccount({uid,access,locked,checkoutReturn}:{
   const refreshKey = access.accessUntil.getTime();
   const subscription = status?.subscription;
   const checkoutUrl = access.suspended ? undefined : hostedPaymentLink(status?.checkout?.url,"checkout");
-  const canStartCard = locked && !waitingForReturn && !checkoutPending && !!status?.canStart && !access.suspended;
+  const canStartCard = !waitingForReturn && !checkoutPending && !!status?.canStart && !access.suspended;
   const canStartPix = !waitingForReturn&&!checkoutPending&&!!status?.pixAvailable&&!!status?.canRenewWithPix&&!access.suspended;
   const canStart=canStartCard||canStartPix;
   const upgradeOffer = !locked&&!access.suspended ? subscription?.upgradeOffer : null;
@@ -196,8 +196,13 @@ function BillingAccount({uid,access,locked,checkoutReturn}:{
       <p className="billing-notice">Contratação online indisponível no momento.</p>}
     {!locked&&!upgradeOffer&&!upgrade&&status?.checkoutAvailable&&!status.checkout&&
       <AppButton variant="secondary" className="billing-toggle-plans" aria-expanded={showPlans} onClick={()=>setShowPlans(value=>!value)}>
-        {showPlans?"Ocultar planos":canStartPix?"Renovar ou trocar plano":"Ver planos"} <ChevronDown size={17} aria-hidden="true"/>
+        {showPlans?"Ocultar planos":access.source==="trial"||access.source==="complimentary"?"Conhecer planos e contratar":canStartPix?"Renovar com Pix":"Ver planos"} <ChevronDown size={17} aria-hidden="true"/>
       </AppButton>}
+    {showPlans&&status?.courtesyUntil&&canStart&&<p className="billing-notice" role="status">
+      Sua cortesia continua até {billingDate(status.courtesyUntil)}. Ao contratar agora, os dias restantes serão preservados.
+      No cartão a cobrança é realizada agora e a renovação continua na periodicidade escolhida.
+      No Pix o período pago começa após a cortesia e a renovação é manual.
+    </p>}
     {readCatalog&&catalog.length>0&&<BillingPlans catalog={catalog} canStart={canStart} pixAvailable={!!status?.pixAvailable}
       upgrade={upgradeOffer&&subscription?{...upgradeOffer,currentPlan:subscription.planCode,currentAmountCents:subscription.amountCents}:null}
       onSelect={plan=>upgradeOffer?setSelectedUpgrade({plan,effectiveOn:upgradeOffer.effectiveOn}):setSelected(plan)}/>}
@@ -207,7 +212,7 @@ function BillingAccount({uid,access,locked,checkoutReturn}:{
       (!access.suspended&&checkoutPending&&!status?.checkout))&&
       <AppButton variant="secondary" className="billing-refresh" onClick={refresh}><RefreshCw size={16} aria-hidden="true"/> Atualizar assinatura</AppButton>}
     {status&&(!locked||status.payments.length>0)&&<BillingHistory firstPage={status} uid={uid}/>}
-    {selected&&canStart&&<CheckoutConsent plan={selected} pixAvailable={canStartPix} cardAvailable={canStartCard}
+    {selected&&canStart&&<CheckoutConsent plan={selected} courtesyUntil={status?.courtesyUntil??null} pixAvailable={canStartPix} cardAvailable={canStartCard}
       onClose={()=>setSelected(null)} onConfirm={method=>confirmCheckout(selected,method)}/>}
     {switchingCheckout&&status?.checkout&&<ConfirmationDialog
       title="Trocar plano ou pagamento?"
