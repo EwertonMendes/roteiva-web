@@ -6,6 +6,7 @@ import {flushBillingProjection,queueBillingProjection} from './billing-projectio
 import {requireBillingPlan} from './billing-catalog.ts';
 import {termsAtRenewal} from './billing-upgrade.ts';
 import {refundedSoFar} from './billing-refunds.ts';
+import {reconcilePixPayment} from './billing-pix.ts';
 import {ApiError,type Env} from './types.ts';
 
 type InboxEvent={
@@ -203,7 +204,9 @@ async function reconcileCheckout(env:Env,event:InboxEvent,ref:string):Promise<'p
     const paymentRef=providerRef(payment?.id);
     if(!payment||!paymentRef)throw new ApiError(503,'billing_payment_not_visible');
     if(payment.checkoutSession!==ref)return 'review';
-    return reconcilePayment(env,payment,paymentRef);
+    return intent.payment_method==='PIX'
+      ?reconcilePixPayment(env,payment,paymentRef,event.event_type)
+      :reconcilePayment(env,payment,paymentRef);
   }
   return 'processed';
 }
@@ -252,7 +255,9 @@ async function processInbox(env:Env):Promise<boolean>{
     if(ref&&action==='reconcile_payment'){
       try{
         const payment=await asaasRequest(env,'GET',`/payments/${ref}`);
-        status=await reconcilePayment(env,payment,ref,event.event_type);
+        status=payment.billingType==='PIX'
+          ?await reconcilePixPayment(env,payment,ref,event.event_type)
+          :await reconcilePayment(env,payment,ref,event.event_type);
       }catch(error){
         if(!(error instanceof AsaasError&&error.upstreamStatus===404&&event.event_type==='PAYMENT_DELETED'))throw error;
         const previous=await env.DB.prepare("SELECT details FROM billing_payment_records WHERE provider='asaas' AND provider_payment_ref=?")
