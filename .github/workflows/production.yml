@@ -265,6 +265,11 @@ jobs:
       VITE_VIRTUAL_LIBRARY: 'true'
       DOMAIN_CUTOVER: ${{ inputs.domain_cutover }}
       PRODUCTION_BILLING_ENABLED: ${{ vars.PRODUCTION_BILLING_ENABLED }}
+      # The frontend smoke must validate the same rollout authorized by the
+      # protected Worker job; otherwise it would falsely reject public billing.
+      PRODUCTION_BILLING_CHECKOUT_ENABLED: ${{ inputs.public_test_billing && 'true' || vars.PRODUCTION_BILLING_CHECKOUT_ENABLED }}
+      PRODUCTION_BILLING_PUBLIC_ROLLOUT_ENABLED: ${{ inputs.public_test_billing && 'true' || vars.PRODUCTION_BILLING_PUBLIC_ROLLOUT_ENABLED }}
+      PRODUCTION_BILLING_TEST_PLAN_ENABLED: ${{ inputs.public_test_billing && 'true' || vars.PRODUCTION_BILLING_TEST_PLAN_ENABLED }}
       VITE_PRODUCTION_BILLING_ENABLED: ${{ vars.PRODUCTION_BILLING_ENABLED }}
     steps:
       - uses: actions/checkout@v4
