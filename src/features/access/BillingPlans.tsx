@@ -1,17 +1,17 @@
 
 import {useEffect,useId,useRef,useState} from "react";
-import {ArrowRight,Check,CreditCard,LockKeyhole} from "lucide-react";
+import {ArrowRight,Check,CreditCard,LockKeyhole,QrCode} from "lucide-react";
 import {AppButton} from "../ui/AppButton";
 import {AppInput} from "../ui/AppInput";
 import {AppModal,AppModalBody,AppModalFooter,AppModalHeader} from "../ui/AppModal";
 import {BillingArt} from "./BillingArt";
-import {billingDate,cadence,money,planNames,type Plan,type PlanCode,type UpgradeOffer} from "./billing-data";
+import {billingDate,cadence,money,planNames,type Plan,type PlanCode,type UpgradeOffer,type PaymentMethod} from "./billing-data";
 
 const months:Record<PlanCode,number> = {monthly:1,quarterly:3,yearly:12};
 type UpgradeComparison=UpgradeOffer&{currentPlan:PlanCode;currentAmountCents:number|null};
 
-export function BillingPlans({catalog,canStart,upgrade,onSelect}:{
-  catalog:Plan[];canStart:boolean;upgrade?:UpgradeComparison|null;onSelect:(plan:Plan)=>void;
+export function BillingPlans({catalog,canStart,pixAvailable=false,upgrade,onSelect}:{
+  catalog:Plan[];canStart:boolean;pixAvailable?:boolean;upgrade?:UpgradeComparison|null;onSelect:(plan:Plan)=>void;
 }) {
   const heading=useRef<HTMLHeadingElement>(null);
   const isUpgrade=!!upgrade;
@@ -25,7 +25,7 @@ export function BillingPlans({catalog,canStart,upgrade,onSelect}:{
     <header className="billing-plan-head">
       <h3 id="billing-plans-title" ref={heading} tabIndex={upgrade?-1:undefined}>{upgrade?"Faça upgrade do seu plano":canStart?"Escolha seu plano":"Planos de assinatura"}</h3>
       <p>{upgrade?`O novo plano começa na renovação de ${billingDate(upgrade.effectiveOn)}.`:
-        canStart?"Todos incluem acesso completo ao Roteiva, com renovação por cartão.":"Valores para novas contratações, com renovação por cartão."}</p>
+        canStart?(pixAvailable?"Todos incluem acesso completo. Escolha cartão com renovação automática ou PIX com pagamento manual.":"Todos incluem acesso completo ao Roteiva, com renovação por cartão."):"Valores para novas contratações."}</p>
     </header>
     <ul className="billing-plans" data-upgrade-options={upgrade?displayed.length:undefined}>
       {displayed.map(plan => {
@@ -52,11 +52,12 @@ export function BillingPlans({catalog,canStart,upgrade,onSelect}:{
   </section>;
 }
 
-export function CheckoutConsent({plan,onClose,onConfirm}:{
-  plan:Plan;onClose:()=>void;onConfirm:()=>Promise<void>;
+export function CheckoutConsent({plan,pixAvailable,cardAvailable,onClose,onConfirm}:{
+  plan:Plan;pixAvailable:boolean;cardAvailable:boolean;onClose:()=>void;onConfirm:(method:PaymentMethod)=>Promise<void>;
 }) {
   const titleId = useId(), descriptionId = useId();
   const [accepted,setAccepted] = useState(false);
+  const [method,setMethod] = useState<PaymentMethod>(cardAvailable?"CREDIT_CARD":"PIX");
   const [working,setWorking] = useState(false);
   const [error,setError] = useState("");
   const pending = useRef(false);
@@ -66,14 +67,14 @@ export function CheckoutConsent({plan,onClose,onConfirm}:{
     pending.current = true;
     setWorking(true);
     setError("");
-    try { await onConfirm(); }
+    try { await onConfirm(method); }
     catch(reason){ setError(reason instanceof Error?reason.message:"Não foi possível abrir o checkout."); }
     finally { pending.current = false;setWorking(false); }
   }
   return <AppModal size="compact" className="billing-consent" aria-labelledby={titleId} aria-describedby={descriptionId} onCloseRequest={close}>
     <div className="rt-modal__layout">
       <AppModalHeader title={`Plano ${planNames[plan.code].toLowerCase()}`} titleId={titleId}
-        description="Revise os valores e confirme a cobrança recorrente." descriptionId={descriptionId}
+        description={method==="PIX"?"Revise o período e confirme o pagamento único por Pix.":"Revise os valores e confirme a cobrança recorrente."} descriptionId={descriptionId}
         icon={<CreditCard size={21}/>} onClose={close} closeDisabled={working}/>
       <AppModalBody>
         <div className="billing-consent-summary">
@@ -90,9 +91,25 @@ export function CheckoutConsent({plan,onClose,onConfirm}:{
             <BillingArt name={plan.code}/>
           </div>
         </div>
+        {pixAvailable&&<div className="billing-payment-methods" role="radiogroup" aria-label="Forma de pagamento">
+          {cardAvailable&&<label className="billing-payment-choice" data-selected={method==="CREDIT_CARD"}>
+            <AppInput type="radio" name="billing-method" checked={method==="CREDIT_CARD"} disabled={working}
+              onChange={()=>{setMethod("CREDIT_CARD");setAccepted(false);}}/>
+            <CreditCard size={19} aria-hidden="true"/>
+            <span><strong>Cartão de crédito</strong><small>Renovação automática a cada período</small></span>
+          </label>}
+          <label className="billing-payment-choice" data-selected={method==="PIX"}>
+            <AppInput type="radio" name="billing-method" checked={method==="PIX"} disabled={working}
+              onChange={()=>{setMethod("PIX");setAccepted(false);}}/>
+            <QrCode size={19} aria-hidden="true"/>
+            <span><strong>Pix</strong><small>Pagamento único, sem renovação automática</small></span>
+          </label>
+        </div>}
         <label className="billing-consent-check">
           <AppInput type="checkbox" checked={accepted} disabled={working} onChange={event=>setAccepted(event.target.checked)}/>
-          <span>Aceito a cobrança de {money(plan.amountCents)} ao concluir o checkout e a renovação {cadence[plan.code]} pelo mesmo valor.</span>
+          <span>{method==="PIX"
+            ?`Aceito pagar ${money(plan.amountCents)} via Pix por um período ${cadence[plan.code]}. Não haverá cobrança automática. Se já tenho acesso pago, o novo período começa após o atual.`
+            :`Aceito a cobrança de ${money(plan.amountCents)} ao concluir o checkout e a renovação ${cadence[plan.code]} pelo mesmo valor.`}</span>
         </label>
         {error&&<p className="billing-inline-error" role="alert">{error}</p>}
       </AppModalBody>
