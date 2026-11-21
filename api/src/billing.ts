@@ -1,7 +1,7 @@
 import {billingCatalog,type BillingPlanCode} from './billing-catalog.ts';
 import {activeState} from './access.ts';
 import {billingNotice} from './billing-notices.ts';
-import {asaasConfigured,checkoutEnabled} from './billing-asaas.ts';
+import {asaasConfigured,checkoutEnabled,pixEnabled} from './billing-asaas.ts';
 import {openCheckout,openCheckoutUrl} from './billing-checkout.ts';
 import {currentUpgrade,upgradeOffer} from './billing-upgrade.ts';
 import {ApiError,type Env} from './types.ts';
@@ -17,10 +17,10 @@ export function billingPlansResponse(env?:Env):Response{
 type SubscriptionView={
   id:string;cadence:BillingPlanCode;
   status:'active'|'past_due'|'canceled'|'expired';
-  paid_until:number;next_due_on:string|null;amount_cents:number|null;can_cancel:number;cancel_after:number|null;cancel_attempts:number|null;stopped_at:number|null;
+  paid_until:number;next_due_on:string|null;amount_cents:number|null;can_cancel:number;cancel_after:number|null;cancel_attempts:number|null;stopped_at:number|null;payment_method:'CREDIT_CARD'|'PIX'|null;
 };
 type PaymentPosition={id:string;due_on:string|null;created_at:number};
-type PaymentView=PaymentPosition&{state:string;amount_cents:number;refunded_amount_cents:number;details:string|null;invoice_path:string|null};
+type PaymentView=PaymentPosition&{state:string;amount_cents:number;refunded_amount_cents:number;details:string|null;invoice_path:string|null;payment_method:string};
 const PAGE_SIZE=5;
 
 function paymentPosition(cursor:string):PaymentPosition{
@@ -36,7 +36,7 @@ function paymentPosition(cursor:string):PaymentPosition{
 
 async function paymentPage(env:Env,uid:string,cursor:string|null){
   const position=cursor===null?null:paymentPosition(cursor);
-  const base='SELECT id,state,amount_cents,refunded_amount_cents,due_on,details,invoice_path,created_at FROM billing_payment_records WHERE owner_uid=?';
+  const base='SELECT id,state,amount_cents,refunded_amount_cents,due_on,details,invoice_path,created_at,payment_method FROM billing_payment_records WHERE owner_uid=?';
   const order=' ORDER BY due_on DESC,created_at DESC,id DESC LIMIT ?';
   const after=position?.due_on===null?' AND due_on IS NULL AND (created_at,id)<(?,?)':
     ' AND ((due_on,created_at,id)<(?,?,?) OR due_on IS NULL)';
@@ -47,7 +47,7 @@ async function paymentPage(env:Env,uid:string,cursor:string|null){
   return {
     nextPaymentCursor:results.length>PAGE_SIZE?JSON.stringify({id:last.id,due_on:last.due_on,created_at:last.created_at}):null,
     payments:results.slice(0,PAGE_SIZE).map(payment=>({
-      state:payment.details??payment.state,
+      state:payment.details??payment.state,paymentMethod:payment.payment_method,
       amountCents:payment.amount_cents,dueOn:payment.due_on,
       ...(payment.refunded_amount_cents>0?{refundedAmountCents:payment.refunded_amount_cents}:{}),
       invoiceUrl:payment.invoice_path&&['pending','overdue'].includes(payment.state)?
@@ -59,28 +59,35 @@ async function paymentPage(env:Env,uid:string,cursor:string|null){
 /** Billing status remains readable with an expired trial or paid period. */
 export async function billingStatusResponse(env:Env,uid:string,now=Date.now(),cursor:string|null=null):Promise<Response>{
   if(cursor!==null)return Response.json(await paymentPage(env,uid,cursor));
-  const [access,subscription,checkout,history]=await Promise.all([
+  const [access,subscription,checkout,history,runningCard]=await Promise.all([
     activeState(env,uid,now),
     env.DB.prepare(
       'SELECT s.id,s.cadence,s.status,s.paid_until,c.next_due_on,c.stopped_at,c.cancel_after,c.cancel_attempts,(c.subscription_id IS NOT NULL AND c.removed_at IS NULL) AS can_cancel '+
-      ",COALESCE((SELECT u.amount_cents FROM billing_plan_changes u WHERE u.subscription_id=s.id AND u.state='applied' ORDER BY u.effective_on DESC LIMIT 1),i.amount_cents) AS amount_cents "+
-      'FROM access_subscriptions s LEFT JOIN billing_contracts c ON c.subscription_id=s.id LEFT JOIN billing_checkout_intents i ON i.id=c.checkout_intent_id '+
+      ",COALESCE((SELECT u.amount_cents FROM billing_plan_changes u WHERE u.subscription_id=s.id AND u.state='applied' ORDER BY u.effective_on DESC LIMIT 1),i.amount_cents) AS amount_cents,i.payment_method "+
+      'FROM access_subscriptions s LEFT JOIN billing_contracts c ON c.subscription_id=s.id LEFT JOIN billing_checkout_intents i ON i.id=COALESCE(c.checkout_intent_id,s.id) '+
       "WHERE s.owner_uid=? ORDER BY CASE s.status WHEN 'active' THEN 0 WHEN 'past_due' THEN 1 WHEN 'canceled' THEN 2 ELSE 3 END,s.updated_at DESC LIMIT 1"
     ).bind(uid).first<SubscriptionView>(),
     openCheckout(env,uid),
     paymentPage(env,uid,null),
+    env.DB.prepare('SELECT 1 AS running FROM billing_contracts WHERE owner_uid=? AND removed_at IS NULL LIMIT 1').bind(uid).first(),
   ]);
   const enabled=checkoutEnabled(env,uid);
+  const pix=pixEnabled(env,uid);
   const checkoutUrl=checkout&&enabled?openCheckoutUrl(checkout,now):null;
   const upgrade=subscription?.can_cancel&&subscription.stopped_at===null&&subscription.cancel_after===null
     ?await currentUpgrade(env,uid,subscription.id):null;
   return Response.json({
-    checkoutAvailable:enabled,
+    checkoutAvailable:enabled||pix,
+    cardAvailable:enabled,
+    pixAvailable:pix,
+    canRenewWithPix:pix&&!!access&&!access.suspended&&!checkout&&!runningCard&&
+      (!access.active||access.source==='subscription'),
     canStart:checkoutEnabled(env,uid)&&!!access&&!access.active&&!access.suspended&&!checkout&&!subscription?.can_cancel,
     access,
     notice:billingNotice(access,subscription,now),
     checkout:checkout?{
-      planCode:checkout.plan_code,
+      intentId:checkout.id,planCode:checkout.plan_code,
+      paymentMethod:checkout.payment_method??'CREDIT_CARD',
       status:checkoutUrl?'ready':'pending',
       url:checkoutUrl,
     }:null,
@@ -90,7 +97,8 @@ export async function billingStatusResponse(env:Env,uid:string,now=Date.now(),cu
       paidUntil:subscription.paid_until>0?new Date(subscription.paid_until).toISOString():null,
       nextDueOn:upgrade?.state==='scheduled'?upgrade.effective_on:subscription.next_due_on,
       amountCents:subscription.amount_cents,
-      paymentMethod:subscription.amount_cents!==null?'CREDIT_CARD':null,
+      paymentMethod:subscription.payment_method??'CREDIT_CARD',
+      renewalMode:subscription.payment_method==='PIX'?'manual':'automatic',
       canCancel:!!subscription.can_cancel&&subscription.cancel_after===null&&upgrade?.state!=='applying'&&asaasConfigured(env),
       cancellation:subscription.can_cancel&&subscription.cancel_after!==null?
         (subscription.cancel_attempts??0)>=8?'review':'pending':null,
