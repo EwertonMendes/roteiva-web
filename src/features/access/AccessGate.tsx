@@ -36,6 +36,7 @@ export function AccessGate({children}:{children:ReactNode}){
     const url=new URL(window.location.href);
     if(url.searchParams.has("billing")){
       url.searchParams.delete("billing");
+      url.searchParams.delete("intent");
       window.history.replaceState(window.history.state,"",url);
     }
   },[usable]);
