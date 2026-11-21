@@ -3,10 +3,11 @@ import {API_BASE_URL,appEnvironment} from "../../lib/environment";
 import {firebaseServices} from "../../lib/firebase";
 
 export type PlanCode = "monthly" | "quarterly" | "yearly";
+export type PaymentMethod="CREDIT_CARD"|"PIX";
 export type Plan = {code:PlanCode;amountCents:number;version:string};
 export type UpgradeOffer = {effectiveOn:string;plans:PlanCode[]};
 export type ScheduledUpgrade = {planCode:PlanCode;amountCents:number;effectiveOn:string;status:"pending"|"scheduled"|"review"};
-export type Payment = {state:string;amountCents:number;refundedAmountCents?:number;dueOn:string|null;invoiceUrl:string|null};
+export type Payment = {state:string;amountCents:number;refundedAmountCents?:number;dueOn:string|null;invoiceUrl:string|null;paymentMethod?:PaymentMethod};
 export type PaymentPage = {payments:Payment[];nextPaymentCursor?:string|null};
 export type Subscription = {
   planCode:PlanCode;
@@ -14,7 +15,8 @@ export type Subscription = {
   paidUntil:string|null;
   nextDueOn:string|null;
   amountCents:number|null;
-  paymentMethod:string|null;
+  paymentMethod:PaymentMethod|null;
+  renewalMode?:"automatic"|"manual";
   canCancel:boolean;
   cancellation:"pending"|"review"|null;
   upgradeOffer?:UpgradeOffer|null;
@@ -22,9 +24,12 @@ export type Subscription = {
 };
 export type BillingStatus = PaymentPage & {
   checkoutAvailable:boolean;
+  cardAvailable:boolean;
+  pixAvailable:boolean;
+  canRenewWithPix:boolean;
   canStart:boolean;
   notice:{code:string}|null;
-  checkout:{planCode:PlanCode;status:"ready"|"pending";url:string|null}|null;
+  checkout:{intentId:string;planCode:PlanCode;paymentMethod:PaymentMethod;status:"ready"|"pending";url:string|null}|null;
   subscription:Subscription|null;
 };
 export const planNames:Record<PlanCode,string> = {monthly:"Mensal",quarterly:"Trimestral",yearly:"Anual"};
@@ -45,6 +50,14 @@ const upgradeErrors:Record<string,string> = {
   billing_upgrade_provider_rejected:"O Asaas não aceitou a mudança nesta recorrência. Fale com o suporte para verificar o cartão.",
   billing_upgrade_in_progress:"Já existe uma mudança em andamento. Atualize a assinatura para acompanhar.",
   billing_upgrade_unavailable:"A assinatura não está elegível para essa mudança. Atualize a assinatura para conferir a situação.",
+  billing_checkout_already_open:"Já existe um checkout para outro plano ou forma de pagamento. Retorne e escolha Trocar plano.",
+  billing_checkout_not_switchable:"A tentativa anterior está sendo verificada. Confira o pagamento antes de trocar.",
+  billing_checkout_payment_verifying:"Pode existir um pagamento dessa tentativa. Não faça outra compra; verifique o histórico e tente novamente.",
+  billing_checkout_cancel_unconfirmed:"O cancelamento não foi confirmado pelo Asaas. O checkout anterior permanece protegido; tente novamente.",
+  billing_access_still_active:"Você já possui acesso pago. Para mudar a forma de pagamento, verifique a renovação atual primeiro.",
+  billing_account_ineligible:"Esta conta não pode iniciar outra contratação neste momento. Atualize sua assinatura.",
+  billing_catalog_changed:"O catálogo foi atualizado. Recarregue os valores antes de confirmar.",
+  billing_provider_unavailable:"O Asaas não respondeu agora. Nenhuma nova tentativa deve ser criada até conferirmos a anterior.",
 };
 
 export async function billingRequest<T>(path:string,uid:string,body?:object,signal?:AbortSignal):Promise<T> {
@@ -61,7 +74,7 @@ export async function billingRequest<T>(path:string,uid:string,body?:object,sign
     signal:signal?AbortSignal.any([signal,timeout]):timeout,
   });
   if(!response.ok) {
-    if(path==="/billing/upgrade"||path==="/billing/cancel"){
+    if(path.startsWith("/billing/")){
       const failure=await response.json().catch(()=>null) as {error?:{code?:string}}|null;
       const message=upgradeErrors[failure?.error?.code??""];
       if(message)throw Error(message);
