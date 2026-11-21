@@ -148,3 +148,51 @@ test('one verified PIX purchase after early checkout starts after courtesy, surv
  assert.equal(f.sql.prepare("SELECT paid_until FROM access_subscriptions WHERE owner_uid='owner'").get().paid_until,paid.paid_until);
  assert.equal((await purchaseWindow(f.env,'owner',f.now)).canPurchase,false);
 });
+
+test('early recurring card checkout preserves one immutable courtesy bonus across monthly renewals',async t=>{
+ const f=setup(t);
+ const day=new Intl.DateTimeFormat('sv-SE',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(f.now);
+ let payment={id:'card_early_1',billingType:'CREDIT_CARD',
+   checkoutSession:'checkout_card_early',subscription:'subscription_early',
+   customer:'customer_early',value:39.9,status:'CONFIRMED',
+   originalDueDate:day,paymentDate:day};
+ const remoteContract={id:'subscription_early',billingType:'CREDIT_CARD',
+   customer:'customer_early',value:39.9,cycle:'MONTHLY',status:'ACTIVE',nextDueDate:day};
+ t.mock.method(globalThis,'fetch',async url=>{
+   const pathname=String(url);
+   if(pathname.endsWith('/v3/checkouts'))return Response.json({id:'checkout_card_early'});
+   if(pathname.endsWith('/v3/subscriptions/subscription_early'))return Response.json(remoteContract);
+   if(pathname.endsWith('/v3/payments/'+payment.id))return Response.json(payment);
+   throw Error('unexpected provider request');
+ });
+ assert.equal((await createCheckout(purchase('CREDIT_CARD'),f.env,'owner',f.now)).status,201);
+ const credit=courtesyCreditForCard(f.now,f.trialEnd);
+ assert.ok(credit>0);
+ const intent=f.sql.prepare('SELECT courtesy_credit_ms FROM billing_checkout_intents').get();
+ assert.equal(intent.courtesy_credit_ms,credit);
+ async function notify(id){
+   const response=await ingestAsaasWebhook(new Request('https://example.invalid/billing/webhooks/asaas',{
+    method:'POST',headers:{'Content-Type':'application/json','asaas-access-token':f.env.ASAAS_WEBHOOK_TOKEN},
+    body:JSON.stringify({id,event:'PAYMENT_CONFIRMED',payment:{id:payment.id}})
+   }),f.env);
+   assert.equal(response.status,200);
+ }
+ await notify('card_early_event_1');
+ await reconcileBilling(f.env);
+ const firstExpected=periodEnd(day,'monthly')+credit;
+ assert.equal(f.sql.prepare('SELECT paid_until FROM access_subscriptions').get().paid_until,firstExpected);
+ assert.equal(f.sql.prepare('SELECT COUNT(*) AS n FROM billing_contracts').get().n,1);
+ const nextDay=new Date(periodEnd(day,'monthly')).toISOString().slice(0,10);
+ payment={...payment,id:'card_early_2',checkoutSession:null,status:'RECEIVED',
+   originalDueDate:nextDay,paymentDate:nextDay};
+ await notify('card_early_event_2');
+ await reconcileBilling(f.env);
+ const end2=f.sql.prepare('SELECT paid_until FROM access_subscriptions').get().paid_until;
+ assert.equal(end2,periodEnd(nextDay,'monthly')+credit);
+ assert.equal(f.sql.prepare('SELECT COUNT(*) AS n FROM billing_payment_records').get().n,2);
+ assert.equal(f.sql.prepare('SELECT courtesy_credit_ms FROM billing_checkout_intents').get().courtesy_credit_ms,credit);
+ await notify('card_early_event_3');
+ await reconcileBilling(f.env);
+ assert.equal(f.sql.prepare('SELECT paid_until FROM access_subscriptions').get().paid_until,end2);
+ assert.equal(f.sql.prepare('SELECT COUNT(*) AS n FROM billing_payment_records').get().n,2);
+});
