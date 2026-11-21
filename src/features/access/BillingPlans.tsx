@@ -37,7 +37,7 @@ export function BillingPlans({catalog,canStart,pixAvailable=false,upgrade,onSele
           <div className="billing-plan-copy">
             <div className="billing-plan-name">
               <h4>{planNames[plan.code]}</h4>
-              {plan.code==='test'&&<span className="billing-pill">Apenas teste autorizado</span>}
+              {plan.code==='test'&&<span className="billing-pill">Oferta temporária de teste</span>}
               {savings>0 && <span className="billing-pill" data-tone="positive" title={`Em relação ${reference}`}>
                 {savings}% de economia<span className="billing-sr-only"> em relação {reference}</span>
               </span>}
