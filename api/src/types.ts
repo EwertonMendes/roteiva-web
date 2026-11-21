@@ -15,6 +15,9 @@ export interface Env {
   BILLING_PUBLIC_ROLLOUT_ENABLED?: string;
   BILLING_CHECKOUT_TEST_UID?: string;
   BILLING_CHECKOUT_TEST_UIDS?: string;
+  /** Private production-only low-value offer; exact Firebase Auth UID, never an email. */
+  BILLING_TEST_PLAN_UID?: string;
+  BILLING_TEST_PLAN_ENABLED?: string;
   ASAAS_API_KEY?: string;
   ASAAS_WEBHOOK_TOKEN?: string;
   FEEDBACK_EMAIL?: {send(message:{to:string;from:string;subject:string;text:string;html?:string;replyTo?:string;
