@@ -147,7 +147,7 @@ test('Provider 400 on Pix is definitive, logged without PII and does not block e
  });
  await assert.rejects(createCheckout(request('monthly','PIX'),s.env,'owner'),
    {status:422,code:'billing_pix_checkout_rejected'});
- assert.deepEqual(s.sql.prepare('SELECT status,payment_method,provider_checkout_ref FROM billing_checkout_intents ORDER BY created_at').all(),
+ assert.deepEqual(s.sql.prepare('SELECT status,payment_method,provider_checkout_ref FROM billing_checkout_intents ORDER BY created_at').all().map(row=>({...row})),
    [{status:'failed',payment_method:'PIX',provider_checkout_ref:null}]);
  assert.equal(warnings.length,1);
  assert.match(warnings[0],/billing_pix_checkout_rejected/);
