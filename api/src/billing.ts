@@ -10,7 +10,7 @@ import {ApiError,type Env} from './types.ts';
 
 export function billingPlansResponse(env?:Env,uid?:string):Response{
   return Response.json({
-    checkoutAvailable:env?checkoutEnabled(env):false,
+    checkoutAvailable:env?checkoutEnabled(env,uid):false,
     currency:'BRL',
     plans:billingCatalog(env,uid),
   });
