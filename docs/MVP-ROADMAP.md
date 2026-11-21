@@ -1,6 +1,6 @@
 # Roadmap vivo — Roteiva MVP
 
-**Navegação por teclado no menu móvel (21/11/2026).** A auditoria no PROD reproduziu foco em um botão fora da tela com o menu lateral fechado. A correção isola o menu fechado e o conteúdo atrás do painel aberto, move o foco para o botão de fechar e o devolve ao botão de origem ao pressionar Escape. A regressão está em `tests/browser/sidebar.spec.ts`.
+**Navegação móvel (21/11/2026).** A auditoria no PROD reproduziu foco fora da tela com o menu lateral fechado, quebra do rótulo Financeiro e rolagem horizontal em 320 px com barra de rolagem vertical. O menu isola o foco ao abrir e o devolve ao botão de origem ao fechar. A página usa a largura disponível e a barra inferior reserva mais espaço para Financeiro. As regressões estão em `tests/browser/sidebar.spec.ts`.
 
 **Checkout cartão/Pix, PR #201, homologação DEV parcial.** Recuperação durável e ações para checkout sem link implementadas, com testes de concorrência, mudança da lista de QA e evidência terminal. O painel Sandbox identificou falta de chave Pix como causa do HTTP 400. A chave solicitada ainda estava pendente. No Sandbox, os três planos de cartão abriram no preço previsto e a troca de checkout sem pagamento foi confirmada no D1. Retorno sem chamada duplicada e rechecagem de acesso sem desmontar a página são cobertos no Playwright. A matriz financeira real segue em `BILLING-PIX-PORTABILITY-DEV.md`.
 

@@ -160,3 +160,30 @@ test('mobile drawer keeps keyboard focus visible and restores the opener on Esca
  await expect(drawer).toHaveAttribute('inert','');
  await expect(page.locator('main.main')).not.toHaveAttribute('inert','');
 });
+
+test('mobile bar fits its labels when 320 px leaves room for a vertical scrollbar',async({page},info)=>{
+  test.skip(info.project.name!=='mobile','Mobile navigation label layout');
+  // A classic 15 px scrollbar can leave just 305 px of content on a 320 px screen.
+  await page.setViewportSize({width:305,height:720});
+  await page.goto('http://127.0.0.1:4174/');
+  await page.locator('.brand-intro').waitFor({state:'detached'});
+  await page.evaluate(()=>document.fonts.ready.then(()=>undefined));
+  const bottom=page.getByRole('navigation',{name:'Navegação no celular'});
+  await bottom.getByRole('button',{name:'Financeiro',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Gestão financeira',exact:true})).toBeVisible();
+  const measurements=await bottom.evaluate(nav=>({
+    viewport:document.documentElement.clientWidth,
+    pageWidth:document.documentElement.scrollWidth,
+    labels:[...nav.querySelectorAll('button > span')].map(label=>({
+      text:label.textContent,
+      height:label.getBoundingClientRect().height,
+      lineHeight:parseFloat(getComputedStyle(label).lineHeight)
+    }))
+  }));
+  expect(measurements.pageWidth).toBeLessThanOrEqual(measurements.viewport);
+  expect(measurements.labels).toHaveLength(5);
+  for(const label of measurements.labels){
+    expect(label.height,label.text ?? '').toBeLessThanOrEqual(label.lineHeight+1);
+  }
+  await page.screenshot({path:info.outputPath('barra-mobile-305.png')});
+});

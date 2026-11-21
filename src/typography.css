@@ -184,7 +184,11 @@ button, [role="button"] { touch-action: manipulation; }
   .app-shell .metric-grid { grid-template-columns: minmax(0,1fr); }
   .app-shell .flow-numbers { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .app-shell .flow-numbers button { min-width: 0; }
-  .app-shell .mobile-bottom-nav { grid-template-columns: repeat(5,minmax(0,1fr)); }
+  .app-shell .mobile-bottom-nav {
+    grid-template-columns: minmax(0,.85fr) minmax(0,1.08fr) minmax(0,1fr) minmax(0,1.3fr) minmax(0,.85fr);
+    column-gap: 2px;
+    padding-inline: 4px;
+  }
   .app-shell .mobile-bottom-nav button { padding-inline: .15rem; overflow-wrap: anywhere; }
   .app-shell .client-list button { padding-inline: 1rem; }
 }
