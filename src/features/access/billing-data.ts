@@ -56,7 +56,6 @@ const upgradeErrors:Record<string,string> = {
   billing_checkout_cancel_unconfirmed:"O cancelamento não foi confirmado pelo Asaas. O checkout anterior permanece protegido; tente novamente.",
   billing_access_still_active:"Você já possui acesso pago. Para mudar a forma de pagamento, verifique a renovação atual primeiro.",
   billing_account_ineligible:"Esta conta não pode iniciar outra contratação neste momento. Atualize sua assinatura.",
-  billing_catalog_changed:"O catálogo foi atualizado. Recarregue os valores antes de confirmar.",
   billing_provider_unavailable:"O Asaas não respondeu agora. Nenhuma nova tentativa deve ser criada até conferirmos a anterior.",
 };
 
