@@ -40,15 +40,16 @@ export function checkoutRouted(env:Env):boolean{
   if(!asaasConfigured(env))return false;
   const hasTestUsers=checkoutTestUsers(env).length>0;
   return env.ENVIRONMENT==='prod'
-    ?hasTestUsers||(env.BILLING_CHECKOUT_ENABLED==='true'&&env.BILLING_PUBLIC_ROLLOUT_ENABLED==='true')
+    ?env.BILLING_CHECKOUT_ENABLED==='true'&&(hasTestUsers||env.BILLING_PUBLIC_ROLLOUT_ENABLED==='true')
     :env.BILLING_CHECKOUT_ENABLED==='true'||hasTestUsers;
 }
 
 export function checkoutEnabled(env:Env,uid?:string):boolean{
   return checkoutRouted(env)&&(
     env.ENVIRONMENT==='dev'&&env.BILLING_CHECKOUT_ENABLED==='true'||
-    env.ENVIRONMENT==='prod'&&env.BILLING_CHECKOUT_ENABLED==='true'&&env.BILLING_PUBLIC_ROLLOUT_ENABLED==='true'||
-    !!uid&&checkoutTestUsers(env).includes(uid)
+    env.ENVIRONMENT==='prod'&&env.BILLING_CHECKOUT_ENABLED==='true'&&(
+      env.BILLING_PUBLIC_ROLLOUT_ENABLED==='true'||!!uid&&checkoutTestUsers(env).includes(uid))||
+    env.ENVIRONMENT==='dev'&&!!uid&&checkoutTestUsers(env).includes(uid)
   );
 }
 
