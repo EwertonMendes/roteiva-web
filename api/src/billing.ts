@@ -4,6 +4,7 @@ import {billingNotice} from './billing-notices.ts';
 import {asaasConfigured,checkoutEnabled,pixEnabled} from './billing-asaas.ts';
 import {openCheckout,openCheckoutUrl} from './billing-checkout.ts';
 import {currentUpgrade,upgradeOffer} from './billing-upgrade.ts';
+import {paymentGateway} from './payments/asaas-adapter.ts';
 import {ApiError,type Env} from './types.ts';
 
 export function billingPlansResponse(env?:Env):Response{
@@ -52,7 +53,7 @@ async function paymentPage(env:Env,uid:string,cursor:string|null){
       amountCents:payment.amount_cents,dueOn:payment.due_on,
       ...(payment.refunded_amount_cents>0?{refundedAmountCents:payment.refunded_amount_cents}:{}),
       invoiceUrl:payment.invoice_path&&['pending','overdue'].includes(payment.state)?
-        'https://sandbox.asaas.com'+payment.invoice_path:null,
+        paymentGateway(env).invoiceUrl(payment.invoice_path):null,
     })),
   };
 }
@@ -76,7 +77,7 @@ export async function billingStatusResponse(env:Env,uid:string,now=Date.now(),cu
   ]);
   const enabled=checkoutEnabled(env,uid);
   const pix=pixEnabled(env,uid);
-  const checkoutUrl=checkout&&!access?.suspended?openCheckoutUrl(checkout,now):null;
+  const checkoutUrl=checkout&&!access?.suspended?openCheckoutUrl(env,checkout,now):null;
   const checkoutStatus=checkout?.close_status==='review'||checkout&&checkout.expires_at<=now&&!checkout.provider_checkout_ref?'review':
     checkout?.close_error==='billing_checkout_payment_verifying'?'payment_pending':
     checkout?.close_status?'closing':checkoutUrl?'ready':'pending';

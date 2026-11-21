@@ -53,13 +53,19 @@ Late confirmations can recover a closed intent when no competing checkout or con
 
 A verified manual Pix payment can extend an existing manual period. A live card recurrence or a remaining card period blocks a new Pix purchase. The customer can cancel renewal and contract after that paid period expires. Card recurrence starts only after existing access ends. Future automatic switches and scheduled downgrades remain outside this policy.
 
-### Initial provider and ledger evidence
+### Chrome, provider and ledger evidence
 
 On 21/11/2026, Chrome showed an expired-access account with a contradictory callback message and no checkout action. After the provider terminal event and a reload, the old attempt was no longer open in D1. The same screen still showed checkout unavailable because a different account had replaced it in the single-UID flag.
 
-Asaas Sandbox request logs showed that the two HTTP 400 responses on 20/11 were returned for a missing Pix key. The request used the documented PIX/DETACHED combination. The Sandbox accepted registration of an EVP key and showed it as pending. No QR generation or PIX settlement can be marked complete based on this evidence. [Checkout para Pix](https://docs.asaas.com/docs/checkout-para-pix) · [FAQ Sandbox](https://docs.asaas.com/docs/faq-sandbox).
+Asaas Sandbox request logs showed that the two HTTP 400 responses on 20/11 were returned for a missing Pix key. The request used the documented PIX/DETACHED combination. The Sandbox accepted registration of an EVP key and showed it as pending. The Roteiva DEV Pix attempt at 00:21 BRT on 21/11 still returned HTTP 400 with the same missing-key error. QR generation and settlement are blocked until the provider recognizes the key. [Checkout para Pix](https://docs.asaas.com/docs/checkout-para-pix) · [FAQ Sandbox](https://docs.asaas.com/docs/faq-sandbox).
 
 The D1 audit found seven `CHECKOUT_PAID` reviews exhausted with `billing_payment_not_visible`. Each was linked to a completed checkout with a verified ledger entry. Six were refunded and one remained confirmed. The worker can now close this redundant event once from already verified ledger evidence. This does not replay charges, refunds or access. A paid signal without a ledger continues to block checkout closure.
+
+At SHA `f774ed7955c3c9f7969d38901beecd74c22d9794` in DEV, the Hytools QA account showed expired access and all three plan choices. The hosted Sandbox opened the R$ 39,90 recurring card checkout after the Pix attempt failed. Browser Back restored both Resume and Switch actions. Switching sent one cancel request. The Asaas request log showed HTTP 200 with the checkout ID and `status: CANCELED`. D1 kept the monthly intent as canceled with zero payment rows and processed `CHECKOUT_CLOSE` and `CHECKOUT_CANCELED`. All plans were available again on-screen. [Worker DEV](https://github.com/EwertonMendes/roteiva-web/actions/runs/44860484974) · [Hosting DEV](https://github.com/EwertonMendes/roteiva-web/actions/runs/44860158624) · [Isolated desktop/mobile suite](https://github.com/EwertonMendes/roteiva-web/actions/runs/44859938718).
+
+The R$ 10,00 partial refund against the reserved R$ 109,90 Sandbox charge was rejected again shortly after midnight on 21/11. The provider still stated that a partial refund could only be requested the next day. No refund event or access change was observed. The precise provider cutoff is unverified.
+
+Checkout request construction and hosted checkout/invoice links are now translated by the adapter and checked against the expected provider environment. Card subscriptions, historical ledger identifiers, and raw provider reconciliation still have Asaas-specific dependencies. Replacing the provider requires extracting those operations and defining tenant-safe migration and replay rules.
 
 For operations, monitor pending or review counts by event type, maximum pending age, and projection retry exhaustion. Check the associated intent, remote payment and ledger before changing any queue record. A DEV Time Travel bookmark was captured before promotion. Prefer rolling back compatible Worker and Hosting releases on the current D1 data and turning off new payments independently of webhooks. Restoring the database to a pre-payment point requires separately reconciling later provider activity.
 

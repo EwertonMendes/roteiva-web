@@ -1,8 +1,9 @@
 import test from 'node:test';
+import {asaasGateway} from '../src/payments/asaas-adapter.ts';
 import assert from 'node:assert/strict';
 import {generateKeyPair,exportPKCS8} from 'jose';
 import {database} from './helpers/database.mjs';
-import {createCheckout,checkoutLink} from '../src/billing-checkout.ts';
+import {createCheckout} from '../src/billing-checkout.ts';
 import {billingStatusResponse} from '../src/billing.ts';
 import {activeState} from '../src/access.ts';
 import {ingestAsaasWebhook} from '../src/billing-webhook.ts';
@@ -127,6 +128,17 @@ test('return recovery verifies Asaas payment immediately and still preserves cro
   assert.equal(s.sql.prepare("SELECT count(*) n FROM billing_webhook_events WHERE event_id=?").get('recovery:'+id).n,1);
 });
 
+test('provider-hosted links are bound to their environment and object IDs',()=>{
+  const hosted=asaasGateway({ENVIRONMENT:'prod'});
+  assert.equal(hosted.checkoutUrl('checkout_test'),'https://asaas.com/checkoutSession/show?id=checkout_test');
+  assert.equal(hosted.invoiceUrl('/i/invoice_test'),'https://asaas.com/i/invoice_test');
+  assert.equal(hosted.invoiceUrl('/i/invoice_test?return=elsewhere'),null);
+  assert.throws(()=>hosted.checkoutPath('checkout_test','https://sandbox.asaas.com/checkoutSession/show/checkout_test'),
+    {code:'billing_provider_invalid_response'});
+  assert.throws(()=>hosted.checkoutPath('checkout_test','https://asaas.com/checkoutSession/show?id=other_checkout'),
+    {code:'billing_provider_invalid_response'});
+});
+
 test('ambiguous checkout creation stays fenced across restarts and can recover from a provider event',async t=>{
   const s=setup(t);
   let posts=0;
@@ -146,7 +158,7 @@ test('ambiguous checkout creation stays fenced across restarts and can recover f
   await reconcileBilling(s.env);
   assert.equal(s.sql.prepare('SELECT status FROM billing_checkout_intents').get().status,'expired');
   assert.equal(posts,1);
-  assert.throws(()=>checkoutLink('checkout_a','https://asaas.com/checkoutSession/show/checkout_a'),{code:'billing_provider_invalid_response'});
+  assert.throws(()=>asaasGateway(s.env).checkoutPath('checkout_a','https://asaas.com/checkoutSession/show/checkout_a'),{code:'billing_provider_invalid_response'});
 });
 
 test('verified payments restore projection, survive retries, renew once, and reverse only their own paid period',async t=>{

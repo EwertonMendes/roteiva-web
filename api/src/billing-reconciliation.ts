@@ -1,5 +1,5 @@
 import {asaasConfigured,AsaasError,asaasRequest,providerRef} from './billing-asaas.ts';
-import {checkoutLink,openCheckout,type CheckoutIntent} from './billing-checkout.ts';
+import {openCheckout,type CheckoutIntent} from './billing-checkout.ts';
 import {observeCheckoutClosure,queueCheckoutClosure} from './billing-checkout-change.ts';
 import {planBillingEvent} from './billing-events.ts';
 import {billingDateInstant,cents,civilDate,periodEnd} from './billing-period.ts';
@@ -8,6 +8,7 @@ import {requireBillingPlan} from './billing-catalog.ts';
 import {termsAtRenewal} from './billing-upgrade.ts';
 import {refundedSoFar} from './billing-refunds.ts';
 import {reconcilePixPayment} from './billing-pix.ts';
+import {paymentGateway} from './payments/asaas-adapter.ts';
 import {ApiError,type Env} from './types.ts';
 
 type InboxEvent={
@@ -159,9 +160,7 @@ async function reconcilePayment(env:Env,payment:Record<string,unknown>,ref:strin
   const state=refund>0?(refund===amount?'refunded':'review'):canceledInvoice?'review':reported;
   const details=refund>0&&refund<amount?'partial_refund':canceledInvoice?'canceled_invoice':
     state==='pending'&&['PAYMENT_CREDIT_CARD_CAPTURE_REFUSED','PAYMENT_REPROVED_BY_RISK_ANALYSIS'].includes(eventType??'')?'refused':null;
-  const invoice=typeof payment.invoiceUrl==='string'?URL.parse(payment.invoiceUrl):null;
-  const invoicePath=invoice?.origin==='https://sandbox.asaas.com'&&!invoice.username&&!invoice.password&&
-    !invoice.search&&!invoice.hash&&/^\/i\/[A-Za-z0-9_-]{1,120}$/.test(invoice.pathname)?invoice.pathname:null;
+  const invoicePath=paymentGateway(env).invoicePath(payment.invoiceUrl);
   const paid=state==='confirmed'||state==='received';
   const paidOn=civilDate(payment.paymentDate??payment.confirmedDate);
   const end=paid?periodEnd(dueOn,change?.plan_code??intent.plan_code):null;
@@ -224,9 +223,9 @@ async function reconcileCheckout(env:Env,event:InboxEvent,ref:string):Promise<'p
     }
   }else if(event.event_type==='CHECKOUT_CREATED'){
     if(intent.expires_at>now&&!await accountDeleting(env,intent.owner_uid)){
-      const url=new URL(checkoutLink(ref));
+      const path=paymentGateway(env).checkoutPath(ref);
       await env.DB.prepare("UPDATE billing_checkout_intents SET status='ready',checkout_path=?,updated_at=? WHERE id=? AND status='pending'")
-        .bind(url.pathname+url.search,now,intent.id).run();
+        .bind(path,now,intent.id).run();
     }
   }else if(event.event_type==='CHECKOUT_PAID'||(event.event_id.startsWith('recovery:')||event.event_id.startsWith('return:'))){
     const result=await asaasRequest(env,'GET',`/payments?checkoutSession=${ref}&limit=2`);
