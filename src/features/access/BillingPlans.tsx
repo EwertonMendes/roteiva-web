@@ -52,8 +52,8 @@ export function BillingPlans({catalog,canStart,pixAvailable=false,upgrade,onSele
   </section>;
 }
 
-export function CheckoutConsent({plan,pixAvailable,cardAvailable,onClose,onConfirm}:{
-  plan:Plan;pixAvailable:boolean;cardAvailable:boolean;onClose:()=>void;onConfirm:(method:PaymentMethod)=>Promise<void>;
+export function CheckoutConsent({plan,pixAvailable,cardAvailable,courtesyUntil,onClose,onConfirm}:{
+  plan:Plan;pixAvailable:boolean;cardAvailable:boolean;courtesyUntil:string|null;onClose:()=>void;onConfirm:(method:PaymentMethod)=>Promise<void>;
 }) {
   const titleId = useId(), descriptionId = useId();
   const [accepted,setAccepted] = useState(false);
@@ -84,7 +84,7 @@ export function CheckoutConsent({plan,pixAvailable,cardAvailable,onClose,onConfi
               <strong>{money(plan.amountCents)}</strong><span>{cadence[plan.code]}</span>
             </div>
             <span className="billing-consent-security">
-              <LockKeyhole size={15} aria-hidden="true"/> {productionBilling?"Pagamento processado pelo Asaas":"Pagamento seguro no ambiente de teste"}
+              <LockKeyhole size={15} aria-hidden="true"/> {productionBilling?"Pagamento em ambiente seguro":"Pagamento seguro no ambiente de teste"}
             </span>
           </div>
           <div className="billing-consent-art" aria-hidden="true">
@@ -105,11 +105,16 @@ export function CheckoutConsent({plan,pixAvailable,cardAvailable,onClose,onConfi
             <span><strong>Pix</strong><small>Pagamento único, sem renovação automática</small></span>
           </label>
         </div>}
+        {courtesyUntil&&<p className="billing-consent-courtesy" role="status">
+          Sua cortesia está garantida até <strong>{billingDate(courtesyUntil)}</strong>.
+          {method==="PIX"?" O período pago será acrescentado ao final dela.":
+          " A cobrança no cartão começa agora; os dias restantes serão acrescentados ao acesso, mas a data das próximas cobranças não será adiada."}
+        </p>}
         <label className="billing-consent-check">
           <AppInput type="checkbox" checked={accepted} disabled={working} onChange={event=>setAccepted(event.target.checked)}/>
           <span>{method==="PIX"
-            ?`Aceito pagar ${money(plan.amountCents)} via Pix por um período ${cadence[plan.code]}. Não haverá cobrança automática. Se já tenho acesso pago, o novo período começa após o atual.`
-            :`Aceito a cobrança de ${money(plan.amountCents)} ao concluir o checkout e a renovação ${cadence[plan.code]} pelo mesmo valor.`}</span>
+            ?`Aceito pagar ${money(plan.amountCents)} via Pix por um período ${cadence[plan.code]}. Não haverá cobrança automática. Uma nova compra só estará disponível após o término do período pago.`
+            :`Aceito a cobrança de ${money(plan.amountCents)} ao concluir o checkout e a renovação automática ${cadence[plan.code]} pelo mesmo valor. Os dias gratuitos restantes não adiam as cobranças futuras.`}</span>
         </label>
         {error&&<p className="billing-inline-error" role="alert">{error}</p>}
       </AppModalBody>
