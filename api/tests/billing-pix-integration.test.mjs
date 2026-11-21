@@ -105,9 +105,10 @@ test('switch cancels only a verified unpaid checkout; old attempt persists for a
  t.mock.method(globalThis,'fetch',async(url,options)=>{
   const path=String(url);
   if(path.endsWith('/checkouts')){posts++;return Response.json({id:'checkout_'+posts});}
-  if(path.endsWith('/checkouts/checkout_1')&&options.method==='GET')
-    return Response.json({id:'checkout_1',status:paid?'PAID':'ACTIVE'});
-  if(path.endsWith('/checkouts/checkout_1/cancel')){cancels++;return Response.json({id:'checkout_1',status:'CANCELED'});}
+  if(path.endsWith('/checkouts/checkout_1/cancel')){
+    cancels++;
+    return paid?new Response('{}',{status:400}):Response.json({id:'checkout_1',status:'CANCELED'});
+  }
   if(path.includes('/payments?checkoutSession=checkout_1'))return Response.json({data:paid?[payment('RECEIVED')]:[],hasMore:false});
   throw Error('unexpected request: '+path);
  });
@@ -117,10 +118,10 @@ test('switch cancels only a verified unpaid checkout; old attempt persists for a
   headers:{'content-type':'application/json'},body:JSON.stringify({intentId:old,confirmed:true})}),s.env,'owner');
  paid=true;
  await assert.rejects(abandon(),{code:'billing_checkout_payment_verifying'});
- assert.equal(cancels,0);
+ assert.equal(cancels,1);
  paid=false;
  assert.equal((await abandon()).status,200);
- assert.equal(cancels,1);
+ assert.equal(cancels,2);
  assert.equal(s.sql.prepare('SELECT status FROM billing_checkout_intents WHERE id=?').get(old).status,'canceled');
  await createCheckout(request('yearly'),s.env,'owner');
  assert.equal(posts,2);
