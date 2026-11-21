@@ -224,7 +224,16 @@ async function main() {
     oldStart=saved.testStart;oldEnd=saved.testEnd;
     newStart=saved.originalStart;newEnd=saved.originalEnd;
   }
-  await writeTrial(cloudflareKey,uid,oldStart,oldEnd,newStart,newEnd,now);
+  try{
+    await writeTrial(cloudflareKey,uid,oldStart,oldEnd,newStart,newEnd,now);
+  }catch(error){
+    if(action==='expire'){
+      const cleanup=await fetch(fsUrl(backupName),{method:'DELETE',redirect:'error',
+        headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(12000)});
+      assert.ok(cleanup.ok,'D1 unchanged, but QA backup cleanup needs manual attention');
+    }
+    throw error;
+  }
   try{
     await updateProjection(token,uid,projection,newEnd,Date.now());
   }catch(error){
@@ -233,6 +242,11 @@ async function main() {
       await writeTrial(cloudflareKey,uid,newStart,newEnd,oldStart,oldEnd,Date.now());
     }catch{
       throw new Error('CRITICAL: Firestore update failed and D1 rollback also failed. Manual repair required.');
+    }
+    if(action==='expire'){
+      const cleanup=await fetch(fsUrl(backupName),{method:'DELETE',redirect:'error',
+        headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(12000)});
+      assert.ok(cleanup.ok,'D1 restored, but QA backup cleanup needs manual attention');
     }
     throw new Error('Firestore update failed. D1 was restored; the QA operation was not completed.');
   }
