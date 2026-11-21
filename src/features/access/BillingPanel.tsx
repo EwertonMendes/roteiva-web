@@ -48,7 +48,7 @@ function BillingAccount({uid,access,locked}:{uid:string;access:AccessInfo;locked
   const status = result?.status;
   const subscription = status?.subscription;
   const checkoutUrl = access.suspended ? undefined : sandboxLink(status?.checkout?.url,"checkout");
-  const canStart = locked && !!status?.canStart && !access.suspended;
+  const canStart = locked && callback!=="return" && !!status?.canStart && !access.suspended;
   const upgradeOffer = !locked&&!access.suspended ? subscription?.upgradeOffer : null;
   const upgrade = subscription?.upgrade;
   const readCatalog = !access.suspended && (canStart || showPlans);
