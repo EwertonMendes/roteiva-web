@@ -222,6 +222,7 @@ test('checkout callback requests one owner-scoped recovery and opens workspace o
   await changeAccess(email,{accessUntil:Timestamp.fromMillis(Date.now()+86400000),source:'subscription'});
   await expect(page.locator('.app-shell')).toBeVisible();
   await expect.poll(()=>new URL(page.url()).searchParams.has('billing')).toBe(false);
+  expect(new URL(page.url()).searchParams.has('intent')).toBe(false);
   expect(checks).toBe(1);
 });
 
