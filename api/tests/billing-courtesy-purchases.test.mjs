@@ -6,6 +6,8 @@ import {billingDateInstant,periodEnd} from '../src/billing-period.ts';
 import {createCheckout} from '../src/billing-checkout.ts';
 import {billingStatusResponse} from '../src/billing.ts';
 import {checkoutEnabled,pixEnabled} from '../src/billing-asaas.ts';
+import {ingestAsaasWebhook} from '../src/billing-webhook.ts';
+import {reconcileBilling} from '../src/billing-reconciliation.ts';
 
 const url='https://roteiva-api-dev.roteiva-dev.workers.dev/billing/checkout';
 function setup(t,now=Date.now()) {
@@ -109,4 +111,40 @@ test('production PIX remains opt-in and never leaks from DEV configuration',()=>
  assert.equal(pixEnabled({...env,BILLING_PIX_ENABLED:'true',BILLING_CHECKOUT_TEST_UIDS:'qa-user'},'qa-user'),true);
  assert.equal(pixEnabled({...env,BILLING_PIX_ENABLED:'false',BILLING_CHECKOUT_TEST_UIDS:'qa-user'},'qa-user'),false);
  assert.equal(pixEnabled({...env,BILLING_PIX_ENABLED:'true',BILLING_PUBLIC_ROLLOUT_ENABLED:'true'},'arbitrary'),true);
+});
+
+test('one verified PIX purchase after early checkout starts after courtesy, survives duplicate notification',async t=>{
+ const f=setup(t);
+ const day=new Intl.DateTimeFormat('sv-SE',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(f.now);
+ const payment={id:'pay_pix_early',billingType:'PIX',checkoutSession:'checkout_pix_early',subscription:null,
+  customer:'cus_early',value:39.9,status:'RECEIVED',originalDueDate:day,paymentDate:day};
+ t.mock.method(globalThis,'fetch',async url=>{
+  const address=String(url);
+  if(address.endsWith('/v3/checkouts'))return Response.json({id:'checkout_pix_early'});
+  if(address.includes('/payments?checkoutSession=checkout_pix_early&limit=2'))
+    return Response.json({data:[payment],hasMore:false});
+  if(address.endsWith('/payments/pay_pix_early'))return Response.json(payment);
+  throw Error('unrecognized provider access');
+ });
+ assert.equal((await createCheckout(purchase('PIX'),f.env,'owner',f.now)).status,201);
+ async function webhook(id) {
+  const response=await ingestAsaasWebhook(new Request('https://example.invalid/billing/webhooks/asaas',{
+   method:'POST',headers:{'Content-Type':'application/json','asaas-access-token':f.env.ASAAS_WEBHOOK_TOKEN},
+   body:JSON.stringify({id,event:'PAYMENT_RECEIVED',payment:{id:payment.id}})
+  }),f.env);
+  assert.equal(response.status,200);
+ }
+ await webhook('evt_early_1');
+ await reconcileBilling(f.env);
+ const paid=f.sql.prepare("SELECT id,status,paid_until FROM access_subscriptions WHERE owner_uid='owner'").get();
+ assert.equal(paid.status,'active');
+ assert.equal(paid.paid_until,manualPaidUntil(f.trialEnd,'monthly'));
+ assert.ok(paid.paid_until>f.trialEnd);
+ assert.equal(f.sql.prepare("SELECT COUNT(*) AS n FROM billing_contracts WHERE owner_uid='owner'").get().n,0);
+ assert.equal(f.sql.prepare("SELECT COUNT(*) AS n FROM billing_payment_records WHERE owner_uid='owner'").get().n,1);
+ await webhook('evt_early_2');
+ await reconcileBilling(f.env);
+ assert.equal(f.sql.prepare("SELECT COUNT(*) AS n FROM billing_payment_records WHERE owner_uid='owner'").get().n,1);
+ assert.equal(f.sql.prepare("SELECT paid_until FROM access_subscriptions WHERE owner_uid='owner'").get().paid_until,paid.paid_until);
+ assert.equal((await purchaseWindow(f.env,'owner',f.now)).canPurchase,false);
 });
