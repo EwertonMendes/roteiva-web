@@ -1,7 +1,7 @@
 import {activeState} from './access.ts';
 import {purchaseWindow,courtesyCreditForCard} from './billing-purchase-policy.ts';
 import {AsaasError,checkoutEnabled,pixEnabled,providerRef} from './billing-asaas.ts';
-import {requireBillingPlan,type BillingPlanCode} from './billing-catalog.ts';
+import {resolveCheckoutOffer,type BillingPlanCode,type BillingPlan} from './billing-catalog.ts';
 import {paymentGateway} from './payments/asaas-adapter.ts';
 import type {PaymentMethod} from './payments/provider.ts';
 import {readBillingJson} from './billing-webhook.ts';
@@ -37,9 +37,10 @@ export function openCheckoutUrl(env:Env,row:CheckoutIntent,now:number):string|nu
   catch{return null;}
 }
 
-function resume(env:Env,row:CheckoutIntent,planCode:BillingPlanCode,method:PaymentMethod,now:number):Response{
+function resume(env:Env,row:CheckoutIntent,plan:BillingPlan,method:PaymentMethod,now:number):Response{
   if((row.payment_method??'CREDIT_CARD')!==method)throw new ApiError(409,'billing_checkout_already_open');
-  if(row.plan_code!==planCode)throw new ApiError(409,'billing_checkout_already_open');
+  if(row.plan_code!==plan.code||row.pricing_version!==plan.version||row.amount_cents!==plan.amountCents)
+    throw new ApiError(409,'billing_checkout_already_open');
   // A provider ID can be saved before the ready response. Reuse the exact
   // existing checkout even when saving the presentation URL was interrupted.
   const url=openCheckoutUrl(env,row,now);
@@ -55,13 +56,13 @@ export async function createCheckout(request:Request,env:Env,uid:string,now=Date
     throw new ApiError(400,'billing_consent_required');
   if(method==='PIX'?!pixEnabled(env,uid):!checkoutEnabled(env,uid))
     throw new ApiError(404,'not_found');
-  const plan=requireBillingPlan(data.planCode);
+  const plan=resolveCheckoutOffer(env,uid,data.planCode);
   if(data.catalogVersion!==plan.version)throw new ApiError(409,'billing_catalog_changed');
   const access=await activeState(env,uid,now);
   if(!access||access.suspended)throw new ApiError(409,'billing_account_ineligible');
 
   const open=await openCheckout(env,uid);
-  if(open)return resume(env,open,plan.code,method,now);
+  if(open)return resume(env,open,plan,method,now);
   // Free time is preserved in the payment period. A currently paid plan or
   // recurring contract is NEVER silently stacked with another checkout.
   const window=await purchaseWindow(env,uid,now);
@@ -74,7 +75,7 @@ export async function createCheckout(request:Request,env:Env,uid:string,now=Date
   const gateway=paymentGateway(env);
   const customer=await env.DB.prepare('SELECT provider_customer_ref FROM billing_customers WHERE owner_uid=? AND provider=?')
     .bind(uid,gateway.code).first<{provider_customer_ref:string}>();
-  const submit=gateway.prepareCheckout({planCode:plan.code,intentId:id,nextDueDate:firstDueDate,method,
+  const submit=gateway.prepareCheckout({planCode:plan.code,pricingVersion:plan.version,intentId:id,nextDueDate:firstDueDate,method,
     customerRef:customer?.provider_customer_ref});
   const result=await env.DB.prepare(
     "INSERT OR IGNORE INTO billing_checkout_intents(id,owner_uid,provider,plan_code,pricing_version,amount_cents,status,created_at,expires_at,updated_at,first_due_on,payment_method,courtesy_credit_ms) "+
@@ -87,7 +88,7 @@ export async function createCheckout(request:Request,env:Env,uid:string,now=Date
     uid,uid,uid,now,now,uid,now,uid).run();
   if(result.meta.changes!==1){
     const existing=await openCheckout(env,uid);
-    if(existing)return resume(env,existing,plan.code,method,now);
+    if(existing)return resume(env,existing,plan,method,now);
     throw new ApiError(409,'billing_account_ineligible');
   }
   let created:Awaited<ReturnType<typeof submit>>;
