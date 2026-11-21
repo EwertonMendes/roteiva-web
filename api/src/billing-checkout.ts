@@ -1,7 +1,9 @@
 import {activeState} from './access.ts';
-import {asaasRequest,AsaasError,checkoutEnabled,providerRef} from './billing-asaas.ts';
+import {AsaasError,checkoutEnabled,pixEnabled,providerRef} from './billing-asaas.ts';
 import {requireBillingPlan,type BillingPlanCode} from './billing-catalog.ts';
-import {buildRecurringCardCheckout} from './billing-checkout-contract.ts';
+import {buildRecurringCardCheckout,buildDetachedPixCheckout} from './billing-checkout-contract.ts';
+import {paymentGateway} from './payments/asaas-adapter.ts';
+import type {PaymentMethod} from './payments/provider.ts';
 import {readBillingJson} from './billing-webhook.ts';
 import {ApiError,type Env} from './types.ts';
 
@@ -14,7 +16,7 @@ const localClock=new Intl.DateTimeFormat('sv-SE',{
 
 export type CheckoutIntent={
   id:string;owner_uid:string;plan_code:BillingPlanCode;pricing_version:string;amount_cents:number;
-  status:'pending'|'ready'|'completed'|'expired'|'canceled'|'failed';
+  status:'pending'|'ready'|'completed'|'expired'|'canceled'|'failed';payment_method:PaymentMethod;
   provider_checkout_ref:string|null;checkout_path:string|null;expires_at:number;first_due_on:string|null;
 };
 
@@ -42,7 +44,8 @@ export function openCheckoutUrl(row:CheckoutIntent,now:number):string|null{
   return checkoutLink(row.provider_checkout_ref,row.checkout_path?sandboxOrigin+row.checkout_path:undefined);
 }
 
-function resume(row:CheckoutIntent,planCode:BillingPlanCode,now:number):Response{
+function resume(row:CheckoutIntent,planCode:BillingPlanCode,method:PaymentMethod,now:number):Response{
+  if((row.payment_method??'CREDIT_CARD')!==method)throw new ApiError(409,'billing_checkout_already_open');
   if(row.plan_code!==planCode)throw new ApiError(409,'billing_checkout_already_open');
   // A provider ID can be saved before the ready response. Reuse the exact
   // existing checkout even when saving the presentation URL was interrupted.
@@ -51,41 +54,50 @@ function resume(row:CheckoutIntent,planCode:BillingPlanCode,now:number):Response
 }
 
 export async function createCheckout(request:Request,env:Env,uid:string,now=Date.now()):Promise<Response>{
-  if(!checkoutEnabled(env,uid))throw new ApiError(404,'not_found');
-  const data=await readBillingJson(request,1024) as {planCode?:unknown;catalogVersion?:unknown;acceptedImmediateCharge?:unknown}|null;
-  if(!data||typeof data!=='object'||Object.keys(data).length!==3||data.acceptedImmediateCharge!==true)
+  const data=await readBillingJson(request,1024) as {planCode?:unknown;catalogVersion?:unknown;acceptedImmediateCharge?:unknown;paymentMethod?:unknown}|null;
+  const method=data?.paymentMethod??'CREDIT_CARD';
+  if((method!=='PIX'&&method!=='CREDIT_CARD')||!data||
+    typeof data!=='object'||Object.keys(data).length!==(data.paymentMethod===undefined?3:4)||
+    data.acceptedImmediateCharge!==true)
     throw new ApiError(400,'billing_consent_required');
+  if(method==='PIX'?!pixEnabled(env,uid):!checkoutEnabled(env,uid))
+    throw new ApiError(404,'not_found');
   const plan=requireBillingPlan(data.planCode);
   if(data.catalogVersion!==plan.version)throw new ApiError(409,'billing_catalog_changed');
   const access=await activeState(env,uid,now);
   if(!access||access.suspended)throw new ApiError(409,'billing_account_ineligible');
 
   const open=await openCheckout(env,uid);
-  if(open)return resume(open,plan.code,now);
+  if(open)return resume(open,plan.code,method,now);
   // Protect remaining trial, courtesy or paid time until scheduling is homologated.
-  if(access.active)throw new ApiError(409,'billing_access_still_active');
+  // PIX is a manual period purchase; an active paid period may be extended,
+  // but trial, complimentary and live card recurrences cannot be overridden.
+  if(access.active&&(method==='CREDIT_CARD'||access.source!=='subscription'))
+    throw new ApiError(409,'billing_access_still_active');
   const firstDueDate=localClock.format(now);
   const id=crypto.randomUUID();
-  const payload=buildRecurringCardCheckout(env,{planCode:plan.code,intentId:id,nextDueDate:firstDueDate});
+  const payload=method==='PIX'
+    ?buildDetachedPixCheckout(env,{planCode:plan.code,intentId:id,nextDueDate:firstDueDate})
+    :buildRecurringCardCheckout(env,{planCode:plan.code,intentId:id,nextDueDate:firstDueDate});
   const customer=await env.DB.prepare("SELECT provider_customer_ref FROM billing_customers WHERE owner_uid=? AND provider='asaas'")
     .bind(uid).first<{provider_customer_ref:string}>();
   const result=await env.DB.prepare(
-    "INSERT OR IGNORE INTO billing_checkout_intents(id,owner_uid,provider,plan_code,pricing_version,amount_cents,status,created_at,expires_at,updated_at,first_due_on) "+
-    "SELECT ?,owner_uid,'asaas',?,?,?,'pending',?,?,?,? FROM access_accounts WHERE owner_uid=? AND suspended_at IS NULL AND sync_pending=0 AND trial_ends_at<=? "+
+    "INSERT OR IGNORE INTO billing_checkout_intents(id,owner_uid,provider,plan_code,pricing_version,amount_cents,status,created_at,expires_at,updated_at,first_due_on,payment_method) "+
+    "SELECT ?,owner_uid,'asaas',?,?,?,'pending',?,?,?,?,? FROM access_accounts WHERE owner_uid=? AND suspended_at IS NULL AND sync_pending=0 AND trial_ends_at<=? "+
     "AND NOT EXISTS(SELECT 1 FROM account_deletions WHERE owner_uid=?) "+
     "AND NOT EXISTS(SELECT 1 FROM access_grants WHERE owner_uid=? AND revoked_at IS NULL AND starts_at<=? AND (ends_at IS NULL OR ends_at>?)) "+
-    "AND NOT EXISTS(SELECT 1 FROM access_subscriptions WHERE owner_uid=? AND (status IN ('active','past_due') OR (status='canceled' AND paid_until>?))) "+
+    "AND (?='PIX' OR NOT EXISTS(SELECT 1 FROM access_subscriptions WHERE owner_uid=? AND (status IN ('active','past_due') OR (status='canceled' AND paid_until>?)))) "+
     "AND NOT EXISTS(SELECT 1 FROM billing_contracts WHERE owner_uid=? AND removed_at IS NULL)"
-  ).bind(id,plan.code,plan.version,plan.amountCents,now,now+CHECKOUT_LIFETIME,now,firstDueDate.slice(0,10),
-    uid,now,uid,uid,now,now,uid,now,uid).run();
+  ).bind(id,plan.code,plan.version,plan.amountCents,now,now+CHECKOUT_LIFETIME,now,firstDueDate.slice(0,10),method,
+    uid,now,uid,uid,now,now,method,uid,now,uid).run();
   if(result.meta.changes!==1){
     const existing=await openCheckout(env,uid);
-    if(existing)return resume(existing,plan.code,now);
+    if(existing)return resume(existing,plan.code,method,now);
     throw new ApiError(409,'billing_account_ineligible');
   }
   let created:Record<string,unknown>;
   try{
-    created=await asaasRequest(env,'POST','/checkouts',{
+    created=await paymentGateway(env).createCheckout({
       ...payload,...(customer?{customer:customer.provider_customer_ref}:{})
     });
   }catch(error){
