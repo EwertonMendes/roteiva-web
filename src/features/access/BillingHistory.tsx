@@ -75,7 +75,7 @@ export function BillingHistory({firstPage,uid}:{firstPage:PaymentPage;uid:string
               <small className="billing-refunded-amount">{money(payment.refundedAmountCents)} estornados</small>}
           </span>
           <span className="billing-table-invoice" role="cell">
-            {invoice ? <a href={invoice} target="_blank" rel="noreferrer" aria-label={`Abrir fatura de ${due} no Asaas (nova aba)`}>Fatura <ArrowUpRight size={14}/></a> :
+            {invoice ? <a href={invoice} target="_blank" rel="noreferrer" aria-label={`Abrir fatura de ${due} (nova aba)`}>Fatura <ArrowUpRight size={14}/></a> :
               <><span className="billing-sr-only">Fatura indisponível</span><span aria-hidden="true">—</span></>}
           </span>
         </div>;
