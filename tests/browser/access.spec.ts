@@ -500,7 +500,7 @@ test('settings upgrade compares plans and schedules the confirmed renewal',{tag:
 });
 
 
-test('active trial shows purchase options, keeps courtesy visible and fits compact dialogs',async({page},info)=>{
+test('active trial shows purchase options, keeps courtesy visible and fits compact dialogs',{tag:'@ci-smoke'},async({page},info)=>{
   const email='billing-courtesy-'+info.project.name+'@example.com';
   await signup(page,email);
   const courtesyUntil=new Date(Date.now()+5*86400000).toISOString();
