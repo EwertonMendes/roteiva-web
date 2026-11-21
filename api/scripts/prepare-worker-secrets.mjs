@@ -25,6 +25,9 @@ const billing=process.env.PRODUCTION_BILLING_ENABLED==='true';
 const checkout=process.env.PRODUCTION_BILLING_CHECKOUT_ENABLED==='true';
 const pix=process.env.PRODUCTION_BILLING_PIX_ENABLED==='true';
 const publicRollout=process.env.PRODUCTION_BILLING_PUBLIC_ROLLOUT_ENABLED==='true';
+const testPlanEnabled=process.env.PRODUCTION_BILLING_TEST_PLAN_ENABLED==='true';
+const testPlanUid=process.env.BILLING_TEST_PLAN_UID??'';
+assert.ok(!testPlanEnabled||billing&&checkout,'A private paid test plan requires active checkout');
 assert.ok(!checkout||billing,'Billing must be configured before canary checkout');
 assert.ok(!pix||billing,'PIX cannot be live without verified billing');
 assert.ok(!publicRollout||checkout,'Public checkout requires an explicit separate checkout release');
@@ -38,6 +41,10 @@ if(billing){
  assert.ok(!checkout||configuredUsers.length>0||publicRollout,'Production checkout needs a tester or an explicitly approved public rollout');
  assert.ok(!pix||configuredUsers.length>0||publicRollout,'Production PIX requires a canary or explicit public rollout');
  for(const uid of configuredUsers)assert.match(uid,/^[A-Za-z0-9_-]{1,128}$/);
+ if(testPlanEnabled){
+  assert.match(testPlanUid,/^[A-Za-z0-9_-]{1,128}$/,'A single exact PROD Firebase Auth UID is required');
+  assert.ok(configuredUsers.includes(testPlanUid),'Private plan UID must already be in the protected PROD canary checkout allowlist');
+ }
  const provider=await fetch('https://api.asaas.com/v3/myAccount/accountNumber',{
   headers:{access_token:key,'User-Agent':'Roteiva/1.0'},redirect:'error',signal:AbortSignal.timeout(10000),
  });
@@ -45,7 +52,9 @@ if(billing){
  assert.equal(provider.status,200,'Asaas PROD read-only authentication failed');
  Object.assign(secrets,{ASAAS_API_KEY:key,ASAAS_WEBHOOK_TOKEN:webhook,BILLING_ENABLED:'true',
   BILLING_CHECKOUT_ENABLED:String(checkout),BILLING_PIX_ENABLED:String(pix),
-  BILLING_PUBLIC_ROLLOUT_ENABLED:String(publicRollout)});
+  BILLING_PUBLIC_ROLLOUT_ENABLED:String(publicRollout),
+  BILLING_TEST_PLAN_ENABLED:String(testPlanEnabled)});
+ if(testPlanEnabled)secrets.BILLING_TEST_PLAN_UID=testPlanUid;
  if(configuredUsers.length)secrets.BILLING_CHECKOUT_TEST_UIDS=configuredUsers.join(',');
  console.log('Asaas PROD read-only authentication passed. Bank details and credentials suppressed.');
 }

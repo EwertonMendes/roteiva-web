@@ -507,7 +507,8 @@ test('active trial shows purchase options, keeps courtesy visible and fits compa
   const plans=[
     {code:'monthly',amountCents:3990,version:'2026-11-v1'},
     {code:'quarterly',amountCents:10990,version:'2026-11-v1'},
-    {code:'yearly',amountCents:39990,version:'2026-11-v1'}
+    {code:'yearly',amountCents:39990,version:'2026-11-v1'},
+    {code:'test',amountCents:500,version:'2026-11-private-test-v1'}
   ];
   let checkouts=0;
   await page.route(/^http:\/\/127\.0\.0\.1:8787\/billing\/(status|plans|checkout)$/,async route=>{
@@ -546,6 +547,12 @@ test('active trial shows purchase options, keeps courtesy visible and fits compa
     expect(geometry!.x).toBeGreaterThanOrEqual(-1);
     expect(geometry!.x+geometry!.width).toBeLessThanOrEqual(page.viewportSize()!.width+1);
   }
+  await dialog.getByRole('button',{name:'Voltar'}).click();
+  await billing.getByRole('button',{name:'Escolher teste (temporário)'}).click();
+  await expect(dialog.locator('.billing-price strong')).toHaveText('R$ 5,00');
+  await expect(dialog.getByText(/Aceito a cobrança de R\$\s*5,00/)).toBeVisible();
+  await dialog.getByRole('radio',{name:/Pix/}).check();
+  await expect(dialog.getByText(/Aceito pagar R\$\s*5,00 via Pix/)).toBeVisible();
   await dialog.getByRole('button',{name:'Voltar'}).click();
   expect(checkouts).toBe(0);
 });

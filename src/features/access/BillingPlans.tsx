@@ -7,7 +7,7 @@ import {AppModal,AppModalBody,AppModalFooter,AppModalHeader} from "../ui/AppModa
 import {BillingArt} from "./BillingArt";
 import {billingDate,cadence,money,planNames,productionBilling,type Plan,type PlanCode,type UpgradeOffer,type PaymentMethod} from "./billing-data";
 
-const months:Record<PlanCode,number> = {monthly:1,quarterly:3,yearly:12};
+const months:Record<PlanCode,number> = {monthly:1,quarterly:3,yearly:12,test:1};
 type UpgradeComparison=UpgradeOffer&{currentPlan:PlanCode;currentAmountCents:number|null};
 
 export function BillingPlans({catalog,canStart,pixAvailable=false,upgrade,onSelect}:{
@@ -29,7 +29,7 @@ export function BillingPlans({catalog,canStart,pixAvailable=false,upgrade,onSele
     </header>
     <ul className="billing-plans" data-upgrade-options={upgrade?displayed.length:undefined}>
       {displayed.map(plan => {
-        const savings = comparisonAmount
+        const savings = plan.code==='test'?0:comparisonAmount
           ?Math.floor(100*(1-plan.amountCents*comparisonMonths/(comparisonAmount*months[plan.code]))):0;
         const highlighted = plan.code==="yearly" && savings>0;
         return <li className="billing-plan" data-featured={highlighted || undefined} data-plan={plan.code} key={plan.code}>
@@ -37,6 +37,7 @@ export function BillingPlans({catalog,canStart,pixAvailable=false,upgrade,onSele
           <div className="billing-plan-copy">
             <div className="billing-plan-name">
               <h4>{planNames[plan.code]}</h4>
+              {plan.code==='test'&&<span className="billing-pill">Apenas teste autorizado</span>}
               {savings>0 && <span className="billing-pill" data-tone="positive" title={`Em relação ${reference}`}>
                 {savings}% de economia<span className="billing-sr-only"> em relação {reference}</span>
               </span>}

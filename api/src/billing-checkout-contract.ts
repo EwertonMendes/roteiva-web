@@ -1,9 +1,9 @@
-import {requireBillingPlan,type BillingPlanCode} from './billing-catalog.ts';
+import {trustedCheckoutPrice,TEST_BILLING_VERSION,type BillingPlanCode} from './billing-catalog.ts';
 import {ApiError,type Env} from './types.ts';
 import {environment} from '../../shared/environments.ts';
 
 type CheckoutEnv=Pick<Env,'ENVIRONMENT'|'FRONTEND_ORIGIN'>;
-type CheckoutInput={planCode:BillingPlanCode;intentId:string;nextDueDate:string};
+type CheckoutInput={planCode:BillingPlanCode;pricingVersion?:string;intentId:string;nextDueDate:string};
 
 const labels:Record<BillingPlanCode,string>={
   monthly:'Mensal',quarterly:'Trimestral',yearly:'Anual'
@@ -27,7 +27,7 @@ function checkLocalDueDate(value:string):void{
  * The environment's checkout gate controls when offers can be created.
  */
 export function buildRecurringCardCheckout(env:CheckoutEnv,input:CheckoutInput){
-  const plan=requireBillingPlan(input.planCode);
+  const plan=trustedCheckoutPrice(input.planCode,input.pricingVersion);
   if(!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(input.intentId))
     throw new ApiError(400,'billing_invalid_intent');
   checkLocalDueDate(input.nextDueDate);
@@ -50,7 +50,7 @@ export function buildRecurringCardCheckout(env:CheckoutEnv,input:CheckoutInput){
       successUrl:origin+'/?billing=return&intent='+input.intentId
     },
     items:[{
-      name:'Roteiva '+labels[plan.code],
+      name:plan.version===TEST_BILLING_VERSION?'Roteiva Teste (temporario)':'Roteiva '+labels[plan.code],
       description:'Acesso completo ao Roteiva — plano '+labels[plan.code].toLowerCase(),
       quantity:1,
       value:plan.amountCents/100
@@ -65,7 +65,7 @@ export function buildRecurringCardCheckout(env:CheckoutEnv,input:CheckoutInput){
  * object: a Pix payment must never create automatic renewals.
  */
 export function buildDetachedPixCheckout(env:CheckoutEnv,input:CheckoutInput){
-  const plan=requireBillingPlan(input.planCode);
+  const plan=trustedCheckoutPrice(input.planCode,input.pricingVersion);
   if(!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(input.intentId))
     throw new ApiError(400,'billing_invalid_intent');
   let origin:string;
@@ -83,7 +83,7 @@ export function buildDetachedPixCheckout(env:CheckoutEnv,input:CheckoutInput){
       successUrl:origin+'/?billing=return&intent='+input.intentId
     },
     items:[{
-      name:'Roteiva '+labels[plan.code]+' (Pix manual)',
+      name:plan.version===TEST_BILLING_VERSION?'Roteiva Teste (Pix manual)':'Roteiva '+labels[plan.code]+' (Pix manual)',
       description:'Um período de acesso ao Roteiva, sem renovação automática',
       quantity:1,value:plan.amountCents/100
     }]

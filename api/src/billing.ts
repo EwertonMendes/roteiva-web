@@ -8,18 +8,18 @@ import {currentUpgrade,upgradeOffer} from './billing-upgrade.ts';
 import {paymentGateway} from './payments/asaas-adapter.ts';
 import {ApiError,type Env} from './types.ts';
 
-export function billingPlansResponse(env?:Env):Response{
+export function billingPlansResponse(env?:Env,uid?:string):Response{
   return Response.json({
-    checkoutAvailable:env?checkoutEnabled(env):false,
+    checkoutAvailable:env?checkoutEnabled(env,uid):false,
     currency:'BRL',
-    plans:billingCatalog(),
-  });
+    plans:billingCatalog(env,uid),
+  },{headers:{'Cache-Control':'private, no-store'}});
 }
 
 type SubscriptionView={
   id:string;cadence:BillingPlanCode;
   status:'active'|'past_due'|'canceled'|'expired';
-  paid_until:number;next_due_on:string|null;amount_cents:number|null;can_cancel:number;cancel_after:number|null;cancel_attempts:number|null;stopped_at:number|null;payment_method:'CREDIT_CARD'|'PIX'|null;
+  paid_until:number;next_due_on:string|null;amount_cents:number|null;can_cancel:number;cancel_after:number|null;cancel_attempts:number|null;stopped_at:number|null;payment_method:'CREDIT_CARD'|'PIX'|null;pricing_version:string|null;
 };
 type PaymentPosition={id:string;due_on:string|null;created_at:number};
 type PaymentView=PaymentPosition&{state:string;amount_cents:number;refunded_amount_cents:number;details:string|null;invoice_path:string|null;payment_method:string};
@@ -66,7 +66,7 @@ export async function billingStatusResponse(env:Env,uid:string,now=Date.now(),cu
     activeState(env,uid,now),
     env.DB.prepare(
       'SELECT s.id,s.cadence,s.status,s.paid_until,c.next_due_on,c.stopped_at,c.cancel_after,c.cancel_attempts,(c.subscription_id IS NOT NULL AND c.removed_at IS NULL) AS can_cancel '+
-      ",COALESCE((SELECT u.amount_cents FROM billing_plan_changes u WHERE u.subscription_id=s.id AND u.state='applied' ORDER BY u.effective_on DESC LIMIT 1),i.amount_cents) AS amount_cents,i.payment_method "+
+      ",COALESCE((SELECT u.amount_cents FROM billing_plan_changes u WHERE u.subscription_id=s.id AND u.state='applied' ORDER BY u.effective_on DESC LIMIT 1),i.amount_cents) AS amount_cents,i.payment_method,i.pricing_version "+
       'FROM access_subscriptions s LEFT JOIN billing_contracts c ON c.subscription_id=s.id LEFT JOIN billing_checkout_intents i ON i.id=COALESCE(c.checkout_intent_id,s.id) '+
       "WHERE s.owner_uid=? ORDER BY CASE s.status WHEN 'active' THEN 0 WHEN 'past_due' THEN 1 WHEN 'canceled' THEN 2 ELSE 3 END,s.updated_at DESC LIMIT 1"
     ).bind(uid).first<SubscriptionView>(),
@@ -108,6 +108,7 @@ export async function billingStatusResponse(env:Env,uid:string,now=Date.now(),cu
       nextDueOn:upgrade?.state==='scheduled'?upgrade.effective_on:subscription.next_due_on,
       amountCents:subscription.amount_cents,
       paymentMethod:subscription.payment_method??'CREDIT_CARD',
+      isTestPlan:subscription.pricing_version==='2026-11-private-test-v1',
       renewalMode:subscription.payment_method==='PIX'?'manual':'automatic',
       canCancel:!!subscription.can_cancel&&subscription.cancel_after===null&&upgrade?.state!=='applying'&&asaasConfigured(env),
       cancellation:subscription.can_cancel&&subscription.cancel_after!==null?

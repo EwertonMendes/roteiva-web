@@ -261,7 +261,7 @@ function PlanSummary({subscription,access,locked,illustrated,grace,onCancel,onUp
     <div className={`billing-account-card${illustrated?" billing-account-card--illustrated":""}`}>
       <div className="billing-account-copy">
         <span className="billing-pill" data-tone={status.tone}>{status.label}</span>
-        <h3>Plano {planNames[subscription.planCode].toLowerCase()}</h3>
+        <h3>{subscription.isTestPlan?'Plano teste (temporário)':`Plano ${planNames[subscription.planCode].toLowerCase()}`}</h3>
         {subscription.amountCents!==null&&<div className="billing-price">
           <strong>{money(subscription.amountCents)}</strong><span>{cadence[subscription.planCode]}</span>
         </div>}

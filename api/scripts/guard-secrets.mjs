@@ -11,6 +11,7 @@ required.push('GOOGLE_CLIENT_SECRET','GOOGLE_PICKER_API_KEY','DROPBOX_APP_KEY','
 if(target==='prod'&&process.env.PRODUCTION_BILLING_ENABLED==='true'){
  required.push('ASAAS_API_KEY','ASAAS_WEBHOOK_TOKEN','BILLING_ENABLED','BILLING_CHECKOUT_ENABLED');
  if(process.env.PRODUCTION_BILLING_CHECKOUT_ENABLED==='true')required.push('BILLING_CHECKOUT_TEST_UIDS');
+ if(process.env.PRODUCTION_BILLING_TEST_PLAN_ENABLED==='true')required.push('BILLING_TEST_PLAN_UID','BILLING_TEST_PLAN_ENABLED');
 }
 for(const name of required)assert.ok(names.has(name),'Missing Worker secret: '+name);
 console.log('Required '+target+' secret names verified. Values were not read.');

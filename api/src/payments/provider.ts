@@ -14,7 +14,7 @@ export type GatewayPayment={
   amountCents:number|null;status:GatewayPaymentStatus;raw:Readonly<Record<string,unknown>>;
 };
 export type CheckoutRequest=Readonly<{
-  planCode:BillingPlanCode;intentId:string;nextDueDate:string;
+  planCode:BillingPlanCode;pricingVersion:string;intentId:string;nextDueDate:string;
   method:PaymentMethod;customerRef?:string;
 }>;
 export interface PaymentGateway {

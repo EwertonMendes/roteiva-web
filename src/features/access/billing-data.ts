@@ -2,7 +2,7 @@
 import {API_BASE_URL,appEnvironment} from "../../lib/environment";
 import {firebaseServices} from "../../lib/firebase";
 
-export type PlanCode = "monthly" | "quarterly" | "yearly";
+export type PlanCode = "monthly" | "quarterly" | "yearly" | "test";
 export type CheckoutReturn="verifying"|"closed"|"not_found";
 export type PaymentMethod="CREDIT_CARD"|"PIX";
 export type Plan = {code:PlanCode;amountCents:number;version:string};
@@ -18,6 +18,7 @@ export type Subscription = {
   amountCents:number|null;
   paymentMethod:PaymentMethod|null;
   renewalMode?:"automatic"|"manual";
+  isTestPlan?:boolean;
   canCancel:boolean;
   cancellation:"pending"|"review"|null;
   upgradeOffer?:UpgradeOffer|null;
@@ -34,8 +35,8 @@ export type BillingStatus = PaymentPage & {
   checkout:{intentId:string;planCode:PlanCode;paymentMethod:PaymentMethod;status:"ready"|"pending"|"closing"|"payment_pending"|"review";url:string|null;canCancel?:boolean}|null;
   subscription:Subscription|null;
 };
-export const planNames:Record<PlanCode,string> = {monthly:"Mensal",quarterly:"Trimestral",yearly:"Anual"};
-export const cadence:Record<PlanCode,string> = {monthly:"por mês",quarterly:"a cada 3 meses",yearly:"por ano"};
+export const planNames:Record<PlanCode,string> = {monthly:"Mensal",quarterly:"Trimestral",yearly:"Anual",test:"Teste (temporário)"};
+export const cadence:Record<PlanCode,string> = {monthly:"por mês",quarterly:"a cada 3 meses",yearly:"por ano",test:"por mês"};
 export const productionBilling = appEnvironment.appEnv==="prod";
 export const billingInThisBuild = appEnvironment.appEnv==="dev" || appEnvironment.appEnv==="emulator" ||
   productionBilling && import.meta.env.VITE_PRODUCTION_BILLING_ENABLED==="true";
