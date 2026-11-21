@@ -27,6 +27,7 @@ export const reviewedBillingMigrations=Object.freeze({
   '0040_billing_refund_amount.sql':'345d0ff8cc48e404598c5daceffaf83047d1a633',
   // Reviewed additive payment-method columns, existing card records retain their default.
   '0041_billing_payment_methods.sql':'c01503390e4babc0414b1628c0adcd89d693c8dd',
+  '0042_billing_courtesy_credit.sql':'3a2160bbd5ee698f79489ff8c1e126e8909a8c9a',
 });
 
 export function gitBlobSha(content){
