@@ -37,14 +37,17 @@ export function ConfirmationDialog({
     aria-labelledby={titleId} aria-describedby={descriptionId}
     onCloseRequest={()=>{if(!pending.current)onCancel();}}>
     <div className="rt-modal__layout">
-      <AppModalHeader title={title} titleId={titleId} description={description} descriptionId={descriptionId}
-        onClose={onCancel} closeDisabled={busy} closeLabel="Fechar confirmação"
-        icon={<span className={"rt-confirm-symbol"+(tone==="danger"?" rt-confirm-symbol--danger":"")}>
-          {tone==="danger"?<AlertTriangle size={23}/>:<Check size={23}/>}
-        </span>}/>
-      <AppModalBody>
-        {error&&<p className="rt-confirm-error" role="alert">{error}</p>}
-      </AppModalBody>
+      <div className="rt-confirm-content">
+        <AppModalHeader title={title} titleId={titleId}
+          onClose={onCancel} closeDisabled={busy} closeLabel="Fechar confirmação"
+          icon={<span className={"rt-confirm-symbol"+(tone==="danger"?" rt-confirm-symbol--danger":"")}>
+            {tone==="danger"?<AlertTriangle size={23}/>:<Check size={23}/>}
+          </span>}/>
+        <AppModalBody>
+          <p id={descriptionId} className="rt-confirm-description">{description}</p>
+          {error&&<p className="rt-confirm-error" role="alert">{error}</p>}
+        </AppModalBody>
+      </div>
       <AppModalFooter>
         <AppButton type="button" variant="secondary" disabled={busy} onClick={onCancel}>{cancelLabel}</AppButton>
         <AppButton type="button" variant={tone==="danger"?"danger":"primary"} loading={busy}
