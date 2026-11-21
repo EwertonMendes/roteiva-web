@@ -108,7 +108,9 @@ export async function handle(request: Request, env: Env, ctx?:ExecutionContext):
       if(!(await env.API_RATE_LIMIT.limit({key:env.ENVIRONMENT+':delete:'+principal.uid})).success)throw new ApiError(429,'rate_limited');
       response=await requestDeletion(request,env,principal.uid,principal);
     } else if (billingRouted(env) && url.pathname === '/billing/plans' && request.method === 'GET') {
-      const uid=await identity(request,env);
+      // Keep public commercial price discovery unchanged. Private canary offers
+       // require an explicitly presented and verified Firebase PROD token.
+       const uid=request.headers.has('Authorization')?await identity(request,env):undefined;
        response=billingPlansResponse(env,uid);
     } else if (checkoutRouted(env) && url.pathname === '/billing/checkout' && request.method === 'POST') {
       if(!allowedFrontend(env,origin))throw new ApiError(403,'origin_required');
