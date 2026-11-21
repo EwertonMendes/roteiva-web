@@ -41,7 +41,9 @@ if(billing){
  assert.ok(!checkout||configuredUsers.length>0||publicRollout,'Production checkout needs a tester or an explicitly approved public rollout');
  assert.ok(!pix||configuredUsers.length>0||publicRollout,'Production PIX requires a canary or explicit public rollout');
  for(const uid of configuredUsers)assert.match(uid,/^[A-Za-z0-9_-]{1,128}$/);
- if(testPlanEnabled){
+ // An explicit public release needs no personal Firebase UID. A private
+ // release still requires exactly one owner included in the canary allowlist.
+ if(testPlanEnabled&&!publicRollout){
   assert.match(testPlanUid,/^[A-Za-z0-9_-]{1,128}$/,'A single exact PROD Firebase Auth UID is required');
   assert.ok(configuredUsers.includes(testPlanUid),'Private plan UID must already be in the protected PROD canary checkout allowlist');
  }
@@ -54,7 +56,7 @@ if(billing){
   BILLING_CHECKOUT_ENABLED:String(checkout),BILLING_PIX_ENABLED:String(pix),
   BILLING_PUBLIC_ROLLOUT_ENABLED:String(publicRollout),
   BILLING_TEST_PLAN_ENABLED:String(testPlanEnabled)});
- if(testPlanEnabled)secrets.BILLING_TEST_PLAN_UID=testPlanUid;
+ if(testPlanEnabled&&!publicRollout)secrets.BILLING_TEST_PLAN_UID=testPlanUid;
  if(configuredUsers.length)secrets.BILLING_CHECKOUT_TEST_UIDS=configuredUsers.join(',');
  console.log('Asaas PROD read-only authentication passed. Bank details and credentials suppressed.');
 }
