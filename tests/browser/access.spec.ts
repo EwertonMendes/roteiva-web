@@ -230,13 +230,14 @@ test('checkout callback requests one owner-scoped recovery and opens workspace o
   await expect(page.getByText(/Estamos conferindo o pagamento com segurança/)).toBeVisible();
   await expect.poll(()=>checks).toBeGreaterThanOrEqual(1);
   await expect.poll(()=>ensureAttempts).toBeGreaterThanOrEqual(3);
-  // StrictMode can replay effects; the server deduplicates recovery by intent.
+  await expect.poll(()=>new URL(page.url()).searchParams.has('billing')).toBe(false);
+  expect(checks).toBe(1);
   await expect(page.locator('.app-shell')).toHaveCount(0);
   await changeAccess(email,{accessUntil:Timestamp.fromMillis(Date.now()+86400000),source:'subscription'});
   await expect(page.locator('.app-shell')).toBeVisible();
   await expect.poll(()=>new URL(page.url()).searchParams.has('billing')).toBe(false);
   expect(new URL(page.url()).searchParams.has('intent')).toBe(false);
-  expect(checks).toBeGreaterThanOrEqual(1);
+  expect(checks).toBe(1);
 });
 
 test('billing summary, responsive history and restricted checkout use the same billing data',{tag:'@ci-smoke'},async({page},info)=>{

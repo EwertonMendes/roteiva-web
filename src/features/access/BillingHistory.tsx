@@ -19,18 +19,22 @@ const inReview = {label:"Em análise",tone:"neutral"};
 
 export function BillingHistory({firstPage,uid}:{firstPage:PaymentPage;uid:string}) {
   const heading = useId();
-  const [pages,setPages] = useState([firstPage]);
+  const [cache,setCache] = useState<{startCursor:string|null|undefined;pages:PaymentPage[]}>({
+    startCursor:firstPage.nextPaymentCursor,pages:[],
+  });
   const [index,setIndex] = useState(0);
   const [loading,setLoading] = useState(false);
   const [error,setError] = useState("");
   const request = useRef<AbortController|null>(null);
   useEffect(() => () => request.current?.abort(),[]);
-  const current = pages[index];
+  const current = index===0?firstPage:cache.pages[index-1];
 
   async function next() {
     if(request.current || !current.nextPaymentCursor) return;
     setError("");
-    if(pages[index+1]) {
+    const startCursor=index===0?firstPage.nextPaymentCursor:cache.startCursor;
+    const pages=startCursor===cache.startCursor?cache.pages:[];
+    if(pages[index]) {
       setIndex(index+1);
       return;
     }
@@ -41,7 +45,7 @@ export function BillingHistory({firstPage,uid}:{firstPage:PaymentPage;uid:string
       const query = new URLSearchParams({paymentCursor:current.nextPaymentCursor});
       const result = await billingRequest<PaymentPage>("/billing/status?"+query,uid,undefined,controller.signal);
       if(controller.signal.aborted) return;
-      setPages(previous=>[...previous,result]);
+      setCache({startCursor,pages:[...pages,result]});
       setIndex(index+1);
     } catch {
       if(!controller.signal.aborted) setError("Não foi possível carregar a próxima página. Tente novamente.");

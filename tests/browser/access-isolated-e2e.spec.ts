@@ -85,7 +85,7 @@ async function readEntitlement(uid:string){
   });
 }
 
-test("isolated E2E: trial expiry locks UI and Firestore; retries and refresh cannot renew it",async({page},info)=>{
+test("isolated E2E: trial expiry locks UI and Firestore; retries and refresh cannot renew it",{tag:"@ci-smoke"},async({page},info)=>{
   const email="isolated-expiry-"+info.project.name+"@example.com";
   await register(page,email);
   await makeClient(page,"Cliente protegido E2E");
@@ -112,8 +112,24 @@ test("isolated E2E: trial expiry locks UI and Firestore; retries and refresh can
   await expect(page.getByRole("heading",{name:"Seu período de acesso terminou."})).toBeVisible();
   await page.reload();
   await expect(page.getByRole("heading",{name:"Seu período de acesso terminou."})).toBeVisible();
+  let resumeCheck=()=>{};
+  const heldCheck=new Promise<void>(resolve=>{resumeCheck=resolve;});
+  let checks=0;
+  await page.route(api+"/access/ensure",async route=>{
+    if(route.request().method()==="POST"){
+      checks++;
+      await heldCheck;
+    }
+    return route.fallback();
+  });
   await page.getByRole("button",{name:/Verificar acesso novamente/}).click();
-  await expect(page.getByRole("heading",{name:"Seu período de acesso terminou."})).toBeVisible();
+  try{
+    await expect(page.getByRole("button",{name:"Verificando acesso…"})).toBeDisabled();
+    await expect(page.getByRole("heading",{name:"Seu período de acesso terminou."})).toBeVisible();
+    await expect(page.locator(".studio-loading")).toHaveCount(0);
+  }finally{resumeCheck();}
+  await expect(page.getByRole("button",{name:"Verificar acesso novamente"})).toBeEnabled();
+  expect(checks).toBe(1);
   const after=await readEntitlement(uid);
   expect(after?.trialEndsAt.toMillis()).toBe(before?.trialEndsAt.toMillis());
   expect(after?.accessUntil.toMillis()).toBeLessThan(Date.now());

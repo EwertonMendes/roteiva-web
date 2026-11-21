@@ -7,10 +7,11 @@ import {AppButton} from "../ui/AppButton";
 import {BrandLogo} from "../ui/BrandLogo";
 import {BillingArt} from "./BillingArt";
 import {BillingPanel} from "./BillingPanel";
-import {billingInThisBuild} from "./billing-data";
+import {billingInThisBuild,type CheckoutReturn} from "./billing-data";
 
-export function RestrictedAccessPage({access,busy,onRetry,onLogout}:{
-  access:AccessInfo;busy:boolean;onRetry:()=>void;onLogout:()=>void;
+export function RestrictedAccessPage({access,busy,checking,accessError,checkoutReturn,onRetry,onLogout}:{
+  access:AccessInfo;busy:boolean;checking:boolean;accessError:string;checkoutReturn:CheckoutReturn|null;
+  onRetry:()=>void;onLogout:()=>void;
 }) {
   useEffect(() => {
     document.documentElement.setAttribute("data-roteiva-ready","true");
@@ -36,10 +37,13 @@ export function RestrictedAccessPage({access,busy,onRetry,onLogout}:{
         </div>
         <div className="billing-access-art"><BillingArt name="access" priority/></div>
       </section>
-      {billingInThisBuild&&<BillingPanel access={access} locked/>}
+      {billingInThisBuild&&<BillingPanel access={access} locked checkoutReturn={checkoutReturn}/>}
       <footer className="billing-access-footer">
+        {accessError&&<p className="billing-inline-error" role="alert">{accessError}</p>}
         <div className="billing-access-footer-actions">
-          <AppButton variant="secondary" onClick={onRetry}><RefreshCw size={16} aria-hidden="true"/> Verificar acesso novamente</AppButton>
+          <AppButton variant="secondary" disabled={checking} onClick={onRetry}><RefreshCw size={16} aria-hidden="true"/>
+            {checking?"Verificando acesso…":"Verificar acesso novamente"}
+          </AppButton>
           <nav aria-label="Informações do serviço">
             {!suspended&&<a href="/suporte.html">Suporte</a>}
             <a href="/termos.html">Termos</a>

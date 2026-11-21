@@ -3,6 +3,7 @@ import {API_BASE_URL,appEnvironment} from "../../lib/environment";
 import {firebaseServices} from "../../lib/firebase";
 
 export type PlanCode = "monthly" | "quarterly" | "yearly";
+export type CheckoutReturn="verifying"|"closed"|"not_found";
 export type PaymentMethod="CREDIT_CARD"|"PIX";
 export type Plan = {code:PlanCode;amountCents:number;version:string};
 export type UpgradeOffer = {effectiveOn:string;plans:PlanCode[]};
