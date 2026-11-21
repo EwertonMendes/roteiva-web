@@ -5,7 +5,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {reviewedAdditiveMigrations,reviewedBillingMigrations,isReviewedAdditiveMigration} from '../scripts/reviewed-additive-migrations.mjs';
 
 test('only an explicit billing promotion admits exact billing migration blobs into PROD',()=>{
- assert.equal(Object.keys(reviewedBillingMigrations).length,7);
+ assert.equal(Object.keys(reviewedBillingMigrations).length,8);
  for(const name of Object.keys(reviewedBillingMigrations)){
   const sql=readFileSync('migrations/'+name,'utf8');
   assert.equal(isReviewedAdditiveMigration(name,sql,'dev'),true);

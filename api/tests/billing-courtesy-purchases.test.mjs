@@ -1,0 +1,198 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {database} from './helpers/database.mjs';
+import {purchaseWindow,courtesyCreditForCard,manualPaidUntil} from '../src/billing-purchase-policy.ts';
+import {billingDateInstant,periodEnd} from '../src/billing-period.ts';
+import {createCheckout} from '../src/billing-checkout.ts';
+import {billingStatusResponse} from '../src/billing.ts';
+import {checkoutEnabled,pixEnabled} from '../src/billing-asaas.ts';
+import {ingestAsaasWebhook} from '../src/billing-webhook.ts';
+import {reconcileBilling} from '../src/billing-reconciliation.ts';
+
+const url='https://roteiva-api-dev.roteiva-dev.workers.dev/billing/checkout';
+function setup(t,now=Date.now()) {
+ const d=database();t.after(d.close);
+ const started=now-2*86400000;
+ const trialEnd=started+7*86400000;
+ d.sql.prepare('INSERT INTO access_accounts(owner_uid,trial_started_at,trial_ends_at,created_at,updated_at) VALUES(?,?,?,?,?)')
+  .run('owner',started,trialEnd,started,now);
+ const env={DB:d.DB,ENVIRONMENT:'dev',FRONTEND_ORIGIN:'https://roteiva-web-dev.web.app',
+  BILLING_ENABLED:'true',BILLING_PIX_ENABLED:'true',BILLING_CHECKOUT_ENABLED:'true',
+  ASAAS_API_KEY:'$aact_hmlg_'+'k'.repeat(32),ASAAS_WEBHOOK_TOKEN:'w'.repeat(48)};
+ return {...d,env,now,trialEnd};
+}
+function purchase(method='PIX',plan='monthly'){
+ return new Request(url,{method:'POST',headers:{'content-type':'application/json'},
+ body:JSON.stringify({planCode:plan,catalogVersion:'2026-11-v1',acceptedImmediateCharge:true,
+ ...(method==='PIX'?{paymentMethod:method}:{})})});
+}
+test('free trial and finite courtesy are purchasable; preserved time is stable',async t=>{
+ const f=setup(t);
+ const initial=await purchaseWindow(f.env,'owner',f.now);
+ assert.equal(initial.canPurchase,true);
+ assert.equal(initial.courtesyUntil,f.trialEnd);
+ const start=f.trialEnd;
+ assert.equal(manualPaidUntil(start,'monthly')>f.trialEnd,true);
+ const localDate=new Intl.DateTimeFormat('sv-SE',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(f.now);
+ const credit=courtesyCreditForCard(f.now,f.trialEnd);
+ assert.equal(credit,f.trialEnd-billingDateInstant(localDate));
+ assert.ok(credit>0);
+ assert.equal(periodEnd(localDate,'monthly')+credit,
+  periodEnd(localDate,'monthly')+f.trialEnd-billingDateInstant(localDate));
+ const courtesyEnd=f.now+25*86400000;
+ f.sql.prepare("INSERT INTO access_grants(id,owner_uid,grant_kind,starts_at,ends_at,reason,created_at) VALUES('free','owner','complimentary',?,?,?,?)")
+   .run(f.now,courtesyEnd,'bonus',f.now);
+ assert.equal((await purchaseWindow(f.env,'owner',f.now)).courtesyUntil,courtesyEnd);
+ assert.equal(courtesyCreditForCard(f.now,courtesyEnd)>credit,true);
+ f.sql.prepare("INSERT INTO access_grants(id,owner_uid,grant_kind,starts_at,reason,created_at) VALUES('life','owner','lifetime',?,?,?)")
+   .run(f.now,'free forever',f.now);
+ assert.equal((await purchaseWindow(f.env,'owner',f.now)).canPurchase,false);
+});
+
+test('calendar-accurate manual period preserves local clock and end-of-month',()=>{
+ const at=Date.parse('2027-01-31T13:37:00-03:00');
+ assert.equal(new Date(manualPaidUntil(at,'monthly')).toISOString(),'2027-02-28T16:37:00.000Z');
+ assert.equal(new Date(manualPaidUntil(at,'quarterly')).toISOString(),'2027-04-30T16:37:00.000Z');
+ assert.equal(new Date(manualPaidUntil(at,'yearly')).toISOString(),'2028-01-31T16:37:00.000Z');
+});
+
+test('an active courtesy user may see and start either mode without interrupting card recurrence',async t=>{
+ const f=setup(t);let received;
+ t.mock.method(globalThis,'fetch',async(request,opts)=>{
+  received=JSON.parse(opts.body);
+  return Response.json({id:received.billingTypes[0]==='PIX'?'checkout_pix':'checkout_card'});
+ });
+ const status=await (await billingStatusResponse(f.env,'owner',f.now)).json();
+ assert.equal(status.canStart,true);
+ assert.equal(status.canRenewWithPix,true);
+ assert.equal(status.courtesyUntil,new Date(f.trialEnd).toISOString());
+ const response=await createCheckout(purchase('CREDIT_CARD'),f.env,'owner',f.now);
+ assert.equal(response.status,201);
+ assert.deepEqual(received.billingTypes,['CREDIT_CARD']);
+ assert.deepEqual(received.chargeTypes,['RECURRENT']);
+ const intent=f.sql.prepare('SELECT payment_method,courtesy_credit_ms FROM billing_checkout_intents').get();
+ assert.equal(intent.payment_method,'CREDIT_CARD');
+ assert.equal(intent.courtesy_credit_ms,courtesyCreditForCard(f.now,f.trialEnd));
+ assert.equal((await (await billingStatusResponse(f.env,'owner',f.now)).json()).canStart,false);
+ await assert.rejects(createCheckout(purchase('PIX'),f.env,'owner',f.now),{code:'billing_checkout_already_open'});
+});
+
+test('PIX purchase during courtesy never adds a credit to recurring card metadata',async t=>{
+ const f=setup(t);let received;
+ t.mock.method(globalThis,'fetch',async(request,opts)=>{
+  received=JSON.parse(opts.body);
+  return Response.json({id:'checkout_pix'});
+ });
+ const response=await createCheckout(purchase('PIX'),f.env,'owner',f.now);
+ assert.equal(response.status,201);
+ assert.deepEqual(received.billingTypes,['PIX']);
+ assert.deepEqual(received.chargeTypes,['DETACHED']);
+ assert.equal(received.subscription,undefined);
+ const intent=f.sql.prepare('SELECT payment_method,courtesy_credit_ms FROM billing_checkout_intents').get();
+ assert.equal(intent.payment_method,'PIX');
+ assert.equal(intent.courtesy_credit_ms,0);
+});
+
+test('a paid period blocks extra purchases; expiration permits a single new attempt',async t=>{
+ const f=setup(t);
+ f.sql.prepare("INSERT INTO access_subscriptions(id,owner_uid,provider,provider_reference,cadence,status,paid_until,updated_at) VALUES('sub','owner','asaas','remote','monthly','active',?,?)")
+  .run(f.now+30*86400000,f.now);
+ assert.equal((await purchaseWindow(f.env,'owner',f.now)).canPurchase,false);
+ await assert.rejects(createCheckout(purchase('PIX'),f.env,'owner',f.now),{code:'billing_access_still_active'});
+ f.sql.prepare("UPDATE access_subscriptions SET paid_until=? WHERE id='sub'").run(f.now-1);
+ assert.equal((await purchaseWindow(f.env,'owner',f.now)).canPurchase,true);
+});
+
+test('production PIX remains opt-in and never leaks from DEV configuration',()=>{
+ const env={ENVIRONMENT:'prod',BILLING_ENABLED:'true',BILLING_CHECKOUT_ENABLED:'true',
+  ASAAS_API_KEY:'$aact_prod_'+'k'.repeat(32),ASAAS_WEBHOOK_TOKEN:'w'.repeat(48)};
+ assert.equal(checkoutEnabled(env,'arbitrary'),false);
+ assert.equal(pixEnabled({...env,BILLING_PIX_ENABLED:'true'},'arbitrary'),false);
+ assert.equal(pixEnabled({...env,BILLING_PIX_ENABLED:'true',BILLING_CHECKOUT_TEST_UIDS:'qa-user'},'qa-user'),true);
+ assert.equal(pixEnabled({...env,BILLING_PIX_ENABLED:'false',BILLING_CHECKOUT_TEST_UIDS:'qa-user'},'qa-user'),false);
+ assert.equal(pixEnabled({...env,BILLING_PIX_ENABLED:'true',BILLING_PUBLIC_ROLLOUT_ENABLED:'true'},'arbitrary'),true);
+});
+
+test('one verified PIX purchase after early checkout starts after courtesy, survives duplicate notification',async t=>{
+ const f=setup(t);
+ const day=new Intl.DateTimeFormat('sv-SE',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(f.now);
+ const payment={id:'pay_pix_early',billingType:'PIX',checkoutSession:'checkout_pix_early',subscription:null,
+  customer:'cus_early',value:39.9,status:'RECEIVED',originalDueDate:day,paymentDate:day};
+ t.mock.method(globalThis,'fetch',async url=>{
+  const address=String(url);
+  if(address.endsWith('/v3/checkouts'))return Response.json({id:'checkout_pix_early'});
+  if(address.includes('/payments?checkoutSession=checkout_pix_early&limit=2'))
+    return Response.json({data:[payment],hasMore:false});
+  if(address.endsWith('/payments/pay_pix_early'))return Response.json(payment);
+  throw Error('unrecognized provider access');
+ });
+ assert.equal((await createCheckout(purchase('PIX'),f.env,'owner',f.now)).status,201);
+ async function webhook(id) {
+  const response=await ingestAsaasWebhook(new Request('https://example.invalid/billing/webhooks/asaas',{
+   method:'POST',headers:{'Content-Type':'application/json','asaas-access-token':f.env.ASAAS_WEBHOOK_TOKEN},
+   body:JSON.stringify({id,event:'PAYMENT_RECEIVED',payment:{id:payment.id}})
+  }),f.env);
+  assert.equal(response.status,200);
+ }
+ await webhook('evt_early_1');
+ await reconcileBilling(f.env);
+ const paid=f.sql.prepare("SELECT id,status,paid_until FROM access_subscriptions WHERE owner_uid='owner'").get();
+ assert.equal(paid.status,'active');
+ assert.equal(paid.paid_until,manualPaidUntil(f.trialEnd,'monthly'));
+ assert.ok(paid.paid_until>f.trialEnd);
+ assert.equal(f.sql.prepare("SELECT COUNT(*) AS n FROM billing_contracts WHERE owner_uid='owner'").get().n,0);
+ assert.equal(f.sql.prepare("SELECT COUNT(*) AS n FROM billing_payment_records WHERE owner_uid='owner'").get().n,1);
+ await webhook('evt_early_2');
+ await reconcileBilling(f.env);
+ assert.equal(f.sql.prepare("SELECT COUNT(*) AS n FROM billing_payment_records WHERE owner_uid='owner'").get().n,1);
+ assert.equal(f.sql.prepare("SELECT paid_until FROM access_subscriptions WHERE owner_uid='owner'").get().paid_until,paid.paid_until);
+ assert.equal((await purchaseWindow(f.env,'owner',f.now)).canPurchase,false);
+});
+
+test('early recurring card checkout preserves one immutable courtesy bonus across monthly renewals',async t=>{
+ const f=setup(t);
+ const day=new Intl.DateTimeFormat('sv-SE',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(f.now);
+ let payment={id:'card_early_1',billingType:'CREDIT_CARD',
+   checkoutSession:'checkout_card_early',subscription:'subscription_early',
+   customer:'customer_early',value:39.9,status:'CONFIRMED',
+   originalDueDate:day,paymentDate:day};
+ const remoteContract={id:'subscription_early',billingType:'CREDIT_CARD',
+   customer:'customer_early',value:39.9,cycle:'MONTHLY',status:'ACTIVE',nextDueDate:day};
+ t.mock.method(globalThis,'fetch',async url=>{
+   const pathname=String(url);
+   if(pathname.endsWith('/v3/checkouts'))return Response.json({id:'checkout_card_early'});
+   if(pathname.endsWith('/v3/subscriptions/subscription_early'))return Response.json(remoteContract);
+   if(pathname.endsWith('/v3/payments/'+payment.id))return Response.json(payment);
+   throw Error('unexpected provider request');
+ });
+ assert.equal((await createCheckout(purchase('CREDIT_CARD'),f.env,'owner',f.now)).status,201);
+ const credit=courtesyCreditForCard(f.now,f.trialEnd);
+ assert.ok(credit>0);
+ const intent=f.sql.prepare('SELECT courtesy_credit_ms FROM billing_checkout_intents').get();
+ assert.equal(intent.courtesy_credit_ms,credit);
+ async function notify(id){
+   const response=await ingestAsaasWebhook(new Request('https://example.invalid/billing/webhooks/asaas',{
+    method:'POST',headers:{'Content-Type':'application/json','asaas-access-token':f.env.ASAAS_WEBHOOK_TOKEN},
+    body:JSON.stringify({id,event:'PAYMENT_CONFIRMED',payment:{id:payment.id}})
+   }),f.env);
+   assert.equal(response.status,200);
+ }
+ await notify('card_early_event_1');
+ await reconcileBilling(f.env);
+ const firstExpected=periodEnd(day,'monthly')+credit;
+ assert.equal(f.sql.prepare('SELECT paid_until FROM access_subscriptions').get().paid_until,firstExpected);
+ assert.equal(f.sql.prepare('SELECT COUNT(*) AS n FROM billing_contracts').get().n,1);
+ const nextDay=new Date(periodEnd(day,'monthly')).toISOString().slice(0,10);
+ payment={...payment,id:'card_early_2',checkoutSession:null,status:'RECEIVED',
+   originalDueDate:nextDay,paymentDate:nextDay};
+ await notify('card_early_event_2');
+ await reconcileBilling(f.env);
+ const end2=f.sql.prepare('SELECT paid_until FROM access_subscriptions').get().paid_until;
+ assert.equal(end2,periodEnd(nextDay,'monthly')+credit);
+ assert.equal(f.sql.prepare('SELECT COUNT(*) AS n FROM billing_payment_records').get().n,2);
+ assert.equal(f.sql.prepare('SELECT courtesy_credit_ms FROM billing_checkout_intents').get().courtesy_credit_ms,credit);
+ await notify('card_early_event_3');
+ await reconcileBilling(f.env);
+ assert.equal(f.sql.prepare('SELECT paid_until FROM access_subscriptions').get().paid_until,end2);
+ assert.equal(f.sql.prepare('SELECT COUNT(*) AS n FROM billing_payment_records').get().n,2);
+});

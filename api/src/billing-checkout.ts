@@ -1,4 +1,5 @@
 import {activeState} from './access.ts';
+import {purchaseWindow,courtesyCreditForCard} from './billing-purchase-policy.ts';
 import {AsaasError,checkoutEnabled,pixEnabled,providerRef} from './billing-asaas.ts';
 import {requireBillingPlan,type BillingPlanCode} from './billing-catalog.ts';
 import {paymentGateway} from './payments/asaas-adapter.ts';
@@ -16,6 +17,7 @@ export type CheckoutIntent={
   id:string;owner_uid:string;plan_code:BillingPlanCode;pricing_version:string;amount_cents:number;
   status:'pending'|'ready'|'completed'|'expired'|'canceled'|'failed';payment_method:PaymentMethod;
   provider_checkout_ref:string|null;checkout_path:string|null;expires_at:number;first_due_on:string|null;
+  courtesy_credit_ms:number;
   close_status?:'pending'|'processed'|'ignored'|'review'|null;
   close_error?:string|null;
 };
@@ -60,11 +62,13 @@ export async function createCheckout(request:Request,env:Env,uid:string,now=Date
 
   const open=await openCheckout(env,uid);
   if(open)return resume(env,open,plan.code,method,now);
-  // Protect remaining trial, courtesy or paid time until scheduling is homologated.
-  // PIX is a manual period purchase; an active paid period may be extended,
-  // but trial, complimentary and live card recurrences cannot be overridden.
-  if(access.active&&(method==='CREDIT_CARD'||access.source!=='subscription'))
+  // Free time is preserved in the payment period. A currently paid plan or
+  // recurring contract is NEVER silently stacked with another checkout.
+  const window=await purchaseWindow(env,uid,now);
+  if(!window.canPurchase||access.unlimited)
     throw new ApiError(409,'billing_access_still_active');
+  const courtesyCredit=method==='CREDIT_CARD'?
+    courtesyCreditForCard(now,window.courtesyUntil):0;
   const firstDueDate=localClock.format(now);
   const id=crypto.randomUUID();
   const gateway=paymentGateway(env);
@@ -73,15 +77,14 @@ export async function createCheckout(request:Request,env:Env,uid:string,now=Date
   const submit=gateway.prepareCheckout({planCode:plan.code,intentId:id,nextDueDate:firstDueDate,method,
     customerRef:customer?.provider_customer_ref});
   const result=await env.DB.prepare(
-    "INSERT OR IGNORE INTO billing_checkout_intents(id,owner_uid,provider,plan_code,pricing_version,amount_cents,status,created_at,expires_at,updated_at,first_due_on,payment_method) "+
-    "SELECT ?,owner_uid,?,?,?,?,'pending',?,?,?,?,? FROM access_accounts WHERE owner_uid=? AND suspended_at IS NULL AND sync_pending=0 AND trial_ends_at<=? "+
+    "INSERT OR IGNORE INTO billing_checkout_intents(id,owner_uid,provider,plan_code,pricing_version,amount_cents,status,created_at,expires_at,updated_at,first_due_on,payment_method,courtesy_credit_ms) "+
+    "SELECT ?,owner_uid,?,?,?,?,'pending',?,?,?,?,?,? FROM access_accounts WHERE owner_uid=? AND suspended_at IS NULL AND sync_pending=0 "+
     "AND NOT EXISTS(SELECT 1 FROM account_deletions WHERE owner_uid=?) "+
-    "AND NOT EXISTS(SELECT 1 FROM access_grants WHERE owner_uid=? AND revoked_at IS NULL AND starts_at<=? AND (ends_at IS NULL OR ends_at>?)) "+
-    "AND NOT EXISTS(SELECT 1 FROM access_subscriptions s WHERE s.owner_uid=? AND s.status IN ('active','past_due','canceled') "+
-    "AND s.paid_until>? AND (?<>'PIX' OR EXISTS(SELECT 1 FROM billing_contracts c WHERE c.subscription_id=s.id))) "+
+    "AND NOT EXISTS(SELECT 1 FROM access_grants WHERE owner_uid=? AND grant_kind='lifetime' AND revoked_at IS NULL AND starts_at<=? AND (ends_at IS NULL OR ends_at>?)) "+
+    "AND NOT EXISTS(SELECT 1 FROM access_subscriptions s WHERE s.owner_uid=? AND s.status IN ('active','past_due','canceled') AND s.paid_until>?) "+
     "AND NOT EXISTS(SELECT 1 FROM billing_contracts WHERE owner_uid=? AND removed_at IS NULL)"
-  ).bind(id,gateway.code,plan.code,plan.version,plan.amountCents,now,now+CHECKOUT_LIFETIME,now,firstDueDate.slice(0,10),method,
-    uid,now,uid,uid,now,now,uid,now,method,uid).run();
+  ).bind(id,gateway.code,plan.code,plan.version,plan.amountCents,now,now+CHECKOUT_LIFETIME,now,firstDueDate.slice(0,10),method,courtesyCredit,
+    uid,uid,uid,now,now,uid,now,uid).run();
   if(result.meta.changes!==1){
     const existing=await openCheckout(env,uid);
     if(existing)return resume(env,existing,plan.code,method,now);

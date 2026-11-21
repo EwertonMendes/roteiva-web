@@ -69,7 +69,7 @@ test('checkout authorizes an enrolled expired owner, uses catalog and sends one 
   });
   await assert.rejects(createCheckout(purchase('quarterly',{value:1}),s.env,'owner'),{code:'billing_consent_required'});
   await assert.rejects(createCheckout(purchase('quarterly',{catalogVersion:'stale'}),s.env,'owner'),{code:'billing_catalog_changed'});
-  await assert.rejects(createCheckout(purchase('quarterly'),s.env,'trial'),{code:'billing_access_still_active'});
+  assert.equal((await (await billingStatusResponse(s.env,'trial')).json()).canStart,true);
   await assert.rejects(createCheckout(purchase('quarterly'),s.env,'unknown'),{code:'billing_account_ineligible'});
   const responses=await Promise.all([createCheckout(purchase('quarterly'),s.env,'owner'),createCheckout(purchase('quarterly'),s.env,'owner')]);
   assert.ok(responses.some(response=>response.status===201));
@@ -145,7 +145,7 @@ test('PROD canary stays account-scoped and reconciles payments after checkout is
   const s=setup(t);
   const env={...s.env,ENVIRONMENT:'prod',FRONTEND_ORIGIN:'https://app.roteiva.com',
     FIREBASE_PROJECT_ID:'roteiva-web-prod',ASAAS_API_KEY:'$aact_prod_'+'k'.repeat(32),BILLING_CHECKOUT_TEST_UIDS:'owner',
-    BILLING_PIX_ENABLED:'true',FIREBASE_ADMIN_CREDENTIALS_JSON:JSON.stringify({...JSON.parse(credentials),
+    BILLING_PIX_ENABLED:'false',FIREBASE_ADMIN_CREDENTIALS_JSON:JSON.stringify({...JSON.parse(credentials),
       project_id:'roteiva-web-prod',client_email:'test@roteiva-web-prod.iam.gserviceaccount.com'})};
   const paused={...env,BILLING_CHECKOUT_ENABLED:'false'};
   let posts=0,projection;

@@ -163,7 +163,11 @@ async function reconcilePayment(env:Env,payment:Record<string,unknown>,ref:strin
   const invoicePath=paymentGateway(env).invoicePath(payment.invoiceUrl);
   const paid=state==='confirmed'||state==='received';
   const paidOn=civilDate(payment.paymentDate??payment.confirmedDate);
-  const end=paid?periodEnd(dueOn,change?.plan_code??intent.plan_code):null;
+  // The one-time credit is frozen in the original checkout intent and applied
+  // to EVERY recurrence end once, never compounded across billing cycles.
+  const credit=intent.courtesy_credit_ms??0;
+  if(!Number.isSafeInteger(credit)||credit<0||credit>31536000000)return 'review';
+  const end=paid?periodEnd(dueOn,change?.plan_code??intent.plan_code)+credit:null;
   if(prior&&previous?.state===state&&previous.amount_cents===amount&&
     previous.details===details&&previous.refunded_amount_cents===refund)return 'processed';
   statements.push(env.DB.prepare(

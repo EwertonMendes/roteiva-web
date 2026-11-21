@@ -498,3 +498,54 @@ test('settings upgrade compares plans and schedules the confirmed renewal',{tag:
   await expect(page.getByRole('heading',{name:'Plano anual'})).toBeVisible();
   await expect(upgrade).toHaveCount(0);
 });
+
+
+test('active trial shows purchase options, keeps courtesy visible and fits compact dialogs',{tag:'@ci-smoke'},async({page},info)=>{
+  const email='billing-courtesy-'+info.project.name+'@example.com';
+  await signup(page,email);
+  const courtesyUntil=new Date(Date.now()+5*86400000).toISOString();
+  const plans=[
+    {code:'monthly',amountCents:3990,version:'2026-11-v1'},
+    {code:'quarterly',amountCents:10990,version:'2026-11-v1'},
+    {code:'yearly',amountCents:39990,version:'2026-11-v1'}
+  ];
+  let checkouts=0;
+  await page.route(/^http:\/\/127\.0\.0\.1:8787\/billing\/(status|plans|checkout)$/,async route=>{
+    const action=new URL(route.request().url()).pathname;
+    const headers={'Access-Control-Allow-Origin':cloud,'Access-Control-Allow-Methods':'GET,POST,OPTIONS','Access-Control-Allow-Headers':'Authorization, Content-Type'};
+    if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
+    if(action.endsWith('/plans'))return route.fulfill({headers,json:{plans}});
+    if(action.endsWith('/checkout')){
+      checkouts++;
+      return route.fulfill({status:422,headers,json:{error:{code:'billing_account_ineligible'}}});
+    }
+    return route.fulfill({headers,json:{
+      checkoutAvailable:true,cardAvailable:true,pixAvailable:true,canRenewWithPix:true,canStart:true,
+      courtesyUntil,notice:null,checkout:null,subscription:null,payments:[],nextPaymentCursor:null,
+    }});
+  });
+  await page.goto(cloud+'/configuracoes');
+  const billing=page.getByRole('region',{name:'Assinatura',exact:true});
+  await expect(billing.getByRole('heading',{name:'Período de teste gratuito'})).toBeVisible();
+  await billing.getByRole('button',{name:'Conhecer planos e contratar'}).click();
+  await expect(billing.getByRole('heading',{name:'Escolha seu plano'})).toBeVisible();
+  await expect(billing.getByText(/Sua cortesia continua até/)).toBeVisible();
+  await billing.getByRole('button',{name:'Escolher mensal'}).click();
+  const dialog=page.getByRole('dialog');
+  await expect(dialog.getByText(/Sua cortesia está garantida até/)).toBeVisible();
+  await expect(dialog.getByText(/os dias restantes serão acrescentados ao acesso/i)).toBeVisible();
+  await dialog.getByRole('radio',{name:/Pix/}).check();
+  await expect(dialog.getByText(/O período pago será acrescentado ao final dela/)).toBeVisible();
+  await expect(dialog.getByText(/Não haverá cobrança automática/)).toBeVisible();
+  for(const theme of ['light','dark']){
+    await page.evaluate(value=>{document.documentElement.dataset.theme=value;},theme);
+    await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+2)).toBe(true);
+    await expect(dialog).toBeVisible();
+    const geometry=await dialog.boundingBox();
+    expect(geometry).not.toBeNull();
+    expect(geometry!.x).toBeGreaterThanOrEqual(-1);
+    expect(geometry!.x+geometry!.width).toBeLessThanOrEqual(page.viewportSize()!.width+1);
+  }
+  await dialog.getByRole('button',{name:'Voltar'}).click();
+  expect(checkouts).toBe(0);
+});

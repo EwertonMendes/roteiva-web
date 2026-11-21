@@ -1,5 +1,6 @@
 import {billingCatalog,type BillingPlanCode} from './billing-catalog.ts';
 import {activeState} from './access.ts';
+import {purchaseWindow} from './billing-purchase-policy.ts';
 import {billingNotice} from './billing-notices.ts';
 import {asaasConfigured,checkoutEnabled,pixEnabled} from './billing-asaas.ts';
 import {openCheckout,openCheckoutUrl} from './billing-checkout.ts';
@@ -61,7 +62,7 @@ async function paymentPage(env:Env,uid:string,cursor:string|null){
 /** Billing status remains readable with an expired trial or paid period. */
 export async function billingStatusResponse(env:Env,uid:string,now=Date.now(),cursor:string|null=null):Promise<Response>{
   if(cursor!==null)return Response.json(await paymentPage(env,uid,cursor));
-  const [access,subscription,checkout,history,blockingCard]=await Promise.all([
+  const [access,subscription,checkout,history,blockingCard,purchase]=await Promise.all([
     activeState(env,uid,now),
     env.DB.prepare(
       'SELECT s.id,s.cadence,s.status,s.paid_until,c.next_due_on,c.stopped_at,c.cancel_after,c.cancel_attempts,(c.subscription_id IS NOT NULL AND c.removed_at IS NULL) AS can_cancel '+
@@ -74,6 +75,7 @@ export async function billingStatusResponse(env:Env,uid:string,now=Date.now(),cu
     env.DB.prepare('SELECT 1 FROM billing_contracts c JOIN access_subscriptions s ON s.id=c.subscription_id '+
       "WHERE c.owner_uid=? AND (c.removed_at IS NULL OR (s.status<>'expired' AND s.paid_until>?)) LIMIT 1")
       .bind(uid,now).first(),
+    purchaseWindow(env,uid,now),
   ]);
   const enabled=checkoutEnabled(env,uid);
   const pix=pixEnabled(env,uid);
@@ -87,9 +89,9 @@ export async function billingStatusResponse(env:Env,uid:string,now=Date.now(),cu
     checkoutAvailable:enabled||pix,
     cardAvailable:enabled,
     pixAvailable:pix,
-    canRenewWithPix:pix&&!!access&&!access.suspended&&!checkout&&!blockingCard&&
-      (!access.active||access.source==='subscription'),
-    canStart:checkoutEnabled(env,uid)&&!!access&&!access.active&&!access.suspended&&!checkout&&!blockingCard,
+    canRenewWithPix:pix&&purchase.canPurchase&&!access?.unlimited&&!checkout&&!blockingCard,
+    canStart:enabled&&purchase.canPurchase&&!access?.unlimited&&!checkout&&!blockingCard,
+    courtesyUntil:purchase.courtesyUntil>now?new Date(purchase.courtesyUntil).toISOString():null,
     access,
     notice:billingNotice(access,subscription,now),
     checkout:checkout?{

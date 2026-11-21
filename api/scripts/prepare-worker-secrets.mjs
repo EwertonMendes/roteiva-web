@@ -23,7 +23,11 @@ assert.equal(account.type,'service_account');assert.equal(account.project_id,con
 assert.ok(account.client_email?.endsWith('@roteiva-web-prod.iam.gserviceaccount.com'));createPrivateKey(account.private_key);
 const billing=process.env.PRODUCTION_BILLING_ENABLED==='true';
 const checkout=process.env.PRODUCTION_BILLING_CHECKOUT_ENABLED==='true';
+const pix=process.env.PRODUCTION_BILLING_PIX_ENABLED==='true';
+const publicRollout=process.env.PRODUCTION_BILLING_PUBLIC_ROLLOUT_ENABLED==='true';
 assert.ok(!checkout||billing,'Billing must be configured before canary checkout');
+assert.ok(!pix||billing,'PIX cannot be live without verified billing');
+assert.ok(!publicRollout||checkout,'Public checkout requires an explicit separate checkout release');
 if(billing){
  const key=process.env.ASAAS_API_KEY??'';
  const webhook=process.env.ASAAS_WEBHOOK_TOKEN??'';
@@ -31,7 +35,8 @@ if(billing){
  assert.match(key,/^\$aact_prod_[A-Za-z0-9_+=\/-]{16,}$/);
  assert.match(webhook,/^\S{32,255}$/);
  assert.notEqual(webhook,key);
- assert.ok(!checkout||configuredUsers.length>0,'Production checkout needs a tester');
+ assert.ok(!checkout||configuredUsers.length>0||publicRollout,'Production checkout needs a tester or an explicitly approved public rollout');
+ assert.ok(!pix||configuredUsers.length>0||publicRollout,'Production PIX requires a canary or explicit public rollout');
  for(const uid of configuredUsers)assert.match(uid,/^[A-Za-z0-9_-]{1,128}$/);
  const provider=await fetch('https://api.asaas.com/v3/myAccount/accountNumber',{
   headers:{access_token:key,'User-Agent':'Roteiva/1.0'},redirect:'error',signal:AbortSignal.timeout(10000),
@@ -39,7 +44,8 @@ if(billing){
  await provider.body?.cancel();
  assert.equal(provider.status,200,'Asaas PROD read-only authentication failed');
  Object.assign(secrets,{ASAAS_API_KEY:key,ASAAS_WEBHOOK_TOKEN:webhook,BILLING_ENABLED:'true',
-  BILLING_CHECKOUT_ENABLED:String(checkout)});
+  BILLING_CHECKOUT_ENABLED:String(checkout),BILLING_PIX_ENABLED:String(pix),
+  BILLING_PUBLIC_ROLLOUT_ENABLED:String(publicRollout)});
  if(configuredUsers.length)secrets.BILLING_CHECKOUT_TEST_UIDS=configuredUsers.join(',');
  console.log('Asaas PROD read-only authentication passed. Bank details and credentials suppressed.');
 }

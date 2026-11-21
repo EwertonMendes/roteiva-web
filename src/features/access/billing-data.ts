@@ -29,6 +29,7 @@ export type BillingStatus = PaymentPage & {
   pixAvailable:boolean;
   canRenewWithPix:boolean;
   canStart:boolean;
+  courtesyUntil:string|null;
   notice:{code:string}|null;
   checkout:{intentId:string;planCode:PlanCode;paymentMethod:PaymentMethod;status:"ready"|"pending"|"closing"|"payment_pending"|"review";url:string|null;canCancel?:boolean}|null;
   subscription:Subscription|null;

@@ -11,6 +11,8 @@ export interface Env {
   BILLING_CHECKOUT_ENABLED?: string;
   /** A separate opt-in flag, independent of existing recurring card billing. */
   BILLING_PIX_ENABLED?: string;
+  /** Explicit PROD rollout fence. Cannot be enabled by a DEV flag. */
+  BILLING_PUBLIC_ROLLOUT_ENABLED?: string;
   BILLING_CHECKOUT_TEST_UID?: string;
   BILLING_CHECKOUT_TEST_UIDS?: string;
   ASAAS_API_KEY?: string;
