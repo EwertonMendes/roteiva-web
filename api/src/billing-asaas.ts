@@ -21,8 +21,10 @@ export function providerRef(value:unknown):string|null {
 }
 
 export function pixEnabled(env:Env,uid?:string):boolean{
+  // Staged rollout: only the existing Sandbox canary until separately approved
+  // for all DEV accounts. A global card checkout flag does not enable PIX.
   return env.ENVIRONMENT==='dev'&&asaasConfigured(env)&&env.BILLING_PIX_ENABLED==='true'&&
-    (env.BILLING_CHECKOUT_ENABLED==='true'||!!uid&&uid===env.BILLING_CHECKOUT_TEST_UID);
+    !!uid&&uid===env.BILLING_CHECKOUT_TEST_UID;
 }
 
 export function checkoutRouted(env:Env):boolean{
