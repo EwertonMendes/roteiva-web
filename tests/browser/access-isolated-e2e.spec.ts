@@ -134,6 +134,7 @@ test("billing requires consent and a callback alone never restores the workspace
     if(path==="/billing/plans")return route.fulfill({headers,json:{plans:[
       {code:"monthly",amountCents:3990,version:"test"},{code:"quarterly",amountCents:10990,version:"test"},
       {code:"yearly",amountCents:39990,version:"test"}]}});
+    if(path==="/billing/return/verify")return route.fulfill({status:202,headers,json:{status:"checking"}});
     if(path==="/billing/checkout"){
       requested++;
       expect(route.request().postDataJSON()).toEqual({planCode:"quarterly",catalogVersion:"test",acceptedImmediateCharge:true});
@@ -143,10 +144,14 @@ test("billing requires consent and a callback alone never restores the workspace
       checkout:requested?{planCode:"quarterly",status:"pending",url:null}:null,payments:[]}});
   });
   await page.goto(cloud+"/?billing=return");
-  await expect(page.getByText("Estamos confirmando seu pagamento.")).toBeVisible();
+  await expect(page.getByText(/Estamos conferindo o pagamento com segurança/)).toBeVisible();
   await expect(page.locator(".app-shell")).toHaveCount(0);
-  await expect(page.getByText(/109,90/)).toBeVisible();
+  // A callback is not authorization to pay again or to enter the workspace.
+  await expect(page.getByRole("button",{name:"Escolher trimestral"})).toHaveCount(0);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  // Start a separate checkout in a normal session after leaving the callback.
+  await page.goto(cloud+"/");
+  await expect(page.getByText(/109,90/)).toBeVisible();
   await page.getByRole("button",{name:"Escolher trimestral"}).click();
   const submit=page.getByRole("button",{name:"Continuar para o Asaas Sandbox"});
   await expect(submit).toBeDisabled();

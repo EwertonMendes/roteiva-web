@@ -2,6 +2,8 @@
 
 ## Assinatura e acesso à conta no DEV
 
+- No retorno do checkout, mostrar confirmação em andamento com liberação automática assim que o servidor atualizar a projeção. O estado de espera tem duração limitada, com botão de nova verificação e suporte; em atraso, orientar a não pagar novamente. Cancelamento e expiração têm mensagens próprias e não apagam o histórico. O Roteiva não interpreta `billing=return` como pagamento concluído.
+
 - Configurações usa um cartão para identificar plano ou acesso atual, situação e valor contratado. Datas e meio de pagamento ficam juntos, e a recorrência tem ação própria com confirmação. O catálogo fica sob **Ver planos** quando a conta pode consultá-lo em Configurações.
 - Uma recorrência elegível mostra **Fazer upgrade** junto ao plano vigente. Apenas ciclos superiores são selecionáveis. Ao abrir as opções, o foco vai para o título da comparação. Os cards se ajustam às opções disponíveis e calculam economia sobre o valor contratado do plano atual. A confirmação mostra valor, data e uso do cartão cadastrado. Em telas de até 400 px, as ações são empilhadas. O ciclo atual fica visível até a confirmação da nova cobrança e o upgrade agendado informa o próximo valor.
 - A tela de acesso expirado mostra mensal, trimestral e anual quando o Worker autoriza o checkout. Os cards mostram o total cobrado por ciclo e calculam a economia comparando o mesmo período com o preço mensal. A confirmação da cobrança usa o modal compartilhado. Na suspensão, a ação principal é o suporte.

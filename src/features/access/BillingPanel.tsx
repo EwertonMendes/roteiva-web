@@ -18,9 +18,8 @@ const subscriptionStates:Record<string,{label:string;tone:string}> = {
   expired:{label:"Expirada",tone:"neutral"},
 };
 const callbacks:Record<string,string> = {
-  return:"Estamos confirmando seu pagamento.",
-  cancelled:"O checkout foi interrompido.",
-  expired:"O prazo do checkout terminou.",
+  cancelled:"O checkout foi interrompido. Se você chegou a pagar, sua confirmação continuará sendo processada. Consulte o histórico antes de tentar novamente.",
+  expired:"O prazo do checkout terminou. Se houve cobrança, aguarde a confirmação antes de iniciar outra contratação.",
 };
 
 export function BillingPanel({access,locked=false}:{access:AccessInfo;locked?:boolean}) {
@@ -42,17 +41,20 @@ function BillingAccount({uid,access,locked}:{uid:string;access:AccessInfo;locked
   const [catalogError,setCatalogError] = useState(false);
   const [message,setMessage] = useState("");
   const [checkoutPending,setCheckoutPending] = useState(false);
+  const [returnState,setReturnState] = useState<"idle"|"checking"|"delayed"|"unavailable">("idle");
   const refreshKey = access.accessUntil.getTime();
   const callback = locked ? new URLSearchParams(window.location.search).get("billing") : null;
+  const returnIntent = locked ? new URLSearchParams(window.location.search).get("intent") : null;
   const status = result?.status;
   const subscription = status?.subscription;
   const checkoutUrl = access.suspended ? undefined : sandboxLink(status?.checkout?.url,"checkout");
-  const canStart = locked && !!status?.canStart && !access.suspended;
+  const canStart = locked && callback!=="return" && !!status?.canStart && !access.suspended;
   const upgradeOffer = !locked&&!access.suspended ? subscription?.upgradeOffer : null;
   const upgrade = subscription?.upgrade;
   const readCatalog = !access.suspended && (canStart || showPlans);
 
   useEffect(() => {
+    if(callback==="return")return; // The bounded callback recovery owns status reads.
     const controller = new AbortController();
     setError("");
     void billingRequest<BillingStatus>("/billing/status",uid,undefined,controller.signal).then(data=>{
@@ -61,7 +63,48 @@ function BillingAccount({uid,access,locked}:{uid:string;access:AccessInfo;locked
       if(!controller.signal.aborted) setError("Não foi possível consultar os dados da assinatura.");
     });
     return ()=>controller.abort();
-  },[uid,attempt,refreshKey,access.suspended]);
+  },[uid,attempt,refreshKey,access.suspended,callback]);
+
+  useEffect(() => {
+    if(callback!=="return"||!locked||access.suspended)return;
+    const controller=new AbortController();
+    let timer:ReturnType<typeof setTimeout>|null=null;
+    const pause=(ms:number)=>new Promise<void>(resolve=>{timer=setTimeout(resolve,ms);});
+    const run=async()=>{
+      setReturnState("checking");
+      setError("");
+      try {
+        // This asks the Worker to reconcile the existing checkout using Asaas.
+        // Neither the URL parameter nor this request may activate access.
+        const result=await billingRequest<{status:string}>("/billing/return/verify",uid,{intentId:returnIntent},controller.signal);
+        if(result.status==="not_found"||result.status==="closed"){
+          if(!controller.signal.aborted)setReturnState("unavailable");
+          return;
+        }
+      }catch{
+        // Keep reading the server's canonical billing status: the webhook may
+        // already be processing even if the verification nudge could not run.
+      }
+      // Only on returning from checkout; finite backoff, no ambient polling.
+      for(const delay of [0,1500,2500,4000,6000,8000,10000]){
+        if(delay)await pause(delay);
+        if(controller.signal.aborted)return;
+        try{
+          const current=await billingRequest<BillingStatus>("/billing/status",uid,undefined,controller.signal);
+          if(controller.signal.aborted)return;
+          setResult(previous=>({status:current,revision:(previous?.revision??0)+1}));
+          // AccessGate continues to enforce the Firestore server projection.
+          // The component unmounts automatically when that verified projection
+          // becomes active; never open the workspace based on this response.
+        }catch{
+          if(controller.signal.aborted)return;
+        }
+      }
+      if(!controller.signal.aborted)setReturnState("delayed");
+    };
+    void run();
+    return()=>{controller.abort();if(timer)clearTimeout(timer);};
+  },[uid,callback,returnIntent,locked,access.suspended,attempt]);
 
   useEffect(() => {
     if(!readCatalog) return;
@@ -119,6 +162,17 @@ function BillingAccount({uid,access,locked}:{uid:string;access:AccessInfo;locked
     {subscription&&<PlanSummary subscription={subscription} illustrated={!locked} access={access} locked={locked}
       grace={status?.notice?.code==="payment_grace"} onCancel={()=>setCanceling(true)}
       onUpgrade={upgradeOffer?()=>setShowPlans(value=>!value):undefined} showPlans={showPlans}/>}
+    {callback==="return"&&returnState==="checking"&&<p className="billing-notice" role="status">
+      Estamos conferindo o pagamento com segurança. Assim que o Asaas confirmar, seu acesso será liberado automaticamente.
+    </p>}
+    {callback==="return"&&returnState==="delayed"&&<div className="billing-notice" role="status">
+      <strong>A confirmação está demorando mais que o esperado.</strong>
+      <p>Se o pagamento foi aprovado, não pague novamente. Você pode verificar outra vez ou procurar o <a href="/suporte.html">suporte</a>. Seus dados estão preservados.</p>
+      <AppButton variant="secondary" onClick={refresh}><RefreshCw size={16} aria-hidden="true"/> Verificar novamente</AppButton>
+    </div>}
+    {callback==="return"&&returnState==="unavailable"&&<p className="billing-notice" role="alert">
+      Não localizamos uma contratação em andamento para esta conta. Confira se você voltou com a mesma conta usada no pagamento. Se houve cobrança, fale com o <a href="/suporte.html">suporte</a> antes de tentar de novo.
+    </p>}
     {callback&&callbacks[callback]&&<p className="billing-notice" role="status">{callbacks[callback]}</p>}
     {message&&<p className="billing-notice" role="status">{message}</p>}
     {upgrade&&!access.suspended&&<div className="billing-notice" role="status">
@@ -129,7 +183,7 @@ function BillingAccount({uid,access,locked}:{uid:string;access:AccessInfo;locked
     {checkoutPending&&!status?.checkout&&!access.suspended&&<p className="billing-notice" role="status">Estamos verificando a criação do checkout.</p>}
     {!status&&!error&&<p className="billing-notice" role="status">Consultando assinatura…</p>}
     {error&&<p className="billing-inline-error" role="alert">{error}</p>}
-    {status?.checkout&&!access.suspended&&<div className="billing-notice billing-next-action">
+    {status?.checkout&&!access.suspended&&callback!=="return"&&<div className="billing-notice billing-next-action">
       <div><strong>Checkout {planNames[status.checkout.planCode].toLowerCase()}</strong>
         <p role={checkoutUrl?undefined:"status"}>{checkoutUrl?"Conclua o pagamento no Asaas.":"Estamos verificando a tentativa de contratação."}</p>
       </div>
@@ -147,7 +201,7 @@ function BillingAccount({uid,access,locked}:{uid:string;access:AccessInfo;locked
     {readCatalog&&!catalog.length&&!catalogError&&<p className="billing-notice" role="status">Consultando os planos…</p>}
     {catalogError&&readCatalog&&<p className="billing-inline-error" role="alert">Não foi possível carregar os planos.</p>}
     {(error||(catalogError&&readCatalog)||subscription?.cancellation==="pending"||(upgrade?.status==="pending"&&!access.suspended)||
-      (!access.suspended&&(callback==="return"||status?.checkout?.status==="pending"||(checkoutPending&&!status?.checkout))))&&
+      (!access.suspended&&(callback!=="return"&&status?.checkout?.status==="pending"||(checkoutPending&&!status?.checkout))))&&
       <AppButton variant="secondary" className="billing-refresh" onClick={refresh}><RefreshCw size={16} aria-hidden="true"/> Atualizar assinatura</AppButton>}
     {status&&(!locked||status.payments.length>0)&&<BillingHistory key={result?.revision} firstPage={status} uid={uid}/>}
     {selected&&canStart&&<CheckoutConsent plan={selected} onClose={()=>setSelected(null)} onConfirm={()=>confirmCheckout(selected)}/>}

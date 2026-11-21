@@ -6,10 +6,10 @@ import {Crown,Gift,RefreshCw} from "lucide-react";
 import {firebaseServices} from "../../lib/firebase";
 import {useAuth} from "../auth/AuthProvider";
 import {AuthLayout} from "../auth/AuthLayout";
-import {billingInThisBuild} from "./billing-data";
+import {billingInThisBuild,billingRequest} from "./billing-data";
 import {RestrictedAccessPage} from "./RestrictedAccessPage";
 import "./access.css";
-import {entryToken,entryRequest,entryErrorMessage} from '../../data/bootstrap-request.ts';
+import {entryToken,entryRequest,entryErrorMessage,EntryError} from '../../data/bootstrap-request.ts';
 
 const BASE=API_BASE_URL;
 const AccessContext=createContext<AccessInfo|null>(null);
@@ -36,6 +36,7 @@ export function AccessGate({children}:{children:ReactNode}){
     const url=new URL(window.location.href);
     if(url.searchParams.has("billing")){
       url.searchParams.delete("billing");
+      url.searchParams.delete("intent");
       window.history.replaceState(window.history.state,"",url);
     }
   },[usable]);
@@ -48,14 +49,47 @@ export function AccessGate({children}:{children:ReactNode}){
   useEffect(()=>{
     if(!user)return;
     let active=true,unsubscribe=()=>{};
+    const controller=new AbortController();
+    const params=new URLSearchParams(window.location.search);
+    const returning=billingInThisBuild&&params.get("billing")==="return";
+    const intentId=returning?params.get("intent"):null;
+    const pause=(ms:number)=>new Promise<void>(resolve=>{
+      const timer=setTimeout(resolve,ms);
+      controller.signal.addEventListener("abort",()=>{clearTimeout(timer);resolve();},{once:true});
+    });
     setAccess(null);setError("");
-    void ensureUserAccess().then(()=>{
-      if(!active)return;
-      unsubscribe=watchAccess(firebaseServices().db,user.uid,value=>{
-        if(active){setAccess(value);setError("");setNow(Date.now());}
-      },reason=>{if(active)setError(reason.message);});
-    }).catch(reason=>{if(active)setError(entryErrorMessage(reason)??'Não foi possível confirmar seu acesso. Tente novamente. Referência: access-ensure/session');});
-    return()=>{active=false;unsubscribe();};
+    const run=async()=>{
+      // A projection update can temporarily fence /access/ensure. The return
+      // verification is owner-authenticated and may safely run before ensure.
+      if(returning){
+        try{await billingRequest("/billing/return/verify",user.uid,{intentId},controller.signal);}
+        catch{/* Webhook and scheduled reconciliation remain authoritative fallbacks. */}
+      }
+      try{
+        for(const delay of returning?[0,750,1400,2500,4000,6000]:[0]){
+          if(delay)await pause(delay);
+          if(!active)return;
+          try{
+            await ensureUserAccess();
+            if(!active)return;
+            unsubscribe=watchAccess(firebaseServices().db,user.uid,value=>{
+              if(active){setAccess(value);setError("");setNow(Date.now());}
+            },reason=>{if(active)setError(reason.message);});
+            return;
+          }catch(reason){
+            // Retry only this known billing fence, and only after a checkout
+            // return. All other failures retain the normal fail-closed path.
+            if(!returning||!(reason instanceof EntryError)||reason.serviceCode!=="access_sync_pending")throw reason;
+          }
+        }
+        throw new Error("O pagamento ainda está sendo conciliado. Não pague novamente. Tente verificar seu acesso em instantes.");
+      }catch(reason){
+        if(active)setError(entryErrorMessage(reason)??(reason instanceof Error?reason.message:
+          "Não foi possível confirmar seu acesso. Tente novamente. Referência: access-ensure/session"));
+      }
+    };
+    void run();
+    return()=>{active=false;controller.abort();unsubscribe();};
   },[user?.uid,attempt]);
   if(error)return <AuthLayout section="ACESSO" title="Não conseguimos validar sua assinatura." description="Por segurança, seu espaço fica protegido até a confirmação. Nenhum dado será apagado.">
     <p role="alert" className="auth-error">{error}</p>
@@ -64,7 +98,7 @@ export function AccessGate({children}:{children:ReactNode}){
       <AppButton className="auth-link" disabled={busy} onClick={()=>void logout()}>Trocar conta</AppButton>
     </div>
   </AuthLayout>;
-  if(!access)return <main className="studio-loading" role="status">Confirmando seu acesso ao Roteiva…</main>;
+  if(!access)return <main className="studio-loading" role="status">{billingInThisBuild&&new URLSearchParams(window.location.search).get("billing")==="return"?"Conferindo seu pagamento e liberando o acesso…":"Confirmando seu acesso ao Roteiva…"}</main>;
   if(!usable)return <RestrictedAccessPage access={access} busy={busy} onRetry={()=>setAttempt(n=>n+1)} onLogout={()=>void logout()}/>;
   return <AccessContext.Provider value={access}>{children}</AccessContext.Provider>;
 }

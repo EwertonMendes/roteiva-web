@@ -1,4 +1,6 @@
-# Arquitetura do Roteiva — MVP SaaS
+# Arquitetura
+> **Retorno do checkout Asaas (DEV):** a URL `?billing=return&intent=<uuid>` serve somente à navegação. O frontend faz uma consulta de reconciliação autenticada, limitada à intenção do usuário, e acompanha por tempo finito o estado canônico do servidor. O Worker insere um único evento determinístico na inbox D1, processado pelo mesmo conciliador com lease/consulta autoritativa ao Asaas; webhooks também iniciam o conciliador após a persistência. Nenhum callback ou status de frontend concede acesso: a transição do workspace exige a projeção autorizada do Firestore. Cancelamento, expiração, indisponibilidade e atraso nunca são declarados cobrança paga ou fracassada sem confirmação.
+ do Roteiva — MVP SaaS
 
 ## Decisão — upgrade na mesma recorrência (DEV Sandbox)
 

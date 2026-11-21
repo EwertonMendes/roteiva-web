@@ -8,6 +8,8 @@
 
 ## Integração Sandbox DEV — 20/11/2026
 
+**Correção de UX da volta do checkout (21/11, DEV):** o retorno inclui ID da intenção, agenda uma reconciliação segura na inbox e faz leituras finitas de status. O webhook pode disparar conciliação antecipada pelo Worker. O workspace só reabre quando o Firestore confirmar o direito derivado de pagamento validado pelo Asaas. Após limite de espera, há instrução para não repetir a cobrança e opção de nova verificação/suporte. A especificação de checkout não declara parâmetro `autoRedirect`: não enviar flag presumida. A homologação real com Hytools e limpeza financeira para repetir o teste exigem garantir cancelamento do contrato e reversão/comprovação dos pagamentos Sandbox; jamais zerar D1 mantendo recorrência ativa.
+
 **Configuração verificada no console.** O proprietário acessou a conta independente [Asaas Sandbox](https://sandbox.asaas.com/) e provisionou os segredos `ASAAS_API_KEY` e `ASAAS_WEBHOOK_TOKEN` no Worker `roteiva-api-dev`. O webhook Roteiva DEV v3, com envio não sequencial, aponta para `https://roteiva-api-dev.roteiva-dev.workers.dev/billing/webhooks/asaas`; a fila foi salva pausada.
 
 **Implementação em validação.** A migração aditiva `0038_billing_reconciliation.sql` inclui coordenação de checkout, contrato, cancelamento, inbox e publicação de acesso. O Worker implementa checkout hospedado em cartão, vínculo por intenção, conciliação autoritativa, ledger, cancelamento durável e projeção Firestore com recuperação. Usuários DEV expirados podem consultar assinatura, contratar após o fim do acesso vigente e solicitar exclusão com reautenticação. O layout reutiliza Configurações e AccessGate. Consulte [procedimento e teste Sandbox](docs/DEVELOPMENT.md#integração-asaas-sandbox-no-dev).

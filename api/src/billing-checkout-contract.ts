@@ -43,9 +43,11 @@ export function buildRecurringCardCheckout(env:CheckoutEnv,input:CheckoutInput){
     externalReference:input.intentId,
     minutesToExpire:30,
     callback:{
-      cancelUrl:origin+'/?billing=cancelled',
-      expiredUrl:origin+'/?billing=expired',
-      successUrl:origin+'/?billing=return'
+      // The opaque intent ID routes the browser to its own existing checkout.
+      // Neither the URL nor a success callback is evidence of a paid charge.
+      cancelUrl:origin+'/?billing=cancelled&intent='+input.intentId,
+      expiredUrl:origin+'/?billing=expired&intent='+input.intentId,
+      successUrl:origin+'/?billing=return&intent='+input.intentId
     },
     items:[{
       name:'Roteiva '+labels[plan.code],

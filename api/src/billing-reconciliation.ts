@@ -185,7 +185,7 @@ async function reconcileCheckout(env:Env,event:InboxEvent,ref:string):Promise<'p
   }
   const intent=await intentByCheckout(env,ref);
   if(!intent)throw new ApiError(503,'billing_checkout_unlinked');
-  if(event.event_id.startsWith('recovery:')&&!['pending','ready'].includes(intent.status))return 'ignored';
+  if((event.event_id.startsWith('recovery:')||event.event_id.startsWith('return:'))&&!['pending','ready'].includes(intent.status))return 'ignored';
   if(event.event_type==='CHECKOUT_CANCELED'||event.event_type==='CHECKOUT_EXPIRED'){
     const status=event.event_type==='CHECKOUT_CANCELED'?'canceled':'expired';
     await env.DB.prepare("UPDATE billing_checkout_intents SET status=?,updated_at=? WHERE id=? AND status IN ('pending','ready')")
@@ -196,7 +196,7 @@ async function reconcileCheckout(env:Env,event:InboxEvent,ref:string):Promise<'p
       await env.DB.prepare("UPDATE billing_checkout_intents SET status='ready',checkout_path=?,updated_at=? WHERE id=? AND status='pending'")
         .bind(url.pathname+url.search,now,intent.id).run();
     }
-  }else if(event.event_type==='CHECKOUT_PAID'||event.event_id.startsWith('recovery:')){
+  }else if(event.event_type==='CHECKOUT_PAID'||(event.event_id.startsWith('recovery:')||event.event_id.startsWith('return:'))){
     const result=await asaasRequest(env,'GET',`/payments?checkoutSession=${ref}&limit=2`);
     if(!Array.isArray(result.data)||result.hasMore===true||result.data.length>1)return 'review';
     const payment=result.data[0] as Record<string,unknown>|undefined;
@@ -247,7 +247,7 @@ async function processInbox(env:Env):Promise<boolean>{
   if(!event)return false;
   let status:'processed'|'ignored'|'pending'|'review'='review',code:string|null=null;
   try{
-    const action=event.event_id.startsWith('recovery:')?'reconcile_checkout':planBillingEvent(event.event_type).action;
+    const action=(event.event_id.startsWith('recovery:')||event.event_id.startsWith('return:'))?'reconcile_checkout':planBillingEvent(event.event_type).action;
     const ref=providerRef(event.resource_ref);
     if(ref&&action==='reconcile_payment'){
       try{
