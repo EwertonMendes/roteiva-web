@@ -104,6 +104,10 @@ export async function createCheckout(request:Request,env:Env,uid:string,now=Date
     if(error instanceof AsaasError&&error.upstreamStatus===400){
       await env.DB.prepare("UPDATE billing_checkout_intents SET status='failed',updated_at=? WHERE id=? AND provider_checkout_ref IS NULL AND status='pending'")
         .bind(Date.now(),id).run();
+      // An HTTP 400 was a deterministic provider rejection, not a network
+      // timeout. The intent was never accepted. Do not mislead the user into
+      // believing an earlier payment might exist.
+      if(method==='PIX')throw new ApiError(422,'billing_pix_checkout_rejected');
       throw error;
     }
     // The POST may have succeeded. The webhook can bind it later. Never repost.
