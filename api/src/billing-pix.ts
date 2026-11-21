@@ -67,6 +67,16 @@ export async function reconcilePixPayment(env:Env,payment:Record<string,unknown>
     'SELECT 1 FROM billing_contracts WHERE owner_uid=? AND removed_at IS NULL LIMIT 1'
   ).bind(intent.owner_uid).first();
   if(activeContract)return 'review';
+  const priorPix=await env.DB.prepare(
+    "SELECT 1 FROM access_subscriptions WHERE owner_uid=? AND status IN ('active','past_due','canceled') AND paid_until>? AND id!=? LIMIT 1"
+  ).bind(intent.owner_uid,now,intent.id).first();
+  // Renewing manual access is allowed. Card recurrences are not.
+  if(priorPix){
+    const recurring=await env.DB.prepare(
+      'SELECT 1 FROM billing_contracts WHERE owner_uid=? LIMIT 1'
+    ).bind(intent.owner_uid).first();
+    if(recurring)return 'review';
+  }
   const last=await env.DB.prepare(
     "SELECT MAX(paid_until) AS until FROM access_subscriptions WHERE owner_uid=? AND status IN ('active','past_due','canceled')"
   ).bind(intent.owner_uid).first<{until:number|null}>();
