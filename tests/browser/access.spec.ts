@@ -550,9 +550,9 @@ test('active trial shows purchase options, keeps courtesy visible and fits compa
   await dialog.getByRole('button',{name:'Voltar'}).click();
   await billing.getByRole('button',{name:'Escolher teste (temporário)'}).click();
   await expect(dialog.locator('.billing-price strong')).toHaveText('R$ 5,00');
-  await expect(dialog.getByText(/Aceito a cobrança de R\$ 5,00/)).toBeVisible();
+  await expect(dialog.getByText(/Aceito a cobrança de R\$\s*5,00/)).toBeVisible();
   await dialog.getByRole('radio',{name:/Pix/}).check();
-  await expect(dialog.getByText(/Aceito pagar R\$ 5,00 via Pix/)).toBeVisible();
+  await expect(dialog.getByText(/Aceito pagar R\$\s*5,00 via Pix/)).toBeVisible();
   await dialog.getByRole('button',{name:'Voltar'}).click();
   expect(checkouts).toBe(0);
 });
